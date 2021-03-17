@@ -160,6 +160,27 @@ ioctl_plugout_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 	return plugout_vusb(vhci, port);
 }
 
+static NTSTATUS
+ioctl_shutdown_vusb(WDFQUEUE queue, WDFREQUEST req)
+{
+	pctx_vhci_t	vhci;
+	pctx_vusb_t	vusb;
+	NTSTATUS	status;
+
+	vusb = get_vusb_by_req(req);
+	if (vusb == NULL) {
+		/* already detached */
+		return STATUS_SUCCESS;
+	}
+
+	vhci = *TO_PVHCI(queue);
+
+	status = plugout_vusb(vhci, (CHAR)vusb->port);
+	put_vusb(vusb);
+
+	return status;
+}
+
 VOID
 io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 	_In_ size_t outlen, _In_ size_t inlen, _In_ ULONG ioctl_code)
@@ -182,6 +203,9 @@ io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		status = ioctl_plugout_vusb(queue, req, inlen);
+		break;
+	case IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE:
+		status = ioctl_shutdown_vusb(queue, req);
 		break;
 	default:
 		if (UdecxWdfDeviceTryHandleUserIoctl((*TO_PVHCI(queue))->hdev, req)) {

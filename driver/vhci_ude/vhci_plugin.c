@@ -94,6 +94,7 @@ setup_vusb(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 	}
 
 	vusb->devid = pluginfo->devid;
+	vusb->port = pluginfo->port;
 
 	vusb->ude_usbdev = ude_usbdev;
 	vusb->pending_req_read = NULL;
@@ -101,6 +102,7 @@ setup_vusb(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 	vusb->len_sent_partial = 0;
 	vusb->seq_num = 0;
 	vusb->invalid = FALSE;
+	vusb->refcnt = 0;
 
 	if (vusb->iSerial > 0 && pluginfo->wserial[0] != L'\0')
 		vusb->wserial = libdrv_strdupW(pluginfo->wserial);
@@ -341,17 +343,9 @@ plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 
 	WdfSpinLockAcquire(vhci->spin_lock);
 	if (vusb != NULL) {
-		WDFFILEOBJECT	fo = WdfRequestGetFileObject(req);
-		if (fo != NULL) {
-			pctx_safe_vusb_t	svusb = TO_SAFE_VUSB(fo);
+		pctx_safe_vusb_t	svusb = TO_SAFE_VUSB_FROM_REQ(req);
 
-			svusb->vhci = vhci;
-			svusb->port = pluginfo->port;
-			svusb->vusb = vusb;
-		}
-		else {
-			TRE(PLUGIN, "empty fileobject. setup failed");
-		}
+		svusb->port = pluginfo->port;
 		status = STATUS_SUCCESS;
 	}
 	vhci->vusbs[pluginfo->port] = vusb;

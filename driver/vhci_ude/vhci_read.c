@@ -42,19 +42,19 @@ get_partial_urbr(pctx_vusb_t vusb)
 static VOID
 req_read_cancelled(WDFREQUEST req_read)
 {
-	pctx_safe_vusb_t	svusb;
 	pctx_vusb_t	vusb;
 
 	TRD(READ, "a pending read req cancelled");
 
-	svusb = TO_SAFE_VUSB(WdfRequestGetFileObject(req_read));
-	vusb = svusb->vusb;
-
-	WdfSpinLockAcquire(vusb->spin_lock);
-	if (vusb->pending_req_read == req_read) {
-		vusb->pending_req_read = NULL;
+	vusb = get_vusb_by_req(req_read);
+	if (vusb != NULL) {
+		WdfSpinLockAcquire(vusb->spin_lock);
+		if (vusb->pending_req_read == req_read) {
+			vusb->pending_req_read = NULL;
+		}
+		WdfSpinLockRelease(vusb->spin_lock);
+		put_vusb(vusb);
 	}
-	WdfSpinLockRelease(vusb->spin_lock);
 
 	WdfRequestComplete(req_read, STATUS_CANCELLED);
 }
@@ -132,7 +132,6 @@ read_vusb(pctx_vusb_t vusb, WDFREQUEST req)
 VOID
 io_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len)
 {
-	pctx_safe_vusb_t	svusb;
 	pctx_vusb_t	vusb;
 	NTSTATUS	status;
 
@@ -140,15 +139,15 @@ io_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len)
 
 	TRD(READ, "Enter: len: %u", (ULONG)len);
 
-	svusb = TO_SAFE_VUSB(WdfRequestGetFileObject(req));
-	vusb = svusb->vusb;
-
-	if (vusb->invalid) {
-		TRD(READ, "vusb disconnected: port: %u", vusb->port);
+	vusb = get_vusb_by_req(req);
+	if (vusb == NULL) {
+		TRD(READ, "vusb disconnected: port: %u", TO_SAFE_VUSB_FROM_REQ(req)->port);
 		status = STATUS_DEVICE_NOT_CONNECTED;
 	}
-	else
+	else {
 		status = read_vusb(vusb, req);
+		put_vusb(vusb);
+	}
 
 	if (status != STATUS_PENDING) {
 		WdfRequestComplete(req, status);

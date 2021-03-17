@@ -47,6 +47,7 @@
     <ClCompile Include="vhci_queue_ep.c" />
     <ClCompile Include="vhci_urbr_store_status.c" />
     <ClCompile Include="vhci_urbr_store_vendor.c" />
+    <ClCompile Include="vhci_vusb.c" />
     <ClCompile Include="vhci_write.c" />
   </ItemGroup>
   <ItemGroup>
