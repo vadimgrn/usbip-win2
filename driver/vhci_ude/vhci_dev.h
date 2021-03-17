@@ -72,6 +72,7 @@ typedef struct _ctx_vusb
 } ctx_vusb_t, *pctx_vusb_t;
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(ctx_vusb_t, TO_VUSB)
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(pctx_vusb_t, TO_PVUSB)
 
 typedef struct _ctx_ep
 {
@@ -107,5 +108,6 @@ extern NTSTATUS plugout_vusb(pctx_vhci_t vhci, CHAR port);
 extern pctx_vusb_t get_vusb(pctx_vhci_t vhci, ULONG port);
 extern pctx_vusb_t get_vusb_by_req(WDFREQUEST req);
 extern void put_vusb(pctx_vusb_t vusb);
+extern void put_vusb_passively(pctx_vusb_t vusb);
 
 EXTERN_C_END

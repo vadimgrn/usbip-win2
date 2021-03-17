@@ -53,7 +53,9 @@ req_read_cancelled(WDFREQUEST req_read)
 			vusb->pending_req_read = NULL;
 		}
 		WdfSpinLockRelease(vusb->spin_lock);
-		put_vusb(vusb);
+
+		/* put_vusb() at <= DISPATCH sometimes causes BSOD */
+		put_vusb_passively(vusb);
 	}
 
 	WdfRequestComplete(req_read, STATUS_CANCELLED);

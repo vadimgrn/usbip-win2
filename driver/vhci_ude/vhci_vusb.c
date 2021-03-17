@@ -46,10 +46,42 @@ put_vusb(pctx_vusb_t vusb)
 
 		status = UdecxUsbDevicePlugOutAndDelete(vusb->ude_usbdev);
 		if (NT_ERROR(status)) {
-			TRD(PLUGIN, "failed to plug out: %!STATUS!", status);
+			TRD(VUSB, "failed to plug out: %!STATUS!", status);
 		}
 	}
 	else {
 		WdfSpinLockRelease(vhci->spin_lock);
+	}
+}
+
+static VOID
+async_put_vusb(WDFWORKITEM workitem)
+{
+	pctx_vusb_t	vusb = *TO_PVUSB(workitem);
+
+	TRD(VUSB, "async put vusb");
+	put_vusb(vusb);
+	WdfObjectDelete(workitem);
+}
+
+void
+put_vusb_passively(pctx_vusb_t vusb)
+{
+	WDFWORKITEM	workitem;
+	WDF_WORKITEM_CONFIG	conf;
+	WDF_OBJECT_ATTRIBUTES	attrs;
+	NTSTATUS	status;
+
+	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, pctx_vusb_t);
+	attrs.ParentObject = vusb->ude_usbdev;
+	WDF_WORKITEM_CONFIG_INIT(&conf, async_put_vusb);
+
+	status = WdfWorkItemCreate(&conf, &attrs, &workitem);
+	if (NT_ERROR(status)) {
+		TRW(VUSB, "failed to create a workitem: %!STATUS!", status);
+	}
+	else {
+		*TO_PVUSB(workitem) = vusb;
+		WdfWorkItemEnqueue(workitem);
 	}
 }
