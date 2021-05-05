@@ -157,7 +157,7 @@ store_urbr_control_transfer_ex(WDFREQUEST req_read, purb_req_t urbr)
 	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans_ex->SetupPacket, 8);
 
 	nread = sizeof(struct usbip_header);
-	if (!in) {
+	if (!in && urb_ctltrans_ex->TransferBufferLength > 0) {
 		if (get_read_payload_length(req_read) >= urb_ctltrans_ex->TransferBufferLength) {
 			PVOID	buf = get_buf(urb_ctltrans_ex->TransferBuffer, urb_ctltrans_ex->TransferBufferMDL);
 			if (buf == NULL) {
