@@ -5,6 +5,9 @@
 
 EXTERN_C_START
 
+#define MAX_HUB_20PORTS		12
+#define MAX_HUB_30PORTS		4
+
 struct _ctx_vusb;
 
 typedef struct

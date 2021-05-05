@@ -269,11 +269,12 @@ get_device_speed(pvhci_pluginfo_t pluginfo)
 }
 
 static char
-get_free_port(pctx_vhci_t vhci)
+get_free_port(pctx_vhci_t vhci, BOOLEAN is_usb30)
 {
+	ULONG	port_start = is_usb30 ? MAX_HUB_20PORTS: 0;
 	ULONG	i;
 
-	for (i = 0; i != vhci->n_max_ports; i++) {
+	for (i = port_start; i != vhci->n_max_ports; i++) {
 		pctx_vusb_t	vusb = vhci->vusbs[i];
 		if (vusb == NULL)
 			return (CHAR)i;
@@ -316,7 +317,10 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 	vusb->is_simple_ep_alloc = (eptype == UdecxEndpointTypeSimple) ? TRUE : FALSE;
 
 	UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&opts);
-	opts.Usb20PortNumber = pluginfo->port + 1;
+	if (speed == UdecxUsbSuperSpeed)
+		opts.Usb30PortNumber = pluginfo->port + 1;
+	else
+		opts.Usb20PortNumber = pluginfo->port + 1;
 
 	if (!setup_vusb(ude_usbdev, pluginfo)) {
 		WdfObjectDelete(ude_usbdev);
@@ -336,6 +340,8 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 	return vusb;
 }
 
+#define IS_USB30_PLUGINFO(pluginfo)	((get_device_speed(pluginfo) == UdecxUsbSuperSpeed))
+
 NTSTATUS
 plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 {
@@ -349,7 +355,7 @@ plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 		return STATUS_END_OF_FILE;
 	}
 
-	pluginfo->port = get_free_port(vhci);
+	pluginfo->port = get_free_port(vhci, IS_USB30_PLUGINFO(pluginfo));
 	/* assign a temporary non-null value indicating on-going vusb allocation */
 	vhci->vusbs[pluginfo->port] = VUSB_CREATING;
 	WdfSpinLockRelease(vhci->spin_lock);
