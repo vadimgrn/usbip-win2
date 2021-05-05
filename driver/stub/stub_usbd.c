@@ -359,6 +359,30 @@ reset_pipe(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe)
 	return FALSE;
 }
 
+int
+set_feature(usbip_stub_dev_t *devstub, USHORT func, USHORT feature, USHORT index)
+{
+	URB	urb;
+	NTSTATUS	status;
+
+	urb.UrbHeader.Function = func;
+	urb.UrbHeader.Length = sizeof(struct _URB_CONTROL_FEATURE_REQUEST);
+	urb.UrbControlFeatureRequest.FeatureSelector = feature;
+	urb.UrbControlFeatureRequest.Index = index;
+	/* should be NULL. If not, usbd returns STATUS_INVALID_PARAMETER */
+	urb.UrbControlFeatureRequest.UrbLink = NULL;
+	status = call_usbd(devstub, &urb);
+	if (NT_SUCCESS(status))
+		return 0;
+	/*
+	 * TODO: Only applied to this routine beause it's unclear that the status is
+	 * unsuccessful when a device is stalled.
+	 */
+	if (status == STATUS_UNSUCCESSFUL && urb.UrbHeader.Status == USBD_STATUS_STALL_PID)
+		return to_usbip_status(urb.UrbHeader.Status);
+	return -1;
+}
+
 BOOLEAN
 submit_class_vendor_req(usbip_stub_dev_t *devstub, BOOLEAN is_in, USHORT cmd, UCHAR reservedBits, UCHAR request, USHORT value, USHORT index, PVOID data, PULONG plen)
 {
