@@ -268,6 +268,20 @@ get_device_speed(pvhci_pluginfo_t pluginfo)
 	}
 }
 
+static char
+get_free_port(pctx_vhci_t vhci)
+{
+	ULONG	i;
+
+	for (i = 0; i != vhci->n_max_ports; i++) {
+		pctx_vusb_t	vusb = vhci->vusbs[i];
+		if (vusb == NULL)
+			return (CHAR)i;
+	}
+	/* Never happen */
+	return (CHAR)-1;
+}
+
 static pctx_vusb_t
 vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 {
@@ -330,11 +344,12 @@ plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 
 	WdfSpinLockAcquire(vhci->spin_lock);
 
-	if (vhci->vusbs[pluginfo->port] != NULL) {
+	if (vhci->n_used_ports == vhci->n_max_ports) {
 		WdfSpinLockRelease(vhci->spin_lock);
-		return STATUS_OBJECT_NAME_COLLISION;
+		return STATUS_END_OF_FILE;
 	}
 
+	pluginfo->port = get_free_port(vhci);
 	/* assign a temporary non-null value indicating on-going vusb allocation */
 	vhci->vusbs[pluginfo->port] = VUSB_CREATING;
 	WdfSpinLockRelease(vhci->spin_lock);
@@ -349,6 +364,7 @@ plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 		status = STATUS_SUCCESS;
 	}
 	vhci->vusbs[pluginfo->port] = vusb;
+	vhci->n_used_ports++;
 	WdfSpinLockRelease(vhci->spin_lock);
 
 	if ((vusb != NULL) && (vusb->is_simple_ep_alloc)) {

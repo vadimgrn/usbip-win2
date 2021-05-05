@@ -9,7 +9,7 @@
 #include "usb_util.h"
 #include "usbip_proto.h"
 
-extern BOOLEAN vhub_is_empty_port(pvhub_dev_t vhub, ULONG port);
+extern CHAR vhub_get_empty_port(pvhub_dev_t vhub);
 extern void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 
 extern void vhub_mark_unplugged_all_vpdos(pvhub_dev_t vhub);
@@ -119,14 +119,11 @@ vhci_plugin_vpdo(pvhci_dev_t vhci, pvhci_pluginfo_t pluginfo, ULONG inlen, PFILE
 		DBGE(DBG_IOCTL, "invalid pluginfo format: %lld != %lld", inlen, sizeof(vhci_pluginfo_t) + *pdscr_fullsize - 9);
 		return STATUS_INVALID_PARAMETER;
 	}
+	pluginfo->port = vhub_get_empty_port(VHUB_FROM_VHCI(vhci));
+	if (pluginfo->port < 0)
+		return STATUS_END_OF_FILE;
 
 	DBGI(DBG_VPDO, "Plugin vpdo: port: %hhd\n", pluginfo->port);
-
-	if (pluginfo->port < 0)
-		return STATUS_INVALID_PARAMETER;
-
-	if (!vhub_is_empty_port(VHUB_FROM_VHCI(vhci), pluginfo->port))
-		return STATUS_INVALID_PARAMETER;
 
 	if ((devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO)) == NULL)
 		return STATUS_UNSUCCESSFUL;

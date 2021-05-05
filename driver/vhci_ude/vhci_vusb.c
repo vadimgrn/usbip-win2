@@ -42,6 +42,7 @@ put_vusb(pctx_vusb_t vusb)
 		NTSTATUS	status;
 
 		vhci->vusbs[vusb->port] = NULL;
+		vhci->n_used_ports--;
 		WdfSpinLockRelease(vhci->spin_lock);
 
 		status = UdecxUsbDevicePlugOutAndDelete(vusb->ude_usbdev);

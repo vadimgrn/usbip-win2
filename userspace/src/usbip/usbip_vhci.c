@@ -149,9 +149,12 @@ usbip_vhci_attach_device(HANDLE hdev, pvhci_pluginfo_t pluginfo)
 	unsigned long	unused;
 
 	if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE,
-		pluginfo, pluginfo->size, NULL, 0, &unused, NULL)) {
+		pluginfo, pluginfo->size, pluginfo, sizeof(vhci_pluginfo_t), &unused, NULL)) {
+		DWORD	err = GetLastError();
+		if (err == ERROR_HANDLE_EOF)
+			return ERR_PORTFULL;
 		dbg("usbip_vhci_attach_device: DeviceIoControl failed: err: 0x%lx", GetLastError());
-		return -1;
+		return ERR_GENERAL;
 	}
 
 	return 0;

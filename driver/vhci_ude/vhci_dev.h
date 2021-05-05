@@ -10,7 +10,7 @@ struct _ctx_vusb;
 typedef struct
 {
 	WDFDEVICE	hdev;
-	ULONG		n_max_ports;
+	ULONG		n_max_ports, n_used_ports;
 	WDFQUEUE	queue;
 	struct _ctx_vusb	**vusbs;
 	WDFSPINLOCK	spin_lock;

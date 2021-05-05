@@ -105,7 +105,7 @@ ioctl_get_imported_devices(WDFQUEUE queue, WDFREQUEST req, size_t outlen)
 }
 
 static NTSTATUS
-ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
+ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen, size_t outlen)
 {
 	pctx_vhci_t	vhci;
 	pvhci_pluginfo_t	pluginfo;
@@ -115,6 +115,10 @@ ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 
 	if (inlen < sizeof(vhci_pluginfo_t)) {
 		TRE(IOCTL, "too small input length: %lld < %lld", inlen, sizeof(vhci_pluginfo_t));
+		return STATUS_INVALID_PARAMETER;
+	}
+	if (outlen < sizeof(vhci_pluginfo_t)) {
+		TRE(IOCTL, "too small output length: %lld < %lld", outlen, sizeof(vhci_pluginfo_t));
 		return STATUS_INVALID_PARAMETER;
 	}
 	status = WdfRequestRetrieveInputBuffer(req, sizeof(vhci_pluginfo_t), &pluginfo, &len);
@@ -128,8 +132,8 @@ ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 		return STATUS_INVALID_PARAMETER;
 	}
 	vhci = *TO_PVHCI(queue);
-	if (pluginfo->port < 0 || (ULONG)pluginfo->port >= vhci->n_max_ports)
-		return STATUS_INVALID_PARAMETER;
+
+	WdfRequestSetInformation(req, sizeof(vhci_pluginfo_t));
 	return plugin_vusb(vhci, req, pluginfo);
 }
 
@@ -199,7 +203,7 @@ io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 		status = ioctl_get_imported_devices(queue, req, outlen);
 		break;
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		status = ioctl_plugin_vusb(queue, req, inlen);
+		status = ioctl_plugin_vusb(queue, req, inlen, outlen);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		status = ioctl_plugout_vusb(queue, req, inlen);
