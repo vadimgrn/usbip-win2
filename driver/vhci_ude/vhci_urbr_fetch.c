@@ -1,3 +1,4 @@
+#include "vhci_urbr_fetch.h"
 #include "vhci_driver.h"
 #include "vhci_urbr_fetch.tmh"
 
@@ -5,20 +6,12 @@
 #include "vhci_urbr.h"
 #include "usbd_helper.h"
 
-extern NTSTATUS
-fetch_urbr_status(PURB urb, struct usbip_header *hdr);
-extern NTSTATUS
-fetch_urbr_dscr(PURB urb, struct usbip_header *hdr);
-extern NTSTATUS
-fetch_urbr_control_transfer(PURB urb, struct usbip_header *hdr);
-extern NTSTATUS
-fetch_urbr_control_transfer_ex(PURB urb, struct usbip_header *hdr);
-extern NTSTATUS
-fetch_urbr_vendor_or_class(PURB urb, struct usbip_header *hdr);
-extern NTSTATUS
-fetch_urbr_bulk_or_interrupt(PURB urb, struct usbip_header *hdr);
-extern NTSTATUS
-fetch_urbr_iso(PURB urb, struct usbip_header *hdr);
+#include "vhci_urbr_fetch_status.h"
+#include "vhci_urbr_fetch_dscr.h"
+#include "vhci_urbr_fetch_control.h"
+#include "vhci_urbr_fetch_vendor.h"
+#include "vhci_urbr_fetch_bulk.h"
+#include "vhci_urbr_fetch_iso.h"
 
 NTSTATUS
 copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, PVOID src, int src_len)

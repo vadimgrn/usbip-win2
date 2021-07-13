@@ -1,3 +1,4 @@
+#include "vhci_dbg.h"
 #include "vhci_driver.h"
 
 #include "dbgcode.h"

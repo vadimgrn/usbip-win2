@@ -1,10 +1,8 @@
-#include "vhci_driver.h"
+#include "vhci_queue_hc.h"
 #include "vhci_queue_hc.tmh"
-
-extern VOID io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
-	_In_ size_t OutputBufferLength, _In_ size_t InputBufferLength, _In_ ULONG IoControlCode);
-extern VOID io_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len);
-extern VOID io_write(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len);
+#include "vhci_ioctl.h"
+#include "vhci_read.h"
+#include "vhci_write.h"
 
 static VOID
 io_default_hc(_In_ WDFQUEUE queue, _In_ WDFREQUEST req)

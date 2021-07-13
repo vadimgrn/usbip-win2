@@ -34,6 +34,87 @@
     <ClInclude Include="vhci_urbr.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="vhci_ep.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_hc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_ioctl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_queue_ep.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_queue_hc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_read.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch_bulk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch_control.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch_dscr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch_iso.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch_status.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_fetch_vendor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_bulk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_control.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_dscr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_iso.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_reset.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_select.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_status.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_urbr_store_vendor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_proto.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_vusb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_plugin.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci_plugout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci_driver.c">

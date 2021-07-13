@@ -44,34 +44,39 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(urb_req_t, TO_URBR)
 
 #define RemoveEntryListInit(le)	do { RemoveEntryList(le); InitializeListHead(le); } while (0)
 
-extern struct usbip_header *get_hdr_from_req_read(WDFREQUEST req_read);
-extern PVOID get_data_from_req_read(WDFREQUEST req_read, ULONG length);
+PVOID
+get_buf(PVOID buf, PMDL bufMDL);
 
-extern ULONG get_read_payload_length(WDFREQUEST req_read);
+struct usbip_header *
+get_hdr_from_req_read(WDFREQUEST req_read);
 
-extern PVOID get_buf(PVOID buf, PMDL bufMDL);
+PVOID
+get_data_from_req_read(WDFREQUEST req_read, ULONG length);
 
-extern NTSTATUS
-copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, PVOID src, int src_len);
+ULONG
+get_read_payload_length(WDFREQUEST req_read);
 
-extern void set_cmd_submit_usbip_header(struct usbip_header *hdr, unsigned long seqnum, unsigned int devid,
-	unsigned int direct, pctx_ep_t ep, unsigned int flags, unsigned int len);
-extern void set_cmd_unlink_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid,
-	unsigned long seqnum_unlink);
-
-extern void
+void
 build_setup_packet(usb_cspkt_t *csp, unsigned char direct_in, unsigned char type, unsigned char recip, unsigned char request);
 
-extern NTSTATUS
-submit_req_urb(pctx_ep_t ep, WDFREQUEST req);
-extern NTSTATUS
-submit_req_select(pctx_ep_t ep, WDFREQUEST req, BOOLEAN is_select_conf, UCHAR conf_value, UCHAR intf_num, UCHAR alt_setting);
-extern NTSTATUS
-submit_req_reset_pipe(pctx_ep_t ep, WDFREQUEST req);
-extern NTSTATUS
-store_urbr(WDFREQUEST req_read, purb_req_t urbr);
+purb_req_t
+find_sent_urbr(pctx_vusb_t vusb, struct usbip_header *hdr);
 
-extern BOOLEAN
+NTSTATUS
+submit_urbr(purb_req_t urbr);
+
+NTSTATUS
+submit_req_urb(pctx_ep_t ep, WDFREQUEST req);
+
+NTSTATUS
+submit_req_select(pctx_ep_t ep, WDFREQUEST req, BOOLEAN is_select_conf, UCHAR conf_value, UCHAR intf_num, UCHAR alt_setting);
+
+NTSTATUS
+submit_req_reset_pipe(pctx_ep_t ep, WDFREQUEST req);
+
+BOOLEAN
 unmark_cancelable_urbr(purb_req_t urbr);
-extern void
+
+void
 complete_urbr(purb_req_t urbr, NTSTATUS status);
+

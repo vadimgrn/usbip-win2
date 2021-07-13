@@ -1,7 +1,9 @@
+#include "vhci_urbr_fetch_control.h"
 #include "vhci_driver.h"
 
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
+#include "vhci_urbr_fetch.h"
 
 NTSTATUS
 fetch_urbr_control_transfer(PURB urb, struct usbip_header *hdr)

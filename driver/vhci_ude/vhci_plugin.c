@@ -1,3 +1,4 @@
+#include "vhci_plugin.h"
 #include "vhci_driver.h"
 #include "vhci_plugin.tmh"
 
@@ -6,12 +7,9 @@
 #include "usbip_proto.h"
 #include "usbip_vhci_api.h"
 #include "devconf.h"
+#include "vhci_ep.h"
 
-extern VOID
-setup_ep_callbacks(PUDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS pcallbacks);
-
-extern NTSTATUS
-add_ep(pctx_vusb_t vusb, PUDECXUSBENDPOINT_INIT *pepinit, PUSB_ENDPOINT_DESCRIPTOR dscr_ep);
+#define IS_USB30_PLUGINFO(pluginfo)	((get_device_speed(pluginfo) == UdecxUsbSuperSpeed))
 
 static void
 setup_with_dsc_dev(pctx_vusb_t vusb, PUSB_DEVICE_DESCRIPTOR dsc_dev)
@@ -339,8 +337,6 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 
 	return vusb;
 }
-
-#define IS_USB30_PLUGINFO(pluginfo)	((get_device_speed(pluginfo) == UdecxUsbSuperSpeed))
 
 NTSTATUS
 plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)

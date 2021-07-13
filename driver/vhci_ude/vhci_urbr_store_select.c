@@ -1,7 +1,10 @@
+#include "vhci_urbr_store_select.h"
 #include "vhci_driver.h"
 
-#include "usbip_proto.h"
+#include <usbip_proto.h>
+
 #include "vhci_urbr.h"
+#include "vhci_proto.h"
 
 NTSTATUS
 store_urbr_select_config(WDFREQUEST req_read, purb_req_t urbr)

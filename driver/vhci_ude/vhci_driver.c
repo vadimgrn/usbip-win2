@@ -1,8 +1,6 @@
 #include "vhci_driver.h"
 #include "vhci_driver.tmh"
-
-extern NTSTATUS
-evt_add_vhci(_In_ WDFDRIVER drv, _Inout_ PWDFDEVICE_INIT dinit);
+#include "vhci_hc.h"
 
 static PAGEABLE VOID
 cleanup_vhci(_In_ WDFOBJECT drvobj)

@@ -1,8 +1,10 @@
+#include "vhci_urbr_store_vendor.h"
 #include "vhci_driver.h"
 #include "vhci_urbr_store_vendor.tmh"
 
-#include "usbip_proto.h"
+#include <usbip_proto.h>
 #include "vhci_urbr.h"
+#include "vhci_proto.h"
 
 NTSTATUS
 store_urbr_vendor_class_partial(WDFREQUEST req_read, purb_req_t urbr)

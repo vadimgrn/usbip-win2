@@ -1,7 +1,10 @@
+#include "vhci_urbr_fetch_vendor.h"
 #include "vhci_driver.h"
 
-#include "usbip_proto.h"
+#include <usbip_proto.h>
+
 #include "vhci_urbr.h"
+#include "vhci_urbr_fetch.h"
 
 NTSTATUS
 fetch_urbr_vendor_or_class(PURB urb, struct usbip_header *hdr)

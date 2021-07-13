@@ -1,9 +1,12 @@
+#include "vhci_urbr_store_control.h"
 #include "vhci_driver.h"
 
 #include "vhci_urbr_store_control.tmh"
 
-#include "usbip_proto.h"
+#include <usbip_proto.h>
 #include "vhci_urbr.h"
+#include "vhci_urbr_fetch.h"
+#include "vhci_proto.h"
 
 #include "strutil.h"
 

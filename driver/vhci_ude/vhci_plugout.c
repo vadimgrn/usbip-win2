@@ -1,7 +1,9 @@
+#include "vhci_plugout.h"
 #include "vhci_driver.h"
 #include "vhci_plugout.tmh"
 
 #include "usbip_vhci_api.h"
+#include "vhci_vusb.h"
 
 static VOID
 abort_pending_req_read(pctx_vusb_t vusb)

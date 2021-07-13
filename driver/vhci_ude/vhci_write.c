@@ -1,14 +1,11 @@
+#include "vhci_write.h"
 #include "vhci_driver.h"
 #include "vhci_write.tmh"
 
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
-
-extern purb_req_t
-find_sent_urbr(pctx_vusb_t vusb, struct usbip_header *hdr);
-
-extern NTSTATUS
-fetch_urbr(purb_req_t urbr, struct usbip_header *hdr);
+#include "vhci_urbr_fetch.h"
+#include "vhci_vusb.h"
 
 static struct usbip_header *
 get_hdr_from_req_write(WDFREQUEST req_write)

@@ -1,44 +1,19 @@
+#include "vhci_urbr_store.h"
 #include "vhci_driver.h"
 #include "vhci_urbr_store.tmh"
 
-#include "usbip_proto.h"
+#include <usbip_proto.h>
 #include "vhci_urbr.h"
+#include "vhci_proto.h"
 
-extern NTSTATUS
-store_urbr_control_transfer_partial(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_control_transfer_ex_partial(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_vendor_class_partial(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_bulk_partial(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_iso_partial(WDFREQUEST req_read, purb_req_t urbr);
-
-extern NTSTATUS
-store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_dscr_dev(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_dscr_intf(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_control_transfer(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_control_transfer_ex(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_vendor_class(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_bulk(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_iso(WDFREQUEST req_read, purb_req_t urbr);
-
-extern NTSTATUS
-store_urbr_select_config(WDFREQUEST req_read, purb_req_t urbr);
-extern NTSTATUS
-store_urbr_select_interface(WDFREQUEST req_read, purb_req_t urbr);
-
-extern NTSTATUS
-store_urbr_reset_pipe(WDFREQUEST req_read, purb_req_t urbr);
+#include "vhci_urbr_store_control.h"
+#include "vhci_urbr_store_vendor.h"
+#include "vhci_urbr_store_bulk.h"
+#include "vhci_urbr_store_iso.h"
+#include "vhci_urbr_store_status.h"
+#include "vhci_urbr_store_dscr.h"
+#include "vhci_urbr_store_select.h"
+#include "vhci_urbr_store_reset.h"
 
 NTSTATUS
 store_urbr_partial(WDFREQUEST req_read, purb_req_t urbr)
