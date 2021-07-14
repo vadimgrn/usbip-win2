@@ -11,6 +11,8 @@ ClassGuid={36FC9E60-C465-11CF-8056-444553540000}
 Provider=%Provider%
 CatalogFile=usbip_vhci.cat
 
+PnpLockDown=1
+
 [Manufacturer]
 %StdMfg%=Standard,NT$ARCH$
 

@@ -3,9 +3,15 @@
 #include <usb.h>
 #include <usbdi.h>
 
-#define EPIPE		32
-#define EOVERFLOW	75
-#define EREMOTEIO	121
+/*
+ * Linux error codes.
+ * See: include/uapi/asm-generic/errno-base.h, include/uapi/asm-generic/errno.h
+ */
+enum { 
+	EPIPE_LINUX = 32, 
+	EOVERFLOW_LINUX = 75, 
+	EREMOTEIO_LINUX = 121 
+};
 
 USBD_STATUS
 to_usbd_status(int usbip_status)
@@ -14,11 +20,11 @@ to_usbd_status(int usbip_status)
 	case 0:
 		return USBD_STATUS_SUCCESS;
 		/* I guess it */
-	case -EPIPE:
+	case -EPIPE_LINUX:
 		return USBD_STATUS_STALL_PID;
-	case -EOVERFLOW:
+	case -EOVERFLOW_LINUX:
 		return USBD_STATUS_DATA_OVERRUN;
-	case -EREMOTEIO:
+	case -EREMOTEIO_LINUX:
 		return USBD_STATUS_ERROR_SHORT_TRANSFER;
 	default:
 		return USBD_STATUS_ERROR;
@@ -38,14 +44,19 @@ to_usbip_status(USBD_STATUS status)
 	}
 }
 
-#define URB_SHORT_NOT_OK	0x0001
-#define URB_ISO_ASAP		0x0002
-#define URB_DIR_IN		0x0200
+/*
+ * include/linux/usb.h
+ */
+enum {
+	URB_SHORT_NOT_OK = 0x0001,
+	URB_ISO_ASAP = 0x0002,
+	URB_DIR_IN = 0x0200
+};
 
 ULONG
 to_usbd_flags(int flags)
 {
-	ULONG	usbd_flags = 0;
+	ULONG usbd_flags = 0;
 
 	if (flags & URB_SHORT_NOT_OK)
 		usbd_flags |= USBD_SHORT_TRANSFER_OK;
