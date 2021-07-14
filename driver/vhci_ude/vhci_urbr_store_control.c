@@ -65,7 +65,7 @@ store_urbr_control_transfer(WDFREQUEST req_read, purb_req_t urbr)
 {
 	struct _URB_CONTROL_TRANSFER	*urb_ctltrans = &urbr->u.urb.urb->UrbControlTransfer;
 	struct usbip_header	*hdr;
-	int	in = IS_TRANSFER_FLAGS_IN(urb_ctltrans->TransferFlags);
+	bool dir_in = IsTransferDirectionIn(urb_ctltrans->TransferFlags);
 	ULONG	nread = 0;
 	NTSTATUS	status = STATUS_SUCCESS;
 
@@ -73,12 +73,12 @@ store_urbr_control_transfer(WDFREQUEST req_read, purb_req_t urbr)
 	if (hdr == NULL)
 		return STATUS_BUFFER_TOO_SMALL;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, in, urbr->ep,
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, urbr->ep,
 		urb_ctltrans->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_ctltrans->TransferBufferLength);
 	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, 8);
 
 	nread = sizeof(struct usbip_header);
-	if (!in && urb_ctltrans->TransferBufferLength > 0) {
+	if (!dir_in && urb_ctltrans->TransferBufferLength > 0) {
 		if (get_read_payload_length(req_read) >= urb_ctltrans->TransferBufferLength) {
 			PVOID	buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
 			if (buf == NULL) {
@@ -138,7 +138,7 @@ store_urbr_control_transfer_ex(WDFREQUEST req_read, purb_req_t urbr)
 	pctx_vusb_t	vusb = urbr->ep->vusb;
 	struct _URB_CONTROL_TRANSFER_EX	*urb_ctltrans_ex = &urbr->u.urb.urb->UrbControlTransferEx;
 	struct usbip_header	*hdr;
-	int	in = IS_TRANSFER_FLAGS_IN(urb_ctltrans_ex->TransferFlags);
+	bool dir_in = IsTransferDirectionIn(urb_ctltrans_ex->TransferFlags);
 	ULONG	nread = 0;
 	NTSTATUS	status = STATUS_SUCCESS;
 
@@ -155,12 +155,14 @@ store_urbr_control_transfer_ex(WDFREQUEST req_read, purb_req_t urbr)
 	if (hdr == NULL)
 		return STATUS_BUFFER_TOO_SMALL;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, in, urbr->ep,
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, urbr->ep,
 		urb_ctltrans_ex->TransferFlags, urb_ctltrans_ex->TransferBufferLength);
-	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans_ex->SetupPacket, 8);
+
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_ctltrans_ex->SetupPacket), "assert");
+	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans_ex->SetupPacket, sizeof(urb_ctltrans_ex->SetupPacket));
 
 	nread = sizeof(struct usbip_header);
-	if (!in && urb_ctltrans_ex->TransferBufferLength > 0) {
+	if (!dir_in && urb_ctltrans_ex->TransferBufferLength > 0) {
 		if (get_read_payload_length(req_read) >= urb_ctltrans_ex->TransferBufferLength) {
 			PVOID	buf = get_buf(urb_ctltrans_ex->TransferBuffer, urb_ctltrans_ex->TransferBufferMDL);
 			if (buf == NULL) {

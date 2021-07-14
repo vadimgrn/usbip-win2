@@ -4,8 +4,9 @@
 #include <wdf.h>
 #include <usbdi.h>
 
-#include "usb_util.h"
+#include <stdbool.h>
 
+#include "usb_util.h"
 #include "vhci_dev.h"
 
 typedef enum {
@@ -40,7 +41,15 @@ typedef struct _urb_req {
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(urb_req_t, TO_URBR)
 
-#define IS_TRANSFER_FLAGS_IN(flags)	((flags) & USBD_TRANSFER_DIRECTION_IN)
+__inline bool IsTransferDirectionIn(ULONG TransferFlags)
+{
+	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_IN;
+}
+
+__inline bool IsTransferDirectionOut(ULONG TransferFlags)
+{
+	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
+}
 
 #define RemoveEntryListInit(le)	do { RemoveEntryList(le); InitializeListHead(le); } while (0)
 

@@ -39,7 +39,7 @@ store_urbr_vendor_class(WDFREQUEST req_read, purb_req_t urbr)
 	struct usbip_header	*hdr;
 	usb_cspkt_t	*csp;
 	char	type, recip;
-	int	in = IS_TRANSFER_FLAGS_IN(urb_vendor_class->TransferFlags);
+	bool dir_in = IsTransferDirectionIn(urb_vendor_class->TransferFlags);
 
 	hdr = get_hdr_from_req_read(req_read);
 	if (hdr == NULL)
@@ -84,15 +84,16 @@ store_urbr_vendor_class(WDFREQUEST req_read, purb_req_t urbr)
 
 	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, in, NULL,
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, NULL,
 		urb_vendor_class->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_vendor_class->TransferBufferLength);
-	build_setup_packet(csp, (unsigned char)in, type, recip, urb_vendor_class->Request);
+
+	build_setup_packet(csp, dir_in, type, recip, urb_vendor_class->Request);
 	//FIXME what is the usage of RequestTypeReservedBits?
 	csp->wLength = (unsigned short)urb_vendor_class->TransferBufferLength;
 	csp->wValue.W = urb_vendor_class->Value;
 	csp->wIndex.W = urb_vendor_class->Index;
 
-	if (!in) {
+	if (!dir_in) {
 		if (get_read_payload_length(req_read) >= urb_vendor_class->TransferBufferLength) {
 			RtlCopyMemory(hdr + 1, urb_vendor_class->TransferBuffer, urb_vendor_class->TransferBufferLength);
 			WdfRequestSetInformation(req_read, sizeof(struct usbip_header) + urb_vendor_class->TransferBufferLength);

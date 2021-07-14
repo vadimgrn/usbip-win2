@@ -18,7 +18,7 @@ to_usbdevfs_flags(ULONG TransferFlags)
 
 	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
 		flags |= USBDEVFS_URB_ISO_ASAP;
-	} else if (IS_TRANSFER_FLAGS_IN(TransferFlags) && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
+	} else if (IsTransferDirectionIn(TransferFlags) && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
 		flags |= USBDEVFS_URB_SHORT_NOT_OK;
 	}
 
@@ -27,14 +27,14 @@ to_usbdevfs_flags(ULONG TransferFlags)
 
 void
 set_cmd_submit_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid,
-			    unsigned int direct, pctx_ep_t ep, unsigned int flags, unsigned int len)
+			    bool dir_in, pctx_ep_t ep, ULONG TransferFlags, unsigned int len)
 {
 	h->base.command = USBIP_CMD_SUBMIT;
 	h->base.seqnum = seqnum;
 	h->base.devid = devid;
-	h->base.direction = direct ? USBIP_DIR_IN : USBIP_DIR_OUT;
+	h->base.direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
 	h->base.ep = ep ? (ep->addr & 0x7f): 0;
-	h->u.cmd_submit.transfer_flags = to_usbdevfs_flags(flags);
+	h->u.cmd_submit.transfer_flags = to_usbdevfs_flags(TransferFlags);
 	h->u.cmd_submit.transfer_buffer_length = len;
 	h->u.cmd_submit.start_frame = 0;
 	h->u.cmd_submit.number_of_packets = 0;
