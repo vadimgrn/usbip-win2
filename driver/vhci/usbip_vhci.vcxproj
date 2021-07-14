@@ -215,9 +215,7 @@
     <Inf>
       <TimeStamp>0.3.4.0</TimeStamp>
     </Inf>
-    <DriverSign>
-      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
-    </DriverSign>
+    <DriverSign />
     <PostBuildEvent>
       <Command>gencat.bat $(OutDir) 10_$(DDKPlatform) $(SolutionDir)/driver/usbip_test.pfx
 </Command>
@@ -240,9 +238,7 @@
     <Inf>
       <TimeStamp>0.3.4.0</TimeStamp>
     </Inf>
-    <DriverSign>
-      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
-    </DriverSign>
+    <DriverSign />
     <PostBuildEvent>
       <Command>gencat.bat $(OutDir) 10_$(DDKPlatform) $(SolutionDir)/driver/usbip_test.pfx
 </Command>
