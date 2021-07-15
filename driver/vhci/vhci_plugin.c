@@ -7,7 +7,7 @@
 #include "usbip_vhci_api.h"
 
 #include "usb_util.h"
-#include "usbip_proto.h"
+#include "devconf.h"
 
 extern CHAR vhub_get_empty_port(pvhub_dev_t vhub);
 extern void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
@@ -57,7 +57,7 @@ setup_vpdo_with_dsc_dev(pvpdo_dev_t vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
 		vpdo->usbclass = dsc_dev->bDeviceClass;
 		vpdo->subclass = dsc_dev->bDeviceSubClass;
 		vpdo->protocol = dsc_dev->bDeviceProtocol;
-		vpdo->speed = (UCHAR)get_usb_speed(dsc_dev->bcdUSB);
+		vpdo->speed = get_usb_speed(dsc_dev->bcdUSB);
 		vpdo->num_configurations = dsc_dev->bNumConfigurations;
 	} else {
 		vpdo->vendor = 0;
@@ -66,7 +66,7 @@ setup_vpdo_with_dsc_dev(pvpdo_dev_t vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
 		vpdo->usbclass = 0;
 		vpdo->subclass = 0;
 		vpdo->protocol = 0;
-		vpdo->speed = USB_SPEED_LOW;
+		vpdo->speed = USB_SPEED_UNKNOWN;
 		vpdo->num_configurations = 0;
 	}
 }

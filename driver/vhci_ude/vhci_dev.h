@@ -60,7 +60,9 @@ typedef struct _ctx_vusb
 	WDFSPINLOCK	spin_lock;
 
 	/* keep these usbip port command */
-	USHORT		id_vendor, id_product, dev_speed;
+	USHORT		id_vendor, id_product;
+
+	enum usb_device_speed dev_speed;
 
 	// string index for USB serial
 	UCHAR		iSerial;

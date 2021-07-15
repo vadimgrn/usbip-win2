@@ -2,7 +2,8 @@
 
 #include "vhci_dev.h"
 #include "usbreq.h"
-#include "usbip_proto.h"
+#include "devconf.h"
+
 
 PAGEABLE NTSTATUS
 vpdo_select_config(pvpdo_dev_t vpdo, struct _URB_SELECT_CONFIGURATION *urb_selc)
@@ -105,7 +106,7 @@ vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION connin
 
 		if (vpdo->dsc_conf != NULL)
 			conninfo->CurrentConfigurationValue = vpdo->dsc_conf->bConfigurationValue;
-		conninfo->LowSpeed = (vpdo->speed == USB_SPEED_LOW || vpdo->speed == USB_SPEED_FULL) ? TRUE : FALSE;
+		conninfo->LowSpeed = vpdo->speed == USB_SPEED_LOW || vpdo->speed == USB_SPEED_FULL;
 
 		dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
 		if (dsc_intf != NULL)

@@ -19,11 +19,10 @@ setup_with_dsc_dev(pctx_vusb_t vusb, PUSB_DEVICE_DESCRIPTOR dsc_dev)
 		vusb->id_product = dsc_dev->idProduct;
 		vusb->dev_speed = get_usb_speed(dsc_dev->bcdUSB);
 		vusb->iSerial = dsc_dev->iSerialNumber;
-	}
-	else {
+	} else {
 		vusb->id_vendor = 0;
 		vusb->id_product = 0;
-		vusb->dev_speed = 0;
+		vusb->dev_speed = USB_SPEED_UNKNOWN;
 		vusb->iSerial = 0;
 	}
 }

@@ -2,7 +2,7 @@
 
 #include "vhci_devconf.h"
 #include "usbip_vhci_api.h"
-#include "usbip_proto.h"
+#include "devconf.h"
 
 #define NEXT_USBD_INTERFACE_INFO(info_intf)	(USBD_INTERFACE_INFORMATION *)((PUINT8)(info_intf + 1) - \
 	(1 * sizeof(USBD_PIPE_INFORMATION)) + (info_intf->NumberOfPipes * sizeof(USBD_PIPE_INFORMATION)));
@@ -28,7 +28,7 @@ dbg_pipe(PUSBD_PIPE_INFORMATION pipe)
 #endif
 
 static void
-set_pipe(PUSBD_PIPE_INFORMATION pipe, PUSB_ENDPOINT_DESCRIPTOR ep_desc, unsigned char speed)
+set_pipe(PUSBD_PIPE_INFORMATION pipe, PUSB_ENDPOINT_DESCRIPTOR ep_desc, enum usb_device_speed speed)
 {
 	pipe->MaximumPacketSize = ep_desc->wMaxPacketSize;
 	pipe->EndpointAddress = ep_desc->bEndpointAddress;
@@ -44,7 +44,7 @@ set_pipe(PUSBD_PIPE_INFORMATION pipe, PUSB_ENDPOINT_DESCRIPTOR ep_desc, unsigned
 }
 
 static NTSTATUS
-setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSB_INTERFACE_DESCRIPTOR dsc_intf, UCHAR speed)
+setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSB_INTERFACE_DESCRIPTOR dsc_intf, enum usb_device_speed speed)
 {
 	PVOID	start = dsc_intf;
 	ULONG	n_pipes_setup;
@@ -76,7 +76,7 @@ setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR 
 }
 
 NTSTATUS
-setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, UCHAR speed)
+setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, enum usb_device_speed speed)
 {
 	PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
 
@@ -104,7 +104,7 @@ setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_c
 }
 
 NTSTATUS
-setup_config(PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSBD_INTERFACE_INFORMATION info_intf, PVOID end_info_intf, UCHAR speed)
+setup_config(PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSBD_INTERFACE_INFORMATION info_intf, PVOID end_info_intf, enum usb_device_speed speed)
 {
 	unsigned int	i;
 

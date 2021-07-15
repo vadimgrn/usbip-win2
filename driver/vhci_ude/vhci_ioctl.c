@@ -69,7 +69,7 @@ get_imported_devices(pctx_vhci_t vhci, pioctl_usbip_vhci_imported_dev_t idevs, U
 			idev->status = 2; /* SDEV_ST_USED */;
 			idev->vendor = vusb->id_vendor;
 			idev->product = vusb->id_product;
-			idev->speed = (UCHAR)vusb->dev_speed;
+			idev->speed = vusb->dev_speed;
 			idev++;
 		}
 	}

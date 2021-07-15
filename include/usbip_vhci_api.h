@@ -86,9 +86,9 @@ typedef struct _ioctl_usbip_vhci_unplug
 } ioctl_usbip_vhci_unplug, *pvhci_unpluginfo_t;
 
 typedef struct usbip_imported_device {
-	char		port;
-	enum usbip_device_status	status;
-	unsigned short	vendor;
-	unsigned short	product;
-	unsigned char	speed;
+	char port;
+	enum usbip_device_status status;
+	unsigned short vendor;
+	unsigned short product;
+	enum usb_device_speed speed; 
 } ioctl_usbip_vhci_imported_dev, *pioctl_usbip_vhci_imported_dev_t;
