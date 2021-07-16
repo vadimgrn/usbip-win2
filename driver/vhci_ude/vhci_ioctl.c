@@ -1,10 +1,11 @@
+#include "vhci_ioctl.h"
 #include "vhci_driver.h"
 #include "vhci_ioctl.tmh"
 
 #include "usbip_vhci_api.h"
-
-NTSTATUS
-plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo);
+#include "vhci_vusb.h"
+#include "vhci_plugin.h"
+#include "vhci_plugout.h"
 
 static VOID
 get_ports_status(pctx_vhci_t vhci, ioctl_usbip_vhci_get_ports_status *ports_status)
@@ -68,7 +69,7 @@ get_imported_devices(pctx_vhci_t vhci, pioctl_usbip_vhci_imported_dev_t idevs, U
 			idev->status = 2; /* SDEV_ST_USED */;
 			idev->vendor = vusb->id_vendor;
 			idev->product = vusb->id_product;
-			idev->speed = (UCHAR)vusb->dev_speed;
+			idev->speed = vusb->dev_speed;
 			idev++;
 		}
 	}

@@ -1,10 +1,10 @@
+#include "vhci_read.h"
 #include "vhci_driver.h"
 #include "vhci_read.tmh"
 
+#include "vhci_urbr_store.h"
 #include "vhci_urbr.h"
-
-extern NTSTATUS
-store_urbr_partial(WDFREQUEST req_read, purb_req_t urbr);
+#include "vhci_vusb.h"
 
 static purb_req_t
 find_pending_urbr(pctx_vusb_t vusb)

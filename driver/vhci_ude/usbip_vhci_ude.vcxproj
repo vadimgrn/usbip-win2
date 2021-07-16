@@ -51,11 +51,38 @@
     <ClCompile Include="vhci_write.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="vhci_ep.h" />
+    <ClInclude Include="vhci_hc.h" />
+    <ClInclude Include="vhci_ioctl.h" />
+    <ClInclude Include="vhci_plugin.h" />
+    <ClInclude Include="vhci_plugout.h" />
+    <ClInclude Include="vhci_proto.h" />
+    <ClInclude Include="vhci_queue_ep.h" />
+    <ClInclude Include="vhci_queue_hc.h" />
+    <ClInclude Include="vhci_read.h" />
     <ClInclude Include="vhci_urbr.h" />
     <ClInclude Include="vhci_dbg.h" />
     <ClInclude Include="vhci_dev.h" />
     <ClInclude Include="vhci_driver.h" />
     <ClInclude Include="vhci_trace.h" />
+    <ClInclude Include="vhci_urbr_fetch.h" />
+    <ClInclude Include="vhci_urbr_fetch_bulk.h" />
+    <ClInclude Include="vhci_urbr_fetch_control.h" />
+    <ClInclude Include="vhci_urbr_fetch_dscr.h" />
+    <ClInclude Include="vhci_urbr_fetch_iso.h" />
+    <ClInclude Include="vhci_urbr_fetch_status.h" />
+    <ClInclude Include="vhci_urbr_fetch_vendor.h" />
+    <ClInclude Include="vhci_urbr_store.h" />
+    <ClInclude Include="vhci_urbr_store_bulk.h" />
+    <ClInclude Include="vhci_urbr_store_control.h" />
+    <ClInclude Include="vhci_urbr_store_dscr.h" />
+    <ClInclude Include="vhci_urbr_store_iso.h" />
+    <ClInclude Include="vhci_urbr_store_reset.h" />
+    <ClInclude Include="vhci_urbr_store_select.h" />
+    <ClInclude Include="vhci_urbr_store_status.h" />
+    <ClInclude Include="vhci_urbr_store_vendor.h" />
+    <ClInclude Include="vhci_vusb.h" />
+    <ClInclude Include="vhci_write.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip_vhci_ude.inf" />

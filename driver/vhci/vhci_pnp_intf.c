@@ -27,9 +27,7 @@ IsDeviceHighSpeed(PVOID context)
 {
 	pvpdo_dev_t	vpdo = context;
 	DBGI(DBG_GENERAL, "IsDeviceHighSpeed called, it is %d\n", vpdo->speed);
-	if (vpdo->speed == USB_SPEED_HIGH)
-		return TRUE;
-	return FALSE;
+	return vpdo->speed == USB_SPEED_HIGH;
 }
 
 static NTSTATUS USB_BUSIFFN

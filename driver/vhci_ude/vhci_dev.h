@@ -2,6 +2,7 @@
 
 #include <ntddk.h>
 #include <wdf.h>
+#include <UdeCxTypes.h>
 
 EXTERN_C_START
 
@@ -59,7 +60,9 @@ typedef struct _ctx_vusb
 	WDFSPINLOCK	spin_lock;
 
 	/* keep these usbip port command */
-	USHORT		id_vendor, id_product, dev_speed;
+	USHORT		id_vendor, id_product;
+
+	enum usb_device_speed dev_speed;
 
 	// string index for USB serial
 	UCHAR		iSerial;
@@ -105,12 +108,5 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(ctx_safe_vusb_t, TO_SAFE_VUSB)
 
 #define VUSB_CREATING	((pctx_vusb_t)-1)
 #define VUSB_IS_VALID(vusb)	((vusb) != NULL && (vusb) != VUSB_CREATING && !(vusb)->invalid)
-
-extern NTSTATUS plugout_vusb(pctx_vhci_t vhci, CHAR port);
-
-extern pctx_vusb_t get_vusb(pctx_vhci_t vhci, ULONG port);
-extern pctx_vusb_t get_vusb_by_req(WDFREQUEST req);
-extern void put_vusb(pctx_vusb_t vusb);
-extern void put_vusb_passively(pctx_vusb_t vusb);
 
 EXTERN_C_END

@@ -1,9 +1,10 @@
-#include "vhci_driver.h"
+#include "vhci_ep.h"
+#include "vhci_trace.h"
 #include "vhci_ep.tmh"
-#include "devconf.h"
+#include "vhci_driver.h"
 
-extern WDFQUEUE
-create_queue_ep(pctx_ep_t ep);
+#include "devconf.h"
+#include "vhci_queue_ep.h"
 
 static VOID
 ep_start(_In_ UDECXUSBENDPOINT ude_ep)

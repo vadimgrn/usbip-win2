@@ -1,10 +1,9 @@
+#include "vhci_urbr.h"
 #include "vhci_driver.h"
+#include "vhci_urbr.tmh"
 
 #include "usbip_proto.h"
-#include "vhci_urbr.tmh"
-#include "vhci_urbr.h"
-
-static NTSTATUS submit_urbr(purb_req_t urbr);
+#include "vhci_urbr_store.h"
 
 PVOID
 get_buf(PVOID buf, PMDL bufMDL)

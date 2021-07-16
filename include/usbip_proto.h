@@ -1,5 +1,34 @@
 #pragma once
 
+#include <basetsd.h>
+
+/*
+ * Declarations from <drivers/usb/usbip/usbip_common.h>
+ */
+
+enum usbip_request_type {
+	USBIP_CMD_SUBMIT = 1,
+	USBIP_CMD_UNLINK,
+	USBIP_RET_SUBMIT,
+	USBIP_RET_UNLINK,
+	USBIP_RESET_DEV = 0xFFFF
+};
+
+enum { USBIP_DIR_OUT, USBIP_DIR_IN };
+enum { USBIP_MAX_ISO_PACKETS = 1024 };
+
+/*
+ * <uapi/linux/usb/ch9.h>
+ */
+enum usb_device_speed {
+	USB_SPEED_UNKNOWN = 0,			/* enumerating */
+	USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
+	USB_SPEED_HIGH,				/* usb 2.0 */
+	USB_SPEED_WIRELESS,			/* wireless (usb 2.5) */
+	USB_SPEED_SUPER,			/* usb 3.0 */
+	USB_SPEED_SUPER_PLUS			/* usb 3.1 */
+};
+
 #pragma pack(push,1)
 
 /*
@@ -22,12 +51,7 @@
  */
 
 struct usbip_header_basic {
-#define USBIP_CMD_SUBMIT	0x0001
-#define USBIP_CMD_UNLINK	0x0002
-#define USBIP_RET_SUBMIT	0x0003
-#define USBIP_RET_UNLINK	0x0004
-#define USBIP_RESET_DEV		0xFFFF
-	UINT32	command;
+	UINT32	command; /* enum usbip_request_type */
 
 	/* sequencial number which identifies requests.
 	* incremented per connections */
@@ -38,9 +62,7 @@ struct usbip_header_basic {
 	 * this value is ((busnum << 16) | devnum) */
 	UINT32	devid;
 
-#define USBIP_DIR_OUT	0
-#define USBIP_DIR_IN	1
-	UINT32	direction;
+	UINT32	direction; /* direction of the transfer, USBIP_DIR_OUT/IN */
 	UINT32	ep;     /* endpoint number */
 };
 
@@ -119,12 +141,3 @@ struct usbip_header {
 };
 
 #pragma pack(pop)
-
-enum usb_device_speed {
-	USB_SPEED_UNKNOWN = 0,			/* enumerating */
-	USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
-	USB_SPEED_HIGH,				/* usb 2.0 */
-	USB_SPEED_WIRELESS,			/* wireless (usb 2.5) */
-	USB_SPEED_SUPER,			/* usb 3.0 */
-	USB_SPEED_SUPER_PLUS			/* usb 3.1 */
-};

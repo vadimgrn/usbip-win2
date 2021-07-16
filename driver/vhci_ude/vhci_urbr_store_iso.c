@@ -1,8 +1,10 @@
+#include "vhci_urbr_store_iso.h"
 #include "vhci_driver.h"
 #include "vhci_urbr_store_iso.tmh"
 
-#include "usbip_proto.h"
+#include <usbip_proto.h>
 #include "vhci_urbr.h"
+#include "vhci_proto.h"
 
 static NTSTATUS
 store_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
@@ -15,10 +17,9 @@ store_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 	if (buf == NULL)
 		return STATUS_INSUFFICIENT_RESOURCES;
 
-	if (IS_TRANSFER_FLAGS_IN(urb_iso->TransferFlags)) {
+	if (IsTransferDirectionIn(urb_iso->TransferFlags)) {
 		iso_desc = (struct usbip_iso_packet_descriptor *)dst;
-	}
-	else {
+	} else {
 		RtlCopyMemory(dst, buf, urb_iso->TransferBufferLength);
 		iso_desc = (struct usbip_iso_packet_descriptor *)((char *)dst + urb_iso->TransferBufferLength);
 	}
@@ -45,10 +46,8 @@ store_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 static ULONG
 get_iso_payload_len(struct _URB_ISOCH_TRANSFER *urb_iso)
 {
-	ULONG	len_iso;
-
-	len_iso = urb_iso->NumberOfPackets * sizeof(struct usbip_iso_packet_descriptor);
-	if (!IS_TRANSFER_FLAGS_IN(urb_iso->TransferFlags)) {
+	ULONG len_iso = urb_iso->NumberOfPackets * sizeof(struct usbip_iso_packet_descriptor);
+	if (IsTransferDirectionOut(urb_iso->TransferFlags)) {
 		len_iso += urb_iso->TransferBufferLength;
 	}
 	return len_iso;
@@ -77,23 +76,23 @@ store_urbr_iso_partial(WDFREQUEST req_read, purb_req_t urbr)
 NTSTATUS
 store_urbr_iso(WDFREQUEST req_read, purb_req_t urbr)
 {
-	struct _URB_ISOCH_TRANSFER	*urb_iso = &urbr->u.urb.urb->UrbIsochronousTransfer;
-	struct usbip_header	*hdr;
-	int	in, type;
-
-	in = IS_TRANSFER_FLAGS_IN(urb_iso->TransferFlags);
-	type = urbr->ep->type;
+	int type = urbr->ep->type;
 	if (type != USB_ENDPOINT_TYPE_ISOCHRONOUS) {
 		TRE(READ, "Error, not a iso pipe");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	hdr = get_hdr_from_req_read(req_read);
-	if (hdr == NULL)
+	struct usbip_header *hdr = get_hdr_from_req_read(req_read);
+	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, in, urbr->ep,
+	struct _URB_ISOCH_TRANSFER *urb_iso = &urbr->u.urb.urb->UrbIsochronousTransfer;
+	bool dir_in = IsTransferDirectionIn(urb_iso->TransferFlags);
+
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, urbr->ep,
 		urb_iso->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_iso->TransferBufferLength);
+
 	hdr->u.cmd_submit.start_frame = urb_iso->StartFrame;
 	hdr->u.cmd_submit.number_of_packets = urb_iso->NumberOfPackets;
 

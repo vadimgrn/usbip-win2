@@ -169,7 +169,7 @@ typedef struct
 	// and set to FALSE when a UnPlug IOCTL is received.
 	BOOLEAN		plugged;
 
-	UCHAR	speed;
+	enum usb_device_speed speed; 
 	UCHAR	num_configurations; // Number of Possible Configurations
 
 	// a pending irp when no urb is requested

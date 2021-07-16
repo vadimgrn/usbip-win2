@@ -1,3 +1,4 @@
+#include "vhci_vusb.h"
 #include "vhci_driver.h"
 #include "vhci_vusb.tmh"
 

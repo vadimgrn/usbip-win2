@@ -1,3 +1,4 @@
+#include "vhci_queue_ep.h"
 #include "vhci_driver.h"
 #include "vhci_queue_ep.tmh"
 

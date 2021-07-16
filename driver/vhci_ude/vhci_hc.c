@@ -1,9 +1,8 @@
+#include "vhci_hc.h"
+#include "vhci_queue_hc.h"
 #include "vhci_driver.h"
 #include "vhci_hc.tmh"
-
 #include "usbip_vhci_api.h"
-
-extern NTSTATUS create_queue_hc(pctx_vhci_t vhci);
 
 static NTSTATUS
 controller_query_usb_capability(WDFDEVICE UdecxWdfDevice, PGUID CapabilityType,

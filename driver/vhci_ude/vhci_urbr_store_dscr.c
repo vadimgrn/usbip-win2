@@ -1,7 +1,9 @@
+#include "vhci_urbr_store_dscr.h"
 #include "vhci_driver.h"
 
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
+#include "vhci_proto.h"
 
 NTSTATUS
 store_urbr_dscr_dev(WDFREQUEST req_read, purb_req_t urbr)
