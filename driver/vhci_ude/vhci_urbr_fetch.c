@@ -98,9 +98,10 @@ handle_urbr_error(purb_req_t urbr, struct usbip_header *hdr)
 	PURB	urb = urbr->u.urb.urb;
 
 	urb->UrbHeader.Status = to_usbd_status(hdr->u.ret_submit.status);
-	if (urb->UrbHeader.Status == USBD_STATUS_STALL_PID && urbr->ep->vusb->is_simple_ep_alloc) {
+	if (urb->UrbHeader.Status == USBD_STATUS_STALL_PID) {
 		/*
-		 * TODO: UDE framework discards URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL for a simple vusb.
+		 * TODO: UDE framework seems to discard URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL.
+		 * For a simple vusb, such the problem was observed by an usb packet monitoring tool.
 		 * Thus an explicit reset is requested if a STALL occurs.
 		 * This workaround resolved some USB disk problems.
 		 */

@@ -105,7 +105,7 @@ ioctl_get_imported_devices(WDFQUEUE queue, WDFREQUEST req, size_t outlen)
 }
 
 static NTSTATUS
-ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
+ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen, size_t outlen)
 {
 	pctx_vhci_t	vhci;
 	pvhci_pluginfo_t	pluginfo;
@@ -115,6 +115,10 @@ ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 
 	if (inlen < sizeof(vhci_pluginfo_t)) {
 		TRE(IOCTL, "too small input length: %lld < %lld", inlen, sizeof(vhci_pluginfo_t));
+		return STATUS_INVALID_PARAMETER;
+	}
+	if (outlen < sizeof(vhci_pluginfo_t)) {
+		TRE(IOCTL, "too small output length: %lld < %lld", outlen, sizeof(vhci_pluginfo_t));
 		return STATUS_INVALID_PARAMETER;
 	}
 	status = WdfRequestRetrieveInputBuffer(req, sizeof(vhci_pluginfo_t), &pluginfo, &len);
@@ -128,8 +132,8 @@ ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 		return STATUS_INVALID_PARAMETER;
 	}
 	vhci = *TO_PVHCI(queue);
-	if (pluginfo->port < 0 || (ULONG)pluginfo->port >= vhci->n_max_ports)
-		return STATUS_INVALID_PARAMETER;
+
+	WdfRequestSetInformation(req, sizeof(vhci_pluginfo_t));
 	return plugin_vusb(vhci, req, pluginfo);
 }
 
@@ -160,6 +164,27 @@ ioctl_plugout_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 	return plugout_vusb(vhci, port);
 }
 
+static NTSTATUS
+ioctl_shutdown_vusb(WDFQUEUE queue, WDFREQUEST req)
+{
+	pctx_vhci_t	vhci;
+	pctx_vusb_t	vusb;
+	NTSTATUS	status;
+
+	vusb = get_vusb_by_req(req);
+	if (vusb == NULL) {
+		/* already detached */
+		return STATUS_SUCCESS;
+	}
+
+	vhci = *TO_PVHCI(queue);
+
+	status = plugout_vusb(vhci, (CHAR)vusb->port);
+	put_vusb(vusb);
+
+	return status;
+}
+
 VOID
 io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 	_In_ size_t outlen, _In_ size_t inlen, _In_ ULONG ioctl_code)
@@ -178,10 +203,13 @@ io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 		status = ioctl_get_imported_devices(queue, req, outlen);
 		break;
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		status = ioctl_plugin_vusb(queue, req, inlen);
+		status = ioctl_plugin_vusb(queue, req, inlen, outlen);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		status = ioctl_plugout_vusb(queue, req, inlen);
+		break;
+	case IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE:
+		status = ioctl_shutdown_vusb(queue, req);
 		break;
 	default:
 		if (UdecxWdfDeviceTryHandleUserIoctl((*TO_PVHCI(queue))->hdev, req)) {

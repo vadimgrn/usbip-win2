@@ -68,19 +68,25 @@ out:
 VOID
 io_write(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len)
 {
-	pctx_safe_vusb_t	svusb;
 	pctx_vusb_t	vusb;
+	NTSTATUS	status;
 
 	UNREFERENCED_PARAMETER(queue);
 
 	TRD(WRITE, "Enter: len: %u", (ULONG)len);
 
-	svusb = TO_SAFE_VUSB(WdfRequestGetFileObject(req));
-	vusb = svusb->vusb;
+	vusb = get_vusb_by_req(req);
+	if (vusb == NULL) {
+		TRD(WRITE, "vusb disconnected: port: %u", TO_SAFE_VUSB_FROM_REQ(req)->port);
+		status = STATUS_DEVICE_NOT_CONNECTED;
+	}
+	else {
+		write_vusb(vusb, req);
+		put_vusb(vusb);
+		status = STATUS_SUCCESS;
+	}
 
-	write_vusb(vusb, req);
-
-	WdfRequestCompleteWithInformation(req, STATUS_SUCCESS, len);
+	WdfRequestCompleteWithInformation(req, status, len);
 
 	TRD(WRITE, "Leave");
 }

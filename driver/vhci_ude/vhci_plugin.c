@@ -94,6 +94,7 @@ setup_vusb(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 	}
 
 	vusb->devid = pluginfo->devid;
+	vusb->port = pluginfo->port;
 
 	vusb->ude_usbdev = ude_usbdev;
 	vusb->pending_req_read = NULL;
@@ -101,6 +102,7 @@ setup_vusb(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 	vusb->len_sent_partial = 0;
 	vusb->seq_num = 0;
 	vusb->invalid = FALSE;
+	vusb->refcnt = 0;
 
 	if (vusb->iSerial > 0 && pluginfo->wserial[0] != L'\0')
 		vusb->wserial = libdrv_strdupW(pluginfo->wserial);
@@ -266,6 +268,21 @@ get_device_speed(pvhci_pluginfo_t pluginfo)
 	}
 }
 
+static char
+get_free_port(pctx_vhci_t vhci, BOOLEAN is_usb30)
+{
+	ULONG	port_start = is_usb30 ? MAX_HUB_20PORTS: 0;
+	ULONG	i;
+
+	for (i = port_start; i != vhci->n_max_ports; i++) {
+		pctx_vusb_t	vusb = vhci->vusbs[i];
+		if (vusb == NULL)
+			return (CHAR)i;
+	}
+	/* Never happen */
+	return (CHAR)-1;
+}
+
 static pctx_vusb_t
 vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 {
@@ -300,7 +317,10 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 	vusb->is_simple_ep_alloc = (eptype == UdecxEndpointTypeSimple) ? TRUE : FALSE;
 
 	UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&opts);
-	opts.Usb20PortNumber = pluginfo->port + 1;
+	if (speed == UdecxUsbSuperSpeed)
+		opts.Usb30PortNumber = pluginfo->port + 1;
+	else
+		opts.Usb20PortNumber = pluginfo->port + 1;
 
 	if (!setup_vusb(ude_usbdev, pluginfo)) {
 		WdfObjectDelete(ude_usbdev);
@@ -320,6 +340,8 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 	return vusb;
 }
 
+#define IS_USB30_PLUGINFO(pluginfo)	((get_device_speed(pluginfo) == UdecxUsbSuperSpeed))
+
 NTSTATUS
 plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 {
@@ -328,11 +350,12 @@ plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 
 	WdfSpinLockAcquire(vhci->spin_lock);
 
-	if (vhci->vusbs[pluginfo->port] != NULL) {
+	if (vhci->n_used_ports == vhci->n_max_ports) {
 		WdfSpinLockRelease(vhci->spin_lock);
-		return STATUS_OBJECT_NAME_COLLISION;
+		return STATUS_END_OF_FILE;
 	}
 
+	pluginfo->port = get_free_port(vhci, IS_USB30_PLUGINFO(pluginfo));
 	/* assign a temporary non-null value indicating on-going vusb allocation */
 	vhci->vusbs[pluginfo->port] = VUSB_CREATING;
 	WdfSpinLockRelease(vhci->spin_lock);
@@ -341,20 +364,13 @@ plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 
 	WdfSpinLockAcquire(vhci->spin_lock);
 	if (vusb != NULL) {
-		WDFFILEOBJECT	fo = WdfRequestGetFileObject(req);
-		if (fo != NULL) {
-			pctx_safe_vusb_t	svusb = TO_SAFE_VUSB(fo);
+		pctx_safe_vusb_t	svusb = TO_SAFE_VUSB_FROM_REQ(req);
 
-			svusb->vhci = vhci;
-			svusb->port = pluginfo->port;
-			svusb->vusb = vusb;
-		}
-		else {
-			TRE(PLUGIN, "empty fileobject. setup failed");
-		}
+		svusb->port = pluginfo->port;
 		status = STATUS_SUCCESS;
 	}
 	vhci->vusbs[pluginfo->port] = vusb;
+	vhci->n_used_ports++;
 	WdfSpinLockRelease(vhci->spin_lock);
 
 	if ((vusb != NULL) && (vusb->is_simple_ep_alloc)) {

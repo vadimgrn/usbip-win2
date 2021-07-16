@@ -44,7 +44,6 @@ static int
 import_device(SOCKET sockfd, pvhci_pluginfo_t pluginfo, HANDLE *phdev)
 {
 	HANDLE	hdev;
-	int	port;
 	int	rc;
 
 	hdev = usbip_vhci_driver_open();
@@ -53,26 +52,20 @@ import_device(SOCKET sockfd, pvhci_pluginfo_t pluginfo, HANDLE *phdev)
 		return ERR_DRIVER;
 	}
 
-	port = usbip_vhci_get_free_port(hdev);
-	if (port < 0) {
-		dbg("no free port");
-		usbip_vhci_driver_close(hdev);
-		return ERR_PORTFULL;
-	}
-
-	dbg("got free port: %d", port);
-
-	pluginfo->port = port;
-
 	rc = usbip_vhci_attach_device(hdev, pluginfo);
 	if (rc < 0) {
-		dbg("failed to attach device: %d", rc);
+		if (rc == ERR_PORTFULL) {
+			dbg("no free port");
+		}
+		else {
+			dbg("failed to attach device: %d", rc);
+		}
 		usbip_vhci_driver_close(hdev);
-		return ERR_GENERAL;
+		return rc;
 	}
 
 	*phdev = hdev;
-	return port;
+	return pluginfo->port;
 }
 
 static pvhci_pluginfo_t

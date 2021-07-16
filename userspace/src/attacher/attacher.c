@@ -2,6 +2,7 @@
 #include <windows.h>
 
 #include "usbip_forward.h"
+#include "usbip_vhci_api.h"
 
 static HANDLE
 read_handle_value(HANDLE hStdin)
@@ -23,6 +24,14 @@ read_handle_value(HANDLE hStdin)
 	return handle;
 }
 
+static void
+shutdown_device(HANDLE hdev)
+{
+	unsigned long	unused;
+
+	DeviceIoControl(hdev, IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, NULL, 0, NULL, 0, &unused, NULL);
+}
+
 static BOOL
 setup_forwarder(void)
 {
@@ -36,6 +45,10 @@ setup_forwarder(void)
 	sockfd = read_handle_value(hStdin);
 
 	usbip_forward(hdev, sockfd, FALSE);
+	shutdown_device(hdev);
+
+	CloseHandle(sockfd);
+	CloseHandle(hdev);
 
 	CloseHandle(hStdin);
 	CloseHandle(hStdout);

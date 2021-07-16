@@ -1,8 +1,6 @@
 #include "vhci_driver.h"
 #include "vhci_hc.tmh"
 
-#define MAX_HUB_PORTS		16
-
 #include "usbip_vhci_api.h"
 
 extern NTSTATUS create_queue_hc(pctx_vhci_t vhci);
@@ -40,8 +38,8 @@ create_ucx_controller(WDFDEVICE hdev)
 
 	UDECX_WDF_DEVICE_CONFIG_INIT(&conf, controller_query_usb_capability);
 	conf.EvtUdecxWdfDeviceReset = controller_reset;
-	/* conf.NumberOfUsb30Ports=1 by UDECX_WDF_DEVICE_CONFIG_INIT */
-	conf.NumberOfUsb20Ports = MAX_HUB_PORTS;
+	conf.NumberOfUsb30Ports = MAX_HUB_30PORTS;
+	conf.NumberOfUsb20Ports = MAX_HUB_20PORTS;
 	/* UdecxWdfDeviceAddUsbDeviceEmulation() will fail if NumberOfUsb20Ports or NumberOfUsb30Ports is 0 */
 	status = UdecxWdfDeviceAddUsbDeviceEmulation(hdev, &conf);
 	if (NT_ERROR(status)) {
@@ -61,27 +59,9 @@ create_fileobject(_In_ 	WDFDEVICE hdev, WDFREQUEST req, _In_ WDFFILEOBJECT fo)
 	TRD(VHCI, "Enter");
 
 	svusb->vhci = vhci;
-	svusb->vusb = NULL;
+	svusb->port = (ULONG)-1;
 
 	WdfRequestComplete(req, STATUS_SUCCESS);
-
-	TRD(VHCI, "Leave");
-}
-
-static VOID
-cleanup_fileobject(_In_ WDFFILEOBJECT fo)
-{
-	pctx_safe_vusb_t	svusb = TO_SAFE_VUSB(fo);
-
-	TRD(VHCI, "Enter");
-
-	/*
-	 * Not sure but the vusb maybe already be destroyed.
-	 * So after checked, proceed to plug out.
-	 */
-	if (svusb->vusb != NULL && svusb->vhci->vusbs[svusb->port] == svusb->vusb) {
-		plugout_vusb(svusb->vhci, (CHAR)svusb->port);
-	}
 
 	TRD(VHCI, "Leave");
 }
@@ -95,7 +75,7 @@ setup_fileobject(PWDFDEVICE_INIT dinit)
 	PAGED_CODE();
 
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, ctx_safe_vusb_t);
-	WDF_FILEOBJECT_CONFIG_INIT(&conf, create_fileobject, NULL, cleanup_fileobject);
+	WDF_FILEOBJECT_CONFIG_INIT(&conf, create_fileobject, NULL, NULL);
 	WdfDeviceInitSetFileObjectConfig(dinit, &conf, &attrs);
 }
 
@@ -129,7 +109,8 @@ setup_vhci(pctx_vhci_t vhci)
 		TRE(VHCI, "failed to create spin lock: %!STATUS!", status);
 		return FALSE;
 	}
-	vhci->n_max_ports = MAX_HUB_PORTS;
+	vhci->n_max_ports = MAX_HUB_30PORTS + MAX_HUB_20PORTS;
+	vhci->n_used_ports = 0;
 
 	vhci->vusbs = ExAllocatePoolWithTag(NonPagedPool, sizeof(pctx_vusb_t) * vhci->n_max_ports, VHCI_POOLTAG);
 	if (vhci->vusbs == NULL) {

@@ -91,7 +91,7 @@ vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code,
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
 		status = vhci_plugin_vpdo(vhci, (pvhci_pluginfo_t)buffer, inlen, irpstack->FileObject);
-		*poutlen = 0;
+		*poutlen = sizeof(vhci_pluginfo_t);
 		break;
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
 		if (*poutlen == sizeof(ioctl_usbip_vhci_get_ports_status))

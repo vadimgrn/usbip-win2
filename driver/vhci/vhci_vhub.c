@@ -3,43 +3,51 @@
 #include "vhci_dev.h"
 #include "usbip_vhci_api.h"
 
-PAGEABLE pvpdo_dev_t
-vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
+static PAGEABLE pvpdo_dev_t
+find_vpdo(pvhub_dev_t vhub, unsigned port)
 {
 	PLIST_ENTRY	entry;
-
-	ExAcquireFastMutex(&vhub->Mutex);
 
 	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 		pvpdo_dev_t	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 
 		if (vpdo->port == port) {
-			vdev_add_ref((pvdev_t)vpdo);
-			ExReleaseFastMutex(&vhub->Mutex);
 			return vpdo;
 		}
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
-
 	return NULL;
 }
 
-PAGEABLE BOOLEAN
-vhub_is_empty_port(pvhub_dev_t vhub, ULONG port)
+PAGEABLE pvpdo_dev_t
+vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
 {
 	pvpdo_dev_t	vpdo;
 
-	vpdo = vhub_find_vpdo(vhub, port);
-	if (vpdo == NULL)
-		return TRUE;
-	if (vpdo->common.DevicePnPState == SurpriseRemovePending) {
-		vdev_del_ref((pvdev_t)vpdo);
-		return TRUE;
-	}
+	ExAcquireFastMutex(&vhub->Mutex);
+	vpdo = find_vpdo(vhub, port);
+	if (vpdo)
+		vdev_add_ref((pvdev_t)vpdo);
+	ExReleaseFastMutex(&vhub->Mutex);
 
-	vdev_del_ref((pvdev_t)vpdo);
-	return FALSE;
+	return vpdo;
+}
+
+PAGEABLE CHAR
+vhub_get_empty_port(pvhub_dev_t vhub)
+{
+	CHAR	i;
+
+	ExAcquireFastMutex(&vhub->Mutex);
+	for (i = 0; i < (CHAR)vhub->n_max_ports; i++) {
+		if (find_vpdo(vhub, i) == NULL) {
+			ExReleaseFastMutex(&vhub->Mutex);
+			return i;
+		}
+	}
+	ExReleaseFastMutex(&vhub->Mutex);
+
+	return -1;
 }
 
 PAGEABLE void

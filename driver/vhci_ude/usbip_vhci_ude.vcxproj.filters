@@ -123,6 +123,9 @@
     <ClCompile Include="vhci_urbr_store_reset.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="vhci_vusb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />

@@ -5,12 +5,15 @@
 
 EXTERN_C_START
 
+#define MAX_HUB_20PORTS		12
+#define MAX_HUB_30PORTS		4
+
 struct _ctx_vusb;
 
 typedef struct
 {
 	WDFDEVICE	hdev;
-	ULONG		n_max_ports;
+	ULONG		n_max_ports, n_used_ports;
 	WDFQUEUE	queue;
 	struct _ctx_vusb	**vusbs;
 	WDFSPINLOCK	spin_lock;
@@ -34,6 +37,9 @@ typedef struct _ctx_vusb
 	 */
 	BOOLEAN		is_simple_ep_alloc;
 	BOOLEAN		invalid;
+	/* reference count to prevent from removal while being used */
+	ULONG		refcnt;
+
 	// pending req which doesn't find an available urbr
 	WDFREQUEST	pending_req_read;
 	// a partially transferred urbr
@@ -69,6 +75,7 @@ typedef struct _ctx_vusb
 } ctx_vusb_t, *pctx_vusb_t;
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(ctx_vusb_t, TO_VUSB)
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(pctx_vusb_t, TO_PVUSB)
 
 typedef struct _ctx_ep
 {
@@ -90,15 +97,20 @@ typedef struct _ctx_safe_vusb
 {
 	pctx_vhci_t	vhci;
 	ULONG		port;
-	pctx_vusb_t	vusb;
 } ctx_safe_vusb_t, *pctx_safe_vusb_t;
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(ctx_safe_vusb_t, TO_SAFE_VUSB)
 
+#define TO_SAFE_VUSB_FROM_REQ(req)	TO_SAFE_VUSB(WdfRequestGetFileObject(req))
+
 #define VUSB_CREATING	((pctx_vusb_t)-1)
-#define VUSB_DELETING	((pctx_vusb_t)1)
-#define VUSB_IS_VALID(vusb)	((vusb) != NULL && (vusb) != VUSB_CREATING && (vusb) != VUSB_DELETING)
+#define VUSB_IS_VALID(vusb)	((vusb) != NULL && (vusb) != VUSB_CREATING && !(vusb)->invalid)
 
 extern NTSTATUS plugout_vusb(pctx_vhci_t vhci, CHAR port);
+
+extern pctx_vusb_t get_vusb(pctx_vhci_t vhci, ULONG port);
+extern pctx_vusb_t get_vusb_by_req(WDFREQUEST req);
+extern void put_vusb(pctx_vusb_t vusb);
+extern void put_vusb_passively(pctx_vusb_t vusb);
 
 EXTERN_C_END
