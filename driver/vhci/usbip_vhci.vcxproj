@@ -64,6 +64,8 @@
     <ClInclude Include="vhci_pnp.h" />
     <ClInclude Include="trace.h" />
     <ClInclude Include="usbreq.h" />
+    <ClInclude Include="vhci_vpdo.h" />
+    <ClInclude Include="vhci_vpdo_dsc.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip_vhci.inf" />

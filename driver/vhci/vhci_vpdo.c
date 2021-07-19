@@ -1,6 +1,6 @@
-#include "vhci.h"
+#include "vhci_vpdo.h"
 
-#include "vhci_dev.h"
+#include "vhci.h"
 #include "usbreq.h"
 #include "devconf.h"
 
@@ -47,7 +47,7 @@ vpdo_select_config(pvpdo_dev_t vpdo, struct _URB_SELECT_CONFIGURATION *urb_selc)
 }
 
 PAGEABLE NTSTATUS
-vpdo_select_interface(pvpdo_dev_t vpdo, PUSBD_INTERFACE_INFORMATION info_intf)
+vpdo_select_interface(pvpdo_dev_t vpdo, USBD_INTERFACE_INFORMATION *info_intf)
 {
 	NTSTATUS	status;
 

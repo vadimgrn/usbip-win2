@@ -3,15 +3,9 @@
 #include "usbip_proto.h"
 #include "usbreq.h"
 #include "usbd_helper.h"
-
-extern struct urb_req *
-find_sent_urbr(pvpdo_dev_t vpdo, struct usbip_header *hdr);
-extern NTSTATUS
-try_to_cache_descriptor(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, PUSB_COMMON_DESCRIPTOR dsc);
-extern NTSTATUS
-vpdo_select_config(pvpdo_dev_t vpdo, struct _URB_SELECT_CONFIGURATION *urb_selc);
-extern NTSTATUS
-vpdo_select_interface(pvpdo_dev_t vpdo, PUSBD_INTERFACE_INFORMATION info_intf);
+#include "vhci_vpdo.h"
+#include "vhci_vpdo_dsc.h"
+#include "usbreq.h"
 
 static BOOLEAN
 save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descriptor *iso_desc)

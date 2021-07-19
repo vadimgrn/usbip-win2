@@ -1,5 +1,5 @@
+#include "vhci_vpdo_dsc.h"
 #include "vhci.h"
-
 #include "vhci_dev.h"
 #include "usbreq.h"
 #include "usbip_proto.h"
