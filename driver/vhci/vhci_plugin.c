@@ -50,34 +50,22 @@ vhci_init_vpdo(pvpdo_dev_t vpdo)
 static void
 setup_vpdo_with_dsc_dev(pvpdo_dev_t vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
 {
-	if (dsc_dev) {
-		vpdo->vendor = dsc_dev->idVendor;
-		vpdo->product = dsc_dev->idProduct;
-		vpdo->revision = dsc_dev->bcdDevice;
-		vpdo->usbclass = dsc_dev->bDeviceClass;
-		vpdo->subclass = dsc_dev->bDeviceSubClass;
-		vpdo->protocol = dsc_dev->bDeviceProtocol;
-		vpdo->speed = get_usb_speed(dsc_dev->bcdUSB);
-		vpdo->num_configurations = dsc_dev->bNumConfigurations;
-	} else {
-		vpdo->vendor = 0;
-		vpdo->product = 0;
-		vpdo->revision = 0;
-		vpdo->usbclass = 0;
-		vpdo->subclass = 0;
-		vpdo->protocol = 0;
-		vpdo->speed = USB_SPEED_UNKNOWN;
-		vpdo->num_configurations = 0;
-	}
+	NT_ASSERT(dsc_dev);
+
+	vpdo->vendor = dsc_dev->idVendor;
+	vpdo->product = dsc_dev->idProduct;
+	vpdo->revision = dsc_dev->bcdDevice;
+	vpdo->usbclass = dsc_dev->bDeviceClass;
+	vpdo->subclass = dsc_dev->bDeviceSubClass;
+	vpdo->protocol = dsc_dev->bDeviceProtocol;
+	vpdo->speed = get_usb_speed(dsc_dev->bcdUSB);
+	vpdo->num_configurations = dsc_dev->bNumConfigurations;
 }
 
 static void
 setup_vpdo_with_dsc_conf(pvpdo_dev_t vpdo, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf)
 {
-	if (!dsc_conf) {
-		vpdo->inum = 0;
-		return;
-	}
+	NT_ASSERT(dsc_conf);
 
 	vpdo->inum = dsc_conf->bNumInterfaces;
 
