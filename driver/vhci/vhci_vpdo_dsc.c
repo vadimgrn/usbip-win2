@@ -82,21 +82,23 @@ vpdo_get_dsc_from_nodeconn(pvpdo_dev_t vpdo, PIRP irp, PUSB_DESCRIPTOR_REQUEST d
 static BOOLEAN
 need_caching_dsc(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, PUSB_COMMON_DESCRIPTOR dsc)
 {
+	USB_CONFIGURATION_DESCRIPTOR *dsc_conf = NULL;
+
 	switch (urb_cdr->DescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (vpdo->dsc_dev != NULL)
+		if (vpdo->dsc_dev) {
 			return FALSE;
+		}
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		if (vpdo->dsc_conf == NULL) {
-			PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf = (PUSB_CONFIGURATION_DESCRIPTOR)dsc;
-			if (dsc_conf->wTotalLength != urb_cdr->TransferBufferLength) {
-				DBGI(DBG_WRITE, "ignore non-full configuration descriptor\n");
-				return FALSE;
-			}
-		}
-		else
+		if (vpdo->dsc_conf) {
 			return FALSE;
+		}
+		dsc_conf = (USB_CONFIGURATION_DESCRIPTOR*)dsc;
+		if (urb_cdr->TransferBufferLength < dsc_conf->wTotalLength) {
+			DBGI(DBG_WRITE, "ignore non-full configuration descriptor\n");
+			return FALSE;
+		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
 		/* string descrptor will be fetched on demand */
@@ -104,22 +106,23 @@ need_caching_dsc(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_c
 	default:
 		return FALSE;
 	}
+
 	return TRUE;
 }
 
 void
 try_to_cache_descriptor(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, PUSB_COMMON_DESCRIPTOR dsc)
 {
-	PUSB_COMMON_DESCRIPTOR	dsc_new;
-
-	if (!need_caching_dsc(vpdo, urb_cdr, dsc))
+	if (!need_caching_dsc(vpdo, urb_cdr, dsc)) {
 		return;
+	}
 
-	dsc_new = ExAllocatePoolWithTag(PagedPool, urb_cdr->TransferBufferLength, USBIP_VHCI_POOL_TAG);
-	if (dsc_new == NULL) {
+	USB_COMMON_DESCRIPTOR *dsc_new = ExAllocatePoolWithTag(PagedPool, urb_cdr->TransferBufferLength, USBIP_VHCI_POOL_TAG);
+	if (!dsc_new) {
 		DBGE(DBG_WRITE, "out of memory\n");
 		return;
 	}
+
 	RtlCopyMemory(dsc_new, dsc, urb_cdr->TransferBufferLength);
 
 	switch (urb_cdr->DescriptorType) {
@@ -131,6 +134,5 @@ try_to_cache_descriptor(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST
 		break;
 	default:
 		ExFreePoolWithTag(dsc_new, USBIP_VHCI_POOL_TAG);
-		break;
 	}
 }
