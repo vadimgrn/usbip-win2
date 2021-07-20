@@ -1,21 +1,7 @@
-#include "vhci.h"
-
-#include "usbip_proto.h"
-#include "usbreq.h"
-#include "usbd_helper.h"
-
-extern struct urb_req *
-find_pending_urbr(pvpdo_dev_t vpdo);
-
-extern void
-set_cmd_submit_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid,
-	unsigned int direct, USBD_PIPE_HANDLE pipe, unsigned int flags, unsigned int len);
-
-extern NTSTATUS
-vhci_ioctl_abort_pipe(pvpdo_dev_t vpdo, USBD_PIPE_HANDLE hPipe);
-
-extern void
-set_cmd_unlink_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid, unsigned long seqnum_unlink);
+#include "vhci_read.h"
+#include "vhci_dbg.h"
+#include "vhci_proto.h"
+#include "vhci_internal_ioctl.h"
 
 static struct usbip_header *
 get_usbip_hdr_from_read_irp(PIRP irp)

@@ -1,9 +1,5 @@
-#include "vhci.h"
-
-#include "vhci_dev.h"
+#include "vhci_pnp_vpdo.h"
 #include "vhci_irp.h"
-
-extern PAGEABLE void vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 
 // IRP_MN_DEVICE_ENUMERATED is included by default since Windows 7.
 #if WINVER<0x0701

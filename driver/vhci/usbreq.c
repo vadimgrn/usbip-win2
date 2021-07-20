@@ -1,9 +1,7 @@
 #include "usbreq.h"
 #include "vhci.h"
 #include "usbip_proto.h"
-
-extern NTSTATUS
-store_urbr(PIRP irp, struct urb_req *urbr);
+#include "vhci_read.h"
 
 #ifdef DBG
 

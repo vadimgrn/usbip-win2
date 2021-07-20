@@ -27,5 +27,3 @@
 
 #define RESTORE_PREVIOUS_PNP_STATE(vdev)   \
         do { (vdev)->DevicePnPState = (vdev)->PreviousPnPState; } while (0)
-
-extern PAGEABLE NTSTATUS vhci_unplug_port(pvhci_dev_t vhci, CHAR port);

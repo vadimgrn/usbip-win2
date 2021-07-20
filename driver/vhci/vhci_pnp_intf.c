@@ -1,12 +1,9 @@
-#include "vhci.h"
-
-#include <wdmguid.h>
-#include <usbdi.h>
-#include <usbbusif.h>
-
+#include <initguid.h>
+#include "vhci_pnp_intf.h"
+#include "vhci_dbg.h"
 #include "usbip_proto.h"
-#include "vhci_dev.h"
 #include "vhci_irp.h"
+#include "strutil.h"
 
 static VOID
 ref_interface(__in PVOID Context)

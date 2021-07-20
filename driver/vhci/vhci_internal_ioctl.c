@@ -1,7 +1,5 @@
-#include "vhci.h"
-
-#include "vhci_dev.h"
-#include "usbreq.h"
+#include "vhci_internal_ioctl.h"
+#include "vhci_dbg.h"
 
 NTSTATUS
 vhci_ioctl_abort_pipe(pvpdo_dev_t vpdo, USBD_PIPE_HANDLE hPipe)

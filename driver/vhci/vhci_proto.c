@@ -1,13 +1,9 @@
-#include "vhci.h"
-
-#include "usbip_proto.h"
+#include "vhci_proto.h"
 #include "usbreq.h"
+#include "usbip_proto.h"
 
 #define USBDEVFS_URB_SHORT_NOT_OK	0x01
 #define USBDEVFS_URB_ISO_ASAP		0x02
-#define USBDEVFS_URB_NO_FSBR		0x20
-#define USBDEVFS_URB_ZERO_PACKET	0x40
-#define USBDEVFS_URB_NO_INTERRUPT	0x80
 
 unsigned int
 transflag(unsigned int flags)

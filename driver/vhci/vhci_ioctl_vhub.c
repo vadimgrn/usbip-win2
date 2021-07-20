@@ -1,34 +1,10 @@
+#include "vhci_ioctl_vhub.h"
+#include "vhci_ioctl_vhci.h"
 #include "vhci.h"
-
-#include "vhci_dev.h"
 #include "vhci_pnp.h"
-
-extern NTSTATUS
-vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen);
-
-extern NTSTATUS
-vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION nodeconn, PULONG poutlen);
-
-extern NTSTATUS
-vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX nodeconn, PULONG poutlen);
-
-extern NTSTATUS
-vpdo_get_nodeconn_info_ex_v2(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX_V2 nodeconn, PULONG poutlen);
-
-extern NTSTATUS
-vpdo_get_dsc_from_nodeconn(pvpdo_dev_t vpdo, PIRP irp, PUSB_DESCRIPTOR_REQUEST dsc_req, PULONG poutlen);
-
-extern NTSTATUS
-vhub_get_information_ex(pvhub_dev_t vhub, PUSB_HUB_INFORMATION_EX pinfo);
-
-extern NTSTATUS
-vhub_get_capabilities_ex(pvhub_dev_t vhub, PUSB_HUB_CAPABILITIES_EX pinfo);
-
-extern NTSTATUS
-vhub_get_port_connector_properties(pvhub_dev_t vhub, PUSB_PORT_CONNECTOR_PROPERTIES pinfo, PULONG poutlen);
-
-extern void
-vhub_get_hub_descriptor(pvhub_dev_t vhub, PUSB_HUB_DESCRIPTOR pdesc);
+#include "vhci_vpdo.h"
+#include "vhci_vpdo_dsc.h"
+#include "vhci_vhub.h"
 
 static PAGEABLE NTSTATUS
 get_node_info(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)

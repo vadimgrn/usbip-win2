@@ -1,10 +1,9 @@
+#include "vhci_wmi.h"
 #include "vhci.h"
-
-#include <wmistr.h>
-
-#include "vhci_dev.h"
 #include "usbip_vhci_api.h"
 #include "globals.h"
+
+#include <wmistr.h>
 
 static WMI_SET_DATAITEM_CALLBACK	vhci_SetWmiDataItem;
 static WMI_SET_DATABLOCK_CALLBACK	vhci_SetWmiDataBlock;

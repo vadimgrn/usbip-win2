@@ -1,18 +1,10 @@
-#include "vhci.h"
-
-#include <wdmsec.h> // for IoCreateDeviceSecure
-
+#include "vhci_plugin.h"
+#include "vhci_dbg.h"
+#include "strutil.h"
+#include "vhci_vhub.h"
 #include "vhci_pnp.h"
-#include "vhci_dev.h"
-#include "usbip_vhci_api.h"
-
 #include "usb_util.h"
 #include "devconf.h"
-
-extern CHAR vhub_get_empty_port(pvhub_dev_t vhub);
-extern void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
-
-extern void vhub_mark_unplugged_all_vpdos(pvhub_dev_t vhub);
 
 static PAGEABLE void
 vhci_init_vpdo(pvpdo_dev_t vpdo)

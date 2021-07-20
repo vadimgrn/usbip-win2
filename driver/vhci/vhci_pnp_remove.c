@@ -1,13 +1,12 @@
+#include "vhci_pnp_remove.h"
 #include "vhci.h"
-
+#include "vhci_dbg.h"
 #include "vhci_pnp.h"
 #include "vhci_irp.h"
+#include "vhci_wmi.h"
+#include "vhci_vhub.h"
 #include "usbip_vhci_api.h"
 #include "usbreq.h"
-
-extern NTSTATUS dereg_wmi(pvhci_dev_t vhci);
-
-extern PAGEABLE void vhub_detach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 
 static PAGEABLE void
 complete_pending_read_irp(pvpdo_dev_t vpdo)

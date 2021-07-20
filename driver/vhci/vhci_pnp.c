@@ -1,42 +1,16 @@
 #include "vhci.h"
 
-#include <wdmguid.h>
-
 #include "vhci_pnp.h"
+#include "vhci_pnp_id.h"
 #include "vhci_irp.h"
-
-extern NTSTATUS
-pnp_query_id(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack);
-
-extern NTSTATUS
-pnp_query_device_text(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack);
-
-extern NTSTATUS
-pnp_query_interface(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack);
-
-extern NTSTATUS
-pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack);
-
-extern NTSTATUS
-pnp_query_capabilities(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack);
-
-extern NTSTATUS
-pnp_start_device(pvdev_t vdev, PIRP irp);
-
-extern NTSTATUS
-pnp_remove_device(pvdev_t vdev, PIRP irp);
-
-extern BOOLEAN
-process_pnp_vpdo(pvpdo_dev_t vpdo, PIRP irp, PIO_STACK_LOCATION irpstack);
-
-extern NTSTATUS
-pnp_query_resource_requirements(pvdev_t vdev, PIRP irp);
-
-extern NTSTATUS
-pnp_query_resources(pvdev_t vdev, PIRP irp);
-
-extern NTSTATUS
-pnp_filter_resource_requirements(pvdev_t vdev, PIRP irp);
+#include "vhci_pnp_devtext.h"
+#include "vhci_pnp_intf.h"
+#include "vhci_pnp_relations.h"
+#include "vhci_pnp_cap.h"
+#include "vhci_pnp_start.h"
+#include "vhci_pnp_remove.h"
+#include "vhci_pnp_vpdo.h"
+#include "vhci_pnp_resources.h"
 
 #define IRP_PASS_DOWN_OR_SUCCESS(vdev, irp)			\
 	do {							\

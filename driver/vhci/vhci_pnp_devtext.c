@@ -1,6 +1,5 @@
+#include "vhci_pnp_devtext.h"
 #include "vhci.h"
-
-#include "vhci_dev.h"
 #include "vhci_irp.h"
 
 static LPCWSTR vdev_descs[] = {

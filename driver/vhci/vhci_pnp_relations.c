@@ -1,7 +1,6 @@
-#include "vhci.h"
-
-#include "vhci_dev.h"
+#include "vhci_pnp_relations.h"
 #include "vhci_irp.h"
+#include "vhci.h"
 
 static PAGEABLE void
 relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)

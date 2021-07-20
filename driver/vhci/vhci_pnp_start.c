@@ -1,10 +1,9 @@
-#include "vhci.h"
-
+#include "vhci_pnp_start.h"
+#include "vhci_dbg.h"
 #include "vhci_pnp.h"
 #include "vhci_irp.h"
+#include "vhci_wmi.h"
 #include "usbip_vhci_api.h"
-
-extern NTSTATUS reg_wmi(pvhci_dev_t vhci);
 
 static PAGEABLE NTSTATUS
 start_vhci(pvhci_dev_t vhci)

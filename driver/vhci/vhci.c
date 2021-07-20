@@ -1,10 +1,10 @@
 #include "vhci.h"
-
-#include <usbdi.h>
-
+#include "vhci_plugin.h"
 #include "globals.h"
 #include "usbreq.h"
 #include "vhci_pnp.h"
+
+#include <usbdi.h>
 
 //
 // Global Debug Level

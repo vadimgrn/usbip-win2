@@ -1,7 +1,6 @@
-#include "vhci.h"
-
-#include "vhci_dev.h"
+#include "vhci_pnp_resources.h"
 #include "vhci_irp.h"
+#include "vhci.h"
 
 static PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST
 get_query_empty_resource_requirements(void)

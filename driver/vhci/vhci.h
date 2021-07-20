@@ -7,7 +7,6 @@
 #include "basetype.h"
 #include "strutil.h"
 #include "vhci_dbg.h"
-#include "strutil.h"
 
 #define USBIP_VHCI_POOL_TAG (ULONG) 'VhcI'
 

@@ -1,7 +1,5 @@
-#include "vhci.h"
-
-#include "vhci_dev.h"
-#include "usbip_vhci_api.h"
+#include "vhci_vhub.h"
+#include "vhci_dbg.h"
 
 static PAGEABLE pvpdo_dev_t
 find_vpdo(pvhub_dev_t vhub, unsigned port)

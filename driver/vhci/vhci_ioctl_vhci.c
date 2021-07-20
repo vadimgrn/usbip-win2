@@ -1,15 +1,12 @@
+#include "vhci_ioctl_vhci.h"
 #include "vhci.h"
+#include "vhci_plugin.h"
+#include "vhci_pnp.h"
+#include "vhci_vhub.h"
+#include "vhci_ioctl_usrreq.h"
 
 #include <usbdi.h>
 #include <usbuser.h>
-
-#include "usbip_vhci_api.h"
-#include "vhci_pnp.h"
-
-extern NTSTATUS vhci_plugin_vpdo(pvhci_dev_t vhci, pvhci_pluginfo_t pluginfo, ULONG inlen, PFILE_OBJECT fo);
-extern NTSTATUS vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st);
-extern NTSTATUS vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imported_dev_t idevs, PULONG poutlen);
-extern NTSTATUS vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG poutlen);
 
 static PAGEABLE NTSTATUS
 get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)

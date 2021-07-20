@@ -1,3 +1,4 @@
+#include "vhci_pnp_id.h"
 #include "vhci.h"
 #include "vhci_pnp.h"
 #include "usbip_vhci_api.h"
@@ -44,7 +45,7 @@ static const size_t vdev_hwids_size[] = {
 	0, (31 + 22 + 1)*sizeof(WCHAR)
 };
 
-void subst_char(wchar_t *s, wchar_t ch, wchar_t rep)
+static void subst_char(wchar_t *s, wchar_t ch, wchar_t rep)
 {
 	for ( ; *s; ++s) {
 		if (*s == ch) {

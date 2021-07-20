@@ -1,4 +1,4 @@
-#include "vhci.h"
+#include "vhci_irp.h"
 
 PAGEABLE NTSTATUS
 irp_pass_down(PDEVICE_OBJECT devobj, PIRP irp)
