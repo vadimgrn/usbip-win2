@@ -1,6 +1,6 @@
 #include "vhci_urbr_fetch_bulk.h"
 #include "vhci_driver.h"
-
+#include "usbd_helper.h"
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
 #include "vhci_urbr_fetch.h"

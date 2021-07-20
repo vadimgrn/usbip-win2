@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+
 #include <ntddk.h>
 #include <usb.h>
 
@@ -17,3 +19,14 @@ ULONG get_iso_descs_len(ULONG n_pkts, const struct usbip_iso_packet_descriptor *
 ULONG get_usbd_iso_descs_len(ULONG n_pkts, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_descs);
 
 enum { USB_REQUEST_RESET_PIPE = 0xfe };
+
+__inline bool IsTransferDirectionIn(ULONG TransferFlags)
+{
+	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_IN;
+}
+
+__inline bool IsTransferDirectionOut(ULONG TransferFlags)
+{
+	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
+}
+

@@ -2,6 +2,7 @@
 #include "vhci_dbg.h"
 #include "vhci_proto.h"
 #include "vhci_internal_ioctl.h"
+#include "usbd_helper.h"
 
 static struct usbip_header *
 get_usbip_hdr_from_read_irp(PIRP irp)
@@ -301,7 +302,7 @@ store_urb_class_vendor(PIRP irp, PURB urb, struct urb_req *urbr)
 	struct usbip_header	*hdr;
 	usb_cspkt_t	*csp;
 	char	type, recip;
-	int	in = urb_vc->TransferFlags & USBD_TRANSFER_DIRECTION_IN ? 1: 0;
+	bool in = IsTransferDirectionIn(urb_vc->TransferFlags);
 
 	hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
@@ -617,7 +618,7 @@ store_urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
 {
 	struct _URB_CONTROL_TRANSFER	*urb_ctltrans = &urb->UrbControlTransfer;
 	struct usbip_header* hdr;
-	int	in = urb_ctltrans->TransferFlags & USBD_TRANSFER_DIRECTION_IN;
+	bool in = IsTransferDirectionIn(urb_ctltrans->TransferFlags);
 
 	hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {

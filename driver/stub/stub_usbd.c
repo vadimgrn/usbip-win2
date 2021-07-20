@@ -539,7 +539,7 @@ submit_iso_transfer(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe, unsigned 
 	purb_iso->StartFrame = start_frame;
 	to_usbd_iso_descs(n_pkts, purb_iso->IsoPacket, iso_descs, FALSE);
 
-	is_in = usbd_flags & USBD_TRANSFER_DIRECTION_IN ? TRUE: FALSE;
+	is_in = IsTransferDirectionIn(usbd_flags);
 	sres = create_stub_res(USBIP_RET_SUBMIT, seqnum, 0, is_in ? data: NULL, datalen, n_pkts, FALSE);
 	if (sres == NULL) {
 		USBD_UrbFree(devstub->hUSBD, purb);

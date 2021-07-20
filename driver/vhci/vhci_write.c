@@ -6,6 +6,7 @@
 #include "vhci_vpdo.h"
 #include "vhci_vpdo_dsc.h"
 #include "usbreq.h"
+#include "usbd_helper.h"
 
 static BOOLEAN
 save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descriptor *iso_desc)
@@ -170,7 +171,7 @@ store_urb_vendor_or_class(PURB urb, const struct usbip_header *hdr)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vendor_class = &urb->UrbControlVendorClassRequest;
 
-	if (urb_vendor_class->TransferFlags & USBD_TRANSFER_DIRECTION_IN) {
+	if (IsTransferDirectionIn(urb_vendor_class->TransferFlags)) {
 		NTSTATUS	status;
 		status = copy_to_transfer_buffer(urb_vendor_class->TransferBuffer, urb_vendor_class->TransferBufferMDL,
 			urb_vendor_class->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);

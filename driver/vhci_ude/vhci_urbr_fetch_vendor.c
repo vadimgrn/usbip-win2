@@ -1,8 +1,7 @@
 #include "vhci_urbr_fetch_vendor.h"
 #include "vhci_driver.h"
-
-#include <usbip_proto.h>
-
+#include "usbd_helper.h"
+#include "usbip_proto.h"
 #include "vhci_urbr.h"
 #include "vhci_urbr_fetch.h"
 

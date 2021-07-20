@@ -5,6 +5,7 @@
 #include <usbip_proto.h>
 #include "vhci_urbr.h"
 #include "vhci_proto.h"
+#include "usbd_helper.h"
 
 NTSTATUS
 store_urbr_bulk_partial(WDFREQUEST req_read, purb_req_t urbr)

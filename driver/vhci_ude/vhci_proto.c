@@ -2,6 +2,7 @@
 #include "vhci_driver.h"
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
+#include "usbd_helper.h"
 
 /*
  * <uapi/linux/usbdevice_fs.h>

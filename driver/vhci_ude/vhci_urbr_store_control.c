@@ -9,6 +9,7 @@
 #include "vhci_proto.h"
 
 #include "strutil.h"
+#include "usbd_helper.h"
 
 NTSTATUS
 store_urbr_control_transfer_partial(WDFREQUEST req_read, purb_req_t urbr)
