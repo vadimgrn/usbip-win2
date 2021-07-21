@@ -321,42 +321,36 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 }
 
 static void
-process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe, struct usbip_header *hdr)
+process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe, const struct usbip_header *hdr)
 {
-	PVOID	data;
-	ULONG	datalen;
-	struct usbip_iso_packet_descriptor	*iso_descs;
-	ULONG	usbd_flags, n_pkts;
-	int	iso_descs_len;
-	BOOLEAN	is_in;
-	NTSTATUS	status;
-
 	DBGI(DBG_READWRITE, "iso_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
 
-	is_in = hdr->base.direction ? TRUE : FALSE;
-	usbd_flags = to_usbd_flags(hdr->u.cmd_submit.transfer_flags);
-	if (is_in)
-		usbd_flags |= USBD_TRANSFER_DIRECTION_IN;
-	n_pkts = hdr->u.cmd_submit.number_of_packets;
-	iso_descs_len = sizeof(struct usbip_iso_packet_descriptor) * n_pkts;
+	ULONG datalen = 0;
+	PVOID data = NULL;
+	struct usbip_iso_packet_descriptor *iso_descs = NULL;
 
-	if (is_in) {
-		iso_descs = (struct usbip_iso_packet_descriptor *)(hdr + 1);
+	bool dir_in = hdr->base.direction == USBIP_DIR_IN;
+	ULONG TransferFlags = to_windows_flags(hdr->u.cmd_submit.transfer_flags, dir_in);
+
+	ULONG n_pkts = hdr->u.cmd_submit.number_of_packets;
+	size_t iso_descs_len = sizeof(*iso_descs)*n_pkts;
+
+	if (dir_in) {
+		iso_descs = (struct usbip_iso_packet_descriptor*)(hdr + 1);
 		datalen = get_iso_descs_len(n_pkts, iso_descs, FALSE);
-		data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen + sizeof(struct usbip_iso_packet_descriptor) * n_pkts, USBIP_STUB_POOL_TAG);
-		if (data == NULL) {
+		data = ExAllocatePoolWithTag(NonPagedPool, datalen + sizeof(*iso_descs)*n_pkts, USBIP_STUB_POOL_TAG);
+		if (!data) {
 			DBGE(DBG_GENERAL, "process_iso_transfer: out of memory\n");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
-		RtlCopyMemory((char *)data + datalen, iso_descs, iso_descs_len);
-	}
-	else {
+		RtlCopyMemory((char*)data + datalen, iso_descs, iso_descs_len);
+	} else {
 		/* Allocate more space for iso descriptors which will maintain length field */
-		datalen = (ULONG)hdr->u.cmd_submit.transfer_buffer_length;
-		iso_descs = (struct usbip_iso_packet_descriptor *)((char *)(hdr + 1) + datalen);
-		data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)(datalen + iso_descs_len), USBIP_STUB_POOL_TAG);
-		if (data == NULL) {
+		datalen = hdr->u.cmd_submit.transfer_buffer_length;
+		iso_descs = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + datalen);
+		data = ExAllocatePoolWithTag(NonPagedPool, datalen + iso_descs_len, USBIP_STUB_POOL_TAG);
+		if (!data) {
 			DBGE(DBG_GENERAL, "process_iso_transfer: out of memory\n");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
@@ -364,12 +358,14 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 		RtlCopyMemory((char *)data, hdr + 1, datalen + iso_descs_len);
 	}
 
-	status = submit_iso_transfer(devstub, info_pipe->PipeHandle, hdr->base.seqnum, usbd_flags, n_pkts,
+	NTSTATUS status = submit_iso_transfer(devstub, info_pipe->PipeHandle, hdr->base.seqnum, TransferFlags, n_pkts,
 		hdr->u.cmd_submit.start_frame, iso_descs, data, datalen);
+	
 	if (NT_ERROR(status)) {
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
-		if (is_in)
+		if (dir_in) {
 			ExFreePoolWithTag(data, USBIP_STUB_POOL_TAG);
+		}
 	}
 }
 

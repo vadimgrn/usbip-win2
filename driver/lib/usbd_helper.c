@@ -1,9 +1,5 @@
+#include "usbd_helper.h"
 #include "pdu.h"
-
-#include <usb.h>
-#include <usbdi.h>
-
-#include <stdbool.h>
 
 /*
  * Linux error codes.
@@ -146,16 +142,15 @@ to_usbip_status(USBD_STATUS status)
 		return -EBUSY_LNX;
 	}
 
-	return status < 0 ? -EINVAL_LNX : 0; /* see USBD_ERROR */
+	return USBD_ERROR(status) ? -EINVAL_LNX : 0;
 }
 
 /*
 * <linux/usb.h>, urb->transfer_flags
 */
 enum {
-	URB_SHORT_NOT_OK = 0x0001,
-	URB_ISO_ASAP = 0x0002,
-	URB_DIR_IN = 0x0200
+	URB_SHORT_NOT_OK = 0x0001, // report short reads as errors
+	URB_ISO_ASAP = 0x0002      // iso-only; use the first unexpired slot in the schedule
 };
 
  /*
@@ -178,25 +173,32 @@ enum {
  1.Direction in endpoint address or transfer flags should be ignored
  2.Direction is determined by bits of bmRequestType in the Setup packet (D7 Data Phase Transfer Direction) 
  */
-ULONG
-to_usbd_flags(int flags)
+ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in)
 {
-	ULONG TransferFlags = 0;
+	ULONG TransferFlags = dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT;
 
-	if (flags & URB_DIR_IN) {
-		TransferFlags |= USBD_TRANSFER_DIRECTION_IN;
-		if (!(flags & URB_SHORT_NOT_OK)) {
-			TransferFlags |= USBD_SHORT_TRANSFER_OK;
-		}
-	} else {
-		static_assert(!USBD_TRANSFER_DIRECTION_OUT, "assert");
+	if (dir_in && !(transfer_flags & URB_SHORT_NOT_OK)) {
+		TransferFlags |= USBD_SHORT_TRANSFER_OK;
 	}
 
-	if (flags & URB_ISO_ASAP) {
+	if (transfer_flags & URB_ISO_ASAP) {
 		TransferFlags |= USBD_START_ISO_TRANSFER_ASAP;
 	}
 
 	return TransferFlags;
+}
+
+UINT32 to_linux_flags(ULONG TransferFlags)
+{
+	UINT32 flags = 0;
+
+	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
+		flags |= URB_ISO_ASAP;
+	} else if (IsTransferDirectionIn(TransferFlags) && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
+		flags |= URB_SHORT_NOT_OK;
+	}
+
+	return flags;
 }
 
 void
