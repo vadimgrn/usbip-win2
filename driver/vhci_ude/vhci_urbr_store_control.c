@@ -76,6 +76,7 @@ store_urbr_control_transfer(WDFREQUEST req_read, purb_req_t urbr)
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, urbr->ep,
 		urb_ctltrans->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_ctltrans->TransferBufferLength);
+	
 	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, 8);
 
 	nread = sizeof(struct usbip_header);

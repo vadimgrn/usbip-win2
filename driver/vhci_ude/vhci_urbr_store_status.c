@@ -21,7 +21,7 @@ store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 
 	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, USBIP_DIR_IN, NULL,
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, true, NULL,
 		USBD_SHORT_TRANSFER_OK, urb_status->TransferBufferLength);
 
 	urbfunc = urb_status->Hdr.Function;

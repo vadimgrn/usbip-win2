@@ -54,7 +54,7 @@ store_urb_reset_dev(PIRP irp, struct urb_req *urbr)
 
 	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, false, 0, 0, 0);
 
 	build_setup_packet(csp, 0, BMREQUEST_CLASS, BMREQUEST_TO_OTHER, USB_REQUEST_SET_FEATURE);
 	csp->wLength = 0;

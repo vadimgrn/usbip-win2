@@ -18,8 +18,9 @@ store_urbr_dscr_dev(WDFREQUEST req_read, purb_req_t urbr)
 
 	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, USBIP_DIR_IN, NULL,
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, true, NULL,
 		USBD_SHORT_TRANSFER_OK, urb_dscr->TransferBufferLength);
+	
 	build_setup_packet(csp, USBIP_DIR_IN, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
 
 	csp->wLength = (unsigned short)urb_dscr->TransferBufferLength;
