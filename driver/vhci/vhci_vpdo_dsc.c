@@ -27,15 +27,16 @@ req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
 	return irp_done(irp, status);
 }
 
-PAGEABLE NTSTATUS
-vpdo_get_dsc_from_nodeconn(pvpdo_dev_t vpdo, PIRP irp, PUSB_DESCRIPTOR_REQUEST dsc_req, PULONG psize)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST *dsc_req, ULONG *psize)
 {
-	usb_cspkt_t	*csp = (usb_cspkt_t *)&dsc_req->SetupPacket;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&dsc_req->SetupPacket;
+	static_assert(sizeof(*setup) == sizeof(dsc_req->SetupPacket), "assert");
+
 	PVOID		dsc_data = NULL;
 	ULONG		dsc_len = 0;
 	NTSTATUS	status = STATUS_INVALID_PARAMETER;
 
-	switch (csp->wValue.HiByte) {
+	switch (setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		dsc_data = vpdo->dsc_dev;
 		if (dsc_data != NULL)
@@ -50,20 +51,20 @@ vpdo_get_dsc_from_nodeconn(pvpdo_dev_t vpdo, PIRP irp, PUSB_DESCRIPTOR_REQUEST d
 		status = req_fetch_dsc(vpdo, irp);
 		break;
 	default:
-		DBGE(DBG_GENERAL, "unhandled descriptor type: %s\n", dbg_usb_descriptor_type(csp->wValue.HiByte));
+		DBGE(DBG_GENERAL, "unhandled descriptor type: %s\n", dbg_usb_descriptor_type(setup->wValue.HiByte));
 		break;
 	}
 
-	if (dsc_data != NULL) {
-		ULONG	outlen = sizeof(USB_DESCRIPTOR_REQUEST) + dsc_len;
+	if (dsc_data) {
+		ULONG	outlen = sizeof(*dsc_req) + dsc_len;
 		ULONG	ncopy = outlen;
 
-		if (*psize < sizeof(USB_DESCRIPTOR_REQUEST)) {
+		if (*psize < sizeof(*dsc_req)) {
 			*psize = outlen;
 			return STATUS_BUFFER_TOO_SMALL;
 		}
 		if (*psize < outlen) {
-			ncopy = *psize - sizeof(USB_DESCRIPTOR_REQUEST);
+			ncopy = *psize - sizeof(*dsc_req);
 		}
 		status = STATUS_SUCCESS;
 		if (ncopy > 0)

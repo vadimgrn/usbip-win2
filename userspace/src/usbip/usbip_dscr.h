@@ -1,11 +1,7 @@
-#ifndef _USBIP_DSCR_H_
-#define _USBIP_DSCR_H_
+#pragma once
 
 #include <WinSock2.h>
+#include <usbspec.h>
 
-extern int
-fetch_device_descriptor(SOCKET sockfd, unsigned devid, char *dscr);
-extern int
-fetch_conf_descriptor(SOCKET sockfd, unsigned devid, char *dscr, unsigned short *plen);
-
-#endif /* _USBIP_DSCR_H_ */
+int fetch_device_descriptor(SOCKET sockfd, unsigned int devid, USB_DEVICE_DESCRIPTOR *dd);
+int fetch_conf_descriptor(SOCKET sockfd, unsigned int devid, USB_CONFIGURATION_DESCRIPTOR *cfgd, USHORT *wTotalLength);

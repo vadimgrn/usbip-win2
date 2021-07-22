@@ -77,7 +77,8 @@ store_urbr_control_transfer(WDFREQUEST req_read, purb_req_t urbr)
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, urbr->ep,
 		urb_ctltrans->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_ctltrans->TransferBufferLength);
 	
-	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, 8);
+	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, sizeof(urb_ctltrans->SetupPacket));
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_ctltrans->SetupPacket), "assert");
 
 	nread = sizeof(struct usbip_header);
 	if (!dir_in && urb_ctltrans->TransferBufferLength > 0) {
@@ -160,8 +161,8 @@ store_urbr_control_transfer_ex(WDFREQUEST req_read, purb_req_t urbr)
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, urbr->ep,
 		urb_ctltrans_ex->TransferFlags, urb_ctltrans_ex->TransferBufferLength);
 
-	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_ctltrans_ex->SetupPacket), "assert");
 	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans_ex->SetupPacket, sizeof(urb_ctltrans_ex->SetupPacket));
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_ctltrans_ex->SetupPacket), "assert");
 
 	nread = sizeof(struct usbip_header);
 	if (!dir_in && urb_ctltrans_ex->TransferBufferLength > 0) {

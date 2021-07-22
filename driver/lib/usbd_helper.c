@@ -6,15 +6,15 @@
  * See: include/uapi/asm-generic/errno-base.h, include/uapi/asm-generic/errno.h
  */
 enum {
-	ENOENT_LNX = ENOENT,
-	ENXIO_LNX = ENXIO,
-	ENOMEM_LNX = ENOMEM,
-	EBUSY_LNX = EBUSY,
-	EXDEV_LNX = EXDEV,
-	ENODEV_LNX = ENODEV,
-	EINVAL_LNX = EINVAL,
-	ENOSPC_LNX = ENOSPC,
-	EPIPE_LNX = EPIPE,
+	ENOENT_LNX = 2,
+	ENXIO_LNX = 6,
+	ENOMEM_LNX = 12,
+	EBUSY_LNX = 16,
+	EXDEV_LNX = 18,
+	ENODEV_LNX = 19,
+	EINVAL_LNX = 22,
+	ENOSPC_LNX = 28,
+	EPIPE_LNX = 32,
 	ETIME_LNX = 62,
 	ENOSR_LNX = 63,
 	ECOMM_LNX = 70,
@@ -27,27 +27,6 @@ enum {
 	EINPROGRESS_LNX = 115,
 	EREMOTEIO_LNX = 121,
 };
-
-static_assert(ENOENT == 2, "assert");
-static_assert(ENXIO == 6, "assert");
-static_assert(ENOMEM == 12, "assert");
-static_assert(EBUSY == 16, "assert");
-static_assert(EXDEV == 18, "assert");
-static_assert(ENODEV == 19, "assert");
-static_assert(EINVAL == 22, "assert");
-static_assert(ENOSPC == 28, "assert");
-static_assert(EPIPE == 32, "assert");
-static_assert(ETIME_LNX != ETIME, "assert");
-static_assert(ENOSR_LNX != ENOSR, "assert");
-//static_assert(ECOMM_LNX != ECOMM, "assert");
-static_assert(EPROTO_LNX != EPROTO, "assert");
-static_assert(EOVERFLOW_LNX != EOVERFLOW, "assert");
-static_assert(EILSEQ_LNX != EILSEQ, "assert");
-static_assert(ECONNRESET_LNX != ECONNRESET, "assert");
-//static_assert(ESHUTDOWN_LNX != ESHUTDOWN, "assert");
-static_assert(ETIMEDOUT_LNX != ETIMEDOUT, "assert");
-static_assert(EINPROGRESS_LNX != EINPROGRESS, "assert");
-//static_assert(EREMOTEIO_LNX != EREMOTEIO, "assert");
 
 /*
  * See:

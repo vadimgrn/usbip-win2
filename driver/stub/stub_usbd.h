@@ -26,4 +26,4 @@ submit_iso_transfer(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe, unsigned 
 	struct usbip_iso_packet_descriptor *iso_descs, PVOID data, ULONG datalen);
 
 BOOLEAN
-submit_control_transfer(usbip_stub_dev_t *devstub, usb_cspkt_t *csp, PVOID data, PULONG pdata_len);
+submit_control_transfer(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_PACKET *csp, PVOID data, PULONG pdata_len);

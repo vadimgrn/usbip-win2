@@ -1,11 +1,14 @@
 #pragma once
 
 #include <guiddef.h>
+
 #ifdef _NTDDK_
 #include <ntddk.h>
 #else
 #include <winioctl.h>
 #endif
+
+#include <usbspec.h>
 
 //
 // Define an Interface Guid for bus vhci class.
@@ -66,9 +69,9 @@ typedef struct _vhci_pluginfo
 	unsigned int	devid;
 	signed char	port;
 	wchar_t		wserial[MAX_VHCI_SERIAL_ID + 1];
-	unsigned char	dscr_dev[18];
+	USB_DEVICE_DESCRIPTOR dscr_dev;
 	/* variable length. It's a full-length configuration descriptor */
-	unsigned char	dscr_conf[9];
+	USB_CONFIGURATION_DESCRIPTOR dscr_conf;
 } vhci_pluginfo_t, *pvhci_pluginfo_t;
 
 /* usbip-win assumes max port is 127 */

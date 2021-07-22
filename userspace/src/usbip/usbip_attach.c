@@ -71,34 +71,36 @@ import_device(SOCKET sockfd, pvhci_pluginfo_t pluginfo, HANDLE *phdev)
 static pvhci_pluginfo_t
 build_pluginfo(SOCKET sockfd, unsigned devid)
 {
-	pvhci_pluginfo_t	pluginfo;
-	unsigned long	pluginfo_size;
-	unsigned short	conf_dscr_len;
+	USHORT wTotalLength = 0;
 
-	if (fetch_conf_descriptor(sockfd, devid, NULL, &conf_dscr_len) < 0) {
+	if (fetch_conf_descriptor(sockfd, devid, NULL, &wTotalLength) < 0) {
 		dbg("failed to get configuration descriptor size");
 		return NULL;
 	}
 
-	pluginfo_size = sizeof(vhci_pluginfo_t) + conf_dscr_len - 9;
-	pluginfo = (pvhci_pluginfo_t)malloc(pluginfo_size);
-	if (pluginfo == NULL) {
+	vhci_pluginfo_t *pluginfo = NULL;
+	unsigned long pluginfo_size = sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf);
+
+	pluginfo = malloc(pluginfo_size);
+	if (!pluginfo) {
 		dbg("out of memory or invalid vhci pluginfo size");
 		return NULL;
 	}
-	if (fetch_device_descriptor(sockfd, devid, pluginfo->dscr_dev) < 0) {
+	
+	pluginfo->size = pluginfo_size;
+	pluginfo->devid = devid;
+
+	if (fetch_device_descriptor(sockfd, devid, &pluginfo->dscr_dev) < 0) {
 		dbg("failed to fetch device descriptor");
 		free(pluginfo);
 		return NULL;
 	}
-	if (fetch_conf_descriptor(sockfd, devid, pluginfo->dscr_conf, &conf_dscr_len) < 0) {
+
+	if (fetch_conf_descriptor(sockfd, devid, &pluginfo->dscr_conf, &wTotalLength) < 0) {
 		dbg("failed to fetch configuration descriptor");
 		free(pluginfo);
 		return NULL;
 	}
-
-	pluginfo->size = pluginfo_size;
-	pluginfo->devid = devid;
 
 	return pluginfo;
 }

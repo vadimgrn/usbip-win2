@@ -85,49 +85,49 @@ setup_vpdo_with_dsc_conf(pvpdo_dev_t vpdo, PUSB_CONFIGURATION_DESCRIPTOR dsc_con
 }
 
 PAGEABLE NTSTATUS
-vhci_plugin_vpdo(pvhci_dev_t vhci, pvhci_pluginfo_t pluginfo, ULONG inlen, PFILE_OBJECT fo)
+vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_OBJECT *fo)
 {
-	PDEVICE_OBJECT	devobj;
-	pvpdo_dev_t	vpdo, devpdo_old;
-	PUSHORT		pdscr_fullsize;
-
 	PAGED_CODE();
 
-	if (inlen < sizeof(vhci_pluginfo_t)) {
-		DBGE(DBG_IOCTL, "too small input length: %lld < %lld", inlen, sizeof(vhci_pluginfo_t));
+	if (inlen < sizeof(*pluginfo)) {
+		DBGE(DBG_IOCTL, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
-	pdscr_fullsize = (PUSHORT)pluginfo->dscr_conf + 1;
-	if (inlen != sizeof(vhci_pluginfo_t) + *pdscr_fullsize - 9) {
-		DBGE(DBG_IOCTL, "invalid pluginfo format: %lld != %lld", inlen, sizeof(vhci_pluginfo_t) + *pdscr_fullsize - 9);
+
+	USHORT wTotalLength = pluginfo->dscr_conf.wTotalLength;
+
+	if (inlen != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
+		DBGE(DBG_IOCTL, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
 		return STATUS_INVALID_PARAMETER;
 	}
+
 	pluginfo->port = vhub_get_empty_port(VHUB_FROM_VHCI(vhci));
-	if (pluginfo->port < 0)
+	if (pluginfo->port < 0) {
 		return STATUS_END_OF_FILE;
+	}
 
 	DBGI(DBG_VPDO, "Plugin vpdo: port: %hhd\n", pluginfo->port);
 
-	if ((devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO)) == NULL)
+	PDEVICE_OBJECT devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO);
+	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
+	}
 
-	vpdo = DEVOBJ_TO_VPDO(devobj);
+	pvpdo_dev_t vpdo = DEVOBJ_TO_VPDO(devobj);
 	vpdo->common.parent = &VHUB_FROM_VHCI(vhci)->common;
 
-	setup_vpdo_with_dsc_dev(vpdo, (PUSB_DEVICE_DESCRIPTOR)pluginfo->dscr_dev);
-	setup_vpdo_with_dsc_conf(vpdo, (PUSB_CONFIGURATION_DESCRIPTOR)pluginfo->dscr_conf);
+	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);
+	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
 
-	if (pluginfo->wserial[0] != L'\0')
-		vpdo->winstid = libdrv_strdupW(pluginfo->wserial);
-	else
-		vpdo->winstid = NULL;
+	vpdo->winstid = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : NULL;
 
-	devpdo_old = (pvpdo_dev_t)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
+	vpdo_dev_t *devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
 	if (devpdo_old) {
 		DBGI(DBG_GENERAL, "you can't plugin again");
 		IoDeleteDevice(devobj);
 		return STATUS_INVALID_PARAMETER;
 	}
+
 	vpdo->port = pluginfo->port;
 	vpdo->fo = fo;
 	vpdo->devid = pluginfo->devid;

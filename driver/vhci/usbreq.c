@@ -18,15 +18,15 @@ dbg_urbr(struct urb_req *urbr)
 
 #endif
 
-void
-build_setup_packet(usb_cspkt_t *csp, unsigned char direct_in, unsigned char type, unsigned char recip, unsigned char request)
+void build_setup_packet(USB_DEFAULT_PIPE_SETUP_PACKET *setup, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
 {
-	csp->bmRequestType.B = 0;
-	csp->bmRequestType.Type = type;
-	if (direct_in)
-		csp->bmRequestType.Dir = BMREQUEST_DEVICE_TO_HOST;
-	csp->bmRequestType.Recipient = recip;
-	csp->bRequest = request;
+	setup->bmRequestType.B = 0; // clear reserved bits as well
+
+	setup->bmRequestType.Dir = dir;
+	setup->bmRequestType.Type = type;
+	setup->bmRequestType.Recipient = recip;
+
+	setup->bRequest = request;
 }
 
 struct urb_req *

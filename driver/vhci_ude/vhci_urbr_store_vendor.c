@@ -37,12 +37,10 @@ NTSTATUS
 store_urbr_vendor_class(WDFREQUEST req_read, purb_req_t urbr)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vendor_class = &urbr->u.urb.urb->UrbControlVendorClassRequest;
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
 	char	type, recip;
 	bool dir_in = IsTransferDirectionIn(urb_vendor_class->TransferFlags);
 
-	hdr = get_hdr_from_req_read(req_read);
+	struct usbip_header *hdr = get_hdr_from_req_read(req_read);
 	if (hdr == NULL)
 		return STATUS_BUFFER_TOO_SMALL;
 
@@ -83,26 +81,26 @@ store_urbr_vendor_class(WDFREQUEST req_read, purb_req_t urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, dir_in, NULL,
 		urb_vendor_class->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_vendor_class->TransferBufferLength);
 
-	build_setup_packet(csp, dir_in, type, recip, urb_vendor_class->Request);
-	//FIXME what is the usage of RequestTypeReservedBits?
-	csp->wLength = (unsigned short)urb_vendor_class->TransferBufferLength;
-	csp->wValue.W = urb_vendor_class->Value;
-	csp->wIndex.W = urb_vendor_class->Index;
+	UCHAR dir = dir_in ? BMREQUEST_DEVICE_TO_HOST : BMREQUEST_HOST_TO_DEVICE;
+	build_setup_packet(setup, dir, type, recip, urb_vendor_class->Request);
+	setup->wLength = (USHORT)urb_vendor_class->TransferBufferLength;
+	setup->wValue.W = urb_vendor_class->Value;
+	setup->wIndex.W = urb_vendor_class->Index;
 
 	if (!dir_in) {
 		if (get_read_payload_length(req_read) >= urb_vendor_class->TransferBufferLength) {
 			RtlCopyMemory(hdr + 1, urb_vendor_class->TransferBuffer, urb_vendor_class->TransferBufferLength);
-			WdfRequestSetInformation(req_read, sizeof(struct usbip_header) + urb_vendor_class->TransferBufferLength);
-		}
-		else {
-			WdfRequestSetInformation(req_read, sizeof(struct usbip_header));
-			urbr->ep->vusb->len_sent_partial = sizeof(struct usbip_header);
+			WdfRequestSetInformation(req_read, sizeof(*hdr) + urb_vendor_class->TransferBufferLength);
+		} else {
+			WdfRequestSetInformation(req_read, sizeof(*hdr));
+			urbr->ep->vusb->len_sent_partial = sizeof(*hdr);
 		}
 	}
+
 	return  STATUS_SUCCESS;
 }

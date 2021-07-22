@@ -17,6 +17,6 @@ const char *dbg_cspkt_reqtype(UCHAR reqtype);
 const char *dbg_cspkt_recipient(UCHAR recip);
 const char *dbg_cspkt_request(UCHAR req);
 const char *dbg_cspkt_desctype(UCHAR desctype);
-const char *dbg_ctlsetup_packet(usb_cspkt_t *csp);
+const char *dbg_ctlsetup_packet(const USB_DEFAULT_PIPE_SETUP_PACKET *csp);
 
 #endif

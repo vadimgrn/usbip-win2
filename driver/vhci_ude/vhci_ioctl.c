@@ -10,17 +10,15 @@
 static VOID
 get_ports_status(pctx_vhci_t vhci, ioctl_usbip_vhci_get_ports_status *ports_status)
 {
-	ULONG	i;
-
 	TRD(IOCTL, "Enter\n");
 
-	RtlZeroMemory(ports_status, sizeof(ioctl_usbip_vhci_get_ports_status));
+	RtlZeroMemory(ports_status, sizeof(*ports_status));
 
 	WdfSpinLockAcquire(vhci->spin_lock);
 
-	for (i = 0; i != vhci->n_max_ports; i++) {
-		pctx_vusb_t	vusb = vhci->vusbs[i];
-		if (vusb != NULL) {
+	for (ULONG i = 0; i != vhci->n_max_ports; i++) {
+		pctx_vusb_t vusb = vhci->vusbs[i];
+		if (vusb) {
 			ports_status->port_status[i] = 1;
 		}
 	}
@@ -108,33 +106,35 @@ ioctl_get_imported_devices(WDFQUEUE queue, WDFREQUEST req, size_t outlen)
 static NTSTATUS
 ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen, size_t outlen)
 {
-	pctx_vhci_t	vhci;
-	pvhci_pluginfo_t	pluginfo;
-	PUSHORT		pdscr_fullsize;
-	size_t		len;
-	NTSTATUS	status;
+	vhci_pluginfo_t *pluginfo = NULL;
 
-	if (inlen < sizeof(vhci_pluginfo_t)) {
-		TRE(IOCTL, "too small input length: %lld < %lld", inlen, sizeof(vhci_pluginfo_t));
+	if (inlen < sizeof(*pluginfo)) {
+		TRE(IOCTL, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
-	if (outlen < sizeof(vhci_pluginfo_t)) {
-		TRE(IOCTL, "too small output length: %lld < %lld", outlen, sizeof(vhci_pluginfo_t));
+
+	if (outlen < sizeof(*pluginfo)) {
+		TRE(IOCTL, "too small output length: %lld < %lld", outlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
-	status = WdfRequestRetrieveInputBuffer(req, sizeof(vhci_pluginfo_t), &pluginfo, &len);
+
+	size_t len = 0;
+	NTSTATUS status = WdfRequestRetrieveInputBuffer(req, sizeof(*pluginfo), &pluginfo, &len);
 	if (NT_ERROR(status)) {
 		TRE(IOCTL, "failed to get pluginfo buffer: %!STATUS!", status);
 		return status;
 	}
-	pdscr_fullsize = (PUSHORT)pluginfo->dscr_conf + 1;
-	if (len != sizeof(vhci_pluginfo_t) + *pdscr_fullsize - 9) {
-		TRE(IOCTL, "invalid pluginfo format: %lld != %lld", len, sizeof(vhci_pluginfo_t) + *pdscr_fullsize - 9);
+
+	USHORT wTotalLength = pluginfo->dscr_conf.wTotalLength;
+
+	if (len != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
+		TRE(IOCTL, "invalid pluginfo format: %lld != %lld", len, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
 		return STATUS_INVALID_PARAMETER;
 	}
-	vhci = *TO_PVHCI(queue);
 
-	WdfRequestSetInformation(req, sizeof(vhci_pluginfo_t));
+	ctx_vhci_t *vhci = *TO_PVHCI(queue);
+
+	WdfRequestSetInformation(req, sizeof(*pluginfo));
 	return plugin_vusb(vhci, req, pluginfo);
 }
 

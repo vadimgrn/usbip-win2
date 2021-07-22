@@ -29,7 +29,7 @@
 #define HDR_IS_CONTROL_TRANSFER(hdr)	((hdr)->base.ep == 0)
 
 static void
-process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	USHORT	op, idx = 0;
 	USHORT	data;
@@ -60,7 +60,7 @@ process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *
 }
 
 static void
-process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	UCHAR	descType = CSPKT_DESCRIPTOR_TYPE(csp);
 	PVOID	pdesc = NULL;
@@ -101,7 +101,7 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *cs
 }
 
 static void
-process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	PUSBD_PIPE_INFORMATION	info_pipe;
 
@@ -127,7 +127,7 @@ process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_
 }
 
 static void
-process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	int	res;
 
@@ -154,7 +154,7 @@ process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t 
 }
 
 static void
-process_select_conf(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_select_conf(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	if (select_usb_conf(devstub, csp->wValue.W))
 		reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
@@ -163,7 +163,7 @@ process_select_conf(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t 
 }
 
 static void
-process_select_intf(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_select_intf(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	if (select_usb_intf(devstub, (UCHAR)csp->wIndex.W, csp->wValue.W))
 		reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
@@ -172,7 +172,7 @@ process_select_intf(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t 
 }
 
 static void
-process_standard_request(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_cspkt_t *csp)
+process_standard_request(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	switch (csp->bRequest) {
 	case USB_REQUEST_GET_STATUS:
@@ -200,7 +200,7 @@ process_standard_request(usbip_stub_dev_t *devstub, unsigned int seqnum, usb_csp
 }
 
 static void
-process_class_vendor_request(usbip_stub_dev_t *devstub, usb_cspkt_t *csp, struct usbip_header *hdr, BOOLEAN vendorreq)
+process_class_vendor_request(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_PACKET *csp, struct usbip_header *hdr, BOOLEAN vendorreq)
 {
 	PVOID	data;
 	ULONG	datalen;
@@ -264,23 +264,21 @@ process_class_vendor_request(usbip_stub_dev_t *devstub, usb_cspkt_t *csp, struct
 static void
 process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 {
-	usb_cspkt_t	*csp;
-	UCHAR		reqType;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	DBGI(DBG_READWRITE, "control_transfer: seq:%u, csp:%s\n", hdr->base.seqnum, dbg_ctlsetup_packet(setup));
 
-	DBGI(DBG_READWRITE, "control_transfer: seq:%u, csp:%s\n", hdr->base.seqnum, dbg_ctlsetup_packet(csp));
+	UCHAR reqType = CSPKT_REQUEST_TYPE(setup);
 
-	reqType = CSPKT_REQUEST_TYPE(csp);
 	switch (reqType) {
 	case BMREQUEST_STANDARD:
-		process_standard_request(devstub, hdr->base.seqnum, csp);
+		process_standard_request(devstub, hdr->base.seqnum, setup);
 		break;
 	case BMREQUEST_CLASS:
-		process_class_vendor_request(devstub, csp, hdr, FALSE);
+		process_class_vendor_request(devstub, setup, hdr, FALSE);
 		break;
 	case BMREQUEST_VENDOR:
-		process_class_vendor_request(devstub, csp, hdr, TRUE);
+		process_class_vendor_request(devstub, setup, hdr, TRUE);
 		break;
 	default:
 		DBGE(DBG_READWRITE, "invalid request type:", dbg_cspkt_reqtype(reqType));
@@ -433,11 +431,10 @@ process_cmd_submit(usbip_stub_dev_t *devstub, PIRP irp, struct usbip_header *hdr
 		process_control_transfer(devstub, hdr);
 	}
 	else {
-		usb_cspkt_t *csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
-		if (CSPKT_REQUEST_TYPE(csp) == BMREQUEST_STANDARD && CSPKT_RECIPIENT(csp) == BMREQUEST_TO_ENDPOINT && CSPKT_REQUEST(csp) == USB_REQUEST_RESET_PIPE) {
+		USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
+		if (CSPKT_REQUEST_TYPE(setup) == BMREQUEST_STANDARD && CSPKT_RECIPIENT(setup) == BMREQUEST_TO_ENDPOINT && CSPKT_REQUEST(setup) == USB_REQUEST_RESET_PIPE) {
 			process_reset_pipe(devstub, hdr);
-		}
-		else {
+		} else {
 			process_data_transfer(devstub, hdr);
 		}
 	}

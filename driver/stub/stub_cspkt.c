@@ -75,7 +75,7 @@ dbg_cspkt_desctype(UCHAR desctype)
 }
 
 const char *
-dbg_ctlsetup_packet(usb_cspkt_t *csp)
+dbg_ctlsetup_packet(const USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
 	static char	buf[1024];
 	int	n;

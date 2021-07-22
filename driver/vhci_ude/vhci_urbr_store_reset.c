@@ -8,23 +8,21 @@
 NTSTATUS
 store_urbr_reset_pipe(WDFREQUEST req_read, purb_req_t urbr)
 {
-	struct usbip_header *hdr;
-	usb_cspkt_t *csp;
-
-	hdr = get_hdr_from_req_read(req_read);
+	struct usbip_header *hdr = get_hdr_from_req_read(req_read);
 	if (hdr == NULL)
 		return STATUS_BUFFER_TOO_SMALL;
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, false, 0, 0, 0);
-	build_setup_packet(csp, 0, BMREQUEST_STANDARD, BMREQUEST_TO_ENDPOINT, USB_REQUEST_CLEAR_FEATURE);
-	csp->wIndex.LowByte = urbr->ep->addr; // Specify enpoint address and direction
-	csp->wIndex.HiByte = 0;
-	csp->wValue.W = 0; // clear ENDPOINT_HALT
-	csp->wLength = 0;
+	
+	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_ENDPOINT, USB_REQUEST_CLEAR_FEATURE);
+	setup->wIndex.LowByte = urbr->ep->addr; // Specify enpoint address and direction
+	setup->wIndex.HiByte = 0;
+	setup->wValue.W = 0; // clear ENDPOINT_HALT
+	setup->wLength = 0;
 
-	WdfRequestSetInformation(req_read, sizeof(struct usbip_header));
+	WdfRequestSetInformation(req_read, sizeof(*hdr));
 
 	return STATUS_SUCCESS;
 }

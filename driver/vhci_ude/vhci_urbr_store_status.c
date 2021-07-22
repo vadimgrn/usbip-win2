@@ -10,16 +10,14 @@ NTSTATUS
 store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 {
 	struct _URB_CONTROL_GET_STATUS_REQUEST	*urb_status = &urbr->u.urb.urb->UrbControlGetStatusRequest;
-	struct usbip_header	*hdr;
 	USHORT		urbfunc;
 	char		recip;
-	usb_cspkt_t	*csp;
 
-	hdr = get_hdr_from_req_read(req_read);
+	struct usbip_header *hdr = get_hdr_from_req_read(req_read);
 	if (hdr == NULL)
 		return STATUS_BUFFER_TOO_SMALL;
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->ep->vusb->devid, true, NULL,
 		USBD_SHORT_TRANSFER_OK, urb_status->TransferBufferLength);
@@ -45,12 +43,11 @@ store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	build_setup_packet(csp, USBIP_DIR_IN, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
+	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
+	setup->wLength = (USHORT)urb_status->TransferBufferLength;
+	setup->wIndex.W = urb_status->Index;
+	setup->wValue.W = 0;
 
-	csp->wLength = (unsigned short)urb_status->TransferBufferLength;
-	csp->wIndex.W = urb_status->Index;
-	csp->wValue.W = 0;
-
-	WdfRequestSetInformation(req_read, sizeof(struct usbip_header));
+	WdfRequestSetInformation(req_read, sizeof(*hdr));
 	return STATUS_SUCCESS;
 }

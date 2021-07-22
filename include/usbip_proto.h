@@ -29,7 +29,7 @@ enum usb_device_speed {
 	USB_SPEED_SUPER_PLUS			/* usb 3.1 */
 };
 
-#pragma pack(push,1)
+#include <PSHPACK1.H>
 
 /*
  * USB/IP request headers.
@@ -90,7 +90,7 @@ struct usbip_header_cmd_submit {
 	INT32	interval;
 
 	/* set setup packet data for a CTRL request */
-	UINT8	setup[8];
+	UINT8	setup[8]; // USB_DEFAULT_PIPE_SETUP_PACKET in <usbspec.h>
 };
 
 /*
@@ -140,4 +140,4 @@ struct usbip_header {
 	} u;
 };
 
-#pragma pack(pop)
+#include <POPPACK.H>

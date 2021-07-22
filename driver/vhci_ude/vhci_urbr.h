@@ -55,8 +55,7 @@ get_data_from_req_read(WDFREQUEST req_read, ULONG length);
 ULONG
 get_read_payload_length(WDFREQUEST req_read);
 
-void
-build_setup_packet(usb_cspkt_t *csp, unsigned char direct_in, unsigned char type, unsigned char recip, unsigned char request);
+void build_setup_packet(USB_DEFAULT_PIPE_SETUP_PACKET *setup, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request);
 
 purb_req_t
 find_sent_urbr(pctx_vusb_t vusb, struct usbip_header *hdr);

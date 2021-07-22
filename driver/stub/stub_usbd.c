@@ -549,7 +549,7 @@ submit_iso_transfer(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe, unsigned 
 }
 
 BOOLEAN
-submit_control_transfer(usbip_stub_dev_t *devstub, usb_cspkt_t *csp, PVOID data, PULONG pdata_len)
+submit_control_transfer(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_PACKET *csp, PVOID data, PULONG pdata_len)
 {
 	struct _URB_CONTROL_TRANSFER	UrbControl;
 	ULONG		flags = USBD_DEFAULT_PIPE_TRANSFER;

@@ -44,24 +44,21 @@ get_read_payload_length(PIRP irp)
 static NTSTATUS
 store_urb_reset_dev(PIRP irp, struct urb_req *urbr)
 {
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
-
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, false, 0, 0, 0);
 
-	build_setup_packet(csp, 0, BMREQUEST_CLASS, BMREQUEST_TO_OTHER, USB_REQUEST_SET_FEATURE);
-	csp->wLength = 0;
-	csp->wValue.LowByte = 4; // Reset
-	csp->wIndex.W = 0;
+	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_CLASS, BMREQUEST_TO_OTHER, USB_REQUEST_SET_FEATURE);
+	setup->wLength = 0;
+	setup->wValue.LowByte = 4; // Reset
+	setup->wIndex.W = 0;
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	irp->IoStatus.Information = sizeof(*hdr);
 
 	return STATUS_SUCCESS;
 }
@@ -70,7 +67,6 @@ static NTSTATUS
 store_urb_dsc_req(PIRP irp, struct urb_req *urbr)
 {
 	struct usbip_header *hdr;
-	usb_cspkt_t *csp;
 	PUSB_DESCRIPTOR_REQUEST dsc_req;
 	PIO_STACK_LOCATION	irpstack;
 	ULONG	outlen;
@@ -81,18 +77,19 @@ store_urb_dsc_req(PIRP irp, struct urb_req *urbr)
 	}
 
 	dsc_req = (PUSB_DESCRIPTOR_REQUEST)urbr->irp->AssociatedIrp.SystemBuffer;
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(USB_DESCRIPTOR_REQUEST);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, outlen);
-	build_setup_packet(csp, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
-	csp->wValue.W = dsc_req->SetupPacket.wValue;
-	csp->wIndex.W = dsc_req->SetupPacket.wIndex;
-	csp->wLength = dsc_req->SetupPacket.wLength;
+	
+	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
+	setup->wValue.W = dsc_req->SetupPacket.wValue;
+	setup->wIndex.W = dsc_req->SetupPacket.wIndex;
+	setup->wLength = dsc_req->SetupPacket.wLength;
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	irp->IoStatus.Information = sizeof(*hdr);
 
 	return STATUS_SUCCESS;
 }
@@ -103,33 +100,33 @@ store_urb_reset_pipe(PIRP irp, PURB urb, struct urb_req *urbr)
 	/* 1. We clear STALL/HALT feature on endpoint specified by pipe
 	 * 2. We abort/cancel all IRP for given pipe
 	 */
-	struct _URB_PIPE_REQUEST	*urb_rp = &urb->UrbPipeRequest;
-	struct usbip_header	*hdr;
-	int	in, type;
+	struct _URB_PIPE_REQUEST *urb_rp = &urb->UrbPipeRequest;
 
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	in = PIPE2DIRECT(urb_rp->PipeHandle);
-	type = PIPE2TYPE(urb_rp->PipeHandle);
+	int dir = PIPE2DIRECT(urb_rp->PipeHandle);
+	int type = PIPE2TYPE(urb_rp->PipeHandle);
+
 	if (type == USB_ENDPOINT_TYPE_CONTROL) {
 		DBGW(DBG_READ, "CLEAR not allowed to a control pipe\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
-	RtlZeroMemory(hdr->u.cmd_submit.setup, 8);
 
-	usb_cspkt_t *csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
-	build_setup_packet(csp, 0, BMREQUEST_STANDARD, BMREQUEST_TO_ENDPOINT, USB_REQUEST_CLEAR_FEATURE);
-	csp->wIndex.LowByte = PIPE2ADDR(urb_rp->PipeHandle) | (unsigned char)(in << 7); // Specify enpoint address and direction
-	csp->wIndex.HiByte = 0;
-	csp->wValue.W = 0; // clear ENDPOINT_HALT
-	csp->wLength = 0;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
+	RtlZeroMemory(setup, sizeof(*setup));
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_ENDPOINT, USB_REQUEST_CLEAR_FEATURE);
+	setup->wIndex.LowByte = PIPE2ADDR(urb_rp->PipeHandle) | (unsigned char)(dir << 7); // Specify enpoint address and direction
+	setup->wIndex.HiByte = 0;
+	setup->wValue.W = 0; // clear ENDPOINT_HALT
+	setup->wLength = 0;
+
+	irp->IoStatus.Information = sizeof(*hdr);
 
 	// cancel/abort all URBs for given pipe
 	vhci_ioctl_abort_pipe(urbr->vpdo, urb_rp->PipeHandle);
@@ -154,40 +151,37 @@ static NTSTATUS
 store_urb_get_dev_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
-
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
 				    USBD_SHORT_TRANSFER_OK, urb_desc->TransferBufferLength);
-	build_setup_packet(csp, USBIP_DIR_IN, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
-
-	csp->wLength = (unsigned short)urb_desc->TransferBufferLength;
-	csp->wValue.HiByte = urb_desc->DescriptorType;
-	csp->wValue.LowByte = urb_desc->Index;
+	
+	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
+	setup->wLength = (USHORT)urb_desc->TransferBufferLength;
+	setup->wValue.HiByte = urb_desc->DescriptorType;
+	setup->wValue.LowByte = urb_desc->Index;
 
 	switch (urb_desc->DescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		csp->wIndex.W = 0;
+		setup->wIndex.W = 0;
 		break;
 	case USB_INTERFACE_DESCRIPTOR_TYPE:
-		csp->wIndex.W = urb_desc->Index;
+		setup->wIndex.W = urb_desc->Index;
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
-		csp->wIndex.W = urb_desc->LanguageId;
+		setup->wIndex.W = urb_desc->LanguageId;
 		break;
 	default:
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -195,17 +189,15 @@ static NTSTATUS
 store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_GET_STATUS_REQUEST	*urb_gsr = &urb->UrbControlGetStatusRequest;
-	struct usbip_header	*hdr;
 	USHORT		code_func;
 	char		recip;
-	usb_cspkt_t	*csp;
 
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
 				    USBD_SHORT_TRANSFER_OK, urb_gsr->TransferBufferLength);
@@ -232,13 +224,12 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	build_setup_packet(csp, USBIP_DIR_IN, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
+	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
+	setup->wLength = (USHORT)urb_gsr->TransferBufferLength;
+	setup->wIndex.W = urb_gsr->Index;
+	setup->wValue.W = 0;
 
-	csp->wLength = (unsigned short)urb_gsr->TransferBufferLength;
-	csp->wIndex.W = urb_gsr->Index;
-	csp->wValue.W = 0;
-
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -246,26 +237,23 @@ static NTSTATUS
 store_urb_get_intf_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
-
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
 				    USBD_SHORT_TRANSFER_OK, urb_desc->TransferBufferLength);
-	build_setup_packet(csp, USBIP_DIR_IN, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_GET_DESCRIPTOR);
+	
+	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_GET_DESCRIPTOR);
+	setup->wLength = (USHORT)urb_desc->TransferBufferLength;
+	setup->wValue.HiByte = urb_desc->DescriptorType;
+	setup->wValue.LowByte = urb_desc->Index;
+	setup->wIndex.W = urb_desc->LanguageId;
 
-	csp->wLength = (unsigned short)urb_desc->TransferBufferLength;
-	csp->wValue.HiByte = urb_desc->DescriptorType;
-	csp->wValue.LowByte = urb_desc->Index;
-	csp->wIndex.W = urb_desc->LanguageId;
-
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -299,12 +287,10 @@ static NTSTATUS
 store_urb_class_vendor(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vc = &urb->UrbControlVendorClassRequest;
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
 	char	type, recip;
-	bool in = IsTransferDirectionIn(urb_vc->TransferFlags);
+	bool dir_in = IsTransferDirectionIn(urb_vc->TransferFlags);
 
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
@@ -346,51 +332,52 @@ store_urb_class_vendor(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, in, 0,
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0,
 				    urb_vc->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_vc->TransferBufferLength);
-	build_setup_packet(csp, (unsigned char)in, type, recip, urb_vc->Request);
-	//FIXME what is the usage of RequestTypeReservedBits?
-	csp->wLength = (unsigned short)urb_vc->TransferBufferLength;
-	csp->wValue.W = urb_vc->Value;
-	csp->wIndex.W = urb_vc->Index;
+	
+	UCHAR dir = dir_in ? BMREQUEST_DEVICE_TO_HOST : BMREQUEST_HOST_TO_DEVICE;
+	build_setup_packet(setup, dir, type, recip, urb_vc->Request);
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	setup->wLength = (USHORT)urb_vc->TransferBufferLength;
+	setup->wValue.W = urb_vc->Value;
+	setup->wIndex.W = urb_vc->Index;
 
-	if (!in) {
+	irp->IoStatus.Information = sizeof(*hdr);
+
+	if (!dir_in) {
 		if (get_read_payload_length(irp) >= urb_vc->TransferBufferLength) {
 			RtlCopyMemory(hdr + 1, urb_vc->TransferBuffer, urb_vc->TransferBufferLength);
 			irp->IoStatus.Information += urb_vc->TransferBufferLength;
-		}
-		else {
-			urbr->vpdo->len_sent_partial = sizeof(struct usbip_header);
+		} else {
+			urbr->vpdo->len_sent_partial = sizeof(*hdr);
 		}
 	}
+
 	return  STATUS_SUCCESS;
 }
 
 static NTSTATUS
 store_urb_select_config(PIRP irp, PURB urb, struct urb_req *urbr)
 {
-	struct _URB_SELECT_CONFIGURATION	*urb_sc = &urb->UrbSelectConfiguration;
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
+	struct _URB_SELECT_CONFIGURATION *urb_sc = &urb->UrbSelectConfiguration;
 
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
-	build_setup_packet(csp, 0, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_SET_CONFIGURATION);
-	csp->wLength = 0;
-	csp->wValue.W = urb_sc->ConfigurationDescriptor->bConfigurationValue;
-	csp->wIndex.W = 0;
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_SET_CONFIGURATION);
+	setup->wLength = 0;
+	setup->wValue.W = urb_sc->ConfigurationDescriptor->bConfigurationValue;
+	setup->wIndex.W = 0;
+
+	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -398,23 +385,21 @@ static NTSTATUS
 store_urb_select_interface(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_SELECT_INTERFACE	*urb_si = &urb->UrbSelectInterface;
-	struct usbip_header	*hdr;
-	usb_cspkt_t	*csp;
-
-	hdr = get_usbip_hdr_from_read_irp(irp);
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	csp = (usb_cspkt_t *)hdr->u.cmd_submit.setup;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
-	build_setup_packet(csp, 0, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_SET_INTERFACE);
-	csp->wLength = 0;
-	csp->wValue.W = urb_si->Interface.AlternateSetting;
-	csp->wIndex.W = urb_si->Interface.InterfaceNumber;
+	
+	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_SET_INTERFACE);
+	setup->wLength = 0;
+	setup->wValue.W = urb_si->Interface.AlternateSetting;
+	setup->wIndex.W = urb_si->Interface.InterfaceNumber;
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	irp->IoStatus.Information = sizeof(*hdr);
 	return  STATUS_SUCCESS;
 }
 
@@ -462,9 +447,10 @@ store_urb_bulk(PIRP irp, PURB urb, struct urb_req *urbr)
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, in, urb_bi->PipeHandle,
 				    urb_bi->TransferFlags, urb_bi->TransferBufferLength);
-	RtlZeroMemory(hdr->u.cmd_submit.setup, 8);
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	RtlZeroMemory(hdr->u.cmd_submit.setup, sizeof(hdr->u.cmd_submit.setup));
+
+	irp->IoStatus.Information = sizeof(*hdr);
 
 	if (!in) {
 		if (get_read_payload_length(irp) >= urb_bi->TransferBufferLength) {
@@ -472,11 +458,11 @@ store_urb_bulk(PIRP irp, PURB urb, struct urb_req *urbr)
 			if (buf == NULL)
 				return STATUS_INSUFFICIENT_RESOURCES;
 			RtlCopyMemory(hdr + 1, buf, urb_bi->TransferBufferLength);
-		}
-		else {
+		} else {
 			urbr->vpdo->len_sent_partial = sizeof(struct usbip_header);
 		}
 	}
+
 	return STATUS_SUCCESS;
 }
 
@@ -493,8 +479,7 @@ copy_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 
 	if (PIPE2DIRECT(urb_iso->PipeHandle)) {
 		iso_desc = (struct usbip_iso_packet_descriptor *)dst;
-	}
-	else {
+	} else {
 		RtlCopyMemory(dst, buf, urb_iso->TransferBufferLength);
 		iso_desc = (struct usbip_iso_packet_descriptor *)((char *)dst + urb_iso->TransferBufferLength);
 	}
@@ -533,7 +518,7 @@ get_iso_payload_len(struct _URB_ISOCH_TRANSFER *urb_iso)
 static NTSTATUS
 store_urb_iso_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
-	struct _URB_ISOCH_TRANSFER	*urb_iso = &urb->UrbIsochronousTransfer;
+	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
 	ULONG	len_iso;
 	PVOID	dst;
 
@@ -553,7 +538,7 @@ store_urb_iso_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 static NTSTATUS
 store_urb_iso(PIRP irp, PURB urb, struct urb_req *urbr)
 {
-	struct _URB_ISOCH_TRANSFER	*urb_iso = &urb->UrbIsochronousTransfer;
+	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
 	struct usbip_header	*hdr;
 	int	in, type;
 
@@ -628,7 +613,9 @@ store_urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, in, urb_ctltrans->PipeHandle,
 		urb_ctltrans->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_ctltrans->TransferBufferLength);
-	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, 8);
+
+	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, sizeof(urb_ctltrans->SetupPacket));
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_ctltrans->SetupPacket), "assert");
 
 	irp->IoStatus.Information = sizeof(struct usbip_header);
 
@@ -687,7 +674,9 @@ store_urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, in, urb_control_ex->PipeHandle,
 		urb_control_ex->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_control_ex->TransferBufferLength);
-	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_control_ex->SetupPacket, 8);
+
+	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_control_ex->SetupPacket, sizeof(urb_control_ex->SetupPacket));
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_control_ex->SetupPacket), "assert");
 
 	irp->IoStatus.Information = sizeof(struct usbip_header);
 
