@@ -105,8 +105,7 @@ invalidate_vhub(pvhub_dev_t vhub)
 	DBGI(DBG_PNP, "invalidating vhub device object: 0x%p\n", TO_DEVOBJ(vhub));
 }
 
-static PAGEABLE void
-invalidate_vpdo(pvpdo_dev_t vpdo)
+static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);
@@ -115,9 +114,14 @@ invalidate_vpdo(pvpdo_dev_t vpdo)
 
 	IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, FALSE);
 
-	if (vpdo->winstid != NULL) {
-		ExFreePoolWithTag(vpdo->winstid, USBIP_VHCI_POOL_TAG);
-		vpdo->winstid = NULL;
+	if (vpdo->serial) {
+		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
+		vpdo->serial = NULL;
+	}
+
+	if (vpdo->serial_usr) {
+		libdrv_free(vpdo->serial_usr);
+		vpdo->serial_usr = NULL;
 	}
 
 	//FIXME

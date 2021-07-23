@@ -184,36 +184,36 @@ if a bus-supplied instance ID is unique across the system, as follows:
 
 An instance ID is persistent across system restarts.
 */
-static NTSTATUS
-setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp, bool serial)
+static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP *irp, bool want_serial)
 {
 	UNREFERENCED_PARAMETER(subst_result);
 	UNREFERENCED_PARAMETER(irp);
-
-	NTSTATUS status = STATUS_SUCCESS;
-
-	const size_t max_wchars = MAX_VHCI_SERIAL_ID + 1;
-	// static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN, "assert");
 
 	if (vdev->type != VDEV_VPDO) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	pvpdo_dev_t vpdo = (pvpdo_dev_t)vdev;
+	const size_t max_wchars = MAX_VHCI_SERIAL_ID + 1;
+//	static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN, "assert");
 
-	PWCHAR id_inst = ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(wchar_t), USBIP_VHCI_POOL_TAG);
-	if (!id_inst) {
-		DBGE(DBG_PNP, "vpdo: %s(%s): out of memory\n", __func__, 
-		     serial ? "DeviceSerialNumber" : "InstanceID");
+	vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
+
+	WCHAR *str = ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	if (!str) {
+		DBGE(DBG_PNP, "vpdo: %s(%s): out of memory\n", __func__, want_serial ? "DeviceSerialNumber" : "InstanceID");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	status = vpdo->winstid ? RtlStringCchCopyW(id_inst, max_wchars, vpdo->winstid) : // is a serial
-		 serial ? RtlStringCchPrintfW(id_inst, max_wchars, L"") : // has no serial
-		 RtlStringCchPrintfW(id_inst, max_wchars, L"%04hx", vpdo->port); // instance id
+	WCHAR *serial = vpdo->serial_usr ? vpdo->serial_usr :
+		        vpdo->serial ? vpdo->serial :
+		        L"";
+
+	NTSTATUS status = status = *serial || want_serial ? 
+		RtlStringCchCopyW(str, max_wchars, serial) :
+		RtlStringCchPrintfW(str, max_wchars, L"%04hx", vpdo->port);
 
 	if (status == STATUS_SUCCESS) {
-		*result = id_inst;
+		*result = str;
 	}
 
 	return status;

@@ -5,6 +5,8 @@
 #include "usbip_proto.h"
 #include "vhci_irp.h"
 
+#include <stdbool.h>
+
 static NTSTATUS
 req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
 {
@@ -80,8 +82,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
  * need to cache a descriptor?
  * Currently, device descriptor & full configuration descriptor are cached in vpdo.
  */
-static BOOLEAN
-need_caching_dsc(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, PUSB_COMMON_DESCRIPTOR dsc)
+static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, USB_COMMON_DESCRIPTOR *dsc)
 {
 	USB_CONFIGURATION_DESCRIPTOR *dsc_conf = NULL;
 
@@ -111,9 +112,57 @@ need_caching_dsc(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_c
 	return TRUE;
 }
 
-void
-try_to_cache_descriptor(pvpdo_dev_t vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, PUSB_COMMON_DESCRIPTOR dsc)
+static bool is_device_serial_number(
+	vpdo_dev_t *vpdo, 
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r, 
+	USB_COMMON_DESCRIPTOR *d)
 {
+	UCHAR idx = vpdo->dsc_dev ? vpdo->dsc_dev->iSerialNumber : 0; // not zero if has serial
+	return  idx &&
+	        d->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE &&
+		r->Index == idx;
+}
+
+static void save_serial_number(
+	vpdo_dev_t *vpdo, 
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, 
+	USB_COMMON_DESCRIPTOR *dsc)
+{
+	UNREFERENCED_PARAMETER(urb_cdr);
+
+	USB_STRING_DESCRIPTOR *sd = (USB_STRING_DESCRIPTOR*)dsc;
+	UCHAR cch = (dsc->bLength - sizeof(*dsc))/sizeof(*sd->bString) + 1;
+
+	if (vpdo->serial) {
+		DBGW(DBG_VPDO, "%s: prior serial '%S'\n", vpdo->serial);
+		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
+	}
+
+	vpdo->serial = ExAllocatePoolWithTag(PagedPool, cch*sizeof(*vpdo->serial), USBIP_VHCI_POOL_TAG);
+
+	if (vpdo->serial) {
+		NTSTATUS st = RtlStringCchCopyNW(vpdo->serial, cch, sd->bString, cch - 1);
+		if (st == STATUS_SUCCESS) {
+			DBGI(DBG_VPDO, "serial '%S', LangId %#04x\n", vpdo->serial, urb_cdr->LanguageId);
+		} else {
+			NT_ASSERT(!"RtlStringCchCopyNW failed");
+		}
+	} else {
+		DBGE(DBG_VPDO, "%s: can't allocate memory: Index %d, bLength %d, LangId %#04x\n",
+			__func__, urb_cdr->Index, sd->bLength, urb_cdr->LanguageId);
+	}
+}
+
+void try_to_cache_descriptor(
+	vpdo_dev_t* vpdo, 
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, 
+	USB_COMMON_DESCRIPTOR* dsc)
+{
+	if (is_device_serial_number(vpdo, urb_cdr, dsc)) {
+		save_serial_number(vpdo, urb_cdr, dsc);
+		return;
+	}
+
 	if (!need_caching_dsc(vpdo, urb_cdr, dsc)) {
 		return;
 	}

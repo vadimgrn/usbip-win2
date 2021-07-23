@@ -65,20 +65,21 @@ copy_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, struct _URB_
 	}
 }
 
-void
-post_get_desc(pvpdo_dev_t vpdo, PURB urb)
+void post_get_desc(vpdo_dev_t *vpdo, URB *urb)
 {
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_cdr = &urb->UrbControlDescriptorRequest;
-	PUSB_COMMON_DESCRIPTOR	dsc;
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *req = &urb->UrbControlDescriptorRequest;
 
-	dsc = get_buf(urb_cdr->TransferBuffer, urb_cdr->TransferBufferMDL);
-	if (dsc == NULL)
-		return;
-	if (dsc->bLength > urb_cdr->TransferBufferLength) {
-		DBGI(DBG_WRITE, "skip to cache partial descriptor: (%u < %hhu)\n", urb_cdr->TransferBufferLength, dsc->bLength);
+	USB_COMMON_DESCRIPTOR *dsc = get_buf(req->TransferBuffer, req->TransferBufferMDL);
+	if (!dsc) {
 		return;
 	}
-	try_to_cache_descriptor(vpdo, urb_cdr, dsc);
+
+	if (req->TransferBufferLength >= dsc->bLength) {
+		try_to_cache_descriptor(vpdo, req, dsc);
+	} else {
+		DBGI(DBG_WRITE, "skip to cache partial descriptor: (%u < %hhu)\n", req->TransferBufferLength, dsc->bLength);
+	}
+
 }
 
 static NTSTATUS
@@ -300,24 +301,24 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 	}
 
 	NTSTATUS status = store_urb_data(urb, hdr);
-	
-	if (status == STATUS_SUCCESS) {
-		switch (urb->UrbHeader.Function) {
-		case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
-		case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
-		case URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT:
-			post_get_desc(vpdo, urb);
-			break;
-		case URB_FUNCTION_SELECT_CONFIGURATION:
-			status = post_select_config(vpdo, urb);
-			break;
-		case URB_FUNCTION_SELECT_INTERFACE:
-			status = post_select_interface(vpdo, urb);
-			break;
-		default:
-			break;
-		}
+	if (status != STATUS_SUCCESS) {
+		return status;
 	}
+
+	switch (urb->UrbHeader.Function) {
+	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
+	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
+	case URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT:
+		post_get_desc(vpdo, urb);
+		break;
+	case URB_FUNCTION_SELECT_CONFIGURATION:
+		status = post_select_config(vpdo, urb);
+		break;
+	case URB_FUNCTION_SELECT_INTERFACE:
+		status = post_select_interface(vpdo, urb);
+		break;
+	}
+
 	return status;
 }
 

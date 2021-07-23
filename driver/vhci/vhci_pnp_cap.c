@@ -154,7 +154,7 @@ pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
 	pcaps->SurpriseRemovalOK = TRUE;
 
 	// If a custom instance id is used, assume that it is system-wide unique */
-	pcaps->UniqueID = (vpdo->winstid != NULL) ? TRUE : FALSE;
+	pcaps->UniqueID = vpdo->serial_usr || vpdo->serial;
 
 	// Specify whether the Device Manager should suppress all
 	// installation pop-ups except required pop-ups such as

@@ -149,18 +149,13 @@ typedef struct
 {
 	vdev_t	common;
 
-	// An array of (zero terminated wide character strings).
-	// The array itself also null terminated
 	USHORT	vendor, product, revision;
 	UCHAR	usbclass, subclass, protocol, inum;
-	// unique port number of the device on the bus
-	ULONG	port;
 
-	/*
-	 * user-defined instance id. If NULL, port number will be used.
-	 * instance id is regarded as USB serial.
-	 */
-	PWCHAR	winstid;
+	PWCHAR	serial; // device serial number
+	PWCHAR	serial_usr; // user-defined serial number
+
+	ULONG	port; // unique port number of the device on the bus
 
 	// Link point to hold all the vpdos for a single bus together
 	LIST_ENTRY	Link;

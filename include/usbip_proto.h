@@ -90,7 +90,7 @@ struct usbip_header_cmd_submit {
 	INT32	interval;
 
 	/* set setup packet data for a CTRL request */
-	UINT8	setup[8]; // USB_DEFAULT_PIPE_SETUP_PACKET in <usbspec.h>
+	UINT8	setup[8];
 };
 
 /*

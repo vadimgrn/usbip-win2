@@ -119,7 +119,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);
 	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
 
-	vpdo->winstid = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : NULL;
+	vpdo->serial_usr = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : NULL;
 
 	vpdo_dev_t *devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
 	if (devpdo_old) {
