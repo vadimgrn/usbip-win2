@@ -78,12 +78,7 @@ static bool is_composite(vpdo_dev_t *vpdo)
 		   vpdo->subclass == 0x02 &&
 		   vpdo->protocol == 0x01); // IAD composite device
 
-	if (ok && vpdo->inum > 1 && vpdo->num_configurations == 1) {
-		return true;
-	}
-
-	return vpdo->num_configurations && // zero if the device descriptor wasn't read yet
-		!(vpdo->usbclass || vpdo->subclass || vpdo->protocol);
+	return ok && vpdo->inum > 1 && vpdo->num_configurations == 1;
 }
 
 /*
