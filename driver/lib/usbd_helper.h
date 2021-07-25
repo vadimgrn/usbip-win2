@@ -32,4 +32,3 @@ __inline bool IsTransferDirectionOut(ULONG TransferFlags)
 {
 	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
 }
-

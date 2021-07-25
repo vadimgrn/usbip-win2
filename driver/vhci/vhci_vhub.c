@@ -1,8 +1,9 @@
 #include "vhci_vhub.h"
 #include "vhci_dbg.h"
+#include "vhci_dev.h"
+#include "usbip_vhci_api.h"
 
-static PAGEABLE pvpdo_dev_t
-find_vpdo(pvhub_dev_t vhub, unsigned port)
+static PAGEABLE pvpdo_dev_t find_vpdo(pvhub_dev_t vhub, unsigned port)
 {
 	PLIST_ENTRY	entry;
 

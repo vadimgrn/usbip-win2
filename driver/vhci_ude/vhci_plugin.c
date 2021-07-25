@@ -339,6 +339,8 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 	return vusb;
 }
 
+#define IS_USB30_PLUGINFO(pluginfo)	((get_device_speed(pluginfo) == UdecxUsbSuperSpeed))
+
 NTSTATUS
 plugin_vusb(pctx_vhci_t vhci, WDFREQUEST req, pvhci_pluginfo_t pluginfo)
 {

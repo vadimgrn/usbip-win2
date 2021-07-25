@@ -33,8 +33,7 @@ enum {
  * <kernel>/doc/Documentation/usb/error-codes.txt
  * winddk, usb.h
  */
-USBD_STATUS
-to_usbd_status(int usbip_status)
+USBD_STATUS to_usbd_status(int usbip_status)
 {
 	switch (abs(usbip_status)) {
 	case 0:
@@ -83,8 +82,7 @@ to_usbd_status(int usbip_status)
  * winddk, usb.h
  * <kernel>/doc/Documentation/usb/error-codes.txt
  */
-int
-to_usbip_status(USBD_STATUS status)
+int to_usbip_status(USBD_STATUS status)
 {
 	switch (status) {
 	case USBD_STATUS_SUCCESS:
@@ -180,8 +178,7 @@ UINT32 to_linux_flags(ULONG TransferFlags)
 	return flags;
 }
 
-void
-to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN as_result)
+void to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN as_result)
 {
 	for (ULONG i = 0; i < n_pkts; ++i) {
 
@@ -196,8 +193,7 @@ to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, const
 	}
 }
 
-void
-to_iso_descs(ULONG n_pkts, struct usbip_iso_packet_descriptor *iso_desc, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, BOOLEAN as_result)
+void to_iso_descs(ULONG n_pkts, struct usbip_iso_packet_descriptor *iso_desc, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, BOOLEAN as_result)
 {
 	for (ULONG i = 0; i < n_pkts; ++i) {
 
@@ -212,8 +208,7 @@ to_iso_descs(ULONG n_pkts, struct usbip_iso_packet_descriptor *iso_desc, const U
 	}
 }
 
-ULONG
-get_iso_descs_len(ULONG n_pkts, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN is_actual)
+ULONG get_iso_descs_len(ULONG n_pkts, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN is_actual)
 {
 	ULONG len = 0;
 		
@@ -225,8 +220,7 @@ get_iso_descs_len(ULONG n_pkts, const struct usbip_iso_packet_descriptor *iso_de
 	return len;
 }
 
-ULONG
-get_usbd_iso_descs_len(ULONG n_pkts, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc)
+ULONG get_usbd_iso_descs_len(ULONG n_pkts, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc)
 {
 	ULONG len = 0;
 

@@ -383,7 +383,7 @@ set_feature(usbip_stub_dev_t *devstub, USHORT func, USHORT feature, USHORT index
 	return -1;
 }
 
-BOOLEAN
+int
 submit_class_vendor_req(usbip_stub_dev_t *devstub, BOOLEAN is_in, USHORT cmd, UCHAR reservedBits, UCHAR request, USHORT value, USHORT index, PVOID data, PULONG plen)
 {
 	URB		Urb;
@@ -396,9 +396,15 @@ submit_class_vendor_req(usbip_stub_dev_t *devstub, BOOLEAN is_in, USHORT cmd, UC
 	status = call_usbd(devstub, &Urb);
 	if (NT_SUCCESS(status)) {
 		*plen = Urb.UrbControlVendorClassRequest.TransferBufferLength;
-		return TRUE;
+		return 0;
 	}
-	return FALSE;
+	/*
+	 * TODO: apply STALL error like as set_feature.
+	 * Should be checked that this error might be better handled in call_usbd().
+	 */
+	if (status == STATUS_UNSUCCESSFUL && Urb.UrbHeader.Status == USBD_STATUS_STALL_PID)
+		return to_usbip_status(Urb.UrbHeader.Status);
+	return -1;
 }
 
 static void
@@ -452,6 +458,20 @@ submit_bulk_intr_transfer(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe, uns
 }
 
 static void
+compact_usbd_iso_data(ULONG n_pkts, char *src, const USBD_ISO_PACKET_DESCRIPTOR* usbd_iso_descs)
+{
+	const USBD_ISO_PACKET_DESCRIPTOR	*usbd_iso_desc;
+	char	*dst = src;
+	ULONG	i;
+
+	for (usbd_iso_desc = usbd_iso_descs, i = 0; i < n_pkts; usbd_iso_desc++, i++) {
+		if (dst != src + usbd_iso_desc->Offset)
+			RtlCopyMemory(dst, src + usbd_iso_desc->Offset, usbd_iso_desc->Length);
+		dst += usbd_iso_desc->Length;
+	}
+}
+
+static void
 done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_res_t *sres)
 {
 	DBGI(DBG_GENERAL, "done_iso_transfer: sres:%s,status:%s,usbd_status:%s\n",
@@ -471,14 +491,15 @@ done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_re
 			iso_descs_len = sizeof(struct usbip_iso_packet_descriptor) * n_pkts;
 
 			if (sres->data != NULL) { /* direction IN case */
+				/* if iso packets are not filled fully, packet data compaction and moving iso_descs are required. */
 				actual_len = get_usbd_iso_descs_len(purb_iso->NumberOfPackets, purb_iso->IsoPacket);
-				/* TODO: check if it is later */
 				NT_ASSERT(actual_len <= sres->data_len);
 				if (actual_len < sres->data_len) {
 					/* usbip expects a length field in iso descriptor to be intact.
 					 * Copying old isochronous descriptors maintain only length field.
 					 * Other fields will be overwritten by to_iso_descs() routine.
 					 */
+					compact_usbd_iso_data(n_pkts, sres->data, purb_iso->IsoPacket);
 					RtlCopyMemory((char *)sres->data + actual_len, (char *)sres->data + sres->data_len, iso_descs_len);
 				}
 			}

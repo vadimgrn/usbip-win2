@@ -107,6 +107,6 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(ctx_safe_vusb_t, TO_SAFE_VUSB)
 #define TO_SAFE_VUSB_FROM_REQ(req)	TO_SAFE_VUSB(WdfRequestGetFileObject(req))
 
 #define VUSB_CREATING	((pctx_vusb_t)-1)
-#define VUSB_IS_VALID(vusb)	((vusb) != NULL && (vusb) != VUSB_CREATING && !(vusb)->invalid)
+#define VUSB_IS_VALID(vusb)	((vusb) && (vusb) != VUSB_CREATING && !(vusb)->invalid)
 
 EXTERN_C_END
