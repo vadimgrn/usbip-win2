@@ -24,7 +24,7 @@ struct urb_req {
 #define RemoveEntryListInit(le) \
 do { RemoveEntryList(le); InitializeListHead(le); } while (0)
 
-void build_setup_packet(USB_DEFAULT_PIPE_SETUP_PACKET *setup, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request);
+USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request);
 NTSTATUS submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr);
 
 struct urb_req *create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink);

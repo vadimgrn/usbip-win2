@@ -5,74 +5,73 @@
 
 #ifdef DBG
 
-const char *
-dbg_urbr(struct urb_req *urbr)
+const char *dbg_urbr(struct urb_req *urbr)
 {
-	static char	buf[128];
+	static char buf[128];
 
-	if (urbr == NULL)
+	if (!urbr) {
 		return "[null]";
-	libdrv_snprintf(buf, 128, "[seq:%u]", urbr->seq_num);
+	}
+
+	libdrv_snprintf(buf, sizeof(buf), "[seq:%u]", urbr->seq_num);
 	return buf;
 }
 
 #endif
 
-void build_setup_packet(USB_DEFAULT_PIPE_SETUP_PACKET *setup, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
+USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
 {
-	setup->bmRequestType.B = 0; // clear reserved bits as well
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
+	RtlZeroMemory(setup, sizeof(*setup));
 
 	setup->bmRequestType.Dir = dir;
 	setup->bmRequestType.Type = type;
 	setup->bmRequestType.Recipient = recip;
 
 	setup->bRequest = request;
+	return setup;
 }
 
-struct urb_req *
-find_sent_urbr(pvpdo_dev_t vpdo, struct usbip_header *hdr)
+struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, struct usbip_header *hdr)
 {
-	KIRQL		oldirql;
-	PLIST_ENTRY	le;
+	struct urb_req *result = NULL;
 
+	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
-	for (le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
-		struct urb_req	*urbr;
-		urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
+
+	for (LIST_ENTRY *le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
+		struct urb_req *urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
 		if (urbr->seq_num == hdr->base.seqnum) {
 			RemoveEntryListInit(&urbr->list_all);
 			RemoveEntryListInit(&urbr->list_state);
-			KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
-			return urbr;
+			result = urbr;
+			break;
 		}
 	}
-	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-	return NULL;
+	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+	return result;
 }
 
-struct urb_req *
-find_pending_urbr(pvpdo_dev_t vpdo)
+struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 {
-	struct urb_req	*urbr;
-
-	if (IsListEmpty(&vpdo->head_urbr_pending))
+	if (IsListEmpty(&vpdo->head_urbr_pending)) {
 		return NULL;
+	}
 
-	urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, struct urb_req, list_state);
-	urbr->seq_num = ++(vpdo->seq_num);
+	struct urb_req *urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, struct urb_req, list_state);
+
+	urbr->seq_num = ++vpdo->seq_num;
 	RemoveEntryListInit(&urbr->list_state);
+
 	return urbr;
 }
 
-static void
-submit_urbr_unlink(pvpdo_dev_t vpdo, unsigned long seq_num_unlink)
+static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 {
-	struct urb_req	*urbr_unlink;
-
-	urbr_unlink = create_urbr(vpdo, NULL, seq_num_unlink);
-	if (urbr_unlink != NULL) {
-		NTSTATUS	status = submit_urbr(vpdo, urbr_unlink);
+	struct urb_req *urbr_unlink = create_urbr(vpdo, NULL, seq_num_unlink);
+	if (urbr_unlink) {
+		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
 		if (NT_ERROR(status)) {
 			DBGI(DBG_GENERAL, "failed to submit unlink urb: %s\n", dbg_urbr(urbr_unlink));
 			free_urbr(urbr_unlink);
@@ -80,8 +79,7 @@ submit_urbr_unlink(pvpdo_dev_t vpdo, unsigned long seq_num_unlink)
 	}
 }
 
-static void
-remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
+static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 {
 	KIRQL	oldirql;
 
@@ -156,21 +154,20 @@ free_urbr(struct urb_req *urbr)
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }
 
-BOOLEAN
-is_port_urbr(struct urb_req *urbr, unsigned char epaddr)
+BOOLEAN is_port_urbr(struct urb_req *urbr, unsigned char epaddr)
 {
-	PIRP	irp = urbr->irp;
-	PURB	urb;
-	PIO_STACK_LOCATION	irpstack;
-	USBD_PIPE_HANDLE	hPipe;
-
-	if (irp == NULL)
+	IRP *irp = urbr->irp;
+	if (!irp) {
 		return FALSE;
+	}
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
-	urb = irpstack->Parameters.Others.Argument1;
-	if (urb == NULL)
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	URB *urb = irpstack->Parameters.Others.Argument1;
+	if (!urb) {
 		return FALSE;
+	}
+
+	USBD_PIPE_HANDLE hPipe;
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
@@ -183,9 +180,7 @@ is_port_urbr(struct urb_req *urbr, unsigned char epaddr)
 		return FALSE;
 	}
 
-	if (PIPE2ADDR(hPipe) == epaddr)
-		return TRUE;
-	return FALSE;
+	return PIPE2ADDR(hPipe) == epaddr;
 }
 
 NTSTATUS

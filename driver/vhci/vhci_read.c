@@ -45,18 +45,14 @@ static NTSTATUS
 store_urb_reset_dev(PIRP irp, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
-	if (hdr == NULL) {
+	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, false, 0, 0, 0);
 
-	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_CLASS, BMREQUEST_TO_OTHER, USB_REQUEST_SET_FEATURE);
-	setup->wLength = 0;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_CLASS, BMREQUEST_TO_OTHER, USB_REQUEST_SET_FEATURE);
 	setup->wValue.LowByte = 4; // Reset
-	setup->wIndex.W = 0;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
@@ -76,15 +72,14 @@ store_urb_dsc_req(PIRP irp, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	dsc_req = (PUSB_DESCRIPTOR_REQUEST)urbr->irp->AssociatedIrp.SystemBuffer;
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
+	dsc_req = (USB_DESCRIPTOR_REQUEST*)urbr->irp->AssociatedIrp.SystemBuffer;
 
 	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(USB_DESCRIPTOR_REQUEST);
+	outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(*dsc_req);
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, outlen);
 	
-	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
 	setup->wValue.W = dsc_req->SetupPacket.wValue;
 	setup->wIndex.W = dsc_req->SetupPacket.wIndex;
 	setup->wLength = dsc_req->SetupPacket.wLength;
@@ -117,14 +112,9 @@ store_urb_reset_pipe(PIRP irp, PURB urb, struct urb_req *urbr)
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-	RtlZeroMemory(setup, sizeof(*setup));
-
-	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_ENDPOINT, USB_REQUEST_CLEAR_FEATURE);
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_ENDPOINT, USB_REQUEST_CLEAR_FEATURE);
 	setup->wIndex.LowByte = PIPE2ADDR(urb_rp->PipeHandle) | (unsigned char)(dir << 7); // Specify enpoint address and direction
-	setup->wIndex.HiByte = 0;
-	setup->wValue.W = 0; // clear ENDPOINT_HALT
-	setup->wLength = 0;
+	setup->wValue.W = USB_FEATURE_ENDPOINT_STALL;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
@@ -134,16 +124,17 @@ store_urb_reset_pipe(PIRP irp, PURB urb, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-static PVOID
-get_buf(PVOID buf, PMDL bufMDL)
+static PVOID get_buf(PVOID buf, PMDL bufMDL)
 {
-	if (buf == NULL) {
-		if (bufMDL != NULL)
+	if (!buf) {
+		if (bufMDL) {
 			buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
-		if (buf == NULL) {
+		}
+		if (!buf) {
 			DBGE(DBG_READ, "No transfer buffer\n");
 		}
 	}
+
 	return buf;
 }
 
@@ -156,12 +147,10 @@ store_urb_get_dev_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
 				    USBD_SHORT_TRANSFER_OK, urb_desc->TransferBufferLength);
 	
-	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
 	setup->wLength = (USHORT)urb_desc->TransferBufferLength;
 	setup->wValue.HiByte = urb_desc->DescriptorType;
 	setup->wValue.LowByte = urb_desc->Index;
@@ -169,7 +158,7 @@ store_urb_get_dev_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 	switch (urb_desc->DescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		setup->wIndex.W = 0;
+		//setup->wIndex.W = 0;
 		break;
 	case USB_INTERFACE_DESCRIPTOR_TYPE:
 		setup->wIndex.W = urb_desc->Index;
@@ -197,8 +186,6 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
 				    USBD_SHORT_TRANSFER_OK, urb_gsr->TransferBufferLength);
 
@@ -224,10 +211,9 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
 	setup->wLength = (USHORT)urb_gsr->TransferBufferLength;
 	setup->wIndex.W = urb_gsr->Index;
-	setup->wValue.W = 0;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -242,12 +228,10 @@ store_urb_get_intf_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
 				    USBD_SHORT_TRANSFER_OK, urb_desc->TransferBufferLength);
 	
-	build_setup_packet(setup, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_GET_DESCRIPTOR);
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_GET_DESCRIPTOR);
 	setup->wLength = (USHORT)urb_desc->TransferBufferLength;
 	setup->wValue.HiByte = urb_desc->DescriptorType;
 	setup->wValue.LowByte = urb_desc->Index;
@@ -332,14 +316,12 @@ store_urb_class_vendor(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0,
 				    urb_vc->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_vc->TransferBufferLength);
 	
 	UCHAR dir = dir_in ? BMREQUEST_DEVICE_TO_HOST : BMREQUEST_HOST_TO_DEVICE;
-	build_setup_packet(setup, dir, type, recip, urb_vc->Request);
 
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, dir, type, recip, urb_vc->Request);
 	setup->wLength = (USHORT)urb_vc->TransferBufferLength;
 	setup->wValue.W = urb_vc->Value;
 	setup->wIndex.W = urb_vc->Index;
@@ -368,14 +350,10 @@ store_urb_select_config(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
 
-	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_SET_CONFIGURATION);
-	setup->wLength = 0;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_SET_CONFIGURATION);
 	setup->wValue.W = urb_sc->ConfigurationDescriptor->bConfigurationValue;
-	setup->wIndex.W = 0;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -390,12 +368,9 @@ store_urb_select_interface(PIRP irp, PURB urb, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 0, 0, 0, 0);
 	
-	build_setup_packet(setup, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_SET_INTERFACE);
-	setup->wLength = 0;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_SET_INTERFACE);
 	setup->wValue.W = urb_si->Interface.AlternateSetting;
 	setup->wIndex.W = urb_si->Interface.InterfaceNumber;
 
@@ -895,21 +870,22 @@ on_pending_irp_read_cancelled(PDEVICE_OBJECT devobj, PIRP irp_read)
 	IoCompleteRequest(irp_read, IO_NO_INCREMENT);
 }
 
-static NTSTATUS
-process_read_irp(pvpdo_dev_t vpdo, PIRP read_irp)
+static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	struct urb_req	*urbr;
-	KIRQL	oldirql;
-	NTSTATUS status;
+	NTSTATUS status = STATUS_SUCCESS;
+	struct urb_req *urbr = NULL;
+	KIRQL oldirql;
 
-	DBGI(DBG_GENERAL | DBG_READ, "process_read_irp: Enter\n");
+	DBGI(DBG_GENERAL | DBG_READ, "%s: Enter\n", __func__);
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+
 	if (vpdo->pending_read_irp) {
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
-	if (vpdo->urbr_sent_partial != NULL) {
+
+	if (vpdo->urbr_sent_partial) {
 		urbr = vpdo->urbr_sent_partial;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
@@ -920,7 +896,7 @@ process_read_irp(pvpdo_dev_t vpdo, PIRP read_irp)
 	}
 	else {
 		urbr = find_pending_urbr(vpdo);
-		if (urbr == NULL) {
+		if (!urbr) {
 			vpdo->pending_read_irp = read_irp;
 
 			KIRQL oldirql_cancel;
@@ -932,6 +908,7 @@ process_read_irp(pvpdo_dev_t vpdo, PIRP read_irp)
 
 			return STATUS_PENDING;
 		}
+
 		vpdo->urbr_sent_partial = urbr;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
@@ -947,11 +924,10 @@ process_read_irp(pvpdo_dev_t vpdo, PIRP read_irp)
 		PIRP irp = urbr->irp;
 		free_urbr(urbr);
 
-		if (irp != NULL) {
+		if (irp) {
 			// urbr irp has cancel routine, if the IoSetCancelRoutine returns NULL that means IRP was cancelled
-			BOOLEAN valid;
 			IoAcquireCancelSpinLock(&oldirql);
-			valid = IoSetCancelRoutine(irp, NULL) != NULL;
+			BOOLEAN valid = IoSetCancelRoutine(irp, NULL) != NULL;
 			IoReleaseCancelSpinLock(oldirql);
 			if (valid) {
 				irp->IoStatus.Status = STATUS_INVALID_PARAMETER;
@@ -959,28 +935,23 @@ process_read_irp(pvpdo_dev_t vpdo, PIRP read_irp)
 				IoCompleteRequest(irp, IO_NO_INCREMENT);
 			}
 		}
-	}
-	else {
-		if (vpdo->len_sent_partial == 0) {
+	} else {
+		if (!vpdo->len_sent_partial) {
 			InsertTailList(&vpdo->head_urbr_sent, &urbr->list_state);
 			vpdo->urbr_sent_partial = NULL;
 		}
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 	}
+
 	return status;
 }
 
-PAGEABLE NTSTATUS
-vhci_read(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
-	pvhci_dev_t	vhci;
-	pvpdo_dev_t	vpdo;
-	PIO_STACK_LOCATION	irpstack;
-	NTSTATUS		status;
-
 	PAGED_CODE();
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
+	NTSTATUS status = STATUS_SUCCESS;
+	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	DBGI(DBG_GENERAL | DBG_READ, "vhci_read: Enter: len:%u, irp:%p\n", irpstack->Parameters.Read.Length, irp);
 
@@ -992,21 +963,20 @@ vhci_read(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	vhci = DEVOBJ_TO_VHCI(devobj);
+	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
 
 	// Check to see whether the bus is removed
 	if (vhci->common.DevicePnPState == Deleted) {
 		status = STATUS_NO_SUCH_DEVICE;
 		goto END;
 	}
-	vpdo = irpstack->FileObject->FsContext;
-	if (vpdo == NULL || !vpdo->plugged)
-		status = STATUS_INVALID_DEVICE_REQUEST;
-	else
-		status = process_read_irp(vpdo, irp);
+
+	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
+	status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 
 END:
 	DBGI(DBG_GENERAL | DBG_READ, "vhci_read: Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+
 	if (status != STATUS_PENDING) {
 		irp->IoStatus.Status = status;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);

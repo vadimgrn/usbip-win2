@@ -393,54 +393,57 @@ get_usbip_hdr_from_write_irp(PIRP irp)
 	return (struct usbip_header *)irp->AssociatedIrp.SystemBuffer;
 }
 
-static NTSTATUS
-process_write_irp(pvpdo_dev_t vpdo, PIRP write_irp)
+static void complete_irp(IRP *irp, NTSTATUS status)
 {
-	struct usbip_header	*hdr;
-	struct urb_req	*urbr;
-	KIRQL	oldirql;
-	NTSTATUS	status;
+	KIRQL oldirql;
 
-	hdr = get_usbip_hdr_from_write_irp(write_irp);
-	if (hdr == NULL) {
+	IoAcquireCancelSpinLock(&oldirql);
+	BOOLEAN valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
+	IoReleaseCancelSpinLock(oldirql);
+
+	if (!valid_irp) {
+		return;
+	}
+
+	irp->IoStatus.Status = status;
+
+	/* it seems windows client usb driver will think
+	* IoCompleteRequest is running at DISPATCH_LEVEL
+	* so without this it will change IRQL sometimes,
+	* and introduce to a dead of my userspace program
+	*/
+	KeRaiseIrql(DISPATCH_LEVEL, &oldirql);
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	KeLowerIrql(oldirql);
+}
+
+static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
+{
+	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
+	if (!hdr) {
 		DBGE(DBG_WRITE, "small write irp\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	urbr = find_sent_urbr(vpdo, hdr);
-	if (urbr == NULL) {
+	struct urb_req *urbr = find_sent_urbr(vpdo, hdr);
+	if (!urbr) {
 		// Might have been cancelled before, so return STATUS_SUCCESS
 		DBGE(DBG_WRITE, "no urbr: seqnum: %d\n", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
-	status = process_urb_res(urbr, hdr);
-	PIRP irp = urbr->irp;
+	NTSTATUS status = process_urb_res(urbr, hdr);
+	IRP *irp = urbr->irp;
 	free_urbr(urbr);
 
-	if (irp != NULL) {
-		BOOLEAN valid_irp;
-		IoAcquireCancelSpinLock(&oldirql);
-		valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
-		IoReleaseCancelSpinLock(oldirql);
-		if (valid_irp) {
-			irp->IoStatus.Status = status;
-
-			/* it seems windows client usb driver will think
-			 * IoCompleteRequest is running at DISPATCH_LEVEL
-			 * so without this it will change IRQL sometimes,
-			 * and introduce to a dead of my userspace program
-			 */
-			KeRaiseIrql(DISPATCH_LEVEL, &oldirql);
-			IoCompleteRequest(irp, IO_NO_INCREMENT);
-			KeLowerIrql(oldirql);
-		}
+	if (irp) {
+		complete_irp(irp, status);
 	}
 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_write(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
@@ -463,7 +466,7 @@ PAGEABLE NTSTATUS vhci_write(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		goto END;
 	}
 
-	pvpdo_dev_t vpdo = irpstack->FileObject->FsContext;
+	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 	if (!(vpdo && vpdo->plugged)) {
 		goto END;
 	}
@@ -473,6 +476,7 @@ PAGEABLE NTSTATUS vhci_write(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 END:
 	DBGI(DBG_WRITE, "%s: Leave: irp:%p, status:%s\n", __func__, irp, dbg_ntstatus(status));
+
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
