@@ -80,7 +80,7 @@ fetch_urbr_urb(PURB urb, struct usbip_header *hdr)
 	}
 
 	if (status == STATUS_SUCCESS)
-		urb->UrbHeader.Status = to_usbd_status(hdr->u.ret_submit.status);
+		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
 
 	return status;
 }
@@ -90,7 +90,7 @@ handle_urbr_error(purb_req_t urbr, struct usbip_header *hdr)
 {
 	PURB	urb = urbr->u.urb.urb;
 
-	urb->UrbHeader.Status = to_usbd_status(hdr->u.ret_submit.status);
+	urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
 	if (urb->UrbHeader.Status == USBD_STATUS_STALL_PID) {
 		/*
 		 * TODO: UDE framework seems to discard URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL.

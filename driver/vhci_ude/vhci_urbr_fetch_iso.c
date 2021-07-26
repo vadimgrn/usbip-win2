@@ -15,7 +15,7 @@ save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descripto
 			return FALSE;
 		}
 		urb->IsoPacket[i].Length = iso_desc->actual_length;
-		urb->IsoPacket[i].Status = to_usbd_status(iso_desc->status);
+		urb->IsoPacket[i].Status = to_windows_status(iso_desc->status);
 		iso_desc++;
 	}
 

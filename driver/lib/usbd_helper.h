@@ -7,8 +7,8 @@
 
 struct usbip_iso_packet_descriptor;
 
-USBD_STATUS to_usbd_status(int usbip_status);
-int to_usbip_status(USBD_STATUS usbd_status);
+USBD_STATUS to_windows_status(int usbip_status);
+int to_linux_status(USBD_STATUS usbd_status);
 
 ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in);
 UINT32 to_linux_flags(ULONG TransferFlags);

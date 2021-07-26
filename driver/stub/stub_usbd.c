@@ -378,8 +378,10 @@ set_feature(usbip_stub_dev_t *devstub, USHORT func, USHORT feature, USHORT index
 	 * TODO: Only applied to this routine beause it's unclear that the status is
 	 * unsuccessful when a device is stalled.
 	 */
-	if (status == STATUS_UNSUCCESSFUL && urb.UrbHeader.Status == USBD_STATUS_STALL_PID)
-		return to_usbip_status(urb.UrbHeader.Status);
+	if (status == STATUS_UNSUCCESSFUL && urb.UrbHeader.Status == USBD_STATUS_STALL_PID) {
+		return to_linux_status(urb.UrbHeader.Status);
+	}
+
 	return -1;
 }
 
@@ -402,8 +404,10 @@ submit_class_vendor_req(usbip_stub_dev_t *devstub, BOOLEAN is_in, USHORT cmd, UC
 	 * TODO: apply STALL error like as set_feature.
 	 * Should be checked that this error might be better handled in call_usbd().
 	 */
-	if (status == STATUS_UNSUCCESSFUL && Urb.UrbHeader.Status == USBD_STATUS_STALL_PID)
-		return to_usbip_status(Urb.UrbHeader.Status);
+	if (status == STATUS_UNSUCCESSFUL && Urb.UrbHeader.Status == USBD_STATUS_STALL_PID) {
+		return to_linux_status(Urb.UrbHeader.Status);
+	}
+
 	return -1;
 }
 
@@ -426,7 +430,7 @@ done_bulk_intr_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, s
 		else {
 			sres->data_len = 0;
 			sres->header.u.ret_submit.actual_length = 0;
-			sres->header.u.ret_submit.status = to_usbip_status(purb->UrbHeader.Status);
+			sres->header.u.ret_submit.status = to_linux_status(purb->UrbHeader.Status);
 		}
 		reply_stub_req(devstub, sres);
 	}
@@ -526,7 +530,7 @@ done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_re
 			sres->header.u.ret_submit.error_count = purb_iso->ErrorCount;
 		}
 		else {
-			sres->header.u.ret_submit.status = to_usbip_status(purb->UrbHeader.Status);
+			sres->header.u.ret_submit.status = to_linux_status(purb->UrbHeader.Status);
 		}
 		reply_stub_req(devstub, sres);
 	}

@@ -20,7 +20,7 @@ save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descripto
 			return FALSE;
 		}
 		urb->IsoPacket[i].Length = iso_desc->actual_length;
-		urb->IsoPacket[i].Status = to_usbd_status(iso_desc->status);
+		urb->IsoPacket[i].Status = to_windows_status(iso_desc->status);
 		iso_desc++;
 	}
 	return TRUE;
@@ -279,7 +279,7 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 	}
 
 	if (status == STATUS_SUCCESS)
-		urb->UrbHeader.Status = to_usbd_status(hdr->u.ret_submit.status);
+		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
 
 	return status;
 }
@@ -292,7 +292,7 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 	}
 
 	if (hdr->u.ret_submit.status) {
-		urb->UrbHeader.Status = to_usbd_status(hdr->u.ret_submit.status);
+		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
 		if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
 			urb->UrbBulkOrInterruptTransfer.TransferBufferLength = hdr->u.ret_submit.actual_length;
 		}
@@ -326,7 +326,7 @@ static NTSTATUS
 process_urb_dsc_req(struct urb_req *urbr, const struct usbip_header *hdr)
 {
 	if (hdr->u.ret_submit.status != 0) {
-		DBGW(DBG_WRITE, "dsc_req: wrong status: %s\n", dbg_usbd_status(to_usbd_status(hdr->u.ret_submit.status)));
+		DBGW(DBG_WRITE, "dsc_req: wrong status: %s\n", dbg_usbd_status(to_windows_status(hdr->u.ret_submit.status)));
 		return STATUS_UNSUCCESSFUL;
 	}
 	else {

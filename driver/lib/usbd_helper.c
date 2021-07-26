@@ -33,7 +33,7 @@ enum {
  * <kernel>/doc/Documentation/usb/error-codes.txt
  * winddk, usb.h
  */
-USBD_STATUS to_usbd_status(int usbip_status)
+USBD_STATUS to_windows_status(int usbip_status)
 {
 	switch (abs(usbip_status)) {
 	case 0:
@@ -82,7 +82,7 @@ USBD_STATUS to_usbd_status(int usbip_status)
  * winddk, usb.h
  * <kernel>/doc/Documentation/usb/error-codes.txt
  */
-int to_usbip_status(USBD_STATUS status)
+int to_linux_status(USBD_STATUS status)
 {
 	switch (status) {
 	case USBD_STATUS_SUCCESS:
@@ -188,7 +188,7 @@ void to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, 
 		dest->Offset = src->offset;
 		if (as_result) {
 			dest->Length = src->actual_length;
-			dest->Status = to_usbd_status(src->status);
+			dest->Status = to_windows_status(src->status);
 		}
 	}
 }
@@ -203,7 +203,7 @@ void to_iso_descs(ULONG n_pkts, struct usbip_iso_packet_descriptor *iso_desc, co
 		dest->offset = src->Offset;
 		if (as_result) {
 			dest->actual_length = src->Length;
-			dest->status = to_usbip_status(src->Status);
+			dest->status = to_linux_status(src->Status);
 		}
 	}
 }
