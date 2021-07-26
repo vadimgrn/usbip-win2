@@ -17,7 +17,7 @@ DEFINE_GUID(GUID_DEVINTERFACE_STUB_USBIP,
 #define IOCTL_USBIP_STUB_GET_DEVINFO	USBIP_STUB_IOCTL(0x0)
 #define IOCTL_USBIP_STUB_EXPORT		USBIP_STUB_IOCTL(0x1)
 
-#pragma pack(push,1)
+#include <PSHPACK1.H>
 
 typedef struct _ioctl_usbip_stub_devinfo
 {
@@ -29,4 +29,4 @@ typedef struct _ioctl_usbip_stub_devinfo
 	unsigned char	protocol;
 } ioctl_usbip_stub_devinfo_t;
 
-#pragma pack(pop)
+#include <POPPACK.H>

@@ -93,7 +93,7 @@ extern const char	*usbip_progname;
 		  abort();				\
 	} while (0)
 
-#pragma pack(push, 1)
+#include <PSHPACK1.H>
 
 struct usbip_usb_interface {
 	uint8_t bInterfaceClass;
@@ -122,7 +122,7 @@ struct usbip_usb_device {
 	uint8_t bNumInterfaces;
 };
 
-#pragma pack(pop)
+#include <POPPACK.H>
 
 #define to_string(s)	#s
 

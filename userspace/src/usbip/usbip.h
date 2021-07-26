@@ -16,8 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __USBIP_H
-#define __USBIP_H
+#pragma once
 
 #ifdef HAVE_CONFIG_H
 #include "../config.h"
@@ -41,5 +40,3 @@ void usbip_unbind_usage(void);
 void usbip_install_usage(void);
 void usbip_uninstall_usage(void);
 void usbip_port_usage(void);
-
-#endif /* __USBIP_H */

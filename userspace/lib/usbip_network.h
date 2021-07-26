@@ -2,8 +2,7 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#ifndef __USBIP_NETWORK_H
-#define __USBIP_NETWORK_H
+#pragma once
 
 #ifdef HAVE_CONFIG_H
 #include "../config.h"
@@ -20,7 +19,7 @@ extern int usbip_port;
 extern char *usbip_port_string;
 void usbip_setup_port_number(char *arg);
 
-#pragma pack(push,1)
+#include <PSHPACK1.H>
 
 /* ---------------------------------------------------------------------- */
 /* Common header for all the kinds of PDUs. */
@@ -154,7 +153,7 @@ struct op_devlist_reply_extra {
 	struct usbip_usb_interface uinf[];
 };
 
-#pragma pack(pop)
+#include <POPPACK.H>
 
 #define PACK_OP_DEVLIST_REQUEST(pack, request)  do {\
 } while (0)
@@ -177,5 +176,3 @@ int usbip_net_set_nodelay(SOCKET sockfd);
 int usbip_net_set_keepalive(SOCKET sockfd);
 int usbip_net_set_v6only(SOCKET sockfd);
 SOCKET usbip_net_tcp_connect(const char *hostname, const char *port);
-
-#endif /* __USBIP_NETWORK_H */
