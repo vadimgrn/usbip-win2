@@ -39,7 +39,7 @@ USBD_STATUS to_windows_status(int usbip_status)
 	case 0:
 		return USBD_STATUS_SUCCESS;
 	case EPIPE_LNX:
-		return USBD_STATUS_STALL_PID; /* USBD_STATUS_ENDPOINT_HALTED */
+		return USBD_STATUS_STALL_PID; /* usb_submit_urb returns USBD_STATUS_ENDPOINT_HALTED */
 	case EREMOTEIO_LNX:
 		return USBD_STATUS_ERROR_SHORT_TRANSFER;
 	case ETIME_LNX:
@@ -49,8 +49,8 @@ USBD_STATUS to_windows_status(int usbip_status)
 	case ENOENT_LNX:
 	case ECONNRESET_LNX:
 		return USBD_STATUS_CANCELED;
-	case EINPROGRESS_LNX:
-		return USBD_STATUS_PENDING;
+//	case EINPROGRESS_LNX:
+//		return USBD_STATUS_PENDING; // don't send this to Windows
 	case EOVERFLOW_LNX:
 		return USBD_STATUS_BABBLE_DETECTED;
 	case ENODEV_LNX:
@@ -84,42 +84,64 @@ USBD_STATUS to_windows_status(int usbip_status)
  */
 int to_linux_status(USBD_STATUS status)
 {
+	int err = 0;
+
 	switch (status) {
 	case USBD_STATUS_SUCCESS:
-		return 0;
+		break;
 	case USBD_STATUS_STALL_PID:
 	case USBD_STATUS_ENDPOINT_HALTED:
-		return -EPIPE_LNX;
+		err = EPIPE_LNX;
+		break;
 	case USBD_STATUS_ERROR_SHORT_TRANSFER:
-		return -EREMOTEIO_LNX;
+		err = EREMOTEIO_LNX;
+		break;
 	case USBD_STATUS_TIMEOUT:
-		return -ETIMEDOUT_LNX; /* ETIME */
+		err = ETIMEDOUT_LNX; /* ETIME */
+		break;
 	case USBD_STATUS_CANCELED:
-		return -ECONNRESET_LNX; /* ENOENT */
+		err = ECONNRESET_LNX; /* ENOENT */
+		break;
 	case USBD_STATUS_PENDING:
-		return -EINPROGRESS_LNX;
+		err = EINPROGRESS_LNX;
+		break;
 	case USBD_STATUS_BABBLE_DETECTED:
-		return -EOVERFLOW_LNX;
+		err = EOVERFLOW_LNX;
+		break;
 	case USBD_STATUS_DEVICE_GONE:
-		return -ENODEV_LNX;
+		err = ENODEV_LNX;
+		break;
 	case USBD_STATUS_CRC:
-		return -EILSEQ_LNX;
+		err = EILSEQ_LNX;
+		break;
 	case USBD_STATUS_DATA_OVERRUN:
-		return -ECOMM_LNX;
+		err = ECOMM_LNX;
+		break;
 	case USBD_STATUS_DATA_UNDERRUN:
-		return -ENOSR_LNX;
+		err = ENOSR_LNX;
+		break;
 	case USBD_STATUS_INSUFFICIENT_RESOURCES:
-		return -ENOMEM_LNX;
+		err = ENOMEM_LNX;
+		break;
 	case USBD_STATUS_BTSTUFF:
 	case USBD_STATUS_INTERNAL_HC_ERROR:
 	case USBD_STATUS_HUB_INTERNAL_ERROR:
 	case USBD_STATUS_DEV_NOT_RESPONDING:
-		return -EPROTO_LNX;
+		err = EPROTO_LNX;
+		break;
 	case USBD_STATUS_ERROR_BUSY:
-		return -EBUSY_LNX;
+		err = EBUSY_LNX;
+		break;
+	case USBD_STATUS_INVALID_PIPE_HANDLE:
+		err = ENOENT_LNX;
+		break;
+	default:
+		if (USBD_ERROR(status)) {
+			err = EINVAL_LNX;
+		}
 	}
 
-	return USBD_ERROR(status) ? -EINVAL_LNX : 0;
+	return -err;
 }
 
 /*
