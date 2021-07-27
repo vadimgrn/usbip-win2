@@ -353,17 +353,14 @@ process_urb_dsc_req(struct urb_req *urbr, const struct usbip_header *hdr)
 	}
 }
 
-static NTSTATUS
-process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
+static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
 {
-	PIO_STACK_LOCATION	irpstack;
-	ULONG	ioctl_code;
-
-	if (urbr->irp == NULL)
+	if (!urbr->irp) {
 		return STATUS_SUCCESS;
+	}
 
-	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
+	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
 	DBGI(DBG_WRITE, "process_urb_res: urbr:%s, ioctl:%s\n", dbg_urbr(urbr), dbg_vhci_ioctl_code(ioctl_code));
 
@@ -380,19 +377,17 @@ process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
 	}
 }
 
-static struct usbip_header *
-get_usbip_hdr_from_write_irp(PIRP irp)
+static struct usbip_header *get_usbip_hdr_from_write_irp(IRP *irp)
 {
-	PIO_STACK_LOCATION	irpstack;
-	ULONG	len;
-
-	irpstack = IoGetCurrentIrpStackLocation(irp);
-	len = irpstack->Parameters.Write.Length;
-	if (len < sizeof(struct usbip_header)) {
-		return NULL;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	ULONG len = irpstack->Parameters.Write.Length;
+	
+	if (len >= sizeof(struct usbip_header)) {
+		irp->IoStatus.Information = len;
+		return irp->AssociatedIrp.SystemBuffer;
 	}
-	irp->IoStatus.Information = len;
-	return (struct usbip_header *)irp->AssociatedIrp.SystemBuffer;
+	
+	return NULL;
 }
 
 static void complete_irp(IRP *irp, NTSTATUS status)
@@ -423,7 +418,7 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
 	if (!hdr) {
-		DBGE(DBG_WRITE, "small write irp\n");
+		DBGE(DBG_WRITE, "%s: too small\n", __func__);
 		return STATUS_INVALID_PARAMETER;
 	}
 

@@ -4,40 +4,22 @@
 #include "vhci_internal_ioctl.h"
 #include "usbd_helper.h"
 
-static struct usbip_header *
-get_usbip_hdr_from_read_irp(PIRP irp)
+static PVOID get_read_irp_data(IRP *irp, ULONG length)
 {
-	PIO_STACK_LOCATION	irpstack;
-
 	irp->IoStatus.Information = 0;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
-	if (irpstack->Parameters.Read.Length < sizeof(struct usbip_header)) {
-		return NULL;
-	}
-	return (struct usbip_header *)irp->AssociatedIrp.SystemBuffer;
+	return irpstack->Parameters.Read.Length >= length ? irp->AssociatedIrp.SystemBuffer : NULL;
 }
 
-static PVOID
-get_read_irp_data(PIRP irp, ULONG length)
+static __inline struct usbip_header *get_usbip_hdr_from_read_irp(IRP *irp)
 {
-	PIO_STACK_LOCATION	irpstack;
-
-	irp->IoStatus.Information = 0;
-
-	irpstack = IoGetCurrentIrpStackLocation(irp);
-	if (irpstack->Parameters.Read.Length < length) {
-		return NULL;
-	}
-	return (PVOID)irp->AssociatedIrp.SystemBuffer;
+	return get_read_irp_data(irp, sizeof(struct usbip_header));
 }
 
-static ULONG
-get_read_payload_length(PIRP irp)
+static ULONG get_read_payload_length(IRP *irp)
 {
-	PIO_STACK_LOCATION	irpstack;
-
-	irpstack = IoGetCurrentIrpStackLocation(irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	return irpstack->Parameters.Read.Length - sizeof(struct usbip_header);
 }
 
@@ -806,21 +788,19 @@ store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS
-store_urbr(PIRP irp, struct urb_req *urbr)
+NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 {
-	PIO_STACK_LOCATION	irpstack;
-	ULONG		ioctl_code;
-	NTSTATUS	status;
-
 	DBGI(DBG_READ, "store_urbr: urbr: %s\n", dbg_urbr(urbr));
 
 	if (urbr->irp == NULL) {
 		return store_cancelled_urbr(irp, urbr);
 	}
 
-	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
+	NTSTATUS status = STATUS_SUCCESS;
+
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
+	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
+
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
 		status = store_urbr_submit(irp, urbr);
