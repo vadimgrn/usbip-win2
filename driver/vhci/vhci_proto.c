@@ -15,7 +15,7 @@ void set_cmd_submit_usbip_header(
 	base->ep = get_endpoint_number(pipe);
 
 	struct usbip_header_cmd_submit *cmd = &h->u.cmd_submit;
-	cmd->transfer_flags = to_linux_flags(TransferFlags);
+	cmd->transfer_flags = to_linux_flags(TransferFlags, dir_in);
 	cmd->transfer_buffer_length = TransferBufferLength;
 	cmd->start_frame = 0;
 	cmd->number_of_packets = 0;

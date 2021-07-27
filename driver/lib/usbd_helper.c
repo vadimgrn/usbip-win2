@@ -187,13 +187,13 @@ ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in)
 	return TransferFlags;
 }
 
-UINT32 to_linux_flags(ULONG TransferFlags)
+UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
 {
 	UINT32 flags = 0;
 
 	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
 		flags |= URB_ISO_ASAP;
-	} else if (IsTransferDirectionIn(TransferFlags) && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
+	} else if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
 		flags |= URB_SHORT_NOT_OK;
 	}
 

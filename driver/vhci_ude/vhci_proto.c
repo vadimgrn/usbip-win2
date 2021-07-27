@@ -12,9 +12,9 @@ set_cmd_submit_usbip_header(struct usbip_header *h, unsigned long seqnum, unsign
 	h->base.seqnum = seqnum;
 	h->base.devid = devid;
 	h->base.direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
-	h->base.ep = ep ? ep->addr & 0x7f : 0;
+	h->base.ep = ep ? ep->addr & USB_ENDPOINT_ADDRESS_MASK : USB_DEFAULT_ENDPOINT_ADDRESS;
 
-	h->u.cmd_submit.transfer_flags = to_linux_flags(TransferFlags);
+	h->u.cmd_submit.transfer_flags = to_linux_flags(TransferFlags, dir_in);
 	h->u.cmd_submit.transfer_buffer_length = TransferBufferLength;
 	h->u.cmd_submit.start_frame = 0;
 	h->u.cmd_submit.number_of_packets = 0;
