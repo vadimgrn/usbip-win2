@@ -22,7 +22,6 @@ const char *dbg_urbr(struct urb_req *urbr)
 USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
 {
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-	RtlZeroMemory(setup, sizeof(*setup));
 
 	setup->bmRequestType.Dir = dir;
 	setup->bmRequestType.Type = type;
@@ -154,7 +153,7 @@ free_urbr(struct urb_req *urbr)
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }
 
-BOOLEAN is_port_urbr(struct urb_req *urbr, unsigned char epaddr)
+BOOLEAN is_port_urbr(struct urb_req *urbr, USBD_PIPE_HANDLE handle)
 {
 	IRP *irp = urbr->irp;
 	if (!irp) {
@@ -167,9 +166,17 @@ BOOLEAN is_port_urbr(struct urb_req *urbr, unsigned char epaddr)
 		return FALSE;
 	}
 
-	USBD_PIPE_HANDLE hPipe;
+	USBD_PIPE_HANDLE hPipe = 0;
 
 	switch (urb->UrbHeader.Function) {
+/*
+	case URB_FUNCTION_CONTROL_TRANSFER:
+		hPipe = urb->UrbControlTransfer.PipeHandle;
+		break;
+	case URB_FUNCTION_CONTROL_TRANSFER_EX:
+		hPipe = urb->UrbControlTransferEx.PipeHandle;
+		break;
+*/
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
 		hPipe = urb->UrbBulkOrInterruptTransfer.PipeHandle;
 		break;
@@ -180,7 +187,8 @@ BOOLEAN is_port_urbr(struct urb_req *urbr, unsigned char epaddr)
 		return FALSE;
 	}
 
-	return PIPE2ADDR(hPipe) == epaddr;
+	NT_ASSERT(hPipe);
+	return hPipe == handle;
 }
 
 NTSTATUS

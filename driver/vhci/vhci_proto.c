@@ -3,21 +3,24 @@
 #include "usbip_proto.h"
 #include "usbd_helper.h"
 
-void
-set_cmd_submit_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid,
-			    bool dir_in, USBD_PIPE_HANDLE pipe, ULONG TransferFlags, ULONG TransferBufferLength)
+void set_cmd_submit_usbip_header(
+	struct usbip_header* h, unsigned long seqnum, UINT32 devid, bool dir_in, 
+	USBD_PIPE_HANDLE pipe, ULONG TransferFlags, ULONG TransferBufferLength)
 {
-	h->base.command = USBIP_CMD_SUBMIT;
-	h->base.seqnum = seqnum;
-	h->base.devid = devid;
-	h->base.direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
-	h->base.ep = PIPE2ADDR(pipe);
+	struct usbip_header_basic *base = &h->base;
+	base->command = USBIP_CMD_SUBMIT;
+	base->seqnum = seqnum;
+	base->devid = devid;
+	base->direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
+	base->ep = get_endpoint_number(pipe);
 
-	h->u.cmd_submit.transfer_flags = to_linux_flags(TransferFlags);
-	h->u.cmd_submit.transfer_buffer_length = TransferBufferLength;
-	h->u.cmd_submit.start_frame = 0;
-	h->u.cmd_submit.number_of_packets = 0;
-	h->u.cmd_submit.interval = PIPE2INTERVAL(pipe);
+	struct usbip_header_cmd_submit *cmd = &h->u.cmd_submit;
+	cmd->transfer_flags = to_linux_flags(TransferFlags);
+	cmd->transfer_buffer_length = TransferBufferLength;
+	cmd->start_frame = 0;
+	cmd->number_of_packets = 0;
+	cmd->interval = get_endpoint_interval(pipe);
+	RtlZeroMemory(cmd->setup, sizeof(cmd->setup));
 }
 
 void

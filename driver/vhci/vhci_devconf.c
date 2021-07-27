@@ -1,13 +1,11 @@
-#include "vhci.h"
-
 #include "vhci_devconf.h"
+#include "vhci.h"
 #include "usbip_vhci_api.h"
 #include "devconf.h"
 
 #define NEXT_USBD_INTERFACE_INFO(info_intf)	(USBD_INTERFACE_INFORMATION *)((PUINT8)(info_intf + 1) - \
 	(1 * sizeof(USBD_PIPE_INFORMATION)) + (info_intf->NumberOfPipes * sizeof(USBD_PIPE_INFORMATION)));
 
-#define MAKE_PIPE(ep, type, interval) ((USBD_PIPE_HANDLE)((ep) | ((interval) << 8) | ((type) << 16)))
 #define TO_INTF_HANDLE(intf_num, altsetting)	((USBD_INTERFACE_HANDLE)((intf_num << 8) + altsetting))
 #define TO_INTF_NUM(handle)		(UCHAR)(((UINT_PTR)(handle)) >> 8)
 #define TO_INTF_ALTSETTING(handle)	(UCHAR)((UINT_PTR)(handle) & 0xff)
@@ -27,24 +25,26 @@ dbg_pipe(PUSBD_PIPE_INFORMATION pipe)
 
 #endif
 
-static void
-set_pipe(PUSBD_PIPE_INFORMATION pipe, PUSB_ENDPOINT_DESCRIPTOR ep_desc, enum usb_device_speed speed)
+static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enum usb_device_speed speed)
 {
 	pipe->MaximumPacketSize = ep_desc->wMaxPacketSize;
-	pipe->EndpointAddress = ep_desc->bEndpointAddress;
-	pipe->Interval = ep_desc->bInterval;
-	pipe->PipeType = ep_desc->bmAttributes & USB_ENDPOINT_TYPE_MASK;
+
 	/* From usb_submit_urb in linux */
-	if (pipe->PipeType == USB_ENDPOINT_TYPE_ISOCHRONOUS && speed == USB_SPEED_HIGH) {
+	if (pipe->PipeType == UsbdPipeTypeIsochronous && speed == USB_SPEED_HIGH) {
 		USHORT	mult = 1 + ((pipe->MaximumPacketSize >> 11) & 0x03);
 		pipe->MaximumPacketSize &= 0x7ff;
 		pipe->MaximumPacketSize *= mult;
 	}
-	pipe->PipeHandle = MAKE_PIPE(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
+	
+	pipe->EndpointAddress = ep_desc->bEndpointAddress;
+	pipe->Interval = ep_desc->bInterval;
+	pipe->PipeType = ep_desc->bmAttributes & USB_ENDPOINT_TYPE_MASK;
+	pipe->PipeHandle = make_pipe_handle(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
+	pipe->MaximumTransferSize = 0; // is not used and does not contain valid data
+	pipe->PipeFlags = 0;
 }
 
-static NTSTATUS
-setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSB_INTERFACE_DESCRIPTOR dsc_intf, enum usb_device_speed speed)
+static NTSTATUS setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSB_INTERFACE_DESCRIPTOR dsc_intf, enum usb_device_speed speed)
 {
 	PVOID	start = dsc_intf;
 	ULONG	n_pipes_setup;

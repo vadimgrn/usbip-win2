@@ -186,42 +186,44 @@ store_urb_vendor_or_class(PURB urb, const struct usbip_header *hdr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urb_bulk_or_interrupt(PURB urb, const struct usbip_header *hdr)
+static NTSTATUS store_urb_bulk_or_interrupt(URB *urb, const struct usbip_header *hdr)
 {
-	struct _URB_BULK_OR_INTERRUPT_TRANSFER	*urb_bi = &urb->UrbBulkOrInterruptTransfer;
+	struct _URB_BULK_OR_INTERRUPT_TRANSFER *urb_bi = &urb->UrbBulkOrInterruptTransfer;
 
-	if (PIPE2DIRECT(urb_bi->PipeHandle)) {
-		NTSTATUS	status;
-		status = copy_to_transfer_buffer(urb_bi->TransferBuffer, urb_bi->TransferBufferMDL,
-			urb_bi->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-		if (status == STATUS_SUCCESS)
-			urb_bi->TransferBufferLength = hdr->u.ret_submit.actual_length;
-		return status;
+	if (is_endpoint_direction_out(urb_bi->PipeHandle)) {
+		return STATUS_SUCCESS;
 	}
-	return STATUS_SUCCESS;
+
+	NTSTATUS status = copy_to_transfer_buffer(urb_bi->TransferBuffer, urb_bi->TransferBufferMDL,
+		urb_bi->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
+
+	if (status == STATUS_SUCCESS) {
+		urb_bi->TransferBufferLength = hdr->u.ret_submit.actual_length;
+	}
+
+	return status;
 }
 
-static NTSTATUS
-store_urb_iso(PURB urb, const struct usbip_header *hdr)
+static NTSTATUS store_urb_iso(URB *urb, const struct usbip_header *hdr)
 {
-	struct _URB_ISOCH_TRANSFER	*urb_iso = &urb->UrbIsochronousTransfer;
-	struct usbip_iso_packet_descriptor	*iso_desc;
-	PVOID	buf;
-	int	in_len = 0;
+	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
+	INT32 in_len = is_endpoint_direction_in(urb_iso->PipeHandle) ? hdr->u.ret_submit.actual_length : 0;
 
-	if (PIPE2DIRECT(urb_iso->PipeHandle))
-		in_len = hdr->u.ret_submit.actual_length;
-	iso_desc = (struct usbip_iso_packet_descriptor *)((char *)(hdr + 1) + in_len);
-	if (!save_iso_desc(urb_iso, iso_desc))
+	struct usbip_iso_packet_descriptor *iso_desc = (struct usbip_iso_packet_descriptor *)((char *)(hdr + 1) + in_len);
+	if (!save_iso_desc(urb_iso, iso_desc)) {
 		return STATUS_INVALID_PARAMETER;
+	}
 
 	urb_iso->ErrorCount = hdr->u.ret_submit.error_count;
-	buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
-	if (buf == NULL)
+
+	PVOID buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
+	if (!buf) {
 		return STATUS_INVALID_PARAMETER;
+	}
+
 	copy_iso_data(buf, urb_iso->TransferBufferLength, (char *)(hdr + 1), hdr->u.ret_submit.actual_length, urb_iso);
 	urb_iso->TransferBufferLength = hdr->u.ret_submit.actual_length;
+
 	return STATUS_SUCCESS;
 }
 

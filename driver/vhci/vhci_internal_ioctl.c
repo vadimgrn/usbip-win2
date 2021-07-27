@@ -2,41 +2,35 @@
 #include "vhci_dbg.h"
 #include "usbreq.h"
 
-NTSTATUS
-vhci_ioctl_abort_pipe(pvpdo_dev_t vpdo, USBD_PIPE_HANDLE hPipe)
+NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
-	KIRQL		oldirql;
-	PLIST_ENTRY	le;
-	unsigned char	epaddr;
-
 	if (!hPipe) {
-		DBGI(DBG_IOCTL, "vhci_ioctl_abort_pipe: empty pipe handle\n");
+		DBGI(DBG_IOCTL, "%s: empty pipe handle\n", __func__);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	epaddr = PIPE2ADDR(hPipe);
+	DBGI(DBG_IOCTL, "%s: PipeHandle %p\n", __func__, hPipe);
 
-	DBGI(DBG_IOCTL, "vhci_ioctl_abort_pipe: EP: %02x\n", epaddr);
-
+	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
 	// remove all URBRs of the aborted pipe
-	for (le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr;) {
+	for (LIST_ENTRY *le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr;) {
 		struct urb_req	*urbr_local = CONTAINING_RECORD(le, struct urb_req, list_all);
 		le = le->Flink;
 
-		if (!is_port_urbr(urbr_local, epaddr))
+		if (!is_port_urbr(urbr_local, hPipe)) {
 			continue;
+		}
 
 		DBGI(DBG_IOCTL, "aborted urbr removed: %s\n", dbg_urbr(urbr_local));
 
 		if (urbr_local->irp) {
 			PIRP	irp = urbr_local->irp;
-			BOOLEAN	valid_irp;
 
 			KIRQL oldirql_cancel;
 			IoAcquireCancelSpinLock(&oldirql_cancel);
-			valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
+			BOOLEAN	valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
 			IoReleaseCancelSpinLock(oldirql_cancel);
 
 			if (valid_irp) {
