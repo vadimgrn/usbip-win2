@@ -5,13 +5,7 @@
 
 static __inline USBD_INTERFACE_INFORMATION* get_next_interface(USBD_INTERFACE_INFORMATION *iface)
 {
-	char *end = (char*)(iface + 1);
-	
-	ULONG cnt = iface->NumberOfPipes;
-	if (cnt > 1) { // first pipe is included into USBD_INTERFACE_INFORMATION
-		end += --cnt*sizeof(*iface->Pipes);
-	}
-
+	char *end = (char*)iface + iface->Length;
 	return (USBD_INTERFACE_INFORMATION*)end;
 }
 
