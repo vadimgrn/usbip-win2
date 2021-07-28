@@ -4,43 +4,34 @@
 #include "usbreq.h"
 #include "devconf.h"
 
-
-PAGEABLE NTSTATUS
-vpdo_select_config(pvpdo_dev_t vpdo, struct _URB_SELECT_CONFIGURATION *urb_selc)
+PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *urb)
 {
-	PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf = urb_selc->ConfigurationDescriptor;
-	PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf_new = NULL;
-	NTSTATUS	status;
+	if (vpdo->dsc_conf) {
+		ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
+		vpdo->dsc_conf = NULL;
+	}
 
-	if (dsc_conf == NULL) {
+	USB_CONFIGURATION_DESCRIPTOR *new_conf = urb->ConfigurationDescriptor;
+	if (!new_conf) {
 		DBGI(DBG_VPDO, "going to unconfigured state\n");
-		if (vpdo->dsc_conf != NULL) {
-			ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
-			vpdo->dsc_conf = NULL;
-		}
 		return STATUS_SUCCESS;
 	}
 
-	if (vpdo->dsc_conf == NULL || vpdo->dsc_conf->wTotalLength != dsc_conf->wTotalLength) {
-		dsc_conf_new = ExAllocatePoolWithTag(NonPagedPool, dsc_conf->wTotalLength, USBIP_VHCI_POOL_TAG);
-		if (dsc_conf_new == NULL) {
-			DBGE(DBG_WRITE, "failed to allocate configuration descriptor: out of memory\n");
-			return STATUS_UNSUCCESSFUL;
-		}
-	}
-	else {
-		dsc_conf_new = NULL;
-	}
-	if (dsc_conf_new != NULL && vpdo->dsc_conf != NULL) {
-		ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
-		vpdo->dsc_conf = dsc_conf_new;
-	}
-	RtlCopyMemory(vpdo->dsc_conf, dsc_conf, dsc_conf->wTotalLength);
+	vpdo->dsc_conf = ExAllocatePoolWithTag(NonPagedPool, new_conf->wTotalLength, USBIP_VHCI_POOL_TAG);
 
-	status = setup_config(vpdo->dsc_conf, &urb_selc->Interface, (PUCHAR)urb_selc + urb_selc->Hdr.Length, vpdo->speed);
+	if (vpdo->dsc_conf) {
+		RtlCopyMemory(vpdo->dsc_conf, new_conf, new_conf->wTotalLength);
+	} else {
+		DBGE(DBG_WRITE, "failed to allocate configuration descriptor: out of memory\n");
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	void *intf_end = (char*)urb + urb->Hdr.Length;
+
+	NTSTATUS status = setup_config(vpdo->dsc_conf, &urb->Interface, intf_end, vpdo->speed);
 	if (NT_SUCCESS(status)) {
 		/* assign meaningless value, handle value is not used */
-		urb_selc->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)0x12345678;
+		urb->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)0x12345678;
 	}
 
 	return status;

@@ -98,8 +98,7 @@ static NTSTATUS setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURA
 	return TRUE;
 }
 
-NTSTATUS
-setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, enum usb_device_speed speed)
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, enum usb_device_speed speed)
 {
 	PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
 
@@ -126,7 +125,11 @@ setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_c
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USBD_INTERFACE_INFORMATION *info_intf, void *end_info_intf, enum usb_device_speed speed)
+NTSTATUS setup_config(
+	USB_CONFIGURATION_DESCRIPTOR *dsc_conf, 
+	USBD_INTERFACE_INFORMATION *info_intf, 
+	void *intf_end, 
+	enum usb_device_speed speed)
 {
 	for (int i = 0; i < dsc_conf->bNumInterfaces; ++i) {
 		
@@ -138,7 +141,7 @@ NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USBD_INTERFACE_INF
 		info_intf = get_next_interface(info_intf);
 	
 		/* urb_selc may have less info_intf than bNumInterfaces in conf desc */
-		if ((PVOID)info_intf >= end_info_intf) {
+		if ((void*)info_intf >= intf_end) {
 			break;
 		}
 	}

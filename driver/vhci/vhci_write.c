@@ -82,17 +82,14 @@ void post_get_desc(vpdo_dev_t *vpdo, URB *urb)
 
 }
 
-static NTSTATUS
-post_select_config(pvpdo_dev_t vpdo, PURB urb)
+static NTSTATUS post_select_config(vpdo_dev_t *vpdo, URB *urb)
 {
 	return vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
-static NTSTATUS
-post_select_interface(pvpdo_dev_t vpdo, PURB urb)
+static NTSTATUS post_select_interface(vpdo_dev_t *vpdo, URB *urb)
 {
-	struct _URB_SELECT_INTERFACE	*urb_seli = &urb->UrbSelectInterface;
-
+	struct _URB_SELECT_INTERFACE *urb_seli = &urb->UrbSelectInterface;
 	return vpdo_select_interface(vpdo, &urb_seli->Interface);
 }
 
