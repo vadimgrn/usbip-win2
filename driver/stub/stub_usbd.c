@@ -294,7 +294,7 @@ select_usb_conf(usbip_stub_dev_t *devstub, USHORT bVal)
 }
 
 BOOLEAN
-select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, USHORT alt_setting)
+select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, UCHAR alt_setting)
 {
 	PURB	purb;
 	struct _URB_SELECT_INTERFACE	*purb_seli;

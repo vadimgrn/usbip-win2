@@ -209,7 +209,6 @@ create_endpoints(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 	PUDECXUSBENDPOINT_INIT	epinit;
 	PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf = &pluginfo->dscr_conf;
 	PUSB_ENDPOINT_DESCRIPTOR	dsc_ep;
-	PVOID	start;
 
 	vusb = TO_VUSB(ude_usbdev);
 	vusb->ude_usbdev = ude_usbdev;
@@ -218,7 +217,8 @@ create_endpoints(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 	TRD(VUSB, "Enter: epinit=0x%p", epinit);
 	add_ep(vusb, &epinit, NULL);
 
-	start = dsc_conf;
+	void *start = dsc_conf;
+
 	while ((dsc_ep = dsc_next_ep(dsc_conf, start)) != NULL) {
 		epinit = UdecxUsbSimpleEndpointInitAllocate(ude_usbdev);
 		TRD(VUSB, "While: epinit=0x%p, dsc_ep->bEndpointAddress=0x%x",

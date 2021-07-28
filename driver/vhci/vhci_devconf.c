@@ -61,49 +61,49 @@ static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_de
 	pipe->PipeFlags = 0;
 }
 
-static NTSTATUS setup_endpoints(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSB_INTERFACE_DESCRIPTOR dsc_intf, enum usb_device_speed speed)
+static bool setup_endpoints(
+	USBD_INTERFACE_INFORMATION *intf, 
+	USB_CONFIGURATION_DESCRIPTOR *dsc_conf, 
+	USB_INTERFACE_DESCRIPTOR *dsc_intf, 
+	enum usb_device_speed speed)
 {
-	PVOID	start = dsc_intf;
-	ULONG	n_pipes_setup;
-	unsigned int	i;
+	ULONG n_pipes_setup = (intf->Length - sizeof(*intf))/sizeof(*intf->Pipes) + 1;
 
-	n_pipes_setup = (intf->Length - sizeof(USBD_INTERFACE_INFORMATION)) / sizeof(USBD_PIPE_INFORMATION) + 1;
-	if (n_pipes_setup < intf->NumberOfPipes) {
+	if (n_pipes_setup >= intf->NumberOfPipes) {
+		n_pipes_setup = intf->NumberOfPipes;
+	} else {
 		DBGW(DBG_URB, "insufficient interface information size: %u < %u\n", n_pipes_setup, intf->NumberOfPipes);
 	}
-	else {
-		n_pipes_setup = intf->NumberOfPipes;
-	}
 
-	for (i = 0; i < n_pipes_setup; i++) {
-		PUSB_ENDPOINT_DESCRIPTOR	dsc_ep;
+	void *start = dsc_intf;
 
-		dsc_ep = dsc_next_ep(dsc_conf, start);
-		if (dsc_ep == NULL) {
+	for (unsigned int i = 0; i < n_pipes_setup; ++i) {
+
+		USB_ENDPOINT_DESCRIPTOR *dsc_ep = dsc_next_ep(dsc_conf, start);
+		if (!dsc_ep) {
 			DBGW(DBG_IOCTL, "no ep desc\n");
-			return FALSE;
+			return false;
 		}
 
-		set_pipe(&intf->Pipes[i], dsc_ep, speed);
-		DBGI(DBG_IOCTL, "ep setup[%u]: %s\n", i, dbg_pipe(&intf->Pipes[i]));
+		set_pipe(intf->Pipes + i, dsc_ep, speed);
+		DBGI(DBG_IOCTL, "ep setup[%u]: %s\n", i, dbg_pipe(intf->Pipes + i));
 		start = dsc_ep;
 
 	}
-	return TRUE;
+
+	return true;
 }
 
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, enum usb_device_speed speed)
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPTOR *dsc_conf, enum usb_device_speed speed)
 {
-	PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
-
-	if (sizeof(USBD_INTERFACE_INFORMATION) - sizeof(USBD_PIPE_INFORMATION) > intf->Length) {
+	if (sizeof(*intf) - sizeof(*intf->Pipes) > intf->Length) {
 		DBGE(DBG_URB, "insufficient interface information size?\n");
 		///TODO: need to check
 		return STATUS_SUCCESS;
 	}
 
-	dsc_intf = dsc_find_intf(dsc_conf, intf->InterfaceNumber, intf->AlternateSetting);
-	if (dsc_intf == NULL) {
+	USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(dsc_conf, intf->InterfaceNumber, intf->AlternateSetting);
+	if (!dsc_intf) {
 		DBGW(DBG_IOCTL, "no interface desc\n");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
@@ -114,9 +114,7 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIP
 	intf->InterfaceHandle = make_interface_handle(intf->InterfaceNumber, intf->AlternateSetting);
 	intf->NumberOfPipes = dsc_intf->bNumEndpoints;
 
-	if (!setup_endpoints(intf, dsc_conf, dsc_intf, speed))
-		return STATUS_INVALID_DEVICE_REQUEST;
-	return STATUS_SUCCESS;
+	return setup_endpoints(intf, dsc_conf, dsc_intf, speed) ? STATUS_SUCCESS : STATUS_INVALID_DEVICE_REQUEST;
 }
 
 NTSTATUS setup_config(

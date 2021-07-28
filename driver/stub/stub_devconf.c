@@ -147,7 +147,7 @@ get_intf_info_pipe(PUSBD_INTERFACE_INFORMATION info_intf, UCHAR epaddr)
 }
 
 USHORT
-get_info_intf_size(devconf_t *devconf, UCHAR intf_num, USHORT alt_setting)
+get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting)
 {
 	PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
 
