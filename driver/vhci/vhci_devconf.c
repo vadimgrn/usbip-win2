@@ -3,12 +3,35 @@
 #include "usbip_vhci_api.h"
 #include "devconf.h"
 
-#define NEXT_USBD_INTERFACE_INFO(info_intf)	(USBD_INTERFACE_INFORMATION *)((PUINT8)(info_intf + 1) - \
-	(1 * sizeof(USBD_PIPE_INFORMATION)) + (info_intf->NumberOfPipes * sizeof(USBD_PIPE_INFORMATION)));
+static __inline USBD_INTERFACE_INFORMATION* get_next_interface(USBD_INTERFACE_INFORMATION *iface)
+{
+	char *end = (char*)(iface + 1);
+	
+	ULONG cnt = iface->NumberOfPipes;
+	if (cnt > 1) { // first pipe is included into USBD_INTERFACE_INFORMATION
+		end += --cnt*sizeof(*iface->Pipes);
+	}
 
-#define TO_INTF_HANDLE(intf_num, altsetting)	((USBD_INTERFACE_HANDLE)((intf_num << 8) + altsetting))
-#define TO_INTF_NUM(handle)		(UCHAR)(((UINT_PTR)(handle)) >> 8)
-#define TO_INTF_ALTSETTING(handle)	(UCHAR)((UINT_PTR)(handle) & 0xff)
+	return (USBD_INTERFACE_INFORMATION*)end;
+}
+
+static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
+{
+	UCHAR v[sizeof(USBD_INTERFACE_HANDLE)] = { altsetting, ifnum };
+	return *(USBD_INTERFACE_HANDLE*)v; 
+}
+
+static __inline UCHAR get_interface_altsettings(USBD_INTERFACE_HANDLE handle)
+{
+	UCHAR *v = (UCHAR*)&handle;
+	return v[0]; 
+}
+
+static __inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
+{
+	UCHAR *v = (UCHAR*)&handle;
+	return v[1]; 
+}
 
 #ifdef DBG
 
@@ -95,7 +118,7 @@ setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_c
 	intf->Class = dsc_intf->bInterfaceClass;
 	intf->SubClass = dsc_intf->bInterfaceSubClass;
 	intf->Protocol = dsc_intf->bInterfaceProtocol;
-	intf->InterfaceHandle = TO_INTF_HANDLE(intf->InterfaceNumber, intf->AlternateSetting);
+	intf->InterfaceHandle = make_interface_handle(intf->InterfaceNumber, intf->AlternateSetting);
 	intf->NumberOfPipes = dsc_intf->bNumEndpoints;
 
 	if (!setup_endpoints(intf, dsc_conf, dsc_intf, speed))
@@ -103,23 +126,22 @@ setup_intf(USBD_INTERFACE_INFORMATION *intf, PUSB_CONFIGURATION_DESCRIPTOR dsc_c
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS
-setup_config(PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSBD_INTERFACE_INFORMATION info_intf, PVOID end_info_intf, enum usb_device_speed speed)
+NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USBD_INTERFACE_INFORMATION *info_intf, void *end_info_intf, enum usb_device_speed speed)
 {
-	unsigned int	i;
-
-	for (i = 0; i < dsc_conf->bNumInterfaces; i++) {
-		NTSTATUS	status;
-
-		if ((status = setup_intf(info_intf, dsc_conf, speed)) != STATUS_SUCCESS)
+	for (int i = 0; i < dsc_conf->bNumInterfaces; ++i) {
+		
+		NTSTATUS status = setup_intf(info_intf, dsc_conf, speed);
+		if (status != STATUS_SUCCESS) {
 			return status;
+		}
 
-		info_intf = NEXT_USBD_INTERFACE_INFO(info_intf);
+		info_intf = get_next_interface(info_intf);
+	
 		/* urb_selc may have less info_intf than bNumInterfaces in conf desc */
-		if ((PVOID)info_intf >= end_info_intf)
+		if ((PVOID)info_intf >= end_info_intf) {
 			break;
+		}
 	}
 
-	/* it seems we must return now */
 	return STATUS_SUCCESS;
 }
