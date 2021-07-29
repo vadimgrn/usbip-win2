@@ -146,35 +146,38 @@ get_intf_info_pipe(PUSBD_INTERFACE_INFORMATION info_intf, UCHAR epaddr)
 	return NULL;
 }
 
-USHORT
-get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting)
+ULONG get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting)
 {
-	PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
-
-	dsc_intf = dsc_find_intf(devconf->dsc_conf, intf_num, alt_setting);
-	if (dsc_intf == NULL)
+	USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(devconf->dsc_conf, intf_num, alt_setting);
+	if (!dsc_intf) {
 		return 0;
-	return sizeof(USBD_INTERFACE_INFORMATION) + (dsc_intf->bNumEndpoints - 1) * sizeof(USBD_PIPE_INFORMATION);
+	}
+
+	int n = dsc_intf->bNumEndpoints; // can be zero
+	if (n > 1) {
+		--n;
+	}
+
+	return sizeof(USBD_INTERFACE_INFORMATION) + n*sizeof(USBD_PIPE_INFORMATION);
 }
 
-PUSBD_PIPE_INFORMATION
-get_info_pipe(devconf_t *devconf, UCHAR epaddr)
+USBD_PIPE_INFORMATION *get_info_pipe(devconf_t *devconf, UCHAR epaddr)
 {
-	int	i;
-
-	if (devconf == NULL)
+	if (!devconf) {
 		return NULL;
+	}
 
-	for (i = 0; i < devconf->bNumInterfaces; i++) {
-		PUSBD_INTERFACE_INFORMATION	info_intf;
-		PUSBD_PIPE_INFORMATION		info_pipe;
+	for (int i = 0; i < devconf->bNumInterfaces; ++i) {
 
-		info_intf = devconf->infos_intf[i];
-		if (info_intf == NULL)
+		USBD_INTERFACE_INFORMATION *info_intf = devconf->infos_intf[i];
+		if (!info_intf) {
 			continue;
-		info_pipe = get_intf_info_pipe(info_intf, epaddr);
-		if (info_pipe != NULL)
+		}
+
+		USBD_PIPE_INFORMATION *info_pipe = get_intf_info_pipe(info_intf, epaddr);
+		if (info_pipe) {
 			return info_pipe;
+		}
 	}
 
 	return NULL;

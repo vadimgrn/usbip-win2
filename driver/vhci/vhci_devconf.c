@@ -61,37 +61,21 @@ static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_de
 	pipe->PipeFlags = 0;
 }
 
-static bool setup_endpoints(
-	USBD_INTERFACE_INFORMATION *intf, 
-	USB_CONFIGURATION_DESCRIPTOR *dsc_conf, 
-	USB_INTERFACE_DESCRIPTOR *dsc_intf, 
-	enum usb_device_speed speed)
+struct init_ep_data
 {
-	ULONG n_pipes_setup = (intf->Length - sizeof(*intf))/sizeof(*intf->Pipes) + 1;
+	USBD_PIPE_INFORMATION *pi;
+	enum usb_device_speed speed;
+};
 
-	if (n_pipes_setup >= intf->NumberOfPipes) {
-		n_pipes_setup = intf->NumberOfPipes;
-	} else {
-		DBGW(DBG_URB, "insufficient interface information size: %u < %u\n", n_pipes_setup, intf->NumberOfPipes);
-	}
+static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
+{
+	struct init_ep_data *params = data;
+	USBD_PIPE_INFORMATION *pi = params->pi + i;
 
-	void *start = dsc_intf;
+	set_pipe(pi, d, params->speed);
+	DBGI(DBG_IOCTL, "%s[%d]: %s\n", __func__, i, dbg_pipe(pi));
 
-	for (unsigned int i = 0; i < n_pipes_setup; ++i) {
-
-		USB_ENDPOINT_DESCRIPTOR *dsc_ep = dsc_next_ep(dsc_conf, start);
-		if (!dsc_ep) {
-			DBGW(DBG_IOCTL, "no ep desc\n");
-			return false;
-		}
-
-		set_pipe(intf->Pipes + i, dsc_ep, speed);
-		DBGI(DBG_IOCTL, "ep setup[%u]: %s\n", i, dbg_pipe(intf->Pipes + i));
-		start = dsc_ep;
-
-	}
-
-	return true;
+	return false;
 }
 
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPTOR *dsc_conf, enum usb_device_speed speed)
@@ -114,7 +98,10 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPT
 	intf->InterfaceHandle = make_interface_handle(intf->InterfaceNumber, intf->AlternateSetting);
 	intf->NumberOfPipes = dsc_intf->bNumEndpoints;
 
-	return setup_endpoints(intf, dsc_conf, dsc_intf, speed) ? STATUS_SUCCESS : STATUS_INVALID_DEVICE_REQUEST;
+	struct init_ep_data data = { intf->Pipes, speed };
+	dsc_for_each_endpoint(dsc_conf, dsc_intf, init_ep, &data);
+
+	return STATUS_SUCCESS;
 }
 
 NTSTATUS setup_config(

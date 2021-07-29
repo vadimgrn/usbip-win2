@@ -1,5 +1,5 @@
 #include "vhci_vpdo.h"
-
+#include "vhci_dbg.h"
 #include "vhci.h"
 #include "usbreq.h"
 #include "devconf.h"
@@ -54,28 +54,21 @@ vpdo_select_interface(pvpdo_dev_t vpdo, USBD_INTERFACE_INFORMATION *info_intf)
 	return status;
 }
 
-static PAGEABLE void
-copy_pipe_info(USB_PIPE_INFO *pinfos, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, PUSB_INTERFACE_DESCRIPTOR dsc_intf)
+static PAGEABLE bool copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 {
-	PVOID	start;
-	int	i;
+	USB_PIPE_INFO *pi = (USB_PIPE_INFO*)data + i;
 
-	for (i = 0, start = dsc_intf; i < dsc_intf->bNumEndpoints; i++) {
-		PUSB_ENDPOINT_DESCRIPTOR	dsc_ep;
+	RtlCopyMemory(&pi->EndpointDescriptor, d, sizeof(*d));
+	pi->ScheduleOffset = 0; // TODO
 
-		dsc_ep = dsc_next_ep(dsc_conf, start);
-		RtlCopyMemory(&pinfos[i].EndpointDescriptor, dsc_ep, sizeof(USB_ENDPOINT_DESCRIPTOR));
-		pinfos[i].ScheduleOffset = 0;///TODO
-		start = dsc_ep;
-	}
+	return false;
 }
 
 PAGEABLE NTSTATUS
 vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION conninfo, PULONG poutlen)
 {
-	PUSB_INTERFACE_DESCRIPTOR	dsc_intf = NULL;
-	ULONG	outlen;
-	NTSTATUS	status = STATUS_INVALID_PARAMETER;
+	ULONG outlen = 0;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	conninfo->DeviceAddress = (USHORT)conninfo->ConnectionIndex;
 	conninfo->NumberOfOpenPipes = 0;
@@ -86,83 +79,87 @@ vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION connin
 		conninfo->LowSpeed = FALSE;
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
 		status = STATUS_SUCCESS;
-	}
-	else {
-		if (vpdo->dsc_dev == NULL)
+	} else {
+		if (!vpdo->dsc_dev) {
 			return STATUS_INVALID_PARAMETER;
+		}
 
 		conninfo->ConnectionStatus = DeviceConnected;
 
-		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(USB_DEVICE_DESCRIPTOR));
+		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(*vpdo->dsc_dev));
 
-		if (vpdo->dsc_conf != NULL)
+		if (vpdo->dsc_conf) {
 			conninfo->CurrentConfigurationValue = vpdo->dsc_conf->bConfigurationValue;
+		}
+
 		conninfo->LowSpeed = vpdo->speed == USB_SPEED_LOW || vpdo->speed == USB_SPEED_FULL;
 
-		dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
-		if (dsc_intf != NULL)
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
+		if (dsc_intf) {
 			conninfo->NumberOfOpenPipes = dsc_intf->bNumEndpoints;
+		}
 
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION) + sizeof(USB_PIPE_INFO) * conninfo->NumberOfOpenPipes;
 		if (*poutlen < outlen) {
 			status = STATUS_BUFFER_TOO_SMALL;
-		}
-		else {
-			if (conninfo->NumberOfOpenPipes > 0)
-				copy_pipe_info(conninfo->PipeList, vpdo->dsc_conf, dsc_intf);
+		} else {
+			if (conninfo->NumberOfOpenPipes > 0) {
+				dsc_for_each_endpoint(vpdo->dsc_conf, dsc_intf, copy_ep, conninfo->PipeList);
+			}
 			status = STATUS_SUCCESS;
 		}
 	}
-	*poutlen = outlen;
 
+	*poutlen = outlen;
 	return status;
 }
 
 PAGEABLE NTSTATUS
 vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX conninfo, PULONG poutlen)
 {
-	PUSB_INTERFACE_DESCRIPTOR	dsc_intf = NULL;
-	ULONG	outlen;
-	NTSTATUS	status = STATUS_INVALID_PARAMETER;
+	ULONG outlen = 0;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	conninfo->DeviceAddress = (USHORT)conninfo->ConnectionIndex;
 	conninfo->NumberOfOpenPipes = 0;
 	conninfo->DeviceIsHub = FALSE;
 
-	if (vpdo == NULL) {
+	if (!vpdo) {
 		conninfo->ConnectionStatus = NoDeviceConnected;
 		conninfo->Speed = UsbFullSpeed;
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
 		status = STATUS_SUCCESS;
-	}
-	else {
-		if (vpdo->dsc_dev == NULL)
+	} else {
+		if (!vpdo->dsc_dev) {
 			return STATUS_INVALID_PARAMETER;
+		}
 
 		conninfo->ConnectionStatus = DeviceConnected;
-
 		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(USB_DEVICE_DESCRIPTOR));
 
-		if (vpdo->dsc_conf != NULL)
+		if (vpdo->dsc_conf) {
 			conninfo->CurrentConfigurationValue = vpdo->dsc_conf->bConfigurationValue;
+		}
+
 		conninfo->Speed = vpdo->speed;
 
-		dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
-		if (dsc_intf != NULL)
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
+		if (dsc_intf) {
 			conninfo->NumberOfOpenPipes = dsc_intf->bNumEndpoints;
+		}
 
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION) + sizeof(USB_PIPE_INFO) * conninfo->NumberOfOpenPipes;
 		if (*poutlen < outlen) {
 			status = STATUS_BUFFER_TOO_SMALL;
-		}
-		else {
-			if (conninfo->NumberOfOpenPipes > 0)
-				copy_pipe_info(conninfo->PipeList, vpdo->dsc_conf, dsc_intf);
+		} else {
+			if (conninfo->NumberOfOpenPipes > 0) {
+				dsc_for_each_endpoint(vpdo->dsc_conf, dsc_intf, copy_ep, conninfo->PipeList);
+			}
 			status = STATUS_SUCCESS;
 		}
 	}
-	*poutlen = outlen;
 
+	*poutlen = outlen;
 	return status;
 }
 

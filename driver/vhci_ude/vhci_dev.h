@@ -2,12 +2,12 @@
 
 #include <ntddk.h>
 #include <wdf.h>
+#include <usbspec.h>
 #include <UdeCxTypes.h>
 
 EXTERN_C_START
 
-#define MAX_HUB_20PORTS		12
-#define MAX_HUB_30PORTS		4
+enum { MAX_HUB_20PORTS = 12, MAX_HUB_30PORTS = 4 };
 
 struct _ctx_vusb;
 
@@ -70,7 +70,7 @@ typedef struct _ctx_vusb
 	PWCHAR		wserial;
 
 	/* Full-length configuration descriptor for finding an interface descriptor of EP */
-	PUCHAR		dsc_conf;
+	USB_CONFIGURATION_DESCRIPTOR	*dsc_conf;
 	/* alt settings for interface. use SHORT for treating unassigned case(-1) */
 	PSHORT		intf_altsettings;
 	/* a first value in configuration descriptor */
@@ -82,13 +82,18 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(pctx_vusb_t, TO_PVUSB)
 
 typedef struct _ctx_ep
 {
-	pctx_vusb_t	vusb;
-	UCHAR		type, addr, interval;
+	ctx_vusb_t	*vusb;
+
+	UCHAR		type; // USB_ENDPOINT_TYPE_CONTROL, ...
+	UCHAR		addr; // bEndpointAddress
+	UCHAR		interval;
 	/*
 	 * Information for a parent interface.
 	 * These are used for adjusting value of interface alternate setting.
 	 */
-	UCHAR		intf_num, altsetting;
+	UCHAR intf_num;
+	UCHAR altsetting;
+
 	UDECXUSBENDPOINT	ude_ep;
 	WDFQUEUE	queue;
 } ctx_ep_t, *pctx_ep_t;

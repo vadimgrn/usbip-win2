@@ -221,24 +221,24 @@ get_usb_dsc_conf(usbip_stub_dev_t *devstub, UCHAR bVal)
 static PUSBD_INTERFACE_LIST_ENTRY
 build_default_intf_list(PUSB_CONFIGURATION_DESCRIPTOR dsc_conf)
 {
-	PUSBD_INTERFACE_LIST_ENTRY	pintf_list;
-	int	size;
-	unsigned	i;
+	size_t size = sizeof(USBD_INTERFACE_LIST_ENTRY) * (dsc_conf->bNumInterfaces + 1);
 
-	size = sizeof(USBD_INTERFACE_LIST_ENTRY) * (dsc_conf->bNumInterfaces + 1);
-	pintf_list = ExAllocatePoolWithTag(NonPagedPool, size, USBIP_STUB_POOL_TAG);
-	if (pintf_list == NULL)
+	USBD_INTERFACE_LIST_ENTRY *pintf_list = ExAllocatePoolWithTag(NonPagedPool, size, USBIP_STUB_POOL_TAG);
+	if (!pintf_list) {
 		return NULL;
+	}
 
 	RtlZeroMemory(pintf_list, size);
 
-	for (i = 0; i < dsc_conf->bNumInterfaces; i++) {
-		PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
-		dsc_intf = dsc_find_intf(dsc_conf, (UCHAR)i, 0);
-		if (dsc_intf == NULL)
+	for (UCHAR i = 0; i < dsc_conf->bNumInterfaces; ++i) {
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(dsc_conf, i, 0);
+		if (dsc_intf) {
+			pintf_list[i].InterfaceDescriptor = dsc_intf;
+		} else {
 			break;
-		pintf_list[i].InterfaceDescriptor = dsc_intf;
+		}
 	}
+
 	return pintf_list;
 }
 
@@ -298,7 +298,6 @@ select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, UCHAR alt_setting)
 {
 	PURB	purb;
 	struct _URB_SELECT_INTERFACE	*purb_seli;
-	USHORT	info_intf_size;
 	ULONG	len_urb;
 	NTSTATUS	status;
 
@@ -313,8 +312,8 @@ select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, UCHAR alt_setting)
 		return FALSE;
 	}
 
-	info_intf_size = get_info_intf_size(devstub->devconf, intf_num, alt_setting);
-	if (info_intf_size == 0) {
+	ULONG info_intf_size = get_info_intf_size(devstub->devconf, intf_num, alt_setting);
+	if (!info_intf_size) {
 		DBGW(DBG_GENERAL, "select_usb_intf: non-existent interface: num: %hhu, alt:%hu\n", intf_num, alt_setting);
 		return FALSE;
 	}

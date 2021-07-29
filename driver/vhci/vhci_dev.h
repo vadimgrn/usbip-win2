@@ -183,8 +183,8 @@ typedef struct
 	PFILE_OBJECT	fo;
 	unsigned int	devid;
 	unsigned long	seq_num;
-	PUSB_DEVICE_DESCRIPTOR	dsc_dev;
-	PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf;
+	USB_DEVICE_DESCRIPTOR	*dsc_dev;
+	USB_CONFIGURATION_DESCRIPTOR	*dsc_conf;
 	UNICODE_STRING	usb_dev_interface;
 	UCHAR	current_intf_num, current_intf_alt;
 } vpdo_dev_t, *pvpdo_dev_t;

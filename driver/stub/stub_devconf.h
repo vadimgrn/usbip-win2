@@ -19,7 +19,7 @@ devconf_t *create_devconf(PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, USBD_CONFIGURA
 void free_devconf(devconf_t *devconf);
 void update_devconf(devconf_t *devconf, PUSBD_INTERFACE_INFORMATION info_intf);
 
-USHORT get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting);
+ULONG get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting);
 PUSBD_PIPE_INFORMATION get_info_pipe(devconf_t *devconf, UCHAR epaddr);
 
 #ifdef DBG

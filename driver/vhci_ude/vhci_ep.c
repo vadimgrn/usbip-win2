@@ -46,31 +46,29 @@ ep_reset(_In_ UDECXUSBENDPOINT ep, _In_ WDFREQUEST req)
 	TRE(VUSB, "Enter");
 }
 
-static void
-setup_ep_from_dscr(pctx_ep_t ep, PUSB_ENDPOINT_DESCRIPTOR dsc_ep)
+static void setup_ep_from_dscr(ctx_ep_t *ep, USB_ENDPOINT_DESCRIPTOR *dsc_ep)
 {
 	ep->intf_num = 0;
 	ep->altsetting = 0;
-	if (dsc_ep == NULL) {
+
+	if (!dsc_ep) {
 		ep->type = USB_ENDPOINT_TYPE_CONTROL;
-		ep->addr = USB_DEFAULT_DEVICE_ADDRESS;
+		ep->addr = USB_DEFAULT_ENDPOINT_ADDRESS;
 		ep->interval = 0;
+		return;
 	}
-	else {
-		PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
+	
+	ep->type = dsc_ep->bmAttributes & USB_ENDPOINT_TYPE_MASK;
+	ep->addr = dsc_ep->bEndpointAddress;
+	ep->interval = dsc_ep->bInterval;
 
-		ep->type = dsc_ep->bmAttributes & USB_ENDPOINT_TYPE_MASK;
-		ep->addr = dsc_ep->bEndpointAddress;
-		ep->interval = dsc_ep->bInterval;
-
-		dsc_intf = dsc_find_intf_by_ep((PUSB_CONFIGURATION_DESCRIPTOR)ep->vusb->dsc_conf, dsc_ep);
-		if (dsc_intf) {
-			ep->intf_num = dsc_intf->bInterfaceNumber;
-			ep->altsetting = dsc_intf->bAlternateSetting;
-		}
-		else {
-			TRE(VUSB, "weird case: interface for ep not found");
-		}
+	USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf_by_ep(ep->vusb->dsc_conf, dsc_ep);
+	
+	if (dsc_intf) {
+		ep->intf_num = dsc_intf->bInterfaceNumber;
+		ep->altsetting = dsc_intf->bAlternateSetting;
+	} else {
+		TRE(VUSB, "%s: interface for ep not found", __func__);
 	}
 }
 
@@ -85,7 +83,7 @@ add_ep(pctx_vusb_t vusb, PUDECXUSBENDPOINT_INIT *pepinit, PUSB_ENDPOINT_DESCRIPT
 	WDF_OBJECT_ATTRIBUTES       attrs;
 	NTSTATUS	status;
 
-	ep_addr = dscr_ep ? dscr_ep->bEndpointAddress : USB_DEFAULT_DEVICE_ADDRESS;
+	ep_addr = dscr_ep ? dscr_ep->bEndpointAddress : USB_DEFAULT_ENDPOINT_ADDRESS;
 	TRD(VUSB, "Enter: ep_addr=0x%x", ep_addr);
 	UdecxUsbEndpointInitSetEndpointAddress(*pepinit, ep_addr);
 
@@ -167,18 +165,16 @@ set_intf_for_ep(pctx_vusb_t vusb, WDFREQUEST req, PUDECX_ENDPOINTS_CONFIGURE_PAR
 	UCHAR	altsetting = params->NewInterfaceSetting;
 
 	if (params->EndpointsToConfigureCount > 0) {
-		pctx_ep_t	ep = TO_EP(params->EndpointsToConfigure[0]);
-		PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf;
-		PUSB_INTERFACE_DESCRIPTOR	dsc_intf;
-		PUSB_ENDPOINT_DESCRIPTOR	dsc_ep = NULL;
+		ctx_ep_t *ep = TO_EP(params->EndpointsToConfigure[0]);
 
-		dsc_conf = (PUSB_CONFIGURATION_DESCRIPTOR)vusb->dsc_conf;
-		dsc_intf = dsc_find_intf(dsc_conf, intf_num, altsetting);
+		USB_ENDPOINT_DESCRIPTOR *dsc_ep = NULL;
+
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vusb->dsc_conf, intf_num, altsetting);
 		if (dsc_intf) {
-			dsc_ep = dsc_find_intf_ep(dsc_conf, dsc_intf, ep->addr);
+			dsc_ep = dsc_find_intf_ep(vusb->dsc_conf, dsc_intf, ep->addr);
 		}
 
-		if (dsc_ep == NULL) {
+		if (!dsc_ep) {
 			/* UDE dynamic EP configuration does not seem to provide correct values */
 			/* Use the values of vhci EP which are obtained from the parent interface descriptor */
 			intf_num = ep->intf_num;
@@ -186,8 +182,9 @@ set_intf_for_ep(pctx_vusb_t vusb, WDFREQUEST req, PUDECX_ENDPOINTS_CONFIGURE_PAR
 		}
 	}
 
-	if (vusb->intf_altsettings[intf_num] == altsetting)
+	if (vusb->intf_altsettings[intf_num] == altsetting) {
 		return STATUS_SUCCESS;
+	}
 
 	vusb->intf_altsettings[intf_num] = altsetting;
 

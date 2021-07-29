@@ -54,32 +54,30 @@ setup_vpdo_with_dsc_dev(pvpdo_dev_t vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
 	vpdo->num_configurations = dsc_dev->bNumConfigurations;
 }
 
-static void
-setup_vpdo_with_dsc_conf(pvpdo_dev_t vpdo, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf)
+/* 
+ * Many devices have 0 usb class number in a device descriptor.
+ * 0 value means that class number is determined at interface level.
+ * USB class, subclass and protocol numbers should be setup before importing.
+ * Because windows vhci driver builds a device compatible id with those numbers.
+ */
+static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *dsc_conf)
 {
 	NT_ASSERT(dsc_conf);
 
 	vpdo->inum = dsc_conf->bNumInterfaces;
 
-	/* Many devices have 0 usb class number in a device descriptor.
-	 * 0 value means that class number is determined at interface level.
-	 * USB class, subclass and protocol numbers should be setup before importing.
-	 * Because windows vhci driver builds a device compatible id with those numbers.
-	 */
 	if (vpdo->usbclass || vpdo->subclass || vpdo->protocol) {
 		return;
 	}
 
-	/* buf[4] holds the number of interfaces in USB configuration.
-	 * Supplement class/subclass/protocol only if there exists only single interface.
-	 * A device with multiple interfaces will be detected as a composite by vhci.
-	 */
 	if (vpdo->inum == 1) {
-		PUSB_INTERFACE_DESCRIPTOR dsc_intf = dsc_find_first_intf(dsc_conf);
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_next_intf(dsc_conf, NULL);
 		if (dsc_intf) {
 			vpdo->usbclass = dsc_intf->bInterfaceClass;
 			vpdo->subclass = dsc_intf->bInterfaceSubClass;
 			vpdo->protocol = dsc_intf->bInterfaceProtocol;
+		} else {
+			DBGE(DBG_PNP, "%s: interface descriptor not found\n", __func__);
 		}
 	}
 }

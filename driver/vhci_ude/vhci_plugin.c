@@ -203,29 +203,24 @@ vusb_cleanup(_In_ WDFOBJECT ude_usbdev)
 }
 
 static void
-create_endpoints(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
+create_endpoints(UDECXUSBDEVICE ude_usbdev, vhci_pluginfo_t *pluginfo)
 {
-	pctx_vusb_t vusb;
-	PUDECXUSBENDPOINT_INIT	epinit;
-	PUSB_CONFIGURATION_DESCRIPTOR	dsc_conf = &pluginfo->dscr_conf;
-	PUSB_ENDPOINT_DESCRIPTOR	dsc_ep;
-
-	vusb = TO_VUSB(ude_usbdev);
+	ctx_vusb_t *vusb = TO_VUSB(ude_usbdev);
 	vusb->ude_usbdev = ude_usbdev;
-	epinit = UdecxUsbSimpleEndpointInitAllocate(ude_usbdev);
 
+	PUDECXUSBENDPOINT_INIT epinit = UdecxUsbSimpleEndpointInitAllocate(ude_usbdev);
 	TRD(VUSB, "Enter: epinit=0x%p", epinit);
 	add_ep(vusb, &epinit, NULL);
-
-	void *start = dsc_conf;
-
-	while ((dsc_ep = dsc_next_ep(dsc_conf, start)) != NULL) {
+	
+	for (USB_COMMON_DESCRIPTOR *cur = NULL; 
+	     (cur = dsc_find_next(&pluginfo->dscr_conf, cur, USB_ENDPOINT_DESCRIPTOR_TYPE)) != NULL;
+	    ) {
+		USB_ENDPOINT_DESCRIPTOR *d = (USB_ENDPOINT_DESCRIPTOR*)cur;
 		epinit = UdecxUsbSimpleEndpointInitAllocate(ude_usbdev);
-		TRD(VUSB, "While: epinit=0x%p, dsc_ep->bEndpointAddress=0x%x",
-			epinit, dsc_ep->bEndpointAddress);
-		add_ep(vusb, &epinit, dsc_ep);
-		start = dsc_ep;
+		TRD(VUSB, "epinit=%#p, bEndpointAddress=%#04x",	epinit, d->bEndpointAddress);
+		add_ep(vusb, &epinit, d);
 	}
+
 	TRD(VUSB, "Leave");
 }
 
