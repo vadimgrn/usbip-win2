@@ -185,6 +185,7 @@
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(UM_IncludePath);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -209,6 +210,7 @@
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(UM_IncludePath);$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -234,6 +236,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Inf2CatAdditionalOptions>/driver:aaaa\temp\</Inf2CatAdditionalOptions>
       <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -259,6 +262,7 @@
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -281,6 +285,9 @@
     <ProjectReference Include="..\lib\libdrv.vcxproj">
       <Project>{27ab4325-4980-4634-9818-ae6bd61de532}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom_wpp.ini" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

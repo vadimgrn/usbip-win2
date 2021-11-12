@@ -1,4 +1,7 @@
 #include "vhci_pnp_devtext.h"
+#include "trace.h"
+#include "vhci_pnp_devtext.tmh"
+
 #include "vhci.h"
 #include "vhci_irp.h"
 

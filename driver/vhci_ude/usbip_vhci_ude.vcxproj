@@ -198,7 +198,6 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
@@ -221,7 +220,6 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
@@ -244,7 +242,6 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
@@ -268,7 +265,6 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>

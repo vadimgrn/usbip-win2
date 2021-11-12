@@ -1,4 +1,7 @@
 #include "usbreq.h"
+#include "trace.h"
+#include "usbreq.tmh"
+
 #include "vhci.h"
 #include "usbip_proto.h"
 #include "vhci_read.h"

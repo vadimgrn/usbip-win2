@@ -1,4 +1,7 @@
 #include "vhci_read.h"
+#include "trace.h"
+#include "vhci_read.tmh"
+
 #include "vhci_dbg.h"
 #include "vhci_proto.h"
 #include "vhci_internal_ioctl.h"
@@ -853,7 +856,7 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 	struct urb_req *urbr = NULL;
 	KIRQL oldirql;
 
-	DBGI(DBG_GENERAL | DBG_READ, "%s: Enter\n", __func__);
+	DBGI(DBG_READ, "Enter\n");
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
@@ -930,7 +933,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	NTSTATUS status = STATUS_SUCCESS;
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DBGI(DBG_GENERAL | DBG_READ, "vhci_read: Enter: len:%u, irp:%p\n", irpstack->Parameters.Read.Length, irp);
+	DBGI(DBG_READ, "Enter: len:%u, irp:%p\n", irpstack->Parameters.Read.Length, irp);
 
 	if (!IS_DEVOBJ_VHCI(devobj)) {
 		DBGE(DBG_READ, "read for non-vhci is not allowed\n");
@@ -952,7 +955,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 
 END:
-	DBGI(DBG_GENERAL | DBG_READ, "vhci_read: Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+	DBGI(DBG_READ, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
 
 	if (status != STATUS_PENDING) {
 		irp->IoStatus.Status = status;

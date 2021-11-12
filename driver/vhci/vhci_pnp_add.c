@@ -1,6 +1,8 @@
-#include "vhci.h"
-
 #include "vhci_pnp.h"
+#include "trace.h"
+#include "vhci_pnp_add.tmh"
+
+#include "vhci.h"
 
 #define MAX_HUB_PORTS		6
 
@@ -106,7 +108,7 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 
 	PAGED_CODE();
 
-	DBGI(DBG_GENERAL | DBG_PNP, "adding %s: pdo: 0x%p\n", dbg_vdev_type(type), pdo);
+	DBGI(DBG_PNP, "adding %s: pdo: 0x%p\n", dbg_vdev_type(type), pdo);
 
 	devobj = vdev_create(drvobj, type);
 	if (devobj == NULL)
@@ -165,7 +167,7 @@ vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 	PAGED_CODE();
 
 	if (!is_valid_vdev_hwid(pdo)) {
-		DBGE(DBG_GENERAL | DBG_PNP, "invalid hw id\n");
+		DBGE(DBG_PNP, "invalid hw id\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 

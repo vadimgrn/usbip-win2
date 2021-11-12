@@ -1,4 +1,7 @@
 #include "vhci_pnp_cap.h"
+#include "trace.h"
+#include "vhci_pnp_cap.tmh"
+
 #include "vhci_irp.h"
 #include "vhci_dbg.h"
 

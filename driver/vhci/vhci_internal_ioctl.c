@@ -1,15 +1,18 @@
 #include "vhci_internal_ioctl.h"
+#include "trace.h"
+#include "vhci_internal_ioctl.tmh"
+
 #include "vhci_dbg.h"
 #include "usbreq.h"
 
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
 	if (!hPipe) {
-		DBGI(DBG_IOCTL, "%s: empty pipe handle\n", __func__);
+		DBGI(DBG_IOCTL, "empty pipe handle\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	DBGI(DBG_IOCTL, "%s: PipeHandle %p\n", __func__, hPipe);
+	DBGI(DBG_IOCTL, "PipeHandle %p\n", hPipe);
 
 	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
@@ -136,7 +139,7 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	pvpdo_dev_t	vpdo;
 	ULONG			ioctl_code;
 
-	DBGI(DBG_GENERAL | DBG_IOCTL, "vhci_internal_ioctl: Enter\n");
+	DBGI(DBG_IOCTL, "Enter\n");
 
 	irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
@@ -185,6 +188,6 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-	DBGI(DBG_GENERAL | DBG_IOCTL, "vhci_internal_ioctl: Leave: %s\n", dbg_ntstatus(status));
+	DBGI(DBG_IOCTL, "Leave: %s\n", dbg_ntstatus(status));
 	return status;
 }

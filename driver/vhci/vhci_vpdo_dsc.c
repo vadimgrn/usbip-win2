@@ -1,4 +1,7 @@
 #include "vhci_vpdo_dsc.h"
+#include "trace.h"
+#include "vhci_vpdo_dsc.tmh"
+
 #include "vhci.h"
 #include "vhci_dev.h"
 #include "usbreq.h"
@@ -134,7 +137,7 @@ static void save_serial_number(
 	UCHAR cch = (dsc->bLength - sizeof(*dsc))/sizeof(*sd->bString) + 1;
 
 	if (vpdo->serial) {
-		DBGW(DBG_VPDO, "%s: prior serial '%S'\n", vpdo->serial);
+		DBGW(DBG_VPDO, "prior serial '%S'\n", vpdo->serial);
 		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
 	}
 

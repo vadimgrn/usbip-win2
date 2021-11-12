@@ -1,5 +1,9 @@
 #include <initguid.h>
+
 #include "vhci_pnp_intf.h"
+#include "trace.h"
+#include "vhci_pnp_intf.tmh"
+
 #include "vhci_dbg.h"
 #include "usbip_proto.h"
 #include "vhci_irp.h"

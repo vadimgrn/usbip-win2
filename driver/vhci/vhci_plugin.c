@@ -1,4 +1,7 @@
 #include "vhci_plugin.h"
+#include "trace.h"
+#include "vhci_plugin.tmh"
+
 #include "vhci_dbg.h"
 #include "strutil.h"
 #include "vhci_vhub.h"
@@ -104,7 +107,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 		return STATUS_END_OF_FILE;
 	}
 
-	DBGI(DBG_VPDO, "Plugin vpdo: port: %hhd\n", pluginfo->port);
+	DBGI(DBG_VPDO, "Plugin vpdo: port: %d\n", (int)pluginfo->port);
 
 	PDEVICE_OBJECT devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {

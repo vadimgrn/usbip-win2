@@ -1,6 +1,9 @@
+#include "stub_dev.h"
+#include "trace.h"
+#include "stub_dev.tmh"
+
 #include "stub_driver.h"
 #include "stub_dbg.h"
-#include "stub_dev.h"
 #include "stub_reg.h"
 
 #define INITGUID

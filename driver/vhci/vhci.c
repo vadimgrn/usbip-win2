@@ -1,4 +1,6 @@
 #include "vhci.h"
+#include "trace.h"
+#include "vhci.tmh"
 #include "vhci_plugin.h"
 #include "globals.h"
 #include "usbreq.h"
@@ -40,8 +42,6 @@ PAGEABLE DRIVER_ADD_DEVICE vhci_add_device;
 static PAGEABLE VOID
 vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 {
-	UNREFERENCED_PARAMETER(drvobj);
-
 	PAGED_CODE();
 
 	DBGI(DBG_GENERAL, "Unload\n");
@@ -52,14 +52,17 @@ vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 	// All the device objects should be gone.
 	//
 
-	ASSERT(NULL == drvobj->DeviceObject);
+	ASSERT(!drvobj->DeviceObject);
 
 	//
 	// Here we free all the resources allocated in the DriverEntry
 	//
 
-	if (Globals.RegistryPath.Buffer)
+	if (Globals.RegistryPath.Buffer) {
 		ExFreePool(Globals.RegistryPath.Buffer);
+	}
+
+	WPP_CLEANUP(drvobj);
 }
 
 static PAGEABLE NTSTATUS
@@ -158,6 +161,7 @@ vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 PAGEABLE NTSTATUS
 DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 {
+	WPP_INIT_TRACING(drvobj, RegistryPath);
 	DBGI(DBG_GENERAL, "DriverEntry: Enter\n");
 
 	ExInitializeNPagedLookasideList(&g_lookaside, NULL,NULL, 0, sizeof(struct urb_req), 'USBV', 0);
@@ -169,6 +173,7 @@ DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 
 	if (!Globals.RegistryPath.Buffer) {
 		ExDeleteNPagedLookasideList(&g_lookaside);
+		WPP_CLEANUP(drvobj);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 

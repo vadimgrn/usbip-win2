@@ -1,6 +1,8 @@
-#include "vhci.h"
-
 #include "vhci_pnp.h"
+#include "trace.h"
+#include "vhci_pnp.tmh"
+
+#include "vhci.h"
 #include "vhci_pnp_id.h"
 #include "vhci_irp.h"
 #include "vhci_pnp_devtext.h"
@@ -117,7 +119,7 @@ vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DBGI(DBG_GENERAL | DBG_PNP, "vhci_pnp(%s): Enter: minor:%s, irp: %p\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_pnp_minor(irpstack->MinorFunction), irp);
+	DBGI(DBG_PNP, "%s: Enter: minor:%s, irp: %p\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_pnp_minor(irpstack->MinorFunction), irp);
 
 	// If the device has been removed, the driver should
 	// not pass the IRP down to the next lower driver.
@@ -188,7 +190,7 @@ vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	}
 
 END:
-	DBGI(DBG_GENERAL | DBG_PNP, "vhci_pnp(%s): Leave: irp:%p, status:%s\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), irp, dbg_ntstatus(status));
+	DBGI(DBG_PNP, "%s: Leave: irp:%p, status:%s\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), irp, dbg_ntstatus(status));
 
 	return status;
 }

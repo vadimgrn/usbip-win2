@@ -1,4 +1,6 @@
 #include "vhci.h"
+#include "trace.h"
+#include "vhci_write.tmh"
 
 #include "usbip_proto.h"
 #include "usbreq.h"
@@ -77,7 +79,7 @@ void post_get_desc(vpdo_dev_t *vpdo, URB *urb)
 	if (req->TransferBufferLength >= dsc->bLength) {
 		try_to_cache_descriptor(vpdo, req, dsc);
 	} else {
-		DBGI(DBG_WRITE, "skip to cache partial descriptor: (%u < %hhu)\n", req->TransferBufferLength, dsc->bLength);
+		DBGI(DBG_WRITE, "skip to cache partial descriptor: (%u < %d)\n", req->TransferBufferLength, (int)dsc->bLength);
 	}
 
 }
@@ -415,7 +417,7 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
 	if (!hdr) {
-		DBGE(DBG_WRITE, "%s: too small\n", __func__);
+		DBGE(DBG_WRITE, "too small\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -443,7 +445,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DBGI(DBG_GENERAL | DBG_WRITE, "%s: Enter: len:%u, irp:%p\n", __func__, irpstack->Parameters.Write.Length, irp);
+	DBGI(DBG_WRITE, "Enter: len:%u, irp:%p\n", irpstack->Parameters.Write.Length, irp);
 
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
@@ -469,7 +471,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = process_write_irp(vpdo, irp);
 
 END:
-	DBGI(DBG_WRITE, "%s: Leave: irp:%p, status:%s\n", __func__, irp, dbg_ntstatus(status));
+	DBGI(DBG_WRITE, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
 
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);

@@ -1,4 +1,7 @@
 #include "vhci_pnp_remove.h"
+#include "trace.h"
+#include "vhci_pnp_remove.tmh"
+
 #include "vhci.h"
 #include "vhci_dbg.h"
 #include "vhci_pnp.h"

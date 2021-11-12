@@ -1,4 +1,7 @@
 #include "vhci_ioctl_vhub.h"
+#include "trace.h"
+#include "vhci_ioctl_vhub.tmh"
+
 #include "vhci_ioctl_vhci.h"
 #include "vhci.h"
 #include "vhci_pnp.h"

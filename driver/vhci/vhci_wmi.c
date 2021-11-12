@@ -1,4 +1,7 @@
 #include "vhci_wmi.h"
+#include "trace.h"
+#include "vhci_wmi.tmh"
+
 #include "vhci.h"
 #include "usbip_vhci_api.h"
 #include "globals.h"

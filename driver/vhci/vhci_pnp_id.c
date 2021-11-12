@@ -1,4 +1,7 @@
 #include "vhci_pnp_id.h"
+#include "trace.h"
+#include "vhci_pnp_id.tmh"
+
 #include "vhci.h"
 #include "vhci_pnp.h"
 #include "usbip_vhci_api.h"

@@ -1,4 +1,7 @@
 #include "vhci_vhub.h"
+#include "trace.h"
+#include "vhci_vhub.tmh"
+
 #include "vhci_dbg.h"
 #include "vhci_dev.h"
 #include "usbip_vhci_api.h"
