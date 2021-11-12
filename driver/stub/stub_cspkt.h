@@ -11,12 +11,8 @@
 
 #define CSPKT_IS_IN(csp)		(CSPKT_DIRECTION(csp) == BMREQUEST_DEVICE_TO_HOST)
 
-#ifdef DBG
-
 const char *dbg_cspkt_reqtype(UCHAR reqtype);
 const char *dbg_cspkt_recipient(UCHAR recip);
 const char *dbg_cspkt_request(UCHAR req);
 const char *dbg_cspkt_desctype(UCHAR desctype);
 const char *dbg_ctlsetup_packet(const USB_DEFAULT_PIPE_SETUP_PACKET *csp);
-
-#endif

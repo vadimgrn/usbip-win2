@@ -29,6 +29,4 @@ BOOLEAN is_port_urbr(struct urb_req *urbr, USBD_PIPE_HANDLE handle);
 struct urb_req *find_sent_urbr(pvpdo_dev_t vpdo, struct usbip_header *hdr);
 struct urb_req *find_pending_urbr(pvpdo_dev_t vpdo);
 
-#ifdef DBG
-  const char *dbg_urbr(struct urb_req *urbr);
-#endif
+const char *dbg_urbr(struct urb_req *urbr);

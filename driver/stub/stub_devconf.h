@@ -22,7 +22,5 @@ void update_devconf(devconf_t *devconf, PUSBD_INTERFACE_INFORMATION info_intf);
 ULONG get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting);
 PUSBD_PIPE_INFORMATION get_info_pipe(devconf_t *devconf, UCHAR epaddr);
 
-#ifdef DBG
 const char *dbg_info_intf(PUSBD_INTERFACE_INFORMATION info_intf);
 const char *dbg_info_pipe(PUSBD_PIPE_INFORMATION info_pipe);
-#endif

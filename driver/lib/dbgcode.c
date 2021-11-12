@@ -1,7 +1,5 @@
 #include "dbgcode.h"
 
-#ifdef DBG
-
 #include <ntstrsafe.h>
 #include "strutil.h"
 
@@ -263,4 +261,3 @@ dbg_usb_descriptor_type(UCHAR dsc_type)
 	return dbg_namecode_buf(namecodes_usb_descriptor_type, "descriptor type", dsc_type, buf, NAMECODE_BUF_MAX);
 }
 
-#endif

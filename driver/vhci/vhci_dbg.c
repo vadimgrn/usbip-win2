@@ -7,8 +7,6 @@
 
 #include "usbip_vhci_api.h"
 
-#ifdef DBG
-
 static namecode_t	namecodes_vhci_ioctl[] = {
 	K_V(IOCTL_USBIP_VHCI_PLUGIN_HARDWARE)
 	K_V(IOCTL_USBIP_VHCI_UNPLUG_HARDWARE)
@@ -181,4 +179,3 @@ dbg_usb_user_request_code(ULONG code)
 	return dbg_namecode(namecodes_usb_user_req, "usb user request", code);
 }
 
-#endif

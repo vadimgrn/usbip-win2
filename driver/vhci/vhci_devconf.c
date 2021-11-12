@@ -30,8 +30,6 @@ static __inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
 	return v[1]; 
 }
 
-#ifdef DBG
-
 static const char *
 dbg_pipe(PUSBD_PIPE_INFORMATION pipe)
 {
@@ -42,8 +40,6 @@ dbg_pipe(PUSBD_PIPE_INFORMATION pipe)
 		pipe->MaximumPacketSize, pipe->MaximumTransferSize, pipe->PipeFlags);
 	return buf;
 }
-
-#endif
 
 static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enum usb_device_speed speed)
 {

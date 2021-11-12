@@ -6,8 +6,6 @@
 #include "usbip_proto.h"
 #include "vhci_read.h"
 
-#ifdef DBG
-
 const char *dbg_urbr(struct urb_req *urbr)
 {
 	static char buf[128];
@@ -19,8 +17,6 @@ const char *dbg_urbr(struct urb_req *urbr)
 	libdrv_snprintf(buf, sizeof(buf), "[seq:%u]", urbr->seq_num);
 	return buf;
 }
-
-#endif
 
 USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
 {

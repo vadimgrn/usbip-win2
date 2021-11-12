@@ -3,8 +3,6 @@
 #include "strutil.h"
 #include "dbgcode.h"
 
-#ifdef DBG
-
 static namecode_t namecodes_usbip_command[] = 
 {
 	K_V(USBIP_CMD_SUBMIT)
@@ -46,5 +44,3 @@ dbg_usbip_hdr(struct usbip_header *hdr)
 	}
 	return buf;
 }
-
-#endif

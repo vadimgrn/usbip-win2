@@ -8,8 +8,6 @@
 #include "stub_usbd.h"
 #include "devconf.h"
 
-#ifdef DBG
-
 #include "strutil.h"
 
 const char *
@@ -37,8 +35,6 @@ dbg_info_pipe(PUSBD_PIPE_INFORMATION info_pipe)
 
 	return buf;
 }
-
-#endif
 
 static PUSBD_INTERFACE_INFORMATION
 dup_info_intf(PUSBD_INTERFACE_INFORMATION info_intf)

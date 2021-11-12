@@ -7,8 +7,6 @@
 #include "stub_dbg.h"
 #include "pdu.h"
 
-#ifdef DBG
-
 #include "strutil.h"
 
 const char *
@@ -24,8 +22,6 @@ dbg_stub_res(stub_res_t *sres, usbip_stub_dev_t *devstub)
 	}
 	return buf;
 }
-
-#endif
 
 void
 free_stub_res(stub_res_t *sres)

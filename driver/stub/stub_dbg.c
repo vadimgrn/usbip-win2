@@ -6,8 +6,6 @@
 #include "dbgcode.h"
 #include "usbip_stub_api.h"
 
-#ifdef DBG
-
 #include "strutil.h"
 
 const char *
@@ -71,5 +69,3 @@ dbg_stub_ioctl_code(ULONG ioctl_code)
 {
 	return dbg_namecode(namecodes_stub_ioctl, "ioctl", ioctl_code);
 }
-
-#endif
