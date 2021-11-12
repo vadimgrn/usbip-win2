@@ -1,4 +1,6 @@
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_devconf.tmh"
 
 #include "stub_dev.h"
 #include "dbgcommon.h"

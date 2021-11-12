@@ -1,4 +1,6 @@
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_res.tmh"
 
 #include "usbip_proto.h"
 #include "stub_res.h"

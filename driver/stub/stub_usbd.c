@@ -17,6 +17,9 @@
  */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_usbd.tmh"
+
 #include "stub_dbg.h"
 #include "stub_dev.h"
 #include "stub_res.h"
@@ -301,27 +304,27 @@ select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, UCHAR alt_setting)
 	ULONG	len_urb;
 	NTSTATUS	status;
 
-	if (devstub->devconf == NULL) {
-		DBGW(DBG_GENERAL, "select_usb_intf: empty devconf: num: %hhu, alt:%hu\n", intf_num, alt_setting);
+	if (!devstub->devconf) {
+		DBGW(DBG_GENERAL, "empty devconf: num: %d, alt: %d\n", (int)intf_num, (int)alt_setting);
 		return FALSE;
 	}
 
 	PUSB_INTERFACE_DESCRIPTOR	dsc_intf = dsc_find_intf(devstub->devconf->dsc_conf, intf_num, alt_setting);
-	if (dsc_intf == NULL) {
-		DBGW(DBG_GENERAL, "select_usb_intf: empty dsc_intf: num: %hhu, alt:%hu\n", intf_num, alt_setting);
+	if (!dsc_intf) {
+		DBGW(DBG_GENERAL, "empty dsc_intf: num: %d, alt: %d\n", (int)intf_num, (int)alt_setting);
 		return FALSE;
 	}
 
 	ULONG info_intf_size = get_info_intf_size(devstub->devconf, intf_num, alt_setting);
 	if (!info_intf_size) {
-		DBGW(DBG_GENERAL, "select_usb_intf: non-existent interface: num: %hhu, alt:%hu\n", intf_num, alt_setting);
+		DBGW(DBG_GENERAL, "non-existent interface: num: %d, alt: %d\n", (int)intf_num, (int)alt_setting);
 		return FALSE;
 	}
 
 	len_urb = sizeof(struct _URB_SELECT_INTERFACE) - sizeof(USBD_INTERFACE_INFORMATION) + info_intf_size;
 	purb = (PURB)ExAllocatePoolWithTag(NonPagedPool, len_urb, USBIP_STUB_POOL_TAG);
 	if (purb == NULL) {
-		DBGE(DBG_GENERAL, "select_usb_intf: out of memory\n");
+		DBGE(DBG_GENERAL, "out of memory\n");
 		return FALSE;
 	}
 	UsbBuildSelectInterfaceRequest(purb, (USHORT)len_urb, devstub->devconf->hConf, intf_num, (UCHAR)alt_setting);

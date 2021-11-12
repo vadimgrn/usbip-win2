@@ -18,6 +18,9 @@
 */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_ioctl.tmh"
+
 #include "stub_dbg.h"
 #include "stub_irp.h"
 #include "usbip_stub_api.h"

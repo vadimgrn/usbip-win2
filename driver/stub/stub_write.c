@@ -18,6 +18,9 @@
 */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_write.tmh"
+
 #include "stub_dbg.h"
 #include "usbip_proto.h"
 #include "usbd_helper.h" 
@@ -282,7 +285,7 @@ process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 		process_class_vendor_request(devstub, setup, hdr, TRUE);
 		break;
 	default:
-		DBGE(DBG_READWRITE, "invalid request type:", dbg_cspkt_reqtype(reqType));
+		DBGE(DBG_READWRITE, "invalid request type: %s", dbg_cspkt_reqtype(reqType));
 		break;
 	}
 }
@@ -383,7 +386,7 @@ process_data_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 	epaddr = get_epaddr_from_hdr(hdr);
 	info_pipe = get_info_pipe(devstub->devconf, epaddr);
 	if (info_pipe == NULL) {
-		DBGW(DBG_READWRITE, "data_transfer: non-existent pipe: %hhx\n", epaddr);
+		DBGW(DBG_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 		return;
 	}
@@ -410,12 +413,12 @@ process_reset_pipe(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 	epaddr = get_epaddr_from_hdr(hdr);
 	info_pipe = get_info_pipe(devstub->devconf, epaddr);
 	if (info_pipe == NULL) {
-		DBGW(DBG_READWRITE, "reset_pipe: non-existent pipe: %hhx\n", epaddr);
+		DBGW(DBG_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 		return;
 	}
 
-	DBGI(DBG_READWRITE, "reset pipe: pipeHandle = %p\n", info_pipe->PipeHandle);
+	DBGI(DBG_READWRITE, "pipeHandle = %p\n", info_pipe->PipeHandle);
 
 	if (NT_SUCCESS(reset_pipe(devstub, info_pipe->PipeHandle)))
 		reply_stub_req_data(devstub, hdr->base.seqnum, NULL, 0, FALSE);
@@ -497,7 +500,7 @@ stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	DBGI(DBG_GENERAL | DBG_READWRITE, "dispatch_write: hdr: %s\n", dbg_usbip_hdr(hdr));
+	DBGI(DBG_READWRITE, "hdr: %s\n", dbg_usbip_hdr(hdr));
 
 	switch (hdr->base.command) {
 	case USBIP_CMD_SUBMIT:

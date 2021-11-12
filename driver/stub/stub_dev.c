@@ -1,5 +1,5 @@
 #include "stub_dev.h"
-#include "trace.h"
+#include "stub_trace.h"
 #include "stub_dev.tmh"
 
 #include "stub_driver.h"
