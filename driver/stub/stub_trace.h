@@ -22,7 +22,7 @@ Environment:
 
 #define WPP_CONTROL_GUIDS                                                 \
     WPP_DEFINE_CONTROL_GUID(                                              \
-        USBDriver1TraceGuid, (682e9961,054c,482b,a86d,d94f6cd5f555),      \
+        UsbipStubTraceGuid, (682e9961,054c,482b,a86d,d94f6cd5f555),       \
                                                                           \
         WPP_DEFINE_BIT(DBG_GENERAL)             /* bit  0 = 0x00000001 */ \
         WPP_DEFINE_BIT(DBG_DISPATCH)            /* bit  1 = 0x00000002 */ \

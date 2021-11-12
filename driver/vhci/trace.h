@@ -24,7 +24,7 @@ Environment:
 
 #define WPP_CONTROL_GUIDS                                                 \
     WPP_DEFINE_CONTROL_GUID(                                              \
-        usbipTraceGuid, (8b56380d,5174,4b15,b6f4,4c47008801a4),           \
+        UsbipVhciTraceGuid, (8b56380d,5174,4b15,b6f4,4c47008801a4),       \
                                                                           \
         WPP_DEFINE_BIT(DBG_GENERAL)             /* bit  0 = 0x00000001 */ \
         WPP_DEFINE_BIT(DBG_READ)                /* bit  1 = 0x00000002 */ \

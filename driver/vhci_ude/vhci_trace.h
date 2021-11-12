@@ -8,7 +8,7 @@
 
 #define WPP_CONTROL_GUIDS                                              \
     WPP_DEFINE_CONTROL_GUID(                                           \
-        vhciTraceGuid, (99b7a5cf,7cb0,4af5,838d,c45d78e49101),         \
+        UsbipVhciUdeTraceGuid, (99b7a5cf,7cb0,4af5,838d,c45d78e49101), \
                                                                        \
         WPP_DEFINE_BIT(MYDRIVER_ALL_INFO)                              \
         WPP_DEFINE_BIT(DRIVER)                                         \
