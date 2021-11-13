@@ -7,7 +7,7 @@ cleanup_vhci(_In_ WDFOBJECT drvobj)
 {
 	PAGED_CODE();
 
-	TRD(DRIVER, "Enter");
+	TraceInfo(DRIVER, "Enter");
 
 	WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)drvobj));
 }
@@ -16,7 +16,7 @@ static PAGEABLE VOID
 driver_unload(_In_ WDFDRIVER drvobj)
 {
 	PAGED_CODE();
-	TRD(DRIVER, "Enter");
+	TraceInfo(DRIVER, "Enter");
 
 	WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)drvobj));
 }
@@ -33,7 +33,7 @@ DriverEntry(_In_ PDRIVER_OBJECT drvobj, _In_ PUNICODE_STRING regpath)
 	PAGED_CODE();
 	WPP_INIT_TRACING(drvobj, regpath);
 
-	TRD(DRIVER, "Enter");
+	TraceInfo(DRIVER, "Enter");
 
 	WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
 	attrs.EvtCleanupCallback = cleanup_vhci;
@@ -44,12 +44,12 @@ DriverEntry(_In_ PDRIVER_OBJECT drvobj, _In_ PUNICODE_STRING regpath)
 
 	status = WdfDriverCreate(drvobj, regpath, &attrs, &conf, WDF_NO_HANDLE);
 	if (!NT_SUCCESS(status)) {
-		TRE(DRIVER, "WdfDriverCreate failed: %!STATUS!", status);
+		TraceError(DRIVER, "WdfDriverCreate failed: %!STATUS!", status);
 		WPP_CLEANUP(drvobj);
 		return status;
 	}
 
-	TRD(DRIVER, "Leave: %!STATUS!", status);
+	TraceInfo(DRIVER, "Leave: %!STATUS!", status);
 
 	return status;
 }

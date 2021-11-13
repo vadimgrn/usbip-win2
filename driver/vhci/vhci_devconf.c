@@ -72,7 +72,7 @@ static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 	USBD_PIPE_INFORMATION *pi = params->pi + i;
 
 	set_pipe(pi, d, params->speed);
-	DBGI(DBG_IOCTL, "%s[%d]: %s\n", __func__, i, dbg_pipe(pi));
+	TraceInfo(DBG_IOCTL, "%d: %s\n", i, dbg_pipe(pi));
 
 	return false;
 }
@@ -80,14 +80,14 @@ static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPTOR *dsc_conf, enum usb_device_speed speed)
 {
 	if (sizeof(*intf) - sizeof(*intf->Pipes) > intf->Length) {
-		DBGE(DBG_URB, "insufficient interface information size?\n");
+		TraceError(DBG_URB, "insufficient interface information size?\n");
 		///TODO: need to check
 		return STATUS_SUCCESS;
 	}
 
 	USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(dsc_conf, intf->InterfaceNumber, intf->AlternateSetting);
 	if (!dsc_intf) {
-		DBGW(DBG_IOCTL, "no interface desc\n");
+		TraceWarning(DBG_IOCTL, "no interface desc\n");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 

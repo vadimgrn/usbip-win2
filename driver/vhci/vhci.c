@@ -44,7 +44,7 @@ vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 {
 	PAGED_CODE();
 
-	DBGI(DBG_GENERAL, "Unload\n");
+	TraceVerbose(DBG_GENERAL, "Enter\n");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
 
@@ -72,11 +72,11 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	PAGED_CODE();
 
-	DBGI(DBG_GENERAL, "vhci_create(%s): Enter\n", dbg_vdev_type(vdev->type));
+	TraceInfo(DBG_GENERAL, "%s: Enter\n", dbg_vdev_type(vdev->type));
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		DBGW(DBG_GENERAL, "vhci_create(%s): no such device\n", dbg_vdev_type(vdev->type));
+		TraceWarning(DBG_GENERAL, "vhci_create(%s): no such device\n", dbg_vdev_type(vdev->type));
 
 		Irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
@@ -87,7 +87,7 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-	DBGI(DBG_GENERAL, "vhci_create(%s): Leave\n", dbg_vdev_type(vdev->type));
+	TraceInfo(DBG_GENERAL, "%s: Leave\n", dbg_vdev_type(vdev->type));
 
 	return STATUS_SUCCESS;
 }
@@ -115,11 +115,11 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	PAGED_CODE();
 
-	DBGI(DBG_GENERAL, "vhci_cleanup(%s): Enter\n", dbg_vdev_type(vdev->type));
+	TraceInfo(DBG_GENERAL, "%s: Enter\n", dbg_vdev_type(vdev->type));
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		DBGW(DBG_GENERAL, "vhci_cleanup(%s): no such device\n", dbg_vdev_type(vdev->type));
+		TraceWarning(DBG_GENERAL, "vhci_cleanup(%s): no such device\n", dbg_vdev_type(vdev->type));
 		irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return STATUS_NO_SUCH_DEVICE;
@@ -132,7 +132,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	DBGI(DBG_GENERAL, "vhci_cleanup(%s): Leave\n", dbg_vdev_type(vdev->type));
+	TraceInfo(DBG_GENERAL, "%s: Leave\n", dbg_vdev_type(vdev->type));
 
 	return STATUS_SUCCESS;
 }
@@ -162,7 +162,7 @@ PAGEABLE NTSTATUS
 DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 {
 	WPP_INIT_TRACING(drvobj, RegistryPath);
-	DBGI(DBG_GENERAL, "DriverEntry: Enter\n");
+	TraceVerbose(DBG_GENERAL, "Enter\n");
 
 	ExInitializeNPagedLookasideList(&g_lookaside, NULL,NULL, 0, sizeof(struct urb_req), 'USBV', 0);
 
@@ -177,7 +177,7 @@ DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	DBGI(DBG_GENERAL, "RegistryPath %p\r\n", RegistryPath);
+	TraceInfo(DBG_GENERAL, "RegistryPath %p\r\n", RegistryPath);
 
 	RtlCopyUnicodeString(&Globals.RegistryPath, RegistryPath);
 
@@ -195,7 +195,7 @@ DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 	drvobj->DriverUnload = vhci_driverUnload;
 	drvobj->DriverExtension->AddDevice = vhci_add_device;
 
-	DBGI(DBG_GENERAL, "DriverEntry: Leave\n");
+	TraceVerbose(DBG_GENERAL, "Leave\n");
 
 	return STATUS_SUCCESS;
 }

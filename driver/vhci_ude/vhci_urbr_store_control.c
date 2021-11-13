@@ -150,7 +150,7 @@ store_urbr_control_transfer_ex(WDFREQUEST req_read, purb_req_t urbr)
 	 * UDE vhub seems to request a serial string via URB_FUNCTION_CONTROL_TRANSFER_EX.
 	 */
 	if (vusb->iSerial > 0 && vusb->wserial && is_serial_setup_pkt(vusb->iSerial, urb_ctltrans_ex->SetupPacket)) {
-		TRD(READ, "overwrite serial string: %S", vusb->wserial);
+		TraceInfo(READ, "overwrite serial string: %S", vusb->wserial);
 		return fetch_done_urbr_control_transfer_ex(vusb, urb_ctltrans_ex);
 	}
 

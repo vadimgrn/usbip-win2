@@ -38,7 +38,7 @@ process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_P
 	USHORT	data;
 	UCHAR	datalen;
 
-	DBGI(DBG_READWRITE, "get_status\n");
+	TraceInfo(DBG_READWRITE, "get_status\n");
 
 	switch (CSPKT_RECIPIENT(csp)) {
 	case BMREQUEST_TO_DEVICE:
@@ -70,11 +70,11 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIP
 	BOOLEAN	res;
 	ULONG	len;
 
-	DBGI(DBG_READWRITE, "get_desc: %s\n", dbg_cspkt_desctype(CSPKT_DESCRIPTOR_TYPE(csp)));
+	TraceInfo(DBG_READWRITE, "get_desc: %s\n", dbg_cspkt_desctype(CSPKT_DESCRIPTOR_TYPE(csp)));
 
 	pdesc = ExAllocatePoolWithTag(NonPagedPool, csp->wLength, USBIP_STUB_POOL_TAG);
 	if (pdesc == NULL) {
-		DBGE(DBG_READWRITE, "process_get_desc: out of memory\n");
+		TraceError(DBG_READWRITE, "process_get_desc: out of memory\n");
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		return;
 	}
@@ -95,7 +95,7 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIP
 		res = get_usb_desc(devstub, descType, CSPKT_DESCRIPTOR_INDEX(csp), idLang, pdesc, &len);
 	}
 	if (!res) {
-		DBGW(DBG_READWRITE, "process_get_desc: failed to get descriptor\n");
+		TraceWarning(DBG_READWRITE, "process_get_desc: failed to get descriptor\n");
 		ExFreePool(pdesc);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -32);
 		return;
@@ -108,7 +108,7 @@ process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAUL
 {
 	PUSBD_PIPE_INFORMATION	info_pipe;
 
-	DBGI(DBG_READWRITE, "clear_feature: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+	TraceInfo(DBG_READWRITE, "clear_feature: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
 
 	switch (CSPKT_RECIPIENT(csp)) {
 	case BMREQUEST_TO_ENDPOINT:
@@ -118,12 +118,12 @@ process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAUL
 			reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
 		}
 		else {
-			DBGE(DBG_READWRITE, "clear_feature: no such ep\n");
+			TraceError(DBG_READWRITE, "clear_feature: no such ep\n");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		}
 		break;
 	default:
-		DBGE(DBG_READWRITE, "clear_feature: not supported: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+		TraceError(DBG_READWRITE, "clear_feature: not supported: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		break;
 	}
@@ -134,7 +134,7 @@ process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_
 {
 	int	res;
 
-	DBGI(DBG_READWRITE, "set_feature: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+	TraceInfo(DBG_READWRITE, "set_feature: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
 
 	switch (CSPKT_RECIPIENT(csp)) {
 	case BMREQUEST_TO_DEVICE:
@@ -144,14 +144,14 @@ process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_
 		res = set_feature(devstub, URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, csp->wValue.W, csp->wIndex.W);
 		break;
 	default:
-		DBGE(DBG_READWRITE, "set_feature: not supported: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+		TraceError(DBG_READWRITE, "set_feature: not supported: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		return;
 	}
 	if (res == 0)
 		reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
 	else {
-		DBGI(DBG_READWRITE, "failed to set feature\n");
+		TraceInfo(DBG_READWRITE, "failed to set feature\n");
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, res);
 	}
 }
@@ -197,7 +197,7 @@ process_standard_request(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEF
 		process_select_intf(devstub, seqnum, csp);
 		break;
 	default:
-		DBGE(DBG_READWRITE, "not supported standard request: %s\n", dbg_cspkt_reqtype(CSPKT_REQUEST_TYPE(csp)));
+		TraceError(DBG_READWRITE, "not supported standard request: %s\n", dbg_cspkt_reqtype(CSPKT_REQUEST_TYPE(csp)));
 		break;
 	}
 }
@@ -221,7 +221,7 @@ process_class_vendor_request(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_P
 		if (is_in) {
 			data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
 			if (data == NULL) {
-				DBGE(DBG_GENERAL, "process_class_vendor_request: out of memory\n");
+				TraceError(DBG_GENERAL, "process_class_vendor_request: out of memory\n");
 				reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 				return;
 			}
@@ -270,7 +270,7 @@ process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 {
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
-	DBGI(DBG_READWRITE, "control_transfer: seq:%u, csp:%s\n", hdr->base.seqnum, dbg_ctlsetup_packet(setup));
+	TraceInfo(DBG_READWRITE, "control_transfer: seq:%u, csp:%s\n", hdr->base.seqnum, dbg_ctlsetup_packet(setup));
 
 	UCHAR reqType = CSPKT_REQUEST_TYPE(setup);
 
@@ -285,7 +285,7 @@ process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 		process_class_vendor_request(devstub, setup, hdr, TRUE);
 		break;
 	default:
-		DBGE(DBG_READWRITE, "invalid request type: %s", dbg_cspkt_reqtype(reqType));
+		TraceError(DBG_READWRITE, "invalid request type: %s", dbg_cspkt_reqtype(reqType));
 		break;
 	}
 }
@@ -298,14 +298,14 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 	BOOLEAN	is_in;
 	NTSTATUS	status;
 
-	DBGI(DBG_READWRITE, "bulk_intr_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
+	TraceInfo(DBG_READWRITE, "bulk_intr_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
 
 	datalen = (ULONG)hdr->u.cmd_submit.transfer_buffer_length;
 	is_in = hdr->base.direction ? TRUE : FALSE;
 	if (is_in) {
 		data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
 		if (data == NULL) {
-			DBGE(DBG_GENERAL, "process_bulk_intr_transfer: out of memory\n");
+			TraceError(DBG_GENERAL, "process_bulk_intr_transfer: out of memory\n");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
@@ -325,7 +325,7 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 static void
 process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe, const struct usbip_header *hdr)
 {
-	DBGI(DBG_READWRITE, "iso_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
+	TraceInfo(DBG_READWRITE, "iso_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
 
 	ULONG datalen = 0;
 	PVOID data = NULL;
@@ -342,7 +342,7 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 		datalen = get_iso_descs_len(n_pkts, iso_descs, FALSE);
 		data = ExAllocatePoolWithTag(NonPagedPool, datalen + sizeof(*iso_descs)*n_pkts, USBIP_STUB_POOL_TAG);
 		if (!data) {
-			DBGE(DBG_GENERAL, "process_iso_transfer: out of memory\n");
+			TraceError(DBG_GENERAL, "process_iso_transfer: out of memory\n");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
@@ -353,7 +353,7 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 		iso_descs = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + datalen);
 		data = ExAllocatePoolWithTag(NonPagedPool, datalen + iso_descs_len, USBIP_STUB_POOL_TAG);
 		if (!data) {
-			DBGE(DBG_GENERAL, "process_iso_transfer: out of memory\n");
+			TraceError(DBG_GENERAL, "process_iso_transfer: out of memory\n");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
@@ -386,7 +386,7 @@ process_data_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 	epaddr = get_epaddr_from_hdr(hdr);
 	info_pipe = get_info_pipe(devstub->devconf, epaddr);
 	if (info_pipe == NULL) {
-		DBGW(DBG_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
+		TraceWarning(DBG_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 		return;
 	}
@@ -399,7 +399,7 @@ process_data_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 		process_iso_transfer(devstub, info_pipe, hdr);
 		break;
 	default:
-		DBGE(DBG_READWRITE, "not supported transfer type\n");
+		TraceError(DBG_READWRITE, "not supported transfer type\n");
 		break;
 	}
 }
@@ -413,12 +413,12 @@ process_reset_pipe(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 	epaddr = get_epaddr_from_hdr(hdr);
 	info_pipe = get_info_pipe(devstub->devconf, epaddr);
 	if (info_pipe == NULL) {
-		DBGW(DBG_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
+		TraceWarning(DBG_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 		return;
 	}
 
-	DBGI(DBG_READWRITE, "pipeHandle = %p\n", info_pipe->PipeHandle);
+	TraceInfo(DBG_READWRITE, "pipeHandle = %p\n", info_pipe->PipeHandle);
 
 	if (NT_SUCCESS(reset_pipe(devstub, info_pipe->PipeHandle)))
 		reply_stub_req_data(devstub, hdr->base.seqnum, NULL, 0, FALSE);
@@ -457,7 +457,7 @@ process_cmd_unlink(usbip_stub_dev_t *devstub, PIRP irp, struct usbip_header *hdr
 {
 	PIO_STACK_LOCATION	irpstack;
 
-	DBGI(DBG_READWRITE, "process_cmd_unlink: enter\n");
+	TraceInfo(DBG_READWRITE, "process_cmd_unlink: enter\n");
 
 	if (cancel_pending_stub_res(devstub, hdr->u.cmd_unlink.seqnum)) {
 		reply_stub_req_hdr(devstub, USBIP_RET_UNLINK, hdr->base.seqnum);
@@ -496,11 +496,11 @@ stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp)
 
 	hdr = get_usbip_hdr_from_write_irp(irp);
 	if (hdr == NULL) {
-		DBGE(DBG_READWRITE, "small write irp\n");
+		TraceError(DBG_READWRITE, "small write irp\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	DBGI(DBG_READWRITE, "hdr: %s\n", dbg_usbip_hdr(hdr));
+	TraceInfo(DBG_READWRITE, "hdr: %s\n", dbg_usbip_hdr(hdr));
 
 	switch (hdr->base.command) {
 	case USBIP_CMD_SUBMIT:
@@ -508,7 +508,7 @@ stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp)
 	case USBIP_CMD_UNLINK:
 		return process_cmd_unlink(devstub, irp, hdr);
 	default:
-		DBGE(DBG_READWRITE, "invalid command: %s\n", dbg_command(hdr->base.command));
+		TraceError(DBG_READWRITE, "invalid command: %s\n", dbg_command(hdr->base.command));
 		return STATUS_INVALID_PARAMETER;
 	}
 }

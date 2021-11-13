@@ -11,9 +11,9 @@ ep_start(_In_ UDECXUSBENDPOINT ude_ep)
 {
 	pctx_ep_t	ep = TO_EP(ude_ep);
 
-	TRD(VUSB, "Enter: ep->addr=0x%x", ep->addr);
+	TraceInfo(VUSB, "Enter: ep->addr=0x%x", ep->addr);
 	WdfIoQueueStart(ep->queue);
-	TRD(VUSB, "Leave");
+	TraceInfo(VUSB, "Leave");
 }
 
 static VOID
@@ -29,12 +29,12 @@ ep_purge(_In_ UDECXUSBENDPOINT ude_ep)
 {
 	pctx_ep_t	ep = TO_EP(ude_ep);
 
-	TRD(VUSB, "Enter: ep->addr=0x%x", ep->addr);
+	TraceInfo(VUSB, "Enter: ep->addr=0x%x", ep->addr);
 
 	/* WdfIoQueuePurgeSynchronously would suffer from blocking */
 	WdfIoQueuePurge(ep->queue, purge_complete, NULL);
 
-	TRD(VUSB, "Leave");
+	TraceInfo(VUSB, "Leave");
 }
 
 static VOID
@@ -43,7 +43,7 @@ ep_reset(_In_ UDECXUSBENDPOINT ep, _In_ WDFREQUEST req)
 	UNREFERENCED_PARAMETER(ep);
 	UNREFERENCED_PARAMETER(req);
 
-	TRE(VUSB, "Enter");
+	TraceError(VUSB, "Enter");
 }
 
 static void setup_ep_from_dscr(ctx_ep_t *ep, USB_ENDPOINT_DESCRIPTOR *dsc_ep)
@@ -68,7 +68,7 @@ static void setup_ep_from_dscr(ctx_ep_t *ep, USB_ENDPOINT_DESCRIPTOR *dsc_ep)
 		ep->intf_num = dsc_intf->bInterfaceNumber;
 		ep->altsetting = dsc_intf->bAlternateSetting;
 	} else {
-		TRE(VUSB, "%s: interface for ep not found", __func__);
+		TraceError(VUSB, "interface for ep not found\n");
 	}
 }
 
@@ -84,7 +84,7 @@ add_ep(pctx_vusb_t vusb, PUDECXUSBENDPOINT_INIT *pepinit, PUSB_ENDPOINT_DESCRIPT
 	NTSTATUS	status;
 
 	ep_addr = dscr_ep ? dscr_ep->bEndpointAddress : USB_DEFAULT_ENDPOINT_ADDRESS;
-	TRD(VUSB, "Enter: ep_addr=0x%x", ep_addr);
+	TraceInfo(VUSB, "Enter: ep_addr=0x%x", ep_addr);
 	UdecxUsbEndpointInitSetEndpointAddress(*pepinit, ep_addr);
 
 	UDECX_USB_ENDPOINT_CALLBACKS_INIT(&callbacks, ep_reset);
@@ -102,7 +102,7 @@ add_ep(pctx_vusb_t vusb, PUDECXUSBENDPOINT_INIT *pepinit, PUSB_ENDPOINT_DESCRIPT
 	attrs.ParentObject = vusb->ude_usbdev;
 	status = UdecxUsbEndpointCreate(pepinit, &attrs, &ude_ep);
 	if (NT_ERROR(status)) {
-		TRE(VUSB, "failed to create endpoint: %!STATUS!", status);
+		TraceError(VUSB, "failed to create endpoint: %!STATUS!", status);
 		return status;
 	}
 
@@ -114,7 +114,7 @@ add_ep(pctx_vusb_t vusb, PUDECXUSBENDPOINT_INIT *pepinit, PUSB_ENDPOINT_DESCRIPT
 	queue = create_queue_ep(ep);
 	if (queue == NULL) {
 		WdfObjectDelete(ude_ep);
-		TRE(VUSB, "failed to create queue: STATUS_UNSUCCESSFUL");
+		TraceError(VUSB, "failed to create queue: STATUS_UNSUCCESSFUL");
 		return STATUS_UNSUCCESSFUL;
 	}
 	UdecxUsbEndpointSetWdfIoQueue(ude_ep, queue);
@@ -123,7 +123,7 @@ add_ep(pctx_vusb_t vusb, PUDECXUSBENDPOINT_INIT *pepinit, PUSB_ENDPOINT_DESCRIPT
 	if (dscr_ep == NULL) {
 		vusb->ep_default = ep;
 	}
-	TRD(VUSB, "Leave");
+	TraceInfo(VUSB, "Leave");
 	return STATUS_SUCCESS;
 }
 
@@ -133,11 +133,11 @@ default_ep_add(_In_ UDECXUSBDEVICE udev, _In_ PUDECXUSBENDPOINT_INIT epinit)
 	pctx_vusb_t	vusb = TO_VUSB(udev);
 	NTSTATUS	status;
 
-	TRD(VUSB, "Enter");
+	TraceInfo(VUSB, "Enter");
 
 	status = add_ep(vusb, &epinit, NULL);
 
-	TRD(VUSB, "Leave: %!STATUS!", status);
+	TraceInfo(VUSB, "Leave: %!STATUS!", status);
 
 	return status;
 }
@@ -148,12 +148,12 @@ ep_add(_In_ UDECXUSBDEVICE udev, _In_ PUDECX_USB_ENDPOINT_INIT_AND_METADATA epcr
 	pctx_vusb_t	vusb = TO_VUSB(udev);
 	NTSTATUS	status;
 
-	TRD(VUSB, "Enter: epaddr: 0x%x, interval: 0x%x", (ULONG)epcreate->EndpointDescriptor->bEndpointAddress,
+	TraceInfo(VUSB, "Enter: epaddr: 0x%x, interval: 0x%x", (ULONG)epcreate->EndpointDescriptor->bEndpointAddress,
 		(ULONG)epcreate->EndpointDescriptor->bInterval);
 
 	status = add_ep(vusb, &epcreate->UdecxUsbEndpointInit, epcreate->EndpointDescriptor);
 
-	TRD(VUSB, "Leave: %!STATUS!", status);
+	TraceInfo(VUSB, "Leave: %!STATUS!", status);
 
 	return status;
 }
@@ -188,7 +188,7 @@ set_intf_for_ep(pctx_vusb_t vusb, WDFREQUEST req, PUDECX_ENDPOINTS_CONFIGURE_PAR
 
 	vusb->intf_altsettings[intf_num] = altsetting;
 
-	TRD(VUSB, "SELECT INTERFACE: NUM:%d Alt:%d", intf_num, altsetting);
+	TraceInfo(VUSB, "SELECT INTERFACE: NUM:%d Alt:%d", intf_num, altsetting);
 
 	return submit_req_select(vusb->ep_default, req, FALSE, 0, intf_num, altsetting);
 }
@@ -199,7 +199,7 @@ ep_configure(_In_ UDECXUSBDEVICE udev, _In_ WDFREQUEST req, _In_ PUDECX_ENDPOINT
 	pctx_vusb_t	vusb = TO_VUSB(udev);
 	NTSTATUS	status = STATUS_SUCCESS;
 
-	TRD(VUSB, "Enter: %!epconf!", params->ConfigureType);
+	TraceInfo(VUSB, "Enter: %!epconf!", params->ConfigureType);
 
 	switch (params->ConfigureType) {
 	case UdecxEndpointsConfigureTypeDeviceInitialize:
@@ -207,7 +207,7 @@ ep_configure(_In_ UDECXUSBDEVICE udev, _In_ WDFREQUEST req, _In_ PUDECX_ENDPOINT
 		 * This enforces the device to be set with the first configuration.
 		 */
 		status = submit_req_select(vusb->ep_default, req, 1, vusb->default_conf_value, 0, 0);
-		TRD(VUSB, "trying to SET CONFIGURATION: %u", (ULONG)vusb->default_conf_value);
+		TraceInfo(VUSB, "trying to SET CONFIGURATION: %u", (ULONG)vusb->default_conf_value);
 		break;
 	case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
 		status = submit_req_select(vusb->ep_default, req, 1, params->NewConfigurationValue, 0, 0);
@@ -224,13 +224,13 @@ ep_configure(_In_ UDECXUSBDEVICE udev, _In_ WDFREQUEST req, _In_ PUDECX_ENDPOINT
 	case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
 		break;
 	default:
-		TRE(VUSB, "unhandled configure type: %!epconf!", params->ConfigureType);
+		TraceError(VUSB, "unhandled configure type: %!epconf!", params->ConfigureType);
 		break;
 	}
 
 	if (status != STATUS_PENDING)
 		WdfRequestComplete(req, status);
-	TRD(VUSB, "Leave: %!STATUS!", status);
+	TraceInfo(VUSB, "Leave: %!STATUS!", status);
 }
 
 VOID

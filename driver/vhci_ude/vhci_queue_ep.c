@@ -11,10 +11,10 @@ internal_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 	UNREFERENCED_PARAMETER(inlen);
 	UNREFERENCED_PARAMETER(outlen);
 
-	TRD(EP, "Enter");
+	TraceInfo(EP, "Enter");
 
 	if (ioctl_code != IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		TRE(EP, "unexpected ioctl: %!IOCTL!", ioctl_code);
+		TraceError(EP, "unexpected ioctl: %!IOCTL!", ioctl_code);
 	}
 	else {
 		pctx_ep_t	ep = *TO_PEP(queue);
@@ -27,7 +27,7 @@ internal_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 	if (status != STATUS_PENDING)
 		UdecxUrbCompleteWithNtStatus(req, status);
 
-	TRD(EP, "Leave: %!STATUS!", status);
+	TraceInfo(EP, "Leave: %!STATUS!", status);
 }
 
 static VOID
@@ -36,7 +36,7 @@ io_default_ep(_In_ WDFQUEUE queue, _In_ WDFREQUEST req)
 	UNREFERENCED_PARAMETER(queue);
 	UNREFERENCED_PARAMETER(req);
 
-	TRE(EP, "unexpected io default callback");
+	TraceError(EP, "unexpected io default callback");
 }
 
 WDFQUEUE
@@ -57,7 +57,7 @@ create_queue_ep(pctx_ep_t ep)
 
 	status = WdfIoQueueCreate(ep->vusb->vhci->hdev, &conf, &attrs, &queue);
 	if (NT_ERROR(status)) {
-		TRE(EP, "failed to create queue: %!STATUS!", status);
+		TraceError(EP, "failed to create queue: %!STATUS!", status);
 		return NULL;
 	}
 

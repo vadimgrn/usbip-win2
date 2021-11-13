@@ -38,7 +38,7 @@ store_urbr_bulk(WDFREQUEST req_read, purb_req_t urbr)
 
 	int type = urbr->ep->type;
 	if (type != USB_ENDPOINT_TYPE_BULK && type != USB_ENDPOINT_TYPE_INTERRUPT) {
-		TRE(READ, "Error, not a bulk or a interrupt pipe\n");
+		TraceError(READ, "Error, not a bulk or a interrupt pipe\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 

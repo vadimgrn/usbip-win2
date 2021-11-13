@@ -105,7 +105,7 @@ setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	PWCHAR id_dev = ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
-		DBGE(DBG_PNP, "%s: query device id: out of memory\n", dbg_vdev_type(vdev->type));
+		TraceError(DBG_PNP, "%s: query device id: out of memory\n", dbg_vdev_type(vdev->type));
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -139,7 +139,7 @@ setup_hw_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	PWCHAR ids_hw = ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
-		DBGE(DBG_PNP, "%s: query hw ids: out of memory\n", dbg_vdev_type(vdev->type));
+		TraceError(DBG_PNP, "%s: query hw ids: out of memory\n", dbg_vdev_type(vdev->type));
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -203,7 +203,7 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 
 	WCHAR *str = ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*str), USBIP_VHCI_POOL_TAG);
 	if (!str) {
-		DBGE(DBG_PNP, "vpdo: %s(%s): out of memory\n", __func__, want_serial ? "DeviceSerialNumber" : "InstanceID");
+		TraceError(DBG_PNP, "vpdo: %s: out of memory\n", want_serial ? "DeviceSerialNumber" : "InstanceID");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -243,7 +243,7 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	PWCHAR ids_compat = ExAllocatePoolWithTag(PagedPool, max_wchars * sizeof(wchar_t), USBIP_VHCI_POOL_TAG);
 	if (!ids_compat) {
-		DBGE(DBG_PNP, "vpdo: query compatible id: out of memory\n");
+		TraceError(DBG_PNP, "vpdo: query compatible id: out of memory\n");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -305,12 +305,12 @@ pnp_query_id(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		DBGI(DBG_PNP, "%s: %s: %S\n", dbg_vdev_type(vdev->type), dbg_bus_query_id_type(type), result);
+		TraceInfo(DBG_PNP, "%s: %s: %S\n", dbg_vdev_type(vdev->type), dbg_bus_query_id_type(type), result);
 		if (subst_result) {
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		DBGW(DBG_PNP, "%s: %s: %s\n", dbg_vdev_type(vdev->type), dbg_bus_query_id_type(type), 
+		TraceWarning(DBG_PNP, "%s: %s: %s\n", dbg_vdev_type(vdev->type), dbg_bus_query_id_type(type), 
 		     status == STATUS_NOT_SUPPORTED ? "not supported" : "failed");
 		
 		if (result) {

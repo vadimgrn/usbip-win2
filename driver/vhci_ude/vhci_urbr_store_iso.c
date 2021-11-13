@@ -28,7 +28,7 @@ store_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 	offset = 0;
 	for (i = 0; i < urb_iso->NumberOfPackets; i++) {
 		if (urb_iso->IsoPacket[i].Offset < offset) {
-			TRW(READ, "strange iso packet offset:%d %d", offset, urb_iso->IsoPacket[i].Offset);
+			TraceWarning(READ, "strange iso packet offset:%d %d", offset, urb_iso->IsoPacket[i].Offset);
 			return STATUS_INVALID_PARAMETER;
 		}
 		iso_desc->offset = urb_iso->IsoPacket[i].Offset;
@@ -79,7 +79,7 @@ store_urbr_iso(WDFREQUEST req_read, purb_req_t urbr)
 {
 	int type = urbr->ep->type;
 	if (type != USB_ENDPOINT_TYPE_ISOCHRONOUS) {
-		TRE(READ, "Error, not a iso pipe");
+		TraceError(READ, "Error, not a iso pipe");
 		return STATUS_INVALID_PARAMETER;
 	}
 

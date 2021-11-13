@@ -11,7 +11,7 @@ save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descripto
 {
 	for (ULONG i = 0; i < urb->NumberOfPackets; ++i) {
 		if (iso_desc->offset > urb->IsoPacket[i].Offset) {
-			TRW(WRITE, "why offset changed?%d %d %d %d", i, iso_desc->offset, iso_desc->actual_length, urb->IsoPacket[i].Offset);
+			TraceWarning(WRITE, "why offset changed?%d %d %d %d", i, iso_desc->offset, iso_desc->actual_length, urb->IsoPacket[i].Offset);
 			return FALSE;
 		}
 		urb->IsoPacket[i].Length = iso_desc->actual_length;
@@ -32,11 +32,11 @@ fetch_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, struct _URB
 			continue;
 
 		if (urb->IsoPacket[i].Offset + urb->IsoPacket[i].Length > dest_len) {
-			TRW(WRITE, "Warning, why this?");
+			TraceWarning(WRITE, "Warning, why this?");
 			break;
 		}
 		if (offset + urb->IsoPacket[i].Length > src_len) {
-			TRE(WRITE, "Warning, why that?");
+			TraceError(WRITE, "Warning, why that?");
 			break;
 		}
 		RtlCopyMemory(dest + urb->IsoPacket[i].Offset, src + offset, urb->IsoPacket[i].Length);
@@ -44,7 +44,7 @@ fetch_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, struct _URB
 	}
 
 	if (offset != src_len) {
-		TRW(WRITE, "why not equal offset:%d src_len:%d", offset, src_len);
+		TraceWarning(WRITE, "why not equal offset:%d src_len:%d", offset, src_len);
 	}
 }
 

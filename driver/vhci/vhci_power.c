@@ -20,7 +20,7 @@ vhci_power_vhci(pvhci_dev_t vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 	}
 
 	if (irpstack->MinorFunction == IRP_MN_SET_POWER) {
-		DBGI(DBG_POWER, "\tRequest to set %s state to %s\n",
+		TraceInfo(DBG_POWER, "\tRequest to set %s state to %s\n",
 			(powerType == SystemPowerState ? "System" : "Device"),
 			(powerType == SystemPowerState ? 
 				dbg_system_power(powerState.SystemState) : 
@@ -42,7 +42,7 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 
 	switch (irpstack->MinorFunction) {
 	case IRP_MN_SET_POWER:
-		DBGI(DBG_POWER, "\tSetting %s power state to %s\n",
+		TraceInfo(DBG_POWER, "\tSetting %s power state to %s\n",
 			(powerType == SystemPowerState ? "System" : "Device"),
 			(powerType == SystemPowerState ?
 				dbg_system_power(powerState.SystemState) :
@@ -110,7 +110,7 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DBGI(DBG_POWER, "%s: Enter: minor:%s\n",
+	TraceInfo(DBG_POWER, "%s: Enter: minor:%s\n",
 		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_power_minor(irpstack->MinorFunction));
 
 	status = STATUS_SUCCESS;
@@ -133,7 +133,7 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	DBGI(DBG_POWER, "%s: Leave: status: %s\n",
+	TraceInfo(DBG_POWER, "%s: Leave: status: %s\n",
 		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_ntstatus(status));
 
 	return status;

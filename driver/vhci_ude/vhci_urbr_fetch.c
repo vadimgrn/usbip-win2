@@ -19,7 +19,7 @@ copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, PVOID src, int 
 	PVOID	buf;
 
 	if (dst_len < src_len) {
-		TRE(WRITE, "too small buffer: dest: %d, src: %d\n", dst_len, src_len);
+		TraceError(WRITE, "too small buffer: dest: %d, src: %d\n", dst_len, src_len);
 		return STATUS_INVALID_PARAMETER;
 	}
 	buf = get_buf(buf_dst, bufMDL);
@@ -74,7 +74,7 @@ fetch_urbr_urb(PURB urb, struct usbip_header *hdr)
 		break;
 #endif
 	default:
-		TRW(WRITE, "not supported func: %!URBFUNC!", urb->UrbHeader.Function);
+		TraceWarning(WRITE, "not supported func: %!URBFUNC!", urb->UrbHeader.Function);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
@@ -101,7 +101,7 @@ handle_urbr_error(purb_req_t urbr, struct usbip_header *hdr)
 		submit_req_reset_pipe(urbr->ep, NULL);
 	}
 
-	TRW(WRITE, "usbd status:%s: %!URBR!:", dbg_usbd_status(urb->UrbHeader.Status), urbr);
+	TraceWarning(WRITE, "usbd status:%s: %!URBR!:", dbg_usbd_status(urb->UrbHeader.Status), urbr);
 }
 
 NTSTATUS
@@ -109,7 +109,7 @@ fetch_urbr(purb_req_t urbr, struct usbip_header *hdr)
 {
 	NTSTATUS	status;
 
-	TRD(WRITE, "Enter: %!URBR!", urbr);
+	TraceInfo(WRITE, "Enter: %!URBR!", urbr);
 
 	if (urbr->type != URBR_TYPE_URB) {
 		status = STATUS_SUCCESS;
@@ -121,6 +121,6 @@ fetch_urbr(purb_req_t urbr, struct usbip_header *hdr)
 		status = fetch_urbr_urb(urbr->u.urb.urb, hdr);
 	}
 
-	TRD(WRITE, "Leave: %!STATUS!", status);
+	TraceInfo(WRITE, "Leave: %!STATUS!", status);
 	return status;
 }

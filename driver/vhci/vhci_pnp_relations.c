@@ -42,7 +42,7 @@ get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 	if (relations == NULL) {
 		relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
 		if (relations == NULL) {
-			DBGE(DBG_PNP, "no relations will be reported: out of memory\n");
+			TraceError(DBG_PNP, "no relations will be reported: out of memory\n");
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 		relations->Count = 0;
@@ -69,7 +69,7 @@ get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 	size = sizeof(DEVICE_RELATIONS) + relations->Count * sizeof(PDEVICE_OBJECT);
 	relations_new = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, size, USBIP_VHCI_POOL_TAG);
 	if (relations_new == NULL) {
-		DBGE(DBG_VHUB, "old relations will be used: out of memory\n");
+		TraceError(DBG_VHUB, "old relations will be used: out of memory\n");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 	RtlCopyMemory(relations_new->Objects, relations->Objects, sizeof(PDEVICE_OBJECT) * relations->Count);
@@ -128,7 +128,7 @@ get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATIONS *pdev_relations)
 
 	relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
 	if (relations == NULL) {
-		DBGE(DBG_VHUB, "failed to allocate a new relation: out of memory\n");
+		TraceError(DBG_VHUB, "failed to allocate a new relation: out of memory\n");
 
 		ExReleaseFastMutex(&vhub->Mutex);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -161,7 +161,7 @@ get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATIONS *pdev_relations)
 
 	relations->Count = n_news;
 
-	DBGI(DBG_VHUB, "vhub vpdos: total:%u,plugged:%u: bus relations: old:%u,new:%u\n", vhub->n_vpdos, vhub->n_vpdos_plugged, n_olds, n_news);
+	TraceInfo(DBG_VHUB, "vhub vpdos: total:%u,plugged:%u: bus relations: old:%u,new:%u\n", vhub->n_vpdos, vhub->n_vpdos_plugged, n_olds, n_news);
 
 	if (relations_old)
 		ExFreePool(relations_old);
@@ -227,7 +227,7 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	PDEVICE_RELATIONS	dev_relations;
 	NTSTATUS	status;
 
-	DBGI(DBG_PNP, "%s: query dev relations: %s\n", dbg_vdev_type(vdev->type), dbg_dev_relation(irpstack->Parameters.QueryDeviceRelations.Type));
+	TraceInfo(DBG_PNP, "%s: query dev relations: %s\n", dbg_vdev_type(vdev->type), dbg_dev_relation(irpstack->Parameters.QueryDeviceRelations.Type));
 
 	dev_relations = (PDEVICE_RELATIONS)irp->IoStatus.Information;
 
@@ -245,7 +245,7 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 		status = STATUS_SUCCESS;
 		break;
 	default:
-		DBGI(DBG_PNP, "query_dev_relations: skip: %s\n", dbg_dev_relation(irpstack->Parameters.QueryDeviceRelations.Type));
+		TraceInfo(DBG_PNP, "query_dev_relations: skip: %s\n", dbg_dev_relation(irpstack->Parameters.QueryDeviceRelations.Type));
 		status = irp->IoStatus.Status;
 		break;
 	}

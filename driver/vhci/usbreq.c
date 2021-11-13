@@ -71,7 +71,7 @@ static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 	if (urbr_unlink) {
 		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
 		if (NT_ERROR(status)) {
-			DBGI(DBG_GENERAL, "failed to submit unlink urb: %s\n", dbg_urbr(urbr_unlink));
+			TraceInfo(DBG_GENERAL, "failed to submit unlink urb: %s\n", dbg_urbr(urbr_unlink));
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -94,7 +94,7 @@ static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 
 	submit_urbr_unlink(vpdo, urbr->seq_num);
 
-	DBGI(DBG_GENERAL, "cancelled urb destroyed: %s\n", dbg_urbr(urbr));
+	TraceInfo(DBG_GENERAL, "cancelled urb destroyed: %s\n", dbg_urbr(urbr));
 	free_urbr(urbr);
 }
 
@@ -110,7 +110,7 @@ cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 	urbr = (struct urb_req *)irp->Tail.Overlay.DriverContext[1];
 
 	vpdo = (pvpdo_dev_t)devobj->DeviceExtension;
-	DBGI(DBG_GENERAL, "irp will be cancelled: %s\n", dbg_urbr(urbr));
+	TraceInfo(DBG_GENERAL, "irp will be cancelled: %s\n", dbg_urbr(urbr));
 	IoReleaseCancelSpinLock(irp->CancelIrql);
 
 	remove_cancelled_urbr(vpdo, urbr);
@@ -127,7 +127,7 @@ create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink)
 
 	urbr = ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (urbr == NULL) {
-		DBGE(DBG_URB, "create_urbr: out of memory\n");
+		TraceError(DBG_URB, "create_urbr: out of memory\n");
 		return NULL;
 	}
 	RtlZeroMemory(urbr, sizeof(*urbr));
@@ -211,7 +211,7 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 		InsertTailList(&vpdo->head_urbr, &urbr->list_all);
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		DBGI(DBG_URB, "submit_urbr: urb pending\n");
+		TraceInfo(DBG_URB, "submit_urbr: urb pending\n");
 		return STATUS_PENDING;
 	}
 
@@ -220,7 +220,7 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 	valid_irp = IoSetCancelRoutine(vpdo->pending_read_irp, NULL) != NULL;
 	IoReleaseCancelSpinLock(oldirql_cancel);
 	if (!valid_irp) {
-		DBGI(DBG_URB, "submit_urbr: read irp was cancelled");
+		TraceInfo(DBG_URB, "submit_urbr: read irp was cancelled");
 		status = STATUS_INVALID_PARAMETER;
 		vpdo->pending_read_irp = NULL;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
@@ -265,6 +265,6 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 
 		status = STATUS_INVALID_PARAMETER;
 	}
-	DBGI(DBG_URB, "submit_urbr: urb requested: status:%s\n", dbg_ntstatus(status));
+	TraceInfo(DBG_URB, "submit_urbr: urb requested: status:%s\n", dbg_ntstatus(status));
 	return status;
 }

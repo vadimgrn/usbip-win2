@@ -44,6 +44,6 @@ get_usbip_hdr_from_read_irp(PIRP irp)
 NTSTATUS
 stub_dispatch_read(usbip_stub_dev_t *devstub, IRP *irp)
 {
-	DBGI(DBG_READWRITE, "enter\n");
+	TraceInfo(DBG_READWRITE, "enter\n");
 	return collect_done_stub_res(devstub, irp);
 }
