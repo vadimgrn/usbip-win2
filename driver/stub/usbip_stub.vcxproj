@@ -1,14 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -59,24 +51,6 @@
     <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <TargetVersion>Windows10</TargetVersion>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
-    <ConfigurationType>Driver</ConfigurationType>
-    <DriverType>KMDF</DriverType>
-    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
-    <SpectreMitigation>false</SpectreMitigation>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <TargetVersion>Windows10</TargetVersion>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
-    <ConfigurationType>Driver</ConfigurationType>
-    <DriverType>KMDF</DriverType>
-    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
-    <SpectreMitigation>false</SpectreMitigation>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -103,20 +77,6 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\$(ProjectName)\</IntDir>
-    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
-    <Inf2CatVerbose>true</Inf2CatVerbose>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\$(ProjectName)\</IntDir>
-    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
-    <Inf2CatVerbose>true</Inf2CatVerbose>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
@@ -131,48 +91,6 @@
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
     <Inf2CatVerbose>true</Inf2CatVerbose>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WppEnabled>true</WppEnabled>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">stub_trace.h</WppScanConfigurationData>
-      <WppKernelMode>true</WppKernelMode>
-      <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
-    </ClCompile>
-    <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;$(DDK_LIB_PATH)usbd.lib;$(DDK_LIB_PATH)usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-    <Inf>
-      <TimeStamp>0.3.0.0</TimeStamp>
-    </Inf>
-    <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
-    </DriverSign>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WppEnabled>true</WppEnabled>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">stub_trace.h</WppScanConfigurationData>
-      <WppKernelMode>true</WppKernelMode>
-      <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
-    </ClCompile>
-    <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;$(DDK_LIB_PATH)usbd.lib;$(DDK_LIB_PATH)usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
-    <Inf>
-      <TimeStamp>0.3.0.0</TimeStamp>
-    </Inf>
-    <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
-    </DriverSign>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
