@@ -7,28 +7,20 @@
 
 ### Notes
 - Build is tested on Windows 10 x64 and the projects are configured for this target by default.
-- x86/x64 platforms should be supported. However, we don't have an x86 setup for testing at the moment.
-- For Windows 7 users, change `usbip_stub` and `usbip_vhci` projects' Target OS version to `Windows 7`.
-  - Right-click on the `Project > Properties > Driver Settings > Target OS version > Windows 7`
-  - The recent tag version which supports is v0.1.0. All versions after v0.1.0 do not support Windows 7 or 8 because usbip-win started to use kernel libraries of Windows 10.
+- x86 platform is no longer supported.
 
 ### Build Tools
-- Visual Studio 2019 Community (v142)
-  - Build with VS 2017 (v141) is also possible if Platform Toolset in Setting is configured to v141.
-- Windows SDK 10.0.18362.0 (recommended)
-  - VS 2019 (v142): requires &gt;= 10.0.18xxx
-  - VS 2017 (v141): requires &gt;= 10.0.17xxx
-- Windows Driver Kit Windows 10, version 1903 (10.0.18362)
-  - WDK 10.0.17134 (1803), 10.0.17763 (1809) and 10.0.18346 are also tested.
+- The latest Microsoft Visual Studio Community 2019
+- Windows 11 SDK (10.1.22000.194)
+- Windows Driver Kit (10.1.22000.1)
 
 ### Build Process
 - Open `usbip_win.sln`
-- If VS 2017 is used, SDK version for userspace projects (`usbip`, `usbip_common`, `usbipd`, `stubctl`) should be adjusted.
 - Set certificate driver signing for `usbip_stub` and `usbip_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Browse to `driver/usbip_test.pfx` (password: usbip)
 - Build solution or desired project
-- All output files are created under {Debug,Release}/{x64,x86} folder.
+- All output files are created under {Debug,Release}/x64 folder.
 
 ## Install
 
@@ -130,31 +122,34 @@ usbip.exe list -l
 ### Reporting Bugs
 - `usbip-win` is not yet ready for production use. We could find the problems with detailed logs.
 
-#### How to get Windows kernel log for vhci(wdm)
-- Set registry key to enable a debug filter
-  - `usbip-win` uses [DbgPrintEx API for kernel logging](https://docs.microsoft.com/en-us/windows-hardware/drivers/devtest/reading-and-filtering-debugging-messages).
-  - save following as `.reg` file and run or manually insert the registry key
-  - reboot the system to apply
+#### How to get Windows kernel log for drivers
+- All drivers use WPP Software Tracing
+- Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
+- These tools are included in the Windows Driver Kit (WDK)
+- Use these tracing GUIDs
+  - `682e9961-054c-482b-a86d-d94f6cd5f555` for stub driver
+  - `8b56380d-5174-4b15-b6f4-4c47008801a4` for vhci(wdm) driver
+  - `99b7a5cf-7cb0-4af5-838d-c45d78e49101` for vhci(ude) driver
+- Example of a log session for vhci(ude) driver using command-line tools
+  - Start a new log session
+    - `tracelog.exe -start usbip-vhci-ude -guid #99b7a5cf-7cb0-4af5-838d-c45d78e49101 -f usbip-vhci-ude.etl -flag 0xFFFF -level 5`
+  - Stop the log session
+    - `tracelog.exe -stop usbip-vhci-ude`
+  - Format binary event trace log `usbip-vhci-ude.etl` as text
 ```
-Windows Registry Editor Version 5.00
-
-[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\Debug Print Filter]
-"IHVDRIVER"=dword:ffffffff
+set TMFS=%TEMP%\tmfs
+set TRACE_FORMAT_PREFIX=%%!LEVEL! [%%9!d!]%%8!04X!.%%3!04X!::%%4!s! [%%1!s!] %%!FUNC!: 
+tracepdb.exe -f D:\usbip-win\Debug\x64 -p %TMFS%
+tracefmt.exe -sortableTime -nosummary -p %TMFS% -o usbip-vhci-ude.txt usbip-vhci-ude.etl
 ```
-- Run a debugging log viewer program before you test.
-  - [DebugView](https://docs.microsoft.com/en-us/sysinternals/downloads/debugview) is a good tool to view the logs.
-- If your testing machine suffer from BSOD (Blue Screen of Death), you should get it via remote debugging.
-  - `WinDbg` on virtual machines would be good to get logs.
-
-#### How to get Windows kernel log for vhci(ude)
-- A new vhci(ude) implementation uses WPP SW tracing instead of DbgPrintEx.
-  - `DebugView.exe` cannot catch a VHCI debug message
-    - `TraceView.exe` is a good utility for a new approach, which is included in WDK.
-- `usbip_vhci_ude.pdb` file is required to add a trace provider easily.
-- Create a new session log in `TraceView.exe`
-  - Choose PDB file radio button in \"*Provider Control GUID Setup*\" popup dialog
-  - Specify `usbip_vhci_ude.pdb` as a PDB file
-- You can send real-time trace messages to WinDbg by modifying in \"*Advanced Log Session Options*\".
+- How to use `TraceView.exe` GUI app
+  - Open the menu item "File/Create New Log Session"
+  - \"*Provider Control GUID Setup*\" dialog window appears
+  - Choose \"*PDB (Debug Information) File*\" radio button and specify PDB file
+    - `usbip_stub.pdb` for stub driver
+    - `usbip_vhci.pdb` for vhci(wdm) driver
+    - `usbip_vhci_ude.pdb` for vhci(ude) driver
+  - You can send real-time trace messages to WinDbg by modifying in \"*Advanced Log Session Options*\".
 - If your testing machine suffer from BSOD (Blue Screen of Death), you should get it via remote debugging.
   - `WinDbg` on virtual machines would be good to get logs
 
@@ -170,6 +165,3 @@ Windows Registry Editor Version 5.00
 ```
 # dmesg --follow | tee kernel_log.txt
 ```
-
-<hr>
-<sub>This project was supported by Basic Science Research Program through the National Research Foundation of Korea(NRF) funded by the Ministry of Education(2020R1I1A1A01066121).</sub>
