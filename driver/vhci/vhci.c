@@ -1,6 +1,7 @@
 #include "vhci.h"
 #include "trace.h"
 #include "vhci.tmh"
+
 #include "vhci_plugin.h"
 #include "globals.h"
 #include "usbreq.h"
@@ -43,20 +44,10 @@ static PAGEABLE VOID
 vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 {
 	PAGED_CODE();
-
 	TraceVerbose(DBG_GENERAL, "Enter\n");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
-
-	//
-	// All the device objects should be gone.
-	//
-
 	ASSERT(!drvobj->DeviceObject);
-
-	//
-	// Here we free all the resources allocated in the DriverEntry
-	//
 
 	if (Globals.RegistryPath.Buffer) {
 		ExFreePool(Globals.RegistryPath.Buffer);
