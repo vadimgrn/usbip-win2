@@ -31,17 +31,17 @@ get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
 
 	status = IoGetDeviceProperty(pdo, prop, 0, NULL, &buflen);
 	if (status != STATUS_BUFFER_TOO_SMALL) {
-		TraceError(DBG_GENERAL, "failed to get device property size: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "failed to get device property size: %s\n", dbg_ntstatus(status));
 		return NULL;
 	}
 	value = ExAllocatePoolWithTag(PagedPool, buflen, USBIP_VHCI_POOL_TAG);
 	if (value == NULL) {
-		TraceError(DBG_GENERAL, "failed to get device property: out of memory\n");
+		TraceError(TRACE_GENERAL, "failed to get device property: out of memory\n");
 		return NULL;
 	}
 	status = IoGetDeviceProperty(pdo, prop, buflen, value, &buflen);
 	if (NT_ERROR(status)) {
-		TraceError(DBG_GENERAL, "failed to get device property: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "failed to get device property: %s\n", dbg_ntstatus(status));
 		ExFreePoolWithTag(value, USBIP_VHCI_POOL_TAG);
 		return NULL;
 	}
@@ -73,7 +73,7 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 		break;
 	}
 	if (!NT_SUCCESS(status)) {
-		TraceError(DBG_GENERAL, "failed to create vdev(%s): status:%s\n", dbg_vdev_type(type), dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "failed to create vdev(%s): status:%s\n", dbg_vdev_type(type), dbg_ntstatus(status));
 		return NULL;
 	}
 

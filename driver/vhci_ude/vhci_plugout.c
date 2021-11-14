@@ -16,7 +16,7 @@ abort_pending_req_read(pctx_vusb_t vusb)
 	WdfSpinLockRelease(vusb->spin_lock);
 
 	if (req_read_pending != NULL) {
-		TraceInfo(PLUGIN, "abort read request");
+		TraceInfo(TRACE_PLUGIN, "abort read request");
 		WdfRequestUnmarkCancelable(req_read_pending);
 		WdfRequestComplete(req_read_pending, STATUS_DEVICE_NOT_CONNECTED);
 	}
@@ -25,7 +25,7 @@ abort_pending_req_read(pctx_vusb_t vusb)
 static VOID
 abort_pending_urbr(purb_req_t urbr)
 {
-	TraceInfo(PLUGIN, "abort pending urbr: %!URBR!", urbr);
+	TraceInfo(TRACE_PLUGIN, "abort pending urbr: %!URBR!", urbr);
 	complete_urbr(urbr, STATUS_DEVICE_NOT_CONNECTED);
 }
 
@@ -64,7 +64,7 @@ vusb_plugout(pctx_vusb_t vusb)
 	abort_pending_req_read(vusb);
 	abort_all_pending_urbrs(vusb);
 
-	TraceInfo(PLUGIN, "plugged out: port: %d", vusb->port);
+	TraceInfo(TRACE_PLUGIN, "plugged out: port: %d", vusb->port);
 }
 
 static NTSTATUS
@@ -72,7 +72,7 @@ plugout_all_vusbs(pctx_vhci_t vhci)
 {
 	ULONG	i;
 
-	TraceInfo(PLUGIN, "plugging out all the devices!");
+	TraceInfo(TRACE_PLUGIN, "plugging out all the devices!");
 
 	for (i = 0; i < vhci->n_max_ports; i++) {
 		pctx_vusb_t	vusb;
@@ -96,18 +96,18 @@ plugout_vusb(pctx_vhci_t vhci, CHAR port)
 	if (port < 0)
 		return plugout_all_vusbs(vhci);
 
-	TraceInfo(IOCTL, "plugging out device: port: %u", port);
+	TraceInfo(TRACE_IOCTL, "plugging out device: port: %u", port);
 
 	vusb = get_vusb(vhci, port);
 	if (vusb == NULL) {
-		TraceInfo(PLUGIN, "no matching vusb: port: %u", port);
+		TraceInfo(TRACE_PLUGIN, "no matching vusb: port: %u", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
 	vusb_plugout(vusb);
 	put_vusb(vusb);
 
-	TraceInfo(IOCTL, "completed to plug out: port: %u", port);
+	TraceInfo(TRACE_IOCTL, "completed to plug out: port: %u", port);
 
 	return STATUS_SUCCESS;
 }

@@ -50,7 +50,7 @@ disable_interface(usbip_stub_dev_t *devstub)
 
 	status = IoSetDeviceInterfaceState(&devstub->interface_name, FALSE);
 	if (NT_ERROR(status)) {
-		TraceError(DBG_PNP, "failed to disable interface: err: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to disable interface: err: %s\n", dbg_ntstatus(status));
 	}
 	if (devstub->interface_name.Buffer) {
 		RtlFreeUnicodeString(&devstub->interface_name);
@@ -64,11 +64,11 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 	IO_STACK_LOCATION	*irpstack = IoGetCurrentIrpStackLocation(irp);
 	NTSTATUS	status;
 
-	TraceInfo(DBG_DISPATCH, "dispatch_pnp: minor: %s\n", dbg_pnp_minor(irpstack->MinorFunction));
+	TraceInfo(TRACE_DISPATCH, "dispatch_pnp: minor: %s\n", dbg_pnp_minor(irpstack->MinorFunction));
 
 	status = lock_dev_removal(devstub);
 	if (NT_ERROR(status)) {
-		TraceInfo(DBG_PNP, "device is pending removal: %s\n", dbg_devstub(devstub));
+		TraceInfo(TRACE_PNP, "device is pending removal: %s\n", dbg_devstub(devstub));
 		return complete_irp(irp, status, 0);
 	}
 
@@ -76,7 +76,7 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 	case IRP_MN_START_DEVICE:
 		status = IoSetDeviceInterfaceState(&devstub->interface_name, TRUE);
 		if (NT_ERROR(status)) {
-			TraceError(DBG_PNP, "failed to enable interface: err: %s\n", dbg_ntstatus(status));
+			TraceError(TRACE_PNP, "failed to enable interface: err: %s\n", dbg_ntstatus(status));
 		}
 		return pass_irp_down(devstub, irp, on_start_complete, NULL);
 	case IRP_MN_REMOVE_DEVICE:
@@ -92,7 +92,7 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 
 		status = pass_irp_down(devstub, irp, NULL, NULL);
 
-		TraceInfo(DBG_PNP, "deleting device: %s\n", dbg_devstub(devstub));
+		TraceInfo(TRACE_PNP, "deleting device: %s\n", dbg_devstub(devstub));
 
 		remove_devlink(devstub);
 		free_devconf(devstub->devconf);

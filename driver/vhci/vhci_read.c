@@ -87,7 +87,7 @@ static NTSTATUS store_urb_reset_pipe(PIRP irp, PURB urb, struct urb_req *urbr)
 	struct _URB_PIPE_REQUEST *urb_rp = &urb->UrbPipeRequest;
 
 	if (get_endpoint_type(urb_rp->PipeHandle) == UsbdPipeTypeControl) {
-		TraceWarning(DBG_READ, "CLEAR not allowed to a control pipe\n");
+		TraceWarning(TRACE_READ, "CLEAR not allowed to a control pipe\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -112,7 +112,7 @@ static PVOID get_buf(PVOID buf, PMDL bufMDL)
 			buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
 		}
 		if (!buf) {
-			TraceError(DBG_READ, "No transfer buffer\n");
+			TraceError(TRACE_READ, "No transfer buffer\n");
 		}
 	}
 
@@ -171,7 +171,7 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 				    USBD_SHORT_TRANSFER_OK, urb_gsr->TransferBufferLength);
 
 	code_func = urb->UrbHeader.Function;
-	TraceInfo(DBG_READ, "store_urb_get_status: urbr: %s, func:%s\n", dbg_urbr(urbr), dbg_urbfunc(code_func));
+	TraceInfo(TRACE_READ, "store_urb_get_status: urbr: %s, func:%s\n", dbg_urbr(urbr), dbg_urbfunc(code_func));
 
 	switch (code_func) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
@@ -187,7 +187,7 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 		recip = BMREQUEST_TO_OTHER;
 		break;
 	default:
-		TraceWarning(DBG_IOCTL, "store_urb_get_status: unhandled function: %s: len: %d\n",
+		TraceWarning(TRACE_IOCTL, "store_urb_get_status: unhandled function: %s: len: %d\n",
 			dbg_urbfunc(urb->UrbHeader.Function), urb->UrbHeader.Length);
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -394,7 +394,7 @@ static NTSTATUS store_urb_bulk(PIRP irp, PURB urb, struct urb_req *urbr)
 	USBD_PIPE_TYPE type = get_endpoint_type(urb_bi->PipeHandle);
 
 	if (!(type == UsbdPipeTypeBulk || type == UsbdPipeTypeInterrupt)) {
-		TraceError(DBG_READ, "Error, not a bulk/int pipe\n");
+		TraceError(TRACE_READ, "Error, not a bulk/int pipe\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -441,7 +441,7 @@ static NTSTATUS copy_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 
 	for (ULONG i = 0; i < urb_iso->NumberOfPackets; ++i) {
 		if (urb_iso->IsoPacket[i].Offset < offset) {
-			TraceWarning(DBG_READ, "strange iso packet offset:%d %d", offset, urb_iso->IsoPacket[i].Offset);
+			TraceWarning(TRACE_READ, "strange iso packet offset:%d %d", offset, urb_iso->IsoPacket[i].Offset);
 			return STATUS_INVALID_PARAMETER;
 		}
 		iso_desc->offset = urb_iso->IsoPacket[i].Offset;
@@ -497,7 +497,7 @@ static NTSTATUS store_urb_iso(PIRP irp, PURB urb, struct urb_req *urbr)
 
 	USBD_PIPE_TYPE type = get_endpoint_type(urb_iso->PipeHandle);
 	if (type != UsbdPipeTypeIsochronous) {
-		TraceError(DBG_READ, "Error, not a iso pipe\n");
+		TraceError(TRACE_READ, "Error, not a iso pipe\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -557,7 +557,7 @@ store_urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
-		TraceError(DBG_READ, "Cannot get usbip header\n");
+		TraceError(TRACE_READ, "Cannot get usbip header\n");
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
@@ -620,7 +620,7 @@ store_urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
-		TraceError(DBG_READ, "Cannot get usbip header\n");
+		TraceError(TRACE_READ, "Cannot get usbip header\n");
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
@@ -660,19 +660,19 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 	USHORT		code_func;
 	NTSTATUS	status;
 
-	TraceInfo(DBG_READ, "store_urbr_submit: urbr: %s\n", dbg_urbr(urbr));
+	TraceInfo(TRACE_READ, "store_urbr_submit: urbr: %s\n", dbg_urbr(urbr));
 
 	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	urb = irpstack->Parameters.Others.Argument1;
 	if (urb == NULL) {
-		TraceError(DBG_READ, "store_urbr_submit: null urb\n");
+		TraceError(TRACE_READ, "store_urbr_submit: null urb\n");
 
 		irp->IoStatus.Information = 0;
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
 	code_func = urb->UrbHeader.Function;
-	TraceInfo(DBG_READ, "store_urbr_submit: urbr: %s, func:%s\n", dbg_urbr(urbr), dbg_urbfunc(code_func));
+	TraceInfo(TRACE_READ, "store_urbr_submit: urbr: %s, func:%s\n", dbg_urbr(urbr), dbg_urbfunc(code_func));
 
 	switch (code_func) {
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
@@ -719,7 +719,7 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(DBG_READ, "unhandled urb function: %s\n", dbg_urbfunc(code_func));
+		TraceError(TRACE_READ, "unhandled urb function: %s\n", dbg_urbfunc(code_func));
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
@@ -735,7 +735,7 @@ store_urbr_partial(PIRP irp, struct urb_req *urbr)
 	USHORT		code_func;
 	NTSTATUS	status;
 
-	TraceInfo(DBG_READ, "store_urbr_partial: Enter: urbr: %s\n", dbg_urbr(urbr));
+	TraceInfo(TRACE_READ, "store_urbr_partial: Enter: urbr: %s\n", dbg_urbr(urbr));
 
 	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	urb = irpstack->Parameters.Others.Argument1;
@@ -765,11 +765,11 @@ store_urbr_partial(PIRP irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(DBG_READ, "store_urbr_partial: unexpected partial urbr: %s\n", dbg_urbfunc(code_func));
+		TraceError(TRACE_READ, "store_urbr_partial: unexpected partial urbr: %s\n", dbg_urbfunc(code_func));
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
-	TraceInfo(DBG_READ, "store_urbr_partial: Leave: %s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_READ, "store_urbr_partial: Leave: %s\n", dbg_ntstatus(status));
 
 	return status;
 }
@@ -779,7 +779,7 @@ store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 {
 	struct usbip_header	*hdr;
 
-	TraceInfo(DBG_READ, "store_cancelled_urbr: Enter\n");
+	TraceInfo(TRACE_READ, "store_cancelled_urbr: Enter\n");
 
 	hdr = get_usbip_hdr_from_read_irp(irp);
 	if (hdr == NULL)
@@ -793,7 +793,7 @@ store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 
 NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 {
-	TraceInfo(DBG_READ, "store_urbr: urbr: %s\n", dbg_urbr(urbr));
+	TraceInfo(TRACE_READ, "store_urbr: urbr: %s\n", dbg_urbr(urbr));
 
 	if (urbr->irp == NULL) {
 		return store_cancelled_urbr(irp, urbr);
@@ -815,7 +815,7 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 		status = store_urb_dsc_req(irp, urbr);
 		break;
 	default:
-		TraceWarning(DBG_READ, "unhandled ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceWarning(TRACE_READ, "unhandled ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
 		irp->IoStatus.Information = 0;
 		status = STATUS_INVALID_PARAMETER;
 		break;
@@ -828,7 +828,7 @@ static VOID
 on_pending_irp_read_cancelled(PDEVICE_OBJECT devobj, PIRP irp_read)
 {
 	UNREFERENCED_PARAMETER(devobj);
-	TraceInfo(DBG_READ, "pending irp read cancelled %p\n", irp_read);
+	TraceInfo(TRACE_READ, "pending irp read cancelled %p\n", irp_read);
 
 	PIO_STACK_LOCATION	irpstack;
 	pvpdo_dev_t	vpdo;
@@ -856,7 +856,7 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 	struct urb_req *urbr = NULL;
 	KIRQL oldirql;
 
-	TraceInfo(DBG_READ, "Enter\n");
+	TraceInfo(TRACE_READ, "Enter\n");
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
@@ -933,10 +933,10 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	NTSTATUS status = STATUS_SUCCESS;
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(DBG_READ, "Enter: len:%u, irp:%p\n", irpstack->Parameters.Read.Length, irp);
+	TraceInfo(TRACE_READ, "Enter: len:%u, irp:%p\n", irpstack->Parameters.Read.Length, irp);
 
 	if (!IS_DEVOBJ_VHCI(devobj)) {
-		TraceError(DBG_READ, "read for non-vhci is not allowed\n");
+		TraceError(TRACE_READ, "read for non-vhci is not allowed\n");
 
 		irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
@@ -955,7 +955,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 
 END:
-	TraceInfo(DBG_READ, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+	TraceInfo(TRACE_READ, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
 
 	if (status != STATUS_PENDING) {
 		irp->IoStatus.Status = status;

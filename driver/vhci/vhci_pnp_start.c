@@ -17,19 +17,19 @@ start_vhci(pvhci_dev_t vhci)
 
 	status = IoRegisterDeviceInterface(vhci->common.pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, NULL, &vhci->DevIntfVhci);
 	if (!NT_SUCCESS(status)) {
-		TraceError(DBG_PNP, "failed to register vhci device interface: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to register vhci device interface: %s\n", dbg_ntstatus(status));
 		return status;
 	}
 	status = IoRegisterDeviceInterface(vhci->common.pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HOST_CONTROLLER, NULL, &vhci->DevIntfUSBHC);
 	if (!NT_SUCCESS(status)) {
-		TraceError(DBG_PNP, "failed to register USB Host controller device interface: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to register USB Host controller device interface: %s\n", dbg_ntstatus(status));
 		return status;
 	}
 
 	// Register with WMI
 	status = reg_wmi(vhci);
 	if (!NT_SUCCESS(status)) {
-		TraceError(DBG_VHCI, "start_vhci: reg_wmi failed: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_VHCI, "start_vhci: reg_wmi failed: %s\n", dbg_ntstatus(status));
 	}
 
 	return status;
@@ -45,25 +45,25 @@ start_vhub(pvhub_dev_t vhub)
 
 	status = IoRegisterDeviceInterface(vhub->common.pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HUB, NULL, &vhub->DevIntfRootHub);
 	if (NT_ERROR(status)) {
-		TraceError(DBG_PNP, "failed to register USB root hub device interface: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to register USB root hub device interface: %s\n", dbg_ntstatus(status));
 		return STATUS_UNSUCCESSFUL;
 	}
 	status = IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, TRUE);
 	if (NT_ERROR(status)) {
-		TraceError(DBG_PNP, "failed to activate USB root hub device interface: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to activate USB root hub device interface: %s\n", dbg_ntstatus(status));
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	vhci = (pvhci_dev_t)vhub->common.parent;
 	status = IoSetDeviceInterfaceState(&vhci->DevIntfVhci, TRUE);
 	if (!NT_SUCCESS(status)) {
-		TraceError(DBG_PNP, "failed to enable vhci device interface: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to enable vhci device interface: %s\n", dbg_ntstatus(status));
 		return status;
 	}
 	status = IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, TRUE);
 	if (!NT_SUCCESS(status)) {
 		IoSetDeviceInterfaceState(&vhci->DevIntfVhci, FALSE);
-		TraceError(DBG_PNP, "failed to enable USB host controller device interface: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to enable USB host controller device interface: %s\n", dbg_ntstatus(status));
 		return status;
 	}
 	return STATUS_SUCCESS;
@@ -80,11 +80,11 @@ start_vpdo(pvpdo_dev_t vpdo)
 	if (NT_SUCCESS(status)) {
 		status = IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, TRUE);
 		if (NT_ERROR(status)) {
-			TraceWarning(DBG_VPDO, "failed to activate USB device interface: %s\n", dbg_ntstatus(status));
+			TraceWarning(TRACE_VPDO, "failed to activate USB device interface: %s\n", dbg_ntstatus(status));
 		}
 	}
 	else {
-		TraceWarning(DBG_VPDO, "failed to register USB device interface: %s\n", dbg_ntstatus(status));
+		TraceWarning(TRACE_VPDO, "failed to register USB device interface: %s\n", dbg_ntstatus(status));
 	}
 
 	return status;
@@ -124,7 +124,7 @@ pnp_start_device(pvdev_t vdev, PIRP irp)
 		powerState.DeviceState = PowerDeviceD0;
 		PoSetPowerState(vdev->Self, DevicePowerState, powerState);
 
-		TraceInfo(DBG_GENERAL, "device(%s) started\n", dbg_vdev_type(vdev->type));
+		TraceInfo(TRACE_GENERAL, "device(%s) started\n", dbg_vdev_type(vdev->type));
 	}
 	status = irp_done(irp, status);
 	return status;

@@ -20,19 +20,19 @@ reg_get_property(PDEVICE_OBJECT pdo, int property)
 
 	status = IoGetDeviceProperty(pdo, property, 0, NULL, &len);
 	if (status != STATUS_BUFFER_TOO_SMALL) {
-		TraceError(DBG_GENERAL, "IoGetDeviceProperty failed to get size: status: %!STATUS!\n", status);
+		TraceError(TRACE_GENERAL, "IoGetDeviceProperty failed to get size: status: %!STATUS!\n", status);
 		return NULL;
 	}
 
 	buf = ExAllocatePoolWithTag(PagedPool, len + sizeof(WCHAR), USBIP_STUB_POOL_TAG);
 	if (buf == NULL) {
-		TraceError(DBG_GENERAL, "out of memory\n");
+		TraceError(TRACE_GENERAL, "out of memory\n");
 		return NULL;
 	}
 
 	status = IoGetDeviceProperty(pdo, property, len, buf, &len);
 	if (NT_ERROR(status)) {
-		TraceError(DBG_GENERAL, "IoGetDeviceProperty failed: status: %x\n", status);
+		TraceError(TRACE_GENERAL, "IoGetDeviceProperty failed: status: %x\n", status);
 		ExFreePool(buf);
 		return NULL;
 	}
@@ -44,13 +44,13 @@ reg_get_property(PDEVICE_OBJECT pdo, int property)
 	ExFreePool(buf);
 
 	if (NT_ERROR(status)) {
-		TraceError(DBG_GENERAL, "failed to convert unicode string: status: %x\n", status);
+		TraceError(TRACE_GENERAL, "failed to convert unicode string: status: %x\n", status);
 		return NULL;
 	}
 
 	prop = ExAllocatePoolWithTag(PagedPool, prop_ansi.Length + 1, USBIP_STUB_POOL_TAG);
 	if (prop == NULL) {
-		TraceError(DBG_GENERAL, "out of memory\n");
+		TraceError(TRACE_GENERAL, "out of memory\n");
 		RtlFreeAnsiString(&prop_ansi);
 		return NULL;
 	}
@@ -90,7 +90,7 @@ reg_get_properties(usbip_stub_dev_t *devstub)
 
 	status = IoOpenDeviceRegistryKey(devstub->pdo, PLUGPLAY_REGKEY_DEVICE, STANDARD_RIGHTS_ALL, &hkey);
 	if (NT_FAILED(status)) {
-		TraceError(DBG_GENERAL, "IoOpenDeviceRegistryKey failed: status: %!STATUS!\n", status);
+		TraceError(TRACE_GENERAL, "IoOpenDeviceRegistryKey failed: status: %!STATUS!\n", status);
 		return FALSE;
 	}
 
@@ -103,7 +103,7 @@ reg_get_properties(usbip_stub_dev_t *devstub)
 	info = ExAllocatePool(NonPagedPool, pool_length);
 	if (info == NULL) {
 		ZwClose(hkey);
-		TraceError(DBG_GENERAL, "ExAllocatePool failed allocating %d bytes\n", pool_length);
+		TraceError(TRACE_GENERAL, "ExAllocatePool failed allocating %d bytes\n", pool_length);
 		return FALSE;
 	}
 

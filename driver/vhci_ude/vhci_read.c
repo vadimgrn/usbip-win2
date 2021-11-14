@@ -44,7 +44,7 @@ req_read_cancelled(WDFREQUEST req_read)
 {
 	pctx_vusb_t	vusb;
 
-	TraceInfo(READ, "a pending read req cancelled");
+	TraceInfo(TRACE_READ, "a pending read req cancelled");
 
 	vusb = get_vusb_by_req(req_read);
 	if (vusb != NULL) {
@@ -67,7 +67,7 @@ read_vusb(pctx_vusb_t vusb, WDFREQUEST req)
 	purb_req_t	urbr;
 	NTSTATUS status;
 
-	TraceInfo(READ, "Enter");
+	TraceInfo(TRACE_READ, "Enter");
 
 	WdfSpinLockAcquire(vusb->spin_lock);
 
@@ -98,7 +98,7 @@ read_vusb(pctx_vusb_t vusb, WDFREQUEST req)
 			WdfSpinLockRelease(vusb->spin_lock);
 			if (!NT_SUCCESS(status)) {
 				WdfRequestComplete(req, status);
-				TraceError(READ, "a pending read req cancelled: %!STATUS!", status);
+				TraceError(TRACE_READ, "a pending read req cancelled: %!STATUS!", status);
 			}
 
 			return STATUS_PENDING;
@@ -139,11 +139,11 @@ io_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len)
 
 	UNREFERENCED_PARAMETER(queue);
 
-	TraceInfo(READ, "Enter: len: %u", (ULONG)len);
+	TraceInfo(TRACE_READ, "Enter: len: %u", (ULONG)len);
 
 	vusb = get_vusb_by_req(req);
 	if (vusb == NULL) {
-		TraceInfo(READ, "vusb disconnected: port: %u", TO_SAFE_VUSB_FROM_REQ(req)->port);
+		TraceInfo(TRACE_READ, "vusb disconnected: port: %u", TO_SAFE_VUSB_FROM_REQ(req)->port);
 		status = STATUS_DEVICE_NOT_CONNECTED;
 	}
 	else {
@@ -155,5 +155,5 @@ io_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST req, _In_ size_t len)
 		WdfRequestComplete(req, status);
 	}
 
-	TraceInfo(READ, "Leave: %!STATUS!", status);
+	TraceInfo(TRACE_READ, "Leave: %!STATUS!", status);
 }

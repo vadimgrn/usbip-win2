@@ -23,7 +23,7 @@ complete_pending_read_irp(pvpdo_dev_t vpdo)
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
 	if (irp != NULL) {
-		TraceInfo(DBG_PNP, "complete pending read irp: %p\n", irp);
+		TraceInfo(TRACE_PNP, "complete pending read irp: %p\n", irp);
 
 		// We got pending_read_irp before submit_urbr
 		BOOLEAN valid_irp;
@@ -51,7 +51,7 @@ complete_pending_irp(pvpdo_dev_t vpdo)
 
 		urbr = CONTAINING_RECORD(vpdo->head_urbr.Flink, struct urb_req, list_all);
 
-		TraceInfo(DBG_PNP, "complete pending urbr: %s\n", dbg_urbr(urbr));
+		TraceInfo(TRACE_PNP, "complete pending urbr: %s\n", dbg_urbr(urbr));
 
 		RemoveEntryListInit(&urbr->list_all);
 		RemoveEntryListInit(&urbr->list_state);
@@ -93,7 +93,7 @@ invalidate_vhci(pvhci_dev_t vhci)
 	// Inform WMI to remove this DeviceObject from its list of providers.
 	dereg_wmi(vhci);
 
-	TraceInfo(DBG_PNP, "invalidating vhci device object: 0x%p\n", TO_DEVOBJ(vhci));
+	TraceInfo(TRACE_PNP, "invalidating vhci device object: 0x%p\n", TO_DEVOBJ(vhci));
 }
 
 static PAGEABLE void
@@ -103,9 +103,9 @@ invalidate_vhub(pvhub_dev_t vhub)
 	RtlFreeUnicodeString(&vhub->DevIntfRootHub);
 
 	/* At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos */
-	TraceInfo(DBG_PNP, "VHUB has no vpdos: current # of vpdos: %u\n", vhub->n_vpdos);
+	TraceInfo(TRACE_PNP, "VHUB has no vpdos: current # of vpdos: %u\n", vhub->n_vpdos);
 
-	TraceInfo(DBG_PNP, "invalidating vhub device object: 0x%p\n", TO_DEVOBJ(vhub));
+	TraceInfo(TRACE_PNP, "invalidating vhub device object: 0x%p\n", TO_DEVOBJ(vhub));
 }
 
 static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
@@ -169,7 +169,7 @@ remove_device(pvdev_t vdev)
 		vdev->devobj_lower = NULL;
 	}
 
-	TraceInfo(DBG_VDEV, "deleting device object(%s): 0x%p\n", dbg_vdev_type(vdev->type), vdev->Self);
+	TraceInfo(TRACE_VDEV, "deleting device object(%s): 0x%p\n", dbg_vdev_type(vdev->type), vdev->Self);
 
 	IoDeleteDevice(vdev->Self);
 }
@@ -180,7 +180,7 @@ pnp_remove_device(pvdev_t vdev, PIRP irp)
 	PDEVICE_OBJECT	devobj_lower;
 
 	if (vdev->DevicePnPState == Deleted) {
-		TraceInfo(DBG_PNP, "%s: already removed\n", dbg_vdev_type(vdev->type));
+		TraceInfo(TRACE_PNP, "%s: already removed\n", dbg_vdev_type(vdev->type));
 		return irp_success(irp);
 	}
 

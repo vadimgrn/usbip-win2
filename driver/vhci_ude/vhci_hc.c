@@ -14,7 +14,7 @@ controller_query_usb_capability(WDFDEVICE UdecxWdfDevice, PGUID CapabilityType,
 	UNREFERENCED_PARAMETER(OutputBuffer);
 	UNREFERENCED_PARAMETER(ResultLength);
 
-	TraceWarning(VHCI, "not supported: %!GUID!", CapabilityType);
+	TraceWarning(TRACE_VHCI, "not supported: %!GUID!", CapabilityType);
 
 	return STATUS_NOT_SUPPORTED;
 }
@@ -24,7 +24,7 @@ controller_reset(WDFDEVICE UdecxWdfDevice)
 {
 	UNREFERENCED_PARAMETER(UdecxWdfDevice);
 
-	TraceWarning(VHCI, "Enter");
+	TraceWarning(TRACE_VHCI, "Enter");
 }
 
 static PAGEABLE BOOLEAN
@@ -42,7 +42,7 @@ create_ucx_controller(WDFDEVICE hdev)
 	/* UdecxWdfDeviceAddUsbDeviceEmulation() will fail if NumberOfUsb20Ports or NumberOfUsb30Ports is 0 */
 	status = UdecxWdfDeviceAddUsbDeviceEmulation(hdev, &conf);
 	if (NT_ERROR(status)) {
-		TraceError(VHCI, "failed to create controller: %!STATUS!", status);
+		TraceError(TRACE_VHCI, "failed to create controller: %!STATUS!", status);
 		return FALSE;
 	}
 
@@ -55,14 +55,14 @@ create_fileobject(_In_ 	WDFDEVICE hdev, WDFREQUEST req, _In_ WDFFILEOBJECT fo)
 	pctx_vhci_t	vhci = TO_VHCI(hdev);
 	pctx_safe_vusb_t	svusb = TO_SAFE_VUSB(fo);
 
-	TraceInfo(VHCI, "Enter");
+	TraceInfo(TRACE_VHCI, "Enter");
 
 	svusb->vhci = vhci;
 	svusb->port = (ULONG)-1;
 
 	WdfRequestComplete(req, STATUS_SUCCESS);
 
-	TraceInfo(VHCI, "Leave");
+	TraceInfo(TRACE_VHCI, "Leave");
 }
 
 static PAGEABLE VOID
@@ -87,11 +87,11 @@ reg_devintf(WDFDEVICE hdev)
 
 	status = WdfDeviceCreateDeviceInterface(hdev, &GUID_DEVINTERFACE_VHCI_USBIP, NULL);
 	if (NT_ERROR(status)) {
-		TraceError(VHCI, "failed to register usbip device interface: %!STATUS!", status);
+		TraceError(TRACE_VHCI, "failed to register usbip device interface: %!STATUS!", status);
 	}
 	status = WdfDeviceCreateDeviceInterface(hdev, &GUID_DEVINTERFACE_USB_HOST_CONTROLLER, NULL);
 	if (NT_ERROR(status)) {
-		TraceError(VHCI, "failed to register host controller device interface: %!STATUS!", status);
+		TraceError(TRACE_VHCI, "failed to register host controller device interface: %!STATUS!", status);
 	}
 }
 
@@ -105,7 +105,7 @@ setup_vhci(pctx_vhci_t vhci)
 	attrs.ParentObject = vhci->hdev;
 	status = WdfSpinLockCreate(&attrs, &vhci->spin_lock);
 	if (NT_ERROR(status)) {
-		TraceError(VHCI, "failed to create spin lock: %!STATUS!", status);
+		TraceError(TRACE_VHCI, "failed to create spin lock: %!STATUS!", status);
 		return FALSE;
 	}
 	vhci->n_max_ports = MAX_HUB_30PORTS + MAX_HUB_20PORTS;
@@ -113,7 +113,7 @@ setup_vhci(pctx_vhci_t vhci)
 
 	vhci->vusbs = ExAllocatePoolWithTag(NonPagedPool, sizeof(pctx_vusb_t) * vhci->n_max_ports, VHCI_POOLTAG);
 	if (vhci->vusbs == NULL) {
-		TraceError(VHCI, "failed to allocate ports: out of memory");
+		TraceError(TRACE_VHCI, "failed to allocate ports: out of memory");
 		return FALSE;
 	}
 	RtlZeroMemory(vhci->vusbs, sizeof(pctx_vusb_t) * vhci->n_max_ports);
@@ -126,7 +126,7 @@ vhci_cleanup(_In_ WDFOBJECT hdev)
 {
 	pctx_vhci_t vhci;
 
-	TraceInfo(VHCI, "Enter");
+	TraceInfo(TRACE_VHCI, "Enter");
 
 	vhci = TO_VHCI(hdev);
 	if (vhci->vusbs != NULL)
@@ -145,11 +145,11 @@ evt_add_vhci(_In_ WDFDRIVER drv, _Inout_ PWDFDEVICE_INIT dinit)
 
 	PAGED_CODE();
 
-	TraceInfo(VHCI, "Enter");
+	TraceInfo(TRACE_VHCI, "Enter");
 
 	status = UdecxInitializeWdfDeviceInit(dinit);
 	if (!NT_SUCCESS(status)) {
-		TraceError(VHCI, "failed to initialize UDE: %!STATUS!", status);
+		TraceError(TRACE_VHCI, "failed to initialize UDE: %!STATUS!", status);
 		goto out;
 	}
 
@@ -159,7 +159,7 @@ evt_add_vhci(_In_ WDFDRIVER drv, _Inout_ PWDFDEVICE_INIT dinit)
 	attrs.EvtCleanupCallback = vhci_cleanup;
 	status = WdfDeviceCreate(&dinit, &attrs, &hdev);
 	if (!NT_SUCCESS(status)) {
-		TraceError(VHCI, "failed to create wdf device: %!STATUS!", status);
+		TraceError(TRACE_VHCI, "failed to create wdf device: %!STATUS!", status);
 		goto out;
 	}
 
@@ -181,7 +181,7 @@ evt_add_vhci(_In_ WDFDRIVER drv, _Inout_ PWDFDEVICE_INIT dinit)
 
 	status = create_queue_hc(vhci);
 out:
-	TraceInfo(VHCI, "Leave: %!STATUS!", status);
+	TraceInfo(TRACE_VHCI, "Leave: %!STATUS!", status);
 
 	return status;
 }

@@ -39,13 +39,13 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	PAGED_CODE();
 
-	TraceInfo(DBG_WMI, "vhci_system_control: Enter\n");
+	TraceInfo(TRACE_WMI, "vhci_system_control: Enter\n");
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	if (!IS_DEVOBJ_VHCI(devobj)) {
 		// The vpdo, just complete the request with the current status
-		TraceInfo(DBG_WMI, "non-vhci: skip: minor:%s\n", dbg_wmi_minor(irpstack->MinorFunction));
+		TraceInfo(TRACE_WMI, "non-vhci: skip: minor:%s\n", dbg_wmi_minor(irpstack->MinorFunction));
 		status = irp->IoStatus.Status;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return status;
@@ -53,7 +53,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	vhci = DEVOBJ_TO_VHCI(devobj);
 
-	TraceInfo(DBG_WMI, "vhci: %s\n", dbg_wmi_minor(irpstack->MinorFunction));
+	TraceInfo(TRACE_WMI, "vhci: %s\n", dbg_wmi_minor(irpstack->MinorFunction));
 
 	if (vhci->common.DevicePnPState == Deleted) {
 		irp->IoStatus.Status = status = STATUS_NO_SUCH_DEVICE ;
@@ -86,7 +86,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	TraceInfo(DBG_WMI, "vhci_system_control: Leave: %s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_WMI, "vhci_system_control: Leave: %s\n", dbg_ntstatus(status));
 
 	return status;
 }

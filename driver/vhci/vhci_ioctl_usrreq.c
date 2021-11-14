@@ -80,7 +80,7 @@ vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG pout
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	TraceInfo(DBG_IOCTL, "usb user request: code: %s\n", dbg_usb_user_request_code(hdr->UsbUserRequest));
+	TraceInfo(TRACE_IOCTL, "usb user request: code: %s\n", dbg_usb_user_request_code(hdr->UsbUserRequest));
 
 	buffer = (PVOID)(hdr + 1);
 	inlen -= sizeof(USBUSER_REQUEST_HEADER);
@@ -94,7 +94,7 @@ vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG pout
 		status = get_controller_info(hdr + 1, inlen, poutlen);
 		break;
 	default:
-		TraceInfo(DBG_IOCTL, "usb user request: unhandled code: %s\n", dbg_usb_user_request_code(hdr->UsbUserRequest));
+		TraceInfo(TRACE_IOCTL, "usb user request: unhandled code: %s\n", dbg_usb_user_request_code(hdr->UsbUserRequest));
 		hdr->UsbUserStatusCode = UsbUserNotSupported;
 		break;
 	}

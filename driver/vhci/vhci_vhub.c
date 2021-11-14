@@ -151,10 +151,10 @@ mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 
 		IoInvalidateDeviceRelations(vhub->common.pdo, BusRelations);
 
-		TraceInfo(DBG_VPDO, "the device is marked as unplugged: port: %u\n", vpdo->port);
+		TraceInfo(TRACE_VPDO, "the device is marked as unplugged: port: %u\n", vpdo->port);
 	}
 	else {
-		TraceError(DBG_VHUB, "vpdo already unplugged: port: %u\n", vpdo->port);
+		TraceError(TRACE_VHUB, "vpdo already unplugged: port: %u\n", vpdo->port);
 	}
 }
 
@@ -189,7 +189,7 @@ vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st)
 
 	PAGED_CODE();
 
-	TraceInfo(DBG_VHUB, "get ports status\n");
+	TraceInfo(TRACE_VHUB, "get ports status\n");
 
 	RtlZeroMemory(st, sizeof(*st));
 	ExAcquireFastMutex(&vhub->Mutex);
@@ -197,7 +197,7 @@ vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st)
 	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 		vpdo = CONTAINING_RECORD (entry, vpdo_dev_t, Link);
 		if (vpdo->port >= 127) {
-			TraceError(DBG_VHUB, "strange port");
+			TraceError(TRACE_VHUB, "strange port");
 			continue;
 		}
 		st->port_status[vpdo->port] = 1;
@@ -222,7 +222,7 @@ vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imported_dev_t idevs,
 	if (n_idevs_max == 0)
 		return STATUS_INVALID_PARAMETER;
 
-	TraceInfo(DBG_VHUB, "get imported devices\n");
+	TraceInfo(TRACE_VHUB, "get imported devices\n");
 
 	ExAcquireFastMutex(&vhub->Mutex);
 
