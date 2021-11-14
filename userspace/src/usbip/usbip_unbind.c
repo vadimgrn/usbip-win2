@@ -76,7 +76,7 @@ static int unbind_device(char *busid)
 			return 3;
 		}
 	}
-	info("bind device on busid %s: complete", busid);
+	info("unbind device on busid %s: complete", busid);
 	return 0;
 }
 
