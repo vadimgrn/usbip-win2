@@ -44,13 +44,14 @@ static PAGEABLE VOID
 vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 {
 	PAGED_CODE();
-	TraceVerbose(TRACE_GENERAL, "Enter\n");
+	TraceInfo(TRACE_GENERAL, "Enter\n");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
 	ASSERT(!drvobj->DeviceObject);
 
 	if (Globals.RegistryPath.Buffer) {
 		ExFreePool(Globals.RegistryPath.Buffer);
+		Globals.RegistryPath.Buffer = NULL;
 	}
 
 	WPP_CLEANUP(drvobj);
@@ -153,26 +154,23 @@ PAGEABLE NTSTATUS
 DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 {
 	WPP_INIT_TRACING(drvobj, RegistryPath);
-	TraceVerbose(TRACE_GENERAL, "Enter\n");
+	TraceInfo(TRACE_GENERAL, "RegistryPath '%!USTR!'\n", RegistryPath);
 
 	ExInitializeNPagedLookasideList(&g_lookaside, NULL,NULL, 0, sizeof(struct urb_req), 'USBV', 0);
 
-	// Save the RegistryPath for WMI.
+	// Save the RegistryPath for WMI
 	Globals.RegistryPath.MaximumLength = RegistryPath->Length + sizeof(UNICODE_NULL);
 	Globals.RegistryPath.Length = RegistryPath->Length;
 	Globals.RegistryPath.Buffer = ExAllocatePoolWithTag(PagedPool, Globals.RegistryPath.MaximumLength, USBIP_VHCI_POOL_TAG);
 
-	if (!Globals.RegistryPath.Buffer) {
-		ExDeleteNPagedLookasideList(&g_lookaside);
-		WPP_CLEANUP(drvobj);
+	if (Globals.RegistryPath.Buffer) {
+		RtlCopyUnicodeString(&Globals.RegistryPath, RegistryPath);
+	} else {
+		TraceCritical(TRACE_GENERAL, "ExAllocatePoolWithTag failed\n");
+		vhci_driverUnload(drvobj);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	TraceInfo(TRACE_GENERAL, "RegistryPath %p\r\n", RegistryPath);
-
-	RtlCopyUnicodeString(&Globals.RegistryPath, RegistryPath);
-
-	// Set entry points into the driver
 	drvobj->MajorFunction[IRP_MJ_CREATE] = vhci_create;
 	drvobj->MajorFunction[IRP_MJ_CLEANUP] = vhci_cleanup;
 	drvobj->MajorFunction[IRP_MJ_CLOSE] = vhci_close;
@@ -185,8 +183,6 @@ DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 	drvobj->MajorFunction[IRP_MJ_SYSTEM_CONTROL] = vhci_system_control;
 	drvobj->DriverUnload = vhci_driverUnload;
 	drvobj->DriverExtension->AddDevice = vhci_add_device;
-
-	TraceVerbose(TRACE_GENERAL, "Leave\n");
 
 	return STATUS_SUCCESS;
 }

@@ -1,21 +1,5 @@
 #pragma once
 
-/*++
-
-Module Name:
-
-    Trace.h
-
-Abstract:
-
-    Header file for the debug tracing related function defintions and macros.
-
-Environment:
-
-    Kernel mode
-
---*/
-
 //
 // Define the tracing flags.
 //
@@ -43,17 +27,18 @@ Environment:
         WPP_DEFINE_BIT(TRACE_VPDO)              /* bit 14 = 0x00004000 */ \
         )                             
 
-#define WPP_FLAG_LEVEL_LOGGER(flag, level) \
+#define WPP_FLAG_LEVEL_LOGGER(flag, level)                                  \
     WPP_LEVEL_LOGGER(flag)
 
-#define WPP_FLAG_LEVEL_ENABLED(flag, level) \
-    (WPP_LEVEL_ENABLED(flag) && WPP_CONTROL(WPP_BIT_ ## flag).Level >= level)
+#define WPP_FLAG_LEVEL_ENABLED(flag, level)                                 \
+    (WPP_LEVEL_ENABLED(flag) &&                                             \
+     WPP_CONTROL(WPP_BIT_ ## flag).Level >= level)
 
 #define WPP_LEVEL_FLAGS_LOGGER(lvl,flags) \
-    WPP_LEVEL_LOGGER(flags)
-               
+           WPP_LEVEL_LOGGER(flags)
+
 #define WPP_LEVEL_FLAGS_ENABLED(lvl, flags) \
-    (WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= lvl)
+           (WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= lvl)
 
 //           
 // WPP orders static parameters before dynamic parameters. To support the Trace function
