@@ -12,18 +12,6 @@ static const namecode_t namecodes_usbd_status[] = {
 	{0,0}
 };
 
-static const namecode_t namecodes_dispatch_major[] = {
-	K_V(IRP_MJ_READ)
-	K_V(IRP_MJ_WRITE)
-	K_V(IRP_MJ_PNP)
-	K_V(IRP_MJ_POWER)
-	K_V(IRP_MJ_DEVICE_CONTROL)
-	K_V(IRP_MJ_CREATE)
-	K_V(IRP_MJ_CLOSE)
-	K_V(IRP_MJ_CLEANUP)
-	{0, 0}
-};
-
 static const namecode_t namecodes_wmi_minor[] = {
 	K_V(IRP_MN_CHANGE_SINGLE_INSTANCE)
 	K_V(IRP_MN_CHANGE_SINGLE_ITEM)
@@ -89,13 +77,6 @@ dbg_usbd_status(USBD_STATUS status)
 {
 	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_usbd_status, "usbd status", status, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_dispatch_major(UCHAR major)
-{
-	static char buf[NAMECODE_BUF_MAX];
-	return dbg_namecode_buf(namecodes_dispatch_major, "dispatch major", (unsigned int)major, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
