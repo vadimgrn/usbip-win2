@@ -6,8 +6,6 @@
 #include "usbreq.h"
 #include "dbgcode.h"
 
-const char *dbg_GUID(GUID *guid);
-
 const char *dbg_vdev_type(vdev_type_t type);
 const char *dbg_urbr(struct urb_req *urbr);
 

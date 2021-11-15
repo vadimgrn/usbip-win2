@@ -201,26 +201,22 @@ query_interface_location(pvdev_t vdev, USHORT size, USHORT version, PINTERFACE i
 PAGEABLE NTSTATUS
 pnp_query_interface(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 {
-	GUID *intf_type;
-	PINTERFACE	intf;
-	USHORT	size, version;
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	intf_type = (GUID *)irpstack->Parameters.QueryInterface.InterfaceType;
-	size = irpstack->Parameters.QueryInterface.Size;
-	version = irpstack->Parameters.QueryInterface.Version;
-	intf = irpstack->Parameters.QueryInterface.Interface;
-	if (IsEqualGUID(intf_type, (PVOID)& GUID_PNP_LOCATION_INTERFACE)) {
+	const GUID *intf_type = irpstack->Parameters.QueryInterface.InterfaceType;
+	USHORT size = irpstack->Parameters.QueryInterface.Size;
+	USHORT version = irpstack->Parameters.QueryInterface.Version;
+	INTERFACE *intf = irpstack->Parameters.QueryInterface.Interface;
+
+	NTSTATUS status = STATUS_NOT_SUPPORTED;
+
+	if (IsEqualGUID(intf_type, &GUID_PNP_LOCATION_INTERFACE)) {
 		status = query_interface_location(vdev, size, version, intf);
+	} else if (IsEqualGUID(intf_type, &USB_BUS_INTERFACE_USBDI_GUID) && vdev->type == VDEV_VPDO) {
+		status = query_interface_usbdi((vpdo_dev_t*)vdev, size, version, intf);
+	} else {
+		TraceWarning(TRACE_GENERAL, "Query unknown interface %!GUID!\n", intf_type);
 	}
-	else if (IsEqualGUID(intf_type, (PVOID)& USB_BUS_INTERFACE_USBDI_GUID) && vdev->type == VDEV_VPDO) {
-		status = query_interface_usbdi((pvpdo_dev_t)vdev, size, version, intf);
-	}
-	else {
-		TraceWarning(TRACE_GENERAL, "Query unknown interface GUID: %s\n", dbg_GUID(intf_type));
-		status = STATUS_NOT_SUPPORTED;
-	}
+
 	return irp_done(irp, status);
 }
