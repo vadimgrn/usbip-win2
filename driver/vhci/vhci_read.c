@@ -769,7 +769,7 @@ store_urbr_partial(PIRP irp, struct urb_req *urbr)
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
-	TraceInfo(TRACE_READ, "store_urbr_partial: Leave: %s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_READ, "Leave %!STATUS!\n", status);
 
 	return status;
 }
@@ -955,7 +955,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 
 END:
-	TraceInfo(TRACE_READ, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+	TraceInfo(TRACE_READ, "Leave: irp %p, %!STATUS!\n", irp, status);
 
 	if (status != STATUS_PENDING) {
 		irp->IoStatus.Status = status;

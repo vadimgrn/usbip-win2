@@ -188,6 +188,6 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-	TraceInfo(TRACE_IOCTL, "Leave: %s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_IOCTL, "Leave %!STATUS!\n", status);
 	return status;
 }

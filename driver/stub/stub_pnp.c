@@ -50,7 +50,7 @@ disable_interface(usbip_stub_dev_t *devstub)
 
 	status = IoSetDeviceInterfaceState(&devstub->interface_name, FALSE);
 	if (NT_ERROR(status)) {
-		TraceError(TRACE_PNP, "failed to disable interface: err: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to disable interface: %!STATUS!\n", status);
 	}
 	if (devstub->interface_name.Buffer) {
 		RtlFreeUnicodeString(&devstub->interface_name);
@@ -76,7 +76,7 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 	case IRP_MN_START_DEVICE:
 		status = IoSetDeviceInterfaceState(&devstub->interface_name, TRUE);
 		if (NT_ERROR(status)) {
-			TraceError(TRACE_PNP, "failed to enable interface: err: %s\n", dbg_ntstatus(status));
+			TraceError(TRACE_PNP, "failed to enable interface: %!STATUS!\n", status);
 		}
 		return pass_irp_down(devstub, irp, on_start_complete, NULL);
 	case IRP_MN_REMOVE_DEVICE:

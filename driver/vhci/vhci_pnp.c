@@ -190,7 +190,7 @@ vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	}
 
 END:
-	TraceInfo(TRACE_PNP, "%s: Leave: irp:%p, status:%s\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), irp, dbg_ntstatus(status));
+	TraceInfo(TRACE_PNP, "%s: Leave: irp:%p, %!STATUS!\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), irp, status);
 
 	return status;
 }

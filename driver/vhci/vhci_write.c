@@ -471,7 +471,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = process_write_irp(vpdo, irp);
 
 END:
-	TraceInfo(TRACE_WRITE, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+	TraceInfo(TRACE_WRITE, "Leave: irp:%p, %!STATUS!\n", irp, status);
 
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);

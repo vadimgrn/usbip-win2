@@ -7,7 +7,6 @@
 
 const char *dbg_namecode(namecode_t *namecodes, const char *codetype, unsigned int code);
 const char *dbg_namecode_buf(namecode_t *namecodes, const char *codetype, unsigned int code, char *buf, int buf_max);
-const char *dbg_ntstatus(NTSTATUS status);
 const char *dbg_usbd_status(USBD_STATUS status);
 const char *dbg_dispatch_major(UCHAR major);
 const char *dbg_pnp_minor(UCHAR minor);

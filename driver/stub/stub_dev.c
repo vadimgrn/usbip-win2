@@ -90,7 +90,7 @@ create_devobj_idx(PDRIVER_OBJECT drvobj, ULONG devtype, int idx)
 	status = IoCreateDevice(drvobj, sizeof(usbip_stub_dev_t), &devname_uni, devtype, 0, FALSE, &devobj);
 	if (NT_ERROR(status)) {
 		if (status != STATUS_OBJECT_NAME_COLLISION)
-			TraceError(TRACE_GENERAL, "create_devobj_idx: IoCreateDevice failed: %S: err: %s\n", devname, dbg_ntstatus(status));
+			TraceError(TRACE_GENERAL, "IoCreateDevice failed: %S: %!STATUS!\n", devname, status);
 		return NULL;
 	}
 
@@ -98,7 +98,7 @@ create_devobj_idx(PDRIVER_OBJECT drvobj, ULONG devtype, int idx)
 	RtlInitUnicodeString(&linkname_uni, linkname);
 	status = IoCreateSymbolicLink(&linkname_uni, &devname_uni);
 	if (NT_ERROR(status)) {
-		TraceError(TRACE_GENERAL, "create_devobj_idx: IoCreateSymbolicLink failed: %S: err: %s\n", devname, dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "IoCreateSymbolicLink failed: %S: %!STATUS!\n", devname, status);
 		IoDeleteDevice(devobj);
 		return NULL;
 	}
@@ -268,7 +268,7 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 
 	status = USBD_CreateHandle(pdo, devstub->next_stack_dev, USBD_CLIENT_CONTRACT_VERSION_602, USBIP_STUB_POOL_TAG, &devstub->hUSBD);
 	if (NT_ERROR(status)) {
-		TraceError(TRACE_DISPATCH, "add_device: failed to create USBD handle: %s: %s\n", dbg_devstub(devstub), dbg_ntstatus(status));
+		TraceError(TRACE_DISPATCH, "add_device: failed to create USBD handle: %s: %!STATUS!\n", dbg_devstub(devstub), status);
 		IoDetachDevice(devstub->next_stack_dev);
 		unlock_dev_removal(devstub);
 		remove_devlink(devstub);

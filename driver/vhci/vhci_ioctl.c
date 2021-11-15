@@ -53,7 +53,7 @@ END:
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 
-	TraceInfo(TRACE_IOCTL, "Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+	TraceInfo(TRACE_IOCTL, "Leave: irp:%p, %!STATUS!\n", irp, status);
 
 	return status;
 }

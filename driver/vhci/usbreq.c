@@ -265,6 +265,6 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 
 		status = STATUS_INVALID_PARAMETER;
 	}
-	TraceInfo(TRACE_URB, "submit_urbr: urb requested: status:%s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_URB, "urb requested: %!STATUS!\n", status);
 	return status;
 }

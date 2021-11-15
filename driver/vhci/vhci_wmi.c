@@ -86,7 +86,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	TraceInfo(TRACE_WMI, "vhci_system_control: Leave: %s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_WMI, "Leave %!STATUS!\n", status);
 
 	return status;
 }

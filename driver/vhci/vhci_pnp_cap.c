@@ -91,7 +91,7 @@ pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
 	// Get the device capabilities of the root pdo
 	status = get_device_capabilities(vpdo->common.parent->parent->parent->devobj_lower, &caps_parent);
 	if (!NT_SUCCESS(status)) {
-		TraceError(TRACE_PNP, "failed to get device capabilities from root device: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to get device capabilities from root device: %!STATUS!\n", status);
 		return status;
 	}
 

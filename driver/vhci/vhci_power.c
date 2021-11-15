@@ -133,8 +133,8 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	TraceInfo(TRACE_POWER, "%s: Leave: status: %s\n",
-		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_ntstatus(status));
+	TraceInfo(TRACE_POWER, "%s: Leave %!STATUS!\n",
+		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), status);
 
 	return status;
 }

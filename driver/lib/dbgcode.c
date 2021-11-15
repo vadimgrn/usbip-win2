@@ -3,21 +3,6 @@
 #include <ntstrsafe.h>
 #include "strutil.h"
 
-static namecode_t namecodes_ntstatus[] = {
-	K_V(STATUS_SUCCESS)
-	K_V(STATUS_PENDING)
-	K_V(STATUS_INVALID_PARAMETER)
-	K_V(STATUS_INVALID_DEVICE_REQUEST)
-	K_V(STATUS_DEVICE_NOT_CONNECTED)
-	K_V(STATUS_INSUFFICIENT_RESOURCES)
-	K_V(STATUS_NOT_SUPPORTED)
-	K_V(STATUS_UNSUCCESSFUL)
-	K_V(STATUS_BUFFER_TOO_SMALL)
-	K_V(STATUS_CANCELLED)
-	K_V(STATUS_NO_SUCH_DEVICE)
-	{0,0}
-};
-
 static namecode_t namecodes_usbd_status[] = {
 	K_V(USBD_STATUS_SUCCESS)
 	K_V(USBD_STATUS_PENDING)
@@ -171,14 +156,6 @@ dbg_namecode(namecode_t *namecodes, const char *codetype, unsigned int code)
 	static char	buf[NAMECODE_BUF_MAX];
 
 	return dbg_namecode_buf(namecodes, codetype, code, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_ntstatus(NTSTATUS status)
-{
-	static char	buf[NAMECODE_BUF_MAX];
-
-	return dbg_namecode_buf(namecodes_ntstatus, "ntstatus", status, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
