@@ -24,35 +24,6 @@ static const namecode_t namecodes_dispatch_major[] = {
 	{0, 0}
 };
 
-static const namecode_t namecodes_pnp_minor[] = {
-	K_V(IRP_MN_START_DEVICE)
-	K_V(IRP_MN_QUERY_REMOVE_DEVICE)
-	K_V(IRP_MN_REMOVE_DEVICE)
-	K_V(IRP_MN_CANCEL_REMOVE_DEVICE)
-	K_V(IRP_MN_STOP_DEVICE)
-	K_V(IRP_MN_QUERY_STOP_DEVICE)
-	K_V(IRP_MN_CANCEL_STOP_DEVICE)
-	K_V(IRP_MN_QUERY_DEVICE_RELATIONS)
-	K_V(IRP_MN_QUERY_INTERFACE)
-	K_V(IRP_MN_QUERY_CAPABILITIES)
-	K_V(IRP_MN_QUERY_RESOURCES)
-	K_V(IRP_MN_QUERY_RESOURCE_REQUIREMENTS)
-	K_V(IRP_MN_QUERY_DEVICE_TEXT)
-	K_V(IRP_MN_FILTER_RESOURCE_REQUIREMENTS)
-	K_V(IRP_MN_READ_CONFIG)
-	K_V(IRP_MN_WRITE_CONFIG)
-	K_V(IRP_MN_EJECT)
-	K_V(IRP_MN_SET_LOCK)
-	K_V(IRP_MN_QUERY_ID)
-	K_V(IRP_MN_QUERY_PNP_DEVICE_STATE)
-	K_V(IRP_MN_QUERY_BUS_INFORMATION)
-	K_V(IRP_MN_DEVICE_USAGE_NOTIFICATION)
-	K_V(IRP_MN_SURPRISE_REMOVAL)
-	K_V(IRP_MN_QUERY_LEGACY_BUS_INFORMATION)
-	K_V(IRP_MN_DEVICE_ENUMERATED)
-	{0,0}
-};
-
 static const namecode_t namecodes_wmi_minor[] = {
 	K_V(IRP_MN_CHANGE_SINGLE_INSTANCE)
 	K_V(IRP_MN_CHANGE_SINGLE_ITEM)
@@ -125,13 +96,6 @@ dbg_dispatch_major(UCHAR major)
 {
 	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_dispatch_major, "dispatch major", (unsigned int)major, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_pnp_minor(UCHAR minor)
-{
-	static char buf[NAMECODE_BUF_MAX];
-	return dbg_namecode_buf(namecodes_pnp_minor, "pnp minor function", minor, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
