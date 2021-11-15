@@ -138,7 +138,7 @@ usbip.exe list -l
   - Format binary event trace log `usbip-vhci-ude.etl` as text
 ```
 set TMFS=%TEMP%\tmfs
-set TRACE_FORMAT_PREFIX=%%!LEVEL! [%%9!d!]%%8!04X!.%%3!04X!::%%4!s! [%%1!s!] %%!FUNC!: 
+set TRACE_FORMAT_PREFIX=%%4!s! [%%9!2u!]%%3!04x! %%!LEVEL! %%!FUNC!: 
 tracepdb.exe -f D:\usbip-win\Debug\x64 -p %TMFS%
 tracefmt.exe -sortableTime -nosummary -p %TMFS% -o usbip-vhci-ude.txt usbip-vhci-ude.etl
 ```
