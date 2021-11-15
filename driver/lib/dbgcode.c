@@ -3,14 +3,16 @@
 #include <ntstrsafe.h>
 #include "strutil.h"
 
-static namecode_t namecodes_usbd_status[] = {
+enum { NAMECODE_BUF_MAX = 256 };
+
+static const namecode_t namecodes_usbd_status[] = {
 	K_V(USBD_STATUS_SUCCESS)
 	K_V(USBD_STATUS_PENDING)
 	K_V(USBD_STATUS_STALL_PID)
 	{0,0}
 };
 
-static namecode_t	namecodes_dispatch_major[] = {
+static const namecode_t namecodes_dispatch_major[] = {
 	K_V(IRP_MJ_READ)
 	K_V(IRP_MJ_WRITE)
 	K_V(IRP_MJ_PNP)
@@ -22,7 +24,7 @@ static namecode_t	namecodes_dispatch_major[] = {
 	{0, 0}
 };
 
-static namecode_t	namecodes_pnp_minor[] = {
+static const namecode_t namecodes_pnp_minor[] = {
 	K_V(IRP_MN_START_DEVICE)
 	K_V(IRP_MN_QUERY_REMOVE_DEVICE)
 	K_V(IRP_MN_REMOVE_DEVICE)
@@ -51,7 +53,7 @@ static namecode_t	namecodes_pnp_minor[] = {
 	{0,0}
 };
 
-static namecode_t	namecodes_wmi_minor[] = {
+static const namecode_t namecodes_wmi_minor[] = {
 	K_V(IRP_MN_CHANGE_SINGLE_INSTANCE)
 	K_V(IRP_MN_CHANGE_SINGLE_ITEM)
 	K_V(IRP_MN_DISABLE_COLLECTION)
@@ -65,7 +67,7 @@ static namecode_t	namecodes_wmi_minor[] = {
 	{0,0}
 };
 
-static namecode_t	namecodes_power_minor[] = {
+static const namecode_t namecodes_power_minor[] = {
 	K_V(IRP_MN_SET_POWER)
 	K_V(IRP_MN_QUERY_POWER)
 	K_V(IRP_MN_POWER_SEQUENCE)
@@ -73,32 +75,7 @@ static namecode_t	namecodes_power_minor[] = {
 	{0,0}
 };
 
-static namecode_t	namecodes_system_power[] = {
-	K_V(PowerSystemUnspecified)
-	K_V(PowerSystemWorking)
-	K_V(PowerSystemSleeping2)
-	K_V(PowerSystemSleeping3)
-	K_V(PowerSystemHibernate)
-	K_V(PowerSystemShutdown)
-	K_V(PowerSystemMaximum)
-	{0,0}
-};
-
-static namecode_t	namecodes_device_power[] = {
-	K_V(PowerDeviceUnspecified)
-	K_V(PowerDeviceD0)
-	K_V(PowerDeviceD1)
-	K_V(PowerDeviceD2)
-	K_V(PowerDeviceD3)
-	K_V(PowerDeviceMaximum)
-	K_V(IRP_MN_EXECUTE_METHOD)
-	K_V(IRP_MN_QUERY_ALL_DATA)
-	K_V(IRP_MN_QUERY_SINGLE_INSTANCE)
-	K_V(IRP_MN_REGINFO)
-	{0,0}
-};
-
-static namecode_t	namecodes_usb_descriptor_type[] = {
+static const namecode_t namecodes_usb_descriptor_type[] = {
 	K_V(USB_DEVICE_DESCRIPTOR_TYPE)
 	K_V(USB_CONFIGURATION_DESCRIPTOR_TYPE)
 	K_V(USB_STRING_DESCRIPTOR_TYPE)
@@ -107,10 +84,8 @@ static namecode_t	namecodes_usb_descriptor_type[] = {
 	{0,0}
 };
 
-#define NAMECODE_BUF_MAX	256
-
 const char *
-dbg_namecode_buf(namecode_t *namecodes, const char *codetype, unsigned int code, char *buf, int buf_max)
+dbg_namecode_buf(const namecode_t *namecodes, const char *codetype, unsigned int code, char *buf, int buf_max)
 {
 	ULONG	nwritten = 0;
 	ULONG	n_codes = 0;
@@ -132,74 +107,51 @@ dbg_namecode_buf(namecode_t *namecodes, const char *codetype, unsigned int code,
 }
 
 const char *
-dbg_namecode(namecode_t *namecodes, const char *codetype, unsigned int code)
+dbg_namecode(const namecode_t *namecodes, const char *codetype, unsigned int code)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes, codetype, code, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
 dbg_usbd_status(USBD_STATUS status)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_usbd_status, "usbd status", status, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
 dbg_dispatch_major(UCHAR major)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_dispatch_major, "dispatch major", (unsigned int)major, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
 dbg_pnp_minor(UCHAR minor)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_pnp_minor, "pnp minor function", minor, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
 dbg_wmi_minor(UCHAR minor)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_wmi_minor, "wmi minor function", minor, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
 dbg_power_minor(UCHAR minor)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_power_minor, "power minor function", minor, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_system_power(SYSTEM_POWER_STATE state)
-{
-	static char	buf[NAMECODE_BUF_MAX];
-
-	return dbg_namecode_buf(namecodes_system_power, "system power", (int)state, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_device_power(DEVICE_POWER_STATE state)
-{
-	static char	buf[NAMECODE_BUF_MAX];
-
-	return dbg_namecode_buf(namecodes_device_power, "device power", (int)state, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
 dbg_usb_descriptor_type(UCHAR dsc_type)
 {
-	static char	buf[NAMECODE_BUF_MAX];
-
+	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_usb_descriptor_type, "descriptor type", dsc_type, buf, NAMECODE_BUF_MAX);
 }
 
