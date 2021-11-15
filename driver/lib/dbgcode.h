@@ -10,7 +10,6 @@ const char *dbg_namecode_buf(namecode_t *namecodes, const char *codetype, unsign
 const char *dbg_usbd_status(USBD_STATUS status);
 const char *dbg_dispatch_major(UCHAR major);
 const char *dbg_pnp_minor(UCHAR minor);
-const char *dbg_dev_relation(DEVICE_RELATION_TYPE type);
 const char *dbg_wmi_minor(UCHAR minor);
 const char *dbg_power_minor(UCHAR minor);
 const char *dbg_system_power(SYSTEM_POWER_STATE state);

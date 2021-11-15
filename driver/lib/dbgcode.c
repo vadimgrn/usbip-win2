@@ -51,15 +51,6 @@ static namecode_t	namecodes_pnp_minor[] = {
 	{0,0}
 };
 
-static namecode_t	namecodes_dev_relation[] = {
-	K_V(BusRelations)
-	K_V(PowerRelations)
-	K_V(EjectionRelations)
-	K_V(RemovalRelations)
-	K_V(TargetDeviceRelation)
-	{0,0}
-};
-
 static namecode_t	namecodes_wmi_minor[] = {
 	K_V(IRP_MN_CHANGE_SINGLE_INSTANCE)
 	K_V(IRP_MN_CHANGE_SINGLE_ITEM)
@@ -170,14 +161,6 @@ dbg_pnp_minor(UCHAR minor)
 	static char	buf[NAMECODE_BUF_MAX];
 
 	return dbg_namecode_buf(namecodes_pnp_minor, "pnp minor function", minor, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_dev_relation(DEVICE_RELATION_TYPE type)
-{
-	static char	buf[NAMECODE_BUF_MAX];
-
-	return dbg_namecode_buf(namecodes_dev_relation, "device relation", type, buf, NAMECODE_BUF_MAX);
 }
 
 const char *

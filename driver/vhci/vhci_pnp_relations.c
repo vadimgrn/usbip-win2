@@ -227,7 +227,7 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	PDEVICE_RELATIONS	dev_relations;
 	NTSTATUS	status;
 
-	TraceInfo(TRACE_PNP, "%s: query dev relations: %s\n", dbg_vdev_type(vdev->type), dbg_dev_relation(irpstack->Parameters.QueryDeviceRelations.Type));
+	TraceInfo(TRACE_PNP, "%s: %!DEVICE_RELATION_TYPE!\n", dbg_vdev_type(vdev->type), irpstack->Parameters.QueryDeviceRelations.Type);
 
 	dev_relations = (PDEVICE_RELATIONS)irp->IoStatus.Information;
 
@@ -245,7 +245,7 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 		status = STATUS_SUCCESS;
 		break;
 	default:
-		TraceInfo(TRACE_PNP, "query_dev_relations: skip: %s\n", dbg_dev_relation(irpstack->Parameters.QueryDeviceRelations.Type));
+		TraceInfo(TRACE_PNP, "skip: %!DEVICE_RELATION_TYPE!\n", irpstack->Parameters.QueryDeviceRelations.Type);
 		status = irp->IoStatus.Status;
 		break;
 	}
