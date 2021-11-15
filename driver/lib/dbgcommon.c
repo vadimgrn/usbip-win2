@@ -1,5 +1,4 @@
 #include "dbgcommon.h"
-
 #include "strutil.h"
 #include "dbgcode.h"
 
