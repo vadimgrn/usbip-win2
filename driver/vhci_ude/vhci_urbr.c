@@ -12,7 +12,7 @@ get_buf(PVOID buf, PMDL bufMDL)
 		if (bufMDL != NULL)
 			buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
 		if (buf == NULL) {
-			TRE(READ, "No transfer buffer\n");
+			TraceError(TRACE_READ, "No transfer buffer\n");
 		}
 	}
 	return buf;
@@ -107,12 +107,12 @@ create_urbr(pctx_ep_t ep, urbr_type_t type, WDFREQUEST req)
 	NTSTATUS	status;
 
 	if (ep == NULL || ep->vusb == NULL) {
-		TRE(URBR, "failed to allocate memory for urbr:%p", ep);
+		TraceError(TRACE_URBR, "failed to allocate memory for urbr:%p", ep);
 		return NULL;
 	}
 	status = WdfMemoryCreateFromLookaside(ep->vusb->lookaside_urbr, &hmem);
 	if (NT_ERROR(status)) {
-		TRE(URBR, "failed to allocate memory for urbr: %!STATUS!", status);
+		TraceError(TRACE_URBR, "failed to allocate memory for urbr: %!STATUS!", status);
 		return NULL;
 	}
 
@@ -154,7 +154,7 @@ submit_urbr_unlink(pctx_ep_t ep, unsigned long seq_num_unlink)
 		urbr_unlink->u.seq_num_unlink = seq_num_unlink;
 		status = submit_urbr(urbr_unlink);
 		if (NT_ERROR(status)) {
-			TRD(URBR, "failed to submit unlink urb: %!URBR!", urbr_unlink);
+			TraceInfo(TRACE_URBR, "failed to submit unlink urb: %!URBR!", urbr_unlink);
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -177,7 +177,7 @@ urbr_cancelled(_In_ WDFREQUEST req)
 
 	if (urbr != NULL && urbr->seq_num != 0) {
 		submit_urbr_unlink(urbr->ep, urbr->seq_num);
-		TRD(URBR, "cancelled urbr destroyed: %!URBR!", urbr);
+		TraceInfo(TRACE_URBR, "cancelled urbr destroyed: %!URBR!", urbr);
 		complete_urbr(urbr, STATUS_CANCELLED);
 	}
 	else {
@@ -197,7 +197,7 @@ mark_cancelable_urbr(purb_req_t urbr)
 
 	status = WdfRequestMarkCancelableEx(urbr->req, urbr_cancelled);
 	if (NT_ERROR(status)) {
-		TRD(URBR, "Already cancelled request?: %!URBR!, %!STATUS!", urbr, status);
+		TraceInfo(TRACE_URBR, "Already cancelled request?: %!URBR!, %!STATUS!", urbr, status);
 		return FALSE;
 	}
 	urbr->u.urb.cancelable = TRUE;
@@ -215,7 +215,7 @@ submit_urbr(purb_req_t urbr)
 
 	if (vusb->invalid) {
 		WdfSpinLockRelease(vusb->spin_lock);
-		TRD(URBR, "failed to submit urbr: invalidated vusb");
+		TraceInfo(TRACE_URBR, "failed to submit urbr: invalidated vusb");
 		return STATUS_DEVICE_NOT_CONNECTED;
 	}
 
@@ -228,7 +228,7 @@ submit_urbr(purb_req_t urbr)
 		InsertTailList(&vusb->head_urbr, &urbr->list_all);
 		WdfSpinLockRelease(vusb->spin_lock);
 
-		TRD(URBR, "urb pending: %!URBR!", urbr);
+		TraceInfo(TRACE_URBR, "urb pending: %!URBR!", urbr);
 		return STATUS_PENDING;
 	}
 
@@ -272,7 +272,7 @@ submit_urbr(purb_req_t urbr)
 			status = STATUS_INVALID_PARAMETER;
 	}
 
-	TRD(URBR, "urb requested: %!URBR!: %!STATUS!", urbr, status);
+	TraceInfo(TRACE_URBR, "urb requested: %!URBR!: %!STATUS!", urbr, status);
 	return status;
 }
 

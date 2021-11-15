@@ -1,4 +1,7 @@
 #include "vhci_pnp_devtext.h"
+#include "trace.h"
+#include "vhci_pnp_devtext.tmh"
+
 #include "vhci.h"
 #include "vhci_irp.h"
 
@@ -33,7 +36,7 @@ pnp_query_device_text(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 		}
 		break;
 	default:
-		DBGI(DBG_PNP, "unsupported device text type: %u\n", irpstack->Parameters.QueryDeviceText.DeviceTextType);
+		TraceInfo(TRACE_PNP, "unsupported device text type: %u\n", irpstack->Parameters.QueryDeviceText.DeviceTextType);
 		break;
 	}
 

@@ -17,6 +17,9 @@
  */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_driver.tmh"
+
 #include "stub_dbg.h"
 #include "stub_dev.h"
 
@@ -26,22 +29,18 @@ NTSTATUS stub_dispatch(PDEVICE_OBJECT devobj, IRP *irp);
 static VOID
 stub_unload(DRIVER_OBJECT *drvobj)
 {
-	UNREFERENCED_PARAMETER(drvobj);
-
-	DBGI(DBG_DISPATCH, "unload\n");
+	TraceInfo(TRACE_GENERAL, "Enter\n");
+	WPP_CLEANUP(drvobj);
 }
 
 NTSTATUS
 DriverEntry(DRIVER_OBJECT *drvobj, UNICODE_STRING *regpath)
 {
-	int i;
-
-	UNREFERENCED_PARAMETER(regpath);
-
-	DBGI(DBG_DISPATCH, "DriverEntry: Enter\n");
+	WPP_INIT_TRACING(drvobj, regpath);
+	TraceInfo(TRACE_GENERAL, "Enter\n");
 
 	/* initialize the driver object's dispatch table */
-	for (i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; i++) {
+	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i) {
 		drvobj->MajorFunction[i] = stub_dispatch;
 	}
 

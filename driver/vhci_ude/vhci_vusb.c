@@ -48,7 +48,7 @@ put_vusb(pctx_vusb_t vusb)
 
 		status = UdecxUsbDevicePlugOutAndDelete(vusb->ude_usbdev);
 		if (NT_ERROR(status)) {
-			TRD(VUSB, "failed to plug out: %!STATUS!", status);
+			TraceInfo(TRACE_VUSB, "failed to plug out: %!STATUS!", status);
 		}
 	}
 	else {
@@ -61,7 +61,7 @@ async_put_vusb(WDFWORKITEM workitem)
 {
 	pctx_vusb_t	vusb = *TO_PVUSB(workitem);
 
-	TRD(VUSB, "async put vusb");
+	TraceInfo(TRACE_VUSB, "async put vusb");
 	put_vusb(vusb);
 	WdfObjectDelete(workitem);
 }
@@ -80,7 +80,7 @@ put_vusb_passively(pctx_vusb_t vusb)
 
 	status = WdfWorkItemCreate(&conf, &attrs, &workitem);
 	if (NT_ERROR(status)) {
-		TRW(VUSB, "failed to create a workitem: %!STATUS!", status);
+		TraceWarning(TRACE_VUSB, "failed to create a workitem: %!STATUS!", status);
 	}
 	else {
 		*TO_PVUSB(workitem) = vusb;

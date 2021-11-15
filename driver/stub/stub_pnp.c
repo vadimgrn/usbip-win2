@@ -17,6 +17,9 @@
  */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_pnp.tmh"
+
 #include "stub_dbg.h"
 #include "stub_irp.h"
 
@@ -47,7 +50,7 @@ disable_interface(usbip_stub_dev_t *devstub)
 
 	status = IoSetDeviceInterfaceState(&devstub->interface_name, FALSE);
 	if (NT_ERROR(status)) {
-		DBGE(DBG_PNP, "failed to disable interface: err: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to disable interface: %!STATUS!\n", status);
 	}
 	if (devstub->interface_name.Buffer) {
 		RtlFreeUnicodeString(&devstub->interface_name);
@@ -58,14 +61,12 @@ disable_interface(usbip_stub_dev_t *devstub)
 NTSTATUS
 stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 {
-	IO_STACK_LOCATION	*irpstack = IoGetCurrentIrpStackLocation(irp);
-	NTSTATUS	status;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	TraceInfo(TRACE_DISPATCH, "%!pnpmn!\n", irpstack->MinorFunction);
 
-	DBGI(DBG_DISPATCH, "dispatch_pnp: minor: %s\n", dbg_pnp_minor(irpstack->MinorFunction));
-
-	status = lock_dev_removal(devstub);
+	NTSTATUS status = lock_dev_removal(devstub);
 	if (NT_ERROR(status)) {
-		DBGI(DBG_PNP, "device is pending removal: %s\n", dbg_devstub(devstub));
+		TraceInfo(TRACE_PNP, "device is pending removal: %s\n", dbg_devstub(devstub));
 		return complete_irp(irp, status, 0);
 	}
 
@@ -73,7 +74,7 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 	case IRP_MN_START_DEVICE:
 		status = IoSetDeviceInterfaceState(&devstub->interface_name, TRUE);
 		if (NT_ERROR(status)) {
-			DBGE(DBG_PNP, "failed to enable interface: err: %s\n", dbg_ntstatus(status));
+			TraceError(TRACE_PNP, "IoSetDeviceInterfaceState %!STATUS!\n", status);
 		}
 		return pass_irp_down(devstub, irp, on_start_complete, NULL);
 	case IRP_MN_REMOVE_DEVICE:
@@ -89,7 +90,7 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 
 		status = pass_irp_down(devstub, irp, NULL, NULL);
 
-		DBGI(DBG_PNP, "deleting device: %s\n", dbg_devstub(devstub));
+		TraceInfo(TRACE_PNP, "deleting device: %s\n", dbg_devstub(devstub));
 
 		remove_devlink(devstub);
 		free_devconf(devstub->devconf);

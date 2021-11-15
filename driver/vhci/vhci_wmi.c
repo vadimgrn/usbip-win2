@@ -1,4 +1,7 @@
 #include "vhci_wmi.h"
+#include "trace.h"
+#include "vhci_wmi.tmh"
+
 #include "vhci.h"
 #include "usbip_vhci_api.h"
 #include "globals.h"
@@ -36,13 +39,13 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	PAGED_CODE();
 
-	DBGI(DBG_WMI, "vhci_system_control: Enter\n");
+	TraceInfo(TRACE_WMI, "vhci_system_control: Enter\n");
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	if (!IS_DEVOBJ_VHCI(devobj)) {
 		// The vpdo, just complete the request with the current status
-		DBGI(DBG_WMI, "non-vhci: skip: minor:%s\n", dbg_wmi_minor(irpstack->MinorFunction));
+		TraceInfo(TRACE_WMI, "skip %!sysctrl!\n", irpstack->MinorFunction);
 		status = irp->IoStatus.Status;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return status;
@@ -50,7 +53,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	vhci = DEVOBJ_TO_VHCI(devobj);
 
-	DBGI(DBG_WMI, "vhci: %s\n", dbg_wmi_minor(irpstack->MinorFunction));
+	TraceInfo(TRACE_WMI, "%!sysctrl!\n", irpstack->MinorFunction);
 
 	if (vhci->common.DevicePnPState == Deleted) {
 		irp->IoStatus.Status = status = STATUS_NO_SUCH_DEVICE ;
@@ -83,7 +86,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	DBGI(DBG_WMI, "vhci_system_control: Leave: %s\n", dbg_ntstatus(status));
+	TraceInfo(TRACE_WMI, "Leave %!STATUS!\n", status);
 
 	return status;
 }

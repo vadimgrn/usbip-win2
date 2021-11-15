@@ -1,4 +1,7 @@
 #include "vhci_vpdo.h"
+#include "trace.h"
+#include "vhci_vpdo.tmh"
+
 #include "vhci_dbg.h"
 #include "vhci.h"
 #include "usbreq.h"
@@ -13,7 +16,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 
 	USB_CONFIGURATION_DESCRIPTOR *new_conf = urb->ConfigurationDescriptor;
 	if (!new_conf) {
-		DBGI(DBG_VPDO, "going to unconfigured state\n");
+		TraceInfo(TRACE_VPDO, "going to unconfigured state\n");
 		return STATUS_SUCCESS;
 	}
 
@@ -22,7 +25,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 	if (vpdo->dsc_conf) {
 		RtlCopyMemory(vpdo->dsc_conf, new_conf, new_conf->wTotalLength);
 	} else {
-		DBGE(DBG_WRITE, "failed to allocate configuration descriptor: out of memory\n");
+		TraceError(TRACE_WRITE, "failed to allocate configuration descriptor: out of memory\n");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -43,7 +46,7 @@ vpdo_select_interface(pvpdo_dev_t vpdo, USBD_INTERFACE_INFORMATION *info_intf)
 	NTSTATUS	status;
 
 	if (vpdo->dsc_conf == NULL) {
-		DBGW(DBG_WRITE, "failed to select interface: empty configuration descriptor\n");
+		TraceWarning(TRACE_WRITE, "failed to select interface: empty configuration descriptor\n");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 	status = setup_intf(info_intf, vpdo->dsc_conf, vpdo->speed);

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "dbgcommon.h"
 #include "vhci_urbr.h"
 #include "dbgcode.h"
 
@@ -19,6 +18,4 @@ const char *dbg_urbfunc(USHORT urbfunc);
 const char *dbg_usb_setup_packet(PCUCHAR packet);
 const char *dbg_urbr(purb_req_t urbr);
 
-#ifndef DBG
-  const char *dbg_usbd_status(USBD_STATUS status);
-#endif
+const char *dbg_usbd_status(USBD_STATUS status);

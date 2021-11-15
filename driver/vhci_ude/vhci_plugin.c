@@ -32,7 +32,7 @@ setup_with_dsc_conf(pctx_vusb_t vusb, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf)
 {
 	vusb->dsc_conf = ExAllocatePoolWithTag(PagedPool, dsc_conf->wTotalLength, VHCI_POOLTAG);
 	if (vusb->dsc_conf == NULL) {
-		TRE(PLUGIN, "failed to allocate configuration descriptor");
+		TraceError(TRACE_PLUGIN, "failed to allocate configuration descriptor");
 		return FALSE;
 	}
 
@@ -42,7 +42,7 @@ setup_with_dsc_conf(pctx_vusb_t vusb, PUSB_CONFIGURATION_DESCRIPTOR dsc_conf)
 
 		vusb->intf_altsettings = (PSHORT)ExAllocatePoolWithTag(PagedPool, dsc_conf->bNumInterfaces * sizeof(SHORT), VHCI_POOLTAG);
 		if (vusb->intf_altsettings == NULL) {
-			TRE(PLUGIN, "failed to allocate alternative settings for interfaces");
+			TraceError(TRACE_PLUGIN, "failed to allocate alternative settings for interfaces");
 			return FALSE;
 		}
 
@@ -70,7 +70,7 @@ setup_vusb(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 
 	status = WdfSpinLockCreate(&attrs, &vusb->spin_lock);
 	if (NT_ERROR(status)) {
-		TRE(PLUGIN, "failed to create wait lock: %!STATUS!", status);
+		TraceError(TRACE_PLUGIN, "failed to create wait lock: %!STATUS!", status);
 		return FALSE;
 	}
 
@@ -79,14 +79,14 @@ setup_vusb(UDECXUSBDEVICE ude_usbdev, pvhci_pluginfo_t pluginfo)
 
 	status = WdfLookasideListCreate(&attrs, sizeof(urb_req_t), NonPagedPool, &attrs_hmem, 0, &vusb->lookaside_urbr);
 	if (NT_ERROR(status)) {
-		TRE(PLUGIN, "failed to create urbr memory: %!STATUS!", status);
+		TraceError(TRACE_PLUGIN, "failed to create urbr memory: %!STATUS!", status);
 		return FALSE;
 	}
 
 	setup_with_dsc_dev(vusb, &pluginfo->dscr_dev);
 
 	if (!setup_with_dsc_conf(vusb, &pluginfo->dscr_conf)) {
-		TRE(PLUGIN, "failed to setup usb with configuration descritor");
+		TraceError(TRACE_PLUGIN, "failed to setup usb with configuration descritor");
 		return FALSE;
 	}
 
@@ -119,7 +119,7 @@ vusb_d0_entry(_In_ WDFDEVICE hdev, _In_ UDECXUSBDEVICE ude_usbdev)
 	UNREFERENCED_PARAMETER(hdev);
 	UNREFERENCED_PARAMETER(ude_usbdev);
 
-	TRD(VUSB, "Enter");
+	TraceInfo(TRACE_VUSB, "Enter");
 
 	return STATUS_NOT_SUPPORTED;
 }
@@ -131,7 +131,7 @@ vusb_d0_exit(_In_ WDFDEVICE hdev, _In_ UDECXUSBDEVICE ude_usbdev, UDECX_USB_DEVI
 	UNREFERENCED_PARAMETER(ude_usbdev);
 	UNREFERENCED_PARAMETER(setting);
 
-	TRD(VUSB, "Enter");
+	TraceInfo(TRACE_VUSB, "Enter");
 
 	return STATUS_NOT_SUPPORTED;
 }
@@ -145,7 +145,7 @@ vusb_set_function_suspend_and_wake(_In_ WDFDEVICE UdecxWdfDevice, _In_ UDECXUSBD
 	UNREFERENCED_PARAMETER(Interface);
 	UNREFERENCED_PARAMETER(FunctionPower);
 
-	TRD(VUSB, "Enter");
+	TraceInfo(TRACE_VUSB, "Enter");
 
 	return STATUS_NOT_SUPPORTED;
 }
@@ -178,12 +178,12 @@ setup_descriptors(PUDECXUSBDEVICE_INIT pdinit, pvhci_pluginfo_t pluginfo)
 {
 	NTSTATUS status = UdecxUsbDeviceInitAddDescriptor(pdinit, (UCHAR*)&pluginfo->dscr_dev, sizeof(pluginfo->dscr_dev));
 	if (NT_ERROR(status)) {
-		TRW(PLUGIN, "failed to add a device descriptor to device init");
+		TraceWarning(TRACE_PLUGIN, "failed to add a device descriptor to device init");
 	}
 
 	status = UdecxUsbDeviceInitAddDescriptor(pdinit, (UCHAR*)&pluginfo->dscr_conf, pluginfo->dscr_conf.wTotalLength);
 		if (NT_ERROR(status)) {
-		TRW(PLUGIN, "failed to add a configuration descriptor to device init");
+		TraceWarning(TRACE_PLUGIN, "failed to add a configuration descriptor to device init");
 	}
 }
 
@@ -192,7 +192,7 @@ vusb_cleanup(_In_ WDFOBJECT ude_usbdev)
 {
 	pctx_vusb_t vusb;
 
-	TRD(VUSB, "Enter");
+	TraceInfo(TRACE_VUSB, "Enter");
 
 	vusb = TO_VUSB(ude_usbdev);
 	if (vusb->dsc_conf != NULL)
@@ -209,7 +209,7 @@ create_endpoints(UDECXUSBDEVICE ude_usbdev, vhci_pluginfo_t *pluginfo)
 	vusb->ude_usbdev = ude_usbdev;
 
 	PUDECXUSBENDPOINT_INIT epinit = UdecxUsbSimpleEndpointInitAllocate(ude_usbdev);
-	TRD(VUSB, "Enter: epinit=0x%p", epinit);
+	TraceInfo(TRACE_VUSB, "Enter: epinit=0x%p", epinit);
 	add_ep(vusb, &epinit, NULL);
 	
 	for (USB_COMMON_DESCRIPTOR *cur = NULL; 
@@ -217,11 +217,11 @@ create_endpoints(UDECXUSBDEVICE ude_usbdev, vhci_pluginfo_t *pluginfo)
 	    ) {
 		USB_ENDPOINT_DESCRIPTOR *d = (USB_ENDPOINT_DESCRIPTOR*)cur;
 		epinit = UdecxUsbSimpleEndpointInitAllocate(ude_usbdev);
-		TRD(VUSB, "epinit=%#p, bEndpointAddress=%#04x",	epinit, d->bEndpointAddress);
+		TraceInfo(TRACE_VUSB, "epinit=%#p, bEndpointAddress=%#04x",	epinit, d->bEndpointAddress);
 		add_ep(vusb, &epinit, d);
 	}
 
-	TRD(VUSB, "Leave");
+	TraceInfo(TRACE_VUSB, "Leave");
 }
 
 static UDECX_ENDPOINT_TYPE
@@ -257,7 +257,7 @@ static UDECX_USB_DEVICE_SPEED get_device_speed(pvhci_pluginfo_t pluginfo)
 	case 0x0310:
 		return UdecxUsbSuperSpeed;
 	default:
-		TRE(PLUGIN, "unknown bcdUSB:%x", (ULONG)bcdUSB);
+		TraceError(TRACE_PLUGIN, "unknown bcdUSB:%x", (ULONG)bcdUSB);
 		return UdecxUsbLowSpeed;
 	}
 }
@@ -299,7 +299,7 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 
 	status = UdecxUsbDeviceCreate(&pdinit, &attrs, &ude_usbdev);
 	if (NT_ERROR(status)) {
-		TRE(PLUGIN, "failed to create usb device: %!STATUS!", status);
+		TraceError(TRACE_PLUGIN, "failed to create usb device: %!STATUS!", status);
 		UdecxUsbDeviceInitFree(pdinit);
 		return NULL;
 	}
@@ -326,7 +326,7 @@ vusb_plugin(pctx_vhci_t vhci, pvhci_pluginfo_t pluginfo)
 
 	status = UdecxUsbDevicePlugIn(ude_usbdev, &opts);
 	if (NT_ERROR(status)) {
-		TRE(PLUGIN, "failed to plugin a new device %!STATUS!", status);
+		TraceError(TRACE_PLUGIN, "failed to plugin a new device %!STATUS!", status);
 		WdfObjectDelete(ude_usbdev);
 		return NULL;
 	}

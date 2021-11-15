@@ -17,6 +17,9 @@
  */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_dispatch.tmh"
+
 #include "stub_dbg.h"
 #include "stub_irp.h"
 
@@ -29,10 +32,10 @@ NTSTATUS stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp);
 NTSTATUS
 stub_dispatch(PDEVICE_OBJECT devobj, IRP *irp)
 {
-	usbip_stub_dev_t	*devstub = (usbip_stub_dev_t *)devobj->DeviceExtension;
-	IO_STACK_LOCATION	*irpstack = IoGetCurrentIrpStackLocation(irp);
+	usbip_stub_dev_t *devstub = devobj->DeviceExtension;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DBGI(DBG_GENERAL | DBG_DISPATCH, "stub_dispatch: %s: Enter\n", dbg_dispatch_major(irpstack->MajorFunction));
+	TraceInfo(TRACE_DISPATCH, "%!pnpmj!\n", irpstack->MajorFunction);
 
 	switch (irpstack->MajorFunction) {
 	case IRP_MJ_PNP:

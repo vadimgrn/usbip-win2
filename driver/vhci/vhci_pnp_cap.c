@@ -1,4 +1,7 @@
 #include "vhci_pnp_cap.h"
+#include "trace.h"
+#include "vhci_pnp_cap.tmh"
+
 #include "vhci_irp.h"
 #include "vhci_dbg.h"
 
@@ -25,7 +28,7 @@ get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
 	// Build an Irp
 	irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, NULL, 0, NULL, &pnpEvent, &ioStatus);
 	if (irp == NULL) {
-		DBGW(DBG_PNP, "failed to create irp\n");
+		TraceWarning(TRACE_PNP, "failed to create irp\n");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -81,14 +84,14 @@ pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
 
 	// Set the capabilities.
 	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
-		DBGW(DBG_PNP, "invalid device capabilities: version: %u, size: %u\n", pcaps->Version, pcaps->Size);
+		TraceWarning(TRACE_PNP, "invalid device capabilities: version: %u, size: %u\n", pcaps->Version, pcaps->Size);
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	// Get the device capabilities of the root pdo
 	status = get_device_capabilities(vpdo->common.parent->parent->parent->devobj_lower, &caps_parent);
 	if (!NT_SUCCESS(status)) {
-		DBGE(DBG_PNP, "failed to get device capabilities from root device: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_PNP, "failed to get device capabilities from root device: %!STATUS!\n", status);
 		return status;
 	}
 
@@ -187,7 +190,7 @@ pnp_query_cap(PIO_STACK_LOCATION irpstack)
 
 	// Set the capabilities.
 	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
-		DBGW(DBG_PNP, "invalid device capabilities: version: %u, size: %u\n", pcaps->Version, pcaps->Size);
+		TraceWarning(TRACE_PNP, "invalid device capabilities: version: %u, size: %u\n", pcaps->Version, pcaps->Size);
 		return STATUS_UNSUCCESSFUL;
 	}
 	setup_capabilities(pcaps);

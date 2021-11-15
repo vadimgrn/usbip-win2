@@ -10,7 +10,7 @@ io_default_hc(_In_ WDFQUEUE queue, _In_ WDFREQUEST req)
 	UNREFERENCED_PARAMETER(queue);
 	UNREFERENCED_PARAMETER(req);
 
-	TRE(QUEUE_HC, "unexpected io default callback");
+	TraceError(TRACE_QUEUE_HC, "unexpected io default callback");
 }
 
 PAGEABLE NTSTATUS
@@ -38,7 +38,7 @@ create_queue_hc(pctx_vhci_t vhci)
 		vhci->queue = queue;
 	}
 	else {
-		TRE(QUEUE_HC, "failed to create queue: %!STATUS!", status);
+		TraceError(TRACE_QUEUE_HC, "failed to create queue: %!STATUS!", status);
 	}
 	return status;
 }

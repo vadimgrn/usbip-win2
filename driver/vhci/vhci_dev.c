@@ -1,8 +1,10 @@
-#include "vhci.h"
+#include "vhci_dev.h"
+#include "trace.h"
+#include "vhci_dev.tmh"
 
+#include "vhci.h"
 #include <wdmsec.h>
 
-#include "vhci_dev.h"
 
 DEFINE_GUID(GUID_SD_USBIP_VHCI,
 	0x9d3039dd, 0xcca5, 0x4b4d, 0xb3, 0x3d, 0xe2, 0xdd, 0xc8, 0xa8, 0xc5, 0x2f);
@@ -29,17 +31,17 @@ get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
 
 	status = IoGetDeviceProperty(pdo, prop, 0, NULL, &buflen);
 	if (status != STATUS_BUFFER_TOO_SMALL) {
-		DBGE(DBG_GENERAL, "failed to get device property size: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "failed to get device property size: %!STATUS!\n", status);
 		return NULL;
 	}
 	value = ExAllocatePoolWithTag(PagedPool, buflen, USBIP_VHCI_POOL_TAG);
 	if (value == NULL) {
-		DBGE(DBG_GENERAL, "failed to get device property: out of memory\n");
+		TraceError(TRACE_GENERAL, "failed to get device property: out of memory\n");
 		return NULL;
 	}
 	status = IoGetDeviceProperty(pdo, prop, buflen, value, &buflen);
 	if (NT_ERROR(status)) {
-		DBGE(DBG_GENERAL, "failed to get device property: %s\n", dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "failed to get device property: %!STATUS!\n", status);
 		ExFreePoolWithTag(value, USBIP_VHCI_POOL_TAG);
 		return NULL;
 	}
@@ -71,7 +73,7 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 		break;
 	}
 	if (!NT_SUCCESS(status)) {
-		DBGE(DBG_GENERAL, "failed to create vdev(%s): status:%s\n", dbg_vdev_type(type), dbg_ntstatus(status));
+		TraceError(TRACE_GENERAL, "failed to create vdev(%!vdev_type_t!): %!STATUS!\n", type, status);
 		return NULL;
 	}
 

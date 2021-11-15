@@ -23,7 +23,7 @@ store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 		USBD_SHORT_TRANSFER_OK, urb_status->TransferBufferLength);
 
 	urbfunc = urb_status->Hdr.Function;
-	TRD(READ, "urbr: %!URBR!", urbr);
+	TraceInfo(TRACE_READ, "urbr: %!URBR!", urbr);
 
 	switch (urbfunc) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
@@ -39,7 +39,7 @@ store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 		recip = BMREQUEST_TO_OTHER;
 		break;
 	default:
-		TRW(READ, "unhandled urb function: %!URBFUNC!: len: %d", urbfunc, urb_status->Hdr.Length);
+		TraceWarning(TRACE_READ, "unhandled urb function: %!URBFUNC!: len: %d", urbfunc, urb_status->Hdr.Length);
 		return STATUS_INVALID_PARAMETER;
 	}
 

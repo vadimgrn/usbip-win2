@@ -18,6 +18,9 @@
 */
 
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_read.tmh"
+
 #include "stub_dbg.h"
 #include "usbip_proto.h"
 
@@ -41,7 +44,6 @@ get_usbip_hdr_from_read_irp(PIRP irp)
 NTSTATUS
 stub_dispatch_read(usbip_stub_dev_t *devstub, IRP *irp)
 {
-	DBGI(DBG_GENERAL | DBG_READWRITE, "dispatch_read: enter\n");
-
+	TraceInfo(TRACE_READWRITE, "enter\n");
 	return collect_done_stub_res(devstub, irp);
 }

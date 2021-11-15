@@ -1,4 +1,7 @@
 #include "vhci_vpdo_dsc.h"
+#include "trace.h"
+#include "vhci_vpdo_dsc.tmh"
+
 #include "vhci.h"
 #include "vhci_dev.h"
 #include "usbreq.h"
@@ -21,7 +24,7 @@ req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
 		if (NT_SUCCESS(status))
 			return STATUS_PENDING;
 		else {
-			DBGI(DBG_GENERAL, "failed to submit unlink urb: %s\n", dbg_urbr(urbr));
+			TraceInfo(TRACE_GENERAL, "failed to submit unlink urb: %s\n", dbg_urbr(urbr));
 			free_urbr(urbr);
 			status = STATUS_UNSUCCESSFUL;
 		}
@@ -53,7 +56,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 		status = req_fetch_dsc(vpdo, irp);
 		break;
 	default:
-		DBGE(DBG_GENERAL, "unhandled descriptor type: %s\n", dbg_usb_descriptor_type(setup->wValue.HiByte));
+		TraceError(TRACE_GENERAL, "unhandled descriptor type: %s\n", dbg_usb_descriptor_type(setup->wValue.HiByte));
 		break;
 	}
 
@@ -98,7 +101,7 @@ static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR
 		}
 		dsc_conf = (USB_CONFIGURATION_DESCRIPTOR*)dsc;
 		if (urb_cdr->TransferBufferLength < dsc_conf->wTotalLength) {
-			DBGI(DBG_WRITE, "ignore non-full configuration descriptor\n");
+			TraceInfo(TRACE_WRITE, "ignore non-full configuration descriptor\n");
 			return FALSE;
 		}
 		break;
@@ -134,7 +137,7 @@ static void save_serial_number(
 	UCHAR cch = (dsc->bLength - sizeof(*dsc))/sizeof(*sd->bString) + 1;
 
 	if (vpdo->serial) {
-		DBGW(DBG_VPDO, "%s: prior serial '%S'\n", vpdo->serial);
+		TraceWarning(TRACE_VPDO, "prior serial '%S'\n", vpdo->serial);
 		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
 	}
 
@@ -143,13 +146,13 @@ static void save_serial_number(
 	if (vpdo->serial) {
 		NTSTATUS st = RtlStringCchCopyNW(vpdo->serial, cch, sd->bString, cch - 1);
 		if (st == STATUS_SUCCESS) {
-			DBGI(DBG_VPDO, "serial '%S', LangId %#04x\n", vpdo->serial, urb_cdr->LanguageId);
+			TraceInfo(TRACE_VPDO, "serial '%S', LangId %#04x\n", vpdo->serial, urb_cdr->LanguageId);
 		} else {
 			NT_ASSERT(!"RtlStringCchCopyNW failed");
 		}
 	} else {
-		DBGE(DBG_VPDO, "%s: can't allocate memory: Index %d, bLength %d, LangId %#04x\n",
-			__func__, urb_cdr->Index, sd->bLength, urb_cdr->LanguageId);
+		TraceError(TRACE_VPDO, "can't allocate memory: Index %d, bLength %d, LangId %#04x\n",
+			urb_cdr->Index, sd->bLength, urb_cdr->LanguageId);
 	}
 }
 
@@ -169,7 +172,7 @@ void try_to_cache_descriptor(
 
 	USB_COMMON_DESCRIPTOR *dsc_new = ExAllocatePoolWithTag(PagedPool, urb_cdr->TransferBufferLength, USBIP_VHCI_POOL_TAG);
 	if (!dsc_new) {
-		DBGE(DBG_WRITE, "out of memory\n");
+		TraceError(TRACE_WRITE, "out of memory\n");
 		return;
 	}
 

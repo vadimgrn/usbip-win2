@@ -3,26 +3,22 @@
 //
 // Define the tracing flags.
 //
-// Tracing GUID - 99b7a5cf-7cb0-4af5-838d-c45d78e49101
+// Tracing GUID - 682e9961-054c-482b-a86d-d94f6cd5f555
 //
 
-#define WPP_CONTROL_GUIDS                                              \
-    WPP_DEFINE_CONTROL_GUID(                                           \
-        UsbipVhciUdeTraceGuid, (99b7a5cf,7cb0,4af5,838d,c45d78e49101), \
-                                                                       \
-        WPP_DEFINE_BIT(TRACE_GENERAL)        /* bit  0 = 0x00000001 */ \
-        WPP_DEFINE_BIT(TRACE_DRIVER)         /* bit  1 = 0x00000002 */ \
-        WPP_DEFINE_BIT(TRACE_VHCI)           /* bit  2 = 0x00000004 */ \
-        WPP_DEFINE_BIT(TRACE_QUEUE_HC)       /* bit  3 = 0x00000008 */ \
-        WPP_DEFINE_BIT(TRACE_VUSB)           /* bit  4 = 0x00000010 */ \
-        WPP_DEFINE_BIT(TRACE_READ)           /* bit  5 = 0x00000020 */ \
-        WPP_DEFINE_BIT(TRACE_WRITE)          /* bit  6 = 0x00000040 */ \
-        WPP_DEFINE_BIT(TRACE_EP)             /* bit  7 = 0x00000080 */ \
-        WPP_DEFINE_BIT(TRACE_QUEUE_EP)       /* bit  8 = 0x00000100 */ \
-        WPP_DEFINE_BIT(TRACE_URBR)           /* bit  9 = 0x00000200 */ \
-        WPP_DEFINE_BIT(TRACE_IOCTL)          /* bit 10 = 0x00000400 */ \
-        WPP_DEFINE_BIT(TRACE_PLUGIN)         /* bit 11 = 0x00000800 */ \
-        )
+#define WPP_CONTROL_GUIDS                                                 \
+    WPP_DEFINE_CONTROL_GUID(                                              \
+        UsbipStubTraceGuid, (682e9961,054c,482b,a86d,d94f6cd5f555),       \
+                                                                          \
+        WPP_DEFINE_BIT(TRACE_GENERAL)           /* bit  0 = 0x00000001 */ \
+        WPP_DEFINE_BIT(TRACE_DISPATCH)          /* bit  1 = 0x00000002 */ \
+        WPP_DEFINE_BIT(TRACE_DEV)               /* bit  2 = 0x00000004 */ \
+        WPP_DEFINE_BIT(TRACE_IOCTL)             /* bit  3 = 0x00000008 */ \
+        WPP_DEFINE_BIT(TRACE_READWRITE)         /* bit  4 = 0x00000010 */ \
+        WPP_DEFINE_BIT(TRACE_PNP)               /* bit  5 = 0x00000020 */ \
+        WPP_DEFINE_BIT(TRACE_POWER)             /* bit  6 = 0x00000040 */ \
+        WPP_DEFINE_BIT(TRACE_DEVCONF)           /* bit  7 = 0x00000080 */ \
+        )                             
 
 #define WPP_FLAG_LEVEL_LOGGER(flag, level)                                  \
     WPP_LEVEL_LOGGER(flag)

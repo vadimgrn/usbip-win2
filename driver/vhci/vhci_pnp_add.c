@@ -1,6 +1,8 @@
-#include "vhci.h"
-
 #include "vhci_pnp.h"
+#include "trace.h"
+#include "vhci_pnp_add.tmh"
+
+#include "vhci.h"
 
 #define MAX_HUB_PORTS		6
 
@@ -53,7 +55,7 @@ create_child_pdo(pvdev_t vdev, vdev_type_t type)
 
 	PAGED_CODE();
 
-	DBGI(DBG_VHUB, "creating child %s\n", dbg_vdev_type(type));
+	TraceInfo(TRACE_VHUB, "creating child %!vdev_type_t!\n", type);
 
 	if ((devobj = vdev_create(vdev->Self->DriverObject, type)) == NULL)
 		return NULL;
@@ -106,7 +108,7 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 
 	PAGED_CODE();
 
-	DBGI(DBG_GENERAL | DBG_PNP, "adding %s: pdo: 0x%p\n", dbg_vdev_type(type), pdo);
+	TraceInfo(TRACE_PNP, "adding %!vdev_type_t!: pdo: 0x%p\n", type, pdo);
 
 	devobj = vdev_create(drvobj, type);
 	if (devobj == NULL)
@@ -127,7 +129,7 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 	// attachment chain.  This is where all the IRPs should be routed.
 	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, pdo);
 	if (vdev->devobj_lower == NULL) {
-		DBGE(DBG_PNP, "failed to attach device stack\n");
+		TraceError(TRACE_PNP, "failed to attach device stack\n");
 		IoDeleteDevice(devobj);
 		return STATUS_NO_SUCH_DEVICE;
 	}
@@ -146,7 +148,7 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 		break;
 	}
 
-	DBGI(DBG_PNP, "%s added: vdev: %p\n", dbg_vdev_type(type), vdev);
+	TraceInfo(TRACE_PNP, "%!vdev_type_t! added: vdev: %p\n", type, vdev);
 
 	// We are done with initializing, so let's indicate that and return.
 	// This should be the final step in the AddDevice process.
@@ -165,7 +167,7 @@ vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 	PAGED_CODE();
 
 	if (!is_valid_vdev_hwid(pdo)) {
-		DBGE(DBG_GENERAL | DBG_PNP, "invalid hw id\n");
+		TraceError(TRACE_PNP, "invalid hw id\n");
 		return STATUS_INVALID_PARAMETER;
 	}
 

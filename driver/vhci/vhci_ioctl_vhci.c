@@ -1,4 +1,7 @@
 #include "vhci_ioctl_vhci.h"
+#include "trace.h"
+#include "vhci_ioctl_vhci.tmh"
+
 #include "vhci.h"
 #include "vhci_plugin.h"
 #include "vhci_pnp.h"
@@ -17,7 +20,7 @@ get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)
 
 	drvkey = get_device_prop(vhci->common.child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
 	if (drvkey == NULL) {
-		DBGW(DBG_IOCTL, "failed to get vhci driver key\n");
+		TraceWarning(TRACE_IOCTL, "failed to get vhci driver key\n");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -64,7 +67,7 @@ vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutle
 
 	prefix_len = get_name_prefix_size(vhub->DevIntfRootHub.Buffer);
 	if (prefix_len == 0) {
-		DBGE(DBG_HPDO, "inavlid root hub format: %S\n", vhub->DevIntfRootHub.Buffer);
+		TraceError(TRACE_HPDO, "inavlid root hub format: %S\n", vhub->DevIntfRootHub.Buffer);
 		return STATUS_INVALID_PARAMETER;
 	}
 	roothub_namelen = sizeof(USB_ROOT_HUB_NAME) + vhub->DevIntfRootHub.Length - prefix_len * sizeof(WCHAR);
@@ -112,7 +115,7 @@ vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code,
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);
 		break;
 	default:
-		DBGE(DBG_IOCTL, "unhandled vhci ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceError(TRACE_IOCTL, "unhandled vhci ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
 		break;
 	}
 

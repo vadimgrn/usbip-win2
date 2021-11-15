@@ -1,14 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -98,18 +90,6 @@
     <ProjectName>usbip_vhci_ude</ProjectName>
     <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
-  <PropertyGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
-    <ConfigurationType>Driver</ConfigurationType>
-    <DriverType>KMDF</DriverType>
-    <DriverTargetPlatform>Universal</DriverTargetPlatform>
-  </PropertyGroup>
-  <PropertyGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
-    <ConfigurationType>Driver</ConfigurationType>
-    <DriverType>KMDF</DriverType>
-    <DriverTargetPlatform>Universal</DriverTargetPlatform>
-  </PropertyGroup>
   <PropertyGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
@@ -123,20 +103,6 @@
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <TargetVersion>Windows10</TargetVersion>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <UdeDriver>true</UdeDriver>
-    <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
-    <UDE_VERSION_MINOR>0</UDE_VERSION_MINOR>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <TargetVersion>Windows10</TargetVersion>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <UdeDriver>true</UdeDriver>
-    <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
-    <UDE_VERSION_MINOR>0</UDE_VERSION_MINOR>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -159,22 +125,6 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\$(ProjectName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))</TargetName>
-    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
-    <EnableInf2cat>false</EnableInf2cat>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\$(ProjectName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))</TargetName>
-    <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
-    <EnableInf2cat>false</EnableInf2cat>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
@@ -191,46 +141,6 @@
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
     <EnableInf2cat>false</EnableInf2cat>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ClCompile>
-      <WppEnabled>true</WppEnabled>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
-      <WppKernelMode>true</WppKernelMode>
-      <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
-      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
-    </ClCompile>
-    <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);ntstrsafe.lib;usbd.lib</AdditionalDependencies>
-    </Link>
-    <PostBuildEvent>
-      <Command>gencat.bat $(OutDir) 10_$(DDKPlatform) $(SolutionDir)\driver\usbip_test.pfx</Command>
-    </PostBuildEvent>
-    <Inf>
-      <TimeStamp>0.3.5.0</TimeStamp>
-    </Inf>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WppEnabled>true</WppEnabled>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
-      <WppKernelMode>true</WppKernelMode>
-      <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
-      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
-    </ClCompile>
-    <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);ntstrsafe.lib;usbd.lib</AdditionalDependencies>
-    </Link>
-    <PostBuildEvent>
-      <Command>gencat.bat $(OutDir) 10_$(DDKPlatform) $(SolutionDir)\driver\usbip_test.pfx</Command>
-    </PostBuildEvent>
-    <Inf>
-      <TimeStamp>0.3.5.0</TimeStamp>
-    </Inf>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
@@ -238,7 +148,6 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
@@ -251,6 +160,9 @@
     <Inf>
       <TimeStamp>0.3.5.0</TimeStamp>
     </Inf>
+    <DriverSign>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -259,7 +171,6 @@
       <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">vhci_trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\lib;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <WppPreprocessorDefinitions>%(WppPreprocessorDefinitions)</WppPreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <Link>
@@ -271,6 +182,9 @@
     <Inf>
       <TimeStamp>0.3.5.0</TimeStamp>
     </Inf>
+    <DriverSign>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />

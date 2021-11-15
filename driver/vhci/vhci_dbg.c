@@ -7,8 +7,6 @@
 
 #include "usbip_vhci_api.h"
 
-#ifdef DBG
-
 static namecode_t	namecodes_vhci_ioctl[] = {
 	K_V(IOCTL_USBIP_VHCI_PLUGIN_HARDWARE)
 	K_V(IOCTL_USBIP_VHCI_UNPLUG_HARDWARE)
@@ -131,39 +129,6 @@ struct namecode	namecodes_usb_user_req[] = {
 };
 
 const char *
-dbg_GUID(GUID *guid)
-{
-	static char	buf[64];
-
-	RtlStringCchPrintfA(buf, 128, "{%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}",
-		guid->Data1, guid->Data2, guid->Data3,
-		guid->Data4[0], guid->Data4[1], guid->Data4[2], guid->Data4[3],
-		guid->Data4[4], guid->Data4[5], guid->Data4[6], guid->Data4[7]);
-	return buf;
-}
-
-const char *
-dbg_vdev_type(vdev_type_t type)
-{
-	switch (type) {
-	case VDEV_ROOT:
-		return "root";
-	case VDEV_CPDO:
-		return "cpdo";
-	case VDEV_VHCI:
-		return "vhci";
-	case VDEV_HPDO:
-		return "hpdo";
-	case VDEV_VHUB:
-		return "vhub";
-	case VDEV_VPDO:
-		return "vpdo";
-	default:
-		return "";
-	}
-}
-
-const char *
 dbg_vhci_ioctl_code(unsigned int ioctl_code)
 {
 	return dbg_namecode(namecodes_vhci_ioctl, "ioctl", ioctl_code);
@@ -181,4 +146,3 @@ dbg_usb_user_request_code(ULONG code)
 	return dbg_namecode(namecodes_usb_user_req, "usb user request", code);
 }
 
-#endif

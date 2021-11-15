@@ -1,12 +1,9 @@
-#include <ntddk.h>
-
+#include "dbgcommon.h"
 #include "strutil.h"
 #include "dbgcode.h"
-#include "usbip_proto.h"
 
-#ifdef DBG
-
-static namecode_t	namecodes_usbip_command[] = {
+static namecode_t namecodes_usbip_command[] = 
+{
 	K_V(USBIP_CMD_SUBMIT)
 	K_V(USBIP_CMD_UNLINK)
 	K_V(USBIP_RET_SUBMIT)
@@ -46,5 +43,3 @@ dbg_usbip_hdr(struct usbip_header *hdr)
 	}
 	return buf;
 }
-
-#endif

@@ -1,7 +1,21 @@
 #include "vhci.h"
+#include "trace.h"
+#include "vhci_power.tmh"
 
 #include "vhci_dev.h"
 #include "vhci_irp.h"
+
+static void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const char *caller)
+{
+	switch (type) {
+	case SystemPowerState:
+		TraceInfo(TRACE_POWER, "%s: %!SYSTEM_POWER_STATE!\n", caller, state->SystemState);
+		break;
+	case DevicePowerState:
+		TraceInfo(TRACE_POWER, "%s: %!DEVICE_POWER_STATE!\n", caller, state->DeviceState);
+		break;
+	}
+}
 
 static NTSTATUS
 vhci_power_vhci(pvhci_dev_t vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
@@ -18,11 +32,7 @@ vhci_power_vhci(pvhci_dev_t vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 	}
 
 	if (irpstack->MinorFunction == IRP_MN_SET_POWER) {
-		DBGI(DBG_POWER, "\tRequest to set %s state to %s\n",
-			((powerType == SystemPowerState) ? "System" : "Device"),
-			((powerType == SystemPowerState) ? \
-				dbg_system_power(powerState.SystemState) : \
-				dbg_device_power(powerState.DeviceState)));
+		log_set_power(powerType, &powerState, __func__);
 	}
 
 	return irp_pass_down(vhci->common.devobj_lower, irp);
@@ -40,27 +50,19 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 
 	switch (irpstack->MinorFunction) {
 	case IRP_MN_SET_POWER:
-		DBGI(DBG_POWER, "\tSetting %s power state to %s\n",
-			((powerType == SystemPowerState) ? "System" : "Device"),
-			((powerType == SystemPowerState) ? \
-				dbg_system_power(powerState.SystemState) : \
-				dbg_device_power(powerState.DeviceState)));
-
+		log_set_power(powerType, &powerState, __func__);
 		switch (powerType) {
 		case DevicePowerState:
 			PoSetPowerState(vdev->Self, powerType, powerState);
 			vdev->DevicePowerState = powerState.DeviceState;
 			status = STATUS_SUCCESS;
 			break;
-
 		case SystemPowerState:
 			vdev->SystemPowerState = powerState.SystemState;
 			status = STATUS_SUCCESS;
 			break;
-
 		default:
 			status = STATUS_NOT_SUPPORTED;
-			break;
 		}
 		break;
 	case IRP_MN_QUERY_POWER:
@@ -86,7 +88,6 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	case IRP_MN_POWER_SEQUENCE:
 	default:
 		status = STATUS_NOT_SUPPORTED;
-		break;
 	}
 
 	if (status != STATUS_NOT_SUPPORTED) {
@@ -108,8 +109,8 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DBGI(DBG_GENERAL | DBG_POWER, "vhci_power(%s): Enter: minor:%s\n",
-		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_power_minor(irpstack->MinorFunction));
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Enter: minor:%s\n",
+		DEVOBJ_VDEV_TYPE(devobj), dbg_power_minor(irpstack->MinorFunction));
 
 	status = STATUS_SUCCESS;
 
@@ -131,8 +132,6 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	DBGI(DBG_GENERAL | DBG_POWER, "vhci_power(%s): Leave: status: %s\n",
-		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_ntstatus(status));
-
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!\n", DEVOBJ_VDEV_TYPE(devobj), status);
 	return status;
 }

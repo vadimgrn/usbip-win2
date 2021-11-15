@@ -11,9 +11,7 @@ typedef struct stub_res {
 	LIST_ENTRY	list;
 } stub_res_t;
 
-#ifdef DBG
 const char *dbg_stub_res(stub_res_t *sres, usbip_stub_dev_t* devstub);
-#endif
 
 stub_res_t *
 create_stub_res(unsigned int cmd, unsigned long seqnum, int err, PVOID data, int data_len, ULONG n_pkts, BOOLEAN need_copy);

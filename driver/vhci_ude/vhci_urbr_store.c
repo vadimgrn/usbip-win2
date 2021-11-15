@@ -23,7 +23,7 @@ store_urbr_partial(WDFREQUEST req_read, purb_req_t urbr)
 	WDF_REQUEST_PARAMETERS	params;
 	NTSTATUS	status;
 
-	TRD(READ, "Enter: urbr: %!URBR!", urbr);
+	TraceInfo(TRACE_READ, "Enter: urbr: %!URBR!", urbr);
 
 	WDF_REQUEST_PARAMETERS_INIT(&params);
 	WdfRequestGetParameters(urbr->req, &params);
@@ -54,12 +54,12 @@ store_urbr_partial(WDFREQUEST req_read, purb_req_t urbr)
 		status = store_urbr_iso_partial(req_read, urbr);
 		break;
 	default:
-		TRW(READ, "unexpected partial urbr: %!URBFUNC!", urbfunc);
+		TraceWarning(TRACE_READ, "unexpected partial urbr: %!URBFUNC!", urbfunc);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
 
-	TRD(READ, "Leave: %!STATUS!", status);
+	TraceInfo(TRACE_READ, "Leave: %!STATUS!", status);
 
 	return status;
 }
@@ -71,7 +71,7 @@ store_urbr_urb(WDFREQUEST req_read, purb_req_t urbr)
 	NTSTATUS	status;
 
 	urb_func = urbr->u.urb.urb->UrbHeader.Function;
-	TRD(READ, "%!URBR!", urbr);
+	TraceInfo(TRACE_READ, "%!URBR!", urbr);
 
 	switch (urb_func) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
@@ -114,7 +114,7 @@ store_urbr_urb(WDFREQUEST req_read, purb_req_t urbr)
 #endif
 	default:
 		WdfRequestSetInformation(req_read, 0);
-		TRE(READ, "unhandled urb function: %!URBFUNC!", urb_func);
+		TraceError(TRACE_READ, "unhandled urb function: %!URBFUNC!", urb_func);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
@@ -127,7 +127,7 @@ store_cancelled_urbr(WDFREQUEST req_read, purb_req_t urbr)
 {
 	struct usbip_header	*hdr;
 
-	TRD(READ, "Enter");
+	TraceInfo(TRACE_READ, "Enter");
 
 	hdr = get_hdr_from_req_read(req_read);
 	if (hdr == NULL)
@@ -142,7 +142,7 @@ store_cancelled_urbr(WDFREQUEST req_read, purb_req_t urbr)
 NTSTATUS
 store_urbr(WDFREQUEST req_read, purb_req_t urbr)
 {
-	TRD(READ, "urbr: %s", dbg_urbr(urbr));
+	TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(urbr));
 
 	switch (urbr->type) {
 	case URBR_TYPE_URB:
@@ -157,7 +157,7 @@ store_urbr(WDFREQUEST req_read, purb_req_t urbr)
 		return store_urbr_reset_pipe(req_read, urbr);
 		break;
 	default:
-		TRE(READ, "unknown type: %d", urbr->type);
+		TraceError(TRACE_READ, "unknown type: %d", urbr->type);
 		return STATUS_UNSUCCESSFUL;
 	}
 }

@@ -1,12 +1,12 @@
 #include "stub_driver.h"
+#include "stub_trace.h"
+#include "stub_devconf.tmh"
 
 #include "stub_dev.h"
 #include "dbgcommon.h"
 #include "stub_dbg.h"
 #include "stub_usbd.h"
 #include "devconf.h"
-
-#ifdef DBG
 
 #include "strutil.h"
 
@@ -36,8 +36,6 @@ dbg_info_pipe(PUSBD_PIPE_INFORMATION info_pipe)
 	return buf;
 }
 
-#endif
-
 static PUSBD_INTERFACE_INFORMATION
 dup_info_intf(PUSBD_INTERFACE_INFORMATION info_intf)
 {
@@ -46,7 +44,7 @@ dup_info_intf(PUSBD_INTERFACE_INFORMATION info_intf)
 
 	info_intf_copied = ExAllocatePoolWithTag(NonPagedPool, size_info, USBIP_STUB_POOL_TAG);
 	if (info_intf_copied == NULL) {
-		DBGE(DBG_GENERAL, "dup_info_intf: out of memory\n");
+		TraceError(TRACE_GENERAL, "dup_info_intf: out of memory\n");
 		return NULL;
 	}
 	RtlCopyMemory(info_intf_copied, info_intf, size_info);
@@ -61,7 +59,7 @@ build_infos_intf(devconf_t *devconf, PUSBD_INTERFACE_LIST_ENTRY pintf_list)
 	for (i = 0; i < devconf->bNumInterfaces; i++) {
 		PUSBD_INTERFACE_INFORMATION	info_intf_copied = dup_info_intf(pintf_list[i].Interface);
 		if (info_intf_copied == NULL) {
-			DBGE(DBG_GENERAL, "build_infos_intf: out of memory\n");
+			TraceError(TRACE_GENERAL, "build_infos_intf: out of memory\n");
 			return FALSE;
 		}
 		devconf->infos_intf[i] = info_intf_copied;
@@ -78,13 +76,13 @@ create_devconf(PUSB_CONFIGURATION_DESCRIPTOR dsc_conf, USBD_CONFIGURATION_HANDLE
 	size_devconf = sizeof(devconf_t) - sizeof(PUSBD_INTERFACE_INFORMATION) + dsc_conf->bNumInterfaces * sizeof(PUSBD_INTERFACE_INFORMATION);
 	devconf = (devconf_t *)ExAllocatePoolWithTag(NonPagedPool, size_devconf, USBIP_STUB_POOL_TAG);
 	if (devconf == NULL) {
-		DBGE(DBG_GENERAL, "create_devconf: out of memory\n");
+		TraceError(TRACE_GENERAL, "create_devconf: out of memory\n");
 		return NULL;
 	}
 
 	devconf->dsc_conf = ExAllocatePoolWithTag(NonPagedPool, dsc_conf->wTotalLength, USBIP_STUB_POOL_TAG);
 	if (devconf->dsc_conf == NULL) {
-		DBGE(DBG_GENERAL, "create_devconf: out of memory\n");
+		TraceError(TRACE_GENERAL, "create_devconf: out of memory\n");
 		ExFreePoolWithTag(devconf, USBIP_STUB_POOL_TAG);
 		return NULL;
 	}

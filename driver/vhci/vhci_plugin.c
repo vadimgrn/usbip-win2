@@ -1,4 +1,7 @@
 #include "vhci_plugin.h"
+#include "trace.h"
+#include "vhci_plugin.tmh"
+
 #include "vhci_dbg.h"
 #include "strutil.h"
 #include "vhci_vhub.h"
@@ -11,7 +14,7 @@ vhci_init_vpdo(pvpdo_dev_t vpdo)
 {
 	PAGED_CODE();
 
-	DBGI(DBG_PNP, "vhci_init_vpdo: 0x%p\n", vpdo);
+	TraceInfo(TRACE_PNP, "vhci_init_vpdo: 0x%p\n", vpdo);
 
 	vpdo->plugged = TRUE;
 
@@ -77,7 +80,7 @@ static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIP
 			vpdo->subclass = dsc_intf->bInterfaceSubClass;
 			vpdo->protocol = dsc_intf->bInterfaceProtocol;
 		} else {
-			DBGE(DBG_PNP, "%s: interface descriptor not found\n", __func__);
+			TraceError(TRACE_PNP, "interface descriptor not found\n");
 		}
 	}
 }
@@ -88,14 +91,14 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 	PAGED_CODE();
 
 	if (inlen < sizeof(*pluginfo)) {
-		DBGE(DBG_IOCTL, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
+		TraceError(TRACE_IOCTL, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	USHORT wTotalLength = pluginfo->dscr_conf.wTotalLength;
 
 	if (inlen != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
-		DBGE(DBG_IOCTL, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
+		TraceError(TRACE_IOCTL, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -104,7 +107,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 		return STATUS_END_OF_FILE;
 	}
 
-	DBGI(DBG_VPDO, "Plugin vpdo: port: %hhd\n", pluginfo->port);
+	TraceInfo(TRACE_VPDO, "Plugin vpdo: port: %d\n", (int)pluginfo->port);
 
 	PDEVICE_OBJECT devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
@@ -121,7 +124,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 
 	vpdo_dev_t *devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
 	if (devpdo_old) {
-		DBGI(DBG_GENERAL, "you can't plugin again");
+		TraceInfo(TRACE_GENERAL, "you can't plugin again");
 		IoDeleteDevice(devobj);
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -149,21 +152,21 @@ vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 	PAGED_CODE();
 
 	if (vhub == NULL) {
-		DBGI(DBG_PNP, "vhub has gone\n");
+		TraceInfo(TRACE_PNP, "vhub has gone\n");
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
 	if (port < 0) {
-		DBGI(DBG_PNP, "plugging out all the devices!\n");
+		TraceInfo(TRACE_PNP, "plugging out all the devices!\n");
 		vhub_mark_unplugged_all_vpdos(vhub);
 		return STATUS_SUCCESS;
 	}
 
-	DBGI(DBG_PNP, "plugging out device: port: %u\n", port);
+	TraceInfo(TRACE_PNP, "plugging out device: port: %u\n", port);
 
 	vpdo = vhub_find_vpdo(vhub, port);
 	if (vpdo == NULL) {
-		DBGI(DBG_PNP, "no matching vpdo: port: %u\n", port);
+		TraceInfo(TRACE_PNP, "no matching vpdo: port: %u\n", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}
 

@@ -5,8 +5,6 @@
 
 #include "stub_cspkt.h"
 
-#ifdef DBG
-
 #include "strutil.h"
 
 #include <usbspec.h>
@@ -90,5 +88,3 @@ dbg_ctlsetup_packet(const USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 
 	return buf;
 }
-
-#endif

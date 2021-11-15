@@ -1,4 +1,7 @@
 #include "vhci.h"
+#include "trace.h"
+#include "vhci_ioctl.tmh"
+
 #include "vhci_ioctl_vhci.h"
 #include "vhci_ioctl_vhub.h"
 
@@ -17,8 +20,8 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 	ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	DBGI(DBG_GENERAL | DBG_IOCTL, "vhci_ioctl(%s): Enter: code:%s, irp:%p\n",
-		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_vhci_ioctl_code(ioctl_code), irp);
+	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: code:%s, irp:%p\n",
+		DEVOBJ_VDEV_TYPE(devobj), dbg_vhci_ioctl_code(ioctl_code), irp);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
@@ -38,7 +41,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		status = vhci_ioctl_vhub(DEVOBJ_TO_VHUB(devobj), irp, ioctl_code, buffer, inlen, &outlen);
 		break;
 	default:
-		DBGW(DBG_IOCTL, "ioctl for %s is not allowed\n", dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)));
+		TraceWarning(TRACE_IOCTL, "ioctl for %!vdev_type_t! is not allowed\n", DEVOBJ_VDEV_TYPE(devobj));
 		outlen = 0;
 		break;
 	}
@@ -50,7 +53,7 @@ END:
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 
-	DBGI(DBG_GENERAL | DBG_IOCTL, "vhci_ioctl: Leave: irp:%p, status:%s\n", irp, dbg_ntstatus(status));
+	TraceInfo(TRACE_IOCTL, "Leave: irp:%p, %!STATUS!\n", irp, status);
 
 	return status;
 }
