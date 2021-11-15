@@ -129,27 +129,6 @@ struct namecode	namecodes_usb_user_req[] = {
 };
 
 const char *
-dbg_vdev_type(vdev_type_t type)
-{
-	switch (type) {
-	case VDEV_ROOT:
-		return "root";
-	case VDEV_CPDO:
-		return "cpdo";
-	case VDEV_VHCI:
-		return "vhci";
-	case VDEV_HPDO:
-		return "hpdo";
-	case VDEV_VHUB:
-		return "vhub";
-	case VDEV_VPDO:
-		return "vpdo";
-	default:
-		return "";
-	}
-}
-
-const char *
 dbg_vhci_ioctl_code(unsigned int ioctl_code)
 {
 	return dbg_namecode(namecodes_vhci_ioctl, "ioctl", ioctl_code);

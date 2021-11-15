@@ -109,8 +109,8 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_POWER, "%s: Enter: minor:%s\n",
-		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), dbg_power_minor(irpstack->MinorFunction));
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Enter: minor:%s\n",
+		DEVOBJ_VDEV_TYPE(devobj), dbg_power_minor(irpstack->MinorFunction));
 
 	status = STATUS_SUCCESS;
 
@@ -132,8 +132,6 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	TraceInfo(TRACE_POWER, "%s: Leave %!STATUS!\n",
-		dbg_vdev_type(DEVOBJ_VDEV_TYPE(devobj)), status);
-
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!\n", DEVOBJ_VDEV_TYPE(devobj), status);
 	return status;
 }

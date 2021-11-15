@@ -105,7 +105,7 @@ setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	PWCHAR id_dev = ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
-		TraceError(TRACE_PNP, "%s: query device id: out of memory\n", dbg_vdev_type(vdev->type));
+		TraceError(TRACE_PNP, "%!vdev_type_t!: query device id: out of memory\n", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -139,7 +139,7 @@ setup_hw_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	PWCHAR ids_hw = ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
-		TraceError(TRACE_PNP, "%s: query hw ids: out of memory\n", dbg_vdev_type(vdev->type));
+		TraceError(TRACE_PNP, "%!vdev_type_t!: query hw ids: out of memory\n", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -305,14 +305,12 @@ pnp_query_id(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		TraceInfo(TRACE_PNP, "%s: %!BUS_QUERY_ID_TYPE!: %S\n", dbg_vdev_type(vdev->type), type, result);
+		TraceInfo(TRACE_PNP, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S\n", vdev->type, type, result);
 		if (subst_result) {
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		TraceWarning(TRACE_PNP, "%s: %!BUS_QUERY_ID_TYPE!: %s\n", dbg_vdev_type(vdev->type), type, 
-		     status == STATUS_NOT_SUPPORTED ? "not supported" : "failed");
-		
+		TraceWarning(TRACE_PNP, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!\n", vdev->type, type, status);
 		if (result) {
 			ExFreePoolWithTag(result, USBIP_VHCI_POOL_TAG);
 			result = NULL;

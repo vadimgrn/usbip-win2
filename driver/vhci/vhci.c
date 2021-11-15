@@ -64,11 +64,11 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_GENERAL, "%s: Enter\n", dbg_vdev_type(vdev->type));
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter\n", vdev->type);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		TraceWarning(TRACE_GENERAL, "vhci_create(%s): no such device\n", dbg_vdev_type(vdev->type));
+		TraceWarning(TRACE_GENERAL, "vhci_create(%!vdev_type_t!): no such device\n", vdev->type);
 
 		Irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
@@ -79,7 +79,7 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-	TraceInfo(TRACE_GENERAL, "%s: Leave\n", dbg_vdev_type(vdev->type));
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave\n", vdev->type);
 
 	return STATUS_SUCCESS;
 }
@@ -107,11 +107,11 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_GENERAL, "%s: Enter\n", dbg_vdev_type(vdev->type));
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter\n", vdev->type);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		TraceWarning(TRACE_GENERAL, "vhci_cleanup(%s): no such device\n", dbg_vdev_type(vdev->type));
+		TraceWarning(TRACE_GENERAL, "vhci_cleanup(%!vdev_type_t!): no such device\n", vdev->type);
 		irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return STATUS_NO_SUCH_DEVICE;
@@ -124,7 +124,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	TraceInfo(TRACE_GENERAL, "%s: Leave\n", dbg_vdev_type(vdev->type));
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave\n", vdev->type);
 
 	return STATUS_SUCCESS;
 }

@@ -227,7 +227,7 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	PDEVICE_RELATIONS	dev_relations;
 	NTSTATUS	status;
 
-	TraceInfo(TRACE_PNP, "%s: %!DEVICE_RELATION_TYPE!\n", dbg_vdev_type(vdev->type), irpstack->Parameters.QueryDeviceRelations.Type);
+	TraceInfo(TRACE_PNP, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!\n", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
 
 	dev_relations = (PDEVICE_RELATIONS)irp->IoStatus.Information;
 

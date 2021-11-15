@@ -73,7 +73,7 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 		break;
 	}
 	if (!NT_SUCCESS(status)) {
-		TraceError(TRACE_GENERAL, "failed to create vdev(%s): %!STATUS!\n", dbg_vdev_type(type), status);
+		TraceError(TRACE_GENERAL, "failed to create vdev(%!vdev_type_t!): %!STATUS!\n", type, status);
 		return NULL;
 	}
 

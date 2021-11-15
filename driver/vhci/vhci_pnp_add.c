@@ -55,7 +55,7 @@ create_child_pdo(pvdev_t vdev, vdev_type_t type)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_VHUB, "creating child %s\n", dbg_vdev_type(type));
+	TraceInfo(TRACE_VHUB, "creating child %!vdev_type_t!\n", type);
 
 	if ((devobj = vdev_create(vdev->Self->DriverObject, type)) == NULL)
 		return NULL;
@@ -108,7 +108,7 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_PNP, "adding %s: pdo: 0x%p\n", dbg_vdev_type(type), pdo);
+	TraceInfo(TRACE_PNP, "adding %!vdev_type_t!: pdo: 0x%p\n", type, pdo);
 
 	devobj = vdev_create(drvobj, type);
 	if (devobj == NULL)
@@ -148,7 +148,7 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 		break;
 	}
 
-	TraceInfo(TRACE_PNP, "%s added: vdev: %p\n", dbg_vdev_type(type), vdev);
+	TraceInfo(TRACE_PNP, "%!vdev_type_t! added: vdev: %p\n", type, vdev);
 
 	// We are done with initializing, so let's indicate that and return.
 	// This should be the final step in the AddDevice process.

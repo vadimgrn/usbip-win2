@@ -124,7 +124,7 @@ pnp_start_device(pvdev_t vdev, PIRP irp)
 		powerState.DeviceState = PowerDeviceD0;
 		PoSetPowerState(vdev->Self, DevicePowerState, powerState);
 
-		TraceInfo(TRACE_GENERAL, "device(%s) started\n", dbg_vdev_type(vdev->type));
+		TraceInfo(TRACE_GENERAL, "device(%!vdev_type_t!) started\n", vdev->type);
 	}
 	status = irp_done(irp, status);
 	return status;

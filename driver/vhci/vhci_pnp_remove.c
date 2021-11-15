@@ -169,7 +169,7 @@ remove_device(pvdev_t vdev)
 		vdev->devobj_lower = NULL;
 	}
 
-	TraceInfo(TRACE_VDEV, "deleting device object(%s): 0x%p\n", dbg_vdev_type(vdev->type), vdev->Self);
+	TraceInfo(TRACE_VDEV, "deleting device object(%!vdev_type_t!): 0x%p\n", vdev->type, vdev->Self);
 
 	IoDeleteDevice(vdev->Self);
 }
@@ -180,7 +180,7 @@ pnp_remove_device(pvdev_t vdev, PIRP irp)
 	PDEVICE_OBJECT	devobj_lower;
 
 	if (vdev->DevicePnPState == Deleted) {
-		TraceInfo(TRACE_PNP, "%s: already removed\n", dbg_vdev_type(vdev->type));
+		TraceInfo(TRACE_PNP, "%!vdev_type_t!: already removed\n", vdev->type);
 		return irp_success(irp);
 	}
 
