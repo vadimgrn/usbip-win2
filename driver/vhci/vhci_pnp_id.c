@@ -305,12 +305,12 @@ pnp_query_id(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		TraceInfo(TRACE_PNP, "%s: %s: %S\n", dbg_vdev_type(vdev->type), dbg_bus_query_id_type(type), result);
+		TraceInfo(TRACE_PNP, "%s: %!BUS_QUERY_ID_TYPE!: %S\n", dbg_vdev_type(vdev->type), type, result);
 		if (subst_result) {
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		TraceWarning(TRACE_PNP, "%s: %s: %s\n", dbg_vdev_type(vdev->type), dbg_bus_query_id_type(type), 
+		TraceWarning(TRACE_PNP, "%s: %!BUS_QUERY_ID_TYPE!: %s\n", dbg_vdev_type(vdev->type), type, 
 		     status == STATUS_NOT_SUPPORTED ? "not supported" : "failed");
 		
 		if (result) {

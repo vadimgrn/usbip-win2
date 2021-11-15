@@ -51,16 +51,6 @@ static namecode_t	namecodes_pnp_minor[] = {
 	{0,0}
 };
 
-static namecode_t	namecodes_bus_query_id[] = {
-	K_V(BusQueryDeviceID)
-	K_V(BusQueryHardwareIDs)
-	K_V(BusQueryCompatibleIDs)
-	K_V(BusQueryInstanceID)
-	K_V(BusQueryDeviceSerialNumber)
-	K_V(BusQueryContainerID)
-	{0,0}
-};
-
 static namecode_t	namecodes_dev_relation[] = {
 	K_V(BusRelations)
 	K_V(PowerRelations)
@@ -180,14 +170,6 @@ dbg_pnp_minor(UCHAR minor)
 	static char	buf[NAMECODE_BUF_MAX];
 
 	return dbg_namecode_buf(namecodes_pnp_minor, "pnp minor function", minor, buf, NAMECODE_BUF_MAX);
-}
-
-const char *
-dbg_bus_query_id_type(BUS_QUERY_ID_TYPE type)
-{
-	static char	buf[NAMECODE_BUF_MAX];
-
-	return dbg_namecode_buf(namecodes_bus_query_id, "bus query id", type, buf, NAMECODE_BUF_MAX);
 }
 
 const char *
