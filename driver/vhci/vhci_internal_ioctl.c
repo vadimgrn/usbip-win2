@@ -85,7 +85,7 @@ process_irp_urb_req(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	TraceInfo(TRACE_IOCTL, "process_irp_urb_req: function: %s\n", dbg_urbfunc(urb->UrbHeader.Function));
+	TraceInfo(TRACE_IOCTL, "%!urb_function!\n", urb->UrbHeader.Function);
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ABORT_PIPE:
@@ -115,8 +115,8 @@ process_irp_urb_req(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 		return submit_urbr_irp(vpdo, irp);
 	default:
-		TraceWarning(TRACE_IOCTL, "process_irp_urb_req: unhandled function: %s: len: %d\n",
-			dbg_urbfunc(urb->UrbHeader.Function), urb->UrbHeader.Length);
+		TraceWarning(TRACE_IOCTL, "unhandled %!urb_function!, len %d\n",
+			urb->UrbHeader.Function, urb->UrbHeader.Length);
 		return STATUS_INVALID_PARAMETER;
 	}
 }

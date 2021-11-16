@@ -171,7 +171,7 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 				    USBD_SHORT_TRANSFER_OK, urb_gsr->TransferBufferLength);
 
 	code_func = urb->UrbHeader.Function;
-	TraceInfo(TRACE_READ, "store_urb_get_status: urbr: %s, func:%s\n", dbg_urbr(urbr), dbg_urbfunc(code_func));
+	TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!\n", dbg_urbr(urbr), code_func);
 
 	switch (code_func) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
@@ -187,8 +187,8 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 		recip = BMREQUEST_TO_OTHER;
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "store_urb_get_status: unhandled function: %s: len: %d\n",
-			dbg_urbfunc(urb->UrbHeader.Function), urb->UrbHeader.Length);
+		TraceWarning(TRACE_IOCTL, "unhandled function: %!urb_function!, len %d\n",
+			urb->UrbHeader.Function, urb->UrbHeader.Length);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -672,7 +672,7 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 	}
 
 	code_func = urb->UrbHeader.Function;
-	TraceInfo(TRACE_READ, "store_urbr_submit: urbr: %s, func:%s\n", dbg_urbr(urbr), dbg_urbfunc(code_func));
+	TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!\n", dbg_urbr(urbr), code_func);
 
 	switch (code_func) {
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
@@ -719,7 +719,7 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "unhandled urb function: %s\n", dbg_urbfunc(code_func));
+		TraceError(TRACE_READ, "unhandled %!urb_function!\n", code_func);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
@@ -765,7 +765,7 @@ store_urbr_partial(PIRP irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "store_urbr_partial: unexpected partial urbr: %s\n", dbg_urbfunc(code_func));
+		TraceError(TRACE_READ, "unexpected partial urbr: %!urb_function!\n", code_func);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
