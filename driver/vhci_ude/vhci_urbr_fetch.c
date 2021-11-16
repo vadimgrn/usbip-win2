@@ -101,7 +101,7 @@ handle_urbr_error(purb_req_t urbr, struct usbip_header *hdr)
 		submit_req_reset_pipe(urbr->ep, NULL);
 	}
 
-	TraceWarning(TRACE_WRITE, "usbd status:%s: %!URBR!:", dbg_usbd_status(urb->UrbHeader.Status), urbr);
+	TraceWarning(TRACE_WRITE, "%s(%#010lX): %!URBR!", dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status, urbr);
 }
 
 NTSTATUS

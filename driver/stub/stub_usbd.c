@@ -42,14 +42,14 @@ typedef struct {
 static NTSTATUS
 do_safe_completion(PDEVICE_OBJECT devobj, PIRP irp, PVOID ctx)
 {
-	safe_completion_t	*safe_completion = (safe_completion_t *)ctx;
-	usbip_stub_dev_t	*devstub;
+        UNREFERENCED_PARAMETER(devobj);
+        
+        safe_completion_t *safe_completion = ctx;
 
-	UNREFERENCED_PARAMETER(devobj);
+        USBD_STATUS st = safe_completion->purb->UrbHeader.Status;
+        TraceInfo(TRACE_GENERAL, "%s(%#010lX)\n", dbg_usbd_status(st), (ULONG)st);
 
-	TraceInfo(TRACE_GENERAL, "do_safe_completion: status = %s\n", dbg_usbd_status(safe_completion->purb->UrbHeader.Status));
-
-	devstub = (usbip_stub_dev_t *)safe_completion->devobj->DeviceExtension;
+        usbip_stub_dev_t *devstub = safe_completion->devobj->DeviceExtension;
 	del_pending_stub_res(devstub, safe_completion->sres);
 
 	safe_completion->cb_urb_done(devstub, irp->IoStatus.Status, safe_completion->purb, safe_completion->sres);
@@ -136,7 +136,7 @@ call_usbd(usbip_stub_dev_t *devstub, PURB purb)
 		status = io_status.Status;
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!STATUS!, usbd_status:%s\n", status, dbg_usbd_status(purb->UrbHeader.Status));
+	TraceInfo(TRACE_GENERAL, "%!STATUS!, %s(%#010lX)\n", status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
 	return status;
 }
 
@@ -416,8 +416,8 @@ submit_class_vendor_req(usbip_stub_dev_t *devstub, BOOLEAN is_in, USHORT cmd, UC
 static void
 done_bulk_intr_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_res_t *sres)
 {
-	TraceInfo(TRACE_GENERAL, "sres %s, %!STATUS!, usbd_status %s\n",
-		dbg_stub_res(sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status));
+	TraceInfo(TRACE_GENERAL, "sres %s, %!STATUS!, %s(%#010lX)\n",
+		dbg_stub_res(sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
 
 	if (status == STATUS_CANCELLED) {
 		/* cancelled. just drop it */
@@ -480,14 +480,13 @@ compact_usbd_iso_data(ULONG n_pkts, char *src, const USBD_ISO_PACKET_DESCRIPTOR*
 static void
 done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_res_t *sres)
 {
-	TraceInfo(TRACE_GENERAL, "sres: %s, %!STATUS!, usbd_status %s\n",
-		dbg_stub_res(sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status));
+	TraceInfo(TRACE_GENERAL, "sres: %s, %!STATUS!, %s(%#010lX)\n",
+		dbg_stub_res(sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
 
 	if (status == STATUS_CANCELLED) {
 		/* cancelled. just drop it */
 		free_stub_res(sres);
-	}
-	else {
+	} else {
 		if (NT_SUCCESS(status)) {
 			struct _URB_ISOCH_TRANSFER	*purb_iso = &purb->UrbIsochronousTransfer;
 			struct usbip_iso_packet_descriptor	*iso_descs;
@@ -496,7 +495,7 @@ done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_re
 			n_pkts = sres->header.u.ret_submit.number_of_packets;
 			iso_descs_len = sizeof(struct usbip_iso_packet_descriptor) * n_pkts;
 
-			if (sres->data != NULL) { /* direction IN case */
+			if (sres->data) { /* direction IN case */
 				/* if iso packets are not filled fully, packet data compaction and moving iso_descs are required. */
 				actual_len = get_usbd_iso_descs_len(purb_iso->NumberOfPackets, purb_iso->IsoPacket);
 				NT_ASSERT(actual_len <= sres->data_len);
@@ -508,16 +507,14 @@ done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_re
 					compact_usbd_iso_data(n_pkts, sres->data, purb_iso->IsoPacket);
 					RtlCopyMemory((char *)sres->data + actual_len, (char *)sres->data + sres->data_len, iso_descs_len);
 				}
-			}
-			else {
+			} else {
 				sres->data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)sres->data_len, USBIP_STUB_POOL_TAG);
-				if (sres->data == NULL) {
-					TraceError(TRACE_GENERAL, "done_iso_transfer: out of memory\n");
-					sres->data_len = 0;
-				}
-				else {
-					/* Copy old iso descriptors. */
-					RtlCopyMemory(sres->data, (char *)purb_iso->TransferBuffer + sres->data_len, iso_descs_len);
+				if (sres->data) {
+                                        /* Copy old iso descriptors. */
+                                        RtlCopyMemory(sres->data, (char*)purb_iso->TransferBuffer + sres->data_len, iso_descs_len);
+                                } else {
+                                        TraceError(TRACE_GENERAL, "done_iso_transfer: out of memory\n");
+                                        sres->data_len = 0;
 				}
 				sres->data_len = iso_descs_len;
 				actual_len = 0;
@@ -530,12 +527,13 @@ done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_re
 			sres->header.u.ret_submit.actual_length = actual_len;
 			sres->header.u.ret_submit.start_frame = purb_iso->StartFrame;
 			sres->header.u.ret_submit.error_count = purb_iso->ErrorCount;
-		}
-		else {
+		} else {
 			sres->header.u.ret_submit.status = to_linux_status(purb->UrbHeader.Status);
 		}
+
 		reply_stub_req(devstub, sres);
 	}
+
 	USBD_UrbFree(devstub->hUSBD, purb);
 }
 

@@ -298,7 +298,9 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 		if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
 			urb->UrbBulkOrInterruptTransfer.TransferBufferLength = hdr->u.ret_submit.actual_length;
 		}
-		TraceWarning(TRACE_WRITE, "%!urb_function!: wrong status: %s\n", urb->UrbHeader.Function, dbg_usbd_status(urb->UrbHeader.Status));
+
+		USBD_STATUS st = urb->UrbHeader.Status;
+		TraceError(TRACE_WRITE, "%!urb_function!: %s(%#010lX)\n", urb->UrbHeader.Function, dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -327,30 +329,28 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 static NTSTATUS
 process_urb_dsc_req(struct urb_req *urbr, const struct usbip_header *hdr)
 {
-	if (hdr->u.ret_submit.status != 0) {
-		TraceWarning(TRACE_WRITE, "dsc_req: wrong status: %s\n", dbg_usbd_status(to_windows_status(hdr->u.ret_submit.status)));
+	if (hdr->u.ret_submit.status) {
+		USBD_STATUS st = to_windows_status(hdr->u.ret_submit.status);
+		TraceError(TRACE_WRITE, "%s(%#010lX)\n", dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
-	else {
-		PIO_STACK_LOCATION	irpstack;
-		PIRP	irp = urbr->irp;
-		ULONG	outlen;
 
-		irpstack = IoGetCurrentIrpStackLocation(irp);
-		outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+	IRP *irp = urbr->irp;
+        IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+        ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
-		irp->IoStatus.Information = hdr->u.ret_submit.actual_length + sizeof(USB_DESCRIPTOR_REQUEST);
-		if (outlen < hdr->u.ret_submit.actual_length + sizeof(USB_DESCRIPTOR_REQUEST)) {
-			irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
-		}
-		else {
-			PUSB_DESCRIPTOR_REQUEST	dsc_req = (PUSB_DESCRIPTOR_REQUEST)urbr->irp->AssociatedIrp.SystemBuffer;
-			RtlCopyMemory(dsc_req->Data, hdr + 1, hdr->u.ret_submit.actual_length);
-			irp->IoStatus.Status = STATUS_SUCCESS;
-		}
-
-		return irp->IoStatus.Status;
+        ULONG sz = hdr->u.ret_submit.actual_length + sizeof(USB_DESCRIPTOR_REQUEST);
+        irp->IoStatus.Information = sz;
+	
+        if (outlen >= sz) {
+                USB_DESCRIPTOR_REQUEST* dsc_req = urbr->irp->AssociatedIrp.SystemBuffer;
+                RtlCopyMemory(dsc_req->Data, hdr + 1, hdr->u.ret_submit.actual_length);
+                irp->IoStatus.Status = STATUS_SUCCESS;
+        } else {
+                irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
 	}
+
+	return irp->IoStatus.Status;
 }
 
 static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)

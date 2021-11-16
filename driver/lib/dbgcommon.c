@@ -5,19 +5,12 @@
 
 #include <usbdi.h>
 #include <usbuser.h>
+#include <ntstrsafe.h>
 
 enum { NAMECODE_BUF_MAX = 256 };
 
 char buf_dbg_vhci_ioctl_code[NAMECODE_BUF_MAX];
 unsigned int len_dbg_vhci_ioctl_code;
-
-static const namecode_t namecodes_usbd_status[] =
-{
-	K_V(USBD_STATUS_SUCCESS)
-	K_V(USBD_STATUS_PENDING)
-	K_V(USBD_STATUS_STALL_PID)
-	{0, 0}
-};
 
 static const namecode_t namecodes_vhci_ioctl[] =
 {
@@ -102,7 +95,130 @@ const char *dbg_namecode(const namecode_t* namecodes, const char* codetype, unsi
 
 const char *dbg_usbd_status(USBD_STATUS status)
 {
-	return dbg_namecode(namecodes_usbd_status, "usbd status", status);
+        switch (status) {
+        case USBD_STATUS_SUCCESS: 
+                return "USBD_STATUS_SUCCESS";
+        case USBD_STATUS_PORT_OPERATION_PENDING:
+                return "USBD_STATUS_PORT_OPERATION_PENDING";
+        case USBD_STATUS_PENDING:
+                return "USBD_STATUS_PENDING";
+        case USBD_STATUS_CRC:
+                return "USBD_STATUS_CRC";
+        case USBD_STATUS_BTSTUFF:
+                return "USBD_STATUS_BTSTUFF";
+        case USBD_STATUS_DATA_TOGGLE_MISMATCH:
+                return "USBD_STATUS_DATA_TOGGLE_MISMATCH";
+        case USBD_STATUS_STALL_PID:
+                return "USBD_STATUS_STALL_PID";
+        case USBD_STATUS_DEV_NOT_RESPONDING:
+                return "USBD_STATUS_DEV_NOT_RESPONDING";
+        case USBD_STATUS_PID_CHECK_FAILURE:
+                return "USBD_STATUS_PID_CHECK_FAILURE";
+        case USBD_STATUS_UNEXPECTED_PID:
+                return "USBD_STATUS_UNEXPECTED_PID";
+        case USBD_STATUS_DATA_OVERRUN:
+                return "USBD_STATUS_DATA_OVERRUN";
+        case USBD_STATUS_DATA_UNDERRUN:
+                return "USBD_STATUS_DATA_UNDERRUN";
+        case USBD_STATUS_BUFFER_OVERRUN:
+                return "USBD_STATUS_BUFFER_OVERRUN";
+        case USBD_STATUS_BUFFER_UNDERRUN:
+                return "USBD_STATUS_BUFFER_UNDERRUN";
+        case USBD_STATUS_NOT_ACCESSED:
+                return "USBD_STATUS_NOT_ACCESSED";
+        case USBD_STATUS_FIFO:
+                return "USBD_STATUS_FIFO";
+        case USBD_STATUS_XACT_ERROR:
+                return "USBD_STATUS_XACT_ERROR";
+        case USBD_STATUS_BABBLE_DETECTED:
+                return "USBD_STATUS_BABBLE_DETECTED";
+        case USBD_STATUS_DATA_BUFFER_ERROR:
+                return "USBD_STATUS_DATA_BUFFER_ERROR";
+        case USBD_STATUS_NO_PING_RESPONSE:
+                return "USBD_STATUS_NO_PING_RESPONSE";
+        case USBD_STATUS_INVALID_STREAM_TYPE:
+                return "USBD_STATUS_INVALID_STREAM_TYPE";
+        case USBD_STATUS_INVALID_STREAM_ID:
+                return "USBD_STATUS_INVALID_STREAM_ID";
+        case USBD_STATUS_ENDPOINT_HALTED:
+                return "USBD_STATUS_ENDPOINT_HALTED";
+        case USBD_STATUS_INVALID_URB_FUNCTION:
+                return "USBD_STATUS_INVALID_URB_FUNCTION";
+        case USBD_STATUS_INVALID_PARAMETER:
+                return "USBD_STATUS_INVALID_PARAMETER";
+        case USBD_STATUS_ERROR_BUSY:
+                return "USBD_STATUS_ERROR_BUSY";
+        case USBD_STATUS_INVALID_PIPE_HANDLE:
+                return "USBD_STATUS_INVALID_PIPE_HANDLE";
+        case USBD_STATUS_NO_BANDWIDTH:
+                return "USBD_STATUS_NO_BANDWIDTH";
+        case USBD_STATUS_INTERNAL_HC_ERROR:
+                return "USBD_STATUS_INTERNAL_HC_ERROR";
+        case USBD_STATUS_ERROR_SHORT_TRANSFER:
+                return "USBD_STATUS_ERROR_SHORT_TRANSFER";
+        case USBD_STATUS_BAD_START_FRAME:
+                return "USBD_STATUS_BAD_START_FRAME";
+        case USBD_STATUS_ISOCH_REQUEST_FAILED:
+                return "USBD_STATUS_ISOCH_REQUEST_FAILED";
+        case USBD_STATUS_FRAME_CONTROL_OWNED:
+                return "USBD_STATUS_FRAME_CONTROL_OWNED";
+        case USBD_STATUS_FRAME_CONTROL_NOT_OWNED:
+                return "USBD_STATUS_FRAME_CONTROL_NOT_OWNED";
+        case USBD_STATUS_NOT_SUPPORTED:
+                return "USBD_STATUS_NOT_SUPPORTED";
+        case USBD_STATUS_INAVLID_CONFIGURATION_DESCRIPTOR:
+                return "USBD_STATUS_INAVLID_CONFIGURATION_DESCRIPTOR";
+        case USBD_STATUS_INSUFFICIENT_RESOURCES:
+                return "USBD_STATUS_INSUFFICIENT_RESOURCES";
+        case USBD_STATUS_SET_CONFIG_FAILED:
+                return "USBD_STATUS_SET_CONFIG_FAILED";
+        case USBD_STATUS_BUFFER_TOO_SMALL:
+                return "USBD_STATUS_BUFFER_TOO_SMALL";
+        case USBD_STATUS_INTERFACE_NOT_FOUND:
+                return "USBD_STATUS_INTERFACE_NOT_FOUND";
+        case USBD_STATUS_INAVLID_PIPE_FLAGS:
+                return "USBD_STATUS_INAVLID_PIPE_FLAGS";
+        case USBD_STATUS_TIMEOUT:
+                return "USBD_STATUS_TIMEOUT";
+        case USBD_STATUS_DEVICE_GONE:
+                return "USBD_STATUS_DEVICE_GONE";
+        case USBD_STATUS_STATUS_NOT_MAPPED:
+                return "USBD_STATUS_STATUS_NOT_MAPPED";
+        case USBD_STATUS_HUB_INTERNAL_ERROR:
+                return "USBD_STATUS_HUB_INTERNAL_ERROR";
+        case USBD_STATUS_CANCELED:
+                return "USBD_STATUS_CANCELED";
+        case USBD_STATUS_ISO_NOT_ACCESSED_BY_HW:
+                return "USBD_STATUS_ISO_NOT_ACCESSED_BY_HW";
+        case USBD_STATUS_ISO_TD_ERROR:
+                return "USBD_STATUS_ISO_TD_ERROR";
+        case USBD_STATUS_ISO_NA_LATE_USBPORT:
+                return "USBD_STATUS_ISO_NA_LATE_USBPORT";
+        case USBD_STATUS_ISO_NOT_ACCESSED_LATE:
+                return "USBD_STATUS_ISO_NOT_ACCESSED_LATE";
+        case USBD_STATUS_BAD_DESCRIPTOR:
+                return "USBD_STATUS_BAD_DESCRIPTOR";
+        case USBD_STATUS_BAD_DESCRIPTOR_BLEN:
+                return "USBD_STATUS_BAD_DESCRIPTOR_BLEN";
+        case USBD_STATUS_BAD_DESCRIPTOR_TYPE:
+                return "USBD_STATUS_BAD_DESCRIPTOR_TYPE";
+        case USBD_STATUS_BAD_INTERFACE_DESCRIPTOR:
+                return "USBD_STATUS_BAD_INTERFACE_DESCRIPTOR";
+        case USBD_STATUS_BAD_ENDPOINT_DESCRIPTOR:
+                return "USBD_STATUS_BAD_ENDPOINT_DESCRIPTOR";
+        case USBD_STATUS_BAD_INTERFACE_ASSOC_DESCRIPTOR:
+                return "USBD_STATUS_BAD_INTERFACE_ASSOC_DESCRIPTOR";
+        case USBD_STATUS_BAD_CONFIG_DESC_LENGTH:
+                return "USBD_STATUS_BAD_CONFIG_DESC_LENGTH";
+        case USBD_STATUS_BAD_NUMBER_OF_INTERFACES:
+                return "USBD_STATUS_BAD_NUMBER_OF_INTERFACES";
+        case USBD_STATUS_BAD_NUMBER_OF_ENDPOINTS:
+                return "USBD_STATUS_BAD_NUMBER_OF_ENDPOINTS";
+        case USBD_STATUS_BAD_ENDPOINT_ADDRESS:
+                return "USBD_STATUS_BAD_ENDPOINT_ADDRESS";
+        }
+
+        return "USBD_STATUS_?";
 }
 
 /*
