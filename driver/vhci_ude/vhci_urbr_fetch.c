@@ -74,7 +74,7 @@ fetch_urbr_urb(PURB urb, struct usbip_header *hdr)
 		break;
 #endif
 	default:
-		TraceWarning(TRACE_WRITE, "not supported func: %!URBFUNC!", urb->UrbHeader.Function);
+		TraceWarning(TRACE_WRITE, "not supported %!urb_function!", urb->UrbHeader.Function);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
