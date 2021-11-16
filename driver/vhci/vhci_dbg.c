@@ -57,29 +57,8 @@ static namecode_t	namecodes_vhci_ioctl[] = {
 	{0,0}
 };
 
-struct namecode	namecodes_usb_user_req[] = {
-	K_V(USBUSER_GET_CONTROLLER_INFO_0)
-	K_V(USBUSER_GET_CONTROLLER_DRIVER_KEY)
-	K_V(USBUSER_PASS_THRU)
-	K_V(USBUSER_GET_POWER_STATE_MAP)
-	K_V(USBUSER_GET_BANDWIDTH_INFORMATION)
-	K_V(USBUSER_GET_BUS_STATISTICS_0)
-	K_V(USBUSER_GET_ROOTHUB_SYMBOLIC_NAME)
-	K_V(USBUSER_GET_USB_DRIVER_VERSION)
-	K_V(USBUSER_GET_USB2_HW_VERSION)
-	K_V(USBUSER_USB_REFRESH_HCT_REG)
-	{0,0}
-};
-
 const char *
 dbg_vhci_ioctl_code(unsigned int ioctl_code)
 {
 	return dbg_namecode(namecodes_vhci_ioctl, "ioctl", ioctl_code);
 }
-
-const char *
-dbg_usb_user_request_code(ULONG code)
-{
-	return dbg_namecode(namecodes_usb_user_req, "usb user request", code);
-}
-

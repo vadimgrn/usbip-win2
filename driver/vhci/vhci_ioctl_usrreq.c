@@ -7,13 +7,13 @@
 #include <usbdi.h>
 #include <usbuser.h>
 
-static PAGEABLE NTSTATUS
-get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 {
-	PUSB_POWER_INFO	pinfo = (PUSB_POWER_INFO)buffer;
+	USB_POWER_INFO *pinfo = buffer;
 
-	if (inlen < sizeof(USB_POWER_INFO))
+	if (inlen < sizeof(*pinfo)) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
 
 	pinfo->HcDeviceWake = WdmUsbPowerDeviceUnspecified;
 	pinfo->HcSystemWake = WdmUsbPowerNotMapped;
@@ -41,21 +41,22 @@ get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 		pinfo->RhDevicePowerState = WdmUsbPowerNotMapped;
 		break;
 	}
+
 	pinfo->CanWakeup = FALSE;
 	pinfo->IsPowered = FALSE;
 
-	*poutlen = sizeof(USB_POWER_INFO);
-
+	*poutlen = sizeof(*pinfo);
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS
-get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 {
-	PUSB_CONTROLLER_INFO_0	pinfo = (PUSB_CONTROLLER_INFO_0)buffer;
+	USB_CONTROLLER_INFO_0 *pinfo = buffer;
 
-	if (inlen < sizeof(USB_CONTROLLER_INFO_0))
+	if (inlen < sizeof(*pinfo)) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
+
 	pinfo->PciVendorId = 0;
 	pinfo->PciDeviceId = 0;
 	pinfo->PciRevision = 0;
@@ -63,28 +64,26 @@ get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 	pinfo->ControllerFlavor = EHCI_Generic;
 	pinfo->HcFeatureFlags = 0;
 
-	*poutlen = sizeof(USB_CONTROLLER_INFO_0);
-
+	*poutlen = sizeof(*pinfo);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
-	USBUSER_REQUEST_HEADER	*hdr = (USBUSER_REQUEST_HEADER *)buffer;
-	NTSTATUS	status = STATUS_INVALID_DEVICE_REQUEST;
-
 	UNREFERENCED_PARAMETER(vhci);
 
-	if (inlen < sizeof(USBUSER_REQUEST_HEADER)) {
+	USBUSER_REQUEST_HEADER *hdr = buffer;
+	if (inlen < sizeof(*hdr)) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	TraceInfo(TRACE_IOCTL, "usb user request: code: %s\n", dbg_usb_user_request_code(hdr->UsbUserRequest));
+	TraceInfo(TRACE_IOCTL, "%!usbuser!\n", hdr->UsbUserRequest);
 
-	buffer = (PVOID)(hdr + 1);
-	inlen -= sizeof(USBUSER_REQUEST_HEADER);
-	(*poutlen) -= sizeof(USBUSER_REQUEST_HEADER);
+	buffer = hdr + 1;
+	inlen -= sizeof(*hdr);
+	*poutlen -= sizeof(*hdr);
+
+	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (hdr->UsbUserRequest) {
 	case USBUSER_GET_POWER_STATE_MAP:
@@ -94,19 +93,18 @@ vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG pout
 		status = get_controller_info(hdr + 1, inlen, poutlen);
 		break;
 	default:
-		TraceInfo(TRACE_IOCTL, "usb user request: unhandled code: %s\n", dbg_usb_user_request_code(hdr->UsbUserRequest));
+		TraceWarning(TRACE_IOCTL, "unhandled %!usbuser!\n", hdr->UsbUserRequest);
 		hdr->UsbUserStatusCode = UsbUserNotSupported;
-		break;
 	}
 
 	if (NT_SUCCESS(status)) {
-		(*poutlen) += sizeof(USBUSER_REQUEST_HEADER);
+		*poutlen += sizeof(*hdr);
 		hdr->UsbUserStatusCode = UsbUserSuccess;
 		hdr->ActualBufferLength = *poutlen;
-	}
-	else {
-		hdr->UsbUserStatusCode = UsbUserMiniportError;///TODO
+	} else {
+		hdr->UsbUserStatusCode = UsbUserMiniportError; // TODO
 
 	}
+
 	return status;
 }
