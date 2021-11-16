@@ -56,7 +56,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 		status = req_fetch_dsc(vpdo, irp);
 		break;
 	default:
-		TraceError(TRACE_GENERAL, "unhandled descriptor type: %s\n", dbg_usb_descriptor_type(setup->wValue.HiByte));
+		TraceError(TRACE_GENERAL, "unhandled %!usb_descriptor_type!\n", setup->wValue.HiByte);
 		break;
 	}
 

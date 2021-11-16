@@ -13,16 +13,6 @@ static const namecode_t namecodes_usbd_status[] =
 	{0,0}
 };
 
-static const namecode_t namecodes_usb_descriptor_type[] = 
-{
-	K_V(USB_DEVICE_DESCRIPTOR_TYPE)
-	K_V(USB_CONFIGURATION_DESCRIPTOR_TYPE)
-	K_V(USB_STRING_DESCRIPTOR_TYPE)
-	K_V(USB_INTERFACE_DESCRIPTOR_TYPE)
-	K_V(USB_ENDPOINT_DESCRIPTOR_TYPE)
-	{0,0}
-};
-
 const char *dbg_namecode_buf(
 	const namecode_t *namecodes, const char *codetype, unsigned int code, 
 	char *buf, unsigned int buf_max, unsigned int *written)
@@ -58,10 +48,3 @@ const char *dbg_usbd_status(USBD_STATUS status)
 	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_usbd_status, "usbd status", status, buf, sizeof(buf), NULL);
 }
-
-const char *dbg_usb_descriptor_type(UCHAR dsc_type)
-{
-	static char buf[NAMECODE_BUF_MAX];
-	return dbg_namecode_buf(namecodes_usb_descriptor_type, "descriptor type", dsc_type, buf, sizeof(buf), NULL);
-}
-
