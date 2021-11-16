@@ -21,7 +21,7 @@ const char *dbg_namecode_buf(
 
 	for ( ; namecodes->name; ++namecodes) {
 		if (code == namecodes->code) {
-			cnt += libdrv_snprintf(buf, buf_max , "%s", namecodes->name);
+			cnt += libdrv_snprintf(buf, buf_max, "%s", namecodes->name);
 			break;
 		}
 	}

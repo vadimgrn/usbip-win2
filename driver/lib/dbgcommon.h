@@ -1,6 +1,5 @@
 #pragma once
 
-#include "usbip_proto.h"
+struct usbip_header;
 
-const char *dbg_usbip_hdr(struct usbip_header *hdr);
-const char *dbg_command(UINT32 command);
+const char *dbg_usbip_hdr(const struct usbip_header *hdr);

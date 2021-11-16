@@ -508,7 +508,7 @@ stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp)
 	case USBIP_CMD_UNLINK:
 		return process_cmd_unlink(devstub, irp, hdr);
 	default:
-		TraceError(TRACE_READWRITE, "invalid command: %s\n", dbg_command(hdr->base.command));
+		TraceError(TRACE_READWRITE, "invalid command: %!usbip_request_type!\n", hdr->base.command);
 		return STATUS_INVALID_PARAMETER;
 	}
 }
