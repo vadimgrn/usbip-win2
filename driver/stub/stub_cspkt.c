@@ -1,10 +1,6 @@
 #include "stub_driver.h"
-
-#include "dbgcode.h"
 #include "dbgcommon.h"
-
 #include "stub_cspkt.h"
-
 #include "strutil.h"
 
 #include <usbspec.h>

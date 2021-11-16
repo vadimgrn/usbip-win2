@@ -1,5 +1,5 @@
 #include "vhci_dbg.h"
-#include "dbgcode.h"
+#include "dbgcommon.h"
 
 #include <usbdi.h>
 #include <usbspec.h>

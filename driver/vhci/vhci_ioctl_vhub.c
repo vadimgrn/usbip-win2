@@ -1,5 +1,5 @@
 #include "vhci_ioctl_vhub.h"
-#include "dbgcode.h"
+#include "dbgcommon.h"
 #include "trace.h"
 #include "vhci_ioctl_vhub.tmh"
 

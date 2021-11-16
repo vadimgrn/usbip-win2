@@ -2,7 +2,6 @@
 #include "vhci_driver.h"
 #include "vhci_urbr_fetch.tmh"
 
-#include "dbgcode.h"
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
 #include "usbd_helper.h"

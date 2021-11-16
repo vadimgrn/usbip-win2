@@ -1,5 +1,5 @@
 #include "vhci_read.h"
-#include "dbgcode.h"
+#include "dbgcommon.h"
 #include "trace.h"
 #include "vhci_read.tmh"
 

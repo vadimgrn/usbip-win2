@@ -1,12 +1,10 @@
 #include "stub_driver.h"
 #include "stub_dev.h"
 #include "dbgcommon.h"
+#include "usbip_stub_api.h"
+#include "strutil.h"
 
 #include <ntstrsafe.h>
-#include "dbgcode.h"
-#include "usbip_stub_api.h"
-
-#include "strutil.h"
 
 const char *
 dbg_device(PDEVICE_OBJECT devobj)

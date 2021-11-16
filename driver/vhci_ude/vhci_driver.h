@@ -9,7 +9,7 @@
 
 #include <ude/1.0/UdeCx.h>
 
-#include "dbgcode.h"
+#include "dbgcommon.h"
 #include "vhci_dev.h"
 #include "vhci_dbg.h"
 #include "vhci_trace.h"

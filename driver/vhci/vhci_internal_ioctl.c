@@ -1,5 +1,5 @@
 #include "vhci_internal_ioctl.h"
-#include "dbgcode.h"
+#include "dbgcommon.h"
 #include "trace.h"
 #include "vhci_internal_ioctl.tmh"
 

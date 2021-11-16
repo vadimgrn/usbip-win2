@@ -1,9 +1,7 @@
 #pragma once
 
 #include "dbgcommon.h"
-#include "dbgcode.h"
 #include "stub_dev.h"
-
 #include "stub_devconf.h"
 
 const char *dbg_device(PDEVICE_OBJECT devobj);
