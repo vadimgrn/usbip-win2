@@ -109,8 +109,8 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Enter: minor:%s\n",
-		DEVOBJ_VDEV_TYPE(devobj), dbg_power_minor(irpstack->MinorFunction));
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!\n",
+		DEVOBJ_VDEV_TYPE(devobj), irpstack->MinorFunction);
 
 	status = STATUS_SUCCESS;
 

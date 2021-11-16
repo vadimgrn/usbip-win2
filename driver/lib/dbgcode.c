@@ -13,15 +13,6 @@ static const namecode_t namecodes_usbd_status[] =
 	{0,0}
 };
 
-static const namecode_t namecodes_power_minor[] = 
-{
-	K_V(IRP_MN_SET_POWER)
-	K_V(IRP_MN_QUERY_POWER)
-	K_V(IRP_MN_POWER_SEQUENCE)
-	K_V(IRP_MN_WAIT_WAKE)
-	{0,0}
-};
-
 static const namecode_t namecodes_usb_descriptor_type[] = 
 {
 	K_V(USB_DEVICE_DESCRIPTOR_TYPE)
@@ -66,12 +57,6 @@ const char *dbg_usbd_status(USBD_STATUS status)
 {
 	static char buf[NAMECODE_BUF_MAX];
 	return dbg_namecode_buf(namecodes_usbd_status, "usbd status", status, buf, sizeof(buf), NULL);
-}
-
-const char *dbg_power_minor(UCHAR minor)
-{
-	static char buf[NAMECODE_BUF_MAX];
-	return dbg_namecode_buf(namecodes_power_minor, "power minor function", minor, buf, sizeof(buf), NULL);
 }
 
 const char *dbg_usb_descriptor_type(UCHAR dsc_type)
