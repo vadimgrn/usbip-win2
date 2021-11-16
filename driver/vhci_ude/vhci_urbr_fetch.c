@@ -2,6 +2,7 @@
 #include "vhci_driver.h"
 #include "vhci_urbr_fetch.tmh"
 
+#include "dbgcode.h"
 #include "usbip_proto.h"
 #include "vhci_urbr.h"
 #include "usbd_helper.h"
@@ -16,18 +17,18 @@
 NTSTATUS
 copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, PVOID src, int src_len)
 {
-	PVOID	buf;
-
 	if (dst_len < src_len) {
 		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d\n", dst_len, src_len);
 		return STATUS_INVALID_PARAMETER;
 	}
-	buf = get_buf(buf_dst, bufMDL);
-	if (buf == NULL)
-		return STATUS_INVALID_PARAMETER;
+	
+	VOID *buf = get_buf(buf_dst, bufMDL);
+	if (buf) {
+		RtlCopyMemory(buf, src, src_len);
+		return STATUS_SUCCESS;
+	}
 
-	RtlCopyMemory(buf, src, src_len);
-	return STATUS_SUCCESS;
+	return STATUS_INVALID_PARAMETER;
 }
 
 static NTSTATUS

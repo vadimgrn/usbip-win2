@@ -1,6 +1,4 @@
 #include "vhci_dbg.h"
-#include "vhci_driver.h"
-
 #include "dbgcode.h"
 
 #include <usbdi.h>
@@ -9,57 +7,22 @@
 #include "strutil.h"
 #include "usbip_vhci_api.h"
 
-#include "vhci_urbr.h"
-
 /*
  * WPP call requires both a debug message buffer and the length at the same time.
  * Thus, WPP macros reference global variables, which are manipluated via dbg_xxxx().
  */
-char	buf_dbg_vhci_ioctl_code[128];
-char	buf_dbg_setup_packet[128];
-char	buf_dbg_urbr[128];
+enum { NAMECODE_BUF_MAX = 128 };
 
-int	len_dbg_vhci_ioctl_code;
-int	len_dbg_setup_packet;
-int	len_dbg_urbr;
+char buf_dbg_vhci_ioctl_code[NAMECODE_BUF_MAX];
+char buf_dbg_setup_packet[NAMECODE_BUF_MAX];
+char buf_dbg_urbr[NAMECODE_BUF_MAX];
 
-/*
- * NOTE: WPP tracing requires debug message routines even for a debug configuration.
- * So, debug routines in this file will be built against a release configuration.
- */
-enum { NAMECODE_BUF_MAX = 256 };
+unsigned int len_dbg_vhci_ioctl_code;
+unsigned int len_dbg_setup_packet;
+unsigned int len_dbg_urbr;
 
-#define K_V(a) {#a, (unsigned int)a},
-
-typedef struct {
-	const char *name;
-	unsigned int code;
-} namecode_my_t;
-
-static const char *
-dbg_namecode_buf_len(namecode_my_t *namecodes, const char *codetype, unsigned int code, char *buf, int buf_max, int *plen)
+static const namecode_t namecodes_vhci_ioctl[] = 
 {
-	ULONG	nwritten = 0;
-	ULONG	n_codes = 0;
-	int i;
-
-	/* assume: duplicated codes may exist */
-	for (i = 0; namecodes[i].name; i++) {
-		if (code == namecodes[i].code) {
-			if (nwritten > 0)
-				nwritten += libdrv_snprintf(buf + nwritten, buf_max - nwritten, ",%s", namecodes[i].name);
-			else
-				nwritten = libdrv_snprintf(buf, buf_max, "%s", namecodes[i].name);
-			n_codes++;
-		}
-	}
-	if (n_codes == 0)
-		nwritten += libdrv_snprintf(buf, buf_max, "Unknown %s code: %x", codetype, code);
-	*plen = nwritten + 1;
-	return buf;
-}
-
-static namecode_my_t	namecodes_vhci_ioctl[] = {
 	K_V(IOCTL_USBIP_VHCI_PLUGIN_HARDWARE)
 	K_V(IOCTL_USBIP_VHCI_UNPLUG_HARDWARE)
 	K_V(IOCTL_USBIP_VHCI_GET_PORTS_STATUS)
@@ -109,51 +72,51 @@ static namecode_my_t	namecodes_vhci_ioctl[] = {
 	{0,0}
 };
 
-const char *
-dbg_vhci_ioctl_code(unsigned int ioctl_code)
+const char *dbg_vhci_ioctl_code(unsigned int ioctl_code)
 {
-	return dbg_namecode_buf_len(namecodes_vhci_ioctl, "ioctl", ioctl_code, buf_dbg_vhci_ioctl_code, 128, &len_dbg_vhci_ioctl_code);
+	return dbg_namecode_buf(namecodes_vhci_ioctl, "ioctl", ioctl_code, 
+			buf_dbg_vhci_ioctl_code, sizeof(buf_dbg_vhci_ioctl_code), 
+			&len_dbg_vhci_ioctl_code);
 }
 
-const char *
-dbg_usb_setup_packet(PCUCHAR packet)
+const char *dbg_usb_setup_packet(PCUCHAR packet)
 {
-	PUSB_DEFAULT_PIPE_SETUP_PACKET	pkt = (PUSB_DEFAULT_PIPE_SETUP_PACKET)packet;
+	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)packet;
 
-	len_dbg_setup_packet = libdrv_snprintf(buf_dbg_setup_packet, 128, "rqtype:%02x,req:%02x,wIndex:%hu,wLength:%hu,wValue:%hu",
-		pkt->bmRequestType, pkt->bRequest, pkt->wIndex, pkt->wLength, pkt->wValue);
-	len_dbg_setup_packet++;
+	len_dbg_setup_packet = libdrv_snprintf(buf_dbg_setup_packet, sizeof(buf_dbg_setup_packet), 
+				"rqtype:%02x,req:%02x,wIndex:%hu,wLength:%hu,wValue:%hu",
+				pkt->bmRequestType, pkt->bRequest, pkt->wIndex, pkt->wLength, pkt->wValue);
+
+	++len_dbg_setup_packet;
 	return buf_dbg_setup_packet;
 }
 
-const char *
-dbg_urbr(purb_req_t urbr)
+const char *dbg_urbr(const urb_req_t *urbr)
 {
-	if (urbr == NULL) {
-		len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[null]");
-	}
-	else {
+	if (!urbr) {
+		len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[null]");
+	} else {
 		switch (urbr->type) {
 		case URBR_TYPE_URB:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[urb,seq:%u,!%urb_function%]", urbr->seq_num, urbr->u.urb.urb->UrbHeader.Function);
+			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[urb,seq:%u,!%urb_function%]", urbr->seq_num, urbr->u.urb.urb->UrbHeader.Function);
 			break;
 		case URBR_TYPE_UNLINK:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[ulk,seq:%u,%u]", urbr->seq_num, urbr->u.seq_num_unlink);
+			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[ulk,seq:%u,%u]", urbr->seq_num, urbr->u.seq_num_unlink);
 			break;
 		case URBR_TYPE_SELECT_CONF:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[slc,seq:%u,%hhu]", urbr->seq_num, urbr->u.conf_value);
+			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[slc,seq:%u,%hhu]", urbr->seq_num, urbr->u.conf_value);
 			break;
 		case URBR_TYPE_SELECT_INTF:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[sli,seq:%u,%hhu,%hhu]", urbr->seq_num, urbr->u.intf.intf_num, urbr->u.intf.alt_setting);
+			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[sli,seq:%u,%hhu,%hhu]", urbr->seq_num, urbr->u.intf.intf_num, urbr->u.intf.alt_setting);
 			break;
 		case URBR_TYPE_RESET_PIPE:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[rst,seq:%u,%hhu]", urbr->seq_num, urbr->ep->addr);
+			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[rst,seq:%u,%hhu]", urbr->seq_num, urbr->ep->addr);
 			break;
 		default:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, 128, "[unk:seq:%u]", urbr->seq_num);
-			break;
+			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[unk:seq:%u]", urbr->seq_num);			break;
 		}
 	}
-	len_dbg_urbr++;
+	
+	++len_dbg_urbr;
 	return buf_dbg_urbr;
 }
