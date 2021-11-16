@@ -1,8 +1,8 @@
 #include "vhci_internal_ioctl.h"
+#include "dbgcode.h"
 #include "trace.h"
 #include "vhci_internal_ioctl.tmh"
 
-#include "vhci_dbg.h"
 #include "usbreq.h"
 
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
@@ -137,14 +137,13 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	PIO_STACK_LOCATION      irpStack;
 	NTSTATUS		status;
 	pvpdo_dev_t	vpdo;
-	ULONG			ioctl_code;
 
 	TraceInfo(TRACE_IOCTL, "Enter\n");
 
 	irpStack = IoGetCurrentIrpStackLocation(Irp);
-	ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
+	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "ioctl code: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+	TraceInfo(TRACE_IOCTL, "%!IOCTL!\n", ioctl_code);
 
 	if (!IS_DEVOBJ_VPDO(devobj)) {
 		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed\n");
@@ -177,7 +176,7 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled internal ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceError(TRACE_IOCTL, "unhandled %!IOCTL!\n", ioctl_code);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}

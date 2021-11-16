@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.c" />
-    <ClCompile Include="vhci_dbg.c" />
     <ClCompile Include="vhci_dev.c" />
     <ClCompile Include="vhci_devconf.c" />
     <ClCompile Include="vhci_internal_ioctl.c" />
@@ -48,7 +47,6 @@
     <ClInclude Include="..\..\include\usbip_proto.h" />
     <ClInclude Include="basetype.h" />
     <ClInclude Include="vhci.h" />
-    <ClInclude Include="vhci_dbg.h" />
     <ClInclude Include="vhci_dev.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="vhci_devconf.h" />

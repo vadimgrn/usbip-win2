@@ -2,8 +2,6 @@
 #include "trace.h"
 #include "vhci_ioctl_usrreq.tmh"
 
-#include "vhci_dbg.h"
-
 #include <usbdi.h>
 #include <usbuser.h>
 

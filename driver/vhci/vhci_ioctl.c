@@ -1,4 +1,5 @@
 #include "vhci.h"
+#include "dbgcode.h"
 #include "trace.h"
 #include "vhci_ioctl.tmh"
 
@@ -9,19 +10,15 @@ PAGEABLE NTSTATUS
 vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	pvdev_t	vdev = DEVOBJ_TO_VDEV(devobj);
-	PIO_STACK_LOCATION	irpstack;
-	ULONG		ioctl_code;
-	PVOID		buffer;
-	ULONG		inlen, outlen;
-	NTSTATUS	status = STATUS_INVALID_DEVICE_REQUEST;
+	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	PAGED_CODE();
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
-	ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
+	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
+	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: code:%s, irp:%p\n",
-		DEVOBJ_VDEV_TYPE(devobj), dbg_vhci_ioctl_code(ioctl_code), irp);
+	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %!IOCTL!, irp:%p\n",
+		DEVOBJ_VDEV_TYPE(devobj), ioctl_code, irp);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
@@ -29,9 +26,10 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		goto END;
 	}
 
-	buffer = irp->AssociatedIrp.SystemBuffer;
-	inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
-	outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+	PVOID buffer = irp->AssociatedIrp.SystemBuffer;
+
+	ULONG inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
+	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
 	switch (DEVOBJ_VDEV_TYPE(devobj)) {
 	case VDEV_VHCI:

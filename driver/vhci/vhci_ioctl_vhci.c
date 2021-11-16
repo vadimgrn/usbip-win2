@@ -1,4 +1,5 @@
 #include "vhci_ioctl_vhci.h"
+#include "dbgcode.h"
 #include "trace.h"
 #include "vhci_ioctl_vhci.tmh"
 
@@ -115,7 +116,7 @@ vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code,
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled vhci ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceError(TRACE_IOCTL, "unhandled vhci ioctl: %!IOCTL!\n", ioctl_code);
 		break;
 	}
 

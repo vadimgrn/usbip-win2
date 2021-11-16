@@ -1,4 +1,5 @@
 #include "vhci.h"
+#include "dbgcode.h"
 #include "trace.h"
 #include "vhci_write.tmh"
 
@@ -361,7 +362,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_WRITE, "process_urb_res: urbr:%s, ioctl:%s\n", dbg_urbr(urbr), dbg_vhci_ioctl_code(ioctl_code));
+	TraceInfo(TRACE_WRITE, "urbr:%s, %!IOCTL!\n", dbg_urbr(urbr), ioctl_code);
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
@@ -371,7 +372,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		return process_urb_dsc_req(urbr, hdr);
 	default:
-		TraceError(TRACE_WRITE, "unhandled ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceError(TRACE_WRITE, "unhandled %!IOCTL!\n", ioctl_code);
 		return STATUS_INVALID_PARAMETER;
 	}
 }

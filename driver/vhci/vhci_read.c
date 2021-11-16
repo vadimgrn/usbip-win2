@@ -1,8 +1,8 @@
 #include "vhci_read.h"
+#include "dbgcode.h"
 #include "trace.h"
 #include "vhci_read.tmh"
 
-#include "vhci_dbg.h"
 #include "vhci_proto.h"
 #include "vhci_internal_ioctl.h"
 #include "usbd_helper.h"
@@ -815,7 +815,7 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 		status = store_urb_dsc_req(irp, urbr);
 		break;
 	default:
-		TraceWarning(TRACE_READ, "unhandled ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceWarning(TRACE_READ, "unhandled ioctl: %!IOCTL!\n", ioctl_code);
 		irp->IoStatus.Information = 0;
 		status = STATUS_INVALID_PARAMETER;
 		break;

@@ -3,7 +3,6 @@
 #include "vhci_pnp_remove.tmh"
 
 #include "vhci.h"
-#include "vhci_dbg.h"
 #include "vhci_pnp.h"
 #include "vhci_irp.h"
 #include "vhci_wmi.h"

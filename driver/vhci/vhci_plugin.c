@@ -2,7 +2,6 @@
 #include "trace.h"
 #include "vhci_plugin.tmh"
 
-#include "vhci_dbg.h"
 #include "strutil.h"
 #include "vhci_vhub.h"
 #include "vhci_pnp.h"

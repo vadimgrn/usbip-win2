@@ -2,7 +2,6 @@
 #include "trace.h"
 #include "vhci_pnp_start.tmh"
 
-#include "vhci_dbg.h"
 #include "vhci_pnp.h"
 #include "vhci_irp.h"
 #include "vhci_wmi.h"

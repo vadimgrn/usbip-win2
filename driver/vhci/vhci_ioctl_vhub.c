@@ -1,4 +1,5 @@
 #include "vhci_ioctl_vhub.h"
+#include "dbgcode.h"
 #include "trace.h"
 #include "vhci_ioctl_vhub.tmh"
 
@@ -220,7 +221,7 @@ vhci_ioctl_vhub(pvhub_dev_t vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULON
 		status = get_node_driverkey_name(vhub, buffer, inlen, poutlen);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled vhub ioctl: %s\n", dbg_vhci_ioctl_code(ioctl_code));
+		TraceError(TRACE_IOCTL, "unhandled vhub ioctl: %!IOCTL!\n", ioctl_code);
 		break;
 	}
 

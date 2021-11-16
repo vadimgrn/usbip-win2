@@ -2,7 +2,6 @@
 #include "trace.h"
 #include "vhci_vpdo.tmh"
 
-#include "vhci_dbg.h"
 #include "vhci.h"
 #include "usbreq.h"
 #include "devconf.h"

@@ -3,7 +3,6 @@
 #include "vhci_pnp_cap.tmh"
 
 #include "vhci_irp.h"
-#include "vhci_dbg.h"
 
 static PAGEABLE NTSTATUS
 get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
