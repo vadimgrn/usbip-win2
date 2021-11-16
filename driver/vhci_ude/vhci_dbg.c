@@ -157,14 +157,3 @@ dbg_urbr(purb_req_t urbr)
 	len_dbg_urbr++;
 	return buf_dbg_urbr;
 }
-
-/*
- * Dummy dbg_usbd_status() will be used in release mode
- * so that debug routines commonly shared by a vhci anda stub are intact.
- */
-const char *
-dbg_usbd_status(USBD_STATUS status)
-{
-	UNREFERENCED_PARAMETER(status);
-	return "";
-}

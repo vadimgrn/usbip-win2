@@ -14,5 +14,3 @@ extern int len_dbg_urbr;
 const char *dbg_vhci_ioctl_code(unsigned int ioctl_code);
 const char *dbg_usb_setup_packet(PCUCHAR packet);
 const char *dbg_urbr(purb_req_t urbr);
-
-const char *dbg_usbd_status(USBD_STATUS status);
