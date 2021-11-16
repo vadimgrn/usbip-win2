@@ -6,7 +6,7 @@
 #include "usbip_proto.h"
 #include "vhci_read.h"
 
-const char *dbg_urbr(struct urb_req *urbr)
+const char* dbg_urbr(const struct urb_req* urbr)
 {
 	static char buf[128];
 
