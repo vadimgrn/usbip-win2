@@ -815,7 +815,7 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 		status = store_urb_dsc_req(irp, urbr);
 		break;
 	default:
-		TraceWarning(TRACE_READ, "unhandled ioctl: %!IOCTL!\n", ioctl_code);
+		TraceWarning(TRACE_READ, "unhandled %s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
 		irp->IoStatus.Information = 0;
 		status = STATUS_INVALID_PARAMETER;
 		break;

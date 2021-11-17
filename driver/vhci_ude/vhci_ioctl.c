@@ -109,26 +109,26 @@ ioctl_plugin_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen, size_t outlen)
 	vhci_pluginfo_t *pluginfo = NULL;
 
 	if (inlen < sizeof(*pluginfo)) {
-		TraceError(TRACE_IOCTL, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
+		TraceError(TRACE_IOCTL, "too small input length: %lld < %lld\n", inlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	if (outlen < sizeof(*pluginfo)) {
-		TraceError(TRACE_IOCTL, "too small output length: %lld < %lld", outlen, sizeof(*pluginfo));
+		TraceError(TRACE_IOCTL, "too small output length: %lld < %lld\n", outlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	size_t len = 0;
 	NTSTATUS status = WdfRequestRetrieveInputBuffer(req, sizeof(*pluginfo), &pluginfo, &len);
 	if (NT_ERROR(status)) {
-		TraceError(TRACE_IOCTL, "failed to get pluginfo buffer: %!STATUS!", status);
+		TraceError(TRACE_IOCTL, "failed to get pluginfo buffer: %!STATUS!\n", status);
 		return status;
 	}
 
 	USHORT wTotalLength = pluginfo->dscr_conf.wTotalLength;
 
 	if (len != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
-		TraceError(TRACE_IOCTL, "invalid pluginfo format: %lld != %lld", len, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
+		TraceError(TRACE_IOCTL, "invalid pluginfo format: %lld != %lld\n", len, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -147,13 +147,13 @@ ioctl_plugout_vusb(WDFQUEUE queue, WDFREQUEST req, size_t inlen)
 	NTSTATUS	status;
 
 	if (inlen != sizeof(ioctl_usbip_vhci_unplug)) {
-		TraceError(TRACE_IOCTL, "invalid unplug input size: %lld < %lld", inlen, sizeof(ioctl_usbip_vhci_unplug));
+		TraceError(TRACE_IOCTL, "invalid unplug input size: %lld < %lld\n", inlen, sizeof(ioctl_usbip_vhci_unplug));
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	status = WdfRequestRetrieveInputBuffer(req, sizeof(ioctl_usbip_vhci_unplug), &unpluginfo, NULL);
 	if (NT_ERROR(status)) {
-		TraceError(TRACE_IOCTL, "failed to get unplug buffer: %!STATUS!", status);
+		TraceError(TRACE_IOCTL, "failed to get unplug buffer: %!STATUS!\n", status);
 		return status;
 	}
 
@@ -194,7 +194,7 @@ io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 
 	UNREFERENCED_PARAMETER(outlen);
 
-	TraceInfo(TRACE_IOCTL, "Enter: %!IOCTL!", ioctl_code);
+	TraceInfo(TRACE_IOCTL, "%s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
@@ -214,14 +214,12 @@ io_device_control(_In_ WDFQUEUE queue, _In_ WDFREQUEST req,
 		break;
 	default:
 		if (UdecxWdfDeviceTryHandleUserIoctl((*TO_PVHCI(queue))->hdev, req)) {
-			TraceInfo(TRACE_IOCTL, "Leave: handled by Udecx");
+			TraceInfo(TRACE_IOCTL, "handled by Udecx\n");
 			return;
 		}
-		TraceError(TRACE_IOCTL, "unhandled IOCTL: %!IOCTL!", ioctl_code);
-		break;
+		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	WdfRequestComplete(req, status);
-
-	TraceInfo(TRACE_IOCTL, "Leave: %!STATUS!", status);
+	TraceInfo(TRACE_IOCTL, "Leave: %!STATUS!\n", status);
 }

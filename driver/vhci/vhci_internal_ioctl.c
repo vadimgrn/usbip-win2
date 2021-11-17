@@ -143,7 +143,7 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!IOCTL!\n", ioctl_code);
+	TraceInfo(TRACE_IOCTL, "%s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	if (!IS_DEVOBJ_VPDO(devobj)) {
 		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed\n");
@@ -176,7 +176,7 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled %!IOCTL!\n", ioctl_code);
+		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
