@@ -1,6 +1,7 @@
 #include "vhci_dbg.h"
 #include "dbgcommon.h"
 
+#include <ntstrsafe.h>
 #include <usbdi.h>
 #include <usbspec.h>
 
@@ -13,23 +14,18 @@
  */
 enum { NAMECODE_BUF_MAX = 128 };
 
-char buf_dbg_setup_packet[NAMECODE_BUF_MAX];
 char buf_dbg_urbr[NAMECODE_BUF_MAX];
-
-unsigned int len_dbg_setup_packet;
 unsigned int len_dbg_urbr;
 
-
-const char *dbg_usb_setup_packet(PCUCHAR packet)
+const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet)
 {
-	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)packet;
+	const USB_DEFAULT_PIPE_SETUP_PACKET *pkt = packet;
+	
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
+			"rqtype:%02x,req:%02x,wIndex:%hu,wLength:%hu,wValue:%hu",
+			pkt->bmRequestType, pkt->bRequest, pkt->wIndex, pkt->wLength, pkt->wValue);
 
-	len_dbg_setup_packet = libdrv_snprintf(buf_dbg_setup_packet, sizeof(buf_dbg_setup_packet), 
-				"rqtype:%02x,req:%02x,wIndex:%hu,wLength:%hu,wValue:%hu",
-				pkt->bmRequestType, pkt->bRequest, pkt->wIndex, pkt->wLength, pkt->wValue);
-
-	++len_dbg_setup_packet;
-	return buf_dbg_setup_packet;
+	return st == STATUS_SUCCESS ? buf : "dbg_usb_setup_packet error";
 }
 
 const char *dbg_urbr(const urb_req_t *urbr)
