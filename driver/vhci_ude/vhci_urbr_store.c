@@ -23,7 +23,8 @@ store_urbr_partial(WDFREQUEST req_read, purb_req_t urbr)
 	WDF_REQUEST_PARAMETERS	params;
 	NTSTATUS	status;
 
-	TraceInfo(TRACE_READ, "Enter: urbr: %!URBR!", urbr);
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_READ, "Enter: urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
 
 	WDF_REQUEST_PARAMETERS_INIT(&params);
 	WdfRequestGetParameters(urbr->req, &params);
@@ -71,7 +72,9 @@ store_urbr_urb(WDFREQUEST req_read, purb_req_t urbr)
 	NTSTATUS	status;
 
 	urb_func = urbr->u.urb.urb->UrbHeader.Function;
-	TraceInfo(TRACE_READ, "%!URBR!", urbr);
+
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_READ, "%s", dbg_urbr(buf, sizeof(buf), urbr));
 
 	switch (urb_func) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
@@ -141,7 +144,8 @@ store_cancelled_urbr(WDFREQUEST req_read, purb_req_t urbr)
 NTSTATUS
 store_urbr(WDFREQUEST req_read, purb_req_t urbr)
 {
-	TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(urbr));
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
 
 	switch (urbr->type) {
 	case URBR_TYPE_URB:

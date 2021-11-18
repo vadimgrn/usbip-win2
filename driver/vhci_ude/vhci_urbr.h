@@ -18,10 +18,10 @@ typedef enum {
 } urbr_type_t;
 
 typedef struct _urb_req {
-	pctx_ep_t	ep;
-	WDFREQUEST	req;
-	urbr_type_t	type;
-	unsigned long	seq_num;
+	ctx_ep_t *ep;
+	WDFREQUEST req;
+	urbr_type_t type;
+	unsigned long seq_num;
 	union {
 		struct {
 			PURB	urb;

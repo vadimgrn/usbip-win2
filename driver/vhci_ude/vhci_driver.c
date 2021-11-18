@@ -18,7 +18,7 @@ DriverEntry(_In_ PDRIVER_OBJECT drvobj, _In_ PUNICODE_STRING regpath)
 	PAGED_CODE();
 
 	WPP_INIT_TRACING(drvobj, regpath);
-	TraceInfo(TRACE_DRIVER, "Enter\n");
+	TraceInfo(TRACE_DRIVER, "Enter");
 
 	WDF_DRIVER_CONFIG conf;
 	WDF_DRIVER_CONFIG_INIT(&conf, evt_add_vhci);

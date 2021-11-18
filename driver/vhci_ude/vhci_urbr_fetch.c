@@ -101,23 +101,22 @@ handle_urbr_error(purb_req_t urbr, struct usbip_header *hdr)
 		submit_req_reset_pipe(urbr->ep, NULL);
 	}
 
-	TraceWarning(TRACE_WRITE, "%s(%#010lX): %!URBR!", dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status, urbr);
+	char buf[DBG_URBR_BUFSZ];
+	TraceWarning(TRACE_WRITE, "%s(%#010lX): %s", dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status, dbg_urbr(buf, sizeof(buf), urbr));
 }
 
 NTSTATUS
 fetch_urbr(purb_req_t urbr, struct usbip_header *hdr)
 {
-	NTSTATUS	status;
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_WRITE, "Enter: %s", dbg_urbr(buf, sizeof(buf), urbr));
 
-	TraceInfo(TRACE_WRITE, "Enter: %!URBR!", urbr);
+	NTSTATUS status = STATUS_SUCCESS;
 
-	if (urbr->type != URBR_TYPE_URB) {
-		status = STATUS_SUCCESS;
-	}
-	else {
-		if (hdr->u.ret_submit.status != 0)
+	if (urbr->type == URBR_TYPE_URB) {
+		if (hdr->u.ret_submit.status) {
 			handle_urbr_error(urbr, hdr);
-
+		}
 		status = fetch_urbr_urb(urbr->u.urb.urb, hdr);
 	}
 

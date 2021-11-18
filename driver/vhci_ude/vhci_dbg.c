@@ -1,59 +1,52 @@
 #include "vhci_dbg.h"
 #include "dbgcommon.h"
+#include "strutil.h"
+#include "usbip_vhci_api.h"
 
 #include <ntstrsafe.h>
 #include <usbdi.h>
 #include <usbspec.h>
-
-#include "strutil.h"
-#include "usbip_vhci_api.h"
-
-/*
- * WPP call requires both a debug message buffer and the length at the same time.
- * Thus, WPP macros reference global variables, which are manipluated via dbg_xxxx().
- */
-enum { NAMECODE_BUF_MAX = 128 };
-
-char buf_dbg_urbr[NAMECODE_BUF_MAX];
-unsigned int len_dbg_urbr;
 
 const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet)
 {
 	const USB_DEFAULT_PIPE_SETUP_PACKET *pkt = packet;
 	
 	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
-			"rqtype:%02x,req:%02x,wIndex:%hu,wLength:%hu,wValue:%hu",
-			pkt->bmRequestType, pkt->bRequest, pkt->wIndex, pkt->wLength, pkt->wValue);
+			"[bmRequestType %#04x, bRequest %#04x, wValue %#06hx, wIndex %#06hx, wLength %hu]",
+			pkt->bmRequestType, pkt->bRequest, pkt->wValue, pkt->wIndex, pkt->wLength);
 
-	return st == STATUS_SUCCESS ? buf : "dbg_usb_setup_packet error";
+	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet: invalid parameter";
 }
 
-const char *dbg_urbr(const urb_req_t *urbr)
+const char *dbg_urbr(char* buf, unsigned int len, const urb_req_t *urbr)
 {
 	if (!urbr) {
-		len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[null]");
-	} else {
-		switch (urbr->type) {
-		case URBR_TYPE_URB:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[urb,seq:%u,!%urb_function%]", urbr->seq_num, urbr->u.urb.urb->UrbHeader.Function);
-			break;
-		case URBR_TYPE_UNLINK:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[ulk,seq:%u,%u]", urbr->seq_num, urbr->u.seq_num_unlink);
-			break;
-		case URBR_TYPE_SELECT_CONF:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[slc,seq:%u,%hhu]", urbr->seq_num, urbr->u.conf_value);
-			break;
-		case URBR_TYPE_SELECT_INTF:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[sli,seq:%u,%hhu,%hhu]", urbr->seq_num, urbr->u.intf.intf_num, urbr->u.intf.alt_setting);
-			break;
-		case URBR_TYPE_RESET_PIPE:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[rst,seq:%u,%hhu]", urbr->seq_num, urbr->ep->addr);
-			break;
-		default:
-			len_dbg_urbr = libdrv_snprintf(buf_dbg_urbr, sizeof(buf_dbg_urbr), "[unk:seq:%u]", urbr->seq_num);			break;
-		}
+		return "[null]";
+	}
+
+	NTSTATUS st = STATUS_SUCCESS;
+	
+	switch (urbr->type) {
+	case URBR_TYPE_URB:
+		st = RtlStringCbPrintfA(buf, len, "[URB, seq_num %lu, cancelable %d]", urbr->seq_num, 
+					urbr->u.urb.urb ? urbr->u.urb.cancelable : 0);
+		break;
+	case URBR_TYPE_UNLINK:
+		st = RtlStringCbPrintfA(buf, len, "[UNLINK, seq_num %lu, seq_num_unlink %lu]", urbr->seq_num, urbr->u.seq_num_unlink);
+		break;
+	case URBR_TYPE_SELECT_CONF:
+		st = RtlStringCbPrintfA(buf, len, "[SELECT_CONF, seq_num %lu, value %d]", urbr->seq_num, urbr->u.conf_value);
+		break;
+	case URBR_TYPE_SELECT_INTF:
+		st = RtlStringCbPrintfA(buf, len, "[SELECT_INTF, seq_num %lu, ifnum %d, altnum %d]", urbr->seq_num, urbr->u.intf.intf_num, urbr->u.intf.alt_setting);
+		break;
+	case URBR_TYPE_RESET_PIPE:
+		st = RtlStringCbPrintfA(buf, len, "[RESET_PIPE, seq_num %lu, bEndpointAddress %#04x]", urbr->seq_num, 
+					urbr->ep ? urbr->ep->addr : 0);
+		break;
+	default:
+		st = RtlStringCbPrintfA(buf, len, "[?, seq_num %lu]", urbr->seq_num);
 	}
 	
-	++len_dbg_urbr;
-	return buf_dbg_urbr;
+	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_urbr: invalid parameter";
 }

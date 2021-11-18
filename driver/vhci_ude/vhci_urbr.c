@@ -154,7 +154,8 @@ submit_urbr_unlink(pctx_ep_t ep, unsigned long seq_num_unlink)
 		urbr_unlink->u.seq_num_unlink = seq_num_unlink;
 		status = submit_urbr(urbr_unlink);
 		if (NT_ERROR(status)) {
-			TraceInfo(TRACE_URBR, "failed to submit unlink urb: %!URBR!", urbr_unlink);
+			char buf[DBG_URBR_BUFSZ];
+			TraceInfo(TRACE_URBR, "failed to submit unlink urb: %s\n", dbg_urbr(buf, sizeof(buf), urbr_unlink));
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -175,12 +176,13 @@ urbr_cancelled(_In_ WDFREQUEST req)
 	}
 	WdfSpinLockRelease(vusb->spin_lock);
 
-	if (urbr != NULL && urbr->seq_num != 0) {
+	if (urbr && urbr->seq_num) {
 		submit_urbr_unlink(urbr->ep, urbr->seq_num);
-		TraceInfo(TRACE_URBR, "cancelled urbr destroyed: %!URBR!", urbr);
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_URBR, "cancelled urbr destroyed: %s\n", dbg_urbr(buf, sizeof(buf), urbr));
+		
 		complete_urbr(urbr, STATUS_CANCELLED);
-	}
-	else {
+	} else {
 		UdecxUrbCompleteWithNtStatus(req, STATUS_CANCELLED);
 	}
 }
@@ -197,7 +199,8 @@ mark_cancelable_urbr(purb_req_t urbr)
 
 	status = WdfRequestMarkCancelableEx(urbr->req, urbr_cancelled);
 	if (NT_ERROR(status)) {
-		TraceInfo(TRACE_URBR, "Already cancelled request?: %!URBR!, %!STATUS!", urbr, status);
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_URBR, "Already cancelled request?: %s, %!STATUS!", dbg_urbr(buf, sizeof(buf), urbr), status);
 		return FALSE;
 	}
 	urbr->u.urb.cancelable = TRUE;
@@ -228,7 +231,9 @@ submit_urbr(purb_req_t urbr)
 		InsertTailList(&vusb->head_urbr, &urbr->list_all);
 		WdfSpinLockRelease(vusb->spin_lock);
 
-		TraceInfo(TRACE_URBR, "urb pending: %!URBR!", urbr);
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_URBR, "urb pending: %s\n", dbg_urbr(buf, sizeof(buf), urbr));
+		
 		return STATUS_PENDING;
 	}
 
@@ -272,7 +277,9 @@ submit_urbr(purb_req_t urbr)
 			status = STATUS_INVALID_PARAMETER;
 	}
 
-	TraceInfo(TRACE_URBR, "urb requested: %!URBR!: %!STATUS!", urbr, status);
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_URBR, "urb requested: %s: %!STATUS!", dbg_urbr(buf, sizeof(buf), urbr), status);
+	
 	return status;
 }
 

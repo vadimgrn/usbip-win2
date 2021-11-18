@@ -23,7 +23,9 @@ store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 		USBD_SHORT_TRANSFER_OK, urb_status->TransferBufferLength);
 
 	urbfunc = urb_status->Hdr.Function;
-	TraceInfo(TRACE_READ, "urbr: %!URBR!", urbr);
+
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
 
 	switch (urbfunc) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
