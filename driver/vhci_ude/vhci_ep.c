@@ -68,7 +68,7 @@ static void setup_ep_from_dscr(ctx_ep_t *ep, USB_ENDPOINT_DESCRIPTOR *dsc_ep)
 		ep->intf_num = dsc_intf->bInterfaceNumber;
 		ep->altsetting = dsc_intf->bAlternateSetting;
 	} else {
-		TraceError(TRACE_VUSB, "interface for ep not found\n");
+		TraceError(TRACE_VUSB, "interface for ep not found");
 	}
 }
 

@@ -12,7 +12,7 @@ get_buf(PVOID buf, PMDL bufMDL)
 		if (bufMDL != NULL)
 			buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
 		if (buf == NULL) {
-			TraceError(TRACE_READ, "No transfer buffer\n");
+			TraceError(TRACE_READ, "No transfer buffer");
 		}
 	}
 	return buf;
@@ -155,7 +155,7 @@ submit_urbr_unlink(pctx_ep_t ep, unsigned long seq_num_unlink)
 		status = submit_urbr(urbr_unlink);
 		if (NT_ERROR(status)) {
 			char buf[DBG_URBR_BUFSZ];
-			TraceInfo(TRACE_URBR, "failed to submit unlink urb: %s\n", dbg_urbr(buf, sizeof(buf), urbr_unlink));
+			TraceInfo(TRACE_URBR, "failed to submit unlink urb: %s", dbg_urbr(buf, sizeof(buf), urbr_unlink));
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -179,7 +179,7 @@ urbr_cancelled(_In_ WDFREQUEST req)
 	if (urbr && urbr->seq_num) {
 		submit_urbr_unlink(urbr->ep, urbr->seq_num);
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_URBR, "cancelled urbr destroyed: %s\n", dbg_urbr(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_URBR, "cancelled urbr destroyed: %s", dbg_urbr(buf, sizeof(buf), urbr));
 		
 		complete_urbr(urbr, STATUS_CANCELLED);
 	} else {
@@ -232,7 +232,7 @@ submit_urbr(purb_req_t urbr)
 		WdfSpinLockRelease(vusb->spin_lock);
 
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_URBR, "urb pending: %s\n", dbg_urbr(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_URBR, "urb pending: %s", dbg_urbr(buf, sizeof(buf), urbr));
 		
 		return STATUS_PENDING;
 	}

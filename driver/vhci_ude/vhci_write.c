@@ -35,7 +35,7 @@ write_vusb(pctx_vusb_t vusb, WDFREQUEST req_write)
 
 	hdr = get_hdr_from_req_write(req_write);
 	if (hdr == NULL) {
-		TraceError(TRACE_WRITE, "small write irp\n");
+		TraceError(TRACE_WRITE, "small write irp");
 		status = STATUS_INVALID_PARAMETER;
 		goto out;
 	}

@@ -6,7 +6,7 @@ static PAGEABLE VOID
 driver_unload(_In_ WDFDRIVER drvobj)
 {
 	PAGED_CODE();
-	TraceInfo(TRACE_DRIVER, "Enter\n");
+	TraceInfo(TRACE_DRIVER, "Enter");
 	WPP_CLEANUP(WdfDriverWdmGetDriverObject((WDFDRIVER)drvobj));
 }
 
@@ -29,7 +29,7 @@ DriverEntry(_In_ PDRIVER_OBJECT drvobj, _In_ PUNICODE_STRING regpath)
 	NTSTATUS status = WdfDriverCreate(drvobj, regpath, WDF_NO_OBJECT_ATTRIBUTES, &conf, WDF_NO_HANDLE);
 
 	if (!NT_SUCCESS(status)) {
-		TraceError(TRACE_DRIVER, "%!STATUS!\n", status);
+		TraceError(TRACE_DRIVER, "%!STATUS!", status);
 		WPP_CLEANUP(drvobj);
 	}
 

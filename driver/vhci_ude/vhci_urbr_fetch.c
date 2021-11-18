@@ -17,7 +17,7 @@ NTSTATUS
 copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, PVOID src, int src_len)
 {
 	if (dst_len < src_len) {
-		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d\n", dst_len, src_len);
+		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d", dst_len, src_len);
 		return STATUS_INVALID_PARAMETER;
 	}
 	

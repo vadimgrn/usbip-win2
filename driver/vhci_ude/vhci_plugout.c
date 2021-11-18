@@ -25,7 +25,7 @@ abort_pending_req_read(pctx_vusb_t vusb)
 static void abort_pending_urbr(urb_req_t *urbr)
 {
 	char buf[DBG_URBR_BUFSZ];
-	TraceInfo(TRACE_PLUGIN, "abort pending urbr: %s\n", dbg_urbr(buf, sizeof(buf), urbr));
+	TraceInfo(TRACE_PLUGIN, "abort pending urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
 	
 	complete_urbr(urbr, STATUS_DEVICE_NOT_CONNECTED);
 }
