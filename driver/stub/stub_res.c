@@ -41,7 +41,7 @@ create_stub_res(unsigned int cmd, unsigned long seqnum, int err, PVOID data, int
 
 	sres = ExAllocatePoolWithTag(NonPagedPool, sizeof(stub_res_t), USBIP_STUB_POOL_TAG);
 	if (sres == NULL) {
-		TraceError(TRACE_GENERAL, "create_stub_res: out of memory\n");
+		TraceError(TRACE_GENERAL, "out of memory");
 		if (data != NULL && !need_copy)
 			ExFreePoolWithTag(data, USBIP_STUB_POOL_TAG);
 		return NULL;
@@ -51,7 +51,7 @@ create_stub_res(unsigned int cmd, unsigned long seqnum, int err, PVOID data, int
 
 		data_copied = ExAllocatePoolWithTag(NonPagedPool, data_len, USBIP_STUB_POOL_TAG);
 		if (data_copied == NULL) {
-			TraceError(TRACE_GENERAL, "create_stub_res: out of memory. drop data.\n");
+			TraceError(TRACE_GENERAL, "out of memory. drop data.");
 			data_len = 0;
 		}
 		else {
@@ -129,7 +129,7 @@ send_stub_res(usbip_stub_dev_t *devstub, PIRP irp_read, stub_res_t *sres)
 		sent = store_irp_stub_res(irp_read, 0, (char *)&sres->header + devstub->len_sent_partial, data_len);
 		devstub->len_sent_partial += sent;
 		if (sent < data_len) {
-			TraceInfo(TRACE_GENERAL, "send_stub_res: header partially sent: %u < %u: %s\n", sent, data_len,
+			TraceInfo(TRACE_GENERAL, "header partially sent: %u < %u: %s", sent, data_len,
 			     dbg_stub_res(sres, devstub));
 			save_pending_sres(devstub, sres);
 			irp_read->IoStatus.Information = sent;
@@ -151,12 +151,12 @@ send_stub_res(usbip_stub_dev_t *devstub, PIRP irp_read, stub_res_t *sres)
 		sent += sent_payload;
 		devstub->len_sent_partial += sent_payload;
 		if (sent_payload < data_len) {
-			TraceInfo(TRACE_GENERAL, "send_stub_res: partially sent: %u < %u: %s\n", sent_payload, data_len,
+			TraceInfo(TRACE_GENERAL, "partially sent: %u < %u: %s", sent_payload, data_len,
 			     dbg_stub_res(sres, devstub));
 			save_pending_sres(devstub, sres);
 		}
 		else {
-			TraceInfo(TRACE_GENERAL, "send_stub_res: sent: %s\n", dbg_stub_res(sres, devstub));
+			TraceInfo(TRACE_GENERAL, "sent: %s", dbg_stub_res(sres, devstub));
 			free_stub_res(sres);
 			save_pending_sres(devstub, NULL);
 		}

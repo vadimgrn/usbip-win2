@@ -35,7 +35,7 @@ stub_dispatch(PDEVICE_OBJECT devobj, IRP *irp)
 	usbip_stub_dev_t *devstub = devobj->DeviceExtension;
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_DISPATCH, "%!pnpmj!\n", irpstack->MajorFunction);
+	TraceInfo(TRACE_DISPATCH, "%!pnpmj!", irpstack->MajorFunction);
 
 	switch (irpstack->MajorFunction) {
 	case IRP_MJ_PNP:

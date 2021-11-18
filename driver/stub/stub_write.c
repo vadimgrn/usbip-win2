@@ -37,7 +37,7 @@ process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_P
 	USHORT	data;
 	UCHAR	datalen;
 
-	TraceInfo(TRACE_READWRITE, "get_status\n");
+	TraceInfo(TRACE_READWRITE, "Enter");
 
 	switch (CSPKT_RECIPIENT(csp)) {
 	case BMREQUEST_TO_DEVICE:
@@ -69,11 +69,11 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIP
 	BOOLEAN	res;
 	ULONG	len;
 
-	TraceInfo(TRACE_READWRITE, "get_desc: %!usb_descriptor_type!", CSPKT_DESCRIPTOR_TYPE(csp));
+	TraceInfo(TRACE_READWRITE, "%!usb_descriptor_type!", CSPKT_DESCRIPTOR_TYPE(csp));
 
 	pdesc = ExAllocatePoolWithTag(NonPagedPool, csp->wLength, USBIP_STUB_POOL_TAG);
 	if (pdesc == NULL) {
-		TraceError(TRACE_READWRITE, "process_get_desc: out of memory");
+		TraceError(TRACE_READWRITE, "out of memory");
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		return;
 	}
@@ -94,7 +94,7 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIP
 		res = get_usb_desc(devstub, descType, CSPKT_DESCRIPTOR_INDEX(csp), idLang, pdesc, &len);
 	}
 	if (!res) {
-		TraceWarning(TRACE_READWRITE, "process_get_desc: failed to get descriptor\n");
+		TraceWarning(TRACE_READWRITE, "failed to get descriptor");
 		ExFreePool(pdesc);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -32);
 		return;
@@ -150,7 +150,7 @@ process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_
 	if (res == 0)
 		reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
 	else {
-		TraceInfo(TRACE_READWRITE, "failed to set feature\n");
+		TraceInfo(TRACE_READWRITE, "failed to set feature");
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, res);
 	}
 }
@@ -220,7 +220,7 @@ process_class_vendor_request(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_P
 		if (is_in) {
 			data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
 			if (data == NULL) {
-				TraceError(TRACE_GENERAL, "process_class_vendor_request: out of memory\n");
+				TraceError(TRACE_GENERAL, "out of memory");
 				reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 				return;
 			}
@@ -298,14 +298,14 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 	BOOLEAN	is_in;
 	NTSTATUS	status;
 
-	TraceInfo(TRACE_READWRITE, "bulk_intr_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
+	TraceInfo(TRACE_READWRITE, "seq %u, ep %s", hdr->base.seqnum, dbg_info_pipe(info_pipe));
 
 	datalen = (ULONG)hdr->u.cmd_submit.transfer_buffer_length;
 	is_in = hdr->base.direction ? TRUE : FALSE;
 	if (is_in) {
 		data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
 		if (data == NULL) {
-			TraceError(TRACE_GENERAL, "process_bulk_intr_transfer: out of memory\n");
+			TraceError(TRACE_GENERAL, "out of memory");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
@@ -325,7 +325,7 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 static void
 process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe, const struct usbip_header *hdr)
 {
-	TraceInfo(TRACE_READWRITE, "iso_transfer: seq:%u, ep:%s\n", hdr->base.seqnum, dbg_info_pipe(info_pipe));
+	TraceInfo(TRACE_READWRITE, "seq %u, ep %s", hdr->base.seqnum, dbg_info_pipe(info_pipe));
 
 	ULONG datalen = 0;
 	PVOID data = NULL;
@@ -342,7 +342,7 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 		datalen = get_iso_descs_len(n_pkts, iso_descs, FALSE);
 		data = ExAllocatePoolWithTag(NonPagedPool, datalen + sizeof(*iso_descs)*n_pkts, USBIP_STUB_POOL_TAG);
 		if (!data) {
-			TraceError(TRACE_GENERAL, "process_iso_transfer: out of memory\n");
+			TraceError(TRACE_GENERAL, "out of memory");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
@@ -353,7 +353,7 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 		iso_descs = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + datalen);
 		data = ExAllocatePoolWithTag(NonPagedPool, datalen + iso_descs_len, USBIP_STUB_POOL_TAG);
 		if (!data) {
-			TraceError(TRACE_GENERAL, "process_iso_transfer: out of memory\n");
+			TraceError(TRACE_GENERAL, "out of memory");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 			return;
 		}
@@ -386,7 +386,7 @@ process_data_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 	epaddr = get_epaddr_from_hdr(hdr);
 	info_pipe = get_info_pipe(devstub->devconf, epaddr);
 	if (info_pipe == NULL) {
-		TraceWarning(TRACE_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
+		TraceWarning(TRACE_READWRITE, "non-existent pipe: %#04x", (int)epaddr);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 		return;
 	}
@@ -399,8 +399,7 @@ process_data_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 		process_iso_transfer(devstub, info_pipe, hdr);
 		break;
 	default:
-		TraceError(TRACE_READWRITE, "not supported transfer type\n");
-		break;
+		TraceError(TRACE_READWRITE, "not supported transfer type");
 	}
 }
 
@@ -413,12 +412,12 @@ process_reset_pipe(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 	epaddr = get_epaddr_from_hdr(hdr);
 	info_pipe = get_info_pipe(devstub->devconf, epaddr);
 	if (info_pipe == NULL) {
-		TraceWarning(TRACE_READWRITE, "non-existent pipe: %x\n", (int)epaddr);
+		TraceWarning(TRACE_READWRITE, "non-existent pipe: %#04x", (int)epaddr);
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
 		return;
 	}
 
-	TraceInfo(TRACE_READWRITE, "pipeHandle = %p\n", info_pipe->PipeHandle);
+	TraceInfo(TRACE_READWRITE, "pipeHandle %!HANDLE!", info_pipe->PipeHandle);
 
 	if (NT_SUCCESS(reset_pipe(devstub, info_pipe->PipeHandle)))
 		reply_stub_req_data(devstub, hdr->base.seqnum, NULL, 0, FALSE);

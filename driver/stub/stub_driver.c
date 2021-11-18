@@ -29,7 +29,7 @@ NTSTATUS stub_dispatch(PDEVICE_OBJECT devobj, IRP *irp);
 static VOID
 stub_unload(DRIVER_OBJECT *drvobj)
 {
-	TraceInfo(TRACE_GENERAL, "Enter\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 	WPP_CLEANUP(drvobj);
 }
 
@@ -37,7 +37,7 @@ NTSTATUS
 DriverEntry(DRIVER_OBJECT *drvobj, UNICODE_STRING *regpath)
 {
 	WPP_INIT_TRACING(drvobj, regpath);
-	TraceInfo(TRACE_GENERAL, "Enter\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 
 	/* initialize the driver object's dispatch table */
 	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i) {

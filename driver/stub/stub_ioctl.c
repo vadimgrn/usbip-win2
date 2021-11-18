@@ -93,12 +93,12 @@ process_export(usbip_stub_dev_t *devstub, IRP *irp)
 {
 	UNREFERENCED_PARAMETER(devstub);
 
-	TraceInfo(TRACE_IOCTL, "exporting: %s\n", dbg_devstub(devstub));
+	TraceInfo(TRACE_IOCTL, "exporting: %s", dbg_devstub(devstub));
 
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	TraceInfo(TRACE_IOCTL, "exported: %s\n", dbg_devstub(devstub));
+	TraceInfo(TRACE_IOCTL, "exported: %s", dbg_devstub(devstub));
 
 	return STATUS_SUCCESS;
 }
@@ -112,7 +112,7 @@ stub_dispatch_ioctl(usbip_stub_dev_t *devstub, IRP *irp)
 	irpStack = IoGetCurrentIrpStackLocation(irp);
 	ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "dispatch_ioctl: code: %s\n", dbg_stub_ioctl_code(ioctl_code));
+	TraceInfo(TRACE_IOCTL, "dispatch_ioctl: code: %s", dbg_stub_ioctl_code(ioctl_code));
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_STUB_GET_DEVINFO:
