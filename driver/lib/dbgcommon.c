@@ -256,3 +256,14 @@ const char *dbg_usbip_hdr(const struct usbip_header *hdr)
 
 	return buf;
 }
+
+const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet)
+{
+	const USB_DEFAULT_PIPE_SETUP_PACKET *pkt = packet;
+
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
+		"[bmRequestType %#04x, bRequest %#04x, wValue %#06hx, wIndex %#06hx, wLength %hu]",
+		pkt->bmRequestType, pkt->bRequest, pkt->wValue, pkt->wIndex, pkt->wLength);
+
+	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet: invalid parameter";
+}

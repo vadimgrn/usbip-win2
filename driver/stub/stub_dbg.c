@@ -6,28 +6,29 @@
 
 #include <ntstrsafe.h>
 
-const char *
-dbg_device(PDEVICE_OBJECT devobj)
+const char *dbg_device(DEVICE_OBJECT *devobj)
 {
-	static char	buf[32];
-	ANSI_STRING	name;
-
-	if (devobj == NULL)
+	if (!devobj) {
 		return "null";
-	if (devobj->DriverObject)
+	}
+
+	if (!devobj->DriverObject) {
 		return "driver null";
+	}
+
+	ANSI_STRING name;
+
 	if (NT_SUCCESS(RtlUnicodeStringToAnsiString(&name, &devobj->DriverObject->DriverName, TRUE))) {
+		static char buf[32];
 		RtlStringCchCopyA(buf, 32, name.Buffer);
 		RtlFreeAnsiString(&name);
 		return buf;
 	}
-	else {
-		return "error";
-	}
+
+	return "error";
 }
 
-const char *
-dbg_devices(PDEVICE_OBJECT devobj, BOOLEAN is_attached)
+const char *dbg_devices(DEVICE_OBJECT *devobj, BOOLEAN is_attached)
 {
 	static char	buf[1024];
 	int	n = 0;
@@ -45,25 +46,25 @@ dbg_devices(PDEVICE_OBJECT devobj, BOOLEAN is_attached)
 	return buf;
 }
 
-const char *
-dbg_devstub(usbip_stub_dev_t *devstub)
+const char *dbg_devstub(usbip_stub_dev_t *devstub)
 {
-	static char	buf[512];
-
-	if (devstub == NULL)
+	if (!devstub) {
 		return "<null>";
+	}
+
+	static char buf[512];
 	RtlStringCchPrintfA(buf, 512, "id:%d,hw:%s", devstub->id, devstub->id_hw);
 	return buf;
 }
 
-static namecode_t	namecodes_stub_ioctl[] = {
-	K_V(IOCTL_USBIP_STUB_GET_DEVINFO)
-	K_V(IOCTL_USBIP_STUB_EXPORT)
-	{0,0}
-};
-
-const char *
-dbg_stub_ioctl_code(ULONG ioctl_code)
+const char *dbg_stub_ioctl_code(int ioctl_code)
 {
-	return dbg_namecode(namecodes_stub_ioctl, "ioctl", ioctl_code);
+	static_assert(sizeof(ioctl_code) == sizeof(IOCTL_USBIP_STUB_EXPORT), "assert");
+
+	switch (ioctl_code) {
+	case IOCTL_USBIP_STUB_GET_DEVINFO: return "IOCTL_USBIP_STUB_GET_DEVINFO";
+	case IOCTL_USBIP_STUB_EXPORT: return "IOCTL_USBIP_STUB_EXPORT";
+	}
+
+	return "IOCTL_USBIP_STUB_?";
 }

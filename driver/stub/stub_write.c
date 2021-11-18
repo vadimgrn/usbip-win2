@@ -24,7 +24,6 @@
 #include "stub_dbg.h"
 #include "usbip_proto.h"
 #include "usbd_helper.h" 
-#include "stub_cspkt.h"
 #include "stub_usbd.h"
 #include "stub_res.h"
 #include "pdu.h"
@@ -70,11 +69,11 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIP
 	BOOLEAN	res;
 	ULONG	len;
 
-	TraceInfo(TRACE_READWRITE, "get_desc: %s\n", dbg_cspkt_desctype(CSPKT_DESCRIPTOR_TYPE(csp)));
+	TraceInfo(TRACE_READWRITE, "get_desc: %!usb_descriptor_type!", CSPKT_DESCRIPTOR_TYPE(csp));
 
 	pdesc = ExAllocatePoolWithTag(NonPagedPool, csp->wLength, USBIP_STUB_POOL_TAG);
 	if (pdesc == NULL) {
-		TraceError(TRACE_READWRITE, "process_get_desc: out of memory\n");
+		TraceError(TRACE_READWRITE, "process_get_desc: out of memory");
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		return;
 	}
@@ -108,7 +107,7 @@ process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAUL
 {
 	PUSBD_PIPE_INFORMATION	info_pipe;
 
-	TraceInfo(TRACE_READWRITE, "clear_feature: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+	TraceInfo(TRACE_READWRITE, "%!bmrequest_to!", CSPKT_RECIPIENT(csp));
 
 	switch (CSPKT_RECIPIENT(csp)) {
 	case BMREQUEST_TO_ENDPOINT:
@@ -118,12 +117,12 @@ process_clear_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAUL
 			reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
 		}
 		else {
-			TraceError(TRACE_READWRITE, "clear_feature: no such ep\n");
+			TraceError(TRACE_READWRITE, "no such ep");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		}
 		break;
 	default:
-		TraceError(TRACE_READWRITE, "clear_feature: not supported: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+		TraceError(TRACE_READWRITE, "not supported %!bmrequest_to!", CSPKT_RECIPIENT(csp));
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		break;
 	}
@@ -134,7 +133,7 @@ process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_
 {
 	int	res;
 
-	TraceInfo(TRACE_READWRITE, "set_feature: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+	TraceInfo(TRACE_READWRITE, "%!bmrequest_to!", CSPKT_RECIPIENT(csp));
 
 	switch (CSPKT_RECIPIENT(csp)) {
 	case BMREQUEST_TO_DEVICE:
@@ -144,7 +143,7 @@ process_set_feature(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_
 		res = set_feature(devstub, URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, csp->wValue.W, csp->wIndex.W);
 		break;
 	default:
-		TraceError(TRACE_READWRITE, "set_feature: not supported: %s\n", dbg_cspkt_recipient(CSPKT_RECIPIENT(csp)));
+		TraceError(TRACE_READWRITE, "not supported %!bmrequest_to!", CSPKT_RECIPIENT(csp));
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
 		return;
 	}
@@ -197,7 +196,7 @@ process_standard_request(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEF
 		process_select_intf(devstub, seqnum, csp);
 		break;
 	default:
-		TraceError(TRACE_READWRITE, "not supported standard request: %s\n", dbg_cspkt_reqtype(CSPKT_REQUEST_TYPE(csp)));
+		TraceError(TRACE_READWRITE, "not supported standard request: %!bmrequest!", CSPKT_REQUEST_TYPE(csp));
 		break;
 	}
 }
@@ -270,7 +269,8 @@ process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 {
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
-	TraceInfo(TRACE_READWRITE, "control_transfer: seq:%u, csp:%s\n", hdr->base.seqnum, dbg_ctlsetup_packet(setup));
+	char buf[DBG_USB_SETUP_BUFBZ];
+	TraceInfo(TRACE_READWRITE, "seq %u, %s", hdr->base.seqnum, dbg_usb_setup_packet(buf, sizeof(buf), setup));
 
 	UCHAR reqType = CSPKT_REQUEST_TYPE(setup);
 
@@ -285,7 +285,7 @@ process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 		process_class_vendor_request(devstub, setup, hdr, TRUE);
 		break;
 	default:
-		TraceError(TRACE_READWRITE, "invalid request type: %s", dbg_cspkt_reqtype(reqType));
+		TraceError(TRACE_READWRITE, "invalid request type: %!bmrequest!", reqType);
 		break;
 	}
 }

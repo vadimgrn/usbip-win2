@@ -11,7 +11,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="stub_cspkt.c" />
     <ClCompile Include="stub_dbg.c" />
     <ClCompile Include="stub_dev.c" />
     <ClCompile Include="stub_devconf.c" />
@@ -29,7 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip_stub_api.h" />
-    <ClInclude Include="stub_cspkt.h" />
     <ClInclude Include="stub_dbg.h" />
     <ClInclude Include="stub_dev.h" />
     <ClInclude Include="stub_devconf.h" />

@@ -25,8 +25,6 @@
 #include "stub_res.h"
 #include "usbd_helper.h"
 
-#include "stub_cspkt.h"
-
 #include <usbdlib.h>
 
 typedef void (*cb_urb_done_t)(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_res_t *sres);
