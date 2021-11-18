@@ -500,7 +500,8 @@ stub_dispatch_write(usbip_stub_dev_t *devstub, IRP *irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	TraceInfo(TRACE_READWRITE, "hdr: %s\n", dbg_usbip_hdr(hdr));
+	char buf[DBG_USBIP_HDR_BUFSZ];
+	TraceInfo(TRACE_READWRITE, "hdr: %s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
 
 	switch (hdr->base.command) {
 	case USBIP_CMD_SUBMIT:
