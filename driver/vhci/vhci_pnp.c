@@ -119,7 +119,7 @@ vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_PNP, "%!vdev_type_t!: Enter: %!pnpmn!, irp: %p\n", DEVOBJ_VDEV_TYPE(devobj), irpstack->MinorFunction, irp);
+	TraceInfo(TRACE_PNP, "%!vdev_type_t!: Enter: %!pnpmn!, irp: %p", DEVOBJ_VDEV_TYPE(devobj), irpstack->MinorFunction, irp);
 
 	// If the device has been removed, the driver should
 	// not pass the IRP down to the next lower driver.
@@ -190,7 +190,7 @@ vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	}
 
 END:
-	TraceInfo(TRACE_PNP, "%!vdev_type_t!: Leave: irp:%p, %!STATUS!\n", DEVOBJ_VDEV_TYPE(devobj), irp, status);
+	TraceInfo(TRACE_PNP, "%!vdev_type_t!: Leave: irp:%p, %!STATUS!", DEVOBJ_VDEV_TYPE(devobj), irp, status);
 
 	return status;
 }

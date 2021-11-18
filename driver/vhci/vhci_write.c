@@ -18,7 +18,7 @@ save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descripto
 
 	for (i = 0; i < urb->NumberOfPackets; i++) {
 		if (iso_desc->offset > urb->IsoPacket[i].Offset) {
-			TraceWarning(TRACE_WRITE, "why offset changed?%d %d %d %d\n",
+			TraceWarning(TRACE_WRITE, "why offset changed?%d %d %d %d",
 			     i, iso_desc->offset, iso_desc->actual_length, urb->IsoPacket[i].Offset);
 			return FALSE;
 		}
@@ -36,7 +36,7 @@ get_buf(PVOID buf, PMDL bufMDL)
 		if (bufMDL != NULL)
 			buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority);
 		if (buf == NULL) {
-			TraceWarning(TRACE_WRITE, "No transfer buffer\n");
+			TraceWarning(TRACE_WRITE, "No transfer buffer");
 		}
 	}
 	return buf;
@@ -80,7 +80,7 @@ void post_get_desc(vpdo_dev_t *vpdo, URB *urb)
 	if (req->TransferBufferLength >= dsc->bLength) {
 		try_to_cache_descriptor(vpdo, req, dsc);
 	} else {
-		TraceInfo(TRACE_WRITE, "skip to cache partial descriptor: (%u < %d)\n", req->TransferBufferLength, (int)dsc->bLength);
+		TraceInfo(TRACE_WRITE, "skip to cache partial descriptor: (%u < %d)", req->TransferBufferLength, (int)dsc->bLength);
 	}
 
 }
@@ -102,7 +102,7 @@ copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, const void *src
 	PVOID	buf;
 
 	if (dst_len < src_len) {
-		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d\n", dst_len, src_len);
+		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d", dst_len, src_len);
 		return STATUS_INVALID_PARAMETER;
 	}
 	buf = get_buf(buf_dst, bufMDL);
@@ -275,7 +275,7 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 		status = store_urb_control_transfer_ex(urb, hdr);
 		break;
 	default:
-		TraceError(TRACE_WRITE, "not supported %!urb_function!\n", urb->UrbHeader.Function);
+		TraceError(TRACE_WRITE, "not supported %!urb_function!", urb->UrbHeader.Function);
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
@@ -300,7 +300,7 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 		}
 
 		USBD_STATUS st = urb->UrbHeader.Status;
-		TraceError(TRACE_WRITE, "%!urb_function!: %s(%#010lX)\n", urb->UrbHeader.Function, dbg_usbd_status(st), (ULONG)st);
+		TraceError(TRACE_WRITE, "%!urb_function!: %s(%#010lX)", urb->UrbHeader.Function, dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -331,7 +331,7 @@ process_urb_dsc_req(struct urb_req *urbr, const struct usbip_header *hdr)
 {
 	if (hdr->u.ret_submit.status) {
 		USBD_STATUS st = to_windows_status(hdr->u.ret_submit.status);
-		TraceError(TRACE_WRITE, "%s(%#010lX)\n", dbg_usbd_status(st), (ULONG)st);
+		TraceError(TRACE_WRITE, "%s(%#010lX)", dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -362,7 +362,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#010lX)\n", dbg_urbr(urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#010lX)", dbg_urbr(urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
@@ -372,7 +372,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		return process_urb_dsc_req(urbr, hdr);
 	default:
-		TraceError(TRACE_WRITE, "unhandled %s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceError(TRACE_WRITE, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 		return STATUS_INVALID_PARAMETER;
 	}
 }
@@ -418,14 +418,14 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
 	if (!hdr) {
-		TraceError(TRACE_WRITE, "too small\n");
+		TraceError(TRACE_WRITE, "too small");
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	struct urb_req *urbr = find_sent_urbr(vpdo, hdr);
 	if (!urbr) {
 		// Might have been cancelled before, so return STATUS_SUCCESS
-		TraceError(TRACE_WRITE, "no urbr: seqnum: %d\n", hdr->base.seqnum);
+		TraceError(TRACE_WRITE, "no urbr: seqnum: %d", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
@@ -446,12 +446,12 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_WRITE, "Enter: len:%u, irp:%p\n", irpstack->Parameters.Write.Length, irp);
+	TraceInfo(TRACE_WRITE, "Enter: len:%u, irp:%p", irpstack->Parameters.Write.Length, irp);
 
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	if (!IS_DEVOBJ_VHCI(devobj)) {
-		TraceError(TRACE_WRITE, "write for non-vhci is not allowed\n");
+		TraceError(TRACE_WRITE, "write for non-vhci is not allowed");
 		irp->IoStatus.Status = status;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return status;
@@ -472,7 +472,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = process_write_irp(vpdo, irp);
 
 END:
-	TraceInfo(TRACE_WRITE, "Leave: irp:%p, %!STATUS!\n", irp, status);
+	TraceInfo(TRACE_WRITE, "Leave: irp:%p, %!STATUS!", irp, status);
 
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);

@@ -36,7 +36,7 @@ pnp_query_device_text(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 		}
 		break;
 	default:
-		TraceInfo(TRACE_PNP, "unsupported device text type: %u\n", irpstack->Parameters.QueryDeviceText.DeviceTextType);
+		TraceInfo(TRACE_PNP, "unsupported device text type: %u", irpstack->Parameters.QueryDeviceText.DeviceTextType);
 		break;
 	}
 

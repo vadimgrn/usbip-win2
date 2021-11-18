@@ -15,7 +15,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 
 	USB_CONFIGURATION_DESCRIPTOR *new_conf = urb->ConfigurationDescriptor;
 	if (!new_conf) {
-		TraceInfo(TRACE_VPDO, "going to unconfigured state\n");
+		TraceInfo(TRACE_VPDO, "going to unconfigured state");
 		return STATUS_SUCCESS;
 	}
 
@@ -24,7 +24,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 	if (vpdo->dsc_conf) {
 		RtlCopyMemory(vpdo->dsc_conf, new_conf, new_conf->wTotalLength);
 	} else {
-		TraceError(TRACE_WRITE, "failed to allocate configuration descriptor: out of memory\n");
+		TraceError(TRACE_WRITE, "failed to allocate configuration descriptor: out of memory");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -45,7 +45,7 @@ vpdo_select_interface(pvpdo_dev_t vpdo, USBD_INTERFACE_INFORMATION *info_intf)
 	NTSTATUS	status;
 
 	if (vpdo->dsc_conf == NULL) {
-		TraceWarning(TRACE_WRITE, "failed to select interface: empty configuration descriptor\n");
+		TraceWarning(TRACE_WRITE, "failed to select interface: empty configuration descriptor");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 	status = setup_intf(info_intf, vpdo->dsc_conf, vpdo->speed);

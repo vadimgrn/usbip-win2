@@ -9,10 +9,10 @@ static void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const
 {
 	switch (type) {
 	case SystemPowerState:
-		TraceInfo(TRACE_POWER, "%s: %!SYSTEM_POWER_STATE!\n", caller, state->SystemState);
+		TraceInfo(TRACE_POWER, "%s: %!SYSTEM_POWER_STATE!", caller, state->SystemState);
 		break;
 	case DevicePowerState:
-		TraceInfo(TRACE_POWER, "%s: %!DEVICE_POWER_STATE!\n", caller, state->DeviceState);
+		TraceInfo(TRACE_POWER, "%s: %!DEVICE_POWER_STATE!", caller, state->DeviceState);
 		break;
 	}
 }
@@ -109,7 +109,7 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!\n",
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!",
 		DEVOBJ_VDEV_TYPE(devobj), irpstack->MinorFunction);
 
 	status = STATUS_SUCCESS;
@@ -132,6 +132,6 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	}
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!\n", DEVOBJ_VDEV_TYPE(devobj), status);
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!", DEVOBJ_VDEV_TYPE(devobj), status);
 	return status;
 }

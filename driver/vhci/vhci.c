@@ -44,7 +44,7 @@ static PAGEABLE VOID
 vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 {
 	PAGED_CODE();
-	TraceInfo(TRACE_GENERAL, "Enter\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
 	ASSERT(!drvobj->DeviceObject);
@@ -64,11 +64,11 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter\n", vdev->type);
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter", vdev->type);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		TraceWarning(TRACE_GENERAL, "vhci_create(%!vdev_type_t!): no such device\n", vdev->type);
+		TraceWarning(TRACE_GENERAL, "vhci_create(%!vdev_type_t!): no such device", vdev->type);
 
 		Irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
@@ -79,7 +79,7 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(Irp, IO_NO_INCREMENT);
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave\n", vdev->type);
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave", vdev->type);
 
 	return STATUS_SUCCESS;
 }
@@ -107,11 +107,11 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter\n", vdev->type);
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter", vdev->type);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		TraceWarning(TRACE_GENERAL, "vhci_cleanup(%!vdev_type_t!): no such device\n", vdev->type);
+		TraceWarning(TRACE_GENERAL, "vhci_cleanup(%!vdev_type_t!): no such device", vdev->type);
 		irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return STATUS_NO_SUCH_DEVICE;
@@ -124,7 +124,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave\n", vdev->type);
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave", vdev->type);
 
 	return STATUS_SUCCESS;
 }
@@ -154,7 +154,7 @@ PAGEABLE NTSTATUS
 DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 {
 	WPP_INIT_TRACING(drvobj, RegistryPath);
-	TraceInfo(TRACE_GENERAL, "RegistryPath '%!USTR!'\n", RegistryPath);
+	TraceInfo(TRACE_GENERAL, "RegistryPath '%!USTR!'", RegistryPath);
 
 	ExInitializeNPagedLookasideList(&g_lookaside, NULL,NULL, 0, sizeof(struct urb_req), 'USBV', 0);
 
@@ -166,7 +166,7 @@ DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 	if (Globals.RegistryPath.Buffer) {
 		RtlCopyUnicodeString(&Globals.RegistryPath, RegistryPath);
 	} else {
-		TraceCritical(TRACE_GENERAL, "ExAllocatePoolWithTag failed\n");
+		TraceCritical(TRACE_GENERAL, "ExAllocatePoolWithTag failed");
 		vhci_driverUnload(drvobj);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}

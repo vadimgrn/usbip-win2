@@ -26,7 +26,7 @@ BOOLEAN USB_BUSIFFN
 IsDeviceHighSpeed(PVOID context)
 {
 	pvpdo_dev_t	vpdo = context;
-	TraceInfo(TRACE_GENERAL, "IsDeviceHighSpeed called, it is %d\n", vpdo->speed);
+	TraceInfo(TRACE_GENERAL, "IsDeviceHighSpeed called, it is %d", vpdo->speed);
 	return vpdo->speed == USB_SPEED_HIGH;
 }
 
@@ -40,7 +40,7 @@ QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN OUT PVOID BusInforma
 	UNREFERENCED_PARAMETER(BusInformationBufferLength);
 	UNREFERENCED_PARAMETER(BusInformationActualLength);
 
-	TraceInfo(TRACE_GENERAL, "QueryBusInformation called\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
@@ -50,7 +50,7 @@ SubmitIsoOutUrb(IN PVOID context, IN PURB urb)
 	UNREFERENCED_PARAMETER(context);
 	UNREFERENCED_PARAMETER(urb);
 
-	TraceInfo(TRACE_GENERAL, "SubmitIsoOutUrb called\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
@@ -60,7 +60,7 @@ QueryBusTime(IN PVOID context, IN OUT PULONG currentusbframe)
 	UNREFERENCED_PARAMETER(context);
 	UNREFERENCED_PARAMETER(currentusbframe);
 
-	TraceInfo(TRACE_GENERAL, "QueryBusTime called\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
@@ -69,7 +69,7 @@ GetUSBDIVersion(IN PVOID context, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT P
 {
 	UNREFERENCED_PARAMETER(context);
 
-	TraceInfo(TRACE_GENERAL, "GetUSBDIVersion called\n");
+	TraceInfo(TRACE_GENERAL, "Enter");
 
 	*HcdCapabilities = 0;
 	inf->USBDI_Version = 0x600; /* Windows 8 */
@@ -149,7 +149,7 @@ query_interface_usbdi(pvpdo_dev_t vpdo, USHORT size, USHORT version, PINTERFACE 
 		bus_intf->BusContext = vpdo;
 		break;
 	default:
-		TraceError(TRACE_GENERAL, "never go here\n");
+		TraceError(TRACE_GENERAL, "never go here");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -214,7 +214,7 @@ pnp_query_interface(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	} else if (IsEqualGUID(intf_type, &USB_BUS_INTERFACE_USBDI_GUID) && vdev->type == VDEV_VPDO) {
 		status = query_interface_usbdi((vpdo_dev_t*)vdev, size, version, intf);
 	} else {
-		TraceWarning(TRACE_GENERAL, "Query unknown interface %!GUID!\n", intf_type);
+		TraceWarning(TRACE_GENERAL, "Query unknown interface %!GUID!", intf_type);
 	}
 
 	return irp_done(irp, status);

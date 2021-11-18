@@ -160,7 +160,7 @@ get_node_driverkey_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG pout
 		return STATUS_NO_SUCH_DEVICE;
 	driverkey = get_device_prop(vpdo->common.Self, DevicePropertyDriverKeyName, &driverkeylen);
 	if (driverkey == NULL) {
-		TraceWarning(TRACE_IOCTL, "failed to get vpdo driver key\n");
+		TraceWarning(TRACE_IOCTL, "failed to get vpdo driver key");
 		status = STATUS_UNSUCCESSFUL;
 	}
 	else {
@@ -221,7 +221,7 @@ vhci_ioctl_vhub(pvhub_dev_t vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULON
 		status = get_node_driverkey_name(vhub, buffer, inlen, poutlen);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 		break;
 	}
 

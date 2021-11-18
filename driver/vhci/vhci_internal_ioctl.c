@@ -8,11 +8,11 @@
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
 	if (!hPipe) {
-		TraceInfo(TRACE_IOCTL, "empty pipe handle\n");
+		TraceInfo(TRACE_IOCTL, "empty pipe handle");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	TraceInfo(TRACE_IOCTL, "PipeHandle %p\n", hPipe);
+	TraceInfo(TRACE_IOCTL, "PipeHandle %!HANDLE!", hPipe);
 
 	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
@@ -26,7 +26,7 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 			continue;
 		}
 
-		TraceInfo(TRACE_IOCTL, "aborted urbr removed: %s\n", dbg_urbr(urbr_local));
+		TraceInfo(TRACE_IOCTL, "aborted urbr removed: %s", dbg_urbr(urbr_local));
 
 		if (urbr_local->irp) {
 			PIRP	irp = urbr_local->irp;
@@ -81,11 +81,11 @@ static NTSTATUS
 process_irp_urb_req(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
 	if (urb == NULL) {
-		TraceError(TRACE_IOCTL, "process_irp_urb_req: null urb\n");
+		TraceError(TRACE_IOCTL, "null urb");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	TraceInfo(TRACE_IOCTL, "%!urb_function!\n", urb->UrbHeader.Function);
+	TraceInfo(TRACE_IOCTL, "%!urb_function!", urb->UrbHeader.Function);
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ABORT_PIPE:
@@ -115,7 +115,7 @@ process_irp_urb_req(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 		return submit_urbr_irp(vpdo, irp);
 	default:
-		TraceWarning(TRACE_IOCTL, "unhandled %!urb_function!, len %d\n",
+		TraceWarning(TRACE_IOCTL, "unhandled %!urb_function!, len %d",
 			urb->UrbHeader.Function, urb->UrbHeader.Length);
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -138,15 +138,15 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	NTSTATUS		status;
 	pvpdo_dev_t	vpdo;
 
-	TraceInfo(TRACE_IOCTL, "Enter\n");
+	TraceInfo(TRACE_IOCTL, "Enter");
 
 	irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceInfo(TRACE_IOCTL, "%s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	if (!IS_DEVOBJ_VPDO(devobj)) {
-		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed\n");
+		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");
 		Irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 		return STATUS_INVALID_DEVICE_REQUEST;
@@ -155,7 +155,7 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	vpdo = (pvpdo_dev_t)devobj->DeviceExtension;
 
 	if (!vpdo->plugged) {
-		TraceWarning(TRACE_IOCTL, "device is not connected\n");
+		TraceWarning(TRACE_IOCTL, "device is not connected");
 		Irp->IoStatus.Status = STATUS_DEVICE_NOT_CONNECTED;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 		return STATUS_DEVICE_NOT_CONNECTED;
@@ -176,9 +176,8 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)\n", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 		status = STATUS_INVALID_PARAMETER;
-		break;
 	}
 
 	if (status != STATUS_PENDING) {
@@ -187,6 +186,6 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-	TraceInfo(TRACE_IOCTL, "Leave %!STATUS!\n", status);
+	TraceInfo(TRACE_IOCTL, "Leave %!STATUS!", status);
 	return status;
 }

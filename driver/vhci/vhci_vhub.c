@@ -150,10 +150,10 @@ mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 
 		IoInvalidateDeviceRelations(vhub->common.pdo, BusRelations);
 
-		TraceInfo(TRACE_VPDO, "the device is marked as unplugged: port: %u\n", vpdo->port);
+		TraceInfo(TRACE_VPDO, "the device is marked as unplugged: port: %u", vpdo->port);
 	}
 	else {
-		TraceError(TRACE_VHUB, "vpdo already unplugged: port: %u\n", vpdo->port);
+		TraceError(TRACE_VHUB, "vpdo already unplugged: port: %u", vpdo->port);
 	}
 }
 
@@ -188,7 +188,7 @@ vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_VHUB, "get ports status\n");
+	TraceInfo(TRACE_VHUB, "Enter");
 
 	RtlZeroMemory(st, sizeof(*st));
 	ExAcquireFastMutex(&vhub->Mutex);
@@ -221,7 +221,7 @@ vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imported_dev_t idevs,
 	if (n_idevs_max == 0)
 		return STATUS_INVALID_PARAMETER;
 
-	TraceInfo(TRACE_VHUB, "get imported devices\n");
+	TraceInfo(TRACE_VHUB, "Enter");
 
 	ExAcquireFastMutex(&vhub->Mutex);
 

@@ -75,7 +75,7 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG 
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	TraceInfo(TRACE_IOCTL, "%!usbuser!\n", hdr->UsbUserRequest);
+	TraceInfo(TRACE_IOCTL, "%!usbuser!", hdr->UsbUserRequest);
 
 	buffer = hdr + 1;
 	inlen -= sizeof(*hdr);
@@ -91,7 +91,7 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG 
 		status = get_controller_info(hdr + 1, inlen, poutlen);
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "unhandled %!usbuser!\n", hdr->UsbUserRequest);
+		TraceWarning(TRACE_IOCTL, "unhandled %!usbuser!", hdr->UsbUserRequest);
 		hdr->UsbUserStatusCode = UsbUserNotSupported;
 	}
 

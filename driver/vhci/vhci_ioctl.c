@@ -17,7 +17,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp:%p\n",
+	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp:%p",
 		DEVOBJ_VDEV_TYPE(devobj), dbg_ioctl_code(ioctl_code), ioctl_code, irp);
 
 	// Check to see whether the bus is removed
@@ -39,7 +39,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		status = vhci_ioctl_vhub(DEVOBJ_TO_VHUB(devobj), irp, ioctl_code, buffer, inlen, &outlen);
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "ioctl for %!vdev_type_t! is not allowed\n", DEVOBJ_VDEV_TYPE(devobj));
+		TraceWarning(TRACE_IOCTL, "ioctl for %!vdev_type_t! is not allowed", DEVOBJ_VDEV_TYPE(devobj));
 		outlen = 0;
 		break;
 	}
@@ -51,7 +51,7 @@ END:
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 
-	TraceInfo(TRACE_IOCTL, "Leave: irp:%p, %!STATUS!\n", irp, status);
+	TraceInfo(TRACE_IOCTL, "Leave: irp:%p, %!STATUS!", irp, status);
 
 	return status;
 }

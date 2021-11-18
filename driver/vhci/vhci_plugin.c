@@ -13,7 +13,7 @@ vhci_init_vpdo(pvpdo_dev_t vpdo)
 {
 	PAGED_CODE();
 
-	TraceInfo(TRACE_PNP, "vhci_init_vpdo: 0x%p\n", vpdo);
+	TraceInfo(TRACE_PNP, "vhci_init_vpdo: %p", vpdo);
 
 	vpdo->plugged = TRUE;
 
@@ -79,7 +79,7 @@ static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIP
 			vpdo->subclass = dsc_intf->bInterfaceSubClass;
 			vpdo->protocol = dsc_intf->bInterfaceProtocol;
 		} else {
-			TraceError(TRACE_PNP, "interface descriptor not found\n");
+			TraceError(TRACE_PNP, "interface descriptor not found");
 		}
 	}
 }
@@ -106,7 +106,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 		return STATUS_END_OF_FILE;
 	}
 
-	TraceInfo(TRACE_VPDO, "Plugin vpdo: port: %d\n", (int)pluginfo->port);
+	TraceInfo(TRACE_VPDO, "Plugin vpdo: port %d", (int)pluginfo->port);
 
 	PDEVICE_OBJECT devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
@@ -151,21 +151,21 @@ vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 	PAGED_CODE();
 
 	if (vhub == NULL) {
-		TraceInfo(TRACE_PNP, "vhub has gone\n");
+		TraceInfo(TRACE_PNP, "vhub has gone");
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
 	if (port < 0) {
-		TraceInfo(TRACE_PNP, "plugging out all the devices!\n");
+		TraceInfo(TRACE_PNP, "plugging out all the devices!");
 		vhub_mark_unplugged_all_vpdos(vhub);
 		return STATUS_SUCCESS;
 	}
 
-	TraceInfo(TRACE_PNP, "plugging out device: port: %u\n", port);
+	TraceInfo(TRACE_PNP, "plugging out device: port %u", port);
 
 	vpdo = vhub_find_vpdo(vhub, port);
 	if (vpdo == NULL) {
-		TraceInfo(TRACE_PNP, "no matching vpdo: port: %u\n", port);
+		TraceInfo(TRACE_PNP, "no matching vpdo: port %u", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
