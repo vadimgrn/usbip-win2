@@ -1,6 +1,5 @@
 #include "vhci_urbr_store_control.h"
 #include "vhci_driver.h"
-
 #include "vhci_urbr_store_control.tmh"
 
 #include <usbip_proto.h>
@@ -10,6 +9,8 @@
 
 #include "strutil.h"
 #include "usbd_helper.h"
+
+#include <ntstrsafe.h>
 
 NTSTATUS
 store_urbr_control_transfer_partial(WDFREQUEST req_read, purb_req_t urbr)
@@ -105,33 +106,45 @@ is_serial_setup_pkt(UCHAR iSerial, PUCHAR setup)
 {
 	if (setup[0] != 0x80 || setup[1] != 0x06 || setup[3] != 0x03 || setup[2] != iSerial)
 		return FALSE;
+
 	return TRUE;
 }
 
-static NTSTATUS
-fetch_done_urbr_control_transfer_ex(pctx_vusb_t vusb, struct _URB_CONTROL_TRANSFER_EX *urb_ctltrans_ex)
+static NTSTATUS fetch_done_urbr_control_transfer_ex(ctx_vusb_t *vusb, struct _URB_CONTROL_TRANSFER_EX *urb_ctltrans_ex)
 {
-	PWCHAR	dsc_serial;
-	size_t	len;
-	NTSTATUS	status;
+	size_t str_sz = 0;
+	NTSTATUS status = RtlStringCbLengthW(vusb->wserial, MAXIMUM_USB_STRING_LENGTH, &str_sz);
+	if (status != STATUS_SUCCESS) {
+		TraceError(TRACE_READ, "Can't get length of wserial '%!WSTR!'", vusb->wserial);
+		return status;
+	}
 
-	len = libdrv_strlenW(vusb->wserial) * sizeof(WCHAR) + 2;
-	dsc_serial = ExAllocatePoolWithTag(PagedPool, len, VHCI_POOLTAG);
-	*(PUCHAR)dsc_serial = (UCHAR)len;
-	((PUCHAR)dsc_serial)[1] = 0x03;
-	RtlCopyMemory((PUCHAR)dsc_serial + 2, vusb->wserial, len - 2);
+	static_assert(MAXIMUM_USB_STRING_LENGTH <= MAXUCHAR, "assert");
 
-	if (urb_ctltrans_ex->TransferBufferLength < len)
-		len = urb_ctltrans_ex->TransferBufferLength;
+	USB_STRING_DESCRIPTOR *sd = NULL;
+	ULONG sd_sz = sizeof(*sd) - sizeof(sd->bString) + (ULONG)str_sz;
+
+	if (sd_sz > MAXIMUM_USB_STRING_LENGTH) { // bLength can't hold this value
+		TraceError(TRACE_READ, "string descriptor size %lu exceeds limit %d for wserial '%!WSTR!'", 
+			sd_sz, MAXIMUM_USB_STRING_LENGTH, vusb->wserial);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	UCHAR buf[MAXIMUM_USB_STRING_LENGTH];
+	sd = (USB_STRING_DESCRIPTOR*)buf;
+
+	sd->bLength = (UCHAR)sd_sz;
+	sd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+	RtlCopyMemory(sd->bString, vusb->wserial, str_sz);
+
 	status = copy_to_transfer_buffer(urb_ctltrans_ex->TransferBuffer, urb_ctltrans_ex->TransferBufferMDL,
-		urb_ctltrans_ex->TransferBufferLength, dsc_serial, (int)len);
-	ExFreePoolWithTag(dsc_serial, VHCI_POOLTAG);
+		urb_ctltrans_ex->TransferBufferLength, sd, sd_sz);
 
 	if (status == STATUS_SUCCESS) {
-		urb_ctltrans_ex->TransferBufferLength = (ULONG)len;
-		/* this status code lets urbr be completed without fetching */
-		return STATUS_FLT_IO_COMPLETE;
+		urb_ctltrans_ex->TransferBufferLength = sd_sz;
+		status = STATUS_FLT_IO_COMPLETE; // lets urbr be completed without fetching
 	}
+
 	return status;
 }
 

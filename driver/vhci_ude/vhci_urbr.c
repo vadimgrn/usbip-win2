@@ -5,16 +5,20 @@
 #include "usbip_proto.h"
 #include "vhci_urbr_store.h"
 
-PVOID
-get_buf(PVOID buf, PMDL bufMDL)
+void *get_buf(void *buf, MDL *bufMDL)
 {
-	if (buf == NULL) {
-		if (bufMDL != NULL)
-			buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
-		if (buf == NULL) {
-			TraceError(TRACE_READ, "No transfer buffer");
-		}
+	if (buf) {
+		return buf;
 	}
+
+	if (bufMDL) {
+		buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
+	}
+
+	if (!buf) {
+		TraceWarning(TRACE_READ, "No transfer buffer");
+	}
+
 	return buf;
 }
 

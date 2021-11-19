@@ -43,8 +43,7 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(urb_req_t, TO_URBR)
 
 #define RemoveEntryListInit(le)	do { RemoveEntryList(le); InitializeListHead(le); } while (0)
 
-PVOID
-get_buf(PVOID buf, PMDL bufMDL);
+void *get_buf(void *buf, MDL *bufMDL);
 
 struct usbip_header *
 get_hdr_from_req_read(WDFREQUEST req_read);

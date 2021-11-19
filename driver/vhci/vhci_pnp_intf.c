@@ -4,9 +4,12 @@
 #include "trace.h"
 #include "vhci_pnp_intf.tmh"
 
+#include "vhci.h"
 #include "usbip_proto.h"
 #include "vhci_irp.h"
 #include "strutil.h"
+
+#include <ntstrsafe.h>
 
 static VOID
 ref_interface(__in PVOID Context)
@@ -156,41 +159,53 @@ query_interface_usbdi(pvpdo_dev_t vpdo, USHORT size, USHORT version, PINTERFACE 
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-get_location_string(PVOID Context, PZZWSTR *ploc_str)
+static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
 {
-	pvdev_t vdev = (pvdev_t)Context;
-	int	len;
+	vdev_t *vdev = Context;
+	NTSTATUS st = STATUS_SUCCESS;
 
-	switch (vdev->type) {
-	case VDEV_VPDO:
-		len = libdrv_asprintfW(ploc_str, L"%s(%u)t", devcodes[vdev->type], ((pvpdo_dev_t)vdev)->port);
-		break;
-	default:
-		len = libdrv_asprintfW(ploc_str, L"%st", devcodes[vdev->type]);
-		break;
+	WCHAR buf[32];
+	size_t remaining = 0;
+
+	if (vdev->type == VDEV_VPDO) {
+		vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
+		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL, 
+			L"%s(%u)", devcodes[vdev->type], vpdo->port);
+	} else {
+		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL, 
+			L"%s", devcodes[vdev->type]);
 	}
-	(*ploc_str)[len - 1] = L'\0';
+	
+	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"
+		TraceError(TRACE_GENERAL, "%!STATUS!, remaining %Iu", st, remaining);
+		return st;
+	}
 
-	return STATUS_SUCCESS;
+	remaining -= 2;
+	size_t sz = sizeof(buf) - remaining*sizeof(*buf);
+
+	*ploc_str = ExAllocatePoolWithTag(PagedPool, sz, USBIP_VHCI_POOL_TAG);
+	if (*ploc_str) {
+		RtlCopyMemory(*ploc_str, buf, sz);
+		return STATUS_SUCCESS;
+	}
+
+	TraceError(TRACE_GENERAL, "Can't allocate memory: size %Iu", sz);
+	return STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static NTSTATUS
-query_interface_location(pvdev_t vdev, USHORT size, USHORT version, PINTERFACE intf)
+static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INTERFACE *intf)
 {
-	PNP_LOCATION_INTERFACE		*intf_loc = (PNP_LOCATION_INTERFACE *)intf;
-
-	UNREFERENCED_PARAMETER(version);
-
-	if (size < sizeof(PNP_LOCATION_INTERFACE)) {
+	PNP_LOCATION_INTERFACE *intf_loc = (PNP_LOCATION_INTERFACE*)intf;
+	if (size < sizeof(*intf_loc)) {
 		TraceWarning(TRACE_GENERAL, "unsupported pnp location interface version: %d", version);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	intf_loc->Size = sizeof(PNP_LOCATION_INTERFACE);
+	intf_loc->Size = sizeof(*intf_loc);
 	intf_loc->Version = 1;
 	intf_loc->GetLocationString = get_location_string;
-	intf_loc->Context = (PVOID)vdev;
+	intf_loc->Context = vdev;
 	intf_loc->InterfaceReference = ref_interface;
 	intf_loc->InterfaceDereference = deref_interface;
 

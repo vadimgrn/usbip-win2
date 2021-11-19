@@ -1,47 +1,34 @@
-#include <ntddk.h>
-
+#include "strutil.h"
 #include <ntstrsafe.h>
 
-#include "strutil.h"
+ULONG libdrv_pooltag = 'dbil';
 
-ULONG	libdrv_pooltag = 'dbil';
-
-size_t
-libdrv_strlenW(LPCWSTR cwstr)
+LPWSTR libdrv_strdupW(LPCWSTR str)
 {
-	size_t	len;
-	NTSTATUS	status;
+	size_t len = 0;
+	NTSTATUS st = RtlStringCchLengthW(str, NTSTRSAFE_MAX_CCH, &len);
+	if (st != STATUS_SUCCESS) {
+		return NULL;
+	}
 
-	if (cwstr == NULL)
-		return 0;
-	status = RtlStringCchLengthW(cwstr, NTSTRSAFE_MAX_CCH, &len);
-	if (NT_ERROR(status))
-		return 0;
-	return len;
+	size_t sz = ++len*sizeof(*str);
+
+	LPWSTR s = ExAllocatePoolWithTag(PagedPool, sz, libdrv_pooltag);
+	if (s) {
+		RtlCopyMemory(s, str, sz);
+	}
+
+	return s;
 }
 
-LPWSTR
-libdrv_strdupW(LPCWSTR cwstr)
+void libdrv_free(void *data)
 {
-	PWCHAR	wstr_duped;
-	size_t	len;
-	NTSTATUS	status;
-
-	if (cwstr == NULL)
-		return NULL;
-	status = RtlStringCchLengthW(cwstr, NTSTRSAFE_MAX_CCH, &len);
-	if (NT_ERROR(status))
-		return NULL;
-	wstr_duped = ExAllocatePoolWithTag(PagedPool, (len + 1) * sizeof(WCHAR), libdrv_pooltag);
-	if (wstr_duped == NULL)
-		return NULL;
-
-	RtlStringCchPrintfW(wstr_duped, len + 1, cwstr);
-	return wstr_duped;
+	if (data) {
+		ExFreePoolWithTag(data, libdrv_pooltag);
+	}
 }
 
-int
-libdrv_snprintf(char *buf, int size, const char *fmt, ...)
+int libdrv_snprintf(char *buf, int size, const char *fmt, ...)
 {
 	va_list	arglist;
 	size_t	len;
@@ -59,8 +46,7 @@ libdrv_snprintf(char *buf, int size, const char *fmt, ...)
 	return (int)len;
 }
 
-int
-libdrv_snprintfW(PWCHAR buf, int size, LPCWSTR fmt, ...)
+int libdrv_snprintfW(PWCHAR buf, int size, LPCWSTR fmt, ...)
 {
 	va_list	arglist;
 	size_t	len;
@@ -76,36 +62,4 @@ libdrv_snprintfW(PWCHAR buf, int size, LPCWSTR fmt, ...)
 	if (NT_ERROR(status))
 		return 0;
 	return (int)len;
-}
-
-#define BUFMAX_ASPRINTF	128
-
-int
-libdrv_asprintfW(PWCHAR *pbuf, LPCWSTR fmt, ...)
-{
-	WCHAR	buf[BUFMAX_ASPRINTF];
-	va_list	arglist;
-	size_t	len;
-	NTSTATUS	status;
-
-	va_start(arglist, fmt);
-	status = RtlStringCchVPrintfW(buf, BUFMAX_ASPRINTF, fmt, arglist);
-	va_end(arglist);
-
-	if (NT_ERROR(status))
-		return 0;
-	status = RtlStringCchLengthW(buf, BUFMAX_ASPRINTF, &len);
-	if (NT_ERROR(status))
-		return 0;
-	*pbuf = libdrv_strdupW(buf);
-	if (*pbuf == NULL)
-		return 0;
-	return (int)len;
-}
-
-VOID
-libdrv_free(PVOID data)
-{
-	if (data)
-		ExFreePoolWithTag(data, libdrv_pooltag);
 }

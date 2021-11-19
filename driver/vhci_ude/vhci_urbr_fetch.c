@@ -13,15 +13,14 @@
 #include "vhci_urbr_fetch_bulk.h"
 #include "vhci_urbr_fetch_iso.h"
 
-NTSTATUS
-copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, PVOID src, int src_len)
+NTSTATUS copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, const void *src, ULONG src_len)
 {
 	if (dst_len < src_len) {
-		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d", dst_len, src_len);
-		return STATUS_INVALID_PARAMETER;
+		TraceError(TRACE_WRITE, "Buffer is small: dest %lu, src %lu", dst_len, src_len);
+		return STATUS_BUFFER_TOO_SMALL;
 	}
 	
-	VOID *buf = get_buf(buf_dst, bufMDL);
+	void *buf = get_buf(buf_dst, bufMDL);
 	if (buf) {
 		RtlCopyMemory(buf, src, src_len);
 		return STATUS_SUCCESS;
