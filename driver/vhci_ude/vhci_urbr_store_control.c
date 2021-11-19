@@ -101,13 +101,15 @@ out:
 	return status;
 }
 
-static BOOLEAN
-is_serial_setup_pkt(UCHAR iSerial, PUCHAR setup)
+static bool is_serial_setup_pkt(UCHAR iSerial, const UCHAR *setup)
 {
-	if (setup[0] != 0x80 || setup[1] != 0x06 || setup[3] != 0x03 || setup[2] != iSerial)
-		return FALSE;
+	const USB_DEFAULT_PIPE_SETUP_PACKET *p = (const USB_DEFAULT_PIPE_SETUP_PACKET*)setup;
 
-	return TRUE;
+	return  p->bmRequestType.Dir == BMREQUEST_DEVICE_TO_HOST && 
+		p->bmRequestType.Type == BMREQUEST_STANDARD && 
+		p->bmRequestType.Recipient == BMREQUEST_TO_DEVICE && 
+		p->bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+		p->wValue.W == USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(USB_STRING_DESCRIPTOR_TYPE, iSerial);
 }
 
 static NTSTATUS fetch_done_urbr_control_transfer_ex(ctx_vusb_t *vusb, struct _URB_CONTROL_TRANSFER_EX *urb_ctltrans_ex)
