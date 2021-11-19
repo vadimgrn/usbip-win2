@@ -16,7 +16,7 @@
 NTSTATUS copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, const void *src, ULONG src_len)
 {
 	if (dst_len < src_len) {
-		TraceError(TRACE_WRITE, "Buffer is small: dest %lu, src %lu", dst_len, src_len);
+		TraceError(TRACE_WRITE, "Buffer too small: dest %lu, src %lu", dst_len, src_len);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 	

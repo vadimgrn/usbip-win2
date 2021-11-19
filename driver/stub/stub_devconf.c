@@ -10,30 +10,30 @@
 
 #include "strutil.h"
 
-const char *
-dbg_info_intf(PUSBD_INTERFACE_INFORMATION info_intf)
+const char *dbg_info_intf(USBD_INTERFACE_INFORMATION *info_intf)
 {
-	static char	buf[128];
-
-	if (info_intf == NULL)
+	if (!info_intf) {
 		return "<null>";
+	}
 
-	libdrv_snprintf(buf, 128, "num:%hhu,alt:%hhu", info_intf->InterfaceNumber, info_intf->AlternateSetting);
+	static char buf[32];
 
-	return buf;
+	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "num:%hhu,alt:%hhu", 
+		info_intf->InterfaceNumber, info_intf->AlternateSetting);
+
+	return st == STATUS_SUCCESS ? buf : "dbg_info_intf error";
 }
 
-const char *
-dbg_info_pipe(PUSBD_PIPE_INFORMATION info_pipe)
+const char *dbg_info_pipe(USBD_PIPE_INFORMATION *info_pipe)
 {
-	static char	buf[128];
-
-	if (info_pipe == NULL)
+	if (!info_pipe) {
 		return "<null>";
+	}
 
-	libdrv_snprintf(buf, 128, "epaddr:%hhx", info_pipe->EndpointAddress);
+	static char buf[32];
 
-	return buf;
+	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "epaddr:%#hhx", info_pipe->EndpointAddress);
+	return st == STATUS_SUCCESS ? buf : "dbg_info_pipe error";
 }
 
 static PUSBD_INTERFACE_INFORMATION

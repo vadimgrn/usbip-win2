@@ -117,7 +117,7 @@ static NTSTATUS fetch_done_urbr_control_transfer_ex(ctx_vusb_t *vusb, struct _UR
 	size_t str_sz = 0;
 	NTSTATUS status = RtlStringCbLengthW(vusb->wserial, MAXIMUM_USB_STRING_LENGTH, &str_sz);
 	if (status != STATUS_SUCCESS) {
-		TraceError(TRACE_READ, "Can't get length of wserial '%!WSTR!'", vusb->wserial);
+		TraceError(TRACE_READ, "Can't get length of wserial '%!WSTR!': %!STATUS!", vusb->wserial, status);
 		return status;
 	}
 
@@ -127,8 +127,9 @@ static NTSTATUS fetch_done_urbr_control_transfer_ex(ctx_vusb_t *vusb, struct _UR
 	ULONG sd_sz = sizeof(*sd) - sizeof(sd->bString) + (ULONG)str_sz;
 
 	if (sd_sz > MAXIMUM_USB_STRING_LENGTH) { // bLength can't hold this value
-		TraceError(TRACE_READ, "string descriptor size %lu exceeds limit %d for wserial '%!WSTR!'", 
+		TraceError(TRACE_READ, "String descriptor size %lu exceeds limit %d for wserial '%!WSTR!'", 
 			sd_sz, MAXIMUM_USB_STRING_LENGTH, vusb->wserial);
+
 		return STATUS_INVALID_PARAMETER;
 	}
 

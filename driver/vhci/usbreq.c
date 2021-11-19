@@ -6,16 +6,16 @@
 #include "usbip_proto.h"
 #include "vhci_read.h"
 
-const char* dbg_urbr(const struct urb_req* urbr)
+const char *dbg_urbr(const struct urb_req *urbr)
 {
 	static char buf[128];
 
 	if (!urbr) {
 		return "[null]";
 	}
-
-	libdrv_snprintf(buf, sizeof(buf), "[seq:%u]", urbr->seq_num);
-	return buf;
+	
+	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "[seq:%lu]", urbr->seq_num);
+	return st == STATUS_SUCCESS ? buf : "dbg_urbr error";
 }
 
 USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)

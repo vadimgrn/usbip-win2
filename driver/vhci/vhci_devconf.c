@@ -30,15 +30,15 @@ static __inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
 	return v[1]; 
 }
 
-static const char *
-dbg_pipe(PUSBD_PIPE_INFORMATION pipe)
+static const char *dbg_pipe(USBD_PIPE_INFORMATION *pipe)
 {
-	static char	buf[512];
+	static char buf[255];
 
-	libdrv_snprintf(buf, 512, "addr:%02x intv:%d typ:%d mps:%d mts:%d flags:%x",
+	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "addr:%02x intv:%d typ:%d mps:%d mts:%d flags:%x",
 		pipe->EndpointAddress, pipe->Interval, pipe->PipeType, pipe->PipeFlags,
 		pipe->MaximumPacketSize, pipe->MaximumTransferSize, pipe->PipeFlags);
-	return buf;
+
+	return st == STATUS_SUCCESS ? buf : "dbg_pipe error";
 }
 
 static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enum usb_device_speed speed)

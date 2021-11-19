@@ -172,8 +172,8 @@ static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
 		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL, 
 			L"%s(%u)", devcodes[vdev->type], vpdo->port);
 	} else {
-		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL, 
-			L"%s", devcodes[vdev->type]);
+		st = RtlStringCchCopyExW(buf, sizeof(buf)/sizeof(*buf), devcodes[vdev->type],
+			NULL, &remaining, STRSAFE_FILL_BEHIND_NULL);
 	}
 	
 	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"

@@ -1,5 +1,4 @@
 #include "dbgcommon.h"
-#include "strutil.h"
 #include "usbip_proto.h"
 #include "usbip_vhci_api.h"
 
@@ -193,30 +192,36 @@ const char *dbg_ioctl_code(int ioctl_code)
 
 const char *dbg_usbip_hdr(char *buf, unsigned int len, const struct usbip_header *hdr)
 {
-	int n = libdrv_snprintf(buf, len, "seq:%u,%s,ep:%u,cmd:%x", 
-				hdr->base.seqnum, 
-				hdr->base.direction ? "in" : "out", 
-				hdr->base.ep, 
-				hdr->base.command);
+	NTSTRSAFE_PSTR end = NULL;
+	size_t remaining = 0;
 
-	len -= n;
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &end, &remaining, STRSAFE_NULL_ON_FAILURE, 
+		"seq:%u,%s,ep:%#04x,cmd:%d",
+		hdr->base.seqnum, 
+		hdr->base.direction ? "in" : "out", 
+		hdr->base.ep, 
+		hdr->base.command);
+
+	if (st != STATUS_SUCCESS) {
+		return "dbg_usbip_hdr error";
+	}
 
 	switch (hdr->base.command) {
 	case USBIP_CMD_SUBMIT:
-		libdrv_snprintf(buf + n, len, "(submit),tlen:%d,intv:%d",
+		RtlStringCbPrintfA(end, remaining, "(submit),tlen:%d,intv:%d", 
 			hdr->u.cmd_submit.transfer_buffer_length, hdr->u.cmd_submit.interval);
 		break;
 	case USBIP_RET_SUBMIT:
-		libdrv_snprintf(buf + n, len, "(ret_submit),alen:%u", hdr->u.ret_submit.actual_length);
+		RtlStringCbPrintfA(end, remaining, "(ret_submit),alen:%u", hdr->u.ret_submit.actual_length);
 		break;
 	case USBIP_CMD_UNLINK:
-		libdrv_snprintf(buf + n, len, "(unlink),unlinkseq:%u", hdr->u.cmd_unlink.seqnum);
+		RtlStringCbPrintfA(end, remaining, "(unlink),unlinkseq:%u", hdr->u.cmd_unlink.seqnum);
 		break;
 	case USBIP_RET_UNLINK:
-		libdrv_snprintf(buf + n, len, "(ret_unlink),st:%u", hdr->u.ret_unlink.status);
+		RtlStringCbPrintfA(end, remaining, "(ret_unlink),st:%u", hdr->u.ret_unlink.status);
 		break;
 	case USBIP_RESET_DEV:
-		libdrv_snprintf(buf + n, len, "(reset_dev)");
+		RtlStringCbCopyA(end, remaining, "(reset_dev)");
 		break;
 	}
 
@@ -231,5 +236,5 @@ const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet
 		"[bmRequestType %#04x, bRequest %#04x, wValue %#06hx, wIndex %#06hx, wLength %hu]",
 		pkt->bmRequestType, pkt->bRequest, pkt->wValue, pkt->wIndex, pkt->wLength);
 
-	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet: invalid parameter";
+	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet invalid parameter";
 }

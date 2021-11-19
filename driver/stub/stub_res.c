@@ -12,16 +12,16 @@
 const char *
 dbg_stub_res(stub_res_t *sres, usbip_stub_dev_t *devstub)
 {
-	static char buf[1024];
+	static char buf[DBG_USBIP_HDR_BUFSZ];
 
 	if (sres == devstub->sres_ongoing) {
-		char dst[DBG_USBIP_HDR_BUFSZ];
-		libdrv_snprintf(buf, sizeof(buf), "%s", dbg_usbip_hdr(dst, sizeof(dst), &sres->header));
-	} else {
-		libdrv_snprintf(buf, sizeof(buf), "seq:%u,data_len:%d", sres->header.base.seqnum, sres->data_len);
+		return dbg_usbip_hdr(buf, sizeof(buf), &sres->header);
 	}
 
-	return buf;
+	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "seq:%u,data_len:%d", 
+		sres->header.base.seqnum, sres->data_len);
+	
+	return st == STATUS_SUCCESS ? buf : "dbg_stub_res error";
 }
 
 void

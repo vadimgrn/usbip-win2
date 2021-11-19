@@ -2,7 +2,6 @@
 #include "stub_dev.h"
 #include "dbgcommon.h"
 #include "usbip_stub_api.h"
-#include "strutil.h"
 
 #include <ntstrsafe.h>
 
@@ -17,32 +16,38 @@ const char *dbg_device(DEVICE_OBJECT *devobj)
 	}
 
 	ANSI_STRING name;
-
-	if (NT_SUCCESS(RtlUnicodeStringToAnsiString(&name, &devobj->DriverObject->DriverName, TRUE))) {
-		static char buf[32];
-		RtlStringCchCopyA(buf, 32, name.Buffer);
-		RtlFreeAnsiString(&name);
-		return buf;
+	NTSTATUS st = RtlUnicodeStringToAnsiString(&name, &devobj->DriverObject->DriverName, TRUE);
+	if (st != STATUS_SUCCESS) {
+		return "dbg_device error";
 	}
+	
+	static char buf[32];
+	RtlStringCbCopyA(buf, min(sizeof(buf), name.Length + 1), name.Buffer);
 
-	return "error";
+	RtlFreeAnsiString(&name);
+	return buf;
 }
 
 const char *dbg_devices(DEVICE_OBJECT *devobj, BOOLEAN is_attached)
 {
-	static char	buf[1024];
-	int	n = 0;
-	int	i;
+	static char buf[1024];
 
-	for (i = 0; i < 16; i++) {
-		if (devobj == NULL)
+	*buf = '\0';
+
+	NTSTRSAFE_PSTR end = buf;
+	size_t remaining = sizeof(buf);
+
+	for (int i = 0; i < 16 && devobj; ++i) {
+
+		NTSTATUS st = RtlStringCbPrintfExA(end, remaining, &end, &remaining, 0, "[%s]", dbg_device(devobj));
+
+		if (st == STATUS_SUCCESS) {
+			devobj = is_attached ? devobj->AttachedDevice : devobj->NextDevice;
+		} else {
 			break;
-		n += libdrv_snprintf(buf + n, 1024 - n, "[%s]", dbg_device(devobj));
-		if (is_attached)
-			devobj = devobj->AttachedDevice;
-		else
-			devobj = devobj->NextDevice;
+		}
 	}
+
 	return buf;
 }
 
@@ -53,8 +58,9 @@ const char *dbg_devstub(usbip_stub_dev_t *devstub)
 	}
 
 	static char buf[512];
-	RtlStringCchPrintfA(buf, 512, "id:%d,hw:%s", devstub->id, devstub->id_hw);
-	return buf;
+
+	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "id:%d,hw:%s", devstub->id, devstub->id_hw);
+	return st == STATUS_SUCCESS ? buf : "dbg_devstub error";
 }
 
 const char *dbg_stub_ioctl_code(int ioctl_code)
