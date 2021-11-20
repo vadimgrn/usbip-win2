@@ -6,15 +6,13 @@
 #include "usbip_proto.h"
 #include "vhci_read.h"
 
-const char *dbg_urbr(const struct urb_req *urbr)
+const char *dbg_urbr(char* buf, unsigned int len, const struct urb_req *urbr)
 {
-	static char buf[128];
-
 	if (!urbr) {
 		return "[null]";
 	}
 	
-	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "[seq:%lu]", urbr->seq_num);
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "[seq:%lu]", urbr->seq_num);
 	return st == STATUS_SUCCESS ? buf : "dbg_urbr error";
 }
 
@@ -71,7 +69,8 @@ static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 	if (urbr_unlink) {
 		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
 		if (NT_ERROR(status)) {
-			TraceInfo(TRACE_GENERAL, "failed to submit unlink urb: %s", dbg_urbr(urbr_unlink));
+			char buf[DBG_URBR_BUFSZ];
+			TraceError(TRACE_GENERAL, "failed to submit unlink urb: %s", dbg_urbr(buf, sizeof(buf), urbr_unlink));
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -94,7 +93,9 @@ static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 
 	submit_urbr_unlink(vpdo, urbr->seq_num);
 
-	TraceInfo(TRACE_GENERAL, "cancelled urb destroyed: %s", dbg_urbr(urbr));
+	char buf[DBG_URBR_BUFSZ];
+	TraceInfo(TRACE_GENERAL, "cancelled urb destroyed: %s", dbg_urbr(buf, sizeof(buf), urbr));
+	
 	free_urbr(urbr);
 }
 
@@ -110,7 +111,12 @@ cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 	urbr = (struct urb_req *)irp->Tail.Overlay.DriverContext[1];
 
 	vpdo = (pvpdo_dev_t)devobj->DeviceExtension;
-	TraceInfo(TRACE_GENERAL, "irp will be cancelled: %s", dbg_urbr(urbr));
+	
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "irp will be cancelled: %s", dbg_urbr(buf, sizeof(buf), urbr));
+	}
+
 	IoReleaseCancelSpinLock(irp->CancelIrql);
 
 	remove_cancelled_urbr(vpdo, urbr);

@@ -11,7 +11,8 @@ typedef struct stub_res {
 	LIST_ENTRY	list;
 } stub_res_t;
 
-const char *dbg_stub_res(stub_res_t *sres, usbip_stub_dev_t* devstub);
+enum { DBG_STUB_RES_BUFSZ = 255 };
+const char *dbg_stub_res(char *buf, unsigned int len, stub_res_t *sres, usbip_stub_dev_t* devstub);
 
 stub_res_t *
 create_stub_res(unsigned int cmd, unsigned long seqnum, int err, PVOID data, int data_len, ULONG n_pkts, BOOLEAN need_copy);

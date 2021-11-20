@@ -95,7 +95,12 @@ call_usbd_nb(usbip_stub_dev_t *devstub, PURB purb, cb_urb_done_t cb_urb_done, st
 	IoSetCompletionRoutine(irp, do_safe_completion, safe_completion, TRUE, TRUE, TRUE);
 
 	add_pending_stub_res(devstub, sres, irp);
-	TraceInfo(TRACE_GENERAL, "call_usbd_nb: %s", dbg_stub_res(sres, devstub));
+	
+	{
+		char buf[DBG_STUB_RES_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "%s", dbg_stub_res(buf, sizeof(buf), sres, devstub));
+	}
+
 	status = IoCallDriver(devstub->next_stack_dev, irp);
 	TraceInfo(TRACE_GENERAL, "%!STATUS!", status);
 
@@ -275,7 +280,9 @@ select_usb_conf(usbip_stub_dev_t *devstub, USHORT bVal)
 
 	status = call_usbd(devstub, purb);
 	if (NT_ERROR(status)) {
-		TraceInfo(TRACE_GENERAL, "failed to select configuration: %s", dbg_devstub(devstub));
+		char buf[DBG_DEVSTUB_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "failed to select configuration: %s", dbg_devstub(buf, sizeof(buf), devstub));
+		
 		USBD_UrbFree(devstub->hUSBD, purb);
 		ExFreePoolWithTag(pintf_list, USBIP_STUB_POOL_TAG);
 		ExFreePoolWithTag(dsc_conf, USBIP_STUB_POOL_TAG);
@@ -414,8 +421,11 @@ submit_class_vendor_req(usbip_stub_dev_t *devstub, BOOLEAN is_in, USHORT cmd, UC
 static void
 done_bulk_intr_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_res_t *sres)
 {
-	TraceInfo(TRACE_GENERAL, "sres %s, %!STATUS!, %s(%#010lX)",
-		dbg_stub_res(sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
+	{
+		char buf[DBG_STUB_RES_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "sres %s, %!STATUS!, %s(%#010lX)",
+			dbg_stub_res(buf, sizeof(buf), sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
+	}
 
 	if (status == STATUS_CANCELLED) {
 		/* cancelled. just drop it */
@@ -478,8 +488,11 @@ compact_usbd_iso_data(ULONG n_pkts, char *src, const USBD_ISO_PACKET_DESCRIPTOR*
 static void
 done_iso_transfer(usbip_stub_dev_t *devstub, NTSTATUS status, PURB purb, stub_res_t *sres)
 {
-	TraceInfo(TRACE_GENERAL, "sres: %s, %!STATUS!, %s(%#010lX)",
-		dbg_stub_res(sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
+	{
+		char buf[DBG_STUB_RES_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "sres: %s, %!STATUS!, %s(%#010lX)",
+			dbg_stub_res(buf, sizeof(buf), sres, devstub), status, dbg_usbd_status(purb->UrbHeader.Status), (ULONG)purb->UrbHeader.Status);
+	}
 
 	if (status == STATUS_CANCELLED) {
 		/* cancelled. just drop it */

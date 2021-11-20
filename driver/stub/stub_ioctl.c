@@ -93,12 +93,16 @@ process_export(usbip_stub_dev_t *devstub, IRP *irp)
 {
 	UNREFERENCED_PARAMETER(devstub);
 
-	TraceInfo(TRACE_IOCTL, "exporting: %s", dbg_devstub(devstub));
+	{
+		char buf[DBG_DEVSTUB_BUFSZ];
+		TraceInfo(TRACE_IOCTL, "exporting: %s", dbg_devstub(buf, sizeof(buf), devstub));
+	}
 
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
-	TraceInfo(TRACE_IOCTL, "exported: %s", dbg_devstub(devstub));
+	char buf[DBG_DEVSTUB_BUFSZ];
+	TraceInfo(TRACE_IOCTL, "exported: %s", dbg_devstub(buf, sizeof(buf), devstub));
 
 	return STATUS_SUCCESS;
 }

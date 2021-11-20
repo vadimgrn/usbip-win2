@@ -50,7 +50,10 @@ complete_pending_irp(pvpdo_dev_t vpdo)
 
 		urbr = CONTAINING_RECORD(vpdo->head_urbr.Flink, struct urb_req, list_all);
 
-		TraceInfo(TRACE_PNP, "complete pending urbr: %s", dbg_urbr(urbr));
+		{
+			char buf[DBG_URBR_BUFSZ];
+			TraceInfo(TRACE_PNP, "complete pending urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
+		}
 
 		RemoveEntryListInit(&urbr->list_all);
 		RemoveEntryListInit(&urbr->list_state);

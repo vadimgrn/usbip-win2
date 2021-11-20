@@ -298,7 +298,10 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 	BOOLEAN	is_in;
 	NTSTATUS	status;
 
-	TraceInfo(TRACE_READWRITE, "seq %u, ep %s", hdr->base.seqnum, dbg_info_pipe(info_pipe));
+	{
+		char buf[DBG_INFO_PIPE_BUFSZ];
+		TraceInfo(TRACE_READWRITE, "seq %u, ep %s", hdr->base.seqnum, dbg_info_pipe(buf, sizeof(buf), info_pipe));
+	}
 
 	datalen = (ULONG)hdr->u.cmd_submit.transfer_buffer_length;
 	is_in = hdr->base.direction ? TRUE : FALSE;
@@ -325,7 +328,10 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 static void
 process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe, const struct usbip_header *hdr)
 {
-	TraceInfo(TRACE_READWRITE, "seq %u, ep %s", hdr->base.seqnum, dbg_info_pipe(info_pipe));
+	{
+		char buf [DBG_INFO_PIPE_BUFSZ];
+		TraceInfo(TRACE_READWRITE, "seq %u, ep %s", hdr->base.seqnum, dbg_info_pipe(buf, sizeof(buf), info_pipe));
+	}
 
 	ULONG datalen = 0;
 	PVOID data = NULL;

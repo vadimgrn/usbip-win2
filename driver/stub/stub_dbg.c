@@ -1,11 +1,12 @@
 #include "stub_driver.h"
+#include "stub_dbg.h"
 #include "stub_dev.h"
 #include "dbgcommon.h"
 #include "usbip_stub_api.h"
 
 #include <ntstrsafe.h>
 
-const char *dbg_device(DEVICE_OBJECT *devobj)
+const char *dbg_device(char *buf, unsigned int len, const DEVICE_OBJECT *devobj)
 {
 	if (!devobj) {
 		return "null";
@@ -18,48 +19,46 @@ const char *dbg_device(DEVICE_OBJECT *devobj)
 	ANSI_STRING name;
 	NTSTATUS st = RtlUnicodeStringToAnsiString(&name, &devobj->DriverObject->DriverName, TRUE);
 	if (st != STATUS_SUCCESS) {
-		return "dbg_device error";
+		return "dbg_device translate error";
 	}
 	
-	static char buf[32];
-	RtlStringCbCopyA(buf, min(sizeof(buf), name.Length + 1), name.Buffer);
-
+	st = RtlStringCbCopyA(buf, min(name.Length + 1U, len), name.Buffer);
 	RtlFreeAnsiString(&name);
-	return buf;
+
+	return st == STATUS_SUCCESS ? buf : "dbg_device copy error";
 }
 
-const char *dbg_devices(DEVICE_OBJECT *devobj, BOOLEAN is_attached)
+const char *dbg_devices(char *buf, unsigned int len, const DEVICE_OBJECT *devobj, bool is_attached)
 {
-	static char buf[1024];
-
 	*buf = '\0';
 
 	NTSTRSAFE_PSTR end = buf;
-	size_t remaining = sizeof(buf);
+	size_t remaining = len;
 
-	for (int i = 0; i < 16 && devobj; ++i) {
+	for (int i = 0; i < DBG_DEVICES_BUFSZ/DBG_DEVICE_BUFSZ && devobj; ++i) {
 
-		NTSTATUS st = RtlStringCbPrintfExA(end, remaining, &end, &remaining, 0, "[%s]", dbg_device(devobj));
+		char dev_buf[DBG_DEVICE_BUFSZ];
+		
+		NTSTATUS st = RtlStringCbPrintfExA(end, remaining, &end, &remaining, 0, "[%s]", 
+			dbg_device(dev_buf, sizeof(dev_buf), devobj));
 
-		if (st == STATUS_SUCCESS) {
-			devobj = is_attached ? devobj->AttachedDevice : devobj->NextDevice;
-		} else {
+		if (st != STATUS_SUCCESS) {
 			break;
 		}
+
+		devobj = is_attached ? devobj->AttachedDevice : devobj->NextDevice;
 	}
 
 	return buf;
 }
 
-const char *dbg_devstub(usbip_stub_dev_t *devstub)
+const char *dbg_devstub(char *buf, unsigned int len, const usbip_stub_dev_t *devstub)
 {
 	if (!devstub) {
 		return "<null>";
 	}
 
-	static char buf[512];
-
-	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "id:%d,hw:%s", devstub->id, devstub->id_hw);
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "id:%d,hw:%s", devstub->id, devstub->id_hw);
 	return st == STATUS_SUCCESS ? buf : "dbg_devstub error";
 }
 

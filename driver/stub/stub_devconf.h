@@ -22,5 +22,8 @@ void update_devconf(devconf_t *devconf, PUSBD_INTERFACE_INFORMATION info_intf);
 ULONG get_info_intf_size(devconf_t *devconf, UCHAR intf_num, UCHAR alt_setting);
 PUSBD_PIPE_INFORMATION get_info_pipe(devconf_t *devconf, UCHAR epaddr);
 
-const char *dbg_info_intf(USBD_INTERFACE_INFORMATION *info_intf);
-const char *dbg_info_pipe(USBD_PIPE_INFORMATION *info_pipe);
+enum { DBG_INFO_INTF_BUFSZ = 32 };
+const char *dbg_info_intf(char *buf, unsigned int len, const USBD_INTERFACE_INFORMATION *info_intf);
+
+enum { DBG_INFO_PIPE_BUFSZ = 32 };
+const char *dbg_info_pipe(char *buf, unsigned int len, const USBD_PIPE_INFORMATION *info_pipe);

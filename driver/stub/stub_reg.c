@@ -5,8 +5,7 @@
 #include "stub_driver.h"
 #include "stub_dbg.h"
 
-static char *
-reg_get_property(PDEVICE_OBJECT pdo, int property)
+static char *reg_get_property(PDEVICE_OBJECT pdo, int property)
 {
 	UNICODE_STRING	prop_uni;
 	ANSI_STRING	prop_ansi;

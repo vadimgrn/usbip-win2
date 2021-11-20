@@ -13,7 +13,13 @@
 
 #define CSPKT_IS_IN(csp)		(CSPKT_DIRECTION(csp) == BMREQUEST_DEVICE_TO_HOST)
 
-const char *dbg_device(DEVICE_OBJECT *devobj);
-const char *dbg_devices(DEVICE_OBJECT *devobj, BOOLEAN is_attached);
-const char *dbg_devstub(usbip_stub_dev_t *devstub);
+enum { DBG_DEVICE_BUFSZ = 36 };
+const char *dbg_device(char *buf, unsigned int len, const DEVICE_OBJECT *devobj);
+
+enum { DBG_DEVICES_BUFSZ = 768 };
+const char *dbg_devices(char *buf, unsigned int len, const DEVICE_OBJECT *devobj, bool is_attached);
+
+enum { DBG_DEVSTUB_BUFSZ = 300 };
+const char *dbg_devstub(char *buf, unsigned int len, const usbip_stub_dev_t *devstub);
+
 const char *dbg_stub_ioctl_code(int ioctl_code);

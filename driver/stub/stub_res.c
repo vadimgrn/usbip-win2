@@ -9,28 +9,26 @@
 
 #include "strutil.h"
 
-const char *
-dbg_stub_res(stub_res_t *sres, usbip_stub_dev_t *devstub)
+const char *dbg_stub_res(char *buf, unsigned int len, stub_res_t *sres, usbip_stub_dev_t *devstub)
 {
-	static char buf[DBG_USBIP_HDR_BUFSZ];
-
 	if (sres == devstub->sres_ongoing) {
-		return dbg_usbip_hdr(buf, sizeof(buf), &sres->header);
+		return dbg_usbip_hdr(buf, len, &sres->header);
 	}
 
-	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "seq:%u,data_len:%d", 
-		sres->header.base.seqnum, sres->data_len);
-	
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "seq:%u,data_len:%d", sres->header.base.seqnum, sres->data_len);
 	return st == STATUS_SUCCESS ? buf : "dbg_stub_res error";
 }
 
-void
-free_stub_res(stub_res_t *sres)
+void free_stub_res(stub_res_t *sres)
 {
-	if (sres == NULL)
+	if (!sres) {
 		return;
-	if (sres->data)
+	}
+
+	if (sres->data) {
 		ExFreePoolWithTag(sres->data, USBIP_STUB_POOL_TAG);
+	}
+
 	ExFreePoolWithTag(sres, USBIP_STUB_POOL_TAG);
 }
 
@@ -129,8 +127,10 @@ send_stub_res(usbip_stub_dev_t *devstub, PIRP irp_read, stub_res_t *sres)
 		sent = store_irp_stub_res(irp_read, 0, (char *)&sres->header + devstub->len_sent_partial, data_len);
 		devstub->len_sent_partial += sent;
 		if (sent < data_len) {
+			char buf[DBG_STUB_RES_BUFSZ];
 			TraceInfo(TRACE_GENERAL, "header partially sent: %u < %u: %s", sent, data_len,
-			     dbg_stub_res(sres, devstub));
+			     dbg_stub_res(buf, sizeof(buf), sres, devstub));
+			
 			save_pending_sres(devstub, sres);
 			irp_read->IoStatus.Information = sent;
 			IoCompleteRequest(irp_read, IO_NO_INCREMENT);
@@ -151,12 +151,14 @@ send_stub_res(usbip_stub_dev_t *devstub, PIRP irp_read, stub_res_t *sres)
 		sent += sent_payload;
 		devstub->len_sent_partial += sent_payload;
 		if (sent_payload < data_len) {
+			char buf[DBG_STUB_RES_BUFSZ];
 			TraceInfo(TRACE_GENERAL, "partially sent: %u < %u: %s", sent_payload, data_len,
-			     dbg_stub_res(sres, devstub));
+			     dbg_stub_res(buf, sizeof(buf), sres, devstub));
 			save_pending_sres(devstub, sres);
 		}
 		else {
-			TraceInfo(TRACE_GENERAL, "sent: %s", dbg_stub_res(sres, devstub));
+			char buf[DBG_STUB_RES_BUFSZ];
+			TraceInfo(TRACE_GENERAL, "sent: %s", dbg_stub_res(buf, sizeof(buf), sres, devstub));
 			free_stub_res(sres);
 			save_pending_sres(devstub, NULL);
 		}

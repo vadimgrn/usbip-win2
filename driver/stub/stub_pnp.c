@@ -66,7 +66,8 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 
 	NTSTATUS status = lock_dev_removal(devstub);
 	if (NT_ERROR(status)) {
-		TraceInfo(TRACE_PNP, "device is pending removal: %s", dbg_devstub(devstub));
+		char buf[DBG_DEVSTUB_BUFSZ];
+		TraceError(TRACE_PNP, "device is pending removal: %s", dbg_devstub(buf, sizeof(buf), devstub));
 		return complete_irp(irp, status, 0);
 	}
 
@@ -90,7 +91,10 @@ stub_dispatch_pnp(usbip_stub_dev_t *devstub, IRP *irp)
 
 		status = pass_irp_down(devstub, irp, NULL, NULL);
 
-		TraceInfo(TRACE_PNP, "deleting device: %s", dbg_devstub(devstub));
+		{
+			char buf[DBG_DEVSTUB_BUFSZ];
+			TraceInfo(TRACE_PNP, "deleting device: %s", dbg_devstub(buf, sizeof(buf), devstub));
+		}
 
 		remove_devlink(devstub);
 		free_devconf(devstub->devconf);

@@ -30,11 +30,11 @@ static __inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
 	return v[1]; 
 }
 
-static const char *dbg_pipe(USBD_PIPE_INFORMATION *pipe)
-{
-	static char buf[255];
+enum { DBG_PIPE_BUFSZ = 255 };
 
-	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "addr:%02x intv:%d typ:%d mps:%d mts:%d flags:%x",
+static const char *dbg_pipe(char* buf, unsigned int len, const USBD_PIPE_INFORMATION *pipe)
+{
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "addr:%02x intv:%d typ:%d mps:%d mts:%lu flags:%x",
 		pipe->EndpointAddress, pipe->Interval, pipe->PipeType, pipe->PipeFlags,
 		pipe->MaximumPacketSize, pipe->MaximumTransferSize, pipe->PipeFlags);
 
@@ -72,7 +72,9 @@ static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 	USBD_PIPE_INFORMATION *pi = params->pi + i;
 
 	set_pipe(pi, d, params->speed);
-	TraceInfo(TRACE_IOCTL, "%d: %s", i, dbg_pipe(pi));
+
+	char buf[DBG_PIPE_BUFSZ];
+	TraceInfo(TRACE_IOCTL, "%d: %s", i, dbg_pipe(buf, sizeof(buf), pi));
 
 	return false;
 }

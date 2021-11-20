@@ -10,29 +10,25 @@
 
 #include "strutil.h"
 
-const char *dbg_info_intf(USBD_INTERFACE_INFORMATION *info_intf)
+const char *dbg_info_intf(char *buf, unsigned int len, const USBD_INTERFACE_INFORMATION *info_intf)
 {
 	if (!info_intf) {
 		return "<null>";
 	}
 
-	static char buf[32];
-
-	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "num:%hhu,alt:%hhu", 
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "num:%hhu,alt:%hhu", 
 		info_intf->InterfaceNumber, info_intf->AlternateSetting);
 
 	return st == STATUS_SUCCESS ? buf : "dbg_info_intf error";
 }
 
-const char *dbg_info_pipe(USBD_PIPE_INFORMATION *info_pipe)
+const char *dbg_info_pipe(char *buf, unsigned int len, const USBD_PIPE_INFORMATION *info_pipe)
 {
 	if (!info_pipe) {
 		return "<null>";
 	}
 
-	static char buf[32];
-
-	NTSTATUS st = RtlStringCbPrintfA(buf, sizeof(buf), "epaddr:%#hhx", info_pipe->EndpointAddress);
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "epaddr:%#hhx", info_pipe->EndpointAddress);
 	return st == STATUS_SUCCESS ? buf : "dbg_info_pipe error";
 }
 

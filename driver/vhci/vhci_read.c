@@ -171,7 +171,11 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 				    USBD_SHORT_TRANSFER_OK, urb_gsr->TransferBufferLength);
 
 	code_func = urb->UrbHeader.Function;
-	TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!", dbg_urbr(urbr), code_func);
+	
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!", dbg_urbr(buf, sizeof(buf), urbr), code_func);
+	}
 
 	switch (code_func) {
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
@@ -659,8 +663,11 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 	PIO_STACK_LOCATION	irpstack;
 	USHORT		code_func;
 	NTSTATUS	status;
-
-	TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(urbr));
+	
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
+	}
 
 	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	urb = irpstack->Parameters.Others.Argument1;
@@ -672,7 +679,11 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 	}
 
 	code_func = urb->UrbHeader.Function;
-	TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!", dbg_urbr(urbr), code_func);
+
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!", dbg_urbr(buf, sizeof(buf), urbr), code_func);
+	}
 
 	switch (code_func) {
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
@@ -735,7 +746,10 @@ store_urbr_partial(PIRP irp, struct urb_req *urbr)
 	USHORT		code_func;
 	NTSTATUS	status;
 
-	TraceInfo(TRACE_READ, "Enter: urbr: %s", dbg_urbr(urbr));
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_READ, "Enter: urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
+	}
 
 	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	urb = irpstack->Parameters.Others.Argument1;
@@ -793,9 +807,12 @@ store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 
 NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 {
-	TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(urbr));
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
+	}
 
-	if (urbr->irp == NULL) {
+	if (!urbr->irp) {
 		return store_cancelled_urbr(irp, urbr);
 	}
 

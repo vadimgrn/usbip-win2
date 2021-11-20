@@ -9,7 +9,7 @@
 #define INITGUID
 #include "usbip_stub_api.h"
 
-#define NAMEBUF_LEN	128
+enum { NAMEBUF_LEN = 128 };
 typedef WCHAR	namebuf_t[NAMEBUF_LEN];
 
 static void
@@ -203,26 +203,25 @@ get_device_type(PDEVICE_OBJECT pdo)
 NTSTATUS
 stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 {
-	DEVICE_OBJECT	*devobj;
-	usbip_stub_dev_t	*devstub;
-	ULONG		devtype;
-	NTSTATUS	status;
+	{
+		char buf[DBG_DEVICES_BUFSZ];
+		TraceInfo(TRACE_DEV, "%s", dbg_devices(buf, sizeof(buf), pdo, TRUE));
+	}
 
-	TraceInfo(TRACE_DEV, "%s", dbg_devices(pdo, TRUE));
-
-	if (!is_addable_pdo(pdo))
+	if (!is_addable_pdo(pdo)) {
 		return STATUS_SUCCESS;
+	}
 
-	devtype = get_device_type(pdo);
+	ULONG devtype = get_device_type(pdo);
 
-	devobj = create_devobj(drvobj, devtype);
-	if (devobj == NULL) {
+	DEVICE_OBJECT *devobj = create_devobj(drvobj, devtype);
+	if (!devobj) {
 		TraceError(TRACE_DEV, "failed to create usbip stub device");
 		return STATUS_SUCCESS;
 	}
 
 	/* setup the "device object" */
-	devstub = (usbip_stub_dev_t *)devobj->DeviceExtension;
+	usbip_stub_dev_t *devstub = (usbip_stub_dev_t *)devobj->DeviceExtension;
 
 	devstub->self = devobj;
 	devstub->pdo = pdo;
@@ -242,7 +241,7 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 	InitializeListHead(&devstub->sres_head_pending);
 	InitializeListHead(&devstub->sres_head_done);
 
-	status = IoRegisterDeviceInterface(pdo, (LPGUID)&GUID_DEVINTERFACE_STUB_USBIP, NULL, &devstub->interface_name);
+	NTSTATUS status = IoRegisterDeviceInterface(pdo, (LPGUID)&GUID_DEVINTERFACE_STUB_USBIP, NULL, &devstub->interface_name);
 	if (NT_ERROR(status)) {
 		TraceError(TRACE_DEV, "failed to register interface");
 	}
@@ -259,7 +258,8 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 	/* attach the newly created device object to the stack */
 	devstub->next_stack_dev = IoAttachDeviceToDeviceStack(devobj, pdo);
 	if (devstub->next_stack_dev == NULL) {
-		TraceError(TRACE_DISPATCH, "failed to attach: %s", dbg_devstub(devstub));
+		char buf[DBG_DEVSTUB_BUFSZ];
+		TraceError(TRACE_DISPATCH, "failed to attach: %s", dbg_devstub(buf, sizeof(buf), devstub));
 		unlock_dev_removal(devstub); // always release acquired locks
 		remove_devlink(devstub);
 		IoDeleteDevice(devobj);
@@ -268,7 +268,9 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 
 	status = USBD_CreateHandle(pdo, devstub->next_stack_dev, USBD_CLIENT_CONTRACT_VERSION_602, USBIP_STUB_POOL_TAG, &devstub->hUSBD);
 	if (NT_ERROR(status)) {
-		TraceError(TRACE_DISPATCH, "failed to create USBD handle: %s: %!STATUS!", dbg_devstub(devstub), status);
+		char buf[DBG_DEVSTUB_BUFSZ];
+		TraceError(TRACE_DISPATCH, "failed to create USBD handle: %s: %!STATUS!", dbg_devstub(buf, sizeof(buf), devstub), status);
+		
 		IoDetachDevice(devstub->next_stack_dev);
 		unlock_dev_removal(devstub);
 		remove_devlink(devstub);
@@ -286,7 +288,8 @@ stub_add_device(PDRIVER_OBJECT drvobj, PDEVICE_OBJECT pdo)
 	// use the same Characteristics as the underlying object
 	devobj->Characteristics = devstub->next_stack_dev->Characteristics;
 
-	TraceInfo(TRACE_DEV, "device added: %s", dbg_devstub(devstub));
+	char buf[DBG_DEVSTUB_BUFSZ];
+	TraceInfo(TRACE_DEV, "device added: %s", dbg_devstub(buf, sizeof(buf), devstub));
 
 	devobj->Flags &= ~DO_DEVICE_INITIALIZING;
 	unlock_dev_removal(devstub);

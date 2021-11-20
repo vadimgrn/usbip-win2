@@ -362,7 +362,10 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#010lX)", dbg_urbr(urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
+	{
+		char buf[DBG_URBR_BUFSZ];
+		TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#010lX)", dbg_urbr(buf, sizeof(buf), urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
+	}
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
