@@ -51,16 +51,9 @@ irp_send_synchronously(PDEVICE_OBJECT devobj, PIRP irp)
 	return status;
 }
 
-NTSTATUS
-irp_done(PIRP irp, NTSTATUS status)
+NTSTATUS irp_done(IRP *irp, NTSTATUS status)
 {
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
-}
-
-NTSTATUS
-irp_success(PIRP irp)
-{
-	return irp_done(irp, STATUS_SUCCESS);
 }

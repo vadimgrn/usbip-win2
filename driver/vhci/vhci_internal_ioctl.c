@@ -134,16 +134,9 @@ setup_topology_address(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpStack)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS
-vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-	PIO_STACK_LOCATION      irpStack;
-	NTSTATUS		status;
-	pvpdo_dev_t	vpdo;
-
-	TraceInfo(TRACE_IOCTL, "Enter");
-
-	irpStack = IoGetCurrentIrpStackLocation(Irp);
+	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
 	TraceInfo(TRACE_IOCTL, "%s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
@@ -152,25 +145,26 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");
 		Irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return STATUS_INVALID_DEVICE_REQUEST;
+		return Irp->IoStatus.Status;
 	}
 
-	vpdo = (pvpdo_dev_t)devobj->DeviceExtension;
-
+	vpdo_dev_t *vpdo = devobj->DeviceExtension;
 	if (!vpdo->plugged) {
 		TraceWarning(TRACE_IOCTL, "device is not connected");
 		Irp->IoStatus.Status = STATUS_DEVICE_NOT_CONNECTED;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return STATUS_DEVICE_NOT_CONNECTED;
+		return Irp->IoStatus.Status;
 	}
+
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = process_irp_urb_req(vpdo, Irp, (PURB)irpStack->Parameters.Others.Argument1);
+		status = process_irp_urb_req(vpdo, Irp, (URB*)irpStack->Parameters.Others.Argument1);
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
+		*(ULONG*)irpStack->Parameters.Others.Argument1 = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
 		status = STATUS_SUCCESS;
-		*(unsigned long *)irpStack->Parameters.Others.Argument1 = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		status = submit_urbr_irp(vpdo, Irp);
@@ -179,8 +173,7 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
-		status = STATUS_INVALID_PARAMETER;
+		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	if (status != STATUS_PENDING) {
@@ -189,6 +182,6 @@ vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-	TraceInfo(TRACE_IOCTL, "Leave %!STATUS!", status);
+	TraceInfo(TRACE_IOCTL, "%!STATUS!", status);
 	return status;
 }

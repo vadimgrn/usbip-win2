@@ -14,6 +14,8 @@
 #include "vhci_pnp_vpdo.h"
 #include "vhci_pnp_resources.h"
 
+#include <wdmguid.h>
+
 #define IRP_PASS_DOWN_OR_SUCCESS(vdev, irp)			\
 	do {							\
 		if (IS_FDO((vdev)->type)) {			\
@@ -108,23 +110,20 @@ pnp_query_bus_information(PIRP irp)
 	return irp_success(irp);
 }
 
-PAGEABLE NTSTATUS
-vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	pvdev_t		vdev = DEVOBJ_TO_VDEV(devobj);
-	PIO_STACK_LOCATION	irpstack;
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
+	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+	IO_STACK_LOCATION* irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_PNP, "%!vdev_type_t!: Enter: %!pnpmn!, irp: %p", DEVOBJ_VDEV_TYPE(devobj), irpstack->MinorFunction, irp);
+	TraceInfo(TRACE_PNP, "%!vdev_type_t!: enter irp %p, %!pnpmn!", vdev->type, irp, irpstack->MinorFunction);
+	NTSTATUS status = STATUS_SUCCESS;
 
-	// If the device has been removed, the driver should
-	// not pass the IRP down to the next lower driver.
+	// If the device has been removed, the driver should not pass the IRP down to the next lower driver
 	if (vdev->DevicePnPState == Deleted) {
-		irp->IoStatus.Status = status = STATUS_NO_SUCH_DEVICE;
+		status = STATUS_NO_SUCH_DEVICE;
+		irp->IoStatus.Status = status;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		goto END;
 	}
@@ -182,15 +181,14 @@ vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		status = pnp_filter_resource_requirements(vdev, irp);
 		break;
 	default:
-		if (process_pnp_vpdo((pvpdo_dev_t)vdev, irp, irpstack))
+		if (process_pnp_vpdo((vpdo_dev_t*)vdev, irp, irpstack)) {
 			status = irp->IoStatus.Status;
-		else
+		} else {
 			status = irp_done(irp, irp->IoStatus.Status);
-		break;
+		}
 	}
 
 END:
-	TraceInfo(TRACE_PNP, "%!vdev_type_t!: Leave: irp:%p, %!STATUS!", DEVOBJ_VDEV_TYPE(devobj), irp, status);
-
+	TraceInfo(TRACE_PNP, "%!vdev_type_t!: leave irp %p, %!STATUS!", vdev->type, irp, status);
 	return status;
 }

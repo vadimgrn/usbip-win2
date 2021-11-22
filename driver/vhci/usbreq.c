@@ -196,18 +196,17 @@ BOOLEAN is_port_urbr(struct urb_req *urbr, USBD_PIPE_HANDLE handle)
 	return hPipe == handle;
 }
 
-NTSTATUS
-submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
+NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 {
 	KIRQL	oldirql;
 	KIRQL	oldirql_cancel;
 	PIRP	read_irp;
-	NTSTATUS	status = STATUS_PENDING;
+	NTSTATUS status = STATUS_PENDING;
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
-	if (vpdo->urbr_sent_partial || vpdo->pending_read_irp == NULL) {
-		if (urbr->irp != NULL) {
+	if (vpdo->urbr_sent_partial || !vpdo->pending_read_irp) {
+		if (urbr->irp) {
 			IoAcquireCancelSpinLock(&oldirql_cancel);
 			IoSetCancelRoutine(urbr->irp, cancel_urbr);
 			IoReleaseCancelSpinLock(oldirql_cancel);
@@ -217,16 +216,16 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 		InsertTailList(&vpdo->head_urbr, &urbr->list_all);
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		TraceInfo(TRACE_URB, "urb pending");
+		TraceInfo(TRACE_URB, "STATUS_PENDING");
 		return STATUS_PENDING;
 	}
 
-	BOOLEAN valid_irp;
 	IoAcquireCancelSpinLock(&oldirql_cancel);
-	valid_irp = IoSetCancelRoutine(vpdo->pending_read_irp, NULL) != NULL;
+	bool valid_irp = IoSetCancelRoutine(vpdo->pending_read_irp, NULL);
 	IoReleaseCancelSpinLock(oldirql_cancel);
+
 	if (!valid_irp) {
-		TraceInfo(TRACE_URB, "read irp was cancelled");
+		TraceInfo(TRACE_URB, "Read irp was cancelled");
 		status = STATUS_INVALID_PARAMETER;
 		vpdo->pending_read_irp = NULL;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
@@ -236,7 +235,7 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 	read_irp = vpdo->pending_read_irp;
 	vpdo->urbr_sent_partial = urbr;
 
-	urbr->seq_num = ++(vpdo->seq_num);
+	urbr->seq_num = ++vpdo->seq_num;
 
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
@@ -245,13 +244,14 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
 	if (status == STATUS_SUCCESS) {
-		if (urbr->irp != NULL) {
+		if (urbr->irp) {
 			IoAcquireCancelSpinLock(&oldirql_cancel);
 			IoSetCancelRoutine(urbr->irp, cancel_urbr);
 			IoReleaseCancelSpinLock(oldirql_cancel);
 			IoMarkIrpPending(urbr->irp);
 		}
-		if (vpdo->len_sent_partial == 0) {
+
+		if (!vpdo->len_sent_partial) {
 			vpdo->urbr_sent_partial = NULL;
 			InsertTailList(&vpdo->head_urbr_sent, &urbr->list_state);
 		}
@@ -264,13 +264,13 @@ submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 		read_irp->IoStatus.Status = STATUS_SUCCESS;
 		IoCompleteRequest(read_irp, IO_NO_INCREMENT);
 		status = STATUS_PENDING;
-	}
-	else {
+	} else {
 		vpdo->urbr_sent_partial = NULL;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
 		status = STATUS_INVALID_PARAMETER;
 	}
-	TraceInfo(TRACE_URB, "urb requested: %!STATUS!", status);
+
+	TraceInfo(TRACE_URB, "%!STATUS!", status);
 	return status;
 }

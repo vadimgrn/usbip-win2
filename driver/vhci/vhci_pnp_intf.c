@@ -10,26 +10,25 @@
 #include "strutil.h"
 
 #include <ntstrsafe.h>
+#include <wdmguid.h>
+#include <usbbusif.h>
+#include <strmini.h>
+#include <usbcamdi.h>
 
-static VOID
-ref_interface(__in PVOID Context)
+static void ref_interface(__in PVOID Context)
 {
-	pvdev_t	vdev = (pvdev_t)Context;
-	vdev_add_ref((pvdev_t)vdev);
+	vdev_add_ref(Context);
 }
 
-static VOID
-deref_interface(__in PVOID Context)
+static void deref_interface(__in PVOID Context)
 {
-	pvdev_t	vdev = (pvdev_t)Context;
-	vdev_del_ref((pvdev_t)vdev);
+	vdev_del_ref(Context);
 }
 
-BOOLEAN USB_BUSIFFN
-IsDeviceHighSpeed(PVOID context)
+static BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(PVOID context)
 {
-	pvpdo_dev_t	vpdo = context;
-	TraceInfo(TRACE_GENERAL, "IsDeviceHighSpeed called, it is %d", vpdo->speed);
+	vpdo_dev_t *vpdo = context;
+	TraceInfo(TRACE_GENERAL, "%!usb_device_speed!", vpdo->speed);
 	return vpdo->speed == USB_SPEED_HIGH;
 }
 
@@ -75,8 +74,8 @@ GetUSBDIVersion(IN PVOID context, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT P
 	TraceInfo(TRACE_GENERAL, "Enter");
 
 	*HcdCapabilities = 0;
-	inf->USBDI_Version = 0x600; /* Windows 8 */
-	inf->Supported_USB_Version = 0x200; /* USB 2.0 */
+	inf->USBDI_Version = USBDI_VERSION;
+	inf->Supported_USB_Version = 0x200; // binary-coded decimal USB specification version number, USB 2.0
 }
 
 static NTSTATUS
@@ -91,72 +90,102 @@ QueryControllerType(_In_opt_ PVOID Context,
 {
 	UNREFERENCED_PARAMETER(Context);
 
-	if (HcdiOptionFlags != NULL)
-		* HcdiOptionFlags = 0;
-	if (PciVendorId != NULL)
-		* PciVendorId = 0x8086;
-	if (PciDeviceId != NULL)
-		* PciDeviceId = 0xa2af;
-	if (PciClass != NULL)
-		* PciClass = 0x0c;
-	if (PciSubClass != NULL)
-		* PciSubClass = 0x03;
-	if (PciRevisionId != NULL)
-		* PciRevisionId = 0;
-	if (PciProgIf != NULL)
-		* PciProgIf = 0;
+	if (HcdiOptionFlags) {
+		*HcdiOptionFlags = 0;
+	}
+
+	if (PciVendorId) {
+		*PciVendorId = 0x8086;
+	}
+
+	if (PciDeviceId) {
+		*PciDeviceId = 0xa2af;
+	}
+
+	if (PciClass) {
+		*PciClass = 0x0c;
+	}
+
+	if (PciSubClass) {
+		*PciSubClass = 0x03;
+	}
+
+	if (PciRevisionId) {
+		*PciRevisionId = 0;
+	}
+
+	if (PciProgIf) {
+		*PciProgIf = 0;
+	}
 
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS
-query_interface_usbdi(pvpdo_dev_t vpdo, USHORT size, USHORT version, PINTERFACE intf)
+static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT version, INTERFACE *intf)
 {
-	USB_BUS_INTERFACE_USBDI_V3	*bus_intf = (USB_BUS_INTERFACE_USBDI_V3 *)intf;
-	unsigned int valid_size[4] = {
+	if (version > USB_BUSIF_USBDI_VERSION_3) {
+		TraceError(TRACE_GENERAL, "Unsupported %!usb_busif_usbdi_version!", version);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	const USHORT iface_size[] = {
 		sizeof(USB_BUS_INTERFACE_USBDI_V0), sizeof(USB_BUS_INTERFACE_USBDI_V1),
 		sizeof(USB_BUS_INTERFACE_USBDI_V2), sizeof(USB_BUS_INTERFACE_USBDI_V3)
 	};
 
-	PAGED_CODE();
-
-	if (version > USB_BUSIF_USBDI_VERSION_3) {
-		TraceWarning(TRACE_GENERAL, "vpdo: unsupported usbdi interface version: %d", version);
-		return STATUS_INVALID_PARAMETER;
-	}
-	if (size < valid_size[version]) {
-		TraceWarning(TRACE_GENERAL, "vpdo: unsupported usbdi interface version: %d", version);
+	if (size < iface_size[version]) {
+		TraceError(TRACE_GENERAL, "%!usb_busif_usbdi_version!: size %d < %d", version, size, iface_size[version]);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	bus_intf->Size = (USHORT)valid_size[version];
+	USB_BUS_INTERFACE_USBDI_V3 *r = (USB_BUS_INTERFACE_USBDI_V3*)intf;
 
 	switch (version) {
 	case USB_BUSIF_USBDI_VERSION_3:
-		bus_intf->QueryControllerType = QueryControllerType;
-		bus_intf->QueryBusTimeEx = NULL;
+		r->QueryControllerType = QueryControllerType;
+		r->QueryBusTimeEx = NULL;
 		/* passthrough */
 	case USB_BUSIF_USBDI_VERSION_2:
-		bus_intf->EnumLogEntry = NULL;
+		r->EnumLogEntry = NULL;
 		/* passthrough */
 	case USB_BUSIF_USBDI_VERSION_1:
-		bus_intf->IsDeviceHighSpeed = IsDeviceHighSpeed;
+		r->IsDeviceHighSpeed = IsDeviceHighSpeed;
 		/* passthrough */
 	case USB_BUSIF_USBDI_VERSION_0:
-		bus_intf->QueryBusInformation = QueryBusInformation;
-		bus_intf->SubmitIsoOutUrb = SubmitIsoOutUrb;
-		bus_intf->QueryBusTime = QueryBusTime;
-		bus_intf->GetUSBDIVersion = GetUSBDIVersion;
-		bus_intf->InterfaceReference = ref_interface;
-		bus_intf->InterfaceDereference = deref_interface;
-		bus_intf->BusContext = vpdo;
+		r->Size = iface_size[version];
+		r->Version = version;
+		//
+		r->BusContext = vpdo;
+		r->InterfaceReference = ref_interface;
+		r->InterfaceDereference = deref_interface;
+		//
+		r->GetUSBDIVersion = GetUSBDIVersion;
+		r->QueryBusTime = QueryBusTime;
+		r->SubmitIsoOutUrb = SubmitIsoOutUrb;
+		r->QueryBusInformation = QueryBusInformation;
 		break;
-	default:
-		TraceError(TRACE_GENERAL, "never go here");
+	}
+
+	TraceInfo(TRACE_GENERAL, "%!usb_busif_usbdi_version!", version);
+	return STATUS_SUCCESS;
+}
+
+static PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INTERFACE* intf)
+{
+	if (version != USBCAMD_VERSION_200) {
+		TraceError(TRACE_GENERAL, "Version %d != %d", version, USBCAMD_VERSION_200);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	return STATUS_SUCCESS;
+	USBCAMD_INTERFACE *r = (USBCAMD_INTERFACE*)intf;
+	if (size < sizeof(*r)) {
+		TraceError(TRACE_GENERAL, "Size %d < %Iu", size, sizeof(*r));
+		return STATUS_INVALID_PARAMETER;
+	}
+
+
+	TraceWarning(TRACE_GENERAL, "Not implemented");
+	return STATUS_NOT_SUPPORTED;
 }
 
 static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
@@ -196,24 +225,28 @@ static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
 
 static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INTERFACE *intf)
 {
-	PNP_LOCATION_INTERFACE *intf_loc = (PNP_LOCATION_INTERFACE*)intf;
-	if (size < sizeof(*intf_loc)) {
-		TraceWarning(TRACE_GENERAL, "unsupported pnp location interface version: %d", version);
+	PNP_LOCATION_INTERFACE *r = (PNP_LOCATION_INTERFACE*)intf;
+	if (size < sizeof(*r)) {
+		TraceError(TRACE_GENERAL, "Size %d < %Iu, version %d", size, sizeof(*r), version);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	intf_loc->Size = sizeof(*intf_loc);
-	intf_loc->Version = 1;
-	intf_loc->GetLocationString = get_location_string;
-	intf_loc->Context = vdev;
-	intf_loc->InterfaceReference = ref_interface;
-	intf_loc->InterfaceDereference = deref_interface;
+	r->Size = sizeof(*r);
+	r->Version = 1;
+	r->Context = vdev;
+	r->InterfaceReference = ref_interface;
+	r->InterfaceDereference = deref_interface;
 
+	r->GetLocationString = get_location_string;
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-pnp_query_interface(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+/*
+ * On success, a bus driver sets Irp->IoStatus.Information to zero.
+ * If a bus driver does not export the requested interface and therefore does not handle this IRP 
+ * for a child PDO, the bus driver leaves Irp->IoStatus.Status as is and completes the IRP.
+ */
+PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
 	PAGED_CODE();
 
@@ -222,14 +255,20 @@ pnp_query_interface(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	USHORT version = irpstack->Parameters.QueryInterface.Version;
 	INTERFACE *intf = irpstack->Parameters.QueryInterface.Interface;
 
-	NTSTATUS status = STATUS_NOT_SUPPORTED;
+	NTSTATUS status = irp->IoStatus.Status;
 
 	if (IsEqualGUID(intf_type, &GUID_PNP_LOCATION_INTERFACE)) {
 		status = query_interface_location(vdev, size, version, intf);
+	} else if (IsEqualGUID(intf_type, &GUID_USBCAMD_INTERFACE)) {
+		status = query_interface_usbcam(size, version, intf);
 	} else if (IsEqualGUID(intf_type, &USB_BUS_INTERFACE_USBDI_GUID) && vdev->type == VDEV_VPDO) {
 		status = query_interface_usbdi((vpdo_dev_t*)vdev, size, version, intf);
-	} else {
-		TraceWarning(TRACE_GENERAL, "Query unknown interface %!GUID!", intf_type);
+	}
+
+	TraceInfo(TRACE_GENERAL, "%!GUID! -> %!STATUS!", intf_type, status);
+
+	if (status == STATUS_SUCCESS) {
+		irp->IoStatus.Information = 0;
 	}
 
 	return irp_done(irp, status);

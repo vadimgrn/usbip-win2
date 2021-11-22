@@ -20,7 +20,7 @@ struct urb_req {
 do { RemoveEntryList(le); InitializeListHead(le); } while (0)
 
 USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request);
-NTSTATUS submit_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr);
+NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr);
 
 struct urb_req *create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink);
 void free_urbr(struct urb_req *urbr);
