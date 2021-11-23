@@ -103,7 +103,7 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 NTSTATUS
 vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!", vdev->type, irpstack->MinorFunction);

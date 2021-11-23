@@ -144,11 +144,11 @@ remove_device(pvdev_t vdev)
 		if (vdev->child_pdo->fdo)
 			vdev->child_pdo->fdo->parent = NULL;
 	}
-	if (vdev->fdo != NULL) {
+	if (vdev->fdo) {
 		vdev->fdo->pdo = NULL;
 	}
-	if (vdev->pdo != NULL && vdev->type != VDEV_ROOT) {
-		DEVOBJ_TO_VDEV(vdev->pdo)->fdo = NULL;
+	if (vdev->pdo && vdev->type != VDEV_ROOT) {
+		devobj_to_vdev(vdev->pdo)->fdo = NULL;
 	}
 
 	switch (vdev->type) {

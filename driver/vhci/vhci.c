@@ -60,7 +60,7 @@ vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 static PAGEABLE NTSTATUS
 vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-	pvdev_t	vdev = DEVOBJ_TO_VDEV(devobj);
+	pvdev_t	vdev = devobj_to_vdev(devobj);
 
 	PAGED_CODE();
 
@@ -103,7 +103,7 @@ cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 static PAGEABLE NTSTATUS
 vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	PAGED_CODE();
 
@@ -132,7 +132,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 static PAGEABLE NTSTATUS
 vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-	pvdev_t	vdev = DEVOBJ_TO_VDEV(devobj);
+	pvdev_t	vdev = devobj_to_vdev(devobj);
 	NTSTATUS	status;
 
 	PAGED_CODE();

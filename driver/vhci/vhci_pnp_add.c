@@ -36,7 +36,7 @@ is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
 static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	for (DEVICE_OBJECT *devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
-		vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+		vdev_t *vdev = devobj_to_vdev(devobj);
 		if (vdev->type == type) {
 			return vdev;
 		}
@@ -60,7 +60,7 @@ create_child_pdo(pvdev_t vdev, vdev_type_t type)
 
 	devobj->Flags &= ~DO_DEVICE_INITIALIZING;
 
-	vdev_child = DEVOBJ_TO_VDEV(devobj);
+	vdev_child = devobj_to_vdev(devobj);
 	vdev_child->parent = vdev;
 	return vdev_child;
 }
@@ -112,11 +112,11 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 	if (devobj == NULL)
 		return STATUS_UNSUCCESSFUL;
 
-	vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev = devobj_to_vdev(devobj);
 	vdev->pdo = pdo;
 
 	if (type != VDEV_ROOT) {
-		pvdev_t	vdev_pdo = DEVOBJ_TO_VDEV(vdev->pdo);
+		pvdev_t	vdev_pdo = devobj_to_vdev(vdev->pdo);
 
 		vdev->parent = vdev_pdo->parent;
 		vdev_pdo->fdo = vdev;

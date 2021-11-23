@@ -185,7 +185,6 @@ vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 LPWSTR
 get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
 
-#define DEVOBJ_TO_VDEV(devobj)	((pvdev_t)((devobj)->DeviceExtension))
 #define DEVOBJ_TO_CPDO(devobj)	((pcpdo_dev_t)((devobj)->DeviceExtension))
 #define DEVOBJ_TO_VHCI(devobj)	((pvhci_dev_t)((devobj)->DeviceExtension))
 #define DEVOBJ_TO_HPDO(devobj)	((phpdo_dev_t)((devobj)->DeviceExtension))
@@ -210,4 +209,4 @@ __inline vhub_dev_t *vhub_from_vpdo(vpdo_dev_t *vpdo)
 	return (vhub_dev_t*)(vpdo->common.parent);
 }
 
-
+__inline vdev_t *devobj_to_vdev(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }

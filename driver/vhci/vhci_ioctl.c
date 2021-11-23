@@ -9,7 +9,7 @@
 PAGEABLE NTSTATUS
 vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	PAGED_CODE();

@@ -114,7 +114,7 @@ PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
-	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION* irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	TraceInfo(TRACE_PNP, "%!vdev_type_t!: enter irp %p, %!pnpmn!", vdev->type, irp, irpstack->MinorFunction);

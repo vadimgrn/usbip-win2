@@ -77,7 +77,7 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 		return NULL;
 	}
 
-	vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev = devobj_to_vdev(devobj);
 	RtlZeroMemory(vdev, extsize);
 
 	vdev->DevicePnPState = NotStarted;
