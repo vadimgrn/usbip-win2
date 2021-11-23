@@ -32,36 +32,33 @@ static WMIGUIDREGINFO USBIPBusWmiGuidList[] = {
 PAGEABLE NTSTATUS
 vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	pvhci_dev_t	vhci;
-	SYSCTL_IRP_DISPOSITION	disposition;
-	PIO_STACK_LOCATION	irpstack;
-	NTSTATUS		status;
-
 	PAGED_CODE();
 
 	TraceInfo(TRACE_WMI, "Enter");
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
 
-	if (!IS_DEVOBJ_VHCI(devobj)) {
+	if (vhci->common.type != VDEV_VHCI) {
 		// The vpdo, just complete the request with the current status
 		TraceInfo(TRACE_WMI, "skip %!sysctrl!", irpstack->MinorFunction);
-		status = irp->IoStatus.Status;
+		NTSTATUS st = irp->IoStatus.Status;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		return status;
+		return st;
 	}
-
-	vhci = DEVOBJ_TO_VHCI(devobj);
 
 	TraceInfo(TRACE_WMI, "%!sysctrl!", irpstack->MinorFunction);
 
 	if (vhci->common.DevicePnPState == Deleted) {
-		irp->IoStatus.Status = status = STATUS_NO_SUCH_DEVICE ;
+		NTSTATUS st = STATUS_NO_SUCH_DEVICE;
+		irp->IoStatus.Status = st;
 		IoCompleteRequest (irp, IO_NO_INCREMENT);
-		return status;
+		return st;
 	}
 
-	status = WmiSystemControl(&vhci->WmiLibInfo, devobj, irp, &disposition);
+	SYSCTL_IRP_DISPOSITION disposition;
+	NTSTATUS status = WmiSystemControl(&vhci->WmiLibInfo, devobj, irp, &disposition);
+	
 	switch(disposition) {
 	case IrpProcessed:
 		// This irp has been processed and may be completed or pending.
@@ -83,7 +80,6 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		ASSERT(FALSE);
 		IoSkipCurrentIrpStackLocation(irp);
 		status = IoCallDriver(vhci->common.devobj_lower, irp);
-		break;
 	}
 
 	TraceInfo(TRACE_WMI, "Leave %!STATUS!", status);

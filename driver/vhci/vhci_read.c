@@ -952,15 +952,15 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	TraceInfo(TRACE_READ, "Enter: len:%u, irp:%p", irpstack->Parameters.Read.Length, irp);
 
-	if (!IS_DEVOBJ_VHCI(devobj)) {
+	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
+
+	if (vhci->common.type != VDEV_VHCI) {
 		TraceError(TRACE_READ, "read for non-vhci is not allowed");
 
 		irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
-
-	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
 
 	// Check to see whether the bus is removed
 	if (vhci->common.DevicePnPState == Deleted) {

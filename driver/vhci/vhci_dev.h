@@ -185,7 +185,6 @@ vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 LPWSTR
 get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
 
-#define IS_DEVOBJ_VHCI(devobj)	(((pvdev_t)(devobj)->DeviceExtension)->type == VDEV_VHCI)
 #define IS_DEVOBJ_VPDO(devobj)	(((pvdev_t)(devobj)->DeviceExtension)->type == VDEV_VPDO)
 
 #define DEVOBJ_TO_VDEV(devobj)	((pvdev_t)((devobj)->DeviceExtension))

@@ -103,7 +103,7 @@ cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 static PAGEABLE NTSTATUS
 vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	pvdev_t	vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
 
 	PAGED_CODE();
 
@@ -116,7 +116,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return STATUS_NO_SUCH_DEVICE;
 	}
-	if (IS_DEVOBJ_VHCI(devobj)) {
+	if (vdev->type == VDEV_VHCI) {
 		cleanup_vpdo(DEVOBJ_TO_VHCI(devobj), irp);
 	}
 
