@@ -141,14 +141,15 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	TraceInfo(TRACE_IOCTL, "%s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 
-	if (!IS_DEVOBJ_VPDO(devobj)) {
+	vpdo_dev_t *vpdo = DEVOBJ_TO_VPDO(devobj);
+
+	if (vpdo->common.type != VDEV_VPDO) {
 		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");
 		Irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 		return Irp->IoStatus.Status;
 	}
 
-	vpdo_dev_t *vpdo = devobj->DeviceExtension;
 	if (!vpdo->plugged) {
 		TraceWarning(TRACE_IOCTL, "device is not connected");
 		Irp->IoStatus.Status = STATUS_DEVICE_NOT_CONNECTED;
