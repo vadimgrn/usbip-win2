@@ -57,7 +57,7 @@ pnp_query_remove_device(pvdev_t vdev, PIRP irp)
 	switch (vdev->type) {
 	case VDEV_VPDO:
 		/* vpdo cannot be removed */
-		vhub_mark_unplugged_vpdo(VHUB_FROM_VPDO((pvpdo_dev_t)vdev), (pvpdo_dev_t)vdev);
+		vhub_mark_unplugged_vpdo(vhub_from_vpdo((pvpdo_dev_t)vdev), (pvpdo_dev_t)vdev);
 		break;
 	default:
 		break;

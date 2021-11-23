@@ -115,7 +115,7 @@ static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);
 
-	vhub_detach_vpdo(VHUB_FROM_VPDO(vpdo), vpdo);
+	vhub_detach_vpdo(vhub_from_vpdo(vpdo), vpdo);
 
 	IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, FALSE);
 

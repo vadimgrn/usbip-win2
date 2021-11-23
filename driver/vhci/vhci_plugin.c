@@ -35,7 +35,7 @@ vhci_init_vpdo(pvpdo_dev_t vpdo)
 
 	InitializeListHead(&vpdo->Link);
 
-	vhub_attach_vpdo(VHUB_FROM_VPDO(vpdo), vpdo);
+	vhub_attach_vpdo(vhub_from_vpdo(vpdo), vpdo);
 
 	// This should be the last step in initialization.
 	TO_DEVOBJ(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;

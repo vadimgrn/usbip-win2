@@ -32,7 +32,7 @@ process_pnp_vpdo(pvpdo_dev_t vpdo, PIRP irp, PIO_STACK_LOCATION irpstack)
 		// for this IRP must wait until the device has been ejected before
 		// completing the IRP.
 
-		vhub_mark_unplugged_vpdo(VHUB_FROM_VPDO(vpdo), vpdo);
+		vhub_mark_unplugged_vpdo(vhub_from_vpdo(vpdo), vpdo);
 
 		status = STATUS_SUCCESS;
 		break;

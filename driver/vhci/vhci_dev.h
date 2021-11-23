@@ -194,9 +194,6 @@ get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
 
 #define TO_DEVOBJ(vdev)		((vdev)->common.Self)
 
-#define VHUB_FROM_VPDO(vpdo)	((pvhub_dev_t)(vpdo)->common.parent)
-
-
 __inline bool is_fdo(vdev_type_t type)
 {
 	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
@@ -207,3 +204,10 @@ __inline vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
 	struct _vdev *child_pdo = vhci->common.child_pdo;
 	return child_pdo ? (vhub_dev_t*)child_pdo->fdo : NULL;
 }
+
+__inline vhub_dev_t *vhub_from_vpdo(vpdo_dev_t *vpdo)
+{
+	return (vhub_dev_t*)(vpdo->common.parent);
+}
+
+
