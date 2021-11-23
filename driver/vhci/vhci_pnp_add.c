@@ -33,15 +33,13 @@ is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
 	return res;
 }
 
-static PAGEABLE pvdev_t
-get_vdev_from_driver(PDRIVER_OBJECT drvobj, vdev_type_t type)
+static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
-	PDEVICE_OBJECT	devobj = drvobj->DeviceObject;
-
-	while (devobj) {
-		if (DEVOBJ_VDEV_TYPE(devobj) == type)
-			return DEVOBJ_TO_VDEV(devobj);
-		devobj = devobj->NextDevice;
+	for (DEVICE_OBJECT *devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
+		vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+		if (vdev->type == type) {
+			return vdev;
+		}
 	}
 
 	return NULL;

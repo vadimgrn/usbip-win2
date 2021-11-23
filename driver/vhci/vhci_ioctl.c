@@ -9,7 +9,7 @@
 PAGEABLE NTSTATUS
 vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	pvdev_t	vdev = DEVOBJ_TO_VDEV(devobj);
+	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	PAGED_CODE();
@@ -17,8 +17,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp:%p",
-		DEVOBJ_VDEV_TYPE(devobj), dbg_ioctl_code(ioctl_code), ioctl_code, irp);
+	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp:%p", vdev->type, dbg_ioctl_code(ioctl_code), ioctl_code, irp);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
@@ -31,7 +30,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	ULONG inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
 	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
-	switch (DEVOBJ_VDEV_TYPE(devobj)) {
+	switch (vdev->type) {
 	case VDEV_VHCI:
 		status = vhci_ioctl_vhci(DEVOBJ_TO_VHCI(devobj), irpstack, ioctl_code, buffer, inlen, &outlen);
 		break;
@@ -39,9 +38,8 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		status = vhci_ioctl_vhub(DEVOBJ_TO_VHUB(devobj), irp, ioctl_code, buffer, inlen, &outlen);
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "ioctl for %!vdev_type_t! is not allowed", DEVOBJ_VDEV_TYPE(devobj));
+		TraceWarning(TRACE_IOCTL, "ioctl for %!vdev_type_t! is not allowed", vdev->type);
 		outlen = 0;
-		break;
 	}
 
 	irp->IoStatus.Information = outlen;

@@ -103,16 +103,12 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 NTSTATUS
 vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	pvdev_t	vdev = DEVOBJ_TO_VDEV(devobj);
-	PIO_STACK_LOCATION	irpstack;
-	NTSTATUS		status;
+	vdev_t *vdev = DEVOBJ_TO_VDEV(devobj);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!", vdev->type, irpstack->MinorFunction);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!",
-		DEVOBJ_VDEV_TYPE(devobj), irpstack->MinorFunction);
-
-	status = STATUS_SUCCESS;
+	NTSTATUS status = STATUS_SUCCESS;
 
 	// If the device has been removed, the driver should
 	// not pass the IRP down to the next lower driver.
@@ -123,15 +119,14 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		return status;
 	}
 
-	switch (DEVOBJ_VDEV_TYPE(devobj)) {
+	switch (vdev->type) {
 	case VDEV_VHCI:
-		status = vhci_power_vhci((pvhci_dev_t)vdev, irp, irpstack);
+		status = vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack);
 		break;
 	default:
 		status = vhci_power_vdev(vdev, irp, irpstack);
-		break;
 	}
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!", DEVOBJ_VDEV_TYPE(devobj), status);
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!", vdev->type, status);
 	return status;
 }
