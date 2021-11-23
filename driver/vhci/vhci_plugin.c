@@ -101,7 +101,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	pluginfo->port = vhub_get_empty_port(VHUB_FROM_VHCI(vhci));
+	pluginfo->port = vhub_get_empty_port(vhub_from_vhci(vhci));
 	if (pluginfo->port < 0) {
 		return STATUS_END_OF_FILE;
 	}
@@ -114,7 +114,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 	}
 
 	pvpdo_dev_t vpdo = DEVOBJ_TO_VPDO(devobj);
-	vpdo->common.parent = &VHUB_FROM_VHCI(vhci)->common;
+	vpdo->common.parent = &vhub_from_vhci(vhci)->common;
 
 	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);
 	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
@@ -145,7 +145,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 PAGEABLE NTSTATUS
 vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 {
-	pvhub_dev_t	vhub = VHUB_FROM_VHCI(vhci);
+	pvhub_dev_t	vhub = vhub_from_vhci(vhci);
 	pvpdo_dev_t	vpdo;
 
 	PAGED_CODE();

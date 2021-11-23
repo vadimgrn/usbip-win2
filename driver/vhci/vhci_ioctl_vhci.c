@@ -96,10 +96,10 @@ vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code,
 		break;
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
 		if (*poutlen == sizeof(ioctl_usbip_vhci_get_ports_status))
-			status = vhub_get_ports_status(VHUB_FROM_VHCI(vhci), (ioctl_usbip_vhci_get_ports_status *)buffer);
+			status = vhub_get_ports_status(vhub_from_vhci(vhci), (ioctl_usbip_vhci_get_ports_status *)buffer);
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
-		status = vhub_get_imported_devs(VHUB_FROM_VHCI(vhci), (pioctl_usbip_vhci_imported_dev_t)buffer, poutlen);
+		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (pioctl_usbip_vhci_imported_dev_t)buffer, poutlen);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		if (inlen == sizeof(ioctl_usbip_vhci_unplug))
