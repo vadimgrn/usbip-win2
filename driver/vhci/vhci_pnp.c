@@ -18,7 +18,7 @@
 
 #define IRP_PASS_DOWN_OR_SUCCESS(vdev, irp)			\
 	do {							\
-		if (IS_FDO((vdev)->type)) {			\
+		if (is_fdo(vdev->type)) {			\
 			irp->IoStatus.Status = STATUS_SUCCESS;	\
 			return irp_pass_down((vdev)->devobj_lower, irp);	\
 		}						\

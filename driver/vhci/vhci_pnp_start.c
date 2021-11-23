@@ -94,7 +94,7 @@ pnp_start_device(pvdev_t vdev, PIRP irp)
 {
 	NTSTATUS	status;
 
-	if (IS_FDO(vdev->type)) {
+	if (is_fdo(vdev->type)) {
 		status = irp_send_synchronously(vdev->devobj_lower, irp);
 		if (NT_ERROR(status)) {
 			return irp_done(irp, status);

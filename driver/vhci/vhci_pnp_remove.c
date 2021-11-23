@@ -192,10 +192,10 @@ pnp_remove_device(pvdev_t vdev, PIRP irp)
 
 	remove_device(vdev);
 
-	if (IS_FDO((vdev)->type)) {
+	if (is_fdo(vdev->type)) {
 		irp->IoStatus.Status = STATUS_SUCCESS;
 		return irp_pass_down(devobj_lower, irp);
-	}
-	else
+	} else {
 		return irp_success(irp);
+	}
 }

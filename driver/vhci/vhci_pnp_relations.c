@@ -240,8 +240,9 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 		break;
 	case RemovalRelations:
 	case EjectionRelations:
-		if (IS_FDO(vdev->type))
+		if (is_fdo(vdev->type)) {
 			return irp_pass_down(vdev->devobj_lower, irp);
+		}
 		status = STATUS_SUCCESS;
 		break;
 	default:

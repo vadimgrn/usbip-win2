@@ -5,24 +5,6 @@
 
 #include "vhci_devconf.h"
 
-#define IS_DEVOBJ_VHCI(devobj)	(((pvdev_t)(devobj)->DeviceExtension)->type == VDEV_VHCI)
-#define IS_DEVOBJ_VPDO(devobj)	(((pvdev_t)(devobj)->DeviceExtension)->type == VDEV_VPDO)
-
-#define DEVOBJ_TO_VDEV(devobj)	((pvdev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_VDEV_TYPE(devobj)	(((pvdev_t)((devobj)->DeviceExtension))->type)
-#define DEVOBJ_TO_CPDO(devobj)	((pcpdo_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_VHCI(devobj)	((pvhci_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_HPDO(devobj)	((phpdo_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_VHUB(devobj)	((pvhub_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_VPDO(devobj)	((pvpdo_dev_t)((devobj)->DeviceExtension))
-
-#define TO_DEVOBJ(vdev)		((vdev)->common.Self)
-
-#define VHUB_FROM_VHCI(vhci)	((pvhub_dev_t)(vhci)->common.child_pdo ? (pvhub_dev_t)(vhci)->common.child_pdo->fdo: NULL)
-#define VHUB_FROM_VPDO(vpdo)	((pvhub_dev_t)(vpdo)->common.parent)
-
-#define IS_FDO(type)		((type) == VDEV_ROOT || (type) == VDEV_VHCI || (type) == VDEV_VHUB)
-
 extern LPCWSTR devcodes[];
 
 // These are the states a vpdo or vhub transition upon
@@ -202,3 +184,25 @@ vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 
 LPWSTR
 get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
+
+#define IS_DEVOBJ_VHCI(devobj)	(((pvdev_t)(devobj)->DeviceExtension)->type == VDEV_VHCI)
+#define IS_DEVOBJ_VPDO(devobj)	(((pvdev_t)(devobj)->DeviceExtension)->type == VDEV_VPDO)
+
+#define DEVOBJ_TO_VDEV(devobj)	((pvdev_t)((devobj)->DeviceExtension))
+#define DEVOBJ_VDEV_TYPE(devobj) (((pvdev_t)((devobj)->DeviceExtension))->type)
+#define DEVOBJ_TO_CPDO(devobj)	((pcpdo_dev_t)((devobj)->DeviceExtension))
+#define DEVOBJ_TO_VHCI(devobj)	((pvhci_dev_t)((devobj)->DeviceExtension))
+#define DEVOBJ_TO_HPDO(devobj)	((phpdo_dev_t)((devobj)->DeviceExtension))
+#define DEVOBJ_TO_VHUB(devobj)	((pvhub_dev_t)((devobj)->DeviceExtension))
+#define DEVOBJ_TO_VPDO(devobj)	((pvpdo_dev_t)((devobj)->DeviceExtension))
+
+#define TO_DEVOBJ(vdev)		((vdev)->common.Self)
+
+#define VHUB_FROM_VHCI(vhci)	((pvhub_dev_t)(vhci)->common.child_pdo ? (pvhub_dev_t)(vhci)->common.child_pdo->fdo: NULL)
+#define VHUB_FROM_VPDO(vpdo)	((pvhub_dev_t)(vpdo)->common.parent)
+
+
+__inline bool is_fdo(vdev_type_t type)
+{
+	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
+}

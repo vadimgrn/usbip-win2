@@ -201,11 +201,15 @@ pnp_query_capabilities(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 {
 	NTSTATUS	status = irp->IoStatus.Status;
 
-	if (IS_FDO(vdev->type))
+	if (is_fdo(vdev->type)) {
 		return irp_pass_down(vdev->devobj_lower, irp);
-	if (vdev->type == VDEV_VPDO)
+	}
+
+	if (vdev->type == VDEV_VPDO) {
 		status = pnp_query_cap_vpdo((pvpdo_dev_t)vdev, irpstack);
-	else
+	} else {
 		status = pnp_query_cap(irpstack);
+	}
+
 	return irp_done(irp, status);
 }
