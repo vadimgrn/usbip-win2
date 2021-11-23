@@ -139,22 +139,24 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceInfo(TRACE_IOCTL, "%s(%#010lX), irp %p", dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo(devobj);
 
 	if (vpdo->common.type != VDEV_VPDO) {
-		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");
-		Irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
+		NTSTATUS st = STATUS_INVALID_DEVICE_REQUEST;
+		TraceError(TRACE_IOCTL, "internal ioctl only for vpdo is allowed, %!STATUS!", st);
+		Irp->IoStatus.Status = st;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return Irp->IoStatus.Status;
+		return st;
 	}
 
 	if (!vpdo->plugged) {
-		TraceWarning(TRACE_IOCTL, "device is not connected");
-		Irp->IoStatus.Status = STATUS_DEVICE_NOT_CONNECTED;
+		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
+		TraceInfo(TRACE_IOCTL, "%!STATUS!", st);
+		Irp->IoStatus.Status = st;
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return Irp->IoStatus.Status;
+		return st;
 	}
 
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
@@ -174,7 +176,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack);
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#010lX), irp %p", dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
 	}
 
 	if (status != STATUS_PENDING) {
@@ -183,6 +185,6 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		IoCompleteRequest(Irp, IO_NO_INCREMENT);
 	}
 
-	TraceInfo(TRACE_IOCTL, "%!STATUS!", status);
+	TraceInfo(TRACE_IOCTL, "%!STATUS!, irp %p", status, Irp);
 	return status;
 }

@@ -6,6 +6,43 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
+const char *bmrequest_type_str(BM_REQUEST_TYPE r)
+{
+	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
+	ASSERT(r.Type < ARRAYSIZE(v));
+	return v[r.Type];
+}
+
+const char *bmrequest_recipient_str(BM_REQUEST_TYPE r)
+{
+	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
+	ASSERT(r.Recipient < ARRAYSIZE(v));
+	return v[r.Recipient];
+}
+
+const char *brequest_str(UCHAR bRequest)
+{
+	switch (bRequest) {
+	case USB_REQUEST_GET_STATUS: return "GET_STATUS";
+	case USB_REQUEST_CLEAR_FEATURE: return "CLEAR_FEATURE";
+	case USB_REQUEST_SET_FEATURE: return "SET_FEATURE";
+	case USB_REQUEST_SET_ADDRESS: return "SET_ADDRESS";
+	case USB_REQUEST_GET_DESCRIPTOR: return "GET_DESCRIPTOR";
+	case USB_REQUEST_SET_DESCRIPTOR: return "SET_DESCRIPTOR";
+	case USB_REQUEST_GET_CONFIGURATION: return "GET_CONFIGURATION";
+	case USB_REQUEST_SET_CONFIGURATION: return "SET_CONFIGURATION";
+	case USB_REQUEST_GET_INTERFACE: return "GET_INTERFACE";
+	case USB_REQUEST_SET_INTERFACE: return "SET_INTERFACE";
+	case USB_REQUEST_SYNC_FRAME: return "SYNC_FRAME";
+	case USB_REQUEST_GET_FIRMWARE_STATUS: return "GET_FIRMWARE_STATUS";
+	case USB_REQUEST_SET_FIRMWARE_STATUS: return "SET_FIRMWARE_STATUS";
+	case USB_REQUEST_SET_SEL: return "SET_SEL";
+	case USB_REQUEST_ISOCH_DELAY: return "ISOCH_DELAY";
+	}
+
+	return "USB_REQUEST_?";
+}
+
 const char *dbg_usbd_status(USBD_STATUS status)
 {
         switch (status) {
@@ -198,7 +235,7 @@ const char *dbg_usbip_hdr(char *buf, unsigned int len, const struct usbip_header
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &end, &remaining, STRSAFE_NULL_ON_FAILURE, 
 		"seq:%u,%s,ep:%#04x,cmd:%d",
 		hdr->base.seqnum, 
-		hdr->base.direction ? "in" : "out", 
+		hdr->base.direction == USBIP_DIR_OUT ? "out" : "in",
 		hdr->base.ep, 
 		hdr->base.command);
 
@@ -230,11 +267,20 @@ const char *dbg_usbip_hdr(char *buf, unsigned int len, const struct usbip_header
 
 const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet)
 {
-	const USB_DEFAULT_PIPE_SETUP_PACKET *pkt = packet;
+	const USB_DEFAULT_PIPE_SETUP_PACKET *r = packet;
 
 	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
-		"[bmRequestType %#04x, bRequest %#04x, wValue %#06hx, wIndex %#06hx, wLength %hu]",
-		pkt->bmRequestType, pkt->bRequest, pkt->wValue, pkt->wIndex, pkt->wLength);
+		"[%#02hhx(%s|%s|%s), %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)]",
+		r->bmRequestType,
+		bmrequest_dir_str(r->bmRequestType),
+		bmrequest_type_str(r->bmRequestType),
+		bmrequest_recipient_str(r->bmRequestType),
+		brequest_str(r->bRequest),
+		r->bRequest,
+		r->wValue,
+		r->wIndex, 
+		r->wLength,
+		r->wLength);
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet invalid parameter";
 }
