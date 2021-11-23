@@ -37,7 +37,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	TraceInfo(TRACE_WMI, "Enter");
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
+	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
 	if (vhci->common.type != VDEV_VHCI) {
 		// The vpdo, just complete the request with the current status
@@ -162,7 +162,7 @@ vhci_QueryWmiDataBlock(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG Gui
 	__in ULONG InstanceIndex, __in ULONG InstanceCount, __inout PULONG InstanceLengthArray,
 	__in ULONG OutBufferSize, __out_bcount(OutBufferSize) PUCHAR Buffer)
 {
-	pvhci_dev_t	vhci = DEVOBJ_TO_VHCI(devobj);
+	pvhci_dev_t	vhci = devobj_to_vhci(devobj);
 	ULONG		size = 0;
 	NTSTATUS	status;
 
@@ -201,7 +201,7 @@ static NTSTATUS
 vhci_QueryWmiRegInfo(__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PUNICODE_STRING InstanceName,
 	__out PUNICODE_STRING *RegistryPath, __out PUNICODE_STRING MofResourceName, __out PDEVICE_OBJECT *Pdo)
 {
-	pvhci_dev_t	vhci = DEVOBJ_TO_VHCI(devobj);
+	pvhci_dev_t	vhci = devobj_to_vhci(devobj);
 
 	PAGED_CODE();
 

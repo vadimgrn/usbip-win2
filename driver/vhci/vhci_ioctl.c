@@ -32,10 +32,10 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	switch (vdev->type) {
 	case VDEV_VHCI:
-		status = vhci_ioctl_vhci(DEVOBJ_TO_VHCI(devobj), irpstack, ioctl_code, buffer, inlen, &outlen);
+		status = vhci_ioctl_vhci(devobj_to_vhci(devobj), irpstack, ioctl_code, buffer, inlen, &outlen);
 		break;
 	case VDEV_VHUB:
-		status = vhci_ioctl_vhub(DEVOBJ_TO_VHUB(devobj), irp, ioctl_code, buffer, inlen, &outlen);
+		status = vhci_ioctl_vhub(devobj_to_vhub(devobj), irp, ioctl_code, buffer, inlen, &outlen);
 		break;
 	default:
 		TraceWarning(TRACE_IOCTL, "ioctl for %!vdev_type_t! is not allowed", vdev->type);

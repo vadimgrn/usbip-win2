@@ -452,7 +452,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	TraceInfo(TRACE_WRITE, "Enter: len:%u, irp:%p", irpstack->Parameters.Write.Length, irp);
 
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
-	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
+	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
 	if (vhci->common.type != VDEV_VHCI) {
 		TraceError(TRACE_WRITE, "write for non-vhci is not allowed");

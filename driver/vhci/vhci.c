@@ -117,7 +117,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		return STATUS_NO_SUCH_DEVICE;
 	}
 	if (vdev->type == VDEV_VHCI) {
-		cleanup_vpdo(DEVOBJ_TO_VHCI(devobj), irp);
+		cleanup_vpdo(devobj_to_vhci(devobj), irp);
 	}
 
 	irp->IoStatus.Information = 0;

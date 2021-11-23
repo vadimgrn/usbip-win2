@@ -141,7 +141,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	TraceInfo(TRACE_IOCTL, "%s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 
-	vpdo_dev_t *vpdo = DEVOBJ_TO_VPDO(devobj);
+	vpdo_dev_t *vpdo = devobj_to_vpdo(devobj);
 
 	if (vpdo->common.type != VDEV_VPDO) {
 		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");

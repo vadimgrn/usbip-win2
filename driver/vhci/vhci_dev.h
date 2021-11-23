@@ -185,12 +185,6 @@ vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 LPWSTR
 get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
 
-#define DEVOBJ_TO_CPDO(devobj)	((pcpdo_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_VHCI(devobj)	((pvhci_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_HPDO(devobj)	((phpdo_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_VHUB(devobj)	((pvhub_dev_t)((devobj)->DeviceExtension))
-#define DEVOBJ_TO_VPDO(devobj)	((pvpdo_dev_t)((devobj)->DeviceExtension))
-
 #define TO_DEVOBJ(vdev)		((vdev)->common.Self)
 
 __inline bool is_fdo(vdev_type_t type)
@@ -209,4 +203,9 @@ __inline vhub_dev_t *vhub_from_vpdo(vpdo_dev_t *vpdo)
 	return (vhub_dev_t*)(vpdo->common.parent);
 }
 
-__inline vdev_t *devobj_to_vdev(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }
+__inline     vdev_t *devobj_to_vdev(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }
+__inline cpdo_dev_t *devobj_to_cpdo(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }
+__inline vhci_dev_t *devobj_to_vhci(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }
+__inline hpdo_dev_t *devobj_to_hpdo(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }
+__inline vhub_dev_t *devobj_to_vhub(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }
+__inline vpdo_dev_t *devobj_to_vpdo(DEVICE_OBJECT *devobj) { return devobj->DeviceExtension; }

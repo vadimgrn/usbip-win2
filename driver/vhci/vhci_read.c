@@ -952,7 +952,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	TraceInfo(TRACE_READ, "Enter: len:%u, irp:%p", irpstack->Parameters.Read.Length, irp);
 
-	vhci_dev_t *vhci = DEVOBJ_TO_VHCI(devobj);
+	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
 	if (vhci->common.type != VDEV_VHCI) {
 		TraceError(TRACE_READ, "read for non-vhci is not allowed");
