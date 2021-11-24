@@ -153,8 +153,8 @@ create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink)
 void
 free_urbr(struct urb_req *urbr)
 {
-	ASSERT(IsListEmpty(&urbr->list_all));
-	ASSERT(IsListEmpty(&urbr->list_state));
+	NT_ASSERT(IsListEmpty(&urbr->list_all));
+	NT_ASSERT(IsListEmpty(&urbr->list_state));
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }
 

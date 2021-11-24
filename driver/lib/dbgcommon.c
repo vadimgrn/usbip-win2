@@ -9,14 +9,14 @@
 const char *bmrequest_type_str(BM_REQUEST_TYPE r)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
-	ASSERT(r.Type < ARRAYSIZE(v));
+	NT_ASSERT(r.Type < ARRAYSIZE(v));
 	return v[r.Type];
 }
 
 const char *bmrequest_recipient_str(BM_REQUEST_TYPE r)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
-	ASSERT(r.Recipient < ARRAYSIZE(v));
+	NT_ASSERT(r.Recipient < ARRAYSIZE(v));
 	return v[r.Recipient];
 }
 

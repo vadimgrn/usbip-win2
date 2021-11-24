@@ -39,7 +39,7 @@ pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
 	if (vdev->DevicePnPState == StopPending) {
 		// We did receive a query-stop, so restore.
 		RESTORE_PREVIOUS_PNP_STATE(vdev);
-		ASSERT(vdev->DevicePnPState == Started);
+		NT_ASSERT(vdev->DevicePnPState == Started);
 	}
 	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
 }

@@ -77,7 +77,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		break;
 	default:
 		// We really should never get here, but if we do just forward....
-		ASSERT(FALSE);
+		NT_ASSERT(FALSE);
 		IoSkipCurrentIrpStackLocation(irp);
 		status = IoCallDriver(vhci->common.devobj_lower, irp);
 	}
@@ -172,7 +172,7 @@ vhci_QueryWmiDataBlock(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG Gui
 	PAGED_CODE();
 
 	// Only ever registers 1 instance per guid
-	ASSERT((InstanceIndex == 0) && (InstanceCount == 1));
+	NT_ASSERT((InstanceIndex == 0) && (InstanceCount == 1));
 
 	switch (GuidIndex) {
 	case WMI_USBIP_BUS_DRIVER_INFORMATION:
@@ -224,7 +224,7 @@ reg_wmi(pvhci_dev_t vhci)
 
 	vhci->WmiLibInfo.GuidCount = sizeof(USBIPBusWmiGuidList) /
 		sizeof(WMIGUIDREGINFO);
-	ASSERT(NUMBER_OF_WMI_GUIDS == vhci->WmiLibInfo.GuidCount);
+	NT_ASSERT(NUMBER_OF_WMI_GUIDS == vhci->WmiLibInfo.GuidCount);
 	vhci->WmiLibInfo.GuidList = USBIPBusWmiGuidList;
 	vhci->WmiLibInfo.QueryWmiRegInfo = vhci_QueryWmiRegInfo;
 	vhci->WmiLibInfo.QueryWmiDataBlock = vhci_QueryWmiDataBlock;

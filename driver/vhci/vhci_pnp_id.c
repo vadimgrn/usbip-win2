@@ -227,21 +227,21 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(irp);
 
+	if (vdev->type != VDEV_VPDO) {
+		return STATUS_NOT_SUPPORTED;
+	}
+
 	const wchar_t fmt[] =
 		L"USB\\Class_%02hhx&SubClass_%02hhx&Prot_%02hhx;" // 33 chars after formatting
 		L"USB\\Class_%02hhx&SubClass_%02hhx;" // 25 chars after formatting
 		L"USB\\Class_%02hhx;"; // 13 chars after formatting
 
 	const wchar_t comp[] = L"USB\\COMPOSITE\0";
-	const size_t max_wchars = 33 + 25 + 13 + sizeof(comp)/sizeof(*comp);
-
-	if (vdev->type != VDEV_VPDO) {
-		return STATUS_NOT_SUPPORTED;
-	}
+	const size_t max_wchars = 33 + 25 + 13 + ARRAYSIZE(comp);
 
 	pvpdo_dev_t vpdo = (pvpdo_dev_t)vdev;
 
-	PWCHAR ids_compat = ExAllocatePoolWithTag(PagedPool, max_wchars * sizeof(wchar_t), USBIP_VHCI_POOL_TAG);
+	PWCHAR ids_compat = ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(wchar_t), USBIP_VHCI_POOL_TAG);
 	if (!ids_compat) {
 		TraceError(TRACE_PNP, "vpdo: query compatible id: out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -259,7 +259,7 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 		*result = ids_compat;
 		*subst_result = true;
 		if (is_composite(vpdo)) {
-			NT_ASSERT(remaining == sizeof(comp)/sizeof(*comp));
+			NT_ASSERT(remaining == ARRAYSIZE(comp));
 			RtlCopyMemory(dest_end, comp, sizeof(comp));
 		}
 	}

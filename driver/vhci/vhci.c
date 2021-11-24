@@ -47,7 +47,7 @@ vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 	TraceInfo(TRACE_GENERAL, "Enter");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
-	ASSERT(!drvobj->DeviceObject);
+	NT_ASSERT(!drvobj->DeviceObject);
 
 	if (Globals.RegistryPath.Buffer) {
 		ExFreePool(Globals.RegistryPath.Buffer);

@@ -141,8 +141,8 @@ create_urbr(pctx_ep_t ep, urbr_type_t type, WDFREQUEST req)
 static void
 free_urbr(purb_req_t urbr)
 {
-	ASSERT(IsListEmpty(&urbr->list_all));
-	ASSERT(IsListEmpty(&urbr->list_state));
+	NT_ASSERT(IsListEmpty(&urbr->list_all));
+	NT_ASSERT(IsListEmpty(&urbr->list_state));
 	WdfObjectDelete(urbr->hmem);
 }
 
@@ -199,7 +199,7 @@ mark_cancelable_urbr(purb_req_t urbr)
 	if (urbr->type != URBR_TYPE_URB)
 		return TRUE;
 
-	ASSERT(!urbr->u.urb.cancelable);
+	NT_ASSERT(!urbr->u.urb.cancelable);
 
 	status = WdfRequestMarkCancelableEx(urbr->req, urbr_cancelled);
 	if (NT_ERROR(status)) {

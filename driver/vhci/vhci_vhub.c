@@ -71,7 +71,7 @@ vhub_detach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 
 	RemoveEntryList(&vpdo->Link);
 	InitializeListHead(&vpdo->Link);
-	ASSERT(vhub->n_vpdos > 0);
+	NT_ASSERT(vhub->n_vpdos > 0);
 	vhub->n_vpdos--;
 
 	ExReleaseFastMutex(&vhub->Mutex);
@@ -145,7 +145,7 @@ mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 {
 	if (vpdo->plugged) {
 		vpdo->plugged = FALSE;
-		ASSERT(vhub->n_vpdos_plugged > 0);
+		NT_ASSERT(vhub->n_vpdos_plugged > 0);
 		vhub->n_vpdos_plugged--;
 
 		IoInvalidateDeviceRelations(vhub->common.pdo, BusRelations);
