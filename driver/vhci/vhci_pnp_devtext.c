@@ -13,32 +13,27 @@ static LPCWSTR vdev_locinfos[] = {
 	L"None", L"Root", L"Root", L"VHCI", L"VHCI", L"HPDO"
 };
 
-PAGEABLE NTSTATUS
-pnp_query_device_text(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	status = irp->IoStatus.Status;
+	DEVICE_TEXT_TYPE type = irpstack->Parameters.QueryDeviceText.DeviceTextType;
+	LPCWSTR str = NULL;
 
-	switch (irpstack->Parameters.QueryDeviceText.DeviceTextType) {
+	switch (type) {
 	case DeviceTextDescription:
-		if (!irp->IoStatus.Information) {
-			irp->IoStatus.Information = (ULONG_PTR)libdrv_strdupW(vdev_descs[vdev->type]);
-			status = STATUS_SUCCESS;
-		}
+		str = libdrv_strdupW(vdev_descs[vdev->type]);
 		break;
 	case DeviceTextLocationInformation:
-		if (!irp->IoStatus.Information) {
-			irp->IoStatus.Information = (ULONG_PTR)libdrv_strdupW(vdev_locinfos[vdev->type]);
-			status = STATUS_SUCCESS;
-		}
-		break;
-	default:
-		TraceInfo(TRACE_PNP, "unsupported device text type: %u", irpstack->Parameters.QueryDeviceText.DeviceTextType);
+		str = libdrv_strdupW(vdev_locinfos[vdev->type]);
 		break;
 	}
+
+	NTSTATUS status = str ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	irp->IoStatus.Information = (ULONG_PTR)str;
+
+	TraceInfo(TRACE_PNP, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!",
+		type, irpstack->Parameters.QueryDeviceText.LocaleId, str, status);
 
 	return irp_done(irp, status);
 }
