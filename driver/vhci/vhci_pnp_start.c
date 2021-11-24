@@ -89,42 +89,39 @@ start_vpdo(pvpdo_dev_t vpdo)
 	return status;
 }
 
-PAGEABLE NTSTATUS
-pnp_start_device(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 {
-	NTSTATUS	status;
-
 	if (is_fdo(vdev->type)) {
-		status = irp_send_synchronously(vdev->devobj_lower, irp);
+		NTSTATUS status = irp_send_synchronously(vdev->devobj_lower, irp);
 		if (NT_ERROR(status)) {
 			return irp_done(irp, status);
 		}
 	}
+
+	NTSTATUS status = STATUS_SUCCESS;
+
 	switch (vdev->type) {
 	case VDEV_VHCI:
-		status = start_vhci((pvhci_dev_t)vdev);
+		status = start_vhci((vhci_dev_t*)vdev);
 		break;
 	case VDEV_VHUB:
-		status = start_vhub((pvhub_dev_t)vdev);
+		status = start_vhub((vhub_dev_t*)vdev);
 		break;
 	case VDEV_VPDO:
-		status = start_vpdo((pvpdo_dev_t)vdev);
-		break;
-	default:
-		status = STATUS_SUCCESS;
+		status = start_vpdo((vpdo_dev_t*)vdev);
 		break;
 	}
 
 	if (NT_SUCCESS(status)) {
-		POWER_STATE	powerState;
-
 		vdev->DevicePowerState = PowerDeviceD0;
 		SET_NEW_PNP_STATE(vdev, Started);
-		powerState.DeviceState = PowerDeviceD0;
-		PoSetPowerState(vdev->Self, DevicePowerState, powerState);
+
+		POWER_STATE ps;
+		ps.DeviceState = PowerDeviceD0;
+		PoSetPowerState(vdev->Self, DevicePowerState, ps);
 
 		TraceInfo(TRACE_GENERAL, "device(%!vdev_type_t!) started", vdev->type);
 	}
-	status = irp_done(irp, status);
-	return status;
+
+	return irp_done(irp, status);
 }
