@@ -196,20 +196,15 @@ pnp_query_cap(PIO_STACK_LOCATION irpstack)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-pnp_query_capabilities(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
-	NTSTATUS	status = irp->IoStatus.Status;
-
 	if (is_fdo(vdev->type)) {
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}
 
-	if (vdev->type == VDEV_VPDO) {
-		status = pnp_query_cap_vpdo((pvpdo_dev_t)vdev, irpstack);
-	} else {
-		status = pnp_query_cap(irpstack);
-	}
+	NTSTATUS status = vdev->type == VDEV_VPDO ? 
+				pnp_query_cap_vpdo((vpdo_dev_t*)vdev, irpstack) :
+				pnp_query_cap(irpstack);
 
 	return irp_done(irp, status);
 }
