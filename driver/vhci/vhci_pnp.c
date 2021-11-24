@@ -82,32 +82,21 @@ pnp_surprise_removal(pvdev_t vdev, PIRP irp)
 	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_query_bus_information(PIRP irp)
+static PAGEABLE NTSTATUS pnp_query_bus_information(PIRP irp)
 {
-	PPNP_BUS_INFORMATION busInfo;
-
 	PAGED_CODE();
 
-	busInfo = ExAllocatePoolWithTag(PagedPool, sizeof(PNP_BUS_INFORMATION), USBIP_VHCI_POOL_TAG);
-
-	if (busInfo == NULL) {
-		return STATUS_INSUFFICIENT_RESOURCES;
+	PNP_BUS_INFORMATION *bi = ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
+	if (bi) {
+		bi->BusTypeGuid = GUID_BUS_TYPE_USB;
+		bi->LegacyBusType = PNPBus;
+		bi->BusNumber = 10; // arbitrary
 	}
 
-	busInfo->BusTypeGuid = GUID_BUS_TYPE_USB;
+	irp->IoStatus.Information = (ULONG_PTR)bi;
 
-	// Some buses have a specific INTERFACE_TYPE value,
-	// such as PCMCIABus, PCIBus, or PNPISABus.
-	// For other buses, especially newer buses like USBIP, the bus
-	// driver sets this member to PNPBus.
-	busInfo->LegacyBusType = PNPBus;
-
-	// This is an hypothetical bus
-	busInfo->BusNumber = 10;
-	irp->IoStatus.Information = (ULONG_PTR)busInfo;
-
-	return irp_success(irp);
+	NTSTATUS st = bi ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	return irp_done(irp, st);
 }
 
 PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
