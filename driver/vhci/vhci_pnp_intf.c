@@ -246,9 +246,11 @@ static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT versi
  * If a bus driver does not export the requested interface and therefore does not handle this IRP 
  * for a child PDO, the bus driver leaves Irp->IoStatus.Status as is and completes the IRP.
  */
-PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
+PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	const GUID *intf_type = irpstack->Parameters.QueryInterface.InterfaceType;
 	USHORT size = irpstack->Parameters.QueryInterface.Size;

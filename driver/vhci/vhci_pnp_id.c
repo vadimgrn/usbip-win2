@@ -272,9 +272,9 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
  * that points to the requested information. On error, a driver sets
  * Irp->IoStatus.Information to zero.
  */
-PAGEABLE NTSTATUS
-pnp_query_id(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
 {
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
 	PWCHAR result = NULL;

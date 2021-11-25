@@ -221,15 +221,13 @@ get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_device_relations(pvdev_t vdev, PIRP irp)
 {
-	PDEVICE_RELATIONS	dev_relations;
-	NTSTATUS	status;
-
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	TraceInfo(TRACE_PNP, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
 
-	dev_relations = (PDEVICE_RELATIONS)irp->IoStatus.Information;
+	DEVICE_RELATIONS *dev_relations = (DEVICE_RELATIONS*)irp->IoStatus.Information;
+	NTSTATUS status = STATUS_SUCCESS;
 
 	switch (irpstack->Parameters.QueryDeviceRelations.Type) {
 	case TargetDeviceRelation:
@@ -248,10 +246,11 @@ pnp_query_dev_relations(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	default:
 		TraceInfo(TRACE_PNP, "skip: %!DEVICE_RELATION_TYPE!", irpstack->Parameters.QueryDeviceRelations.Type);
 		status = irp->IoStatus.Status;
-		break;
 	}
+
 	if (NT_SUCCESS(status)) {
 		irp->IoStatus.Information = (ULONG_PTR)dev_relations;
 	}
+
 	return irp_done(irp, status);
 }

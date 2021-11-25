@@ -13,9 +13,11 @@ static LPCWSTR vdev_locinfos[] = {
 	L"None", L"Root", L"Root", L"VHCI", L"VHCI", L"HPDO"
 };
 
-PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
+PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	DEVICE_TEXT_TYPE type = irpstack->Parameters.QueryDeviceText.DeviceTextType;
 	LPCWSTR str = (PWSTR)irp->IoStatus.Information;

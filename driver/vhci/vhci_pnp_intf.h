@@ -3,4 +3,4 @@
 #include "basetype.h"
 #include "vhci_dev.h"
 
-PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack);
+PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp);

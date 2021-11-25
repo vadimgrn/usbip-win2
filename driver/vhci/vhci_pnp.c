@@ -11,7 +11,6 @@
 #include "vhci_pnp_cap.h"
 #include "vhci_pnp_start.h"
 #include "vhci_pnp_remove.h"
-#include "vhci_pnp_vpdo.h"
 #include "vhci_pnp_resources.h"
 
 #include <wdmguid.h>
@@ -78,8 +77,9 @@ pnp_surprise_removal(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_bus_information(IRP *irp)
+static PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 {
+	UNREFERENCED_PARAMETER(vdev);
 	PAGED_CODE();
 
 	PNP_BUS_INFORMATION *bi = ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
@@ -95,85 +95,140 @@ static PAGEABLE NTSTATUS pnp_query_bus_information(IRP *irp)
 	return irp_done(irp, st);
 }
 
+static PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done_iostatus(irp);
+}
+
+static PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done_iostatus(irp);
+}
+
+static PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done_iostatus(irp);
+}
+
+/*
+ * For the device to be ejected, the device must be in the D3
+ * device power state (off) and must be unlocked
+ * (if the device supports locking). Any driver that returns success
+ * for this IRP must wait until the device has been ejected before
+ * completing the IRP.
+ */
+static PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
+{
+	if (vdev->type == VDEV_VPDO) {
+		vpdo_dev_t* vpdo = (vpdo_dev_t*)vdev;
+		vhub_mark_unplugged_vpdo(vhub_from_vpdo(vpdo), vpdo);
+		return irp_done_success(irp);
+	}
+
+	return irp_done_iostatus(irp);
+}
+
+static PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done_iostatus(irp);
+}
+
+static PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	irp->IoStatus.Information = 0;
+	return irp_done_success(irp);
+}
+
+/*
+ * OPTIONAL for bus drivers.
+ * This bus drivers any of the bus's descendants
+ * (child device, child of a child device, etc.) do not
+ * contain a memory file namely paging file, dump file,
+ * or hibernation file. So we  fail this Irp.
+ */
+static PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done(irp, STATUS_UNSUCCESSFUL);
+}
+
+static PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done_iostatus(irp);
+}
+
+/*
+ * This request notifies bus drivers that a device object exists and
+ * that it has been fully enumerated by the plug and play manager.
+ */
+static PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
+{
+	UNREFERENCED_PARAMETER(vdev);
+	return irp_done_success(irp);
+}
+
+typedef NTSTATUS (*pnpmn_func_t)(vdev_t*, IRP*);
+
+static const pnpmn_func_t pnpmn_functions[] =
+{
+	pnp_start_device, // IRP_MN_START_DEVICE
+	pnp_query_remove_device,
+	pnp_remove_device,
+	pnp_cancel_remove_device,
+	pnp_stop_device,
+	pnp_query_stop_device,
+	pnp_cancel_stop_device,
+
+	pnp_query_device_relations,
+	pnp_query_interface,
+	pnp_query_capabilities,
+	pnp_query_resources,
+	pnp_query_resource_requirements,
+	pnp_query_device_text,
+	pnp_filter_resource_requirements,
+
+	pnp_0x0E, // 0x0E, undefined
+
+	pnp_read_config,
+	pnp_write_config,
+	pnp_eject,
+	pnp_set_lock,
+	pnp_query_id,
+	pnp_query_pnp_device_state,
+	pnp_query_bus_information,
+	pnp_device_usage_notification,
+	pnp_surprise_removal,
+
+	pnp_query_legacy_bus_information, // IRP_MN_QUERY_LEGACY_BUS_INFORMATION
+	pnp_device_enumerated // IRP_MN_DEVICE_ENUMERATED, since WIN7
+};
+
 PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
 	vdev_t *vdev = devobj_to_vdev(devobj);
-	IO_STACK_LOCATION* irpstack = IoGetCurrentIrpStackLocation(irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	TraceInfo(TRACE_PNP, "%!vdev_type_t!: enter irp %p, %!pnpmn!", vdev->type, irp, irpstack->MinorFunction);
+
 	NTSTATUS status = STATUS_SUCCESS;
 
-	// If the device has been removed, the driver should not pass the IRP down to the next lower driver
-	if (vdev->DevicePnPState == Deleted) {
-		status = STATUS_NO_SUCH_DEVICE;
-		irp->IoStatus.Status = status;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		goto END;
+	if (vdev->DevicePnPState == Deleted) { // the driver should not pass the IRP down to the next lower driver
+		status = irp_done(irp, STATUS_NO_SUCH_DEVICE);
+	} else if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
+		status = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
+	} else {
+		TraceWarning(TRACE_PNP, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
+		status = irp_done_iostatus(irp);
 	}
 
-	switch (irpstack->MinorFunction) {
-	case IRP_MN_START_DEVICE:
-		status = pnp_start_device(vdev, irp);
-		break;
-	case IRP_MN_QUERY_STOP_DEVICE:
-		status = pnp_query_stop_device(vdev, irp);
-		break;
-	case IRP_MN_CANCEL_STOP_DEVICE:
-		status = pnp_cancel_stop_device(vdev, irp);
-		break;
-	case IRP_MN_STOP_DEVICE:
-		status = pnp_stop_device(vdev, irp);
-		break;
-	case IRP_MN_QUERY_REMOVE_DEVICE:
-		status = pnp_query_remove_device(vdev, irp);
-		break;
-	case IRP_MN_CANCEL_REMOVE_DEVICE:
-		status = pnp_cancel_remove_device(vdev, irp);
-		break;
-	case IRP_MN_REMOVE_DEVICE:
-		status = pnp_remove_device(vdev, irp);
-		break;
-	case IRP_MN_SURPRISE_REMOVAL:
-		status = pnp_surprise_removal(vdev, irp);
-		break;
-	case IRP_MN_QUERY_ID:
-		status = pnp_query_id(vdev, irp, irpstack);
-		break;
-	case IRP_MN_QUERY_DEVICE_TEXT:
-		status = pnp_query_device_text(vdev, irp, irpstack);
-		break;
-	case IRP_MN_QUERY_INTERFACE:
-		status = pnp_query_interface(vdev, irp, irpstack);
-		break;
-	case IRP_MN_QUERY_DEVICE_RELATIONS:
-		status = pnp_query_dev_relations(vdev, irp, irpstack);
-		break;
-	case IRP_MN_QUERY_CAPABILITIES:
-		status = pnp_query_capabilities(vdev, irp, irpstack);
-		break;
-	case IRP_MN_QUERY_BUS_INFORMATION:
-		status = pnp_query_bus_information(irp);
-		break;
-	case IRP_MN_QUERY_RESOURCE_REQUIREMENTS:
-		status = pnp_query_resource_requirements(vdev, irp);
-		break;
-	case IRP_MN_QUERY_RESOURCES:
-		status = pnp_query_resources(vdev, irp);
-		break;
-	case IRP_MN_FILTER_RESOURCE_REQUIREMENTS:
-		status = pnp_filter_resource_requirements(vdev, irp);
-		break;
-	default:
-		if (process_pnp_vpdo((vpdo_dev_t*)vdev, irp, irpstack)) {
-			status = irp->IoStatus.Status;
-		} else {
-			status = irp_done_iostatus(irp);
-		}
-	}
-
-END:
 	TraceInfo(TRACE_PNP, "%!vdev_type_t!: leave irp %p, %!STATUS!", vdev->type, irp, status);
 	return status;
 }

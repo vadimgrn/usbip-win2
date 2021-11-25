@@ -29,7 +29,6 @@
     <ClCompile Include="vhci_pnp_remove.c" />
     <ClCompile Include="vhci_pnp_resources.c" />
     <ClCompile Include="vhci_pnp_start.c" />
-    <ClCompile Include="vhci_pnp_vpdo.c" />
     <ClCompile Include="vhci_vhub.c" />
     <ClCompile Include="vhci_vpdo.c" />
     <ClCompile Include="vhci_read.c" />
@@ -67,7 +66,6 @@
     <ClInclude Include="vhci_pnp_remove.h" />
     <ClInclude Include="vhci_pnp_resources.h" />
     <ClInclude Include="vhci_pnp_start.h" />
-    <ClInclude Include="vhci_pnp_vpdo.h" />
     <ClInclude Include="vhci_proto.h" />
     <ClInclude Include="vhci_read.h" />
     <ClInclude Include="vhci_vhub.h" />
