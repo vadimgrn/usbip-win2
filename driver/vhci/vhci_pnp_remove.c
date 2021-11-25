@@ -30,9 +30,8 @@ complete_pending_read_irp(pvpdo_dev_t vpdo)
 		valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
 		IoReleaseCancelSpinLock(oldirql);
 		if (valid_irp) {
-			irp->IoStatus.Status = STATUS_DEVICE_NOT_CONNECTED;
 			irp->IoStatus.Information = 0;
-			IoCompleteRequest(irp, IO_NO_INCREMENT);
+			irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
 		}
 	}
 }
@@ -68,9 +67,8 @@ complete_pending_irp(pvpdo_dev_t vpdo)
 			valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
 			IoReleaseCancelSpinLock(oldirql);
 			if (valid_irp) {
-				irp->IoStatus.Status = STATUS_DEVICE_NOT_CONNECTED;
 				irp->IoStatus.Information = 0;
-				IoCompleteRequest(irp, IO_NO_INCREMENT);
+				irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
 			}
 		}
 

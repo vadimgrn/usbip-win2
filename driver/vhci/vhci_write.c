@@ -10,6 +10,7 @@
 #include "vhci_vpdo_dsc.h"
 #include "usbreq.h"
 #include "usbd_helper.h"
+#include "vhci_irp.h"
 
 static BOOLEAN
 save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descriptor *iso_desc)
@@ -456,9 +457,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	if (vhci->common.type != VDEV_VHCI) {
 		TraceError(TRACE_WRITE, "write for non-vhci is not allowed");
-		irp->IoStatus.Status = status;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		return status;
+		return irp_done(irp, status);
 	}
 
 	if (vhci->common.DevicePnPState == Deleted) {
@@ -475,10 +474,6 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	status = process_write_irp(vpdo, irp);
 
 END:
-	TraceInfo(TRACE_WRITE, "Leave: irp:%p, %!STATUS!", irp, status);
-
-	irp->IoStatus.Status = status;
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-	return status;
+	TraceInfo(TRACE_WRITE, "Leave irp %p, %!STATUS!", irp, status);
+	return irp_done(irp, status);
 }

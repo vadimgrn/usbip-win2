@@ -3,6 +3,7 @@
 #include "trace.h"
 #include "vhci_read.tmh"
 
+#include "vhci_irp.h"
 #include "vhci_proto.h"
 #include "vhci_internal_ioctl.h"
 #include "usbd_helper.h"
@@ -862,9 +863,8 @@ on_pending_irp_read_cancelled(PDEVICE_OBJECT devobj, PIRP irp_read)
 	}
 	KeReleaseSpinLock(&vpdo->lock_urbr, irql);
 
-	irp_read->IoStatus.Status = STATUS_CANCELLED;
 	irp_read->IoStatus.Information = 0;
-	IoCompleteRequest(irp_read, IO_NO_INCREMENT);
+	irp_done(irp_read, STATUS_CANCELLED);
 }
 
 static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
@@ -927,9 +927,8 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 			BOOLEAN valid = IoSetCancelRoutine(irp, NULL) != NULL;
 			IoReleaseCancelSpinLock(oldirql);
 			if (valid) {
-				irp->IoStatus.Status = STATUS_INVALID_PARAMETER;
 				irp->IoStatus.Information = 0;
-				IoCompleteRequest(irp, IO_NO_INCREMENT);
+				irp_done(irp, STATUS_INVALID_PARAMETER);
 			}
 		}
 	} else {
@@ -956,10 +955,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	if (vhci->common.type != VDEV_VHCI) {
 		TraceError(TRACE_READ, "read for non-vhci is not allowed");
-
-		irp->IoStatus.Status = STATUS_INVALID_DEVICE_REQUEST;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		return STATUS_INVALID_DEVICE_REQUEST;
+		return  irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	// Check to see whether the bus is removed
@@ -975,8 +971,7 @@ END:
 	TraceInfo(TRACE_READ, "Leave: irp %p, %!STATUS!", irp, status);
 
 	if (status != STATUS_PENDING) {
-		irp->IoStatus.Status = status;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
+		irp_done(irp, status);
 	}
 
 	return status;

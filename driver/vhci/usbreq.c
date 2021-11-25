@@ -5,6 +5,7 @@
 #include "vhci.h"
 #include "usbip_proto.h"
 #include "vhci_read.h"
+#include "vhci_irp.h"
 
 const char *dbg_urbr(char* buf, unsigned int len, const struct urb_req *urbr)
 {
@@ -121,9 +122,8 @@ cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 
 	remove_cancelled_urbr(vpdo, urbr);
 
-	irp->IoStatus.Status = STATUS_CANCELLED;
 	irp->IoStatus.Information = 0;
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	irp_done(irp, STATUS_CANCELLED);
 }
 
 struct urb_req *
@@ -261,8 +261,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 		vpdo->pending_read_irp = NULL;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		read_irp->IoStatus.Status = STATUS_SUCCESS;
-		IoCompleteRequest(read_irp, IO_NO_INCREMENT);
+		irp_done_success(read_irp);
 		status = STATUS_PENDING;
 	} else {
 		vpdo->urbr_sent_partial = NULL;

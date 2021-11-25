@@ -94,10 +94,7 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 		irp->IoStatus.Status = status;
 	}
 
-	status = irp->IoStatus.Status;
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-	return status;
+	return irp_done_iostatus(irp);
 }
 
 NTSTATUS
@@ -114,9 +111,7 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	// not pass the IRP down to the next lower driver.
 	if (vdev->DevicePnPState == Deleted) {
 		PoStartNextPowerIrp(irp);
-		irp->IoStatus.Status = status = STATUS_NO_SUCH_DEVICE;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		return status;
+		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	switch (vdev->type) {

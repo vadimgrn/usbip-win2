@@ -3,6 +3,7 @@
 #include "trace.h"
 #include "vhci_ioctl.tmh"
 
+#include "vhci_irp.h"
 #include "vhci_ioctl_vhci.h"
 #include "vhci_ioctl_vhub.h"
 
@@ -17,7 +18,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp:%p", vdev->type, dbg_ioctl_code(ioctl_code), ioctl_code, irp);
+	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp %p", vdev->type, dbg_ioctl_code(ioctl_code), ioctl_code, irp);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
@@ -45,11 +46,9 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	irp->IoStatus.Information = outlen;
 END:
 	if (status != STATUS_PENDING) {
-		irp->IoStatus.Status = status;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
+		irp_done(irp, status);
 	}
 
-	TraceInfo(TRACE_IOCTL, "Leave: irp:%p, %!STATUS!", irp, status);
-
+	TraceInfo(TRACE_IOCTL, "Leave irp %p, %!STATUS!", irp, status);
 	return status;
 }

@@ -5,6 +5,7 @@
 #include "vhci.h"
 #include "usbip_vhci_api.h"
 #include "globals.h"
+#include "vhci_irp.h"
 
 #include <wmistr.h>
 
@@ -42,18 +43,13 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	if (vhci->common.type != VDEV_VHCI) {
 		// The vpdo, just complete the request with the current status
 		TraceInfo(TRACE_WMI, "skip %!sysctrl!", irpstack->MinorFunction);
-		NTSTATUS st = irp->IoStatus.Status;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		return st;
+		return irp_done_iostatus(irp);
 	}
 
 	TraceInfo(TRACE_WMI, "%!sysctrl!", irpstack->MinorFunction);
 
 	if (vhci->common.DevicePnPState == Deleted) {
-		NTSTATUS st = STATUS_NO_SUCH_DEVICE;
-		irp->IoStatus.Status = st;
-		IoCompleteRequest (irp, IO_NO_INCREMENT);
-		return st;
+		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	SYSCTL_IRP_DISPOSITION disposition;

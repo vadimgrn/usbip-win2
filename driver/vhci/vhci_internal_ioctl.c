@@ -4,6 +4,7 @@
 #include "vhci_internal_ioctl.tmh"
 
 #include "usbreq.h"
+#include "vhci_irp.h"
 
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
@@ -40,9 +41,8 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 			IoReleaseCancelSpinLock(oldirql_cancel);
 
 			if (valid_irp) {
-				irp->IoStatus.Status = STATUS_CANCELLED;
 				irp->IoStatus.Information = 0;
-				IoCompleteRequest(irp, IO_NO_INCREMENT);
+				irp_done(irp, STATUS_CANCELLED);
 			}
 		}
 		RemoveEntryListInit(&urbr_local->list_state);
@@ -144,19 +144,14 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	vpdo_dev_t *vpdo = devobj_to_vpdo(devobj);
 
 	if (vpdo->common.type != VDEV_VPDO) {
-		NTSTATUS st = STATUS_INVALID_DEVICE_REQUEST;
-		TraceError(TRACE_IOCTL, "internal ioctl only for vpdo is allowed, %!STATUS!", st);
-		Irp->IoStatus.Status = st;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return st;
+		TraceError(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");
+		return irp_done(Irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	if (!vpdo->plugged) {
 		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
 		TraceInfo(TRACE_IOCTL, "%!STATUS!", st);
-		Irp->IoStatus.Status = st;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return st;
+		return irp_done(Irp, st);
 	}
 
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
@@ -181,8 +176,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	if (status != STATUS_PENDING) {
 		Irp->IoStatus.Information = 0;
-		Irp->IoStatus.Status = status;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
+		irp_done(Irp, status);
 	}
 
 	TraceInfo(TRACE_IOCTL, "%!STATUS!, irp %p", status, Irp);

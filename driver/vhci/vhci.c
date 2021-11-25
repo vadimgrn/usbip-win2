@@ -6,6 +6,7 @@
 #include "globals.h"
 #include "usbreq.h"
 #include "vhci_pnp.h"
+#include "vhci_irp.h"
 
 #include <usbdi.h>
 
@@ -64,24 +65,16 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	PAGED_CODE();
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter", vdev->type);
-
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
 		TraceWarning(TRACE_GENERAL, "vhci_create(%!vdev_type_t!): no such device", vdev->type);
-
-		Irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return STATUS_NO_SUCH_DEVICE;
+		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!", vdev->type);
+
 	Irp->IoStatus.Information = 0;
-	Irp->IoStatus.Status = STATUS_SUCCESS;
-	IoCompleteRequest(Irp, IO_NO_INCREMENT);
-
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave", vdev->type);
-
-	return STATUS_SUCCESS;
+	return irp_done_success(Irp);
 }
 
 static PAGEABLE void
@@ -112,42 +105,30 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
 		TraceWarning(TRACE_GENERAL, "vhci_cleanup(%!vdev_type_t!): no such device", vdev->type);
-		irp->IoStatus.Status = STATUS_NO_SUCH_DEVICE;
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		return STATUS_NO_SUCH_DEVICE;
+		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
+
 	if (vdev->type == VDEV_VHCI) {
 		cleanup_vpdo(devobj_to_vhci(devobj), irp);
 	}
 
 	irp->IoStatus.Information = 0;
-	irp->IoStatus.Status = STATUS_SUCCESS;
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Leave", vdev->type);
-
-	return STATUS_SUCCESS;
+	return irp_done_success(irp);
 }
 
 static PAGEABLE NTSTATUS
 vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-	pvdev_t	vdev = devobj_to_vdev(devobj);
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	// Check to see whether the bus is removed
-	if (vdev->DevicePnPState == Deleted) {
-		Irp->IoStatus.Status = status = STATUS_NO_SUCH_DEVICE;
-		IoCompleteRequest(Irp, IO_NO_INCREMENT);
-		return status;
-	}
-	Irp->IoStatus.Information = 0;
-	Irp->IoStatus.Status = STATUS_SUCCESS;
-	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 
-	return STATUS_SUCCESS;
+	if (vdev->DevicePnPState == Deleted) {
+		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
+	}
+
+	Irp->IoStatus.Information = 0;
+	return irp_done_success(Irp);
 }
 
 PAGEABLE NTSTATUS
