@@ -16,21 +16,16 @@
 
 #include <wdmguid.h>
 
-#define IRP_PASS_DOWN_OR_SUCCESS(vdev, irp)			\
-	do {							\
-		if (is_fdo(vdev->type)) {			\
-			irp->IoStatus.Status = STATUS_SUCCESS;	\
-			return irp_pass_down((vdev)->devobj_lower, irp);	\
-		} else {					\
-			return irp_done_success(irp);		\
-		}						\
-	} while (0)
+NTSTATUS irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
+{
+	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : irp_done_success(irp);
+}
 
 static PAGEABLE NTSTATUS
 pnp_query_stop_device(pvdev_t vdev, PIRP irp)
 {
 	SET_NEW_PNP_STATE(vdev, StopPending);
-	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
+	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS
@@ -41,14 +36,15 @@ pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
 		RESTORE_PREVIOUS_PNP_STATE(vdev);
 		NT_ASSERT(vdev->DevicePnPState == Started);
 	}
-	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
+
+	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS
 pnp_stop_device(pvdev_t vdev, PIRP irp)
 {
 	SET_NEW_PNP_STATE(vdev, Stopped);
-	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
+	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS
@@ -59,11 +55,10 @@ pnp_query_remove_device(pvdev_t vdev, PIRP irp)
 		/* vpdo cannot be removed */
 		vhub_mark_unplugged_vpdo(vhub_from_vpdo((pvpdo_dev_t)vdev), (pvpdo_dev_t)vdev);
 		break;
-	default:
-		break;
 	}
+
 	SET_NEW_PNP_STATE(vdev, RemovePending);
-	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
+	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS
@@ -72,14 +67,15 @@ pnp_cancel_remove_device(pvdev_t vdev, PIRP irp)
 	if (vdev->DevicePnPState == RemovePending) {
 		RESTORE_PREVIOUS_PNP_STATE(vdev);
 	}
-	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
+
+	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS
 pnp_surprise_removal(pvdev_t vdev, PIRP irp)
 {
 	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);
-	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
+	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS pnp_query_bus_information(IRP *irp)
