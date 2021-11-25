@@ -183,7 +183,7 @@ pnp_remove_device(pvdev_t vdev, PIRP irp)
 
 	if (vdev->DevicePnPState == Deleted) {
 		TraceInfo(TRACE_PNP, "%!vdev_type_t!: already removed", vdev->type);
-		return irp_success(irp);
+		return irp_done_success(irp);
 	}
 
 	devobj_lower = vdev->devobj_lower;
@@ -196,6 +196,6 @@ pnp_remove_device(pvdev_t vdev, PIRP irp)
 		irp->IoStatus.Status = STATUS_SUCCESS;
 		return irp_pass_down(devobj_lower, irp);
 	} else {
-		return irp_success(irp);
+		return irp_done_success(irp);
 	}
 }

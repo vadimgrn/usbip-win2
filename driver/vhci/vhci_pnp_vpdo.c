@@ -57,6 +57,5 @@ process_pnp_vpdo(pvpdo_dev_t vpdo, PIRP irp, PIO_STACK_LOCATION irpstack)
 	}
 
 	irp_done(irp, status);
-
 	return TRUE;
 }

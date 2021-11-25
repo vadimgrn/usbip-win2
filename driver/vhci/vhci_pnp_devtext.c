@@ -18,7 +18,14 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp, IO_STACK_LOCATIO
 	PAGED_CODE();
 
 	DEVICE_TEXT_TYPE type = irpstack->Parameters.QueryDeviceText.DeviceTextType;
-	LPCWSTR str = NULL;
+	LPCWSTR str = (PWSTR)irp->IoStatus.Information;
+
+	if (str) {
+		TraceWarning(TRACE_PNP, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> pre-filled '%!WSTR!', %!STATUS!",
+			type, irpstack->Parameters.QueryDeviceText.LocaleId, str, irp->IoStatus.Status);
+
+		return irp_done_iostatus(irp);
+	}
 
 	switch (type) {
 	case DeviceTextDescription:

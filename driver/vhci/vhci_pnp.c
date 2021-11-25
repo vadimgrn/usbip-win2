@@ -21,9 +21,9 @@
 		if (is_fdo(vdev->type)) {			\
 			irp->IoStatus.Status = STATUS_SUCCESS;	\
 			return irp_pass_down((vdev)->devobj_lower, irp);	\
+		} else {					\
+			return irp_done_success(irp);		\
 		}						\
-		else						\
-			return irp_success(irp);		\
 	} while (0)
 
 static PAGEABLE NTSTATUS
@@ -82,7 +82,7 @@ pnp_surprise_removal(pvdev_t vdev, PIRP irp)
 	IRP_PASS_DOWN_OR_SUCCESS(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_bus_information(PIRP irp)
+static PAGEABLE NTSTATUS pnp_query_bus_information(IRP *irp)
 {
 	PAGED_CODE();
 
@@ -173,7 +173,7 @@ PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		if (process_pnp_vpdo((vpdo_dev_t*)vdev, irp, irpstack)) {
 			status = irp->IoStatus.Status;
 		} else {
-			status = irp_done(irp, irp->IoStatus.Status);
+			status = irp_done_iostatus(irp);
 		}
 	}
 

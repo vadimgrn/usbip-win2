@@ -39,7 +39,7 @@ pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)
 {
 	if (!is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resource_requirements();
-		return irp_done(irp, STATUS_SUCCESS);
+		return irp_done_success(irp);
 	} else {
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}
@@ -50,7 +50,7 @@ pnp_query_resources(pvdev_t vdev, PIRP irp)
 {
 	if (!is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resources();
-		return irp_done(irp, STATUS_SUCCESS);
+		return irp_done_success(irp);
 	} else {
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}
@@ -61,7 +61,7 @@ pnp_filter_resource_requirements(pvdev_t vdev, PIRP irp)
 {
 	if (is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resource_requirements();
-		return irp_done(irp, STATUS_SUCCESS);
+		return irp_done_success(irp);
 	} else {
 		return irp_done(irp, STATUS_NOT_SUPPORTED);
 	}
