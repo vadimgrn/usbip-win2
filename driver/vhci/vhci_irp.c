@@ -53,7 +53,9 @@ irp_send_synchronously(PDEVICE_OBJECT devobj, PIRP irp)
 
 NTSTATUS irp_done(IRP *irp, NTSTATUS status)
 {
+	NT_ASSERT(status != STATUS_PENDING);
 	irp->IoStatus.Status = status;
+
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
 }

@@ -126,35 +126,37 @@ cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 	irp_done(irp, STATUS_CANCELLED);
 }
 
-struct urb_req *
-create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink)
+struct urb_req *create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink)
 {
-	struct urb_req	*urbr;
-
-	urbr = ExAllocateFromNPagedLookasideList(&g_lookaside);
-	if (urbr == NULL) {
+	struct urb_req *urbr = ExAllocateFromNPagedLookasideList(&g_lookaside);
+	if (!urbr) {
 		TraceError(TRACE_URB, "out of memory");
 		return NULL;
 	}
+
 	RtlZeroMemory(urbr, sizeof(*urbr));
+
 	urbr->vpdo = vpdo;
 	urbr->irp = irp;
-	if (irp != NULL) {
+
+	if (irp) {
 		irp->Tail.Overlay.DriverContext[0] = vpdo;
 		irp->Tail.Overlay.DriverContext[1] = urbr;
 	}
 
 	urbr->seq_num_unlink = seq_num_unlink;
+
 	InitializeListHead(&urbr->list_all);
 	InitializeListHead(&urbr->list_state);
+
 	return urbr;
 }
 
-void
-free_urbr(struct urb_req *urbr)
+void free_urbr(struct urb_req *urbr)
 {
 	NT_ASSERT(IsListEmpty(&urbr->list_all));
 	NT_ASSERT(IsListEmpty(&urbr->list_state));
+
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }
 
@@ -206,14 +208,18 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
 	if (vpdo->urbr_sent_partial || !vpdo->pending_read_irp) {
+		
 		if (urbr->irp) {
 			IoAcquireCancelSpinLock(&oldirql_cancel);
 			IoSetCancelRoutine(urbr->irp, cancel_urbr);
 			IoReleaseCancelSpinLock(oldirql_cancel);
+
 			IoMarkIrpPending(urbr->irp);
 		}
+
 		InsertTailList(&vpdo->head_urbr_pending, &urbr->list_state);
 		InsertTailList(&vpdo->head_urbr, &urbr->list_all);
+		
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
 		TraceInfo(TRACE_URB, "STATUS_PENDING");

@@ -890,8 +890,7 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 
 		KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 		vpdo->len_sent_partial = 0;
-	}
-	else {
+	} else {
 		urbr = find_pending_urbr(vpdo);
 		if (!urbr) {
 			vpdo->pending_read_irp = read_irp;
@@ -946,10 +945,8 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
-	NTSTATUS status = STATUS_SUCCESS;
-	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
-
-	TraceInfo(TRACE_READ, "Enter: len:%u, irp:%p", irpstack->Parameters.Read.Length, irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	TraceInfo(TRACE_READ, "Enter: len %lu, irp %p", irpstack->Parameters.Read.Length, irp);
 
 	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
@@ -958,17 +955,14 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		return  irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
-	// Check to see whether the bus is removed
-	if (vhci->common.DevicePnPState == Deleted) {
-		status = STATUS_NO_SUCH_DEVICE;
-		goto END;
+	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
+
+	if (vhci->common.DevicePnPState != Deleted) {
+		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
+		status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
-	status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
-
-END:
-	TraceInfo(TRACE_READ, "Leave: irp %p, %!STATUS!", irp, status);
+	TraceInfo(TRACE_READ, "Leave irp %p, %!STATUS!", irp, status);
 
 	if (status != STATUS_PENDING) {
 		irp_done(irp, status);

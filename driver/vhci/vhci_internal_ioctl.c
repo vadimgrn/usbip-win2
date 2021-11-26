@@ -65,25 +65,24 @@ process_urb_get_frame(pvpdo_dev_t vpdo, PURB urb)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-submit_urbr_irp(pvpdo_dev_t vpdo, PIRP irp)
+static NTSTATUS submit_urbr_irp(vpdo_dev_t *vpdo, IRP *irp)
 {
-	struct urb_req	*urbr;
-	NTSTATUS	status;
-
-	urbr = create_urbr(vpdo, irp, 0);
-	if (urbr == NULL)
+	struct urb_req *urbr = create_urbr(vpdo, irp, 0);
+	if (!urbr) {
 		return STATUS_INSUFFICIENT_RESOURCES;
-	status = submit_urbr(vpdo, urbr);
-	if (NT_ERROR(status))
+	}
+
+	NTSTATUS status = submit_urbr(vpdo, urbr);
+	if (NT_ERROR(status)) {
 		free_urbr(urbr);
+	}
+
 	return status;
 }
 
-static NTSTATUS
-process_irp_urb_req(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS process_irp_urb_req(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 {
-	if (urb == NULL) {
+	if (!urb) {
 		TraceError(TRACE_IOCTL, "null urb");
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -117,11 +116,12 @@ process_irp_urb_req(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 	case URB_FUNCTION_CONTROL_TRANSFER:
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 		return submit_urbr_irp(vpdo, irp);
-	default:
-		TraceWarning(TRACE_IOCTL, "unhandled %!urb_function!, len %d",
-			urb->UrbHeader.Function, urb->UrbHeader.Length);
-		return STATUS_INVALID_PARAMETER;
 	}
+
+	TraceWarning(TRACE_IOCTL, "unhandled %!urb_function!, len %d",
+			urb->UrbHeader.Function, urb->UrbHeader.Length);
+	
+	return STATUS_INVALID_PARAMETER;
 }
 
 static NTSTATUS

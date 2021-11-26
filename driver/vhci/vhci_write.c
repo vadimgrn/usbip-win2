@@ -375,10 +375,10 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 		return STATUS_SUCCESS;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		return process_urb_dsc_req(urbr, hdr);
-	default:
-		TraceError(TRACE_WRITE, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
-		return STATUS_INVALID_PARAMETER;
 	}
+
+	TraceError(TRACE_WRITE, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+	return STATUS_INVALID_PARAMETER;
 }
 
 static struct usbip_header *get_usbip_hdr_from_write_irp(IRP *irp)
@@ -399,7 +399,7 @@ static void complete_irp(IRP *irp, NTSTATUS status)
 	KIRQL oldirql;
 
 	IoAcquireCancelSpinLock(&oldirql);
-	BOOLEAN valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
+	bool valid_irp = IoSetCancelRoutine(irp, NULL);
 	IoReleaseCancelSpinLock(oldirql);
 
 	if (!valid_irp) {
@@ -427,8 +427,7 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 	}
 
 	struct urb_req *urbr = find_sent_urbr(vpdo, hdr);
-	if (!urbr) {
-		// Might have been cancelled before, so return STATUS_SUCCESS
+	if (!urbr) { // might have been cancelled before, so return STATUS_SUCCESS
 		TraceError(TRACE_WRITE, "no urbr: seqnum: %d", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
@@ -450,30 +449,27 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_WRITE, "Enter: len:%u, irp:%p", irpstack->Parameters.Write.Length, irp);
+	TraceInfo(TRACE_WRITE, "Enter len %lu, irp %p", irpstack->Parameters.Write.Length, irp);
 
-	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
 	if (vhci->common.type != VDEV_VHCI) {
 		TraceError(TRACE_WRITE, "write for non-vhci is not allowed");
-		return irp_done(irp, status);
+		return irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
-	if (vhci->common.DevicePnPState == Deleted) {
-		status = STATUS_NO_SUCH_DEVICE;
-		goto END;
+	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
+
+	if (vhci->common.DevicePnPState != Deleted) {
+		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
+		if (vpdo && vpdo->plugged) {
+			irp->IoStatus.Information = 0;
+			status = process_write_irp(vpdo, irp);
+		} else {
+			status = STATUS_INVALID_DEVICE_REQUEST;
+		}
 	}
 
-	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
-	if (!(vpdo && vpdo->plugged)) {
-		goto END;
-	}
-
-	irp->IoStatus.Information = 0;
-	status = process_write_irp(vpdo, irp);
-
-END:
 	TraceInfo(TRACE_WRITE, "Leave irp %p, %!STATUS!", irp, status);
 	return irp_done(irp, status);
 }
