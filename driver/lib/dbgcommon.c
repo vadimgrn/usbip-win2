@@ -286,3 +286,16 @@ const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet invalid parameter";
 }
+
+
+const char* usbd_transfer_flags(char* buf, unsigned int len, ULONG TransferFlags)
+{
+	const char *dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
+
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
+					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
+					TransferFlags & USBD_START_ISO_TRANSFER_ASAP ? "|ISO_ASAP" : "",
+					TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");
+
+	return st != STATUS_INVALID_PARAMETER ? buf : "usbd_transfer_flags invalid parameter";
+}

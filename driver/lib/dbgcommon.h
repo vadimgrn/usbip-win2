@@ -23,3 +23,6 @@ const char *dbg_usbip_hdr(char *buf, unsigned int len, const struct usbip_header
 
 enum { DBG_USB_SETUP_BUFBZ = 128 };
 const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet);
+
+enum { USBD_TRANSFER_FLAGS_BUFBZ = 36 };
+const char *usbd_transfer_flags(char *buf, unsigned int len, ULONG TransferFlags);
