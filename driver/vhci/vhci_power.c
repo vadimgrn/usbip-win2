@@ -103,25 +103,20 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!powermn!", vdev->type, irpstack->MinorFunction);
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!irql!, %!powermn!", 
+		vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
-	NTSTATUS status = STATUS_SUCCESS;
 
-	// If the device has been removed, the driver should
-	// not pass the IRP down to the next lower driver.
 	if (vdev->DevicePnPState == Deleted) {
+		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		PoStartNextPowerIrp(irp);
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	switch (vdev->type) {
-	case VDEV_VHCI:
-		status = vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack);
-		break;
-	default:
-		status = vhci_power_vdev(vdev, irp, irpstack);
-	}
+	NTSTATUS st = vdev->type == VDEV_VHCI ?
+			vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
+			vhci_power_vdev(vdev, irp, irpstack);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!", vdev->type, status);
-	return status;
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!", vdev->type, st);
+	return st;
 }

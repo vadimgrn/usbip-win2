@@ -449,7 +449,8 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_WRITE, "Enter len %lu, irp %p", irpstack->Parameters.Write.Length, irp);
+	TraceInfo(TRACE_WRITE, "Enter irp %p, %!irql!, len %lu", 
+		irp, KeGetCurrentIrql(), irpstack->Parameters.Write.Length);
 
 	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
@@ -461,7 +462,9 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
 
 	if (vhci->common.DevicePnPState != Deleted) {
+
 		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
+		
 		if (vpdo && vpdo->plugged) {
 			irp->IoStatus.Information = 0;
 			status = process_write_irp(vpdo, irp);

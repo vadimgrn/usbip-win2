@@ -10,17 +10,17 @@
 PAGEABLE NTSTATUS
 vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
+	PAGED_CODE();
+
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
-	PAGED_CODE();
-
-	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: Enter: %s(%#010lX), irp %p", vdev->type, dbg_ioctl_code(ioctl_code), ioctl_code, irp);
+	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: enter irp %p, %!irql!, %s(%#010lX)", 
+		vdev->type, irp, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
-	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
 		status = STATUS_NO_SUCH_DEVICE;
 		goto END;
@@ -44,6 +44,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	}
 
 	irp->IoStatus.Information = outlen;
+
 END:
 	if (status != STATUS_PENDING) {
 		irp_done(irp, status);

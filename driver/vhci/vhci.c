@@ -61,17 +61,17 @@ vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 static PAGEABLE NTSTATUS
 vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-	pvdev_t	vdev = devobj_to_vdev(devobj);
-
 	PAGED_CODE();
+
+	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		TraceWarning(TRACE_GENERAL, "vhci_create(%!vdev_type_t!): no such device", vdev->type);
+		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!", vdev->type);
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!, %!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
 	return irp_done_success(Irp);
@@ -96,17 +96,16 @@ cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 static PAGEABLE NTSTATUS
 vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	vdev_t *vdev = devobj_to_vdev(devobj);
-
 	PAGED_CODE();
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: Enter", vdev->type);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 
-	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
-		TraceWarning(TRACE_GENERAL, "vhci_cleanup(%!vdev_type_t!): no such device", vdev->type);
+		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
+
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: %!irql!", vdev->type, KeGetCurrentIrql());
 
 	if (vdev->type == VDEV_VHCI) {
 		cleanup_vpdo(devobj_to_vhci(devobj), irp);
@@ -124,8 +123,11 @@ vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
+		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
+
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: %!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
 	return irp_done_success(Irp);
@@ -162,6 +164,7 @@ DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
 	drvobj->MajorFunction[IRP_MJ_DEVICE_CONTROL] = vhci_ioctl;
 	drvobj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = vhci_internal_ioctl;
 	drvobj->MajorFunction[IRP_MJ_SYSTEM_CONTROL] = vhci_system_control;
+
 	drvobj->DriverUnload = vhci_driverUnload;
 	drvobj->DriverExtension->AddDevice = vhci_add_device;
 

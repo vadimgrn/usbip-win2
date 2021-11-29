@@ -101,10 +101,10 @@ init_dev_vhub(pvdev_t vdev)
 static PAGEABLE NTSTATUS
 add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 {
+	PAGED_CODE();
+
 	PDEVICE_OBJECT	devobj;
 	pvdev_t		vdev;
-
-	PAGED_CODE();
 
 	TraceInfo(TRACE_PNP, "adding %!vdev_type_t!: pdo: %p", type, pdo);
 
@@ -158,10 +158,6 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 PAGEABLE NTSTATUS
 vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 {
-	proot_dev_t	root;
-	pvhci_dev_t	vhci = NULL;
-	vdev_type_t	type;
-
 	PAGED_CODE();
 
 	if (!is_valid_vdev_hwid(pdo)) {
@@ -169,12 +165,17 @@ vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	root = (proot_dev_t)get_vdev_from_driver(drvobj, VDEV_ROOT);
-	if (root == NULL)
+	root_dev_t *root = (root_dev_t*)get_vdev_from_driver(drvobj, VDEV_ROOT);
+	vhci_dev_t *vhci = NULL;
+	vdev_type_t type;
+
+	if (root) {
+		vhci = (vhci_dev_t*)get_vdev_from_driver(drvobj, VDEV_VHCI);
+		type = vhci ? VDEV_VHUB : VDEV_VHCI;
+	} else {
 		type = VDEV_ROOT;
-	else {
-		vhci = (pvhci_dev_t)get_vdev_from_driver(drvobj, VDEV_VHCI);
-		type = (vhci == NULL) ? VDEV_VHCI: VDEV_VHUB;
 	}
+
+	TraceInfo(TRACE_GENERAL, "%!irql!", KeGetCurrentIrql());
 	return add_vdev(drvobj, pdo, type);
 }

@@ -23,7 +23,6 @@ static WMI_QUERY_REGINFO_CALLBACK	vhci_QueryWmiRegInfo;
 
 #define MOFRESOURCENAME L"USBIPVhciWMI"
 
-#define NUMBER_OF_WMI_GUIDS                 1
 #define WMI_USBIP_BUS_DRIVER_INFORMATION  0
 
 static WMIGUIDREGINFO USBIPBusWmiGuidList[] = {
@@ -211,16 +210,11 @@ vhci_QueryWmiRegInfo(__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PU
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-reg_wmi(pvhci_dev_t vhci)
+PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 {
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	vhci->WmiLibInfo.GuidCount = sizeof(USBIPBusWmiGuidList) /
-		sizeof(WMIGUIDREGINFO);
-	NT_ASSERT(NUMBER_OF_WMI_GUIDS == vhci->WmiLibInfo.GuidCount);
+	vhci->WmiLibInfo.GuidCount = ARRAYSIZE(USBIPBusWmiGuidList);
 	vhci->WmiLibInfo.GuidList = USBIPBusWmiGuidList;
 	vhci->WmiLibInfo.QueryWmiRegInfo = vhci_QueryWmiRegInfo;
 	vhci->WmiLibInfo.QueryWmiDataBlock = vhci_QueryWmiDataBlock;
@@ -230,11 +224,12 @@ reg_wmi(pvhci_dev_t vhci)
 	vhci->WmiLibInfo.WmiFunctionControl = NULL;
 
 	// Register with WMI
-	status = IoWMIRegistrationControl(TO_DEVOBJ(vhci), WMIREG_ACTION_REGISTER);
+	NTSTATUS status = IoWMIRegistrationControl(TO_DEVOBJ(vhci), WMIREG_ACTION_REGISTER);
 
 	// Initialize the Std device data structure
 	vhci->StdUSBIPBusData.ErrorCount = 0;
 
+	TraceInfo(TRACE_GENERAL, "%!irql!, %!STATUS!", KeGetCurrentIrql(), status);
 	return status;
 }
 

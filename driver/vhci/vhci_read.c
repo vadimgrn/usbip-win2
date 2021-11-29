@@ -946,7 +946,9 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	PAGED_CODE();
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	TraceInfo(TRACE_READ, "Enter: len %lu, irp %p", irpstack->Parameters.Read.Length, irp);
+
+	TraceInfo(TRACE_READ, "Enter irp %p, %!irql!, len %lu", 
+		irp, KeGetCurrentIrql(), irpstack->Parameters.Read.Length);
 
 	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
