@@ -18,6 +18,8 @@ const char *brequest_str(UCHAR bRequest);
 const char *dbg_usbd_status(USBD_STATUS status);
 const char *dbg_ioctl_code(int ioctl_code);
 
+const char *usbd_pipe_type_str(USBD_PIPE_TYPE t);
+
 enum { DBG_USBIP_HDR_BUFSZ = 255 };
 const char *dbg_usbip_hdr(char *buf, unsigned int len, const struct usbip_header *hdr);
 

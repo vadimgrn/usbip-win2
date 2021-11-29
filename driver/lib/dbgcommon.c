@@ -288,7 +288,7 @@ const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet
 }
 
 
-const char* usbd_transfer_flags(char* buf, unsigned int len, ULONG TransferFlags)
+const char* usbd_transfer_flags(char *buf, unsigned int len, ULONG TransferFlags)
 {
 	const char *dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
 
@@ -298,4 +298,11 @@ const char* usbd_transfer_flags(char* buf, unsigned int len, ULONG TransferFlags
 					TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "usbd_transfer_flags invalid parameter";
+}
+
+const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
+{
+	static const char* v[] = { "Control", "Isochronous", "Bulk", "Interrupt" };
+	NT_ASSERT(t < ARRAYSIZE(v));
+	return v[t];
 }
