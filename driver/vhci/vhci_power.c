@@ -103,7 +103,7 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: %!irql!, %!powermn!", 
+	TraceInfo(TRACE_POWER, "%!vdev_type_t!: irql %!irql!, %!powermn!", 
 		vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 

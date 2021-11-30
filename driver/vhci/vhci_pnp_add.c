@@ -176,6 +176,6 @@ vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 		type = VDEV_ROOT;
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!irql!", KeGetCurrentIrql());
+	TraceInfo(TRACE_GENERAL, "irql %!irql!", KeGetCurrentIrql());
 	return add_vdev(drvobj, pdo, type);
 }

@@ -449,7 +449,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "irp %p, %!irql!, %s(%#010lX)", 
+	TraceInfo(TRACE_IOCTL, "irp %p, irql %!irql!, %s(%#010lX)", 
 		Irp, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo(devobj);

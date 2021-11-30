@@ -71,7 +71,7 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!, %!irql!", vdev->type, KeGetCurrentIrql());
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!, irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
 	return irp_done_success(Irp);
@@ -105,7 +105,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: %!irql!", vdev->type, KeGetCurrentIrql());
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	if (vdev->type == VDEV_VHCI) {
 		cleanup_vpdo(devobj_to_vhci(devobj), irp);
@@ -127,7 +127,7 @@ vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: %!irql!", vdev->type, KeGetCurrentIrql());
+	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
 	return irp_done_success(Irp);
