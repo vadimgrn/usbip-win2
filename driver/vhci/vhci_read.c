@@ -670,29 +670,29 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "%!urb_function!: %s, ", code_func, dbg_urbr(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_READ, "%!urb_function!: %s", code_func, dbg_urbr(buf, sizeof(buf), urbr));
 	}
 
-	NTSTATUS	status;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	switch (code_func) {
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = store_urb_bulk(irp, urb, urbr);
-		break;
 	case URB_FUNCTION_ISOCH_TRANSFER:
 		status = store_urb_iso(irp, urb, urbr);
 		break;
+	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
+		status = store_urb_bulk(irp, urb, urbr);
+		break;
 	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
 		status = store_urb_get_dev_desc(irp, urb, urbr);
+		break;
+	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
+		status = store_urb_get_intf_desc(irp, urb, urbr);
 		break;
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
 	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
 	case URB_FUNCTION_GET_STATUS_FROM_ENDPOINT:
 	case URB_FUNCTION_GET_STATUS_FROM_OTHER:
 		status = store_urb_get_status(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
-		status = store_urb_get_intf_desc(irp, urb, urbr);
 		break;
 	case URB_FUNCTION_CLASS_DEVICE:
 	case URB_FUNCTION_CLASS_INTERFACE:
@@ -701,6 +701,7 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 	case URB_FUNCTION_VENDOR_DEVICE:
 	case URB_FUNCTION_VENDOR_INTERFACE:
 	case URB_FUNCTION_VENDOR_ENDPOINT:
+	case URB_FUNCTION_VENDOR_OTHER:
 		status = store_urb_class_vendor(irp, urb, urbr);
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
@@ -720,9 +721,7 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "unhandled %!urb_function!", code_func);
-		status = STATUS_INVALID_PARAMETER;
-		break;
+		TraceError(TRACE_READ, "%!urb_function!: unhandled", code_func);
 	}
 
 	return status;

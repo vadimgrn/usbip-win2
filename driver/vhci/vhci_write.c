@@ -231,9 +231,21 @@ static NTSTATUS store_urb_iso(URB *urb, const struct usbip_header *hdr)
 static NTSTATUS
 store_urb_data(PURB urb, const struct usbip_header *hdr)
 {
-	NTSTATUS	status;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	switch (urb->UrbHeader.Function) {
+	case URB_FUNCTION_ISOCH_TRANSFER:
+		status = store_urb_iso(urb, hdr);
+		break;
+	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
+		status = store_urb_bulk_or_interrupt(urb, hdr);
+		break;
+	case URB_FUNCTION_CONTROL_TRANSFER:
+		status = store_urb_control_transfer(urb, hdr);
+		break;
+	case URB_FUNCTION_CONTROL_TRANSFER_EX:
+		status = store_urb_control_transfer_ex(urb, hdr);
+		break;
 	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
 	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
 		status = store_urb_get_desc(urb, hdr);
@@ -254,12 +266,6 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 	case URB_FUNCTION_VENDOR_OTHER:
 		status = store_urb_vendor_or_class(urb, hdr);
 		break;
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = store_urb_bulk_or_interrupt(urb, hdr);
-		break;
-	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = store_urb_iso(urb, hdr);
-		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
 		status = STATUS_SUCCESS;
 		break;
@@ -269,20 +275,13 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 		status = STATUS_SUCCESS;
 		break;
-	case URB_FUNCTION_CONTROL_TRANSFER:
-		status = store_urb_control_transfer(urb, hdr);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		status = store_urb_control_transfer_ex(urb, hdr);
-		break;
 	default:
-		TraceError(TRACE_WRITE, "not supported %!urb_function!", urb->UrbHeader.Function);
-		status = STATUS_INVALID_PARAMETER;
-		break;
+		TraceError(TRACE_WRITE, "%!urb_function!: not supported", urb->UrbHeader.Function);
 	}
 
-	if (status == STATUS_SUCCESS)
+	if (status == STATUS_SUCCESS) { // FIXME: ???
 		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
+	}
 
 	return status;
 }
