@@ -128,8 +128,8 @@ static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb)
 
 	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
 	
-	TraceVerbose(TRACE_IOCTL, "%!urb_function!: TransferBufferLength %lu, Index %hd", 
-		r->Hdr.Function, r->TransferBufferLength, r->Index);
+	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu, Index %hd", 
+		urb_function_str(r->Hdr.Function), r->TransferBufferLength, r->Index);
 	
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -141,8 +141,8 @@ static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb)
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "%!urb_function!: %s, TransferBufferLength %lu, %s(%!#XBYTE!), Value %#hx, Index %#hx",
-		r->Hdr.Function, usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags), 
+	TraceVerbose(TRACE_IOCTL, "%s: %s, TransferBufferLength %lu, %s(%!#XBYTE!), Value %#hx, Index %#hx",
+		urb_function_str(r->Hdr.Function), usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags), 
 		r->TransferBufferLength, brequest_str(r->Request), r->Request, r->Value, r->Index);
 
 	return STATUS_SUBMIT_URBR_IRP;
@@ -154,8 +154,8 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb)
 	
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	TraceVerbose(TRACE_IOCTL, "%!urb_function!: TransferBufferLength %lu, Index %!UBYTE!, %!usb_descriptor_type!, LanguageId %#04hx",
-		r->Hdr.Function, r->TransferBufferLength, r->Index, r->DescriptorType, r->LanguageId);
+	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu, Index %!UBYTE!, %!usb_descriptor_type!, LanguageId %#04hx",
+		urb_function_str(r->Hdr.Function), r->TransferBufferLength, r->Index, r->DescriptorType, r->LanguageId);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -166,8 +166,8 @@ static NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, URB *urb)
 	
 	struct _URB_CONTROL_FEATURE_REQUEST *r = &urb->UrbControlFeatureRequest;
 
-	TraceVerbose(TRACE_IOCTL, "%!urb_function!: FeatureSelector %#hx, Index %#hx", 
-		r->Hdr.Function, r->FeatureSelector, r->Index);
+	TraceVerbose(TRACE_IOCTL, "%s: FeatureSelector %#hx, Index %#hx", 
+		urb_function_str(r->Hdr.Function), r->FeatureSelector, r->Index);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -236,7 +236,9 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 		break;
 	}
 
-	TraceVerbose(TRACE_IOCTL, "%!urb_function!: PipeHandle %!HANDLE! -> %!STATUS!", r->Hdr.Function, r->PipeHandle, st);
+	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %!HANDLE! -> %!STATUS!",
+		urb_function_str(r->Hdr.Function), r->PipeHandle, st);
+
 	return st;
 }
 
@@ -426,7 +428,9 @@ static NTSTATUS process_irp_urb_req(vpdo_dev_t *vpdo, IRP *irp)
 		return st == STATUS_SUBMIT_URBR_IRP ? submit_urbr_irp(vpdo, irp) : st;
 	}
 
-	TraceWarning(TRACE_IOCTL, "Not implemented/supported: Function %!urb_function!, Length %d", func, urb->UrbHeader.Length);
+	TraceWarning(TRACE_IOCTL, "Not implemented/supported %s(%#04x), Length %d", 
+		urb_function_str(func), func, urb->UrbHeader.Length);
+
 	return STATUS_NOT_SUPPORTED;
 }
 

@@ -55,7 +55,7 @@ store_urbr_partial(WDFREQUEST req_read, purb_req_t urbr)
 		status = store_urbr_iso_partial(req_read, urbr);
 		break;
 	default:
-		TraceWarning(TRACE_READ, "unexpected partial urbr: %!urb_function!", urbfunc);
+		TraceWarning(TRACE_READ, "unexpected partial urbr: %s", urb_function_str(urbfunc));
 		status = STATUS_INVALID_PARAMETER;
 		break;
 	}
@@ -117,7 +117,7 @@ store_urbr_urb(WDFREQUEST req_read, purb_req_t urbr)
 #endif
 	default:
 		WdfRequestSetInformation(req_read, 0);
-		TraceError(TRACE_READ, "unhandled %!urb_function!", urb_func);
+		TraceError(TRACE_READ, "unhandled %s", urb_function_str(urb_func));
 		status = STATUS_INVALID_PARAMETER;
 	}
 

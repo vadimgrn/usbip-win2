@@ -175,7 +175,7 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 	
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!", dbg_urbr(buf, sizeof(buf), urbr), code_func);
+		TraceInfo(TRACE_READ, "urbr: %s, %s", dbg_urbr(buf, sizeof(buf), urbr), urb_function_str(code_func));
 	}
 
 	switch (code_func) {
@@ -192,8 +192,9 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 		recip = BMREQUEST_TO_OTHER;
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "unhandled function: %!urb_function!, len %d",
-			urb->UrbHeader.Function, urb->UrbHeader.Length);
+		TraceWarning(TRACE_IOCTL, "unhandled function: %s, len %d",
+			urb_function_str(urb->UrbHeader.Function), urb->UrbHeader.Length);
+
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -670,7 +671,7 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "%!urb_function!: %s", code_func, dbg_urbr(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(code_func), dbg_urbr(buf, sizeof(buf), urbr));
 	}
 
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
@@ -721,7 +722,7 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "%!urb_function!: unhandled", code_func);
+		TraceError(TRACE_READ, "%s: unhandled", urb_function_str(code_func));
 	}
 
 	return status;
@@ -763,7 +764,7 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "%!urb_function!: unexpected partial urbr", code_func);
+		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(code_func));
 	}
 
 	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);

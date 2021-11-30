@@ -276,7 +276,7 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 		status = STATUS_SUCCESS;
 		break;
 	default:
-		TraceError(TRACE_WRITE, "%!urb_function!: not supported", urb->UrbHeader.Function);
+		TraceError(TRACE_WRITE, "%s: not supported", urb_function_str(urb->UrbHeader.Function));
 	}
 
 	if (status == STATUS_SUCCESS) { // FIXME: ???
@@ -300,7 +300,7 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 		}
 
 		USBD_STATUS st = urb->UrbHeader.Status;
-		TraceError(TRACE_WRITE, "%!urb_function!: %s(%#010lX)", urb->UrbHeader.Function, dbg_usbd_status(st), (ULONG)st);
+		TraceError(TRACE_WRITE, "%s: %s(%#010lX)", urb_function_str(urb->UrbHeader.Function), dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 

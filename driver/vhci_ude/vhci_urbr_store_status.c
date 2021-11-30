@@ -41,7 +41,7 @@ store_urbr_get_status(WDFREQUEST req_read, purb_req_t urbr)
 		recip = BMREQUEST_TO_OTHER;
 		break;
 	default:
-		TraceWarning(TRACE_READ, "unhandled %!urb_function!: len: %d", urbfunc, urb_status->Hdr.Length);
+		TraceWarning(TRACE_READ, "unhandled %s: len: %d", urb_function_str(urbfunc), urb_status->Hdr.Length);
 		return STATUS_INVALID_PARAMETER;
 	}
 
