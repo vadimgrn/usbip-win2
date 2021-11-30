@@ -25,7 +25,8 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr);
 struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_unlink);
 void free_urbr(struct urb_req *urbr);
 
-BOOLEAN is_port_urbr(struct urb_req *urbr, USBD_PIPE_HANDLE handle);
+bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle);
+
 struct urb_req *find_sent_urbr(pvpdo_dev_t vpdo, struct usbip_header *hdr);
 struct urb_req *find_pending_urbr(pvpdo_dev_t vpdo);
 

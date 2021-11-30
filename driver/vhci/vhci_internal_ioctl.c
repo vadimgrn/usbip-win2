@@ -90,7 +90,7 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 		struct urb_req	*urbr_local = CONTAINING_RECORD(le, struct urb_req, list_all);
 		le = le->Flink;
 
-		if (!is_port_urbr(urbr_local, hPipe)) {
+		if (!is_port_urbr(urbr_local->irp, hPipe)) {
 			continue;
 		}
 

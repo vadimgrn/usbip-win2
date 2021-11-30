@@ -160,40 +160,36 @@ void free_urbr(struct urb_req *urbr)
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }
 
-BOOLEAN is_port_urbr(struct urb_req *urbr, USBD_PIPE_HANDLE handle)
+bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle)
 {
-	IRP *irp = urbr->irp;
-	if (!irp) {
-		return FALSE;
+	if (!(irp && handle)) {
+		return false;
 	}
 
 	URB *urb = URB_FROM_IRP(irp);
 	if (!urb) {
-		return FALSE;
+		return false;
 	}
 
 	USBD_PIPE_HANDLE hPipe = 0;
 
 	switch (urb->UrbHeader.Function) {
-/*
 	case URB_FUNCTION_CONTROL_TRANSFER:
-		hPipe = urb->UrbControlTransfer.PipeHandle;
+		hPipe = urb->UrbControlTransfer.PipeHandle; // NULL if (TransferFlags & USBD_DEFAULT_PIPE_TRANSFER)
 		break;
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		hPipe = urb->UrbControlTransferEx.PipeHandle;
+		hPipe = urb->UrbControlTransferEx.PipeHandle; // NULL if (TransferFlags & USBD_DEFAULT_PIPE_TRANSFER)
 		break;
-*/
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
 		hPipe = urb->UrbBulkOrInterruptTransfer.PipeHandle;
+		NT_ASSERT(hPipe);
 		break;
 	case URB_FUNCTION_ISOCH_TRANSFER:
 		hPipe = urb->UrbIsochronousTransfer.PipeHandle;
+		NT_ASSERT(hPipe);
 		break;
-	default:
-		return FALSE;
 	}
 
-	NT_ASSERT(hPipe);
 	return hPipe == handle;
 }
 
