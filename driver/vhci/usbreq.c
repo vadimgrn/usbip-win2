@@ -167,8 +167,7 @@ BOOLEAN is_port_urbr(struct urb_req *urbr, USBD_PIPE_HANDLE handle)
 		return FALSE;
 	}
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	URB *urb = irpstack->Parameters.Others.Argument1;
+	URB *urb = URB_FROM_IRP(irp);
 	if (!urb) {
 		return FALSE;
 	}

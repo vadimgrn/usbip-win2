@@ -370,7 +370,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		return process_urb_res_submit(urbr->vpdo, irpstack->Parameters.Others.Argument1, hdr);
+		return process_urb_res_submit(urbr->vpdo, URB_FROM_IRP(urbr->irp), hdr);
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		return STATUS_SUCCESS;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:

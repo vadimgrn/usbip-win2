@@ -657,34 +657,23 @@ store_urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urbr_submit(PIRP irp, struct urb_req *urbr)
+static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 {
-	PURB	urb;
-	PIO_STACK_LOCATION	irpstack;
-	USHORT		code_func;
-	NTSTATUS	status;
-	
-	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
-	}
-
-	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	urb = irpstack->Parameters.Others.Argument1;
-	if (urb == NULL) {
+	URB *urb = URB_FROM_IRP(urbr->irp);
+	if (!urb) {
 		TraceError(TRACE_READ, "null urb");
-
 		irp->IoStatus.Information = 0;
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	code_func = urb->UrbHeader.Function;
+	USHORT code_func = urb->UrbHeader.Function;
 
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "urbr: %s, %!urb_function!", dbg_urbr(buf, sizeof(buf), urbr), code_func);
+		TraceInfo(TRACE_READ, "%!urb_function!: %s, ", code_func, dbg_urbr(buf, sizeof(buf), urbr));
 	}
+
+	NTSTATUS	status;
 
 	switch (code_func) {
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
@@ -739,22 +728,17 @@ store_urbr_submit(PIRP irp, struct urb_req *urbr)
 	return status;
 }
 
-static NTSTATUS
-store_urbr_partial(PIRP irp, struct urb_req *urbr)
+static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 {
-	PURB	urb;
-	PIO_STACK_LOCATION	irpstack;
-	USHORT		code_func;
-	NTSTATUS	status;
-
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "Enter: urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_READ, "Enter %s", dbg_urbr(buf, sizeof(buf), urbr));
 	}
 
-	irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	urb = irpstack->Parameters.Others.Argument1;
-	code_func = urb->UrbHeader.Function;
+	URB *urb = URB_FROM_IRP(urbr->irp);
+
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	USHORT code_func = urb->UrbHeader.Function;
 
 	switch (code_func) {
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
@@ -780,12 +764,10 @@ store_urbr_partial(PIRP irp, struct urb_req *urbr)
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "unexpected partial urbr: %!urb_function!", code_func);
-		status = STATUS_INVALID_PARAMETER;
-		break;
+		TraceError(TRACE_READ, "%!urb_function!: unexpected partial urbr", code_func);
 	}
-	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);
 
+	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);
 	return status;
 }
 
