@@ -10,45 +10,41 @@
 
 const NTSTATUS STATUS_SUBMIT_URBR_IRP = -1L;
 
-enum { USBD_INTERFACE_STR_BUFSZ = 768 };
+enum { USBD_INTERFACE_STR_BUFSZ = 1024 };
 
 static const char *usbd_interface_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt)
 {
 	NTSTATUS st = STATUS_SUCCESS;
 
-	NTSTRSAFE_PSTR end = NULL;
-	size_t remaining = 0;
-
 	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i) {
 
-		st = RtlStringCbPrintfExA(buf, len, &end, &remaining, STRSAFE_NULL_ON_FAILURE,
-			"%sInterface: Length %hu, InterfaceNumber %hhu, AlternateSetting %hhu, "
-			"Class %#02hhx, SubClass %#02hhx, Protocol %#02hhx, InterfaceHandle %#p, NumberOfPipes %lu", 
-			i ? "; " : "",
+		st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "
+			"Class %#02hhx, SubClass %#02hhx, Protocol %#02hhx, InterfaceHandle %#Ix, NumberOfPipes %lu)", 
 			r->Length, 
 			r->InterfaceNumber,
 			r->AlternateSetting,
 			r->Class,
 			r->SubClass,
 			r->Protocol,
-			r->InterfaceHandle,
+			(uintptr_t)r->InterfaceHandle,
 			r->NumberOfPipes);
 
 		for (ULONG j = 0; j < r->NumberOfPipes && st == STATUS_SUCCESS; ++j) {
 
 			const USBD_PIPE_INFORMATION *p = r->Pipes + j;
 
-			st = RtlStringCbPrintfExA(end, remaining, &end, &remaining, STRSAFE_NULL_ON_FAILURE,
-				", Pipes[%lu](MaximumPacketSize %hu, EndpointAddress %#02hhx(%s#%d), Interval %hhu, %s, "
-				"PipeHandle %#p, MaximumTransferSize %lu, PipeFlags %#lx)",
+			st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+				"\nPipes[%lu](MaximumPacketSize %#x, EndpointAddress %#02hhx(%s#%d), Interval %#hhx, %s, "
+				"PipeHandle %#Ix, MaximumTransferSize %#lx, PipeFlags %#lx)",
 				j,
 				p->MaximumPacketSize,
 				p->EndpointAddress,
-				USB_ENDPOINT_DIRECTION_IN(p->EndpointAddress) ? "In" : "Out",
+				USB_ENDPOINT_DIRECTION_IN(p->EndpointAddress) ? "in" : "out",
 				p->EndpointAddress & USB_ENDPOINT_ADDRESS_MASK,
 				p->Interval,
 				usbd_pipe_type_str(p->PipeType),
-				p->PipeHandle,
+				(uintptr_t)p->PipeHandle,
 				p->MaximumTransferSize,
 				p->PipeFlags);
 		}
@@ -76,7 +72,7 @@ static NTSTATUS submit_urbr_irp(vpdo_dev_t* vpdo, IRP* irp)
 
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
-	TraceInfo(TRACE_IOCTL, "PipeHandle %!HANDLE!", hPipe);
+	TraceInfo(TRACE_IOCTL, "PipeHandle %#Ix", (uintptr_t)hPipe);
 
 	if (!hPipe) {
 		return STATUS_INVALID_PARAMETER;
@@ -154,7 +150,7 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb)
 	
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu, Index %!UBYTE!, %!usb_descriptor_type!, LanguageId %#04hx",
+	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu, Index %d, %!usb_descriptor_type!, LanguageId %#04hx",
 		urb_function_str(r->Hdr.Function), r->TransferBufferLength, r->Index, r->DescriptorType, r->LanguageId);
 
 	return STATUS_SUBMIT_URBR_IRP;
@@ -182,10 +178,10 @@ static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb)
 	if (cd) {
 		char buf[USBD_INTERFACE_STR_BUFSZ];
 
-		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %!HANDLE!, "
-			"ConfigurationDescriptor(bLength %!UBYTE!, %!usb_descriptor_type!, wTotalLength %hu, bNumInterfaces %!UBYTE!, "
-			"bConfigurationValue %!UBYTE!, iConfiguration %!UBYTE!, bmAttributes %!#XBYTE!, MaxPower %!UBYTE!), %s",
-			r->ConfigurationHandle,
+		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, "
+			"ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu, bNumInterfaces %d, "
+			"bConfigurationValue %d, iConfiguration %d, bmAttributes %!#XBYTE!, MaxPower %d)%s",
+			(uintptr_t)r->ConfigurationHandle,
 			cd->bLength,
 			cd->bDescriptorType,
 			cd->wTotalLength,
@@ -196,8 +192,8 @@ static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb)
 			cd->MaxPower,
 			usbd_interface_str(buf, sizeof(buf), &r->Interface, cd->bNumInterfaces));
 	} else {
-		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %!HANDLE!, ConfigurationDescriptor NULL (unconfigured)",  
-					r->ConfigurationHandle);
+		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
+				(uintptr_t)r->ConfigurationHandle);
 	}
 
 	return STATUS_SUBMIT_URBR_IRP;
@@ -210,7 +206,7 @@ static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb)
 	struct _URB_SELECT_INTERFACE *r = &urb->UrbSelectInterface;
 	char buf[USBD_INTERFACE_STR_BUFSZ];
 
-	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %!HANDLE!, %s", r->ConfigurationHandle, 
+	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix%s", (uintptr_t)r->ConfigurationHandle, 
 			usbd_interface_str(buf, sizeof(buf), &r->Interface, 1));
 
 	return STATUS_SUBMIT_URBR_IRP;
@@ -236,8 +232,8 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 		break;
 	}
 
-	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %!HANDLE! -> %!STATUS!",
-		urb_function_str(r->Hdr.Function), r->PipeHandle, st);
+	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %#Ix -> %!STATUS!",
+		urb_function_str(r->Hdr.Function), (uintptr_t)r->PipeHandle, st);
 
 	return st;
 }
@@ -261,8 +257,8 @@ static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb)
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
 	char buf_setup[DBG_USB_SETUP_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %!HANDLE!, %s, TransferBufferLength %lu, %s",
-		r->PipeHandle, 
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, %s",
+		(uintptr_t)r->PipeHandle, 
 		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r->TransferFlags),
 		r->TransferBufferLength,
 		dbg_usb_setup_packet(buf_setup, sizeof(buf_setup), r->SetupPacket));
@@ -277,8 +273,8 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb)
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %!HANDLE!, %s, TransferBufferLength %lu",
-		r->PipeHandle,
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu",
+		(uintptr_t)r->PipeHandle,
 		usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
 		r->TransferBufferLength);
 
@@ -292,8 +288,8 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb)
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %!HANDLE!, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu",
-		r->PipeHandle,
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu",
+		(uintptr_t)r->PipeHandle,
 		usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
 		r->TransferBufferLength, r->StartFrame, r->NumberOfPackets, r->ErrorCount);
 
@@ -309,8 +305,8 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb)
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
 	char buf_setup[DBG_USB_SETUP_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %!HANDLE!, %s, TransferBufferLength %lu, Timeout %lu, %s",
-		r->PipeHandle,
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
+		(uintptr_t)r->PipeHandle,
 		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r->TransferFlags),
 		r->TransferBufferLength,
 		r->Timeout,

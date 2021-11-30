@@ -287,7 +287,6 @@ const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet
 	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet invalid parameter";
 }
 
-
 const char* usbd_transfer_flags(char *buf, unsigned int len, ULONG TransferFlags)
 {
 	const char *dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
@@ -302,7 +301,7 @@ const char* usbd_transfer_flags(char *buf, unsigned int len, ULONG TransferFlags
 
 const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
 {
-	static const char* v[] = { "Control", "Isochronous", "Bulk", "Interrupt" };
+	static const char* v[] = { "Ctrl", "Isoch", "Bulk", "Intr" };
 	NT_ASSERT(t < ARRAYSIZE(v));
 	return v[t];
 }
@@ -310,7 +309,7 @@ const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
 /*
  * Can't use CUSTOM_TYPE(urb_function, ItemListShort(...)), it's too big for WPP.
  */
-const char *urb_function_str(USHORT function)
+const char *urb_function_str(int function)
 {
 	static const char* v[] = 
 	{
@@ -403,5 +402,5 @@ const char *urb_function_str(USHORT function)
 		"URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS"
 	};
 
-	return function < ARRAYSIZE(v) ? v[function] : "URB_FUNCTION_?";
+	return function >= 0 && function < ARRAYSIZE(v) ? v[function] : "URB_FUNCTION_?";
 }
