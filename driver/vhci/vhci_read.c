@@ -106,15 +106,18 @@ static NTSTATUS store_urb_reset_pipe(PIRP irp, PURB urb, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-static PVOID get_buf(PVOID buf, PMDL bufMDL)
+static void *get_buf(void *buf, MDL *bufMDL)
 {
+	if (buf) {
+		return buf;
+	}
+
+	if (bufMDL) {
+		buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
+	}
+
 	if (!buf) {
-		if (bufMDL) {
-			buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
-		}
-		if (!buf) {
-			TraceError(TRACE_READ, "No transfer buffer");
-		}
+		TraceError(TRACE_READ, "No transfer buffer");
 	}
 
 	return buf;
@@ -228,24 +231,19 @@ store_urb_get_intf_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urb_class_vendor_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS store_urb_class_vendor_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 {
-	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vc = &urb->UrbControlVendorClassRequest;
-	PVOID	dst;
-	char    *buf;
+	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *urb_vc = &urb->UrbControlVendorClassRequest;
 
-	dst = get_read_irp_data(irp, urb_vc->TransferBufferLength);
-	if (dst == NULL)
+	void *dst = get_read_irp_data(irp, urb_vc->TransferBufferLength);
+	if (!dst) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
 
-	/*
-	 * reading from TransferBuffer or TransferBufferMDL,
-	 * whichever of them is not null
-	 */
-	buf = get_buf(urb_vc->TransferBuffer, urb_vc->TransferBufferMDL);
-	if (buf == NULL)
+	void *buf = get_buf(urb_vc->TransferBuffer, urb_vc->TransferBufferMDL);
+	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
+	}
 
 	RtlCopyMemory(dst, buf, urb_vc->TransferBufferLength);
 	irp->IoStatus.Information = urb_vc->TransferBufferLength;
@@ -429,7 +427,7 @@ static NTSTATUS store_urb_bulk(PIRP irp, PURB urb, struct urb_req *urbr)
 
 static NTSTATUS copy_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 {
-	char *buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
+	void *buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -542,11 +540,7 @@ static NTSTATUS store_urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, P
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	/*
-	 * reading from TransferBuffer or TransferBufferMDL,
-	 * whichever of them is not null
-	 */
-	char *buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
+	void *buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}

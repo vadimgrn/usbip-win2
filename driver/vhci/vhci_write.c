@@ -30,16 +30,20 @@ save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descripto
 	return TRUE;
 }
 
-static PVOID
-get_buf(PVOID buf, PMDL bufMDL)
+static void *get_buf(void *buf, MDL *bufMDL)
 {
-	if (buf == NULL) {
-		if (bufMDL != NULL)
-			buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority);
-		if (buf == NULL) {
-			TraceWarning(TRACE_WRITE, "No transfer buffer");
-		}
+	if (buf) {
+		return buf;
 	}
+	
+	if (bufMDL) {
+		buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority);
+	}
+
+	if (!buf) {
+		TraceWarning(TRACE_WRITE, "No transfer buffer");
+	}
+
 	return buf;
 }
 
@@ -97,21 +101,20 @@ static NTSTATUS post_select_interface(vpdo_dev_t *vpdo, URB *urb)
 	return vpdo_select_interface(vpdo, &urb_seli->Interface);
 }
 
-static NTSTATUS
-copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, const void *src, int src_len)
+static NTSTATUS copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, const void *src, int src_len)
 {
-	PVOID	buf;
-
 	if (dst_len < src_len) {
 		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d", dst_len, src_len);
 		return STATUS_INVALID_PARAMETER;
 	}
-	buf = get_buf(buf_dst, bufMDL);
-	if (buf == NULL)
-		return STATUS_INVALID_PARAMETER;
 
-	RtlCopyMemory(buf, src, src_len);
-	return STATUS_SUCCESS;
+	void *buf = get_buf(buf_dst, bufMDL);
+	if (buf) {
+		RtlCopyMemory(buf, src, src_len);
+		return STATUS_SUCCESS;
+	}
+
+	return STATUS_INVALID_PARAMETER;
 }
 
 static NTSTATUS
@@ -217,7 +220,7 @@ static NTSTATUS store_urb_iso(URB *urb, const struct usbip_header *hdr)
 
 	urb_iso->ErrorCount = hdr->u.ret_submit.error_count;
 
-	PVOID buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
+	void *buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INVALID_PARAMETER;
 	}
