@@ -7,14 +7,16 @@
 #include "vhci_read.h"
 #include "vhci_irp.h"
 
-const char *dbg_urbr(char* buf, unsigned int len, const struct urb_req *urbr)
+const char *dbg_urbr(char *buf, unsigned int len, const struct urb_req *urbr)
 {
 	if (!urbr) {
 		return "[null]";
 	}
-	
-	NTSTATUS st = RtlStringCbPrintfA(buf, len, "[seq:%lu]", urbr->seq_num);
-	return st == STATUS_SUCCESS ? buf : "dbg_urbr error";
+
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "[irp %#p, seq_num %lu, seq_num_unlink %lu]", 
+							urbr->irp, urbr->seq_num, urbr->seq_num_unlink);
+
+	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_urbr invalid parameter";
 }
 
 USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
