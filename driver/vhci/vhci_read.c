@@ -78,7 +78,7 @@ store_urb_dsc_req(PIRP irp, struct urb_req *urbr)
  * 1. We clear STALL/HALT feature on endpoint specified by pipe
  * 2. We abort/cancel all IRP for given pipe
  */
-static NTSTATUS store_urb_reset_pipe(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS sync_reset_pipe_and_clear_stall(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -123,8 +123,7 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
-static NTSTATUS
-store_urb_get_dev_desc(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS get_descriptor_from_device(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -160,7 +159,7 @@ store_urb_get_dev_desc(PIRP irp, PURB urb, struct urb_req *urbr)
 }
 
 static NTSTATUS
-store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_control_get_status_request(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_GET_STATUS_REQUEST	*urb_gsr = &urb->UrbControlGetStatusRequest;
 	USHORT		code_func;
@@ -209,8 +208,7 @@ store_urb_get_status(PIRP irp, PURB urb, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urb_get_intf_desc(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS get_descriptor_from_interface(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -253,7 +251,7 @@ static NTSTATUS store_urb_class_vendor_partial(vpdo_dev_t *vpdo, IRP *irp, URB *
 }
 
 static NTSTATUS
-store_urb_class_vendor(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_control_vendor_class_request(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vc = &urb->UrbControlVendorClassRequest;
 	char	type, recip;
@@ -326,7 +324,7 @@ store_urb_class_vendor(PIRP irp, PURB urb, struct urb_req *urbr)
 }
 
 static NTSTATUS
-store_urb_select_config(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_select_configuration(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_SELECT_CONFIGURATION *urb_sc = &urb->UrbSelectConfiguration;
 
@@ -345,7 +343,7 @@ store_urb_select_config(PIRP irp, PURB urb, struct urb_req *urbr)
 }
 
 static NTSTATUS
-store_urb_select_interface(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_select_interface(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_SELECT_INTERFACE	*urb_si = &urb->UrbSelectInterface;
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -387,7 +385,7 @@ store_urb_bulk_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
  * Sometimes, direction in TransferFlags of _URB_BULK_OR_INTERRUPT_TRANSFER is not consistent 
   * with PipeHandle. Use a direction flag in pipe handle.
  */
-static NTSTATUS store_urb_bulk(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS urb_bulk_or_interrupt_transfer(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -495,7 +493,7 @@ store_urb_iso_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS store_urb_iso(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS urb_isoch_transfer(PIRP irp, PURB urb, struct urb_req *urbr)
 {
 	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
 
@@ -553,7 +551,7 @@ static NTSTATUS store_urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, P
 }
 
 static NTSTATUS
-store_urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
+urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -616,7 +614,7 @@ store_urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 }
 
 static NTSTATUS
-store_urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
+urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -652,6 +650,100 @@ store_urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
 	return STATUS_SUCCESS;
 }
 
+typedef NTSTATUS (*urb_function_t)(IRP *irp, URB *urb, struct urb_req*);
+
+static const urb_function_t urb_functions[] =
+{
+	urb_select_configuration,
+	urb_select_interface,
+	NULL, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
+
+	NULL, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
+	NULL, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
+
+	NULL, // URB_FUNCTION_GET_FRAME_LENGTH
+	NULL, // URB_FUNCTION_SET_FRAME_LENGTH
+	NULL, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
+
+	urb_control_transfer,
+	urb_bulk_or_interrupt_transfer,
+	urb_isoch_transfer,
+
+	get_descriptor_from_device, // urb_control_descriptor_request
+	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE, urb_control_descriptor_request
+
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, urb_control_feature_request
+
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE, urb_control_feature_request
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
+
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
+
+	NULL, // URB_FUNCTION_RESERVED_0X0016          
+
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_DEVICE
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_INTERFACE
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_ENDPOINT
+
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_DEVICE 
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_INTERFACE
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_ENDPOINT
+
+	NULL, // URB_FUNCTION_RESERVE_0X001D
+
+	sync_reset_pipe_and_clear_stall, // urb_pipe_request
+
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_OTHER
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_OTHER
+
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
+
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
+
+	NULL, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT, urb_control_descriptor_request
+	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT, urb_control_descriptor_request
+
+	NULL, // URB_FUNCTION_GET_CONFIGURATION
+	NULL, // URB_FUNCTION_GET_INTERFACE
+
+	get_descriptor_from_interface, // urb_control_descriptor_request
+	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE, urb_control_descriptor_request
+
+	NULL, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+
+	NULL, // URB_FUNCTION_RESERVE_0X002B
+	NULL, // URB_FUNCTION_RESERVE_0X002C
+	NULL, // URB_FUNCTION_RESERVE_0X002D
+	NULL, // URB_FUNCTION_RESERVE_0X002E
+	NULL, // URB_FUNCTION_RESERVE_0X002F
+
+	NULL, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
+	NULL, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
+	urb_control_transfer_ex,
+/*
+	NULL, // URB_FUNCTION_RESERVE_0X0033
+	NULL, // URB_FUNCTION_RESERVE_0X0034                  
+
+	NULL, // URB_FUNCTION_OPEN_STATIC_STREAMS
+	NULL, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
+	NULL, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	NULL, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
+
+	NULL, // 0x0039
+	NULL, // 0x003A        
+	NULL, // 0x003B        
+	NULL, // 0x003C        
+
+	NULL // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
+*/
+};
+
 static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 {
 	URB *urb = URB_FROM_IRP(urbr->irp);
@@ -661,65 +753,22 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	USHORT code_func = urb->UrbHeader.Function;
+	USHORT func = urb->UrbHeader.Function;
 
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(code_func), dbg_urbr(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(func), dbg_urbr(buf, sizeof(buf), urbr));
 	}
 
-	NTSTATUS status = STATUS_INVALID_PARAMETER;
-
-	switch (code_func) {
-	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = store_urb_iso(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = store_urb_bulk(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
-		status = store_urb_get_dev_desc(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
-		status = store_urb_get_intf_desc(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
-	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
-	case URB_FUNCTION_GET_STATUS_FROM_ENDPOINT:
-	case URB_FUNCTION_GET_STATUS_FROM_OTHER:
-		status = store_urb_get_status(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_CLASS_DEVICE:
-	case URB_FUNCTION_CLASS_INTERFACE:
-	case URB_FUNCTION_CLASS_ENDPOINT:
-	case URB_FUNCTION_CLASS_OTHER:
-	case URB_FUNCTION_VENDOR_DEVICE:
-	case URB_FUNCTION_VENDOR_INTERFACE:
-	case URB_FUNCTION_VENDOR_ENDPOINT:
-	case URB_FUNCTION_VENDOR_OTHER:
-		status = store_urb_class_vendor(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_SELECT_CONFIGURATION:
-		status = store_urb_select_config(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_SELECT_INTERFACE:
-		status = store_urb_select_interface(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
-		status = store_urb_reset_pipe(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER:
-		status = store_urb_control_transfer(irp, urb, urbr);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		status = store_urb_control_transfer_ex(irp, urb, urbr);
-		break;
-	default:
-		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "%s: unhandled", urb_function_str(code_func));
+	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
+	if (pfunc) {
+		return pfunc(irp, urb, urbr);
 	}
 
-	return status;
+	TraceError(TRACE_READ, "Unhandled %s(%#04x)", urb_function_str(func), func);
+
+	irp->IoStatus.Information = 0;
+	return STATUS_INVALID_PARAMETER;
 }
 
 static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
@@ -793,7 +842,7 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 		return store_cancelled_urbr(irp, urbr);
 	}
 
-	NTSTATUS status = STATUS_SUCCESS;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
@@ -811,8 +860,6 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 	default:
 		TraceWarning(TRACE_READ, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 		irp->IoStatus.Information = 0;
-		status = STATUS_INVALID_PARAMETER;
-		break;
 	}
 
 	return status;
