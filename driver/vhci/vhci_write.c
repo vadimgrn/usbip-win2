@@ -234,7 +234,7 @@ static NTSTATUS store_urb_iso(URB *urb, const struct usbip_header *hdr)
 static NTSTATUS
 store_urb_data(PURB urb, const struct usbip_header *hdr)
 {
-	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	NTSTATUS status = STATUS_SUCCESS;
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ISOCH_TRANSFER:
@@ -270,16 +270,12 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 		status = store_urb_vendor_or_class(urb, hdr);
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
-		status = STATUS_SUCCESS;
-		break;
 	case URB_FUNCTION_SELECT_INTERFACE:
-		status = STATUS_SUCCESS;
-		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
-		status = STATUS_SUCCESS;
 		break;
 	default:
 		TraceError(TRACE_WRITE, "%s: not supported", urb_function_str(urb->UrbHeader.Function));
+		status = STATUS_INVALID_PARAMETER;
 	}
 
 	if (status == STATUS_SUCCESS) { // FIXME: ???
