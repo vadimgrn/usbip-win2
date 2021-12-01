@@ -12,7 +12,13 @@ const NTSTATUS STATUS_SUBMIT_URBR_IRP = -1L;
 
 enum { USBD_INTERFACE_STR_BUFSZ = 1024 };
 
-static const char *usbd_interface_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt)
+__inline USBD_INTERFACE_INFORMATION *next_interface(const USBD_INTERFACE_INFORMATION *iface)
+{
+	void *next = (char*)iface + iface->Length;
+	return next;
+}
+
+static const char *usbd_interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt)
 {
 	NTSTATUS st = STATUS_SUCCESS;
 
@@ -49,7 +55,7 @@ static const char *usbd_interface_str(char *buf, size_t len, const USBD_INTERFAC
 				p->PipeFlags);
 		}
 
-		r = (const USBD_INTERFACE_INFORMATION*)((char*)r + r->Length);
+		r = next_interface(r);
 	}
 
 	return buf && *buf ? buf : "usbd_interface_str error"; 
@@ -82,7 +88,7 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
 	// remove all URBRs of the aborted pipe
-	for (LIST_ENTRY *le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr;) {
+	for (LIST_ENTRY *le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr; ) {
 		struct urb_req	*urbr_local = CONTAINING_RECORD(le, struct urb_req, list_all);
 		le = le->Flink;
 
@@ -96,7 +102,7 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 		}
 
 		if (urbr_local->irp) {
-			PIRP	irp = urbr_local->irp;
+			PIRP irp = urbr_local->irp;
 
 			KIRQL oldirql_cancel;
 			IoAcquireCancelSpinLock(&oldirql_cancel);
@@ -190,7 +196,7 @@ static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb)
 			cd->iConfiguration,
 			cd->bmAttributes,
 			cd->MaxPower,
-			usbd_interface_str(buf, sizeof(buf), &r->Interface, cd->bNumInterfaces));
+			usbd_interfaces_str(buf, sizeof(buf), &r->Interface, cd->bNumInterfaces));
 	} else {
 		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
 				(uintptr_t)r->ConfigurationHandle);
@@ -207,7 +213,7 @@ static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb)
 	char buf[USBD_INTERFACE_STR_BUFSZ];
 
 	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix%s", (uintptr_t)r->ConfigurationHandle, 
-			usbd_interface_str(buf, sizeof(buf), &r->Interface, 1));
+			usbd_interfaces_str(buf, sizeof(buf), &r->Interface, 1));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -430,13 +436,17 @@ static NTSTATUS process_irp_urb_req(vpdo_dev_t *vpdo, IRP *irp)
 	return STATUS_NOT_SUPPORTED;
 }
 
-static NTSTATUS
-setup_topology_address(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpStack)
+static NTSTATUS setup_topology_address(vpdo_dev_t *vpdo, USB_TOPOLOGY_ADDRESS *r)
 {
-	USB_TOPOLOGY_ADDRESS *r = irpStack->Parameters.Others.Argument1;
 	r->RootHubPortNumber = (USHORT)vpdo->port;
-
 	TraceVerbose(TRACE_IOCTL, "RootHubPortNumber %d", r->RootHubPortNumber);
+	return STATUS_SUCCESS;
+}
+
+static NTSTATUS usb_get_port_status(ULONG *status)
+{
+	*status = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
+	TraceVerbose(TRACE_IOCTL, "-> PORT_ENABLED|PORT_CONNECTED"); 
 	return STATUS_SUCCESS;
 }
 
@@ -468,13 +478,13 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = process_irp_urb_req(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
-		*(ULONG*)irpStack->Parameters.Others.Argument1 = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
+		status = usb_get_port_status(irpStack->Parameters.Others.Argument1);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		status = submit_urbr_irp(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
-		status = setup_topology_address(vpdo, irpStack);
+		status = setup_topology_address(vpdo, irpStack->Parameters.Others.Argument1);
 		break;
 	default:
 		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#010lX), irp %p", dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
