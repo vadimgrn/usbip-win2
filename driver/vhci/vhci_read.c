@@ -229,7 +229,7 @@ static NTSTATUS get_descriptor_from_interface(PIRP irp, PURB urb, struct urb_req
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS store_urb_class_vendor_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *urb_vc = &urb->UrbControlVendorClassRequest;
 
@@ -361,8 +361,7 @@ urb_select_interface(PIRP irp, PURB urb, struct urb_req *urbr)
 	return  STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urb_bulk_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER	*urb_bi = &urb->UrbBulkOrInterruptTransfer;
 	PVOID	dst, src;
@@ -473,8 +472,7 @@ get_iso_payload_len(struct _URB_ISOCH_TRANSFER *urb_iso)
 	return len_iso;
 }
 
-static NTSTATUS
-store_urb_iso_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS urb_isoch_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
 	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
 	ULONG	len_iso;
@@ -529,7 +527,7 @@ static NTSTATUS urb_isoch_transfer(PIRP irp, PURB urb, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS store_urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
 	struct _URB_CONTROL_TRANSFER *urb_ctltrans = &urb->UrbControlTransfer;
 
@@ -588,8 +586,7 @@ urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
 	struct _URB_CONTROL_TRANSFER_EX	*urb_control_ex = &urb->UrbControlTransferEx;
 	PVOID	dst;
@@ -779,16 +776,20 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 	}
 
 	URB *urb = URB_FROM_IRP(urbr->irp);
-
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
-	USHORT code_func = urb->UrbHeader.Function;
 
-	switch (code_func) {
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = store_urb_bulk_partial(urbr->vpdo, irp, urb);
-		break;
+	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = store_urb_iso_partial(urbr->vpdo, irp, urb);
+		status = urb_isoch_transfer_partial(urbr->vpdo, irp, urb);
+		break;
+	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
+		status = urb_bulk_or_interrupt_transfer_partial(urbr->vpdo, irp, urb);
+		break;
+	case URB_FUNCTION_CONTROL_TRANSFER:
+		status = urb_control_transfer_partial(urbr->vpdo, irp, urb);
+		break;
+	case URB_FUNCTION_CONTROL_TRANSFER_EX:
+		status = urb_control_transfer_ex_partial(urbr->vpdo, irp, urb);
 		break;
 	case URB_FUNCTION_CLASS_DEVICE:
 	case URB_FUNCTION_CLASS_INTERFACE:
@@ -797,17 +798,12 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 	case URB_FUNCTION_VENDOR_DEVICE:
 	case URB_FUNCTION_VENDOR_INTERFACE:
 	case URB_FUNCTION_VENDOR_ENDPOINT:
-		status = store_urb_class_vendor_partial(urbr->vpdo, irp, urb);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER:
-		status = store_urb_control_transfer_partial(urbr->vpdo, irp, urb);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		status = store_urb_control_transfer_ex_partial(urbr->vpdo, irp, urb);
+	case URB_FUNCTION_VENDOR_OTHER:
+		status = urb_control_vendor_class_request_partial(urbr->vpdo, irp, urb);
 		break;
 	default:
 		irp->IoStatus.Information = 0;
-		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(code_func));
+		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(urb->UrbHeader.Function));
 	}
 
 	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);
