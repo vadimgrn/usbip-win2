@@ -16,7 +16,7 @@ const char *bmrequest_recipient_str(BM_REQUEST_TYPE r);
 const char *brequest_str(UCHAR bRequest);
 
 const char *dbg_usbd_status(USBD_STATUS status);
-const char *dbg_ioctl_code(int ioctl_code);
+const char *dbg_ioctl_code(ULONG ioctl_code);
 
 const char *usbd_pipe_type_str(USBD_PIPE_TYPE t);
 const char *urb_function_str(int function);
