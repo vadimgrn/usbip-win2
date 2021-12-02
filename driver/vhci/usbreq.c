@@ -31,7 +31,7 @@ USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR
 	return setup;
 }
 
-struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, struct usbip_header *hdr)
+struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 {
 	struct urb_req *result = NULL;
 
@@ -40,7 +40,7 @@ struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, struct usbip_header *hdr)
 
 	for (LIST_ENTRY *le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
 		struct urb_req *urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
-		if (urbr->seq_num == hdr->base.seqnum) {
+		if (urbr->seq_num == seqnum) {
 			RemoveEntryListInit(&urbr->list_all);
 			RemoveEntryListInit(&urbr->list_state);
 			result = urbr;

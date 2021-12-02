@@ -27,7 +27,7 @@ void free_urbr(struct urb_req *urbr);
 
 bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle);
 
-struct urb_req *find_sent_urbr(pvpdo_dev_t vpdo, struct usbip_header *hdr);
+struct urb_req *find_sent_urbr(pvpdo_dev_t vpdo, unsigned long seqnum);
 struct urb_req *find_pending_urbr(pvpdo_dev_t vpdo);
 
 enum { DBG_URBR_BUFSZ = 64 };

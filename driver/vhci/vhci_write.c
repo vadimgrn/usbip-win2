@@ -423,13 +423,13 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
 	if (!hdr) {
-		TraceError(TRACE_WRITE, "too small");
+		TraceError(TRACE_WRITE, "usbip header expected");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	struct urb_req *urbr = find_sent_urbr(vpdo, hdr);
+	struct urb_req *urbr = find_sent_urbr(vpdo, hdr->base.seqnum);
 	if (!urbr) { // might have been cancelled before, so return STATUS_SUCCESS
-		TraceError(TRACE_WRITE, "no urbr: seqnum: %d", hdr->base.seqnum);
+		TraceError(TRACE_WRITE, "urb_req not found, seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
@@ -469,6 +469,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 			irp->IoStatus.Information = 0;
 			status = process_write_irp(vpdo, irp);
 		} else {
+			TraceVerbose(TRACE_WRITE, "null or unplugged");
 			status = STATUS_INVALID_DEVICE_REQUEST;
 		}
 	}
