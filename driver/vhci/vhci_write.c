@@ -285,8 +285,7 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 	return status;
 }
 
-static NTSTATUS
-process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hdr)
+static NTSTATUS internal_usb_submit_urb(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hdr)
 {
 	if (!urb) {
 		return STATUS_INVALID_PARAMETER;
@@ -325,31 +324,40 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 	return status;
 }
 
-static NTSTATUS
-process_urb_dsc_req(struct urb_req *urbr, const struct usbip_header *hdr)
+static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const struct usbip_header *hdr)
 {
-	if (hdr->u.ret_submit.status) {
-		USBD_STATUS st = to_windows_status(hdr->u.ret_submit.status);
-		TraceError(TRACE_WRITE, "%s(%#08lX)", dbg_usbd_status(st), (ULONG)st);
+	int linux_status = hdr->u.ret_submit.status;
+	if (linux_status) {
+		USBD_STATUS st = to_windows_status(linux_status);
+		TraceError(TRACE_WRITE, "errno %d -> %s(%#08lX)", linux_status, dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	IRP *irp = urbr->irp;
         IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-        ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
-        ULONG sz = hdr->u.ret_submit.actual_length + sizeof(USB_DESCRIPTOR_REQUEST);
+	USB_DESCRIPTOR_REQUEST *req = NULL;
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	ULONG sz = actual_length + sizeof(*req);
         irp->IoStatus.Information = sz;
-	
-        if (outlen >= sz) {
-                USB_DESCRIPTOR_REQUEST* dsc_req = urbr->irp->AssociatedIrp.SystemBuffer;
-                RtlCopyMemory(dsc_req->Data, hdr + 1, hdr->u.ret_submit.actual_length);
-                irp->IoStatus.Status = STATUS_SUCCESS;
-        } else {
-                irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
+
+	ULONG OutputBufferLength = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+        if (sz > OutputBufferLength) {
+		TraceError(TRACE_WRITE, "%lu > OutputBufferLength %lu", sz, OutputBufferLength);
+		return irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
 	}
 
-	return irp->IoStatus.Status;
+	req = urbr->irp->AssociatedIrp.SystemBuffer;
+        RtlCopyMemory(req->Data, hdr + 1, actual_length);
+		
+	char buf[DBG_USB_SETUP_BUFBZ];
+	TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, SetupPacket %s, Data %!BIN!", 
+				req->ConnectionIndex, 
+				dbg_usb_setup_packet(buf, sizeof(buf), &req->SetupPacket),
+				WppBinary(req->Data, (USHORT)actual_length));
+
+        return irp->IoStatus.Status = STATUS_SUCCESS;
 }
 
 static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
@@ -365,10 +373,10 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = process_urb_res_submit(urbr->vpdo, URB_FROM_IRP(urbr->irp), hdr);
+		st = internal_usb_submit_urb(urbr->vpdo, URB_FROM_IRP(urbr->irp), hdr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		st = process_urb_dsc_req(urbr, hdr);
+		st = get_descriptor_from_node_connection(urbr, hdr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		st = STATUS_SUCCESS;
@@ -429,7 +437,7 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 
 	struct urb_req *urbr = find_sent_urbr(vpdo, hdr->base.seqnum);
 	if (!urbr) { // might have been cancelled before, so return STATUS_SUCCESS
-		TraceError(TRACE_WRITE, "urb_req not found, seqnum %u", hdr->base.seqnum);
+		TraceInfo(TRACE_WRITE, "urb_req not found, seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
