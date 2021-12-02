@@ -116,8 +116,7 @@ vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code,
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
-		break;
+		TraceError(TRACE_IOCTL, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return status;

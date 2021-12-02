@@ -18,8 +18,8 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "%!vdev_type_t!: enter irp %p, irql %!irql!, %s(%#010lX)", 
-		vdev->type, irp, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceVerbose(TRACE_IOCTL, "%!vdev_type_t!: enter irp %p, irql %!irql!, %s(%#08lX)", 
+			vdev->type, irp, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	if (vdev->DevicePnPState == Deleted) {
 		status = STATUS_NO_SUCH_DEVICE;

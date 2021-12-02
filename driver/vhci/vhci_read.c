@@ -854,7 +854,7 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 		status = store_urb_dsc_req(irp, urbr);
 		break;
 	default:
-		TraceWarning(TRACE_READ, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceWarning(TRACE_READ, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 		irp->IoStatus.Information = 0;
 	}
 
@@ -965,9 +965,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	PAGED_CODE();
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-
-	TraceInfo(TRACE_READ, "Enter irp %p, irql %!irql!, len %lu", 
-		irp, KeGetCurrentIrql(), irpstack->Parameters.Read.Length);
+	TraceVerbose(TRACE_READ, "Enter irp %p, irql %!irql!, len %lu", irp, KeGetCurrentIrql(), irpstack->Parameters.Read.Length);
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {

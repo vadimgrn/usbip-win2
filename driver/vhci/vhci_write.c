@@ -299,7 +299,7 @@ process_urb_res_submit(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hd
 		}
 
 		USBD_STATUS st = urb->UrbHeader.Status;
-		TraceError(TRACE_WRITE, "%s: %s(%#010lX)", urb_function_str(urb->UrbHeader.Function), dbg_usbd_status(st), (ULONG)st);
+		TraceError(TRACE_WRITE, "%s: %s(%#08lX)", urb_function_str(urb->UrbHeader.Function), dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -330,7 +330,7 @@ process_urb_dsc_req(struct urb_req *urbr, const struct usbip_header *hdr)
 {
 	if (hdr->u.ret_submit.status) {
 		USBD_STATUS st = to_windows_status(hdr->u.ret_submit.status);
-		TraceError(TRACE_WRITE, "%s(%#010lX)", dbg_usbd_status(st), (ULONG)st);
+		TraceError(TRACE_WRITE, "%s(%#08lX)", dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -363,7 +363,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 
 	{
 		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#010lX)", dbg_urbr(buf, sizeof(buf), urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#08lX)", dbg_urbr(buf, sizeof(buf), urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
@@ -376,7 +376,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		st = process_urb_dsc_req(urbr, hdr);
 	default:
-		TraceError(TRACE_WRITE, "unhandled %s(%#010lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceError(TRACE_WRITE, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return st;
@@ -449,14 +449,13 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
-	PIO_STACK_LOCATION irpstack = IoGetCurrentIrpStackLocation(irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_WRITE, "Enter irp %p, irql %!irql!, len %lu", 
-		irp, KeGetCurrentIrql(), irpstack->Parameters.Write.Length);
+	TraceVerbose(TRACE_WRITE, "irql %!irql!, Length %lu", KeGetCurrentIrql(), irpstack->Parameters.Write.Length);
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
-		TraceError(TRACE_WRITE, "write for non-vhci is not allowed");
+		TraceWarning(TRACE_WRITE, "write for non-vhci is not allowed");
 		return irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
@@ -474,6 +473,5 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		}
 	}
 
-	TraceInfo(TRACE_WRITE, "Leave irp %p, %!STATUS!", irp, status);
 	return irp_done(irp, status);
 }

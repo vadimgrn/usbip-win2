@@ -103,9 +103,8 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: irql %!irql!, %!powermn!", 
-		vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
-
+	TraceVerbose(TRACE_POWER, "%!vdev_type_t!: irql %!irql!, %!powermn!", 
+			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	if (vdev->DevicePnPState == Deleted) {
 		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);

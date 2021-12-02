@@ -226,7 +226,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	// Initialize the Std device data structure
 	vhci->StdUSBIPBusData.ErrorCount = 0;
 
-	TraceInfo(TRACE_GENERAL, "irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
+	TraceVerbose(TRACE_GENERAL, "irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
 	return status;
 }
 

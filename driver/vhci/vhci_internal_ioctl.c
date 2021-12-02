@@ -78,7 +78,7 @@ static NTSTATUS submit_urbr_irp(vpdo_dev_t* vpdo, IRP* irp)
 
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
-	TraceInfo(TRACE_IOCTL, "PipeHandle %#Ix", (uintptr_t)hPipe);
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix", (uintptr_t)hPipe);
 
 	if (!hPipe) {
 		return STATUS_INVALID_PARAMETER;
@@ -455,8 +455,8 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "irp %p, irql %!irql!, %s(%#08lX)", 
-		Irp, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceVerbose(TRACE_IOCTL, "%s(%#08lX), irql %!irql!", 
+			dbg_ioctl_code(ioctl_code), ioctl_code, KeGetCurrentIrql());
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -466,11 +466,11 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	if (!vpdo->plugged) {
 		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
-		TraceInfo(TRACE_IOCTL, "%!STATUS!", st);
+		TraceVerbose(TRACE_IOCTL, "%!STATUS!", st);
 		return irp_done(Irp, st);
 	}
 
-	NTSTATUS status = STATUS_SUCCESS;
+	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
@@ -486,8 +486,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack->Parameters.Others.Argument1);
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#08lX), irp %p", dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
-		status = STATUS_NOT_SUPPORTED;
+		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	if (status != STATUS_PENDING) {
@@ -495,6 +494,5 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		irp_done(Irp, status);
 	}
 
-	TraceInfo(TRACE_IOCTL, "irp %p -> %!STATUS!", Irp, status);
 	return status;
 }
