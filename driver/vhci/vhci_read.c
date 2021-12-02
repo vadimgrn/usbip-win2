@@ -969,9 +969,8 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	TraceInfo(TRACE_READ, "Enter irp %p, irql %!irql!, len %lu", 
 		irp, KeGetCurrentIrql(), irpstack->Parameters.Read.Length);
 
-	vhci_dev_t *vhci = devobj_to_vhci(devobj);
-
-	if (vhci->common.type != VDEV_VHCI) {
+	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
+	if (!vhci) {
 		TraceError(TRACE_READ, "read for non-vhci is not allowed");
 		return  irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}

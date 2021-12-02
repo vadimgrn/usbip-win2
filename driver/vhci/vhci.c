@@ -65,7 +65,6 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	vdev_t *vdev = devobj_to_vdev(devobj);
 
-	// Check to see whether the bus is removed
 	if (vdev->DevicePnPState == Deleted) {
 		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
@@ -108,7 +107,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	if (vdev->type == VDEV_VHCI) {
-		cleanup_vpdo(devobj_to_vhci(devobj), irp);
+		cleanup_vpdo((vhci_dev_t*)vdev, irp);
 	}
 
 	irp->IoStatus.Information = 0;

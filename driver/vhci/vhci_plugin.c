@@ -113,7 +113,7 @@ vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	pvpdo_dev_t vpdo = devobj_to_vpdo(devobj);
+	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
 	vpdo->common.parent = &vhub_from_vhci(vhci)->common;
 
 	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);

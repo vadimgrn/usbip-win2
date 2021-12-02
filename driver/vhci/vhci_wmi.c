@@ -37,9 +37,9 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	TraceInfo(TRACE_WMI, "Enter");
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	vhci_dev_t *vhci = devobj_to_vhci(devobj);
 
-	if (vhci->common.type != VDEV_VHCI) {
+	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
+	if (!vhci) {
 		// The vpdo, just complete the request with the current status
 		TraceInfo(TRACE_WMI, "skip %!sysctrl!", irpstack->MinorFunction);
 		return irp_done_iostatus(irp);
@@ -157,22 +157,21 @@ vhci_QueryWmiDataBlock(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG Gui
 	__in ULONG InstanceIndex, __in ULONG InstanceCount, __inout PULONG InstanceLengthArray,
 	__in ULONG OutBufferSize, __out_bcount(OutBufferSize) PUCHAR Buffer)
 {
-	pvhci_dev_t	vhci = devobj_to_vhci(devobj);
-	ULONG		size = 0;
-	NTSTATUS	status;
-
 	UNREFERENCED_PARAMETER(InstanceIndex);
 	UNREFERENCED_PARAMETER(InstanceCount);
 
 	PAGED_CODE();
 
+	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
+	ULONG		size = 0;
+	NTSTATUS	status;
+
 	// Only ever registers 1 instance per guid
-	NT_ASSERT((InstanceIndex == 0) && (InstanceCount == 1));
+	NT_ASSERT(!InstanceIndex && InstanceCount == 1);
 
 	switch (GuidIndex) {
 	case WMI_USBIP_BUS_DRIVER_INFORMATION:
 		size = sizeof (USBIP_BUS_WMI_STD_DATA);
-
 		if (OutBufferSize < size) {
 			status = STATUS_BUFFER_TOO_SMALL;
 			break;
@@ -181,14 +180,12 @@ vhci_QueryWmiDataBlock(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG Gui
 		*(PUSBIP_BUS_WMI_STD_DATA)Buffer = vhci->StdUSBIPBusData;
 		*InstanceLengthArray = size;
 		status = STATUS_SUCCESS;
-
 		break;
 	default:
 		status = STATUS_WMI_GUID_NOT_FOUND;
 	}
 
 	status = WmiCompleteRequest(devobj, irp, status, size, IO_NO_INCREMENT);
-
 	return status;
 }
 
@@ -196,15 +193,15 @@ static NTSTATUS
 vhci_QueryWmiRegInfo(__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PUNICODE_STRING InstanceName,
 	__out PUNICODE_STRING *RegistryPath, __out PUNICODE_STRING MofResourceName, __out PDEVICE_OBJECT *Pdo)
 {
-	pvhci_dev_t	vhci = devobj_to_vhci(devobj);
+	UNREFERENCED_PARAMETER(InstanceName);
 
 	PAGED_CODE();
 
-	UNREFERENCED_PARAMETER(InstanceName);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	*RegFlags = WMIREG_FLAG_INSTANCE_PDO;
 	*RegistryPath = &Globals.RegistryPath;
-	*Pdo = vhci->common.pdo;
+	*Pdo = vdev->pdo;
 	RtlInitUnicodeString(MofResourceName, MOFRESOURCENAME);
 
 	return STATUS_SUCCESS;

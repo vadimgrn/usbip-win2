@@ -134,10 +134,9 @@ static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 	}
 }
 
-static PAGEABLE void
-remove_device(pvdev_t vdev)
+static PAGEABLE void remove_device(vdev_t *vdev)
 {
-	if (vdev->child_pdo != NULL) {
+	if (vdev->child_pdo) {
 		vdev->child_pdo->parent = NULL;
 		if (vdev->child_pdo->fdo)
 			vdev->child_pdo->fdo->parent = NULL;
@@ -151,20 +150,18 @@ remove_device(pvdev_t vdev)
 
 	switch (vdev->type) {
 	case VDEV_VHCI:
-		invalidate_vhci((pvhci_dev_t)vdev);
+		invalidate_vhci((vhci_dev_t*)vdev);
 		break;
 	case VDEV_VHUB:
-		invalidate_vhub((pvhub_dev_t)vdev);
+		invalidate_vhub((vhub_dev_t*)vdev);
 		break;
 	case VDEV_VPDO:
-		invalidate_vpdo((pvpdo_dev_t)vdev);
-		break;
-	default:
+		invalidate_vpdo((vpdo_dev_t*)vdev);
 		break;
 	}
 
 	// Detach from the underlying devices.
-	if (vdev->devobj_lower != NULL) {
+	if (vdev->devobj_lower) {
 		IoDetachDevice(vdev->devobj_lower);
 		vdev->devobj_lower = NULL;
 	}

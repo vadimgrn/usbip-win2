@@ -48,20 +48,20 @@ static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t 
 static PAGEABLE pvdev_t
 create_child_pdo(pvdev_t vdev, vdev_type_t type)
 {
-	pvdev_t	vdev_child;
-	PDEVICE_OBJECT	devobj;
-
 	PAGED_CODE();
 
 	TraceInfo(TRACE_VHUB, "creating child %!vdev_type_t!", type);
 
-	if ((devobj = vdev_create(vdev->Self->DriverObject, type)) == NULL)
+	DEVICE_OBJECT *devobj = vdev_create(vdev->Self->DriverObject, type);
+	if (!devobj) {
 		return NULL;
+	}
 
 	devobj->Flags &= ~DO_DEVICE_INITIALIZING;
 
-	vdev_child = devobj_to_vdev(devobj);
+	vdev_t *vdev_child = devobj_to_vdev(devobj);
 	vdev_child->parent = vdev;
+
 	return vdev_child;
 }
 
@@ -103,21 +103,18 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 {
 	PAGED_CODE();
 
-	PDEVICE_OBJECT	devobj;
-	pvdev_t		vdev;
-
 	TraceInfo(TRACE_PNP, "adding %!vdev_type_t!: pdo: %p", type, pdo);
 
-	devobj = vdev_create(drvobj, type);
-	if (devobj == NULL)
+	DEVICE_OBJECT *devobj = vdev_create(drvobj, type);
+	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
+	}
 
-	vdev = devobj_to_vdev(devobj);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 	vdev->pdo = pdo;
 
 	if (type != VDEV_ROOT) {
-		pvdev_t	vdev_pdo = devobj_to_vdev(vdev->pdo);
-
+		vdev_t *vdev_pdo = devobj_to_vdev(vdev->pdo);
 		vdev->parent = vdev_pdo->parent;
 		vdev_pdo->fdo = vdev;
 	}
@@ -141,8 +138,6 @@ add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 		break;
 	case VDEV_VHUB:
 		init_dev_vhub(vdev);
-		break;
-	default:
 		break;
 	}
 

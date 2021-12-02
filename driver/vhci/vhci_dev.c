@@ -53,7 +53,6 @@ get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
 PAGEABLE PDEVICE_OBJECT
 vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 {
-	pvdev_t	vdev;
 	PDEVICE_OBJECT	devobj;
 	ULONG	extsize = ext_sizes_per_devtype[type];
 	NTSTATUS	status;
@@ -77,7 +76,7 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 		return NULL;
 	}
 
-	vdev = devobj_to_vdev(devobj);
+	vdev_t *vdev = devobj_to_vdev(devobj);
 	RtlZeroMemory(vdev, extsize);
 
 	vdev->DevicePnPState = NotStarted;
@@ -94,14 +93,37 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 	return devobj;
 }
 
-void
-vdev_add_ref(pvdev_t vdev)
-{
-	InterlockedIncrement(&vdev->n_refs);
+cpdo_dev_t *devobj_to_cpdo_or_null(DEVICE_OBJECT *devobj) 
+{ 
+	vdev_t *vdev = devobj_to_vdev(devobj);
+	NT_ASSERT(vdev);
+	return vdev->type == VDEV_CPDO ? (cpdo_dev_t*)vdev : NULL;
 }
 
-VOID
-vdev_del_ref(pvdev_t vdev)
-{
-	InterlockedDecrement(&vdev->n_refs);
+vhci_dev_t *devobj_to_vhci_or_null(DEVICE_OBJECT *devobj)
+{ 
+	vdev_t *vdev = devobj_to_vdev(devobj);
+	NT_ASSERT(vdev);
+	return vdev->type == VDEV_VHCI ? (vhci_dev_t*)vdev : NULL;
+}
+
+hpdo_dev_t *devobj_to_hpdo_or_null(DEVICE_OBJECT *devobj)
+{ 
+	vdev_t *vdev = devobj_to_vdev(devobj);
+	NT_ASSERT(vdev);
+	return vdev->type == VDEV_HPDO ? (hpdo_dev_t*)vdev : NULL;
+}
+
+vhub_dev_t *devobj_to_vhub_or_null(DEVICE_OBJECT *devobj)
+{ 
+	vdev_t *vdev = devobj_to_vdev(devobj);
+	NT_ASSERT(vdev);
+	return vdev->type == VDEV_VHUB ? (vhub_dev_t*)vdev : NULL;
+}
+
+vpdo_dev_t *devobj_to_vpdo_or_null(DEVICE_OBJECT *devobj)
+{ 
+	vdev_t *vdev = devobj_to_vdev(devobj);
+	NT_ASSERT(vdev);
+	return vdev->type == VDEV_VPDO ? (vpdo_dev_t*)vdev : NULL;
 }

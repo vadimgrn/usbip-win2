@@ -455,12 +455,11 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceInfo(TRACE_IOCTL, "irp %p, irql %!irql!, %s(%#010lX)", 
+	TraceInfo(TRACE_IOCTL, "irp %p, irql %!irql!, %s(%#08lX)", 
 		Irp, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
-	vpdo_dev_t *vpdo = devobj_to_vpdo(devobj);
-
-	if (vpdo->common.type != VDEV_VPDO) {
+	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
+	if (!vpdo) {
 		TraceWarning(TRACE_IOCTL, "internal ioctl only for vpdo is allowed");
 		return irp_done(Irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
@@ -487,7 +486,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = setup_topology_address(vpdo, irpStack->Parameters.Others.Argument1);
 		break;
 	default:
-		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#010lX), irp %p", dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
+		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#08lX), irp %p", dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
 		status = STATUS_NOT_SUPPORTED;
 	}
 
