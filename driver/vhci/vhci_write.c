@@ -12,7 +12,7 @@
 #include "usbd_helper.h"
 #include "vhci_irp.h"
 
-static bool save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descriptor *iso_desc)
+static bool save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, const struct usbip_iso_packet_descriptor *iso_desc)
 {
 	for (ULONG i = 0; i < urb->NumberOfPackets; ++i, ++iso_desc) {
 
@@ -76,223 +76,307 @@ static void copy_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, 
 	}
 }
 
-void post_get_desc(vpdo_dev_t *vpdo, URB *urb)
+static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *req = &urb->UrbControlDescriptorRequest;
-
-	USB_COMMON_DESCRIPTOR *dsc = get_buf(req->TransferBuffer, req->TransferBufferMDL);
-	if (!dsc) {
-		return;
-	}
-
-	if (req->TransferBufferLength >= dsc->bLength) {
-		try_to_cache_descriptor(vpdo, req, dsc);
-	} else {
-		TraceInfo(TRACE_WRITE, "skip to cache partial descriptor: (%u < %d)", req->TransferBufferLength, (int)dsc->bLength);
-	}
-
-}
-
-static NTSTATUS post_select_config(vpdo_dev_t *vpdo, URB *urb)
-{
+	UNREFERENCED_PARAMETER(hdr);
 	return vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
-static NTSTATUS post_select_interface(vpdo_dev_t *vpdo, URB *urb)
+static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	struct _URB_SELECT_INTERFACE *urb_seli = &urb->UrbSelectInterface;
-	return vpdo_select_interface(vpdo, &urb_seli->Interface);
+	UNREFERENCED_PARAMETER(hdr);
+	struct _URB_SELECT_INTERFACE *r = &urb->UrbSelectInterface;
+	return vpdo_select_interface(vpdo, &r->Interface);
 }
 
-static NTSTATUS copy_to_transfer_buffer(PVOID buf_dst, PMDL bufMDL, int dst_len, const void *src, int src_len)
+static void *copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, const void *src, int src_len)
 {
-	if (dst_len < src_len) {
-		TraceError(TRACE_WRITE, "too small buffer: dest: %d, src: %d", dst_len, src_len);
-		return STATUS_INVALID_PARAMETER;
+	if (!(src_len >= 0 && dst_len >= (ULONG)src_len)) {
+		TraceError(TRACE_WRITE, "Buffer length check: dst_len %lu, src_len %d", dst_len, src_len);
+		return NULL;
 	}
 
 	void *buf = get_buf(buf_dst, bufMDL);
+
 	if (buf) {
 		RtlCopyMemory(buf, src, src_len);
-		return STATUS_SUCCESS;
+	} else {
+		TraceError(TRACE_WRITE, "Null destination buffers");
 	}
 
-	return STATUS_INVALID_PARAMETER;
+	return buf;
 }
 
-static NTSTATUS
-store_urb_get_desc(PURB urb, const struct usbip_header *hdr)
+static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_desc = &urb->UrbControlDescriptorRequest;
-	NTSTATUS	status;
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
+	int actual_length = hdr->u.ret_submit.actual_length;
+	
+	USB_COMMON_DESCRIPTOR *dsc = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, 
+						hdr + 1, actual_length);
 
-	status = copy_to_transfer_buffer(urb_desc->TransferBuffer, urb_desc->TransferBufferMDL,
-		urb_desc->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (status == STATUS_SUCCESS)
-		urb_desc->TransferBufferLength = hdr->u.ret_submit.actual_length;
-	return status;
-}
-
-static NTSTATUS
-store_urb_get_status(PURB urb, const struct usbip_header *hdr)
-{
-	struct _URB_CONTROL_GET_STATUS_REQUEST	*urb_gsr = &urb->UrbControlGetStatusRequest;
-	NTSTATUS	status;
-
-	status = copy_to_transfer_buffer(urb_gsr->TransferBuffer, urb_gsr->TransferBufferMDL,
-		urb_gsr->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (status == STATUS_SUCCESS)
-		urb_gsr->TransferBufferLength = hdr->u.ret_submit.actual_length;
-	return status;
-}
-
-static NTSTATUS
-store_urb_control_transfer(PURB urb, const struct usbip_header *hdr)
-{
-	struct _URB_CONTROL_TRANSFER	*urb_desc = &urb->UrbControlTransfer;
-	NTSTATUS	status;
-
-	if (urb_desc->TransferBufferLength == 0)
-		return STATUS_SUCCESS;
-	status = copy_to_transfer_buffer(urb_desc->TransferBuffer, urb_desc->TransferBufferMDL,
-		urb_desc->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (status == STATUS_SUCCESS)
-		urb_desc->TransferBufferLength = hdr->u.ret_submit.actual_length;
-	return status;
-}
-
-static NTSTATUS
-store_urb_control_transfer_ex(PURB urb, const struct usbip_header* hdr)
-{
-	struct _URB_CONTROL_TRANSFER_EX	*urb_desc = &urb->UrbControlTransferEx;
-	NTSTATUS	status;
-
-	status = copy_to_transfer_buffer(urb_desc->TransferBuffer, urb_desc->TransferBufferMDL,
-		urb_desc->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (status == STATUS_SUCCESS)
-		urb_desc->TransferBufferLength = hdr->u.ret_submit.actual_length;
-	return status;
-}
-
-static NTSTATUS
-store_urb_vendor_or_class(PURB urb, const struct usbip_header *hdr)
-{
-	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vendor_class = &urb->UrbControlVendorClassRequest;
-
-	if (IsTransferDirectionIn(urb_vendor_class->TransferFlags)) {
-		NTSTATUS	status;
-		status = copy_to_transfer_buffer(urb_vendor_class->TransferBuffer, urb_vendor_class->TransferBufferMDL,
-			urb_vendor_class->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-		if (status == STATUS_SUCCESS)
-			urb_vendor_class->TransferBufferLength = hdr->u.ret_submit.actual_length;
-		return status;
-	}
-	else {
-		urb_vendor_class->TransferBufferLength = hdr->u.ret_submit.actual_length;
-	}
-	return STATUS_SUCCESS;
-}
-
-static NTSTATUS store_urb_bulk_or_interrupt(URB *urb, const struct usbip_header *hdr)
-{
-	struct _URB_BULK_OR_INTERRUPT_TRANSFER *urb_bi = &urb->UrbBulkOrInterruptTransfer;
-
-	if (is_endpoint_direction_out(urb_bi->PipeHandle)) {
-		return STATUS_SUCCESS;
-	}
-
-	NTSTATUS status = copy_to_transfer_buffer(urb_bi->TransferBuffer, urb_bi->TransferBufferMDL,
-		urb_bi->TransferBufferLength, hdr + 1, hdr->u.ret_submit.actual_length);
-
-	if (status == STATUS_SUCCESS) {
-		urb_bi->TransferBufferLength = hdr->u.ret_submit.actual_length;
-	}
-
-	return status;
-}
-
-static NTSTATUS store_urb_iso(URB *urb, const struct usbip_header *hdr)
-{
-	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
-	INT32 in_len = is_endpoint_direction_in(urb_iso->PipeHandle) ? hdr->u.ret_submit.actual_length : 0;
-
-	struct usbip_iso_packet_descriptor *iso_desc = (struct usbip_iso_packet_descriptor *)((char *)(hdr + 1) + in_len);
-	if (!save_iso_desc(urb_iso, iso_desc)) {
+	if (!dsc) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	urb_iso->ErrorCount = hdr->u.ret_submit.error_count;
+	r->TransferBufferLength = actual_length;
 
-	void *buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
+	if (actual_length >= dsc->bLength) {
+		try_to_cache_descriptor(vpdo, r, dsc);
+	} else {
+		TraceWarning(TRACE_WRITE, "skip to cache partial descriptor: bLength(%d) > TransferBufferLength(%d)", 
+						dsc->bLength, actual_length);
+	}
+
+	return STATUS_SUCCESS;
+}
+
+static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+	}
+	
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
+
+	if (!r->TransferBufferLength) {
+		return STATUS_SUCCESS;
+	}
+	
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+	}
+	
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header* hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
+
+	if (!r->TransferBufferLength) {
+		return STATUS_SUCCESS;
+	}
+
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+	}
+	
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	if (IsTransferDirectionOut(r->TransferFlags)) {
+		r->TransferBufferLength = actual_length;
+		return STATUS_SUCCESS;
+	}
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
+
+	if (is_endpoint_direction_out(r->PipeHandle)) {
+		return STATUS_SUCCESS;
+	}
+
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	{
+		int in_len = is_endpoint_direction_in(r->PipeHandle) ? actual_length : 0;
+		struct usbip_iso_packet_descriptor *d = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + in_len);
+		if (!save_iso_desc(r, d)) {
+			return STATUS_INVALID_PARAMETER;
+		}
+	}
+
+	r->ErrorCount = hdr->u.ret_submit.error_count;
+
+	if (r->TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
+		r->StartFrame = hdr->u.ret_submit.start_frame;
+	}
+
+	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	copy_iso_data(buf, urb_iso->TransferBufferLength, (char *)(hdr + 1), hdr->u.ret_submit.actual_length, urb_iso);
-	urb_iso->TransferBufferLength = hdr->u.ret_submit.actual_length;
+	copy_iso_data(buf, r->TransferBufferLength, (char*)(hdr + 1), actual_length, r);
+	r->TransferBufferLength = actual_length;
 
 	return STATUS_SUCCESS;
 }
 
+static NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+	UNREFERENCED_PARAMETER(urb);
+	UNREFERENCED_PARAMETER(hdr);
+	return STATUS_SUCCESS;
+}
+
+typedef NTSTATUS (*urb_function_t)(vpdo_dev_t*, URB*, const struct usbip_header*);
+
+static const urb_function_t urb_functions[] =
+{
+	urb_select_configuration,
+	urb_select_interface,
+	NULL, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
+
+	NULL, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
+	NULL, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
+
+	NULL, // URB_FUNCTION_GET_FRAME_LENGTH
+	NULL, // URB_FUNCTION_SET_FRAME_LENGTH
+	NULL, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
+
+	urb_control_transfer,
+	urb_bulk_or_interrupt_transfer,
+	urb_isoch_transfer,
+
+	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
+	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE, urb_control_descriptor_request
+
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, urb_control_feature_request
+
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE, urb_control_feature_request
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
+
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
+
+	NULL, // URB_FUNCTION_RESERVED_0X0016          
+
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_DEVICE
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_INTERFACE
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_ENDPOINT
+
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_DEVICE 
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_INTERFACE
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_ENDPOINT
+
+	NULL, // URB_FUNCTION_RESERVE_0X001D
+
+	sync_reset_pipe_and_clear_stall, // urb_pipe_request
+
+	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_OTHER
+	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_OTHER
+
+	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
+
+	NULL, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
+	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
+
+	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
+	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT, urb_control_descriptor_request
+
+	NULL, // URB_FUNCTION_GET_CONFIGURATION
+	NULL, // URB_FUNCTION_GET_INTERFACE
+
+	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
+	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE, urb_control_descriptor_request
+
+	NULL, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+
+	NULL, // URB_FUNCTION_RESERVE_0X002B
+	NULL, // URB_FUNCTION_RESERVE_0X002C
+	NULL, // URB_FUNCTION_RESERVE_0X002D
+	NULL, // URB_FUNCTION_RESERVE_0X002E
+	NULL, // URB_FUNCTION_RESERVE_0X002F
+
+	NULL, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
+	NULL, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
+	urb_control_transfer_ex,
+/*
+	NULL, // URB_FUNCTION_RESERVE_0X0033
+	NULL, // URB_FUNCTION_RESERVE_0X0034                  
+
+	NULL, // URB_FUNCTION_OPEN_STATIC_STREAMS
+	NULL, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
+	NULL, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	NULL, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
+
+	NULL, // 0x0039
+	NULL, // 0x003A        
+	NULL, // 0x003B        
+	NULL, // 0x003C        
+
+	NULL // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
+*/
+};
+
 static NTSTATUS store_urb_data(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	USHORT func = urb->UrbHeader.Function;
+	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
 
-	switch (urb->UrbHeader.Function) {
-	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = store_urb_iso(urb, hdr);
-		break;
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = store_urb_bulk_or_interrupt(urb, hdr);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER:
-		status = store_urb_control_transfer(urb, hdr);
-		break;
-	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		status = store_urb_control_transfer_ex(urb, hdr);
-		break;
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT:
-		status = store_urb_get_desc(urb, hdr);
-		if (status == STATUS_SUCCESS) {
-			post_get_desc(vpdo, urb);
-		}
-		break;
-	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
-	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
-	case URB_FUNCTION_GET_STATUS_FROM_ENDPOINT:
-	case URB_FUNCTION_GET_STATUS_FROM_OTHER:
-		status = store_urb_get_status(urb, hdr);
-		break;
-	case URB_FUNCTION_CLASS_DEVICE:
-	case URB_FUNCTION_CLASS_INTERFACE:
-	case URB_FUNCTION_CLASS_ENDPOINT:
-	case URB_FUNCTION_CLASS_OTHER:
-	case URB_FUNCTION_VENDOR_DEVICE:
-	case URB_FUNCTION_VENDOR_INTERFACE:
-	case URB_FUNCTION_VENDOR_ENDPOINT:
-	case URB_FUNCTION_VENDOR_OTHER:
-		status = store_urb_vendor_or_class(urb, hdr);
-		break;
-	case URB_FUNCTION_SELECT_CONFIGURATION:
-		status = post_select_config(vpdo, urb);
-		break;
-	case URB_FUNCTION_SELECT_INTERFACE:
-		status = post_select_interface(vpdo, urb);
-		break;
-	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
-		status = STATUS_SUCCESS;
-		break;
-	default:
-		TraceError(TRACE_WRITE, "%s: not supported", urb_function_str(urb->UrbHeader.Function));
+	if (!pfunc) {
+		TraceVerbose(TRACE_WRITE, "Not handled %s(%#04x)", urb_function_str(func), func);
+		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (status == STATUS_SUCCESS) { // FIXME: ???
+	NTSTATUS st = pfunc(vpdo, urb, hdr);
+
+	if (st == STATUS_SUCCESS) {
 		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
 	}
 
-	return status;
+	return st;
 }
 
 static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
