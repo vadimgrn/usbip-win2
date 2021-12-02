@@ -361,22 +361,22 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "urbr:%s, %s(%#08lX)", dbg_urbr(buf, sizeof(buf), urbr), dbg_ioctl_code(ioctl_code), ioctl_code);
-	}
-
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
 		st = process_urb_res_submit(urbr->vpdo, URB_FROM_IRP(urbr->irp), hdr);
-	case IOCTL_INTERNAL_USB_RESET_PORT:
-		st = STATUS_SUCCESS;
+		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		st = process_urb_dsc_req(urbr, hdr);
+		break;
+	case IOCTL_INTERNAL_USB_RESET_PORT:
+		st = STATUS_SUCCESS;
+		break;
 	default:
-		TraceError(TRACE_WRITE, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		char buf[DBG_URBR_BUFSZ];
+		TraceWarning(TRACE_WRITE, "Unhandled %s(%#08lX), urbr %s", 
+			dbg_ioctl_code(ioctl_code), ioctl_code, dbg_urbr(buf, sizeof(buf), urbr));
 	}
 
 	return st;
