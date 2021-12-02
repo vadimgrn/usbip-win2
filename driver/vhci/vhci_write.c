@@ -12,22 +12,22 @@
 #include "usbd_helper.h"
 #include "vhci_irp.h"
 
-static BOOLEAN
-save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descriptor *iso_desc)
+static bool save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, struct usbip_iso_packet_descriptor *iso_desc)
 {
-	ULONG	i;
+	for (ULONG i = 0; i < urb->NumberOfPackets; ++i, ++iso_desc) {
 
-	for (i = 0; i < urb->NumberOfPackets; i++) {
 		if (iso_desc->offset > urb->IsoPacket[i].Offset) {
 			TraceWarning(TRACE_WRITE, "why offset changed?%d %d %d %d",
-			     i, iso_desc->offset, iso_desc->actual_length, urb->IsoPacket[i].Offset);
-			return FALSE;
+						i, iso_desc->offset, iso_desc->actual_length, urb->IsoPacket[i].Offset);
+				
+			return false;
 		}
+
 		urb->IsoPacket[i].Length = iso_desc->actual_length;
 		urb->IsoPacket[i].Status = to_windows_status(iso_desc->status);
-		iso_desc++;
 	}
-	return TRUE;
+
+	return true;
 }
 
 static void *get_buf(void *buf, MDL *bufMDL)
@@ -47,27 +47,30 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
-static void
-copy_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, struct _URB_ISOCH_TRANSFER *urb)
+static void copy_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, struct _URB_ISOCH_TRANSFER *urb)
 {
-	ULONG	i;
-	ULONG	offset = 0;
+	ULONG offset = 0;
 
-	for (i = 0; i < urb->NumberOfPackets; i++) {
-		if (urb->IsoPacket[i].Length == 0)
+	for (ULONG i = 0; i < urb->NumberOfPackets; ++i) {
+	
+		if (!urb->IsoPacket[i].Length) {
 			continue;
+		}
 
 		if (urb->IsoPacket[i].Offset + urb->IsoPacket[i].Length	> dest_len) {
 			TraceWarning(TRACE_WRITE, "Warning, why this?");
 			break;
 		}
+
 		if (offset + urb->IsoPacket[i].Length > src_len) {
 			TraceWarning(TRACE_WRITE, "Warning, why that?");
 			break;
 		}
+
 		RtlCopyMemory(dest + urb->IsoPacket[i].Offset, src + offset, urb->IsoPacket[i].Length);
 		offset += urb->IsoPacket[i].Length;
 	}
+
 	if (offset != src_len) {
 		TraceWarning(TRACE_WRITE, "why not equal offset:%d src_len:%d", offset, src_len);
 	}
@@ -231,10 +234,9 @@ static NTSTATUS store_urb_iso(URB *urb, const struct usbip_header *hdr)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-store_urb_data(PURB urb, const struct usbip_header *hdr)
+static NTSTATUS store_urb_data(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	NTSTATUS status = STATUS_SUCCESS;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ISOCH_TRANSFER:
@@ -249,9 +251,13 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 		status = store_urb_control_transfer_ex(urb, hdr);
 		break;
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
 	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
+	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
+	case URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT:
 		status = store_urb_get_desc(urb, hdr);
+		if (status == STATUS_SUCCESS) {
+			post_get_desc(vpdo, urb);
+		}
 		break;
 	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
 	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
@@ -270,12 +276,16 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 		status = store_urb_vendor_or_class(urb, hdr);
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
+		status = post_select_config(vpdo, urb);
+		break;
 	case URB_FUNCTION_SELECT_INTERFACE:
+		status = post_select_interface(vpdo, urb);
+		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
+		status = STATUS_SUCCESS;
 		break;
 	default:
 		TraceError(TRACE_WRITE, "%s: not supported", urb_function_str(urb->UrbHeader.Function));
-		status = STATUS_INVALID_PARAMETER;
 	}
 
 	if (status == STATUS_SUCCESS) { // FIXME: ???
@@ -285,43 +295,28 @@ store_urb_data(PURB urb, const struct usbip_header *hdr)
 	return status;
 }
 
-static NTSTATUS internal_usb_submit_urb(pvpdo_dev_t vpdo, PURB urb, const struct usbip_header *hdr)
+static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	if (!urb) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (hdr->u.ret_submit.status) {
-		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
-		if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
-			urb->UrbBulkOrInterruptTransfer.TransferBufferLength = hdr->u.ret_submit.actual_length;
-		}
-
-		USBD_STATUS st = urb->UrbHeader.Status;
-		TraceError(TRACE_WRITE, "%s: %s(%#08lX)", urb_function_str(urb->UrbHeader.Function), dbg_usbd_status(st), (ULONG)st);
-		return STATUS_UNSUCCESSFUL;
+	int linux_status = hdr->u.ret_submit.status;
+	if (!linux_status) {
+		return store_urb_data(vpdo, urb, hdr);
 	}
 
-	NTSTATUS status = store_urb_data(urb, hdr);
-	if (status != STATUS_SUCCESS) {
-		return status;
+	USBD_STATUS status = to_windows_status(linux_status);
+	urb->UrbHeader.Status = status;
+
+	if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
+		urb->UrbBulkOrInterruptTransfer.TransferBufferLength = hdr->u.ret_submit.actual_length;
 	}
 
-	switch (urb->UrbHeader.Function) {
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE:
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE:
-	case URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT:
-		post_get_desc(vpdo, urb);
-		break;
-	case URB_FUNCTION_SELECT_CONFIGURATION:
-		status = post_select_config(vpdo, urb);
-		break;
-	case URB_FUNCTION_SELECT_INTERFACE:
-		status = post_select_interface(vpdo, urb);
-		break;
-	}
+	TraceError(TRACE_WRITE, "%s: errno %d -> %s(%#08lX)", urb_function_str(urb->UrbHeader.Function), 
+				linux_status, dbg_usbd_status(status), (ULONG)status);
 
-	return status;
+	return STATUS_UNSUCCESSFUL;
 }
 
 static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const struct usbip_header *hdr)
