@@ -166,7 +166,7 @@ urb_control_get_status_request(PIRP irp, PURB urb, struct urb_req *urbr)
 	char		recip;
 
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
-	if (hdr == NULL) {
+	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
@@ -176,8 +176,8 @@ urb_control_get_status_request(PIRP irp, PURB urb, struct urb_req *urbr)
 	code_func = urb->UrbHeader.Function;
 	
 	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "urbr: %s, %s", dbg_urbr(buf, sizeof(buf), urbr), urb_function_str(code_func));
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(code_func), urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	switch (code_func) {
@@ -753,8 +753,8 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 	USHORT func = urb->UrbHeader.Function;
 
 	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(func), dbg_urbr(buf, sizeof(buf), urbr));
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(func), urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
@@ -771,8 +771,8 @@ static NTSTATUS store_urbr_submit(IRP *irp, struct urb_req *urbr)
 static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 {
 	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "Enter %s", dbg_urbr(buf, sizeof(buf), urbr));
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceInfo(TRACE_READ, "Enter %s", urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	URB *urb = URB_FROM_IRP(urbr->irp);
@@ -830,8 +830,8 @@ store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 {
 	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_READ, "urbr: %s", dbg_urbr(buf, sizeof(buf), urbr));
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceInfo(TRACE_READ, "%s", urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	if (!urbr->irp) {

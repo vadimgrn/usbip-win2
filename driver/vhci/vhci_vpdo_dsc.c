@@ -24,8 +24,8 @@ req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
 		if (NT_SUCCESS(status)) {
 			return STATUS_PENDING;
 		} else {
-			char buf[DBG_URBR_BUFSZ];
-			TraceInfo(TRACE_GENERAL, "failed to submit unlink urb: %s", dbg_urbr(buf, sizeof(buf), urbr));
+			char buf[URB_REQ_STR_BUFSZ];
+			TraceInfo(TRACE_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr));
 			free_urbr(urbr);
 			status = STATUS_UNSUCCESSFUL;
 		}

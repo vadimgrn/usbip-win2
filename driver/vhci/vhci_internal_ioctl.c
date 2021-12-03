@@ -97,8 +97,8 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 		}
 
 		{
-			char buf[DBG_URBR_BUFSZ];
-			TraceInfo(TRACE_IOCTL, "aborted urbr removed: %s", dbg_urbr(buf, sizeof(buf), urbr_local));
+			char buf[URB_REQ_STR_BUFSZ];
+			TraceInfo(TRACE_IOCTL, "aborted urbr removed %s", urb_req_str(buf, sizeof(buf), urbr_local));
 		}
 
 		if (urbr_local->irp) {

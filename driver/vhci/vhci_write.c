@@ -473,9 +473,9 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 		st = STATUS_SUCCESS;
 		break;
 	default:
-		char buf[DBG_URBR_BUFSZ];
-		TraceWarning(TRACE_WRITE, "Unhandled %s(%#08lX), urbr %s", 
-			dbg_ioctl_code(ioctl_code), ioctl_code, dbg_urbr(buf, sizeof(buf), urbr));
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceWarning(TRACE_WRITE, "Unhandled %s(%#08lX), %s", 
+			dbg_ioctl_code(ioctl_code), ioctl_code, urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	return st;

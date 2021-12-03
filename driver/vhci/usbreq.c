@@ -7,13 +7,13 @@
 #include "vhci_read.h"
 #include "vhci_irp.h"
 
-const char *dbg_urbr(char *buf, unsigned int len, const struct urb_req *urbr)
+const char *urb_req_str(char *buf, size_t len, const struct urb_req *urbr)
 {
 	if (!urbr) {
-		return "[null]";
+		return "urb_req{null}";
 	}
 
-	NTSTATUS st = RtlStringCbPrintfA(buf, len, "[irp %#p, seq_num %lu, seq_num_unlink %lu]", 
+	NTSTATUS st = RtlStringCbPrintfA(buf, len, "urb_req{irp %#p, seq_num %lu, seq_num_unlink %lu}", 
 							urbr->irp, urbr->seq_num, urbr->seq_num_unlink);
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_urbr invalid parameter";
@@ -72,8 +72,8 @@ static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 	if (urbr_unlink) {
 		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
 		if (NT_ERROR(status)) {
-			char buf[DBG_URBR_BUFSZ];
-			TraceError(TRACE_GENERAL, "failed to submit unlink urb: %s", dbg_urbr(buf, sizeof(buf), urbr_unlink));
+			char buf[URB_REQ_STR_BUFSZ];
+			TraceError(TRACE_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr_unlink));
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -96,8 +96,8 @@ static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 
 	submit_urbr_unlink(vpdo, urbr->seq_num);
 
-	char buf[DBG_URBR_BUFSZ];
-	TraceInfo(TRACE_GENERAL, "cancelled urb destroyed: %s", dbg_urbr(buf, sizeof(buf), urbr));
+	char buf[URB_REQ_STR_BUFSZ];
+	TraceInfo(TRACE_GENERAL, "cancelled urb destroyed %s", urb_req_str(buf, sizeof(buf), urbr));
 	
 	free_urbr(urbr);
 }
@@ -116,8 +116,8 @@ cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 	vpdo = (pvpdo_dev_t)devobj->DeviceExtension;
 	
 	{
-		char buf[DBG_URBR_BUFSZ];
-		TraceInfo(TRACE_GENERAL, "irp will be cancelled: %s", dbg_urbr(buf, sizeof(buf), urbr));
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "irp will be cancelled %s", urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	IoReleaseCancelSpinLock(irp->CancelIrql);
