@@ -395,7 +395,9 @@ static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	int linux_status = hdr->u.ret_submit.status;
+	const struct usbip_header_ret_submit *ret_submit = &hdr->u.ret_submit;
+
+	int linux_status = ret_submit->status;
 	if (!linux_status) {
 		return store_urb_data(vpdo, urb, hdr);
 	}
@@ -404,7 +406,7 @@ static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 	urb->UrbHeader.Status = status;
 
 	if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
-		urb->UrbBulkOrInterruptTransfer.TransferBufferLength = hdr->u.ret_submit.actual_length;
+		urb->UrbBulkOrInterruptTransfer.TransferBufferLength = ret_submit->actual_length;
 	}
 
 	TraceError(TRACE_WRITE, "%s: errno %d -> %s(%#08lX)", urb_function_str(urb->UrbHeader.Function), 
@@ -525,14 +527,19 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 	}
 
 	struct urb_req *urbr = find_sent_urbr(vpdo, hdr->base.seqnum);
-	if (!urbr) { // might have been cancelled before, so return STATUS_SUCCESS
-		TraceInfo(TRACE_WRITE, "urb_req not found, seqnum %u", hdr->base.seqnum);
+	if (!urbr) {
+		TraceInfo(TRACE_WRITE, "urb_req not found (cancelled?), seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS status = process_urb_res(urbr, hdr);
-
 	IRP *irp = urbr->irp;
+
+	{
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceInfo(TRACE_WRITE, "irp %p -> %s", irp, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	}
+
+	NTSTATUS status = process_urb_res(urbr, hdr);
 	free_urbr(urbr);
 
 	if (irp) {
