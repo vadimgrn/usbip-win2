@@ -12,19 +12,17 @@
 #include "usbd_helper.h"
 #include "vhci_irp.h"
 
-static bool save_iso_desc(struct _URB_ISOCH_TRANSFER *urb, const struct usbip_iso_packet_descriptor *iso_desc)
+static bool update_iso_packets(USBD_ISO_PACKET_DESCRIPTOR *dst, ULONG cnt, const struct usbip_iso_packet_descriptor *src)
 {
-	for (ULONG i = 0; i < urb->NumberOfPackets; ++i, ++iso_desc) {
+	for (ULONG i = 0; i < cnt; ++i, ++dst, ++src) {
 
-		if (iso_desc->offset > urb->IsoPacket[i].Offset) {
-			TraceWarning(TRACE_WRITE, "why offset changed?%d %d %d %d",
-						i, iso_desc->offset, iso_desc->actual_length, urb->IsoPacket[i].Offset);
-				
+		if (dst->Offset >= src->offset) {
+			dst->Length = src->actual_length;
+			dst->Status = to_windows_status(src->status);
+		} else {
+			TraceWarning(TRACE_WRITE, "#%lu: Offset(%lu) >= offset(%u)", i, dst->Offset, src->offset);
 			return false;
 		}
-
-		urb->IsoPacket[i].Length = iso_desc->actual_length;
-		urb->IsoPacket[i].Status = to_windows_status(iso_desc->status);
 	}
 
 	return true;
@@ -47,32 +45,33 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
-static void copy_iso_data(char *dest, ULONG dest_len, char *src, ULONG src_len, struct _URB_ISOCH_TRANSFER *urb)
+static void copy_iso_data(char *dest, ULONG dest_len, const char *src, ULONG src_len, const struct _URB_ISOCH_TRANSFER *urb)
 {
-	ULONG offset = 0;
+	ULONG src_offset = 0;
 
 	for (ULONG i = 0; i < urb->NumberOfPackets; ++i) {
 	
-		if (!urb->IsoPacket[i].Length) {
+		const USBD_ISO_PACKET_DESCRIPTOR *p = urb->IsoPacket + i;
+		if (!p->Length) {
 			continue;
 		}
 
-		if (urb->IsoPacket[i].Offset + urb->IsoPacket[i].Length	> dest_len) {
-			TraceWarning(TRACE_WRITE, "Warning, why this?");
+		if (p->Offset + p->Length > dest_len) {
+			TraceWarning(TRACE_WRITE, "#%lu: Offset(%lu) + Length(%lu) > dest_len(%lu)", i, p->Offset, p->Length, dest_len);
 			break;
 		}
 
-		if (offset + urb->IsoPacket[i].Length > src_len) {
-			TraceWarning(TRACE_WRITE, "Warning, why that?");
+		if (src_offset + p->Length > src_len) {
+			TraceWarning(TRACE_WRITE, "#%lu:src_offset(%lu) + Length(%lu) > src_len(%lu)", i, src_offset, p->Length, src_len);
 			break;
 		}
 
-		RtlCopyMemory(dest + urb->IsoPacket[i].Offset, src + offset, urb->IsoPacket[i].Length);
-		offset += urb->IsoPacket[i].Length;
+		RtlCopyMemory(dest + p->Offset, src + src_offset, p->Length);
+		src_offset += p->Length;
 	}
 
-	if (offset != src_len) {
-		TraceWarning(TRACE_WRITE, "why not equal offset:%d src_len:%d", offset, src_len);
+	if (src_offset != src_len) {
+		TraceWarning(TRACE_WRITE, "src_offset(%lu) != src_len(%lu)", src_offset, src_len);
 	}
 }
 
@@ -226,17 +225,28 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const
 	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
+/*
+ * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[]
+ */
 static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
+	int cnt = hdr->u.ret_submit.number_of_packets;
+
+	if (!(cnt >= 0 && (ULONG)cnt == r->NumberOfPackets)) {
+		TraceError(TRACE_WRITE, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r->NumberOfPackets);
+		return STATUS_INVALID_PARAMETER;
+	}
+	
+	const char *usbip_data = (char*)(hdr + 1);
 	int actual_length = hdr->u.ret_submit.actual_length;
 
 	{
-		int in_len = is_endpoint_direction_in(r->PipeHandle) ? actual_length : 0;
-		struct usbip_iso_packet_descriptor *d = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + in_len);
-		if (!save_iso_desc(r, d)) {
+		int data_len = is_endpoint_direction_in(r->PipeHandle) ? actual_length : 0;
+		const void *d = usbip_data + data_len; // usbip_iso_packet_descriptor*
+		if (!update_iso_packets(r->IsoPacket, r->NumberOfPackets, d)) {
 			return STATUS_INVALID_PARAMETER;
 		}
 	}
@@ -252,7 +262,7 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	copy_iso_data(buf, r->TransferBufferLength, (char*)(hdr + 1), actual_length, r);
+	copy_iso_data(buf, r->TransferBufferLength, usbip_data, actual_length, r);
 	r->TransferBufferLength = actual_length;
 
 	return STATUS_SUCCESS;
