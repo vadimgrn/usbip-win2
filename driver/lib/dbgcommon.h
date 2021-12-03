@@ -22,10 +22,10 @@ const char *usbd_pipe_type_str(USBD_PIPE_TYPE t);
 const char *urb_function_str(int function);
 
 enum { DBG_USBIP_HDR_BUFSZ = 255 };
-const char *dbg_usbip_hdr(char *buf, unsigned int len, const struct usbip_header *hdr);
+const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr);
 
 enum { DBG_USB_SETUP_BUFBZ = 128 };
-const char *dbg_usb_setup_packet(char *buf, unsigned int len, const void *packet);
+const char *dbg_usb_setup_packet(char *buf, size_t len, const void *packet);
 
 enum { USBD_TRANSFER_FLAGS_BUFBZ = 36 };
-const char *usbd_transfer_flags(char *buf, unsigned int len, ULONG TransferFlags);
+const char *usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags);
