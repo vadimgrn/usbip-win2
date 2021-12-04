@@ -230,7 +230,7 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cmd_submit *cmd)
 {
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len,  &buf, &len, STRSAFE_NULL_ON_FAILURE, 
-			"submit: transfer_flags %#x, transfer_buffer_length %d, start_frame %d, number_of_packets %d, interval %d, ",
+			"cmd_submit: transfer_flags %#x, transfer_buffer_length %d, start_frame %d, number_of_packets %d, interval %d, ",
 			cmd->transfer_flags, 
 			cmd->transfer_buffer_length, 
 			cmd->start_frame, 
@@ -257,7 +257,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 	const struct usbip_header_basic *base = &hdr->base;
 
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE, 
-					"hdr{command %u, seqnum %u, devid %#x(busnum %d, devnum %d), %s, ep %#x}, ",
+					"usbip_header{command %u, seqnum %u, devid %#x(busnum %d, devnum %d), %s, ep %#x}, ",
 					base->command,
 					base->seqnum,
 					base->devid, (base->devid >> 16) & 0xFFFF, base->devid & 0xFFFF, 
@@ -276,7 +276,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 		print_ret_submit(buf, len, &hdr->u.ret_submit);
 		break;
 	case USBIP_CMD_UNLINK:
-		RtlStringCbPrintfA(buf, len, "unlink: seqnum %u", hdr->u.cmd_unlink.seqnum);
+		RtlStringCbPrintfA(buf, len, "cmd_unlink: seqnum %u", hdr->u.cmd_unlink.seqnum);
 		break;
 	case USBIP_RET_UNLINK:
 		RtlStringCbPrintfA(buf, len, "ret_unlink: status %d", hdr->u.ret_unlink.status);

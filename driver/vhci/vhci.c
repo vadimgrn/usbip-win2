@@ -79,16 +79,15 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 static PAGEABLE void
 cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 {
-	PIO_STACK_LOCATION  irpstack;
-	pvpdo_dev_t	vpdo;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 
-	irpstack = IoGetCurrentIrpStackLocation(irp);
-	vpdo = irpstack->FileObject->FsContext;
 	if (vpdo) {
 		vpdo->fo = NULL;
 		irpstack->FileObject->FsContext = NULL;
-		if (vpdo->plugged)
+		if (vpdo->plugged) {
 			vhci_unplug_port(vhci, (CHAR)vpdo->port);
+		}
 	}
 }
 

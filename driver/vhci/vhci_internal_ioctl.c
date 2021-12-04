@@ -239,7 +239,7 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 	}
 
 	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %#Ix -> %!STATUS!",
-		urb_function_str(r->Hdr.Function), (uintptr_t)r->PipeHandle, st);
+				urb_function_str(r->Hdr.Function), (uintptr_t)r->PipeHandle, st);
 
 	return st;
 }
