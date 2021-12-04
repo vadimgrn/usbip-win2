@@ -73,7 +73,7 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
  * 1. We clear STALL/HALT feature on endpoint specified by pipe
  * 2. We abort/cancel all IRP for given pipe
  */
-static NTSTATUS sync_reset_pipe_and_clear_stall(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -118,7 +118,7 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
-static NTSTATUS get_descriptor_from_device(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS get_descriptor_from_device(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -140,57 +140,57 @@ static NTSTATUS get_descriptor_from_device(PIRP irp, PURB urb, struct urb_req *u
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-urb_control_get_status_request(PIRP irp, PURB urb, struct urb_req *urbr)
+static int get_recipient(int usb_function)
 {
-	struct _URB_CONTROL_GET_STATUS_REQUEST	*urb_gsr = &urb->UrbControlGetStatusRequest;
-	USHORT		code_func;
-	char		recip;
+	switch (usb_function) {
+	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
+		return BMREQUEST_TO_DEVICE;
+	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
+		return BMREQUEST_TO_INTERFACE;
+	case URB_FUNCTION_GET_STATUS_FROM_ENDPOINT:
+		return BMREQUEST_TO_ENDPOINT;
+	case URB_FUNCTION_GET_STATUS_FROM_OTHER:
+		return BMREQUEST_TO_OTHER;
+	}
 
+	NT_FRE_ASSERT(!"Unexpected usb function");
+	return -1;
+}
+
+static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_req *urbr)
+{
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
-				    USBD_SHORT_TRANSFER_OK, urb_gsr->TransferBufferLength);
-
-	code_func = urb->UrbHeader.Function;
-	
 	{
 		char buf[URB_REQ_STR_BUFSZ];
-		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(code_func), urb_req_str(buf, sizeof(buf), urbr));
+		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(urb->UrbHeader.Function), urb_req_str(buf, sizeof(buf), urbr));
 	}
 
-	switch (code_func) {
-	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
-		recip = BMREQUEST_TO_DEVICE;
-		break;
-	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
-		recip = BMREQUEST_TO_INTERFACE;
-		break;
-	case URB_FUNCTION_GET_STATUS_FROM_ENDPOINT:
-		recip = BMREQUEST_TO_ENDPOINT;
-		break;
-	case URB_FUNCTION_GET_STATUS_FROM_OTHER:
-		recip = BMREQUEST_TO_OTHER;
-		break;
-	default:
-		TraceWarning(TRACE_IOCTL, "unhandled function: %s, len %d",
-			urb_function_str(urb->UrbHeader.Function), urb->UrbHeader.Length);
+	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
 
-		return STATUS_INVALID_PARAMETER;
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
+				    USBD_SHORT_TRANSFER_OK, r->TransferBufferLength);
+
+	int recip = get_recipient(urb->UrbHeader.Function);
+
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, 
+								(UCHAR)recip, USB_REQUEST_GET_STATUS);
+
+	setup->wIndex.W = r->Index;
+	setup->wLength = (USHORT)r->TransferBufferLength;
+	
+	if (r->TransferBufferLength != 2) {
+		TraceWarning(TRACE_READ, "TransferBufferLength %lu != 2", r->TransferBufferLength);
 	}
-
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, recip, USB_REQUEST_GET_STATUS);
-	setup->wLength = (USHORT)urb_gsr->TransferBufferLength;
-	setup->wIndex.W = urb_gsr->Index;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS get_descriptor_from_interface(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS get_descriptor_from_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -233,7 +233,7 @@ static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *
 }
 
 static NTSTATUS
-urb_control_vendor_class_request(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vc = &urb->UrbControlVendorClassRequest;
 	char	type, recip;
@@ -306,7 +306,7 @@ urb_control_vendor_class_request(PIRP irp, PURB urb, struct urb_req *urbr)
 }
 
 static NTSTATUS
-urb_select_configuration(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_SELECT_CONFIGURATION *urb_sc = &urb->UrbSelectConfiguration;
 
@@ -325,7 +325,7 @@ urb_select_configuration(PIRP irp, PURB urb, struct urb_req *urbr)
 }
 
 static NTSTATUS
-urb_select_interface(PIRP irp, PURB urb, struct urb_req *urbr)
+urb_select_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_SELECT_INTERFACE	*urb_si = &urb->UrbSelectInterface;
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -366,7 +366,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP ir
  * Sometimes, direction in TransferFlags of _URB_BULK_OR_INTERRUPT_TRANSFER is not consistent 
   * with PipeHandle. Use a direction flag in pipe handle.
  */
-static NTSTATUS urb_bulk_or_interrupt_transfer(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -473,7 +473,7 @@ static NTSTATUS urb_isoch_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS urb_isoch_transfer(PIRP irp, PURB urb, struct urb_req *urbr)
+static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
 
@@ -530,8 +530,7 @@ static NTSTATUS urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB ur
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-urb_control_transfer(PIRP irp, PURB urb, struct urb_req* urbr)
+static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -592,8 +591,7 @@ static NTSTATUS urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-urb_control_transfer_ex(PIRP irp, PURB urb, struct urb_req* urbr)
+static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
