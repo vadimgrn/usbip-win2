@@ -120,34 +120,21 @@ static void *get_buf(void *buf, MDL *bufMDL)
 
 static NTSTATUS get_descriptor_from_device(PIRP irp, PURB urb, struct urb_req *urbr)
 {
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
-	if (hdr == NULL) {
+	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
-				    USBD_SHORT_TRANSFER_OK, urb_desc->TransferBufferLength);
-	
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
-	setup->wLength = (USHORT)urb_desc->TransferBufferLength;
-	setup->wValue.HiByte = urb_desc->DescriptorType;
-	setup->wValue.LowByte = urb_desc->Index;
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	switch (urb_desc->DescriptorType) {
-	case USB_DEVICE_DESCRIPTOR_TYPE:
-	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		//setup->wIndex.W = 0;
-		break;
-	case USB_INTERFACE_DESCRIPTOR_TYPE:
-		setup->wIndex.W = urb_desc->Index;
-		break;
-	case USB_STRING_DESCRIPTOR_TYPE:
-		setup->wIndex.W = urb_desc->LanguageId;
-		break;
-	default:
-		return STATUS_INVALID_PARAMETER;
-	}
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, USBD_SHORT_TRANSFER_OK, r->TransferBufferLength);
+	
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, 
+								      BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
+
+	setup->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r->DescriptorType, r->Index); 
+	setup->wIndex.W = r->LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
+	setup->wLength = (USHORT)r->TransferBufferLength;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
