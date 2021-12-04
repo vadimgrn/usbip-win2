@@ -964,8 +964,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	TraceVerbose(TRACE_READ, "Enter irp %p, irql %!irql!, len %lu", irp, KeGetCurrentIrql(), irpstack->Parameters.Read.Length);
+	TraceVerbose(TRACE_READ, "Enter irql %!irql!", KeGetCurrentIrql());
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -976,15 +975,15 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
 
 	if (vhci->common.DevicePnPState != Deleted) {
+		IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 		status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 	}
-
-	TraceInfo(TRACE_READ, "Leave irp %p, %!STATUS!", irp, status);
 
 	if (status != STATUS_PENDING) {
 		irp_done(irp, status);
 	}
 
+	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);
 	return status;
 }

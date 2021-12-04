@@ -34,7 +34,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
-	TraceInfo(TRACE_WMI, "Enter");
+	TraceVerbose(TRACE_WMI, "Enter irql %!irql!", KeGetCurrentIrql());
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
@@ -77,8 +77,7 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		status = IoCallDriver(vhci->common.devobj_lower, irp);
 	}
 
-	TraceInfo(TRACE_WMI, "Leave %!STATUS!", status);
-
+	TraceVerbose(TRACE_WMI, "Leave %!STATUS!", status);
 	return status;
 }
 

@@ -116,6 +116,6 @@ vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 			vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
 			vhci_power_vdev(vdev, irp, irpstack);
 
-	TraceInfo(TRACE_POWER, "%!vdev_type_t!: Leave %!STATUS!", vdev->type, st);
+	TraceVerbose(TRACE_POWER, "%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
 	return st;
 }

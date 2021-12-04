@@ -216,8 +216,8 @@ PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	
-	TraceVerbose(TRACE_PNP, "%!vdev_type_t!: enter irp %p, irql %!irql!, %!pnpmn!", 
-			vdev->type, irp, KeGetCurrentIrql(), irpstack->MinorFunction);
+	TraceVerbose(TRACE_PNP, "%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", 
+			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	NTSTATUS status = STATUS_SUCCESS;
 
@@ -230,6 +230,6 @@ PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		status = irp_done_iostatus(irp);
 	}
 
-	TraceInfo(TRACE_PNP, "%!vdev_type_t!: leave irp %p, %!STATUS!", vdev->type, irp, status);
+	TraceVerbose(TRACE_PNP, "%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
 	return status;
 }

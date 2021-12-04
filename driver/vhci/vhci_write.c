@@ -553,9 +553,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-
-	TraceVerbose(TRACE_WRITE, "irql %!irql!, Length %lu", KeGetCurrentIrql(), irpstack->Parameters.Write.Length);
+	TraceVerbose(TRACE_WRITE, "Enter irql %!irql!", KeGetCurrentIrql());
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -567,6 +565,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 
 	if (vhci->common.DevicePnPState != Deleted) {
 
+		IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 		
 		if (vpdo && vpdo->plugged) {
@@ -578,5 +577,6 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		}
 	}
 
+	TraceVerbose(TRACE_WRITE, "Leave %!STATUS!", status);
 	return irp_done(irp, status);
 }

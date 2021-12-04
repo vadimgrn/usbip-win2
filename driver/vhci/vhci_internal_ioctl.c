@@ -455,8 +455,8 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceVerbose(TRACE_IOCTL, "%s(%#08lX), irql %!irql!", 
-			dbg_ioctl_code(ioctl_code), ioctl_code, KeGetCurrentIrql());
+	TraceVerbose(TRACE_IOCTL, "Enter irql %!irql!, %s(%#08lX)", 
+			KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -494,5 +494,6 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		irp_done(Irp, status);
 	}
 
+	TraceVerbose(TRACE_IOCTL, "Leave %!STATUS!", status);
 	return status;
 }
