@@ -442,10 +442,10 @@ static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const 
 	req = urbr->irp->AssociatedIrp.SystemBuffer;
         RtlCopyMemory(req->Data, hdr + 1, actual_length);
 		
-	char buf[DBG_USB_SETUP_BUFBZ];
-	TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, SetupPacket %s, Data %!BIN!", 
+	char buf[USB_SETUP_PKT_STR_BUFBZ];
+	TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, %s, Data[%!BIN!]", 
 				req->ConnectionIndex, 
-				dbg_usb_setup_packet(buf, sizeof(buf), &req->SetupPacket),
+				usb_setup_pkt_str(buf, sizeof(buf), &req->SetupPacket),
 				WppBinary(req->Data, (USHORT)actual_length));
 
         return irp->IoStatus.Status = STATUS_SUCCESS;

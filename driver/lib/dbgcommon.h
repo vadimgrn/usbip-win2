@@ -24,8 +24,8 @@ const char *urb_function_str(int function);
 enum { DBG_USBIP_HDR_BUFSZ = 255 };
 const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr);
 
-enum { DBG_USB_SETUP_BUFBZ = 128 };
-const char *dbg_usb_setup_packet(char *buf, size_t len, const void *packet);
+enum { USB_SETUP_PKT_STR_BUFBZ = 128 };
+const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet);
 
 enum { USBD_TRANSFER_FLAGS_BUFBZ = 36 };
 const char *usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags);

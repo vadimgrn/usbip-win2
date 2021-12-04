@@ -238,7 +238,7 @@ static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cm
 			cmd->interval);
 
 	if (st == STATUS_SUCCESS) {
-		dbg_usb_setup_packet(buf, len, cmd->setup);
+		usb_setup_pkt_str(buf, len, cmd->setup);
 	}
 }
 
@@ -289,12 +289,12 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 	return buf;
 }
 
-const char *dbg_usb_setup_packet(char *buf, size_t len, const void *packet)
+const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 {
 	const USB_DEFAULT_PIPE_SETUP_PACKET *r = packet;
 
 	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
-		"[%#02hhx(%s|%s|%s), %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)]",
+		"SetupPacket{%#02hhx(%s|%s|%s), %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
 		r->bmRequestType,
 		bmrequest_dir_str(r->bmRequestType),
 		bmrequest_type_str(r->bmRequestType),
@@ -306,7 +306,7 @@ const char *dbg_usb_setup_packet(char *buf, size_t len, const void *packet)
 		r->wLength,
 		r->wLength);
 
-	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_usb_setup_packet invalid parameter";
+	return st != STATUS_INVALID_PARAMETER ? buf : "usb_setup_pkt_str invalid parameter";
 }
 
 const char* usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)

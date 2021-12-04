@@ -269,8 +269,8 @@ process_control_transfer(usbip_stub_dev_t *devstub, struct usbip_header *hdr)
 {
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
 
-	char buf[DBG_USB_SETUP_BUFBZ];
-	TraceInfo(TRACE_READWRITE, "seq %u, %s", hdr->base.seqnum, dbg_usb_setup_packet(buf, sizeof(buf), setup));
+	char buf[USB_SETUP_PKT_STR_BUFBZ];
+	TraceInfo(TRACE_READWRITE, "seq %u, %s", hdr->base.seqnum, usb_setup_pkt_str(buf, sizeof(buf), setup));
 
 	UCHAR reqType = CSPKT_REQUEST_TYPE(setup);
 

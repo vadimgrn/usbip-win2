@@ -261,13 +261,13 @@ static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb)
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
 
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
-	char buf_setup[DBG_USB_SETUP_BUFBZ];
+	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
 	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, %s",
 		(uintptr_t)r->PipeHandle, 
 		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r->TransferFlags),
 		r->TransferBufferLength,
-		dbg_usb_setup_packet(buf_setup, sizeof(buf_setup), r->SetupPacket));
+		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r->SetupPacket));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -309,14 +309,14 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb)
 	struct _URB_CONTROL_TRANSFER_EX* r = &urb->UrbControlTransferEx;
 
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
-	char buf_setup[DBG_USB_SETUP_BUFBZ];
+	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
 	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
 		(uintptr_t)r->PipeHandle,
 		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r->TransferFlags),
 		r->TransferBufferLength,
 		r->Timeout,
-		dbg_usb_setup_packet(buf_setup, sizeof(buf_setup), r->SetupPacket));
+		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r->SetupPacket));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
