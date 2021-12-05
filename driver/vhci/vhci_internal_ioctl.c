@@ -321,6 +321,101 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
+static NTSTATUS usb_function_deprecated(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+	UNREFERENCED_PARAMETER(urb);
+	return STATUS_NOT_SUPPORTED;
+}
+
+static NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
+	TraceVerbose(TRACE_IOCTL, "TransferBufferLength %lu (must be 1)", r->TransferBufferLength);
+
+	return STATUS_SUBMIT_URBR_IRP;
+}
+
+static NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
+	TraceVerbose(TRACE_IOCTL, "TransferBufferLength %lu (must be 1), Interface %hu", r->TransferBufferLength, r->Interface);
+
+	return STATUS_SUBMIT_URBR_IRP;
+}
+
+static NTSTATUS get_ms_feature_descriptor(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST *r = &urb->UrbOSFeatureDescriptorRequest;
+
+	TraceVerbose(TRACE_IOCTL, "TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
+			r->TransferBufferLength, r->Recipient, r->InterfaceNumber, r->MS_PageIndex, r->MS_FeatureDescriptorIndex);
+
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+static NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS *r = &urb->UrbGetIsochPipeTransferPathDelays;
+
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, MaximumSendPathDelayInMilliSeconds %lu, MaximumCompletionPathDelayInMilliSeconds %lu",
+				(uintptr_t)r->PipeHandle, 
+				r->MaximumSendPathDelayInMilliSeconds, 
+				r->MaximumCompletionPathDelayInMilliSeconds);
+
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+static NTSTATUS open_static_streams(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_OPEN_STATIC_STREAMS *r = &urb->UrbOpenStaticStreams;
+
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",
+				(uintptr_t)r->PipeHandle, r->NumberOfStreams, r->StreamInfoVersion, r->StreamInfoSize);
+
+	return STATUS_NOT_IMPLEMENTED;
+}
+
+static NTSTATUS bulk_or_interrupt_transfer_using_chained_mdl(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
+	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
+
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu",
+				(uintptr_t)r->PipeHandle,
+				usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
+				r->TransferBufferLength);
+
+	return STATUS_SUBMIT_URBR_IRP;
+}
+
+static NTSTATUS isoch_transfer_using_chained_mdl(vpdo_dev_t *vpdo, URB *urb)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
+	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
+
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu",
+				(uintptr_t)r->PipeHandle,
+				usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
+				r->TransferBufferLength, r->StartFrame, r->NumberOfPackets, r->ErrorCount);
+
+	return STATUS_SUBMIT_URBR_IRP;
+}
+
 typedef NTSTATUS (*urb_function_t)(vpdo_dev_t*, URB*);
 
 static const urb_function_t urb_functions[] =
@@ -329,11 +424,11 @@ static const urb_function_t urb_functions[] =
 	urb_select_interface,
 	urb_pipe_request, // URB_FUNCTION_ABORT_PIPE
 
-	NULL, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
-	NULL, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
+	usb_function_deprecated, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
+	usb_function_deprecated, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
 
-	NULL, // URB_FUNCTION_GET_FRAME_LENGTH
-	NULL, // URB_FUNCTION_SET_FRAME_LENGTH
+	usb_function_deprecated, // URB_FUNCTION_GET_FRAME_LENGTH
+	usb_function_deprecated, // URB_FUNCTION_SET_FRAME_LENGTH
 	urb_get_current_frame_number,
 
 	urb_control_transfer,
@@ -380,13 +475,13 @@ static const urb_function_t urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
 
-	NULL, // URB_FUNCTION_GET_CONFIGURATION
-	NULL, // URB_FUNCTION_GET_INTERFACE
+	get_configuration, // URB_FUNCTION_GET_CONFIGURATION
+	get_interface, // URB_FUNCTION_GET_INTERFACE
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
 
-	NULL, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+	get_ms_feature_descriptor,
 
 	NULL, // URB_FUNCTION_RESERVE_0X002B
 	NULL, // URB_FUNCTION_RESERVE_0X002C
@@ -401,17 +496,17 @@ static const urb_function_t urb_functions[] =
 	NULL, // URB_FUNCTION_RESERVE_0X0033
 	NULL, // URB_FUNCTION_RESERVE_0X0034                  
 
-	NULL, // URB_FUNCTION_OPEN_STATIC_STREAMS
+	open_static_streams,
 	urb_pipe_request, // URB_FUNCTION_CLOSE_STATIC_STREAMS
-	NULL, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
-	NULL, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
+	bulk_or_interrupt_transfer_using_chained_mdl,
+	isoch_transfer_using_chained_mdl,
 
 	NULL, // 0x0039
 	NULL, // 0x003A        
-	NULL, // 0x003B        
+	NULL, // 0x003B
 	NULL, // 0x003C        
 
-	NULL // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
+	get_isoch_pipe_transfer_path_delays // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
 static NTSTATUS process_irp_urb_req(vpdo_dev_t *vpdo, IRP *irp)
@@ -430,10 +525,8 @@ static NTSTATUS process_irp_urb_req(vpdo_dev_t *vpdo, IRP *irp)
 		return st == STATUS_SUBMIT_URBR_IRP ? submit_urbr_irp(vpdo, irp) : st;
 	}
 
-	TraceWarning(TRACE_IOCTL, "Not implemented/supported %s(%#04x), Length %d", 
-		urb_function_str(func), func, urb->UrbHeader.Length);
-
-	return STATUS_NOT_SUPPORTED;
+	TraceError(TRACE_IOCTL, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
+	return STATUS_INVALID_PARAMETER;
 }
 
 static NTSTATUS setup_topology_address(vpdo_dev_t *vpdo, USB_TOPOLOGY_ADDRESS *r)
