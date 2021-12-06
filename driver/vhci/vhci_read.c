@@ -118,7 +118,7 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
-static NTSTATUS get_descriptor_from_device(IRP *irp, URB *urb, struct urb_req *urbr)
+static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_req *urbr, bool dir_in, UCHAR recipient)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -127,17 +127,34 @@ static NTSTATUS get_descriptor_from_device(IRP *irp, URB *urb, struct urb_req *u
 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, USBD_SHORT_TRANSFER_OK, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0, USBD_SHORT_TRANSFER_OK, r->TransferBufferLength);
 	
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, 
-								      BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
+	UCHAR dir = dir_in ? BMREQUEST_DEVICE_TO_HOST : BMREQUEST_HOST_TO_DEVICE;
+	UCHAR request = dir_in ? USB_REQUEST_GET_DESCRIPTOR : USB_REQUEST_SET_DESCRIPTOR;
+	
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, dir, BMREQUEST_STANDARD, recipient, request);
 
 	setup->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r->DescriptorType, r->Index); 
 	setup->wIndex.W = r->LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
 	setup->wLength = (USHORT)r->TransferBufferLength;
 
 	irp->IoStatus.Information = sizeof(*hdr);
-	return STATUS_SUCCESS;
+
+	if (dir_in) {
+		return STATUS_SUCCESS;
+	}
+	
+	if (get_read_payload_length(irp) < r->TransferBufferLength) {
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
+		irp->IoStatus.Information += r->TransferBufferLength;
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 static int get_recipient(int usb_function)
@@ -185,27 +202,6 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 	if (r->TransferBufferLength != 2) {
 		TraceWarning(TRACE_READ, "TransferBufferLength %lu != 2", r->TransferBufferLength);
 	}
-
-	irp->IoStatus.Information = sizeof(*hdr);
-	return STATUS_SUCCESS;
-}
-
-static NTSTATUS get_descriptor_from_interface(IRP *irp, URB *urb, struct urb_req *urbr)
-{
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST	*urb_desc = &urb->UrbControlDescriptorRequest;
-	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
-	if (hdr == NULL) {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
-				    USBD_SHORT_TRANSFER_OK, urb_desc->TransferBufferLength);
-	
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_INTERFACE, USB_REQUEST_GET_DESCRIPTOR);
-	setup->wLength = (USHORT)urb_desc->TransferBufferLength;
-	setup->wValue.HiByte = urb_desc->DescriptorType;
-	setup->wValue.LowByte = urb_desc->Index;
-	setup->wIndex.W = urb_desc->LanguageId;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -364,7 +360,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP ir
 
 /* 
  * Sometimes, direction in TransferFlags of _URB_BULK_OR_INTERRUPT_TRANSFER is not consistent 
-  * with PipeHandle. Use a direction flag in pipe handle.
+ * with PipeHandle. Use a direction flag in pipe handle.
  */
 static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
@@ -390,14 +386,18 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 
 	if (!dir_in) {
 		if (get_read_payload_length(irp) >= urb_bi->TransferBufferLength) {
-			PVOID buf = get_buf(urb_bi->TransferBuffer, urb_bi->TransferBufferMDL);
+
+			void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? 
+					NULL : urb_bi->TransferBuffer;
+
+			void *buf = get_buf(buf_a, urb_bi->TransferBufferMDL);
 			if (buf) {
 				RtlCopyMemory(hdr + 1, buf, urb_bi->TransferBufferLength);
 			} else {
 				return STATUS_INSUFFICIENT_RESOURCES;
 			}
 		} else {
-			urbr->vpdo->len_sent_partial = sizeof(struct usbip_header);
+			urbr->vpdo->len_sent_partial = sizeof(*hdr);
 		}
 	}
 
@@ -406,7 +406,9 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 
 static NTSTATUS copy_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 {
-	void *buf = get_buf(urb_iso->TransferBuffer, urb_iso->TransferBufferMDL);
+	void *buf_a = urb_iso->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : urb_iso->TransferBuffer;
+
+	void *buf = get_buf(buf_a, urb_iso->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -627,35 +629,178 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 	return STATUS_SUCCESS;
 }
 
+/*
+ * vhci_internal_ioctl.c handles such functions itself, so this function must never be called.
+ */
+static NTSTATUS urb_function_unexpected(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	UNREFERENCED_PARAMETER(irp);
+	UNREFERENCED_PARAMETER(urb);
+	UNREFERENCED_PARAMETER(urbr);
+
+	TraceError(TRACE_READ, "Internal logic error");
+	return STATUS_INTERNAL_ERROR;
+}	
+
+static NTSTATUS get_descriptor_from_device(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_descriptor_request(irp, urb, urbr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_TO_DEVICE);
+}
+
+static NTSTATUS set_descriptor_to_device(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_descriptor_request(irp, urb, urbr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_TO_DEVICE);
+}
+
+static NTSTATUS get_descriptor_from_interface(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_descriptor_request(irp, urb, urbr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_TO_INTERFACE);
+}
+
+static NTSTATUS set_descriptor_to_interface(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_descriptor_request(irp, urb, urbr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_TO_INTERFACE);
+}
+
+static NTSTATUS get_descriptor_from_endpoint(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_descriptor_request(irp, urb, urbr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_TO_ENDPOINT);
+}
+
+static NTSTATUS set_descriptor_to_endpoint(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_descriptor_request(irp, urb, urbr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_TO_ENDPOINT);
+}
+
+static NTSTATUS urb_control_feature_request(IRP *irp, URB *urb, struct urb_req* urbr, UCHAR bRequest, UCHAR recipient)
+{
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
+	if (!hdr) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	struct _URB_CONTROL_FEATURE_REQUEST *r = &urb->UrbControlFeatureRequest;
+
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, USBD_SHORT_TRANSFER_OK, 0);
+
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, recipient, bRequest);
+	setup->wValue.W = r->FeatureSelector; 
+	setup->wIndex.W = r->Index;
+
+	irp->IoStatus.Information = sizeof(*hdr);
+	return STATUS_SUCCESS;
+}
+
+static NTSTATUS set_feature_to_device(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_SET_FEATURE, BMREQUEST_TO_DEVICE);
+}
+
+static NTSTATUS set_feature_to_interface(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_SET_FEATURE, BMREQUEST_TO_INTERFACE);
+}
+
+static NTSTATUS set_feature_to_endpoint(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_SET_FEATURE, BMREQUEST_TO_ENDPOINT);
+}
+
+static NTSTATUS set_feature_to_other(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_SET_FEATURE, BMREQUEST_TO_OTHER);
+}
+
+static NTSTATUS clear_feature_to_device(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_CLEAR_FEATURE, BMREQUEST_TO_DEVICE);
+}
+
+static NTSTATUS clear_feature_to_interface(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_CLEAR_FEATURE, BMREQUEST_TO_INTERFACE);
+}
+
+static NTSTATUS clear_feature_to_endpoint(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_CLEAR_FEATURE, BMREQUEST_TO_ENDPOINT);
+}
+
+static NTSTATUS clear_feature_to_other(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_feature_request(irp, urb, urbr, USB_REQUEST_CLEAR_FEATURE, BMREQUEST_TO_OTHER);
+}
+
+static NTSTATUS get_configuration(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
+	if (!hdr) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
+
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
+
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, 
+									BMREQUEST_TO_DEVICE, USB_REQUEST_GET_CONFIGURATION);
+
+	setup->wLength = (USHORT)r->TransferBufferLength; // must be 1
+
+	irp->IoStatus.Information = sizeof(*hdr);
+	return STATUS_SUCCESS;
+}
+
+static NTSTATUS get_interface(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
+	if (!hdr) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
+
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
+
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, 
+									BMREQUEST_TO_INTERFACE, USB_REQUEST_GET_CONFIGURATION);
+
+	setup->wIndex.W = r->Interface;
+	setup->wLength = (USHORT)r->TransferBufferLength; // must be 1
+
+	irp->IoStatus.Information = sizeof(*hdr);
+	return STATUS_SUCCESS;
+}
+
 typedef NTSTATUS (*urb_function_t)(IRP *irp, URB *urb, struct urb_req*);
 
 static const urb_function_t urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,
-	NULL, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
+	urb_function_unexpected, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
 
-	NULL, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
-	NULL, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
+	urb_function_unexpected, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
+	urb_function_unexpected, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
 
-	NULL, // URB_FUNCTION_GET_FRAME_LENGTH
-	NULL, // URB_FUNCTION_SET_FRAME_LENGTH
-	NULL, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
+	urb_function_unexpected, // URB_FUNCTION_GET_FRAME_LENGTH
+	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
+	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
 
 	urb_control_transfer,
 	urb_bulk_or_interrupt_transfer,
 	urb_isoch_transfer,
 
-	get_descriptor_from_device, // urb_control_descriptor_request
-	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE, urb_control_descriptor_request
+	get_descriptor_from_device,
+	set_descriptor_to_device,
 
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, urb_control_feature_request
+	set_feature_to_device,
+	set_feature_to_interface, 
+	set_feature_to_endpoint,
 
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE, urb_control_feature_request
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
+	clear_feature_to_device,
+	clear_feature_to_interface,
+	clear_feature_to_endpoint,
 
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
@@ -680,19 +825,19 @@ static const urb_function_t urb_functions[] =
 
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
 
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
+	set_feature_to_other, 
+	clear_feature_to_other,
 
-	NULL, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT, urb_control_descriptor_request
-	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT, urb_control_descriptor_request
+	get_descriptor_from_endpoint,
+	set_descriptor_to_endpoint,
 
-	NULL, // URB_FUNCTION_GET_CONFIGURATION
-	NULL, // URB_FUNCTION_GET_INTERFACE
+	get_configuration, // URB_FUNCTION_GET_CONFIGURATION
+	get_interface, // URB_FUNCTION_GET_INTERFACE
 
-	get_descriptor_from_interface, // urb_control_descriptor_request
-	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE, urb_control_descriptor_request
+	get_descriptor_from_interface,
+	set_descriptor_to_interface,
 
-	NULL, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+	urb_function_unexpected, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
 
 	NULL, // URB_FUNCTION_RESERVE_0X002B
 	NULL, // URB_FUNCTION_RESERVE_0X002C
@@ -700,25 +845,24 @@ static const urb_function_t urb_functions[] =
 	NULL, // URB_FUNCTION_RESERVE_0X002E
 	NULL, // URB_FUNCTION_RESERVE_0X002F
 
-	NULL, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
-	NULL, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
+	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
+	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
 	urb_control_transfer_ex,
-/*
+
 	NULL, // URB_FUNCTION_RESERVE_0X0033
 	NULL, // URB_FUNCTION_RESERVE_0X0034                  
 
-	NULL, // URB_FUNCTION_OPEN_STATIC_STREAMS
-	NULL, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
-	NULL, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
-	NULL, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
+	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
+	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
+	urb_bulk_or_interrupt_transfer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	NULL, // 0x0039
 	NULL, // 0x003A        
 	NULL, // 0x003B        
 	NULL, // 0x003C        
 
-	NULL // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
-*/
+	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
 static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
@@ -742,7 +886,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 		return pfunc(irp, urb, urbr);
 	}
 
-	TraceError(TRACE_READ, "Unhandled %s(%#04x)", urb_function_str(func), func);
+	TraceError(TRACE_READ, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
 
 	irp->IoStatus.Information = 0;
 	return STATUS_INVALID_PARAMETER;
