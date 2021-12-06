@@ -130,7 +130,7 @@ static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb)
 
 	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
 	
-	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu, Index %hd", 
+	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu (must be 2), Index %hd", 
 		urb_function_str(r->Hdr.Function), r->TransferBufferLength, r->Index);
 	
 	return STATUS_SUBMIT_URBR_IRP;

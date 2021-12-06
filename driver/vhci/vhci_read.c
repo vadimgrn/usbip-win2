@@ -126,7 +126,7 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0, USBD_SHORT_TRANSFER_OK, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0, 0, r->TransferBufferLength);
 	
 	UCHAR dir = dir_in ? BMREQUEST_DEVICE_TO_HOST : BMREQUEST_HOST_TO_DEVICE;
 	UCHAR request = dir_in ? USB_REQUEST_GET_DESCRIPTOR : USB_REQUEST_SET_DESCRIPTOR;
@@ -187,8 +187,7 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 
 	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0,
-				    USBD_SHORT_TRANSFER_OK, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
 
 	int recip = get_recipient(urb->UrbHeader.Function);
 
@@ -198,10 +197,6 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 	setup->wIndex.W = r->Index;
 	setup->wLength = (USHORT)r->TransferBufferLength;
 	
-	if (r->TransferBufferLength != 2) {
-		TraceWarning(TRACE_READ, "TransferBufferLength %lu != 2", r->TransferBufferLength);
-	}
-
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
@@ -544,29 +539,27 @@ static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	struct _URB_CONTROL_TRANSFER *urb_ctltrans = &urb->UrbControlTransfer;
-	bool dir_in = IsTransferDirectionIn(urb_ctltrans->TransferFlags);
+	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
+	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 
-	ULONG TransferFlags = urb_ctltrans->TransferFlags | USBD_SHORT_TRANSFER_OK;
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, r->PipeHandle,
+					r->TransferFlags, r->TransferBufferLength);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, urb_ctltrans->PipeHandle,
-		TransferFlags, urb_ctltrans->TransferBufferLength);
-
-	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_ctltrans->SetupPacket, sizeof(urb_ctltrans->SetupPacket));
-	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_ctltrans->SetupPacket), "assert");
+	RtlCopyMemory(hdr->u.cmd_submit.setup, r->SetupPacket, sizeof(r->SetupPacket));
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r->SetupPacket), "assert");
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	if (!dir_in && urb_ctltrans->TransferBufferLength > 0) {
-		if (get_read_payload_length(irp) >= urb_ctltrans->TransferBufferLength) {
-			PVOID buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
+	if (!dir_in && r->TransferBufferLength) {
+		if (get_read_payload_length(irp) >= r->TransferBufferLength) {
+			PVOID buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 			if (buf) {
-				RtlCopyMemory(hdr + 1, buf, urb_ctltrans->TransferBufferLength);
+				RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
 			} else {
 				return STATUS_INSUFFICIENT_RESOURCES;
 			}
 		} else {
-			urbr->vpdo->len_sent_partial = sizeof(struct usbip_header);
+			urbr->vpdo->len_sent_partial = sizeof(*hdr);
 		}
 	}
 
@@ -605,23 +598,22 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	struct _URB_CONTROL_TRANSFER_EX	*urb_control_ex = &urb->UrbControlTransferEx;
-	bool dir_in = is_endpoint_direction_in(urb_control_ex->PipeHandle);
-	ULONG TransferFlags = urb_control_ex->TransferFlags | USBD_SHORT_TRANSFER_OK;
+	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
+	bool dir_in = is_endpoint_direction_in(r->PipeHandle);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, urb_control_ex->PipeHandle,
-		TransferFlags, urb_control_ex->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, r->PipeHandle,
+					r->TransferFlags, r->TransferBufferLength);
 
-	RtlCopyMemory(hdr->u.cmd_submit.setup, urb_control_ex->SetupPacket, sizeof(urb_control_ex->SetupPacket));
-	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(urb_control_ex->SetupPacket), "assert");
+	RtlCopyMemory(hdr->u.cmd_submit.setup, r->SetupPacket, sizeof(r->SetupPacket));
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r->SetupPacket), "assert");
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
 	if (!dir_in) {
-		if (get_read_payload_length(irp) >= urb_control_ex->TransferBufferLength) {
-			PVOID buf = get_buf(urb_control_ex->TransferBuffer, urb_control_ex->TransferBufferMDL);
+		if (get_read_payload_length(irp) >= r->TransferBufferLength) {
+			PVOID buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 			if (buf) {
-				RtlCopyMemory(hdr + 1, buf, urb_control_ex->TransferBufferLength);
+				RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
 			} else {
 				return STATUS_INSUFFICIENT_RESOURCES;
 			}
@@ -685,7 +677,7 @@ static NTSTATUS urb_control_feature_request(IRP *irp, URB *urb, struct urb_req* 
 
 	struct _URB_CONTROL_FEATURE_REQUEST *r = &urb->UrbControlFeatureRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, USBD_SHORT_TRANSFER_OK, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, BMREQUEST_HOST_TO_DEVICE, BMREQUEST_STANDARD, recipient, bRequest);
 	setup->wValue.W = r->FeatureSelector; 
