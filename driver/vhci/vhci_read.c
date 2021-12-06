@@ -40,7 +40,6 @@ static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	setup->wValue.LowByte = 4; // Reset
 
 	irp->IoStatus.Information = sizeof(*hdr);
-
 	return STATUS_SUCCESS;
 }
 
@@ -228,81 +227,86 @@ static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS
-urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_req *urbr)
+static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR type, UCHAR recipient)
 {
-	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST	*urb_vc = &urb->UrbControlVendorClassRequest;
-	char	type, recip;
-	bool dir_in = IsTransferDirectionIn(urb_vc->TransferFlags);
-
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
-	if (hdr == NULL) {
+	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	switch (urb_vc->Hdr.Function) {
-	case URB_FUNCTION_CLASS_DEVICE:
-		type = BMREQUEST_CLASS;
-		recip = BMREQUEST_TO_DEVICE;
-		break;
-	case URB_FUNCTION_CLASS_INTERFACE:
-		type = BMREQUEST_CLASS;
-		recip = BMREQUEST_TO_INTERFACE;
-		break;
-	case URB_FUNCTION_CLASS_ENDPOINT:
-		type = BMREQUEST_CLASS;
-		recip = BMREQUEST_TO_ENDPOINT;
-		break;
-	case URB_FUNCTION_CLASS_OTHER:
-		type = BMREQUEST_CLASS;
-		recip = BMREQUEST_TO_OTHER;
-		break;
-	case URB_FUNCTION_VENDOR_DEVICE:
-		type = BMREQUEST_VENDOR;
-		recip = BMREQUEST_TO_DEVICE;
-		break;
-	case URB_FUNCTION_VENDOR_INTERFACE:
-		type = BMREQUEST_VENDOR;
-		recip = BMREQUEST_TO_INTERFACE;
-		break;
-	case URB_FUNCTION_VENDOR_ENDPOINT:
-		type = BMREQUEST_VENDOR;
-		recip = BMREQUEST_TO_ENDPOINT;
-		break;
-	case URB_FUNCTION_VENDOR_OTHER:
-		type = BMREQUEST_VENDOR;
-		recip = BMREQUEST_TO_OTHER;
-		break;
-	default:
-		return STATUS_INVALID_PARAMETER;
-	}
+	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
+	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0,
-				    urb_vc->TransferFlags | USBD_SHORT_TRANSFER_OK, urb_vc->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0, r->TransferFlags, r->TransferBufferLength);
 	
 	UCHAR dir = dir_in ? BMREQUEST_DEVICE_TO_HOST : BMREQUEST_HOST_TO_DEVICE;
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, dir, type, recip, urb_vc->Request);
-	setup->wLength = (USHORT)urb_vc->TransferBufferLength;
-	setup->wValue.W = urb_vc->Value;
-	setup->wIndex.W = urb_vc->Index;
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = init_setup_packet(hdr, dir, type, recipient, r->Request);
+	setup->wValue.W = r->Value;
+	setup->wIndex.W = r->Index;
+	setup->wLength = (USHORT)r->TransferBufferLength;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	if (!dir_in) {
-		if (get_read_payload_length(irp) >= urb_vc->TransferBufferLength) {
-			RtlCopyMemory(hdr + 1, urb_vc->TransferBuffer, urb_vc->TransferBufferLength);
-			irp->IoStatus.Information += urb_vc->TransferBufferLength;
-		} else {
-			urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		}
+	if (dir_in) {
+		return STATUS_SUCCESS;
 	}
 
-	return  STATUS_SUCCESS;
+	if (get_read_payload_length(irp) < r->TransferBufferLength) {
+		urbr->vpdo->len_sent_partial = sizeof(*hdr);
+		return STATUS_SUCCESS;
+	}
+	
+	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
+		irp->IoStatus.Information += r->TransferBufferLength;
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static NTSTATUS
-urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urbr)
+static NTSTATUS vendor_device(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_VENDOR, BMREQUEST_TO_DEVICE);
+}
+
+static NTSTATUS vendor_interface(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_VENDOR, BMREQUEST_TO_INTERFACE);
+}
+
+static NTSTATUS vendor_endpoint(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_VENDOR, BMREQUEST_TO_ENDPOINT);
+}
+
+static NTSTATUS vendor_other(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_VENDOR, BMREQUEST_TO_OTHER);
+}
+
+static NTSTATUS class_device(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_CLASS, BMREQUEST_TO_DEVICE);
+}
+
+static NTSTATUS class_interface(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_CLASS, BMREQUEST_TO_INTERFACE);
+}
+
+static NTSTATUS class_endpoint(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_CLASS, BMREQUEST_TO_ENDPOINT);
+}
+
+static NTSTATUS class_other(IRP *irp, URB *urb, struct urb_req *urbr)
+{
+	return urb_control_vendor_class_request(irp, urb, urbr, BMREQUEST_CLASS, BMREQUEST_TO_OTHER);
+}
+
+static NTSTATUS urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_SELECT_CONFIGURATION *urb_sc = &urb->UrbSelectConfiguration;
 
@@ -808,20 +812,20 @@ static const urb_function_t urb_functions[] =
 
 	NULL, // URB_FUNCTION_RESERVED_0X0016          
 
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_DEVICE
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_INTERFACE
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_ENDPOINT
+	vendor_device,
+	vendor_interface,
+	vendor_endpoint,
 
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_DEVICE 
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_INTERFACE
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_ENDPOINT
+	class_device,
+	class_interface,
+	class_endpoint,
 
 	NULL, // URB_FUNCTION_RESERVE_0X001D
 
 	sync_reset_pipe_and_clear_stall, // urb_pipe_request
 
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_OTHER
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_OTHER
+	class_other,
+	vendor_other,
 
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
 
