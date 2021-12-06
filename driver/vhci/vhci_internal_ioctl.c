@@ -272,36 +272,48 @@ static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb)
+static NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
+
+	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? 
+				", using chained mdl" : "";
+
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu",
-		(uintptr_t)r->PipeHandle,
-		usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
-		r->TransferBufferLength);
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu%s",
+			(uintptr_t)r->PipeHandle,
+			usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
+			r->TransferBufferLength,
+			func);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb)
+static NTSTATUS isoch_transfer(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
+
+	const char *func = urb->UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? 
+				", using chained mdl" : "";
+
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu",
-		(uintptr_t)r->PipeHandle,
-		usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
-		r->TransferBufferLength, r->StartFrame, r->NumberOfPackets, r->ErrorCount);
+	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
+			(uintptr_t)r->PipeHandle,	
+			usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
+			r->TransferBufferLength, 
+			r->StartFrame, 
+			r->NumberOfPackets, 
+			r->ErrorCount,
+			func);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
-
 static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
@@ -386,36 +398,6 @@ static NTSTATUS open_static_streams(vpdo_dev_t *vpdo, URB *urb)
 	return STATUS_NOT_IMPLEMENTED;
 }
 
-static NTSTATUS bulk_or_interrupt_transfer_using_chained_mdl(vpdo_dev_t *vpdo, URB *urb)
-{
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
-	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
-
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu",
-				(uintptr_t)r->PipeHandle,
-				usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
-				r->TransferBufferLength);
-
-	return STATUS_SUBMIT_URBR_IRP;
-}
-
-static NTSTATUS isoch_transfer_using_chained_mdl(vpdo_dev_t *vpdo, URB *urb)
-{
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
-	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
-
-	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu",
-				(uintptr_t)r->PipeHandle,
-				usbd_transfer_flags(buf, sizeof(buf), r->TransferFlags),
-				r->TransferBufferLength, r->StartFrame, r->NumberOfPackets, r->ErrorCount);
-
-	return STATUS_SUBMIT_URBR_IRP;
-}
-
 typedef NTSTATUS (*urb_function_t)(vpdo_dev_t*, URB*);
 
 static const urb_function_t urb_functions[] =
@@ -432,8 +414,8 @@ static const urb_function_t urb_functions[] =
 	urb_get_current_frame_number,
 
 	urb_control_transfer,
-	urb_bulk_or_interrupt_transfer,
-	urb_isoch_transfer,
+	bulk_or_interrupt_transfer,
+	isoch_transfer,
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE
@@ -498,8 +480,8 @@ static const urb_function_t urb_functions[] =
 
 	open_static_streams,
 	urb_pipe_request, // URB_FUNCTION_CLOSE_STATIC_STREAMS
-	bulk_or_interrupt_transfer_using_chained_mdl,
-	isoch_transfer_using_chained_mdl,
+	bulk_or_interrupt_transfer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	NULL, // 0x0039
 	NULL, // 0x003A        
