@@ -19,18 +19,6 @@ const char *urb_req_str(char *buf, size_t len, const struct urb_req *urbr)
 	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_urbr invalid parameter";
 }
 
-USB_DEFAULT_PIPE_SETUP_PACKET *init_setup_packet(struct usbip_header *hdr, UCHAR dir, UCHAR type, UCHAR recip, UCHAR request)
-{
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = get_submit_setup(hdr);
-
-	setup->bmRequestType.Dir = dir;
-	setup->bmRequestType.Type = type;
-	setup->bmRequestType.Recipient = recip;
-
-	setup->bRequest = request;
-	return setup;
-}
-
 struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 {
 	struct urb_req *result = NULL;
