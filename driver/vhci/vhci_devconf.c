@@ -8,8 +8,8 @@
 
 static __inline USBD_INTERFACE_INFORMATION* get_next_interface(USBD_INTERFACE_INFORMATION *iface)
 {
-	char *end = (char*)iface + iface->Length;
-	return (USBD_INTERFACE_INFORMATION*)end;
+	void *end = (char*)iface + iface->Length;
+	return end;
 }
 
 static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)

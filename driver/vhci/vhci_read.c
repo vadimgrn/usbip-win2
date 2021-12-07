@@ -159,24 +159,7 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static UCHAR get_recipient(int usb_function)
-{
-	switch (usb_function) {
-	case URB_FUNCTION_GET_STATUS_FROM_DEVICE:
-		return USB_RECIP_DEVICE;
-	case URB_FUNCTION_GET_STATUS_FROM_INTERFACE:
-		return USB_RECIP_INTERFACE;
-	case URB_FUNCTION_GET_STATUS_FROM_ENDPOINT:
-		return USB_RECIP_ENDPOINT;
-	case URB_FUNCTION_GET_STATUS_FROM_OTHER:
-		return USB_RECIP_OTHER;
-	}
-
-	NT_FRE_ASSERT(!"Unexpected usb function");
-	return USB_RECIP_MASK;
-}
-
-static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_req *urbr)
+static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR recipient)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
 	if (!hdr) {
@@ -193,7 +176,7 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
-	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | get_recipient(urb->UrbHeader.Function);
+	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | recipient;
 	pkt->bRequest = USB_REQUEST_GET_STATUS;
 	pkt->wIndex.W = r->Index;
 	pkt->wLength = (USHORT)r->TransferBufferLength; // must be 2
@@ -573,26 +556,21 @@ static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 
 static NTSTATUS urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
-	struct _URB_CONTROL_TRANSFER_EX	*urb_control_ex = &urb->UrbControlTransferEx;
-	PVOID	dst;
-	char	*buf;
+	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
 
-	dst = get_read_irp_data(irp, urb_control_ex->TransferBufferLength);
-	if (dst == NULL)
+	void *dst = get_read_irp_data(irp, r->TransferBufferLength);
+	if (!dst) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
 
-	/*
-	 * reading from TransferBuffer or TransferBufferMDL,
-	 * whichever of them is not null
-	 */
-	buf = get_buf(urb_control_ex->TransferBuffer, urb_control_ex->TransferBufferMDL);
-	if (buf == NULL)
-		return STATUS_INSUFFICIENT_RESOURCES;
-	RtlCopyMemory(dst, buf, urb_control_ex->TransferBufferLength);
-	irp->IoStatus.Information = urb_control_ex->TransferBufferLength;
-	vpdo->len_sent_partial = 0;
+	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(dst, buf, r->TransferBufferLength);
+		irp->IoStatus.Information = r->TransferBufferLength;
+		vpdo->len_sent_partial = 0;
+	}
 
-	return STATUS_SUCCESS;
+	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr)
@@ -775,6 +753,26 @@ static NTSTATUS get_interface(IRP *irp, URB *urb, struct urb_req* urbr)
 	return STATUS_SUCCESS;
 }
 
+static NTSTATUS get_status_from_device(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_get_status_request(irp, urb, urbr, USB_RECIP_DEVICE);
+}
+
+static NTSTATUS get_status_from_interface(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_get_status_request(irp, urb, urbr, USB_RECIP_INTERFACE);
+}
+
+static NTSTATUS get_status_from_endpoint(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_get_status_request(irp, urb, urbr, USB_RECIP_ENDPOINT);
+}
+
+static NTSTATUS get_status_from_other(IRP *irp, URB *urb, struct urb_req* urbr)
+{
+	return urb_control_get_status_request(irp, urb, urbr, USB_RECIP_OTHER);
+}
+
 typedef NTSTATUS (*urb_function_t)(IRP *irp, URB *urb, struct urb_req*);
 
 static const urb_function_t urb_functions[] =
@@ -805,9 +803,9 @@ static const urb_function_t urb_functions[] =
 	clear_feature_to_interface,
 	clear_feature_to_endpoint,
 
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
+	get_status_from_device,
+	get_status_from_interface,
+	get_status_from_endpoint,
 
 	NULL, // URB_FUNCTION_RESERVED_0X0016          
 
@@ -826,7 +824,7 @@ static const urb_function_t urb_functions[] =
 	class_other,
 	vendor_other,
 
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
+	get_status_from_other,
 
 	set_feature_to_other, 
 	clear_feature_to_other,
@@ -937,16 +935,14 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 	return status;
 }
 
-static NTSTATUS
-store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
+static NTSTATUS store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 {
-	struct usbip_header	*hdr;
-
 	TraceInfo(TRACE_READ, "Enter");
 
-	hdr = get_usbip_hdr_from_read_irp(irp);
-	if (hdr == NULL)
+	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
+	if (!hdr) {
 		return STATUS_INVALID_PARAMETER;
+	}
 
 	set_cmd_unlink_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, urbr->seq_num_unlink);
 
@@ -988,19 +984,15 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 	return status;
 }
 
-static VOID
-on_pending_irp_read_cancelled(PDEVICE_OBJECT devobj, PIRP irp_read)
+static void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 {
 	UNREFERENCED_PARAMETER(devobj);
 	TraceInfo(TRACE_READ, "pending irp read cancelled %p", irp_read);
 
-	PIO_STACK_LOCATION	irpstack;
-	pvpdo_dev_t	vpdo;
-
 	IoReleaseCancelSpinLock(irp_read->CancelIrql);
 
-	irpstack = IoGetCurrentIrpStackLocation(irp_read);
-	vpdo = irpstack->FileObject->FsContext;
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp_read);
+	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 
 	KIRQL irql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &irql);
