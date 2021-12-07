@@ -437,7 +437,7 @@ static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const 
 		return irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
 	}
 
-	req = urbr->irp->AssociatedIrp.SystemBuffer;
+	req = irp->AssociatedIrp.SystemBuffer;
         RtlCopyMemory(req->Data, hdr + 1, actual_length);
 		
 	char buf[USB_SETUP_PKT_STR_BUFBZ];
@@ -451,23 +451,24 @@ static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const 
 
 static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
 {
+	IRP *irp = urbr->irp;
+	if (!irp) {
+		return STATUS_SUCCESS;
+	}
+
 	if (hdr->base.command != USBIP_RET_SUBMIT) {
 		TraceError(TRACE_WRITE, "USBIP_RET_SUBMIT expected, got %!usbip_request_type!", hdr->base.command);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (!urbr->irp) {
-		return STATUS_SUCCESS;
-	}
-
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = internal_usb_submit_urb(urbr->vpdo, URB_FROM_IRP(urbr->irp), hdr);
+		st = internal_usb_submit_urb(urbr->vpdo, URB_FROM_IRP(irp), hdr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		st = get_descriptor_from_node_connection(urbr, hdr);
@@ -478,7 +479,7 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	default:
 		char buf[URB_REQ_STR_BUFSZ];
 		TraceWarning(TRACE_WRITE, "Unhandled %s(%#08lX), %s", 
-			dbg_ioctl_code(ioctl_code), ioctl_code, urb_req_str(buf, sizeof(buf), urbr));
+				dbg_ioctl_code(ioctl_code), ioctl_code, urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	return st;
@@ -486,15 +487,17 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 
 static struct usbip_header *get_usbip_hdr_from_write_irp(IRP *irp)
 {
+	struct usbip_header *hdr = NULL;
+
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG len = irpstack->Parameters.Write.Length;
 	
-	if (len >= sizeof(struct usbip_header)) {
+	if (len >= sizeof(*hdr)) {
 		irp->IoStatus.Information = len;
-		return irp->AssociatedIrp.SystemBuffer;
+		hdr = irp->AssociatedIrp.SystemBuffer;
 	}
 	
-	return NULL;
+	return hdr;
 }
 
 static void complete_irp(IRP *irp, NTSTATUS status)

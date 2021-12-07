@@ -46,9 +46,6 @@ static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-/*
- * BMREQUEST_DEVICE_TO_HOST, BMREQUEST_STANDARD, BMREQUEST_TO_DEVICE, USB_REQUEST_GET_DESCRIPTOR);
- */
 static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -64,8 +61,11 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, outlen);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
-	static_assert(sizeof(*pkt) == sizeof(r->SetupPacket), "assert");
-	RtlCopyMemory(pkt, &r->SetupPacket, sizeof(*pkt));
+	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+	pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
+	pkt->wValue.W = r->SetupPacket.wValue;
+	pkt->wIndex.W = r->SetupPacket.wIndex;
+	pkt->wLength = r->SetupPacket.wLength;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
