@@ -35,7 +35,7 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	}
 	
 	if (bufMDL) {
-		buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority);
+		buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority | MdlMappingNoExecute);
 	}
 
 	if (!buf) {
@@ -258,14 +258,12 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 	}
 
 	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
-	if (!buf) {
-		return STATUS_INVALID_PARAMETER;
+	if (buf) {
+		copy_iso_data(buf, r->TransferBufferLength, usbip_data, actual_length, r);
+		r->TransferBufferLength = actual_length;
 	}
 
-	copy_iso_data(buf, r->TransferBufferLength, usbip_data, actual_length, r);
-	r->TransferBufferLength = actual_length;
-
-	return STATUS_SUCCESS;
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
 static NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)

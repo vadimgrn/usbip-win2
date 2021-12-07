@@ -105,14 +105,14 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 	return STATUS_SUCCESS;
 }
 
-static void *get_buf(void *buf, MDL *bufMDL)
+static const void *get_buf(void *buf, MDL *bufMDL)
 {
 	if (buf) {
 		return buf;
 	}
 
 	if (bufMDL) {
-		buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority);
+		buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority | MdlMappingNoExecute | MdlMappingNoWrite);
 	}
 
 	if (!buf) {
@@ -150,7 +150,7 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 	if (buf) {
 		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
 		irp->IoStatus.Information += r->TransferBufferLength;
@@ -194,7 +194,7 @@ static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	void *buf = get_buf(urb_vc->TransferBuffer, urb_vc->TransferBufferMDL);
+	const void *buf = get_buf(urb_vc->TransferBuffer, urb_vc->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -236,7 +236,7 @@ static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_
 		return STATUS_SUCCESS;
 	}
 	
-	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 	if (buf) {
 		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
 		irp->IoStatus.Information += r->TransferBufferLength;
@@ -328,21 +328,21 @@ static NTSTATUS urb_select_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 
 static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
-	struct _URB_BULK_OR_INTERRUPT_TRANSFER	*urb_bi = &urb->UrbBulkOrInterruptTransfer;
-	PVOID	dst, src;
+	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
 
-	dst = get_read_irp_data(irp, urb_bi->TransferBufferLength);
-	if (dst == NULL)
+	void *dst = get_read_irp_data(irp, r->TransferBufferLength);
+	if (!dst) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
 
-	src = get_buf(urb_bi->TransferBuffer, urb_bi->TransferBufferMDL);
-	if (src == NULL)
-		return STATUS_INSUFFICIENT_RESOURCES;
-	RtlCopyMemory(dst, src, urb_bi->TransferBufferLength);
-	irp->IoStatus.Information = urb_bi->TransferBufferLength;
-	vpdo->len_sent_partial = 0;
-
-	return STATUS_SUCCESS;
+	const void *src = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (src) {
+		RtlCopyMemory(dst, src, r->TransferBufferLength);
+		irp->IoStatus.Information = r->TransferBufferLength;
+		vpdo->len_sent_partial = 0;
+	}
+	
+	return src ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 /* 
@@ -377,7 +377,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 			void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? 
 					NULL : urb_bi->TransferBuffer;
 
-			void *buf = get_buf(buf_a, urb_bi->TransferBufferMDL);
+			const void *buf = get_buf(buf_a, urb_bi->TransferBufferMDL);
 			if (buf) {
 				RtlCopyMemory(hdr + 1, buf, urb_bi->TransferBufferLength);
 			} else {
@@ -395,7 +395,7 @@ static NTSTATUS copy_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
 {
 	void *buf_a = urb_iso->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : urb_iso->TransferBuffer;
 
-	void *buf = get_buf(buf_a, urb_iso->TransferBufferMDL);
+	const void *buf = get_buf(buf_a, urb_iso->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -507,7 +507,7 @@ static NTSTATUS urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB ur
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	void *buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
+	const void *buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
 	if (!buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -540,7 +540,7 @@ static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 
 	if (!dir_in && r->TransferBufferLength) {
 		if (get_read_payload_length(irp) >= r->TransferBufferLength) {
-			PVOID buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+			const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 			if (buf) {
 				RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
 			} else {
@@ -563,7 +563,7 @@ static NTSTATUS urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 	if (buf) {
 		RtlCopyMemory(dst, buf, r->TransferBufferLength);
 		irp->IoStatus.Information = r->TransferBufferLength;
@@ -594,7 +594,7 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 
 	if (!dir_in) {
 		if (get_read_payload_length(irp) >= r->TransferBufferLength) {
-			PVOID buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+			const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 			if (buf) {
 				RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
 			} else {
