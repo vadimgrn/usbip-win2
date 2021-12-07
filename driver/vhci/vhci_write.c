@@ -453,6 +453,11 @@ static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const 
 
 static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
 {
+	if (hdr->base.command != USBIP_RET_SUBMIT) {
+		TraceError(TRACE_WRITE, "USBIP_RET_SUBMIT expected, got %!usbip_request_type!", hdr->base.command);
+		return STATUS_INVALID_PARAMETER;
+	}
+
 	if (!urbr->irp) {
 		return STATUS_SUCCESS;
 	}
