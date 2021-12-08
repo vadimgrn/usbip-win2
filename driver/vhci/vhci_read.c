@@ -74,6 +74,9 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 /* 
  * 1. We clear STALL/HALT feature on endpoint specified by pipe
  * 2. We abort/cancel all IRP for given pipe
+ *
+ * See: <linux>/drivers/usb/core/message.c, usb_clear_halt.
+ *	<linux>/drivers/usb/core/hcd.c, usb_hcd_reset_endpoint
  */
 static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_req *urbr)
 {
@@ -82,9 +85,9 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	struct _URB_PIPE_REQUEST *urb_rp = &urb->UrbPipeRequest;
+	struct _URB_PIPE_REQUEST *r = &urb->UrbPipeRequest;
 
-	if (get_endpoint_type(urb_rp->PipeHandle) == UsbdPipeTypeControl) {
+	if (get_endpoint_type(r->PipeHandle) == UsbdPipeTypeControl) {
 		TraceWarning(TRACE_READ, "CLEAR not allowed to a control pipe");
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -95,13 +98,11 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
 	pkt->bRequest = USB_REQUEST_CLEAR_FEATURE;
 	pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL;
-	pkt->wIndex.W = get_endpoint_address(urb_rp->PipeHandle);
+	pkt->wIndex.W = get_endpoint_address(r->PipeHandle);
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	// cancel/abort all URBs for given pipe
-	vhci_ioctl_abort_pipe(urbr->vpdo, urb_rp->PipeHandle);
-
+	vhci_ioctl_abort_pipe(urbr->vpdo, r->PipeHandle); // cancel/abort all URBs for given pipe
 	return STATUS_SUCCESS;
 }
 

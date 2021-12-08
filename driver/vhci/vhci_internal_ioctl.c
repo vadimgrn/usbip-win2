@@ -223,6 +223,14 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_PIPE_REQUEST *r = &urb->UrbPipeRequest;
+
+	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d)",
+			urb_function_str(r->Hdr.Function), 
+			(uintptr_t)r->PipeHandle, 
+			get_endpoint_address(r->PipeHandle), 
+			get_endpoint_type(r->PipeHandle),
+			get_endpoint_interval(r->PipeHandle));
+
 	NTSTATUS st = STATUS_NOT_SUPPORTED;
 
 	switch (urb->UrbHeader.Function) {
@@ -237,9 +245,6 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 	case URB_FUNCTION_CLOSE_STATIC_STREAMS:
 		break;
 	}
-
-	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %#Ix -> %!STATUS!",
-				urb_function_str(r->Hdr.Function), (uintptr_t)r->PipeHandle, st);
 
 	return st;
 }
