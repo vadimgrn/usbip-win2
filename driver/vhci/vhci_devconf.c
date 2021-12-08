@@ -5,6 +5,7 @@
 #include "vhci.h"
 #include "usbip_vhci_api.h"
 #include "devconf.h"
+#include "dbgcommon.h"
 
 static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 {
@@ -105,4 +106,84 @@ NTSTATUS setup_config(
 	}
 
 	return STATUS_SUCCESS;
+}
+
+enum { USBD_INTERFACE_STR_BUFSZ = 1024 };
+
+static const char *usbd_interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt)
+{
+	NTSTATUS st = STATUS_SUCCESS;
+
+	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i) {
+
+		st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "
+			"Class %#02hhx, SubClass %#02hhx, Protocol %#02hhx, InterfaceHandle %#Ix, NumberOfPipes %lu)", 
+			r->Length, 
+			r->InterfaceNumber,
+			r->AlternateSetting,
+			r->Class,
+			r->SubClass,
+			r->Protocol,
+			(uintptr_t)r->InterfaceHandle,
+			r->NumberOfPipes);
+
+		for (ULONG j = 0; j < r->NumberOfPipes && st == STATUS_SUCCESS; ++j) {
+
+			const USBD_PIPE_INFORMATION *p = r->Pipes + j;
+
+			st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+				"\nPipes[%lu](MaximumPacketSize %#x, EndpointAddress %#02hhx(%s#%d), Interval %#hhx, %s, "
+				"PipeHandle %#Ix, MaximumTransferSize %#lx, PipeFlags %#lx)",
+				j,
+				p->MaximumPacketSize,
+				p->EndpointAddress,
+				USB_ENDPOINT_DIRECTION_IN(p->EndpointAddress) ? "in" : "out",
+				p->EndpointAddress & USB_ENDPOINT_ADDRESS_MASK,
+				p->Interval,
+				usbd_pipe_type_str(p->PipeType),
+				(uintptr_t)p->PipeHandle,
+				p->MaximumTransferSize,
+				p->PipeFlags);
+		}
+
+		r = get_next_interface(r);
+	}
+
+	return buf && *buf ? buf : "usbd_interface_str error"; 
+}
+
+void trace_select_configuration(const struct _URB_SELECT_CONFIGURATION *r)
+{
+	const USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor;
+	if (!cd) {
+		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
+						(uintptr_t)r->ConfigurationHandle);
+
+		return;
+	}
+	
+	char buf[USBD_INTERFACE_STR_BUFSZ];
+
+	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, "
+			"ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu, bNumInterfaces %d, "
+			"bConfigurationValue %d, iConfiguration %d, bmAttributes %!#XBYTE!, MaxPower %d)%s",
+			(uintptr_t)r->ConfigurationHandle,
+			cd->bLength,
+			cd->bDescriptorType,
+			cd->wTotalLength,
+			cd->bNumInterfaces,
+			cd->bConfigurationValue,
+			cd->iConfiguration,
+			cd->bmAttributes,
+			cd->MaxPower,
+			usbd_interfaces_str(buf, sizeof(buf), &r->Interface, cd->bNumInterfaces));
+}
+
+void trace_select_interface(const struct _URB_SELECT_INTERFACE *r)
+{
+	char buf[USBD_INTERFACE_STR_BUFSZ];
+
+	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix%s", (uintptr_t)r->ConfigurationHandle, 
+				usbd_interfaces_str(buf, sizeof(buf), &r->Interface, 1));
 }
