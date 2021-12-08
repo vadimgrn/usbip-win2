@@ -124,14 +124,20 @@ static NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, URB *urb)
 static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
-	trace_select_configuration(&urb->UrbSelectConfiguration);
+
+	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+	TraceVerbose(TRACE_IOCTL, "%s", select_configuration_str(buf, sizeof(buf), &urb->UrbSelectConfiguration));
+
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
 static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
-	trace_select_interface(&urb->UrbSelectInterface);
+
+	char buf[SELECT_INTERFACE_STR_BUFSZ];
+	TraceVerbose(TRACE_IOCTL, "%s", select_interface_str(buf, sizeof(buf), &urb->UrbSelectInterface));
+
 	return STATUS_SUBMIT_URBR_IRP;
 }
 

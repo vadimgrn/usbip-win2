@@ -91,13 +91,12 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPT
  * followed by a sequence of variable-length array of USBD_INTERFACE_INFORMATION structures, 
  * each element in the array for each unique interface number in the configuration. 
  */
-NTSTATUS setup_config(
-	USB_CONFIGURATION_DESCRIPTOR *cfgd, 
-	USBD_INTERFACE_INFORMATION *iface, 
-	const void *cfg_end, 
-	enum usb_device_speed speed)
+NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed)
 {
-	for (int i = 0; i < cfgd->bNumInterfaces && (void*)iface < cfg_end; ++i, iface = get_next_interface(iface)) {
+	USBD_INTERFACE_INFORMATION *iface = &cfg->Interface;
+	const void *cfg_end = get_configuration_end(cfg);
+		
+	for (int i = 0; i < cfgd->bNumInterfaces; ++i, iface = get_next_interface(iface, cfg_end)) {
 		
 		NTSTATUS status = setup_intf(iface, cfgd, speed);
 		if (status != STATUS_SUCCESS) {
@@ -108,13 +107,11 @@ NTSTATUS setup_config(
 	return STATUS_SUCCESS;
 }
 
-enum { USBD_INTERFACE_STR_BUFSZ = 1024 };
-
-static const char *usbd_interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt)
+static void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt, const void *cfg_end)
 {
 	NTSTATUS st = STATUS_SUCCESS;
 
-	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i) {
+	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i, r = get_next_interface(r, cfg_end)) {
 
 		st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
 			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "
@@ -146,44 +143,53 @@ static const char *usbd_interfaces_str(char *buf, size_t len, const USBD_INTERFA
 				p->MaximumTransferSize,
 				p->PipeFlags);
 		}
-
-		r = get_next_interface(r);
 	}
-
-	return buf && *buf ? buf : "usbd_interface_str error"; 
 }
 
-void trace_select_configuration(const struct _URB_SELECT_CONFIGURATION *r)
+const char *select_configuration_str(char *buf, size_t len, const struct _URB_SELECT_CONFIGURATION *cfg)
 {
-	const USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor;
+	const USB_CONFIGURATION_DESCRIPTOR *cd = cfg->ConfigurationDescriptor;
 	if (!cd) {
-		TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
-						(uintptr_t)r->ConfigurationHandle);
+		NTSTATUS st = RtlStringCbPrintfA(buf, len, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
+							(uintptr_t)cfg->ConfigurationHandle);
 
-		return;
+		return st != STATUS_INVALID_PARAMETER ? buf : "select_configuration_str invalid parameter";
 	}
 	
-	char buf[USBD_INTERFACE_STR_BUFSZ];
+	const char *result = buf;
 
-	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix, "
-			"ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu, bNumInterfaces %d, "
-			"bConfigurationValue %d, iConfiguration %d, bmAttributes %!#XBYTE!, MaxPower %d)%s",
-			(uintptr_t)r->ConfigurationHandle,
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+			"ConfigurationHandle %#Ix, "
+			"ConfigurationDescriptor(bLength %d, bDescriptorType %d (must be %d), wTotalLength %hu, "
+			"bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
+			(uintptr_t)cfg->ConfigurationHandle,
 			cd->bLength,
 			cd->bDescriptorType,
+			USB_CONFIGURATION_DESCRIPTOR_TYPE,
 			cd->wTotalLength,
 			cd->bNumInterfaces,
 			cd->bConfigurationValue,
 			cd->iConfiguration,
 			cd->bmAttributes,
-			cd->MaxPower,
-			usbd_interfaces_str(buf, sizeof(buf), &r->Interface, cd->bNumInterfaces));
+			cd->MaxPower);
+
+	if (st == STATUS_SUCCESS) {
+		const void *cfg_end = get_configuration_end(cfg);
+		interfaces_str(buf, len, &cfg->Interface, cd->bNumInterfaces, cfg_end);
+	}
+
+	return result && *result ? result : "select_configuration_str error";
 }
 
-void trace_select_interface(const struct _URB_SELECT_INTERFACE *r)
+const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT_INTERFACE *iface)
 {
-	char buf[USBD_INTERFACE_STR_BUFSZ];
+	const char *result = buf;
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,  
+						"ConfigurationHandle %#Ix", (uintptr_t)iface->ConfigurationHandle);
 
-	TraceVerbose(TRACE_IOCTL, "ConfigurationHandle %#Ix%s", (uintptr_t)r->ConfigurationHandle, 
-				usbd_interfaces_str(buf, sizeof(buf), &r->Interface, 1));
+	if (st == STATUS_SUCCESS) {
+		interfaces_str(buf, len, &iface->Interface, 1, NULL);
+	}
+
+	return result && *result ? result : "select_interface_str error";
 }

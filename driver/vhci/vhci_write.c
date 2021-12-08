@@ -84,8 +84,7 @@ static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struc
 static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	UNREFERENCED_PARAMETER(hdr);
-	struct _URB_SELECT_INTERFACE *r = &urb->UrbSelectInterface;
-	return vpdo_select_interface(vpdo, &r->Interface);
+	return vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
 static void *copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, const void *src, int src_len)

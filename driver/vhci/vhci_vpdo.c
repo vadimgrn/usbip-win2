@@ -24,30 +24,36 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 	if (vpdo->dsc_conf) {
 		RtlCopyMemory(vpdo->dsc_conf, new_conf, new_conf->wTotalLength);
 	} else {
-		TraceError(TRACE_WRITE, "failed to allocate configuration descriptor: out of memory");
+		TraceError(TRACE_VPDO, "failed to allocate configuration descriptor: out of memory");
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	const void *cfg_end = (char*)cfg + cfg->Hdr.Length;
+	NTSTATUS status = setup_config(cfg, vpdo->dsc_conf, vpdo->speed);
 
-	NTSTATUS status = setup_config(vpdo->dsc_conf, &cfg->Interface, cfg_end, vpdo->speed);
 	if (NT_SUCCESS(status)) {
 		cfg->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)0x12345678; // meaningless value, handle value is not used
+
+		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+		TraceVerbose(TRACE_VPDO, "%s", select_configuration_str(buf, sizeof(buf), cfg));
 	}
 
 	return status;
 }
 
-PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, USBD_INTERFACE_INFORMATION *iface)
+PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INTERFACE *r)
 {
 	if (!vpdo->dsc_conf) {
-		TraceWarning(TRACE_WRITE, "Empty configuration descriptor");
+		TraceWarning(TRACE_VPDO, "Empty configuration descriptor");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
+	USBD_INTERFACE_INFORMATION *iface = &r->Interface;
 	NTSTATUS status = setup_intf(iface, vpdo->dsc_conf, vpdo->speed);
 
 	if (NT_SUCCESS(status)) {
+		char buf[SELECT_INTERFACE_STR_BUFSZ];
+		TraceVerbose(TRACE_VPDO, "%s", select_interface_str(buf, sizeof(buf), r));
+
 		vpdo->current_intf_num = iface->InterfaceNumber;
 		vpdo->current_intf_alt = iface->AlternateSetting;
 	}

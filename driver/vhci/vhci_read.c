@@ -294,13 +294,14 @@ static NTSTATUS urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urb
 	}
 
 	struct _URB_SELECT_CONFIGURATION *r = &urb->UrbSelectConfiguration;
+	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor; // NULL if unconfigured
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
 	pkt->bRequest = USB_REQUEST_SET_CONFIGURATION;
-	pkt->wValue.W = r->ConfigurationDescriptor->bConfigurationValue;
+	pkt->wValue.W = cd ? cd->bConfigurationValue : 0; // FIXME: linux expects -1 if unconfigured
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;

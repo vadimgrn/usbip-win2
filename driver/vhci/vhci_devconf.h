@@ -8,16 +8,27 @@
 
 #include "usbip_proto.h" 
 
-NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *cfgd, USBD_INTERFACE_INFORMATION *iface, const void *cfg_end, enum usb_device_speed speed);
+NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed);
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed);
 
-void trace_select_configuration(const struct _URB_SELECT_CONFIGURATION *r);
-void trace_select_interface(const struct _URB_SELECT_INTERFACE *r);
+enum { 
+	SELECT_CONFIGURATION_STR_BUFSZ = 1024, 
+	SELECT_INTERFACE_STR_BUFSZ = SELECT_CONFIGURATION_STR_BUFSZ 
+};
 
-__inline USBD_INTERFACE_INFORMATION *get_next_interface(const USBD_INTERFACE_INFORMATION *iface)
+const char *select_configuration_str(char *buf, size_t len, const struct _URB_SELECT_CONFIGURATION *cfg);
+const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT_INTERFACE *iface);
+
+__inline const void *get_configuration_end(const struct _URB_SELECT_CONFIGURATION *cfg)
 {
-	void *end = (char*)iface + iface->Length;
-	return end;
+	return (char*)cfg + cfg->Hdr.Length;
+}
+
+__inline USBD_INTERFACE_INFORMATION *get_next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end)
+{
+	NT_ASSERT((void*)iface < cfg_end);
+	void *next = (char*)iface + iface->Length;
+	return next < cfg_end ? next : NULL;
 }
 
 __inline USBD_PIPE_HANDLE make_pipe_handle(UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
