@@ -6,14 +6,14 @@
 #include "usbreq.h"
 #include "devconf.h"
 
-PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *urb)
+PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *cfg)
 {
 	if (vpdo->dsc_conf) {
 		ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
 		vpdo->dsc_conf = NULL;
 	}
 
-	USB_CONFIGURATION_DESCRIPTOR *new_conf = urb->ConfigurationDescriptor;
+	USB_CONFIGURATION_DESCRIPTOR *new_conf = cfg->ConfigurationDescriptor;
 	if (!new_conf) {
 		TraceInfo(TRACE_VPDO, "going to unconfigured state");
 		return STATUS_SUCCESS;
@@ -28,31 +28,30 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	void *intf_end = (char*)urb + urb->Hdr.Length;
+	const void *cfg_end = (char*)cfg + cfg->Hdr.Length;
 
-	NTSTATUS status = setup_config(vpdo->dsc_conf, &urb->Interface, intf_end, vpdo->speed);
+	NTSTATUS status = setup_config(vpdo->dsc_conf, &cfg->Interface, cfg_end, vpdo->speed);
 	if (NT_SUCCESS(status)) {
-		/* assign meaningless value, handle value is not used */
-		urb->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)0x12345678;
+		cfg->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)0x12345678; // meaningless value, handle value is not used
 	}
 
 	return status;
 }
 
-PAGEABLE NTSTATUS
-vpdo_select_interface(pvpdo_dev_t vpdo, USBD_INTERFACE_INFORMATION *info_intf)
+PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, USBD_INTERFACE_INFORMATION *iface)
 {
-	NTSTATUS	status;
-
-	if (vpdo->dsc_conf == NULL) {
-		TraceWarning(TRACE_WRITE, "failed to select interface: empty configuration descriptor");
+	if (!vpdo->dsc_conf) {
+		TraceWarning(TRACE_WRITE, "Empty configuration descriptor");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
-	status = setup_intf(info_intf, vpdo->dsc_conf, vpdo->speed);
+
+	NTSTATUS status = setup_intf(iface, vpdo->dsc_conf, vpdo->speed);
+
 	if (NT_SUCCESS(status)) {
-		vpdo->current_intf_num = info_intf->InterfaceNumber;
-		vpdo->current_intf_alt = info_intf->AlternateSetting;
+		vpdo->current_intf_num = iface->InterfaceNumber;
+		vpdo->current_intf_alt = iface->AlternateSetting;
 	}
+
 	return status;
 }
 

@@ -8,8 +8,8 @@
 
 #include "usbip_proto.h" 
 
-NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USBD_INTERFACE_INFORMATION *info_intf, void *intf_end, enum usb_device_speed speed);
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, USB_CONFIGURATION_DESCRIPTOR *dsc_conf, enum usb_device_speed speed);
+NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *cfgd, USBD_INTERFACE_INFORMATION *iface, const void *cfg_end, enum usb_device_speed speed);
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed);
 
 __inline USBD_PIPE_HANDLE make_pipe_handle(UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
 {

@@ -30,17 +30,6 @@ static __inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
 	return v[1]; 
 }
 
-enum { DBG_PIPE_BUFSZ = 255 };
-
-static const char *dbg_pipe(char* buf, unsigned int len, const USBD_PIPE_INFORMATION *pipe)
-{
-	NTSTATUS st = RtlStringCbPrintfA(buf, len, "addr:%02x intv:%d typ:%d mps:%d mts:%lu flags:%x",
-		pipe->EndpointAddress, pipe->Interval, pipe->PipeType, pipe->PipeFlags,
-		pipe->MaximumPacketSize, pipe->MaximumTransferSize, pipe->PipeFlags);
-
-	return st == STATUS_SUCCESS ? buf : "dbg_pipe error";
-}
-
 static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enum usb_device_speed speed)
 {
 	pipe->MaximumPacketSize = ep_desc->wMaxPacketSize;
@@ -72,57 +61,52 @@ static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 	USBD_PIPE_INFORMATION *pi = params->pi + i;
 
 	set_pipe(pi, d, params->speed);
-
-	char buf[DBG_PIPE_BUFSZ];
-	TraceInfo(TRACE_IOCTL, "%d: %s", i, dbg_pipe(buf, sizeof(buf), pi));
-
 	return false;
 }
 
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPTOR *dsc_conf, enum usb_device_speed speed)
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed)
 {
-	if (sizeof(*intf) - sizeof(*intf->Pipes) > intf->Length) {
-		TraceError(TRACE_URB, "insufficient interface information size?");
-		///TODO: need to check
+	if (intf->Length < sizeof(*intf) - sizeof(intf->Pipes)) { // can have zero pipes
+		TraceError(TRACE_URB, "Interface length %d is too short", intf->Length);
 		return STATUS_SUCCESS;
 	}
 
-	USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(dsc_conf, intf->InterfaceNumber, intf->AlternateSetting);
-	if (!dsc_intf) {
-		TraceWarning(TRACE_IOCTL, "no interface desc");
+	USB_INTERFACE_DESCRIPTOR *ifd = dsc_find_intf(cfgd, intf->InterfaceNumber, intf->AlternateSetting);
+	if (!ifd) {
+		TraceWarning(TRACE_IOCTL, "Can't find descriptor: InterfaceNumber %d, AlternateSetting %d",
+					intf->InterfaceNumber, intf->AlternateSetting);
+
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	intf->Class = dsc_intf->bInterfaceClass;
-	intf->SubClass = dsc_intf->bInterfaceSubClass;
-	intf->Protocol = dsc_intf->bInterfaceProtocol;
+	intf->Class = ifd->bInterfaceClass;
+	intf->SubClass = ifd->bInterfaceSubClass;
+	intf->Protocol = ifd->bInterfaceProtocol;
 	intf->InterfaceHandle = make_interface_handle(intf->InterfaceNumber, intf->AlternateSetting);
-	intf->NumberOfPipes = dsc_intf->bNumEndpoints;
+	intf->NumberOfPipes = ifd->bNumEndpoints;
 
 	struct init_ep_data data = { intf->Pipes, speed };
-	dsc_for_each_endpoint(dsc_conf, dsc_intf, init_ep, &data);
+	dsc_for_each_endpoint(cfgd, ifd, init_ep, &data);
 
 	return STATUS_SUCCESS;
 }
 
+/*
+ * An URB_FUNCTION_SELECT_CONFIGURATION URB consists of a _URB_SELECT_CONFIGURATION structure 
+ * followed by a sequence of variable-length array of USBD_INTERFACE_INFORMATION structures, 
+ * each element in the array for each unique interface number in the configuration. 
+ */
 NTSTATUS setup_config(
-	USB_CONFIGURATION_DESCRIPTOR *dsc_conf, 
-	USBD_INTERFACE_INFORMATION *info_intf, 
-	void *intf_end, 
+	USB_CONFIGURATION_DESCRIPTOR *cfgd, 
+	USBD_INTERFACE_INFORMATION *iface, 
+	const void *cfg_end, 
 	enum usb_device_speed speed)
 {
-	for (int i = 0; i < dsc_conf->bNumInterfaces; ++i) {
+	for (int i = 0; i < cfgd->bNumInterfaces && (void*)iface < cfg_end; ++i, iface = get_next_interface(iface)) {
 		
-		NTSTATUS status = setup_intf(info_intf, dsc_conf, speed);
+		NTSTATUS status = setup_intf(iface, cfgd, speed);
 		if (status != STATUS_SUCCESS) {
 			return status;
-		}
-
-		info_intf = get_next_interface(info_intf);
-	
-		/* urb_selc may have less info_intf than bNumInterfaces in conf desc */
-		if ((void*)info_intf >= intf_end) {
-			break;
 		}
 	}
 

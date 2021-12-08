@@ -542,7 +542,7 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "irp %p -> %s", irp, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+		TraceInfo(TRACE_WRITE, "irp %#p -> %s", irp, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	}
 
 	NTSTATUS status = process_urb_res(urbr, hdr);
