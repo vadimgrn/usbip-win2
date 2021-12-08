@@ -6,12 +6,6 @@
 #include "usbip_vhci_api.h"
 #include "devconf.h"
 
-static __inline USBD_INTERFACE_INFORMATION* get_next_interface(USBD_INTERFACE_INFORMATION *iface)
-{
-	void *end = (char*)iface + iface->Length;
-	return end;
-}
-
 static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 {
 	UCHAR v[sizeof(USBD_INTERFACE_HANDLE)] = { altsetting, ifnum };

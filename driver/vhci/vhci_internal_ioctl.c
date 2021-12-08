@@ -12,12 +12,6 @@ const NTSTATUS STATUS_SUBMIT_URBR_IRP = -1L;
 
 enum { USBD_INTERFACE_STR_BUFSZ = 1024 };
 
-__inline USBD_INTERFACE_INFORMATION *next_interface(const USBD_INTERFACE_INFORMATION *iface)
-{
-	void *next = (char*)iface + iface->Length;
-	return next;
-}
-
 static const char *usbd_interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt)
 {
 	NTSTATUS st = STATUS_SUCCESS;
@@ -55,7 +49,7 @@ static const char *usbd_interfaces_str(char *buf, size_t len, const USBD_INTERFA
 				p->PipeFlags);
 		}
 
-		r = next_interface(r);
+		r = get_next_interface(r);
 	}
 
 	return buf && *buf ? buf : "usbd_interface_str error"; 

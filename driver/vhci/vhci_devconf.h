@@ -11,6 +11,12 @@
 NTSTATUS setup_config(USB_CONFIGURATION_DESCRIPTOR *cfgd, USBD_INTERFACE_INFORMATION *iface, const void *cfg_end, enum usb_device_speed speed);
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed);
 
+__inline USBD_INTERFACE_INFORMATION *get_next_interface(const USBD_INTERFACE_INFORMATION *iface)
+{
+	void *end = (char*)iface + iface->Length;
+	return end;
+}
+
 __inline USBD_PIPE_HANDLE make_pipe_handle(UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
 {
 	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = {EndpointAddress, Interval, PipeType};
