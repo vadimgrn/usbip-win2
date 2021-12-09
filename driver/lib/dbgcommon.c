@@ -229,7 +229,7 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 
 static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cmd_submit *cmd)
 {
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len,  &buf, &len, STRSAFE_NULL_ON_FAILURE, 
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
 			"cmd_submit: transfer_flags %#x, transfer_buffer_length %d, start_frame %d, number_of_packets %d, interval %d, ",
 			cmd->transfer_flags, 
 			cmd->transfer_buffer_length, 
@@ -256,7 +256,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 {
 	const struct usbip_header_basic *base = &hdr->base;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE, 
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, 
 					"usbip_header{command %u, seqnum %u, devid %#x(busnum %d, devnum %d), %s, ep %#x}, ",
 					base->command,
 					base->seqnum,

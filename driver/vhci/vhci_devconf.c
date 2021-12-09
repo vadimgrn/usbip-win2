@@ -113,7 +113,7 @@ static void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATI
 
 	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i, r = get_next_interface(r, cfg_end)) {
 
-		st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+		st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "
 			"Class %#02hhx, SubClass %#02hhx, Protocol %#02hhx, InterfaceHandle %#Ix, NumberOfPipes %lu)", 
 			r->Length, 
@@ -129,7 +129,7 @@ static void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATI
 
 			const USBD_PIPE_INFORMATION *p = r->Pipes + j;
 
-			st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+			st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 				"\nPipes[%lu](MaximumPacketSize %#x, EndpointAddress %#02hhx(%s#%d), Interval %#hhx, %s, "
 				"PipeHandle %#Ix, MaximumTransferSize %#lx, PipeFlags %#lx)",
 				j,
@@ -158,7 +158,7 @@ const char *select_configuration_str(char *buf, size_t len, const struct _URB_SE
 	
 	const char *result = buf;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"ConfigurationHandle %#Ix, "
 			"ConfigurationDescriptor(bLength %d, bDescriptorType %d (must be %d), wTotalLength %hu, "
 			"bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
@@ -184,7 +184,7 @@ const char *select_configuration_str(char *buf, size_t len, const struct _URB_SE
 const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT_INTERFACE *iface)
 {
 	const char *result = buf;
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, STRSAFE_NULL_ON_FAILURE,  
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,  
 						"ConfigurationHandle %#Ix", (uintptr_t)iface->ConfigurationHandle);
 
 	if (st == STATUS_SUCCESS) {
