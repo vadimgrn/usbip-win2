@@ -272,6 +272,38 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
+static NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+static NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		r->TransferBufferLength = actual_length;
+		TraceInfo(TRACE_WRITE, "Interface %hu alternate setting %!BIN!", r->Interface, WppBinary(buf, (USHORT)actual_length));
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
 /*
 * Nothing to handle.
 */
@@ -343,7 +375,7 @@ static const urb_function_t urb_functions[] =
 
 	NULL, // URB_FUNCTION_RESERVE_0X001D
 
-	urb_function_success, // urb_pipe_request
+	urb_function_success, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL, urb_pipe_request
 
 	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_OTHER
 	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_OTHER
@@ -356,8 +388,8 @@ static const urb_function_t urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
 
-	NULL, // URB_FUNCTION_GET_CONFIGURATION
-	NULL, // URB_FUNCTION_GET_INTERFACE
+	get_configuration, // URB_FUNCTION_GET_CONFIGURATION
+	get_interface, // URB_FUNCTION_GET_INTERFACE
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
