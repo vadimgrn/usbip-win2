@@ -86,7 +86,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
  * need to cache a descriptor?
  * Currently, device descriptor & full configuration descriptor are cached in vpdo.
  */
-static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, USB_COMMON_DESCRIPTOR *dsc)
+static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, const USB_COMMON_DESCRIPTOR *dsc)
 {
 	USB_CONFIGURATION_DESCRIPTOR *dsc_conf = NULL;
 
@@ -119,7 +119,7 @@ static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR
 static bool is_device_serial_number(
 	vpdo_dev_t *vpdo, 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r, 
-	USB_COMMON_DESCRIPTOR *d)
+	const USB_COMMON_DESCRIPTOR *d)
 {
 	UCHAR idx = vpdo->dsc_dev ? vpdo->dsc_dev->iSerialNumber : 0; // not zero if has serial
 	return  idx &&
@@ -130,7 +130,7 @@ static bool is_device_serial_number(
 static void save_serial_number(
 	vpdo_dev_t *vpdo, 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, 
-	USB_COMMON_DESCRIPTOR *dsc)
+	const USB_COMMON_DESCRIPTOR *dsc)
 {
 	UNREFERENCED_PARAMETER(urb_cdr);
 
@@ -160,7 +160,7 @@ static void save_serial_number(
 void try_to_cache_descriptor(
 	vpdo_dev_t* vpdo, 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, 
-	USB_COMMON_DESCRIPTOR* dsc)
+	const USB_COMMON_DESCRIPTOR* dsc)
 {
 	if (is_device_serial_number(vpdo, urb_cdr, dsc)) {
 		save_serial_number(vpdo, urb_cdr, dsc);

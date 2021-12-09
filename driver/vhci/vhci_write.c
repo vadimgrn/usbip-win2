@@ -117,8 +117,8 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const
 		return STATUS_SUCCESS;
 	}
 
-	USB_COMMON_DESCRIPTOR *dsc = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, 
-								hdr + 1, actual_length);
+	const USB_COMMON_DESCRIPTOR *dsc = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, 
+									hdr + 1, actual_length);
 
 	if (!dsc) {
 		return STATUS_INVALID_PARAMETER;
@@ -126,10 +126,16 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const
 
 	r->TransferBufferLength = actual_length;
 
+	TraceInfo(TRACE_WRITE, "%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
+				urb_function_str(r->Hdr.Function), 
+				dsc->bLength,
+				dsc->bDescriptorType,
+				WppBinary(dsc + 1, (USHORT)(actual_length - sizeof(*dsc))));
+
 	if (actual_length >= dsc->bLength) {
 		try_to_cache_descriptor(vpdo, r, dsc);
 	} else {
-		TraceWarning(TRACE_WRITE, "skip to cache partial descriptor: bLength(%d) > TransferBufferLength(%d)", 
+		TraceWarning(TRACE_WRITE, "skip to cache partial descriptor: bLength(%d), TransferBufferLength(%d)", 
 						dsc->bLength, actual_length);
 	}
 
