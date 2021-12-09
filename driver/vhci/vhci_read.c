@@ -611,15 +611,16 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 }
 
 /*
- * vhci_internal_ioctl.c handles such functions itself, so this function must never be called.
+ * vhci_internal_ioctl.c handles such functions itself.
  */
 static NTSTATUS urb_function_unexpected(IRP *irp, URB *urb, struct urb_req* urbr)
 {
 	UNREFERENCED_PARAMETER(irp);
-	UNREFERENCED_PARAMETER(urb);
 	UNREFERENCED_PARAMETER(urbr);
 
-	TraceError(TRACE_READ, "Internal logic error");
+	USHORT func = urb->UrbHeader.Function;
+	TraceError(TRACE_READ, "%s(%#04x) must never be called", urb_function_str(func), func);
+
 	return STATUS_INTERNAL_ERROR;
 }	
 

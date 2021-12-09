@@ -146,6 +146,7 @@ static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb, const
 	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
 	if (buf) {
 		r->TransferBufferLength = actual_length;
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
 	}
 	
 	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
@@ -206,6 +207,7 @@ static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb, con
 	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
 	if (buf) {
 		r->TransferBufferLength = actual_length;
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
 	}
 
 	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
@@ -223,7 +225,9 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const
 
 	int actual_length = hdr->u.ret_submit.actual_length;
 
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
+
+	void *buf = copy_to_transfer_buffer(buf_a, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
 	if (buf) {
 		r->TransferBufferLength = actual_length;
 	}
@@ -263,7 +267,9 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 		r->StartFrame = hdr->u.ret_submit.start_frame;
 	}
 
-	void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
+
+	void *buf = get_buf(buf_a, r->TransferBufferMDL);
 	if (buf) {
 		copy_iso_data(buf, r->TransferBufferLength, usbip_data, actual_length, r);
 		r->TransferBufferLength = actual_length;
@@ -316,16 +322,14 @@ static NTSTATUS urb_function_success(vpdo_dev_t *vpdo, URB *urb, const struct us
 	return STATUS_SUCCESS;
 }
 
-/*
-* This function must never be called.
-*/
 static NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	UNREFERENCED_PARAMETER(vpdo);
-	UNREFERENCED_PARAMETER(urb);
 	UNREFERENCED_PARAMETER(hdr);
 
-	TraceError(TRACE_WRITE, "Internal logic error");
+	USHORT func = urb->UrbHeader.Function;
+	TraceError(TRACE_WRITE, "%s(%#04x) must never be called", urb_function_str(func), func);
+
 	return STATUS_INTERNAL_ERROR;
 }	
 
@@ -394,7 +398,7 @@ static const urb_function_t urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
 
-	NULL, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+	urb_function_unexpected, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
 
 	NULL, // URB_FUNCTION_RESERVE_0X002B
 	NULL, // URB_FUNCTION_RESERVE_0X002C
@@ -402,25 +406,24 @@ static const urb_function_t urb_functions[] =
 	NULL, // URB_FUNCTION_RESERVE_0X002E
 	NULL, // URB_FUNCTION_RESERVE_0X002F
 
-	NULL, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
-	NULL, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
+	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
+	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
 	urb_control_transfer_ex,
-/*
+
 	NULL, // URB_FUNCTION_RESERVE_0X0033
 	NULL, // URB_FUNCTION_RESERVE_0X0034                  
 
-	NULL, // URB_FUNCTION_OPEN_STATIC_STREAMS
-	NULL, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
-	NULL, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
-	NULL, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
+	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
+	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
+	urb_bulk_or_interrupt_transfer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	NULL, // 0x0039
 	NULL, // 0x003A        
 	NULL, // 0x003B        
 	NULL, // 0x003C        
 
-	NULL // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
-*/
+	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
 static NTSTATUS store_urb_data(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -429,7 +432,7 @@ static NTSTATUS store_urb_data(vpdo_dev_t *vpdo, URB *urb, const struct usbip_he
 	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
 
 	if (!pfunc) {
-		TraceVerbose(TRACE_WRITE, "Not handled %s(%#04x)", urb_function_str(func), func);
+		TraceError(TRACE_WRITE, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
 		return STATUS_INVALID_PARAMETER;
 	}
 
