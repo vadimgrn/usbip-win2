@@ -272,11 +272,15 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
-static NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+/*
+* Nothing to handle.
+*/
+static NTSTATUS urb_function_success(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 	UNREFERENCED_PARAMETER(urb);
 	UNREFERENCED_PARAMETER(hdr);
+	
 	return STATUS_SUCCESS;
 }
 
@@ -315,13 +319,13 @@ static const urb_function_t urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE 
 
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, urb_control_feature_request
 
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE, urb_control_feature_request
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
 
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
@@ -339,15 +343,15 @@ static const urb_function_t urb_functions[] =
 
 	NULL, // URB_FUNCTION_RESERVE_0X001D
 
-	sync_reset_pipe_and_clear_stall, // urb_pipe_request
+	urb_function_success, // urb_pipe_request
 
 	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_OTHER
 	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_OTHER
 
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
 
-	NULL, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
-	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
+	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
