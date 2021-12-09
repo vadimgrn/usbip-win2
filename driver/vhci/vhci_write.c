@@ -152,24 +152,31 @@ static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb, const
 	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
+static NTSTATUS do_control_transfer(
+	const struct usbip_header *hdr, 
+	ULONG TransferFlags, void *TransferBuffer, MDL *TransferBufferMDL, ULONG *TransferBufferLength)
+{
+	if (!(*TransferBufferLength && IsTransferDirectionIn(TransferFlags))) {
+		return STATUS_SUCCESS;
+	}
+
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	void *buf = copy_to_transfer_buffer(TransferBuffer, TransferBufferMDL, *TransferBufferLength, hdr + 1, actual_length);
+	if (buf) {
+		*TransferBufferLength = actual_length;
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
 static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
-
-	if (!r->TransferBufferLength) {
-		return STATUS_SUCCESS;
-	}
-	
-	int actual_length = hdr->u.ret_submit.actual_length;
-
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
-	if (buf) {
-		r->TransferBufferLength = actual_length;
-	}
-	
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return do_control_transfer(hdr, r->TransferFlags, r->TransferBuffer, r->TransferBufferMDL, &r->TransferBufferLength);
 }
 
 static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header* hdr)
@@ -177,19 +184,7 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, const struct
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
-
-	if (!r->TransferBufferLength) {
-		return STATUS_SUCCESS;
-	}
-
-	int actual_length = hdr->u.ret_submit.actual_length;
-
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
-	if (buf) {
-		r->TransferBufferLength = actual_length;
-	}
-	
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return do_control_transfer(hdr, r->TransferFlags, r->TransferBuffer, r->TransferBufferMDL, &r->TransferBufferLength);
 }
 
 static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
