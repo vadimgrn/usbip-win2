@@ -245,12 +245,14 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 		return STATUS_INVALID_PARAMETER;
 	}
 	
+	bool dir_out = is_endpoint_direction_out(r->PipeHandle);
+
 	const char *usbip_data = (char*)(hdr + 1);
 	int actual_length = hdr->u.ret_submit.actual_length;
 
 	{
-		int data_len = is_endpoint_direction_in(r->PipeHandle) ? actual_length : 0;
-		const void *d = usbip_data + data_len; // usbip_iso_packet_descriptor*
+		int data_len = dir_out ? 0 : actual_length;
+		const struct usbip_iso_packet_descriptor *d = (void*)(usbip_data + data_len);
 		if (!update_iso_packets(r->IsoPacket, r->NumberOfPackets, d)) {
 			return STATUS_INVALID_PARAMETER;
 		}
@@ -260,6 +262,10 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 
 	if (r->TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
 		r->StartFrame = hdr->u.ret_submit.start_frame;
+	}
+
+	if (dir_out) {
+		return STATUS_SUCCESS;
 	}
 
 	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
