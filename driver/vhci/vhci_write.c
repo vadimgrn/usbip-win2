@@ -34,12 +34,14 @@ static void *get_buf(void *buf, MDL *bufMDL)
 		return buf;
 	}
 	
-	if (bufMDL) {
-		buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority | MdlMappingNoExecute);
+	if (!bufMDL) {
+		TraceError(TRACE_WRITE, "TransferBuffer and TransferBufferMDL are NULL");
+		return NULL;
 	}
 
+	buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority | MdlMappingNoExecute);
 	if (!buf) {
-		TraceWarning(TRACE_WRITE, "No transfer buffer");
+		TraceError(TRACE_WRITE, "MmGetSystemAddressForMdlSafe error");
 	}
 
 	return buf;
@@ -90,16 +92,13 @@ static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct us
 static void *copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, const void *src, int src_len)
 {
 	if (!(src_len >= 0 && dst_len >= (ULONG)src_len)) {
-		TraceError(TRACE_WRITE, "Buffer length check: dst_len %lu, src_len %d", dst_len, src_len);
+		TraceError(TRACE_WRITE, "dst_len %lu < src_len %d", dst_len, src_len);
 		return NULL;
 	}
 
 	void *buf = get_buf(buf_dst, bufMDL);
-
 	if (buf) {
 		RtlCopyMemory(buf, src, src_len);
-	} else {
-		TraceError(TRACE_WRITE, "Null destination buffers");
 	}
 
 	return buf;
@@ -107,11 +106,19 @@ static void *copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, 
 
 static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 	int actual_length = hdr->u.ret_submit.actual_length;
-	
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
+
+	switch (r->Hdr.Function) {
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:
+		r->TransferBufferLength = actual_length; // USB_DIR_OUT
+		return STATUS_SUCCESS;
+	}
+
 	USB_COMMON_DESCRIPTOR *dsc = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, 
-						hdr + 1, actual_length);
+								hdr + 1, actual_length);
 
 	if (!dsc) {
 		return STATUS_INVALID_PARAMETER;
@@ -273,27 +280,40 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, URB *urb, cons
 	return STATUS_SUCCESS;
 }
 
+/*
+* This function must never be called.
+*/
+static NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	UNREFERENCED_PARAMETER(vpdo);
+	UNREFERENCED_PARAMETER(urb);
+	UNREFERENCED_PARAMETER(hdr);
+
+	TraceError(TRACE_WRITE, "Internal logic error");
+	return STATUS_INTERNAL_ERROR;
+}	
+
 typedef NTSTATUS (*urb_function_t)(vpdo_dev_t*, URB*, const struct usbip_header*);
 
 static const urb_function_t urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,
-	NULL, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
+	urb_function_unexpected, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
 
-	NULL, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
-	NULL, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
+	urb_function_unexpected, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
+	urb_function_unexpected, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
 
-	NULL, // URB_FUNCTION_GET_FRAME_LENGTH
-	NULL, // URB_FUNCTION_SET_FRAME_LENGTH
-	NULL, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
+	urb_function_unexpected, // URB_FUNCTION_GET_FRAME_LENGTH
+	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
+	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
 
 	urb_control_transfer,
 	urb_bulk_or_interrupt_transfer,
 	urb_isoch_transfer,
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
-	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE, urb_control_descriptor_request
+	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE 
 
 	NULL, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
 	NULL, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
@@ -330,13 +350,13 @@ static const urb_function_t urb_functions[] =
 	NULL, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
-	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT, urb_control_descriptor_request
+	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
 
 	NULL, // URB_FUNCTION_GET_CONFIGURATION
 	NULL, // URB_FUNCTION_GET_INTERFACE
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
-	NULL, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE, urb_control_descriptor_request
+	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
 
 	NULL, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
 
