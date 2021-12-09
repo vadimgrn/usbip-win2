@@ -59,8 +59,10 @@ static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 	return false;
 }
 
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed)
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd)
 {
+	NT_ASSERT(cfgd);
+
 	if (intf->Length < sizeof(*intf) - sizeof(intf->Pipes)) { // can have zero pipes
 		TraceError(TRACE_URB, "Interface length %d is too short", intf->Length);
 		return STATUS_SUCCESS;
@@ -91,14 +93,17 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, USB_CONFIGURATION_DESCRIPT
  * followed by a sequence of variable-length array of USBD_INTERFACE_INFORMATION structures, 
  * each element in the array for each unique interface number in the configuration. 
  */
-NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed)
+NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed)
 {
+	USB_CONFIGURATION_DESCRIPTOR *cd = cfg->ConfigurationDescriptor;
+	NT_ASSERT(cd);
+
 	USBD_INTERFACE_INFORMATION *iface = &cfg->Interface;
 	const void *cfg_end = get_configuration_end(cfg);
+
+	for (int i = 0; i < cd->bNumInterfaces; ++i, iface = get_next_interface(iface, cfg_end)) {
 		
-	for (int i = 0; i < cfgd->bNumInterfaces; ++i, iface = get_next_interface(iface, cfg_end)) {
-		
-		NTSTATUS status = setup_intf(iface, cfgd, speed);
+		NTSTATUS status = setup_intf(iface, speed, cd);
 		if (status != STATUS_SUCCESS) {
 			return status;
 		}

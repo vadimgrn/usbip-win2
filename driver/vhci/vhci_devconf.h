@@ -8,8 +8,8 @@
 
 #include "usbip_proto.h" 
 
-NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed);
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, USB_CONFIGURATION_DESCRIPTOR *cfgd, enum usb_device_speed speed);
+NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed);
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);
 
 enum { 
 	SELECT_CONFIGURATION_STR_BUFSZ = 1024, 

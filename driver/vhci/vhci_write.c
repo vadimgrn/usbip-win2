@@ -1,11 +1,9 @@
 #include "vhci.h"
-#include "dbgcommon.h"
 #include "trace.h"
 #include "vhci_write.tmh"
 
+#include "dbgcommon.h"
 #include "usbip_proto.h"
-#include "usbreq.h"
-#include "usbd_helper.h"
 #include "vhci_vpdo.h"
 #include "vhci_vpdo_dsc.h"
 #include "usbreq.h"
@@ -20,7 +18,7 @@ static bool update_iso_packets(USBD_ISO_PACKET_DESCRIPTOR *dst, ULONG cnt, const
 			dst->Length = src->actual_length;
 			dst->Status = to_windows_status(src->status);
 		} else {
-			TraceWarning(TRACE_WRITE, "#%lu: Offset(%lu) >= offset(%u)", i, dst->Offset, src->offset);
+			TraceError(TRACE_WRITE, "#%lu: Offset(%lu) >= offset(%u)", i, dst->Offset, src->offset);
 			return false;
 		}
 	}
@@ -162,11 +160,12 @@ static NTSTATUS do_control_transfer(
 	const struct usbip_header *hdr, 
 	ULONG TransferFlags, void *TransferBuffer, MDL *TransferBufferMDL, ULONG *TransferBufferLength)
 {
-	if (!(*TransferBufferLength && IsTransferDirectionIn(TransferFlags))) {
+	int actual_length = hdr->u.ret_submit.actual_length;
+
+	if (IsTransferDirectionOut(TransferFlags)) {
+		*TransferBufferLength = actual_length;
 		return STATUS_SUCCESS;
 	}
-
-	int actual_length = hdr->u.ret_submit.actual_length;
 
 	void *buf = copy_to_transfer_buffer(TransferBuffer, TransferBufferMDL, *TransferBufferLength, hdr + 1, actual_length);
 	if (buf) {
@@ -219,12 +218,12 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
+	int actual_length = hdr->u.ret_submit.actual_length;
 
 	if (is_endpoint_direction_out(r->PipeHandle)) {
+		r->TransferBufferLength = actual_length;
 		return STATUS_SUCCESS;
 	}
-
-	int actual_length = hdr->u.ret_submit.actual_length;
 
 	void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
 
@@ -271,6 +270,7 @@ static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbi
 	}
 
 	if (dir_out) {
+		r->TransferBufferLength = actual_length;
 		return STATUS_SUCCESS;
 	}
 

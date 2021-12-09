@@ -112,12 +112,14 @@ static const void *get_buf(void *buf, MDL *bufMDL)
 		return buf;
 	}
 
-	if (bufMDL) {
-		buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority | MdlMappingNoExecute | MdlMappingNoWrite);
+	if (!bufMDL) {
+		TraceError(TRACE_READ, "TransferBuffer and TransferBufferMDL are NULL");
+		return NULL;
 	}
 
+	buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority | MdlMappingNoExecute | MdlMappingNoWrite);
 	if (!buf) {
-		TraceError(TRACE_READ, "No transfer buffer");
+		TraceError(TRACE_READ, "MmGetSystemAddressForMdlSafe error");
 	}
 
 	return buf;
