@@ -16,7 +16,7 @@ static bool update_iso_packets(USBD_ISO_PACKET_DESCRIPTOR *dst, ULONG cnt, const
 
 		if (dst->Offset >= src->offset) {
 			dst->Length = src->actual_length;
-			dst->Status = to_windows_status(src->status);
+			dst->Status = src->status ? to_windows_status(src->status) : USBD_STATUS_SUCCESS;
 		} else {
 			TraceError(TRACE_WRITE, "#%lu: Offset(%lu) >= offset(%u)", i, dst->Offset, src->offset);
 			return false;
@@ -446,7 +446,8 @@ static NTSTATUS store_urb_data(vpdo_dev_t *vpdo, URB *urb, const struct usbip_he
 	NTSTATUS st = pfunc(vpdo, urb, hdr);
 
 	if (st == STATUS_SUCCESS) {
-		urb->UrbHeader.Status = to_windows_status(hdr->u.ret_submit.status);
+		int usbip_status = hdr->u.ret_submit.status;
+		urb->UrbHeader.Status = usbip_status ? to_windows_status(usbip_status) : USBD_STATUS_SUCCESS;
 	}
 
 	return st;
@@ -460,12 +461,12 @@ static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 
 	const struct usbip_header_ret_submit *ret_submit = &hdr->u.ret_submit;
 
-	int linux_status = ret_submit->status;
-	if (!linux_status) {
+	int usbip_status = ret_submit->status;
+	if (!usbip_status) {
 		return store_urb_data(vpdo, urb, hdr);
 	}
 
-	USBD_STATUS status = to_windows_status(linux_status);
+	USBD_STATUS status = to_windows_status(usbip_status);
 	urb->UrbHeader.Status = status;
 
 	if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
@@ -473,17 +474,17 @@ static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 	}
 
 	TraceError(TRACE_WRITE, "%s: errno %d -> %s(%#08lX)", urb_function_str(urb->UrbHeader.Function), 
-				linux_status, dbg_usbd_status(status), (ULONG)status);
+				usbip_status, dbg_usbd_status(status), (ULONG)status);
 
 	return STATUS_UNSUCCESSFUL;
 }
 
 static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const struct usbip_header *hdr)
 {
-	int linux_status = hdr->u.ret_submit.status;
-	if (linux_status) {
-		USBD_STATUS st = to_windows_status(linux_status);
-		TraceError(TRACE_WRITE, "errno %d -> %s(%#08lX)", linux_status, dbg_usbd_status(st), (ULONG)st);
+	int usbip_status = hdr->u.ret_submit.status;
+	if (usbip_status) {
+		USBD_STATUS st = to_windows_status(usbip_status);
+		TraceError(TRACE_WRITE, "errno %d -> %s(%#08lX)", usbip_status, dbg_usbd_status(st), (ULONG)st);
 		return STATUS_UNSUCCESSFUL;
 	}
 
