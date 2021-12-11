@@ -42,6 +42,7 @@ static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_de
 	
 	pipe->PipeHandle = make_pipe_handle(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
 	NT_ASSERT(pipe->PipeHandle);
+//	NT_ASSERT(is_endpoint_direction_in(pipe->PipeHandle) == (bool)USBD_PIPE_DIRECTION_IN(pipe));
 
 	pipe->MaximumTransferSize = 0; // is not used and does not contain valid data
 	pipe->PipeFlags = 0; // USBD_PF_CHANGE_MAX_PACKET if override MaximumPacketSize

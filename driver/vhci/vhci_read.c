@@ -395,82 +395,80 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS copy_iso_data(PVOID dst, struct _URB_ISOCH_TRANSFER *urb_iso)
+/*
+ * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
+ */
+static NTSTATUS copy_iso_data(void *dst_buf, const struct _URB_ISOCH_TRANSFER *r)
 {
-	void *buf_a = urb_iso->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : urb_iso->TransferBuffer;
+	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
 
-	const void *buf = get_buf(buf_a, urb_iso->TransferBufferMDL);
-	if (!buf) {
+	const void *src_buf = get_buf(buf_a, r->TransferBufferMDL);
+	if (!src_buf) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	struct usbip_iso_packet_descriptor *iso_desc = NULL;
+	bool dir_out = IsTransferDirectionOut(r->TransferFlags);
+	ULONG buf_len = dir_out ? r->TransferBufferLength : 0;
 
-	if (is_endpoint_direction_in(urb_iso->PipeHandle)) {
-		iso_desc = (struct usbip_iso_packet_descriptor *)dst;
-	} else {
-		RtlCopyMemory(dst, buf, urb_iso->TransferBufferLength);
-		iso_desc = (struct usbip_iso_packet_descriptor *)((char *)dst + urb_iso->TransferBufferLength);
-	}
+	RtlCopyMemory(dst_buf, src_buf, buf_len);
 
-	ULONG offset = 0;
+	struct usbip_iso_packet_descriptor *d = (void*)((char*)dst_buf + buf_len);
+	ULONG sum = 0;
 
-	for (ULONG i = 0; i < urb_iso->NumberOfPackets; ++i) {
-		if (urb_iso->IsoPacket[i].Offset < offset) {
-			TraceWarning(TRACE_READ, "strange iso packet offset:%d %d", offset, urb_iso->IsoPacket[i].Offset);
+	for (ULONG i = 0; i < r->NumberOfPackets; ++d) {
+
+		ULONG offset = r->IsoPacket[i].Offset;
+		ULONG next_offset = ++i < r->NumberOfPackets ? r->IsoPacket[i].Offset : r->TransferBufferLength;
+
+		if (next_offset >= offset && next_offset <= r->TransferBufferLength) {
+			d->offset = offset;
+			d->length = next_offset - offset;
+			d->actual_length = 0;
+			d->status = 0;
+			sum += d->length;
+		} else {
+			TraceError(TRACE_READ, "[%lu] next_offset(%lu) >= offset(%lu) && next_offset <= r->TransferBufferLength(%lu)",
+						i, next_offset, offset, r->TransferBufferLength);
+
 			return STATUS_INVALID_PARAMETER;
 		}
-		iso_desc->offset = urb_iso->IsoPacket[i].Offset;
-		if (i > 0) {
-			(iso_desc - 1)->length = urb_iso->IsoPacket[i].Offset - offset;
-		}
-		offset = urb_iso->IsoPacket[i].Offset;
-		iso_desc->actual_length = 0;
-		iso_desc->status = 0;
-		++iso_desc;
 	}
 
-	(iso_desc - 1)->length = urb_iso->TransferBufferLength - offset;
-
+	NT_ASSERT(sum == r->TransferBufferLength);
 	return STATUS_SUCCESS;
 }
 
-static ULONG
-get_iso_payload_len(struct _URB_ISOCH_TRANSFER *urb_iso)
+static ULONG get_iso_payload_len(const struct _URB_ISOCH_TRANSFER *r)
 {
-	ULONG len_iso = urb_iso->NumberOfPackets * sizeof(struct usbip_iso_packet_descriptor);
+	ULONG len = r->NumberOfPackets*sizeof(struct usbip_iso_packet_descriptor);
 	
-	if (is_endpoint_direction_out(urb_iso->PipeHandle)) {
-		len_iso += urb_iso->TransferBufferLength;
+	if (IsTransferDirectionOut(r->TransferFlags)) {
+		len += r->TransferBufferLength;
 	}
 
-	return len_iso;
+	return len;
 }
 
 static NTSTATUS urb_isoch_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 {
-	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
-	ULONG	len_iso;
-	PVOID	dst;
+	const struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
+	ULONG len = get_iso_payload_len(r);
 
-	len_iso = get_iso_payload_len(urb_iso);
+	void *dst = get_read_irp_data(irp, len);
+	if (dst) {
+		copy_iso_data(dst, r);
+		vpdo->len_sent_partial = 0;
+		irp->IoStatus.Information = len;
+	}
 
-	dst = get_read_irp_data(irp, len_iso);
-	if (dst == NULL)
-		return STATUS_BUFFER_TOO_SMALL;
-
-	copy_iso_data(dst, urb_iso);
-	vpdo->len_sent_partial = 0;
-	irp->IoStatus.Information = len_iso;
-
-	return STATUS_SUCCESS;
+	return dst ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
-	struct _URB_ISOCH_TRANSFER *urb_iso = &urb->UrbIsochronousTransfer;
+	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
 
-	USBD_PIPE_TYPE type = get_endpoint_type(urb_iso->PipeHandle);
+	USBD_PIPE_TYPE type = get_endpoint_type(r->PipeHandle);
 	if (type != UsbdPipeTypeIsochronous) {
 		TraceError(TRACE_READ, "Error, not a iso pipe");
 		return STATUS_INVALID_PARAMETER;
@@ -481,20 +479,20 @@ static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	bool dir_in = is_endpoint_direction_in(urb_iso->PipeHandle);
+	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
+	NT_ASSERT(is_endpoint_direction_in(r->PipeHandle));
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid,
-				    dir_in, urb_iso->PipeHandle, urb_iso->TransferFlags,
-				    urb_iso->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 
+					r->PipeHandle, r->TransferFlags, r->TransferBufferLength);
 
-	hdr->u.cmd_submit.start_frame = urb_iso->StartFrame;
-	hdr->u.cmd_submit.number_of_packets = urb_iso->NumberOfPackets;
+	hdr->u.cmd_submit.start_frame = r->StartFrame;
+	hdr->u.cmd_submit.number_of_packets = r->NumberOfPackets;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	if (get_read_payload_length(irp) >= get_iso_payload_len(urb_iso)) {
-		copy_iso_data(hdr + 1, urb_iso);
-		irp->IoStatus.Information += get_iso_payload_len(urb_iso);
+	if (get_read_payload_length(irp) >= get_iso_payload_len(r)) {
+		copy_iso_data(hdr + 1, r);
+		irp->IoStatus.Information += get_iso_payload_len(r);
 	} else {
 		urbr->vpdo->len_sent_partial = sizeof(*hdr);
 	}

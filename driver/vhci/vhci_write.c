@@ -10,20 +10,67 @@
 #include "usbd_helper.h"
 #include "vhci_irp.h"
 
-static bool update_iso_packets(USBD_ISO_PACKET_DESCRIPTOR *dst, ULONG cnt, const struct usbip_iso_packet_descriptor *src)
+/*
+ * These URBs have the same layout from the beginning of the structure.
+ * Pointer to any of them can be used to access TransferBufferLength, TransferBuffer, TransferBufferMDL of any other instance 
+ * of these URBs.
+ */
+// const size_t off = offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength);
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferLength), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferLength), "assert");
+
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBuffer), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBuffer), "assert");
+
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferMDL), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferMDL), "assert");
+
+static NTSTATUS assignTransferBufferLength(ULONG *TransferBufferLength, int actual_length)
 {
-	for (ULONG i = 0; i < cnt; ++i, ++dst, ++src) {
+	bool ok = actual_length >= 0 && (ULONG)actual_length <= *TransferBufferLength;
+	*TransferBufferLength = ok ? actual_length : 0;
 
-		if (dst->Offset >= src->offset) {
-			dst->Length = src->actual_length;
-			dst->Status = src->status ? to_windows_status(src->status) : USBD_STATUS_SUCCESS;
-		} else {
-			TraceError(TRACE_WRITE, "#%lu: Offset(%lu) >= offset(%u)", i, dst->Offset, src->offset);
-			return false;
-		}
-	}
+	return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
 
-	return true;
+/*
+ * Any struct with TransferBufferLength can be used.
+ */
+static __inline NTSTATUS setTransferBufferLength(URB *urb, int actual_length)
+{
+	return assignTransferBufferLength(&urb->UrbControlTransfer.TransferBufferLength, actual_length);
+}
+
+static __inline bool is_transfer_dir_out(const struct _URB_CONTROL_TRANSFER *r)
+{
+	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)r->SetupPacket;
+	return pkt->bmRequestType.Dir == BMREQUEST_HOST_TO_DEVICE;
+}
+
+static __inline NTSTATUS ptr_to_status(const void *p)
+{
+	return p ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
 static void *get_buf(void *buf, MDL *bufMDL)
@@ -31,7 +78,7 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	if (buf) {
 		return buf;
 	}
-	
+
 	if (!bufMDL) {
 		TraceError(TRACE_WRITE, "TransferBuffer and TransferBufferMDL are NULL");
 		return NULL;
@@ -45,96 +92,88 @@ static void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
-static void copy_iso_data(char *dest, ULONG dest_len, const char *src, ULONG src_len, const struct _URB_ISOCH_TRANSFER *urb)
+/*
+ * TransferBufferLength must already be set by assignTransferBufferLength/setTransferBufferLength.
+ */
+static void *copy_to_transfer_buffer(URB *urb, const void *src, bool mdl)
 {
-	ULONG src_offset = 0;
+	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with TransferBuffer can be used here
+	void *buf = get_buf(mdl ? NULL : r->TransferBuffer, r->TransferBufferMDL);
 
-	for (ULONG i = 0; i < urb->NumberOfPackets; ++i) {
-	
-		const USBD_ISO_PACKET_DESCRIPTOR *p = urb->IsoPacket + i;
-		if (!p->Length) {
-			continue;
-		}
-
-		if (p->Offset + p->Length > dest_len) {
-			TraceWarning(TRACE_WRITE, "#%lu: Offset(%lu) + Length(%lu) > dest_len(%lu)", i, p->Offset, p->Length, dest_len);
-			break;
-		}
-
-		if (src_offset + p->Length > src_len) {
-			TraceWarning(TRACE_WRITE, "#%lu:src_offset(%lu) + Length(%lu) > src_len(%lu)", i, src_offset, p->Length, src_len);
-			break;
-		}
-
-		RtlCopyMemory(dest + p->Offset, src + src_offset, p->Length);
-		src_offset += p->Length;
-	}
-
-	if (src_offset != src_len) {
-		TraceWarning(TRACE_WRITE, "src_offset(%lu) != src_len(%lu)", src_offset, src_len);
-	}
-}
-
-static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	UNREFERENCED_PARAMETER(hdr);
-	return vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
-}
-
-static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	UNREFERENCED_PARAMETER(hdr);
-	return vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
-}
-
-static void *copy_to_transfer_buffer(void *buf_dst, MDL *bufMDL, ULONG dst_len, const void *src, int src_len)
-{
-	if (!(src_len >= 0 && dst_len >= (ULONG)src_len)) {
-		TraceError(TRACE_WRITE, "dst_len %lu < src_len %d", dst_len, src_len);
-		return NULL;
-	}
-
-	void *buf = get_buf(buf_dst, bufMDL);
 	if (buf) {
-		RtlCopyMemory(buf, src, src_len);
+		RtlCopyMemory(buf, src, r->TransferBufferLength);
+	} else {
+		r->TransferBufferLength = 0;
 	}
 
 	return buf;
 }
 
+static void *copy_to_transfer_buffer_length(URB *urb, const void *src, int actual_length, bool mdl)
+{
+	return setTransferBufferLength(urb, actual_length) == STATUS_SUCCESS ? 
+		copy_to_transfer_buffer(urb, src, mdl) : NULL;
+}
+
+static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
+}
+
+static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
+}
+
 static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	int actual_length = hdr->u.ret_submit.actual_length;
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
+
+	NTSTATUS st = assignTransferBufferLength(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
+	if (st) {
+		return st;
+	}
 
 	switch (r->Hdr.Function) {
 	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:
 	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:
 	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:
-		r->TransferBufferLength = actual_length; // USB_DIR_OUT
-		return STATUS_SUCCESS;
+		return STATUS_SUCCESS; // USB_DIR_OUT
 	}
+	
+	const USB_COMMON_DESCRIPTOR *dsc = NULL;
 
-	const USB_COMMON_DESCRIPTOR *dsc = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, 
-									hdr + 1, actual_length);
+	if (r->TransferBufferLength < sizeof(*dsc)) {
+		TraceError(TRACE_WRITE, "Descriptor is shorter than header: TransferBufferLength(%lu) < %Iu", 
+					r->TransferBufferLength, sizeof(*dsc));
 
-	if (!dsc) {
+		r->TransferBufferLength = 0;
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	r->TransferBufferLength = actual_length;
+	dsc = copy_to_transfer_buffer(urb, hdr + 1, false);
+	if (!dsc) {
+		return ptr_to_status(dsc);
+	}
+
+	ULONG min_sz = min(r->TransferBufferLength, dsc->bLength);
 
 	TraceInfo(TRACE_WRITE, "%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
 				urb_function_str(r->Hdr.Function), 
 				dsc->bLength,
 				dsc->bDescriptorType,
-				WppBinary(dsc + 1, (USHORT)(actual_length - sizeof(*dsc))));
+				WppBinary(dsc + 1, (USHORT)(min_sz - sizeof(*dsc))));
 
-	if (actual_length >= dsc->bLength) {
+	if (r->TransferBufferLength < dsc->bLength) {
+		TraceError(TRACE_WRITE, "TransferBufferLength(%lu) < bLength(%d)", r->TransferBufferLength, dsc->bLength);
+		r->TransferBufferLength = 0;
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	r->TransferBufferLength = dsc->bLength;
+
+	if (!urb->UrbHeader.Status) {
 		try_to_cache_descriptor(vpdo, r, dsc);
-	} else {
-		TraceWarning(TRACE_WRITE, "skip to cache partial descriptor: bLength(%d), TransferBufferLength(%d)", 
-						dsc->bLength, actual_length);
 	}
 
 	return STATUS_SUCCESS;
@@ -145,35 +184,33 @@ static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb, const
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
-	int actual_length = hdr->u.ret_submit.actual_length;
 
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	void *buf = copy_to_transfer_buffer_length(urb, hdr + 1, hdr->u.ret_submit.actual_length, false);
 	if (buf) {
-		r->TransferBufferLength = actual_length;
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 	
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ptr_to_status(buf);
 }
 
-static NTSTATUS do_control_transfer(
-	const struct usbip_header *hdr, 
-	ULONG TransferFlags, void *TransferBuffer, MDL *TransferBufferMDL, ULONG *TransferBufferLength)
+static NTSTATUS do_control_transfer(URB *urb, ULONG TransferFlags, ULONG *TransferBufferLength, const struct usbip_header *hdr)
 {
-	int actual_length = hdr->u.ret_submit.actual_length;
+	NTSTATUS st = assignTransferBufferLength(TransferBufferLength, hdr->u.ret_submit.actual_length);
+	if (st) {
+		return st;
+	}
 
 	if (IsTransferDirectionOut(TransferFlags)) {
-		*TransferBufferLength = actual_length;
+		NT_ASSERT(is_transfer_dir_out(&urb->UrbControlTransfer)); // good for UrbControlTransferEx too
 		return STATUS_SUCCESS;
 	}
 
-	void *buf = copy_to_transfer_buffer(TransferBuffer, TransferBufferMDL, *TransferBufferLength, hdr + 1, actual_length);
+	void *buf = copy_to_transfer_buffer(urb, hdr + 1, false);
 	if (buf) {
-		*TransferBufferLength = actual_length;
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)*TransferBufferLength));
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -181,7 +218,7 @@ static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, const struct us
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
-	return do_control_transfer(hdr, r->TransferFlags, r->TransferBuffer, r->TransferBufferMDL, &r->TransferBufferLength);
+	return do_control_transfer(urb, r->TransferFlags, &r->TransferBufferLength, hdr);
 }
 
 static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header* hdr)
@@ -189,7 +226,7 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, const struct
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
-	return do_control_transfer(hdr, r->TransferFlags, r->TransferBuffer, r->TransferBufferMDL, &r->TransferBufferLength);
+	return do_control_transfer(urb, r->TransferFlags, &r->TransferBufferLength, hdr);
 }
 
 static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -197,20 +234,22 @@ static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb, con
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
-	int actual_length = hdr->u.ret_submit.actual_length;
+
+	NTSTATUS st = assignTransferBufferLength(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
+	if (st) {
+		return st;
+	}
 
 	if (IsTransferDirectionOut(r->TransferFlags)) {
-		r->TransferBufferLength = actual_length;
 		return STATUS_SUCCESS;
 	}
 
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	void *buf = copy_to_transfer_buffer(urb, hdr + 1, false);
 	if (buf) {
-		r->TransferBufferLength = actual_length;
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -218,71 +257,143 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
-	int actual_length = hdr->u.ret_submit.actual_length;
+
+	NTSTATUS st = assignTransferBufferLength(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
+	if (st) {
+		return st;
+	}
 
 	if (is_endpoint_direction_out(r->PipeHandle)) {
-		r->TransferBufferLength = actual_length;
+		NT_ASSERT(IsTransferDirectionOut(r->TransferFlags));
 		return STATUS_SUCCESS;
 	}
 
-	void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
+	bool mdl = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
+	void *buf = copy_to_transfer_buffer(urb, hdr + 1, mdl);
 
-	void *buf = copy_to_transfer_buffer(buf_a, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
-	if (buf) {
-		r->TransferBufferLength = actual_length;
-	}
-
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ptr_to_status(buf);
 }
 
 /*
- * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[]
+ * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == src_len, 
+ * src->offset is ignored for that reason.
+ *
+ * For isochronous packets: actual length is the sum of
+ * the actual length of the individual, packets, but as
+ * the packet offsets are not changed there will be
+ * padding between the packets. To optimally use the
+ * bandwidth the padding is not transmitted.
+ *
+ * See: 
+ * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
+ * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
+
+ */
+static NTSTATUS copy_isoch(
+	struct _URB_ISOCH_TRANSFER *r, char *dst_buf, 
+	const struct usbip_iso_packet_descriptor *src, const char *src_buf, ULONG src_len)
+{
+	bool dir_out = !src_buf;
+	USBD_ISO_PACKET_DESCRIPTOR *dst = r->IsoPacket;
+	
+	ULONG src_offset = r->NumberOfPackets ? src->offset : 0;
+	NT_ASSERT(!src_offset);
+
+	for (ULONG i = 0; i < r->NumberOfPackets; ++i, ++src, ++dst) {
+	
+		dst->Status = src->status ? to_windows_status(src->status) : USBD_STATUS_SUCCESS;
+		
+		if (dir_out) {
+			continue; // dst->Length not used for OUT transfers
+		}
+
+		if (!src->actual_length) {
+			dst->Length = 0;
+			continue;
+		}
+
+		if (src->actual_length > src->length) {
+			TraceError(TRACE_WRITE, "src->actual_length(%u) > src->length(%u)", src->actual_length, src->length);
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		if (src_offset > dst->Offset) {// source buffer has no gaps
+			TraceError(TRACE_WRITE, "src_offset(%lu) > dst->Offset(%lu)", src_offset, dst->Offset);
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		if (src_offset + src->actual_length > src_len) {
+			TraceError(TRACE_WRITE, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)", 
+						src_offset, src->actual_length, src_len);
+
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		if (dst->Offset + src->actual_length > r->TransferBufferLength) {
+			TraceError(TRACE_WRITE, "dst->Offset(%lu) + src->actual_length(%u) > r->TransferBufferLength(%lu)", 
+				dst->Offset, src->actual_length, r->TransferBufferLength);
+
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		RtlCopyMemory(dst_buf + dst->Offset, src_buf + src_offset, src->actual_length);
+		
+		dst->Length = src->actual_length;
+		src_offset += src->actual_length;
+	}
+
+	bool ok = src_offset == src_len;
+	if (!ok) {
+		TraceError(TRACE_WRITE, "src_offset(%lu) != src_len(%lu)", src_offset, src_len);
+	}
+
+	return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+/*
+ * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[].
  */
 static NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
-	int cnt = hdr->u.ret_submit.number_of_packets;
+	const struct usbip_header_ret_submit *res = &hdr->u.ret_submit;
+
+	int cnt = res->number_of_packets;
 
 	if (!(cnt >= 0 && (ULONG)cnt == r->NumberOfPackets)) {
 		TraceError(TRACE_WRITE, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r->NumberOfPackets);
 		return STATUS_INVALID_PARAMETER;
 	}
-	
-	bool dir_out = is_endpoint_direction_out(r->PipeHandle);
 
-	const char *usbip_data = (char*)(hdr + 1);
-	int actual_length = hdr->u.ret_submit.actual_length;
-
-	{
-		int data_len = dir_out ? 0 : actual_length;
-		const struct usbip_iso_packet_descriptor *d = (void*)(usbip_data + data_len);
-		if (!update_iso_packets(r->IsoPacket, r->NumberOfPackets, d)) {
-			return STATUS_INVALID_PARAMETER;
-		}
+	if (!(res->actual_length >= 0 && (ULONG)res->actual_length <= r->TransferBufferLength)) {
+		TraceError(TRACE_WRITE, "actual_length(%d) > TransferBufferLength(%lu)", res->actual_length, r->TransferBufferLength);
+		return STATUS_INVALID_PARAMETER;
 	}
 
-	r->ErrorCount = hdr->u.ret_submit.error_count;
+	r->ErrorCount = res->error_count;
+
+	if (cnt && cnt == res->error_count) {
+		r->Hdr.Status = USBD_STATUS_ISOCH_REQUEST_FAILED;
+	}
 
 	if (r->TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
-		r->StartFrame = hdr->u.ret_submit.start_frame;
+		r->StartFrame = res->start_frame;
 	}
 
-	if (dir_out) {
-		r->TransferBufferLength = actual_length;
-		return STATUS_SUCCESS;
-	}
+	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
+
+	const char *src_buf = (char*)(hdr + 1);
+	ULONG src_len = dir_in ? res->actual_length : 0;
+
+	const struct usbip_iso_packet_descriptor *src = (void*)(src_buf + src_len);
 
 	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
-
 	void *buf = get_buf(buf_a, r->TransferBufferMDL);
-	if (buf) {
-		copy_iso_data(buf, r->TransferBufferLength, usbip_data, actual_length, r);
-		r->TransferBufferLength = actual_length;
-	}
-
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	
+	return buf ? copy_isoch(r, buf, src, dir_in ? src_buf : NULL, src_len) : 
+		     ptr_to_status(buf);
 }
 
 static NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -290,15 +401,13 @@ static NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
-	int actual_length = hdr->u.ret_submit.actual_length;
 
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	void *buf = copy_to_transfer_buffer_length(urb, hdr + 1, hdr->u.ret_submit.actual_length, false);
 	if (buf) {
-		r->TransferBufferLength = actual_length;
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)actual_length));
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -306,15 +415,14 @@ static NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_hea
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
-	int actual_length = hdr->u.ret_submit.actual_length;
 
-	void *buf = copy_to_transfer_buffer(r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength, hdr + 1, actual_length);
+	void *buf = copy_to_transfer_buffer_length(urb, hdr + 1, hdr->u.ret_submit.actual_length, false);
 	if (buf) {
-		r->TransferBufferLength = actual_length;
-		TraceInfo(TRACE_WRITE, "Interface %hu alternate setting %!BIN!", r->Interface, WppBinary(buf, (USHORT)actual_length));
+		TraceInfo(TRACE_WRITE, "Interface %hu alternate setting %!BIN!", 
+				r->Interface, WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ptr_to_status(buf);
 }
 
 /*
@@ -335,7 +443,7 @@ static NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const struct
 	UNREFERENCED_PARAMETER(hdr);
 
 	USHORT func = urb->UrbHeader.Function;
-	TraceError(TRACE_WRITE, "%s(%#04x) must never be called", urb_function_str(func), func);
+	TraceError(TRACE_WRITE, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
 
 	return STATUS_INTERNAL_ERROR;
 }	
@@ -433,50 +541,38 @@ static const urb_function_t urb_functions[] =
 	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
-static NTSTATUS store_urb_data(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+/*
+ * URB function must:
+ * 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
+ *   For example, select_configuration/select_interface immediately return STATUS_UNSUCCESSFUL in such case.
+ * 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
+ *   even if UrbHeader.Status != STATUS_SUCCESS. Data was sent over the network, do not ditch it.
+ */
+static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
+	if (urb) {
+		int err = hdr->u.ret_submit.status;
+		urb->UrbHeader.Status = err ? to_windows_status(err) : USBD_STATUS_SUCCESS;
+	} else {
+		return STATUS_INVALID_PARAMETER;
+	}
+
 	USHORT func = urb->UrbHeader.Function;
 	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
 
-	if (!pfunc) {
-		TraceError(TRACE_WRITE, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	NTSTATUS st = pfunc(vpdo, urb, hdr);
-
-	if (st == STATUS_SUCCESS) {
-		int usbip_status = hdr->u.ret_submit.status;
-		urb->UrbHeader.Status = usbip_status ? to_windows_status(usbip_status) : USBD_STATUS_SUCCESS;
+	NTSTATUS st = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
+	
+	if (st && !urb->UrbHeader.Status) {
+		urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
+		TraceWarning(TRACE_WRITE, "Set USBD_STATUS=%s because return is %!STATUS!", 
+					dbg_usbd_status(urb->UrbHeader.Status), st);
+	} else if (urb->UrbHeader.Status && !st) {
+		st = STATUS_UNSUCCESSFUL;
+		TraceWarning(TRACE_WRITE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
+					st, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
 	}
 
 	return st;
-}
-
-static NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	if (!urb) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	const struct usbip_header_ret_submit *ret_submit = &hdr->u.ret_submit;
-
-	int usbip_status = ret_submit->status;
-	if (!usbip_status) {
-		return store_urb_data(vpdo, urb, hdr);
-	}
-
-	USBD_STATUS status = to_windows_status(usbip_status);
-	urb->UrbHeader.Status = status;
-
-	if (urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER) {
-		urb->UrbBulkOrInterruptTransfer.TransferBufferLength = ret_submit->actual_length;
-	}
-
-	TraceError(TRACE_WRITE, "%s: errno %d -> %s(%#08lX)", urb_function_str(urb->UrbHeader.Function), 
-				usbip_status, dbg_usbd_status(status), (ULONG)status);
-
-	return STATUS_UNSUCCESSFUL;
 }
 
 static NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const struct usbip_header *hdr)
