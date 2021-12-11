@@ -33,7 +33,7 @@ __inline USBD_INTERFACE_INFORMATION *get_next_interface(const USBD_INTERFACE_INF
 
 __inline USBD_PIPE_HANDLE make_pipe_handle(UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
 {
-	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = {EndpointAddress, Interval, PipeType};
+	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = {EndpointAddress, Interval, PipeType, 1}; // must be != 0
 	NT_ASSERT(*(USBD_PIPE_HANDLE*)v);
 	return *(USBD_PIPE_HANDLE*)v;
 }

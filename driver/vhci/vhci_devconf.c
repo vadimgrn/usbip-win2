@@ -9,7 +9,7 @@
 
 static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 {
-	UCHAR v[sizeof(USBD_INTERFACE_HANDLE)] = { altsetting, ifnum };
+	UCHAR v[sizeof(USBD_INTERFACE_HANDLE)] = { altsetting, ifnum, 1 }; // must be != 0
 	return *(USBD_INTERFACE_HANDLE*)v; 
 }
 
@@ -39,9 +39,12 @@ static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_de
 	pipe->EndpointAddress = ep_desc->bEndpointAddress;
 	pipe->Interval = ep_desc->bInterval;
 	pipe->PipeType = ep_desc->bmAttributes & USB_ENDPOINT_TYPE_MASK;
+	
 	pipe->PipeHandle = make_pipe_handle(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
+	NT_ASSERT(pipe->PipeHandle);
+
 	pipe->MaximumTransferSize = 0; // is not used and does not contain valid data
-	pipe->PipeFlags = 0;
+	pipe->PipeFlags = 0; // USBD_PF_CHANGE_MAX_PACKET if override MaximumPacketSize
 }
 
 struct init_ep_data
@@ -79,7 +82,10 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
 	intf->Class = ifd->bInterfaceClass;
 	intf->SubClass = ifd->bInterfaceSubClass;
 	intf->Protocol = ifd->bInterfaceProtocol;
+	
 	intf->InterfaceHandle = make_interface_handle(intf->InterfaceNumber, intf->AlternateSetting);
+	NT_ASSERT(intf->InterfaceHandle);
+
 	intf->NumberOfPipes = ifd->bNumEndpoints;
 
 	struct init_ep_data data = { intf->Pipes, speed };
