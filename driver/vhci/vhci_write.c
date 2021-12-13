@@ -195,7 +195,6 @@ static NTSTATUS do_control_transfer(URB *urb, ULONG TransferFlags, ULONG *Transf
 	}
 
 	if (IsTransferDirectionOut(TransferFlags)) {
-		NT_ASSERT(is_transfer_dir_out(&urb->UrbControlTransfer)); // good for UrbControlTransferEx too
 		return STATUS_SUCCESS;
 	}
 
@@ -257,8 +256,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const
 		return st;
 	}
 
-	if (is_endpoint_direction_out(r->PipeHandle)) {
-		NT_ASSERT(IsTransferDirectionOut(r->TransferFlags));
+	if (IsTransferDirectionOut(r->TransferFlags)) {
 		return STATUS_SUCCESS;
 	}
 

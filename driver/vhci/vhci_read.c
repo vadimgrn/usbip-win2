@@ -130,6 +130,11 @@ static const void *get_buf(void *buf, MDL *bufMDL)
 	return buf;
 }
 
+static __inline NTSTATUS ptr_to_status(const void *p)
+{
+	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+}
+
 static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_req *urbr, bool dir_in, UCHAR recipient)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -164,7 +169,7 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 		irp->IoStatus.Information += r->TransferBufferLength;
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR recipient)
@@ -203,15 +208,13 @@ static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *
 	}
 
 	const void *buf = get_buf(urb_vc->TransferBuffer, urb_vc->TransferBufferMDL);
-	if (!buf) {
-		return STATUS_INSUFFICIENT_RESOURCES;
+	if (buf) {
+		RtlCopyMemory(dst, buf, urb_vc->TransferBufferLength);
+		irp->IoStatus.Information = urb_vc->TransferBufferLength;
+		vpdo->len_sent_partial = 0;
 	}
 
-	RtlCopyMemory(dst, buf, urb_vc->TransferBufferLength);
-	irp->IoStatus.Information = urb_vc->TransferBufferLength;
-	vpdo->len_sent_partial = 0;
-
-	return STATUS_SUCCESS;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR type, UCHAR recipient)
@@ -250,7 +253,7 @@ static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_
 		irp->IoStatus.Information += r->TransferBufferLength;
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS vendor_device(IRP *irp, URB *urb, struct urb_req *urbr)
@@ -344,14 +347,14 @@ static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP ir
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	const void *src = get_buf(r->TransferBuffer, r->TransferBufferMDL);
-	if (src) {
-		RtlCopyMemory(dst, src, r->TransferBufferLength);
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(dst, buf, r->TransferBufferLength);
 		irp->IoStatus.Information = r->TransferBufferLength;
 		vpdo->len_sent_partial = 0;
 	}
 	
-	return src ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	return ptr_to_status(buf);
 }
 
 /* 
@@ -365,39 +368,45 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	struct _URB_BULK_OR_INTERRUPT_TRANSFER *urb_bi = &urb->UrbBulkOrInterruptTransfer;
-	USBD_PIPE_TYPE type = get_endpoint_type(urb_bi->PipeHandle);
+	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
+	USBD_PIPE_TYPE type = get_endpoint_type(r->PipeHandle);
 
 	if (!(type == UsbdPipeTypeBulk || type == UsbdPipeTypeInterrupt)) {
-		TraceError(TRACE_READ, "Error, not a bulk/int pipe");
+		TraceError(TRACE_READ, "%!USBD_PIPE_TYPE!", type);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	bool dir_in = is_endpoint_direction_in(urb_bi->PipeHandle);
+	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, urb_bi->PipeHandle,
-				    urb_bi->TransferFlags, urb_bi->TransferBufferLength);
+	if (dir_in != is_endpoint_direction_in(r->PipeHandle)) {
+		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and PipeHandle(%#08Ix)", 
+					r->TransferFlags, (uintptr_t)r->PipeHandle);
+
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 
+					r->PipeHandle, r->TransferFlags, r->TransferBufferLength);
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	if (!dir_in) {
-		if (get_read_payload_length(irp) >= urb_bi->TransferBufferLength) {
-
-			void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? 
-					NULL : urb_bi->TransferBuffer;
-
-			const void *buf = get_buf(buf_a, urb_bi->TransferBufferMDL);
-			if (buf) {
-				RtlCopyMemory(hdr + 1, buf, urb_bi->TransferBufferLength);
-			} else {
-				return STATUS_INSUFFICIENT_RESOURCES;
-			}
-		} else {
-			urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		}
+	if (dir_in) {
+		return STATUS_SUCCESS;
 	}
 
-	return STATUS_SUCCESS;
+	if (get_read_payload_length(irp) < r->TransferBufferLength) {
+		urbr->vpdo->len_sent_partial = sizeof(*hdr);
+		return STATUS_SUCCESS;
+	}
+
+	void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
+	
+	const void *buf = get_buf(buf_a, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
+	}
+
+	return ptr_to_status(buf);
 }
 
 /*
@@ -472,10 +481,10 @@ static NTSTATUS urb_isoch_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
 static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
-
 	USBD_PIPE_TYPE type = get_endpoint_type(r->PipeHandle);
+
 	if (type != UsbdPipeTypeIsochronous) {
-		TraceError(TRACE_READ, "Error, not a iso pipe");
+		TraceError(TRACE_READ, "%!USBD_PIPE_TYPE!", type);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -485,7 +494,13 @@ static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 	}
 
 	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
-	NT_ASSERT(is_endpoint_direction_in(r->PipeHandle));
+
+	if (dir_in != is_endpoint_direction_in(r->PipeHandle)) {
+		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and PipeHandle(%#08Ix)", 
+					r->TransferFlags, (uintptr_t)r->PipeHandle);
+
+		return STATUS_INVALID_PARAMETER;
+	}
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 
 					r->PipeHandle, r->TransferFlags, r->TransferBufferLength);
@@ -515,15 +530,13 @@ static NTSTATUS urb_control_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB ur
 	}
 
 	const void *buf = get_buf(urb_ctltrans->TransferBuffer, urb_ctltrans->TransferBufferMDL);
-	if (!buf) {
-		return STATUS_INSUFFICIENT_RESOURCES;
+	if (buf) {
+		RtlCopyMemory(dst, buf, urb_ctltrans->TransferBufferLength);
+		irp->IoStatus.Information = urb_ctltrans->TransferBufferLength;
+		vpdo->len_sent_partial = 0;
 	}
 
-	RtlCopyMemory(dst, buf, urb_ctltrans->TransferBufferLength);
-	irp->IoStatus.Information = urb_ctltrans->TransferBufferLength;
-	vpdo->len_sent_partial = 0;
-
-	return STATUS_SUCCESS;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
@@ -535,7 +548,22 @@ static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 	}
 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
+
+	bool def_pipe = r->TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
+	if (def_pipe == (bool)((uintptr_t)r->PipeHandle)) {
+		TraceError(TRACE_READ, "PipeHandle(%#08Ix) must be NULL if TransferFlags(%#lx) has bit %#x", 
+					(uintptr_t)r->PipeHandle, r->TransferFlags, USBD_DEFAULT_PIPE_TRANSFER);
+
+		return STATUS_INVALID_PARAMETER;
+	}
+
 	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
+	if (dir_in != is_transfer_dir_in(r)) {
+		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and SetupPacket, PipeHandle(%#08Ix)", 
+					r->TransferFlags, (uintptr_t)r->PipeHandle);
+
+		return STATUS_INVALID_PARAMETER;
+	}
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, r->PipeHandle,
 					r->TransferFlags, r->TransferBufferLength);
@@ -545,20 +573,21 @@ static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	if (!dir_in && r->TransferBufferLength) {
-		if (get_read_payload_length(irp) >= r->TransferBufferLength) {
-			const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
-			if (buf) {
-				RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
-			} else {
-				return STATUS_INSUFFICIENT_RESOURCES;
-			}
-		} else {
-			urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		}
+	if (dir_in || !r->TransferBufferLength) {
+		return STATUS_SUCCESS;
 	}
 
-	return STATUS_SUCCESS;
+	if (get_read_payload_length(irp) < r->TransferBufferLength) {
+		urbr->vpdo->len_sent_partial = sizeof(*hdr);
+		return STATUS_SUCCESS;
+	}
+
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
+	}
+
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
@@ -577,7 +606,7 @@ static NTSTATUS urb_control_transfer_ex_partial(pvpdo_dev_t vpdo, PIRP irp, PURB
 		vpdo->len_sent_partial = 0;
 	}
 
-	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr)
@@ -589,7 +618,22 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 	}
 
 	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
-	bool dir_in = is_endpoint_direction_in(r->PipeHandle);
+
+	bool def_pipe = r->TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
+	if (def_pipe == (bool)((uintptr_t)r->PipeHandle)) {
+		TraceError(TRACE_READ, "PipeHandle(%#08Ix) must be NULL if TransferFlags(%#lx) has bit %#x", 
+			(uintptr_t)r->PipeHandle, r->TransferFlags, USBD_DEFAULT_PIPE_TRANSFER);
+
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
+	if (dir_in != is_transfer_dir_in_ex(r)) {
+		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and SetupPacket, PipeHandle(%#08Ix)", 
+					r->TransferFlags, (uintptr_t)r->PipeHandle);
+
+		return STATUS_INVALID_PARAMETER;
+	}
 
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, r->PipeHandle,
 					r->TransferFlags, r->TransferBufferLength);
@@ -599,20 +643,21 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 
 	irp->IoStatus.Information = sizeof(*hdr);
 
-	if (!dir_in) {
-		if (get_read_payload_length(irp) >= r->TransferBufferLength) {
-			const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
-			if (buf) {
-				RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
-			} else {
-				return STATUS_INSUFFICIENT_RESOURCES;
-			}
-		} else {
-			urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		}
+	if (dir_in || !r->TransferBufferLength) {
+		return STATUS_SUCCESS;
 	}
 
-	return STATUS_SUCCESS;
+	if (get_read_payload_length(irp) < r->TransferBufferLength) {
+		urbr->vpdo->len_sent_partial = sizeof(*hdr);
+		return STATUS_SUCCESS;
+	}
+
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
+	}
+
+	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 /*
@@ -624,7 +669,7 @@ static NTSTATUS urb_function_unexpected(IRP *irp, URB *urb, struct urb_req* urbr
 	UNREFERENCED_PARAMETER(urbr);
 
 	USHORT func = urb->UrbHeader.Function;
-	TraceError(TRACE_READ, "%s(%#04x) must never be called", urb_function_str(func), func);
+	TraceError(TRACE_READ, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
 
 	return STATUS_INTERNAL_ERROR;
 }	
