@@ -79,7 +79,8 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
  * 1. We clear STALL/HALT feature on endpoint specified by pipe
  * 2. We abort/cancel all IRP for given pipe
  *
- * See: <linux>/drivers/usb/core/message.c, usb_clear_halt.
+ * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
+        <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
  *	<linux>/drivers/usb/core/hcd.c, usb_hcd_reset_endpoint
  */
 static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_req *urbr)
@@ -101,7 +102,7 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
 	pkt->bRequest = USB_REQUEST_CLEAR_FEATURE;
-	pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL;
+	pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
 	pkt->wIndex.W = get_endpoint_address(r->PipeHandle);
 
 	irp->IoStatus.Information = sizeof(*hdr);
