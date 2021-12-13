@@ -309,6 +309,11 @@ static NTSTATUS copy_isoch(
 			return STATUS_INVALID_PARAMETER;
 		}
 
+		if (src->offset != dst->Offset) { // buffer is compacted, but offsets are intact
+			TraceError(TRACE_WRITE, "src->offset(%u) != dst->Offset(%lu)", src->offset, dst->Offset);
+			return STATUS_INVALID_PARAMETER;
+		}
+
 		if (src_offset > dst->Offset) {// source buffer has no gaps
 			TraceError(TRACE_WRITE, "src_offset(%lu) > dst->Offset(%lu)", src_offset, dst->Offset);
 			return STATUS_INVALID_PARAMETER;
