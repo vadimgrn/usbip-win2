@@ -108,6 +108,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip_proto.h" />
+    <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="devconf.h" />

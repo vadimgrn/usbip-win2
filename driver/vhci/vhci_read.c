@@ -8,6 +8,7 @@
 #include "vhci_internal_ioctl.h"
 #include "usbd_helper.h"
 #include "ch9.h"
+#include "ch11.h"
 
 static PVOID get_read_irp_data(IRP *irp, ULONG length)
 {
@@ -28,6 +29,9 @@ static ULONG get_read_payload_length(IRP *irp)
 	return irpstack->Parameters.Read.Length - sizeof(struct usbip_header);
 }
 
+/*
+ * See: <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd.
+ */
 static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -38,9 +42,9 @@ static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
-	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER;
+	pkt->bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
 	pkt->bRequest = USB_REQUEST_SET_FEATURE;
-	pkt->wValue.LowByte = 4; // reset
+	pkt->wValue.W = USB_PORT_FEAT_RESET;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
