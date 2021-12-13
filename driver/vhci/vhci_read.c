@@ -39,7 +39,7 @@ static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, EP0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
@@ -62,7 +62,7 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(*r);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, outlen);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, EP0, 0, outlen);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
@@ -97,7 +97,7 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, EP0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
@@ -144,7 +144,7 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0, 0, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, EP0, 0, r->TransferBufferLength);
 	
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = (dir_in ? USB_DIR_IN : USB_DIR_OUT) | USB_TYPE_STANDARD | recipient;
@@ -186,7 +186,7 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 
 	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, EP0, 0, r->TransferBufferLength);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | recipient;
@@ -227,7 +227,7 @@ static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
 	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 0, r->TransferFlags, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, EP0, r->TransferFlags, r->TransferBufferLength);
 	
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = (dir_in ? USB_DIR_IN : USB_DIR_OUT) | type | recipient;
@@ -306,7 +306,7 @@ static NTSTATUS urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urb
 	struct _URB_SELECT_CONFIGURATION *r = &urb->UrbSelectConfiguration;
 	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor; // NULL if unconfigured
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, EP0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
@@ -326,7 +326,7 @@ static NTSTATUS urb_select_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 
 	struct _URB_SELECT_INTERFACE *r = &urb->UrbSelectInterface;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, EP0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
@@ -357,10 +357,6 @@ static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP ir
 	return ptr_to_status(buf);
 }
 
-/* 
- * Sometimes, direction in TransferFlags of _URB_BULK_OR_INTERRUPT_TRANSFER is not consistent 
- * with PipeHandle. Use a direction flag in pipe handle.
- */
 static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -557,16 +553,16 @@ static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
+	USBD_PIPE_HANDLE PipeHandle = def_pipe ? EP0 : r->PipeHandle;
+
 	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 	if (dir_in != is_transfer_dir_in(r)) {
-		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and SetupPacket, PipeHandle(%#08Ix)", 
-					r->TransferFlags, (uintptr_t)r->PipeHandle);
-
+		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and SetupPacket", r->TransferFlags);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, r->PipeHandle,
-					r->TransferFlags, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 
+					PipeHandle, r->TransferFlags, r->TransferBufferLength);
 
 	RtlCopyMemory(hdr->u.cmd_submit.setup, r->SetupPacket, sizeof(r->SetupPacket));
 	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r->SetupPacket), "assert");
@@ -627,16 +623,16 @@ static NTSTATUS urb_control_transfer_ex(IRP *irp, URB *urb, struct urb_req* urbr
 		return STATUS_INVALID_PARAMETER;
 	}
 
+	USBD_PIPE_HANDLE PipeHandle = def_pipe ? EP0 : r->PipeHandle;
+
 	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 	if (dir_in != is_transfer_dir_in_ex(r)) {
-		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and SetupPacket, PipeHandle(%#08Ix)", 
-					r->TransferFlags, (uintptr_t)r->PipeHandle);
-
+		TraceError(TRACE_READ, "Transfer direction mismatches in TransferFlags(%#lx) and SetupPacket", r->TransferFlags);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, r->PipeHandle,
-					r->TransferFlags, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, dir_in, 
+					PipeHandle, r->TransferFlags, r->TransferBufferLength);
 
 	RtlCopyMemory(hdr->u.cmd_submit.setup, r->SetupPacket, sizeof(r->SetupPacket));
 	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r->SetupPacket), "assert");
@@ -713,7 +709,7 @@ static NTSTATUS urb_control_feature_request(IRP *irp, URB *urb, struct urb_req* 
 
 	struct _URB_CONTROL_FEATURE_REQUEST *r = &urb->UrbControlFeatureRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, 0, 0, 0);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, EP0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | recipient;
@@ -774,7 +770,7 @@ static NTSTATUS get_configuration(IRP *irp, URB *urb, struct urb_req* urbr)
 
 	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, EP0, 0, r->TransferBufferLength);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
@@ -794,7 +790,7 @@ static NTSTATUS get_interface(IRP *irp, URB *urb, struct urb_req* urbr)
 
 	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
 
-	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, 0, 0, r->TransferBufferLength);
+	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_IN, EP0, 0, r->TransferBufferLength);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;

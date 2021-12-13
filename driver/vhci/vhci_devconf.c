@@ -7,6 +7,8 @@
 #include "devconf.h"
 #include "dbgcommon.h"
 
+const USBD_PIPE_HANDLE EP0 = 0;
+
 static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 {
 	UCHAR v[sizeof(USBD_INTERFACE_HANDLE)] = { altsetting, ifnum, 1 }; // must be != 0

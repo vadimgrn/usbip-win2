@@ -76,3 +76,10 @@ __inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
 	UCHAR addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_OUT(addr);
 }
+
+extern const USBD_PIPE_HANDLE EP0;
+
+//static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl, "assert");
+//static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");
+//static_assert(!get_endpoint_number(EP0), "assert");
+//static_assert(!get_endpoint_interval(EP0), "assert");
