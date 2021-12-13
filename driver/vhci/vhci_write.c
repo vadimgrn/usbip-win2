@@ -62,12 +62,6 @@ static __inline NTSTATUS setTransferBufferLength(URB *urb, int actual_length)
 	return assignTransferBufferLength(&urb->UrbControlTransfer.TransferBufferLength, actual_length);
 }
 
-static __inline bool is_transfer_dir_out(const struct _URB_CONTROL_TRANSFER *r)
-{
-	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)r->SetupPacket;
-	return pkt->bmRequestType.Dir == BMREQUEST_HOST_TO_DEVICE;
-}
-
 static __inline NTSTATUS ptr_to_status(const void *p)
 {
 	return p ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
