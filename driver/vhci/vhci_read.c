@@ -86,12 +86,18 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 }
 
 /* 
- * 1. We clear STALL/HALT feature on endpoint specified by pipe
- * 2. We abort/cancel all IRP for given pipe
- *
+ * Any URBs queued for such an endpoint should normally be unlinked by the driver before clearing the halt condition, 
+ * as described in sections 5.7.5 and 5.8.5 of the USB 2.0 spec.
+ * 
+ * Thus, a driver must call URB_FUNCTION_ABORT_PIPE before URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL.
+ * For that reason vhci_ioctl_abort_pipe(urbr->vpdo, r->PipeHandle) is not called here.
+ * 
+ * Linux server catches control transfer USB_REQ_CLEAR_FEATURE/USB_ENDPOINT_HALT and calls usb_clear_halt which 
+ * a) Issues USB_REQ_CLEAR_FEATURE/USB_ENDPOINT_HALT # URB_FUNCTION_SYNC_CLEAR_STALL
+ * b) Calls usb_reset_endpoint # URB_FUNCTION_SYNC_RESET_PIPE
+ * 
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
-        <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
- *	<linux>/drivers/usb/core/hcd.c, usb_hcd_reset_endpoint
+        <linux>/drivers/usb/core/message.c, usb_clear_halt
  */
 static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_req *urbr)
 {
@@ -116,8 +122,6 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 	pkt->wIndex.W = get_endpoint_address(r->PipeHandle);
 
 	irp->IoStatus.Information = sizeof(*hdr);
-
-	vhci_ioctl_abort_pipe(urbr->vpdo, r->PipeHandle); // cancel/abort all URBs for given pipe
 	return STATUS_SUCCESS;
 }
 
