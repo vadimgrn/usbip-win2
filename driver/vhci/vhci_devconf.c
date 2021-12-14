@@ -7,7 +7,22 @@
 #include "devconf.h"
 #include "dbgcommon.h"
 
-const USBD_PIPE_HANDLE EP0 = 0;
+static __inline USBD_PIPE_HANDLE make_pipe_handle(
+	UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
+{
+	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = {EndpointAddress, Interval, PipeType};
+	NT_ASSERT(*(USBD_PIPE_HANDLE*)v);
+	return *(USBD_PIPE_HANDLE*)v;
+}
+
+const USBD_PIPE_HANDLE EP0 = 0; // make_pipe_handle(USB_DEFAULT_ENDPOINT_ADDRESS, UsbdPipeTypeControl, 0);
+/*
+static_assert(!EP0, "assert");
+static_assert(!get_endpoint_number(EP0), "assert");
+static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");
+static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl, "assert");
+static_assert(!get_endpoint_interval(EP0), "assert");
+*/
 
 static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 {
@@ -44,7 +59,7 @@ static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_de
 	
 	pipe->PipeHandle = make_pipe_handle(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
 	NT_ASSERT(pipe->PipeHandle);
-//	NT_ASSERT(is_endpoint_direction_in(pipe->PipeHandle) == (bool)USBD_PIPE_DIRECTION_IN(pipe));
+	NT_ASSERT(is_endpoint_direction_in(pipe->PipeHandle) == (bool)USBD_PIPE_DIRECTION_IN(pipe));
 
 	pipe->MaximumTransferSize = 0; // is not used and does not contain valid data
 	pipe->PipeFlags = 0; // USBD_PF_CHANGE_MAX_PACKET if override MaximumPacketSize

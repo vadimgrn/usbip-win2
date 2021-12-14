@@ -8,6 +8,8 @@
 
 #include "usbip_proto.h" 
 
+extern const USBD_PIPE_HANDLE EP0;
+
 NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed);
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);
 
@@ -29,13 +31,6 @@ __inline USBD_INTERFACE_INFORMATION *get_next_interface(const USBD_INTERFACE_INF
 	NT_ASSERT((void*)iface < cfg_end);
 	void *next = (char*)iface + iface->Length;
 	return next < cfg_end ? next : NULL;
-}
-
-__inline USBD_PIPE_HANDLE make_pipe_handle(UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
-{
-	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = {EndpointAddress, Interval, PipeType, 1}; // must be != 0
-	NT_ASSERT(*(USBD_PIPE_HANDLE*)v);
-	return *(USBD_PIPE_HANDLE*)v;
 }
 
 /*
@@ -76,10 +71,3 @@ __inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
 	UCHAR addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_OUT(addr);
 }
-
-extern const USBD_PIPE_HANDLE EP0;
-
-//static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl, "assert");
-//static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");
-//static_assert(!get_endpoint_number(EP0), "assert");
-//static_assert(!get_endpoint_interval(EP0), "assert");
