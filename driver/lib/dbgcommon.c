@@ -254,6 +254,7 @@ static void print_ret_submit(char *buf, size_t len, const struct usbip_header_re
 
 const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 {
+	const char *result = buf;
 	const struct usbip_header_basic *base = &hdr->base;
 
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, 
@@ -286,7 +287,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 		break;
 	}
 
-	return buf;
+	return result;
 }
 
 const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)

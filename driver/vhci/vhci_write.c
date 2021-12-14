@@ -150,21 +150,16 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const
 		return ptr_to_status(dsc);
 	}
 
-	ULONG min_sz = min(r->TransferBufferLength, dsc->bLength);
+	if (r->TransferBufferLength < dsc->bLength) {
+		TraceError(TRACE_WRITE, "TransferBufferLength(%lu) < bLength(%d)", r->TransferBufferLength, dsc->bLength);
+		return STATUS_INVALID_PARAMETER;
+	}
 
 	TraceInfo(TRACE_WRITE, "%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
 				urb_function_str(r->Hdr.Function), 
 				dsc->bLength,
 				dsc->bDescriptorType,
-				WppBinary(dsc + 1, (USHORT)(min_sz - sizeof(*dsc))));
-
-	if (r->TransferBufferLength < dsc->bLength) {
-		TraceError(TRACE_WRITE, "TransferBufferLength(%lu) < bLength(%d)", r->TransferBufferLength, dsc->bLength);
-		r->TransferBufferLength = 0;
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	r->TransferBufferLength = dsc->bLength;
+				WppBinary(dsc, (USHORT)r->TransferBufferLength));
 
 	if (!urb->UrbHeader.Status) {
 		try_to_cache_descriptor(vpdo, r, dsc);

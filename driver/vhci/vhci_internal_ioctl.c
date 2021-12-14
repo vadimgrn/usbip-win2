@@ -103,8 +103,9 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb)
 	
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu, Index %d, %!usb_descriptor_type!, LanguageId %#04hx",
-		urb_function_str(r->Hdr.Function), r->TransferBufferLength, r->Index, r->DescriptorType, r->LanguageId);
+	TraceVerbose(TRACE_IOCTL, "%s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
+					urb_function_str(r->Hdr.Function), r->TransferBufferLength, r->TransferBufferLength, 
+					r->Index, r->DescriptorType, r->LanguageId);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -213,10 +214,10 @@ static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb)
 	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
 	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix, %s, TransferBufferLength %lu, %s",
-		(uintptr_t)r->PipeHandle, 
-		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r->TransferFlags),
-		r->TransferBufferLength,
-		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r->SetupPacket));
+			(uintptr_t)r->PipeHandle, 
+			usbd_transfer_flags(buf_flags, sizeof(buf_flags), r->TransferFlags),
+			r->TransferBufferLength,
+			usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r->SetupPacket));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
