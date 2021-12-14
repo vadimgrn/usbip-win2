@@ -92,11 +92,6 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 
 	struct _URB_PIPE_REQUEST *r = &urb->UrbPipeRequest;
 
-	if (get_endpoint_type(r->PipeHandle) == UsbdPipeTypeControl) {
-		TraceWarning(TRACE_READ, "CLEAR not allowed to a control pipe");
-		return STATUS_INVALID_PARAMETER;
-	}
-
 	set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, USBIP_DIR_OUT, EP0, 0, 0);
 
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);

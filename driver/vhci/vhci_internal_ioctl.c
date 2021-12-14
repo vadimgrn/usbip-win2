@@ -141,19 +141,24 @@ static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
+/*
+ * URB_FUNCTION_SYNC_CLEAR_STALL must issue USB_REQ_CLEAR_FEATURE, USB_ENDPOINT_HALT.
+ * URB_FUNCTION_SYNC_RESET_PIPE must call usb_reset_endpoint.
+ * 
+ * Linux server catches control transfer USB_REQ_CLEAR_FEATURE/USB_ENDPOINT_HALT and calls usb_clear_halt.
+ * There is no way to distinguish these two operations without modifications on server's side.
+ * It can be implemented by passing extra parameter
+ * a) wValue=1 to clear halt 
+ * b) wValue=2 to call usb_reset_endpoint
+ * 
+ * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
+ * <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
+ */
 static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_PIPE_REQUEST *r = &urb->UrbPipeRequest;
-
-	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d)",
-			urb_function_str(r->Hdr.Function), 
-			(uintptr_t)r->PipeHandle, 
-			get_endpoint_address(r->PipeHandle), 
-			get_endpoint_type(r->PipeHandle),
-			get_endpoint_interval(r->PipeHandle));
-
 	NTSTATUS st = STATUS_NOT_SUPPORTED;
 
 	switch (urb->UrbHeader.Function) {
@@ -166,20 +171,36 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
 	case URB_FUNCTION_CLOSE_STATIC_STREAMS:
+		urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 		break;
 	}
+
+	TraceVerbose(TRACE_IOCTL, "%s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d) -> %!STATUS!",
+				urb_function_str(r->Hdr.Function), 
+				(uintptr_t)r->PipeHandle, 
+				get_endpoint_address(r->PipeHandle), 
+				get_endpoint_type(r->PipeHandle),
+				get_endpoint_interval(r->PipeHandle),
+				st);
 
 	return st;
 }
 
+/*
+ * Can't be implemented without server's support.
+ * In any case the result will not be relevant due to network latency.
+ * 
+ * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number. 
+ */
 static NTSTATUS urb_get_current_frame_number(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
+	UNREFERENCED_PARAMETER(urb);
 
-	urb->UrbGetCurrentFrameNumber.FrameNumber = 0;
-	TraceVerbose(TRACE_IOCTL, "FrameNumber %lu", urb->UrbGetCurrentFrameNumber.FrameNumber);
+	TraceVerbose(TRACE_IOCTL, "Not supported");
+	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 
-	return STATUS_SUCCESS;
+	return STATUS_NOT_SUPPORTED;
 }
 
 static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb)
@@ -264,7 +285,7 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb)
 static NTSTATUS usb_function_deprecated(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
-	UNREFERENCED_PARAMETER(urb);
+	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 	return STATUS_NOT_SUPPORTED;
 }
 
@@ -419,7 +440,7 @@ static const urb_function_t urb_functions[] =
 	get_isoch_pipe_transfer_path_delays // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
-static NTSTATUS process_irp_urb_req(vpdo_dev_t *vpdo, IRP *irp)
+static NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 {
 	URB *urb = URB_FROM_IRP(irp);
 	if (!urb) {
@@ -477,7 +498,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = process_irp_urb_req(vpdo, Irp);
+		status = usb_submit_urb(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
 		status = usb_get_port_status(irpStack->Parameters.Others.Argument1);
