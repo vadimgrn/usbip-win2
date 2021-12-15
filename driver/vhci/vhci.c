@@ -41,8 +41,7 @@ DRIVER_DISPATCH vhci_system_control;
 
 PAGEABLE DRIVER_ADD_DEVICE vhci_add_device;
 
-static PAGEABLE VOID
-vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
+static PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
 	TraceInfo(TRACE_GENERAL, "Enter");
@@ -58,8 +57,7 @@ vhci_driverUnload(__in PDRIVER_OBJECT drvobj)
 	WPP_CLEANUP(drvobj);
 }
 
-static PAGEABLE NTSTATUS
-vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+static PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
 	PAGED_CODE();
 
@@ -76,8 +74,7 @@ vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	return irp_done_success(Irp);
 }
 
-static PAGEABLE void
-cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
+static PAGEABLE void cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 {
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
@@ -91,8 +88,7 @@ cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 	}
 }
 
-static PAGEABLE NTSTATUS
-vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+static PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
@@ -113,8 +109,7 @@ vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	return irp_done_success(irp);
 }
 
-static PAGEABLE NTSTATUS
-vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+static PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
 	PAGED_CODE();
 
@@ -131,13 +126,84 @@ vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	return irp_done_success(Irp);
 }
 
-PAGEABLE NTSTATUS
-DriverEntry(__in PDRIVER_OBJECT drvobj, __in PUNICODE_STRING RegistryPath)
+/*
+ * Set only if such value does not exist. 
+ */
+static PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
 {
+	UNICODE_STRING name;
+	RtlInitUnicodeString(&name, L"VerboseOn");
+
+	ULONG len = 0;
+	KEY_VALUE_PARTIAL_INFORMATION info;
+
+	NTSTATUS st = ZwQueryValueKey(h, &name, KeyValuePartialInformation, &info, sizeof(info), &len);
+
+	if (st == STATUS_OBJECT_NAME_NOT_FOUND) {
+		DWORD val = 1;
+		st = ZwSetValueKey(h, &name, 0, REG_DWORD, &val, sizeof(val));
+	} else {
+		NT_ASSERT(!st);
+	}
+
+	return st;
+}
+
+/*
+ * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
+ * The default setting of zero causes the IFR to log errors, warnings, and informational events. 
+ * Set to one to add verbose output to the log.
+ */
+static PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
+{
+	UNICODE_STRING params;
+	RtlInitUnicodeString(&params, L"\\Parameters");
+
+	UNICODE_STRING path;
+	path.Length = 0;
+	path.MaximumLength = RegistryPath->Length + params.Length;
+	path.Buffer = ExAllocatePoolWithTag(PagedPool, path.MaximumLength + sizeof(*path.Buffer), USBIP_VHCI_POOL_TAG);
+
+	if (!path.Buffer) {
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+	
+	NTSTATUS st = RtlUnicodeStringCopy(&path, RegistryPath);
+	NT_ASSERT(!st);
+
+	st = RtlUnicodeStringCat(&path, &params);
+	NT_ASSERT(!st);
+
+	OBJECT_ATTRIBUTES attrs;
+	InitializeObjectAttributes(&attrs, &path, OBJ_KERNEL_HANDLE, NULL, NULL);
+
+	HANDLE h = NULL;
+	st = ZwCreateKey(&h, KEY_WRITE, &attrs, 0, NULL, 0, NULL);
+	if (!st) {
+		st = set_verbose_on(h);
+		ZwClose(h);
+	}
+
+	ExFreePoolWithTag(path.Buffer, USBIP_VHCI_POOL_TAG);
+	return st;
+}
+
+PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
+{
+	PAGED_CODE();
+
+	NTSTATUS st = set_ifr_verbose(RegistryPath);
 	WPP_INIT_TRACING(drvobj, RegistryPath);
+
+	if (st) {
+		TraceCritical(TRACE_GENERAL, "Can't set IFR parameter: %!STATUS!", st);
+		WPP_CLEANUP(drvobj);
+		return st;
+	}
+
 	TraceInfo(TRACE_GENERAL, "RegistryPath '%!USTR!'", RegistryPath);
 
-	ExInitializeNPagedLookasideList(&g_lookaside, NULL,NULL, 0, sizeof(struct urb_req), 'USBV', 0);
+	ExInitializeNPagedLookasideList(&g_lookaside, NULL, NULL, 0, sizeof(struct urb_req), 'USBV', 0);
 
 	// Save the RegistryPath for WMI
 	Globals.RegistryPath.MaximumLength = RegistryPath->Length + sizeof(UNICODE_NULL);
