@@ -39,9 +39,9 @@ static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_OUT, 0);
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -67,9 +67,9 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(*r);
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_IN, outlen);
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, outlen);
 	if (err) {
 		return err;
 	}
@@ -107,10 +107,9 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 	}
 
 	struct _URB_PIPE_REQUEST *r = &urb->UrbPipeRequest;
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_OUT, 0);
-
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -158,8 +157,8 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | 
-				(dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | 
+					(dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
 
 	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r->TransferBufferLength);
 	if (err) {
@@ -205,10 +204,9 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 	}
 
 	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_IN, r->TransferBufferLength);
-
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r->TransferBufferLength);
 	if (err) {
 		return err;
 	}
@@ -336,9 +334,9 @@ static NTSTATUS urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urb
 	struct _URB_SELECT_CONFIGURATION *r = &urb->UrbSelectConfiguration;
 	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor; // NULL if unconfigured
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_OUT, 0);
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -346,7 +344,7 @@ static NTSTATUS urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urb
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
 	pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
 	pkt->bRequest = USB_REQUEST_SET_CONFIGURATION;
-	pkt->wValue.W = cd ? cd->bConfigurationValue : 0; // FIXME: linux expects -1 if unconfigured
+	pkt->wValue.W = cd ? cd->bConfigurationValue : 0;
 
 	irp->IoStatus.Information = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -360,10 +358,9 @@ static NTSTATUS urb_select_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 	}
 
 	struct _URB_SELECT_INTERFACE *r = &urb->UrbSelectInterface;
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_OUT, 0);
-
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -692,10 +689,9 @@ static NTSTATUS urb_control_feature_request(IRP *irp, URB *urb, struct urb_req* 
 	}
 
 	struct _URB_CONTROL_FEATURE_REQUEST *r = &urb->UrbControlFeatureRequest;
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-						EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_OUT, 0);
-
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -758,10 +754,9 @@ static NTSTATUS get_configuration(IRP *irp, URB *urb, struct urb_req* urbr)
 	}
 
 	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-					EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_IN, r->TransferBufferLength);
-
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r->TransferBufferLength);
 	if (err) {
 		return err;
 	}
@@ -783,10 +778,9 @@ static NTSTATUS get_interface(IRP *irp, URB *urb, struct urb_req* urbr)
 	}
 
 	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
-					EP0, USBD_DEFAULT_PIPE_TRANSFER|USBD_TRANSFER_DIRECTION_IN, r->TransferBufferLength);
-
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r->TransferBufferLength);
 	if (err) {
 		return err;
 	}
