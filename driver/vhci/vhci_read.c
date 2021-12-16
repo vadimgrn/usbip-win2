@@ -10,7 +10,7 @@
 #include "ch9.h"
 #include "ch11.h"
 
-static PVOID get_read_irp_data(IRP *irp, ULONG length)
+static void *get_read_irp_data(IRP *irp, ULONG length)
 {
 	irp->IoStatus.Information = 0;
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
@@ -930,7 +930,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 	return STATUS_INVALID_PARAMETER;
 }
 
-static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
+static NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 {
 	{
 		char buf[URB_REQ_STR_BUFSZ];
@@ -942,16 +942,16 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = urb_isoch_transfer_partial(urbr->vpdo, irp, urb);
+		status = urb_isoch_transfer_partial(urbr->vpdo, read_irp, urb);
 		break;
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = urb_bulk_or_interrupt_transfer_partial(urbr->vpdo, irp, urb);
+		status = urb_bulk_or_interrupt_transfer_partial(urbr->vpdo, read_irp, urb);
 		break;
 	case URB_FUNCTION_CONTROL_TRANSFER:
-		status = urb_control_transfer_partial(urbr->vpdo, irp, urb);
+		status = urb_control_transfer_partial(urbr->vpdo, read_irp, urb);
 		break;
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		status = urb_control_transfer_ex_partial(urbr->vpdo, irp, urb);
+		status = urb_control_transfer_ex_partial(urbr->vpdo, read_irp, urb);
 		break;
 	case URB_FUNCTION_CLASS_DEVICE:
 	case URB_FUNCTION_CLASS_INTERFACE:
@@ -961,10 +961,10 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 	case URB_FUNCTION_VENDOR_INTERFACE:
 	case URB_FUNCTION_VENDOR_ENDPOINT:
 	case URB_FUNCTION_VENDOR_OTHER:
-		status = urb_control_vendor_class_request_partial(urbr->vpdo, irp, urb);
+		status = urb_control_vendor_class_request_partial(urbr->vpdo, read_irp, urb);
 		break;
 	default:
-		irp->IoStatus.Information = 0;
+		read_irp->IoStatus.Information = 0;
 		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(urb->UrbHeader.Function));
 	}
 
@@ -987,10 +987,10 @@ static NTSTATUS store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
+NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
 {
 	if (!urbr->irp) {
-		return store_cancelled_urbr(irp, urbr);
+		return store_cancelled_urbr(read_irp, urbr);
 	}
 
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
@@ -1000,17 +1000,17 @@ NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = usb_submit_urb(irp, urbr);
+		status = usb_submit_urb(read_irp, urbr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		status = usb_reset_port(irp, urbr);
+		status = usb_reset_port(read_irp, urbr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descriptor_from_node_connection(irp, urbr);
+		status = get_descriptor_from_node_connection(read_irp, urbr);
 		break;
 	default:
 		TraceWarning(TRACE_READ, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
-		irp->IoStatus.Information = 0;
+		read_irp->IoStatus.Information = 0;
 	}
 
 	return status;

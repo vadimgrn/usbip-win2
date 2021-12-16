@@ -230,38 +230,39 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cmd_submit *cmd)
 {
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
-			"cmd_submit: transfer_flags %#x, transfer_buffer_length %d, start_frame %d, number_of_packets %d, interval %d, ",
+			"cmd_submit: flags %#x, length %d, isoch[%d]{start %d}, interval %d, ",
 			cmd->transfer_flags, 
 			cmd->transfer_buffer_length, 
-			cmd->start_frame, 
 			cmd->number_of_packets, 
+			cmd->start_frame, 
 			cmd->interval);
 
-	if (st == STATUS_SUCCESS) {
+	if (!st) {
 		usb_setup_pkt_str(buf, len, cmd->setup);
 	}
 }
 
 static void print_ret_submit(char *buf, size_t len, const struct usbip_header_ret_submit *cmd)
 {
-	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, start_frame %d, number_of_packets %d, error_count %d", 
-		cmd->status,
-		cmd->actual_length,
-		cmd->start_frame,
-		cmd->number_of_packets,
-		cmd->error_count);
+	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, isoch[%d]{start %d, errors %d}", 
+					cmd->status,
+					cmd->actual_length,
+					cmd->number_of_packets,
+					cmd->start_frame,
+					cmd->error_count);
 }
 
 const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 {
+	if (!hdr) {
+		return "usbip_header{null}";
+	}
+
 	const char *result = buf;
 	const struct usbip_header_basic *base = &hdr->base;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, 
-					"usbip_header{command %u, seqnum %u, devid %#x(busnum %d, devnum %d), %s, ep %#x}, ",
-					base->command,
-					base->seqnum,
-					base->devid, (base->devid >> 16) & 0xFFFF, base->devid & 0xFFFF, 
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s#%02x}, ",
+					base->seqnum, base->devid,			
 					base->direction == USBIP_DIR_OUT ? "out" : "in",
 					base->ep);
 
@@ -285,6 +286,8 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 	case USBIP_RESET_DEV:
 		RtlStringCbCopyA(buf, len, "reset_dev");
 		break;
+	default:
+		RtlStringCbPrintfA(buf, len, "command %u", base->command);
 	}
 
 	return result;
@@ -295,17 +298,17 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 	const USB_DEFAULT_PIPE_SETUP_PACKET *r = packet;
 
 	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
-		"SetupPacket{%#02hhx(%s|%s|%s), %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
-		r->bmRequestType,
-		bmrequest_dir_str(r->bmRequestType),
-		bmrequest_type_str(r->bmRequestType),
-		bmrequest_recipient_str(r->bmRequestType),
-		brequest_str(r->bRequest),
-		r->bRequest,
-		r->wValue,
-		r->wIndex, 
-		r->wLength,
-		r->wLength);
+			"{%#02hhx(%s|%s|%s), %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
+			r->bmRequestType,
+			bmrequest_dir_str(r->bmRequestType),
+			bmrequest_type_str(r->bmRequestType),
+			bmrequest_recipient_str(r->bmRequestType),
+			brequest_str(r->bRequest),
+			r->bRequest,
+			r->wValue,
+			r->wIndex, 
+			r->wLength,
+			r->wLength);
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "usb_setup_pkt_str invalid parameter";
 }

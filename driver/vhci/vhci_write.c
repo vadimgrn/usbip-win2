@@ -681,7 +681,11 @@ static void complete_irp(IRP *irp, NTSTATUS status)
 static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
-	if (!hdr) {
+
+	if (hdr) {
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceInfo(TRACE_WRITE, "IN %s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	} else {
 		TraceError(TRACE_WRITE, "usbip header expected");
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -691,13 +695,8 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		TraceInfo(TRACE_WRITE, "urb_req not found (cancelled?), seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
-
+	
 	IRP *irp = urbr->irp;
-
-	{
-		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "irp %#p -> %s", irp, dbg_usbip_hdr(buf, sizeof(buf), hdr));
-	}
 
 	NTSTATUS status = process_urb_res(urbr, hdr);
 	free_urbr(urbr);
