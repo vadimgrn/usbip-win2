@@ -7,6 +7,22 @@
 #include "devconf.h"
 #include "dbgcommon.h"
 
+static __inline USBD_INTERFACE_INFORMATION *next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end)
+{
+	void *next = (char*)iface + iface->Length;
+	if (!cfg_end) {
+		return next;
+	}
+
+	NT_ASSERT((void*)iface < cfg_end);
+	return next < cfg_end ? next : NULL;
+}
+
+static __inline const void *get_configuration_end(const struct _URB_SELECT_CONFIGURATION *cfg)
+{
+	return (char*)cfg + cfg->Hdr.Length;
+}
+
 static __inline USBD_PIPE_HANDLE make_pipe_handle(
 	UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
 {
@@ -125,7 +141,7 @@ NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_spe
 	USBD_INTERFACE_INFORMATION *iface = &cfg->Interface;
 	const void *cfg_end = get_configuration_end(cfg);
 
-	for (int i = 0; i < cd->bNumInterfaces; ++i, iface = get_next_interface(iface, cfg_end)) {
+	for (int i = 0; i < cd->bNumInterfaces; ++i, iface = next_interface(iface, cfg_end)) {
 		
 		NTSTATUS status = setup_intf(iface, speed, cd);
 		if (status != STATUS_SUCCESS) {
@@ -140,7 +156,7 @@ static void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATI
 {
 	NTSTATUS st = STATUS_SUCCESS;
 
-	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i, r = get_next_interface(r, cfg_end)) {
+	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i, r = next_interface(r, cfg_end)) {
 
 		st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "

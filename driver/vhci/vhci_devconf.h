@@ -21,18 +21,6 @@ enum {
 const char *select_configuration_str(char *buf, size_t len, const struct _URB_SELECT_CONFIGURATION *cfg);
 const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT_INTERFACE *iface);
 
-__inline const void *get_configuration_end(const struct _URB_SELECT_CONFIGURATION *cfg)
-{
-	return (char*)cfg + cfg->Hdr.Length;
-}
-
-__inline USBD_INTERFACE_INFORMATION *get_next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end)
-{
-	NT_ASSERT((void*)iface < cfg_end);
-	void *next = (char*)iface + iface->Length;
-	return next < cfg_end ? next : NULL;
-}
-
 /*
  * @return bEndpointAddress of endpoint descriptor 
  */
