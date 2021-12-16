@@ -261,6 +261,6 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 		status = STATUS_INVALID_PARAMETER;
 	}
 
-	TraceInfo(TRACE_URB, "%!STATUS!", status);
+	TraceVerbose(TRACE_URB, "%!STATUS!", status);
 	return status;
 }

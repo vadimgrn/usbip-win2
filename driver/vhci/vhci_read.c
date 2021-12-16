@@ -919,11 +919,6 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 
 	USHORT func = urb->UrbHeader.Function;
 
-	{
-		char buf[URB_REQ_STR_BUFSZ];
-		TraceInfo(TRACE_READ, "%s: %s", urb_function_str(func), urb_req_str(buf, sizeof(buf), urbr));
-	}
-
 	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
 	if (pfunc) {
 		return pfunc(irp, urb, urbr);
@@ -939,7 +934,7 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 {
 	{
 		char buf[URB_REQ_STR_BUFSZ];
-		TraceInfo(TRACE_READ, "Enter %s", urb_req_str(buf, sizeof(buf), urbr));
+		TraceVerbose(TRACE_READ, "Enter %s", urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	URB *urb = URB_FROM_IRP(urbr->irp);
@@ -973,7 +968,7 @@ static NTSTATUS store_urbr_partial(IRP *irp, struct urb_req *urbr)
 		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(urb->UrbHeader.Function));
 	}
 
-	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);
+	TraceVerbose(TRACE_READ, "Leave %!STATUS!", status);
 	return status;
 }
 
@@ -994,11 +989,6 @@ static NTSTATUS store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 
 NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr)
 {
-	{
-		char buf[URB_REQ_STR_BUFSZ];
-		TraceInfo(TRACE_READ, "%s", urb_req_str(buf, sizeof(buf), urbr));
-	}
-
 	if (!urbr->irp) {
 		return store_cancelled_urbr(irp, urbr);
 	}
@@ -1053,7 +1043,7 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 	struct urb_req *urbr = NULL;
 	KIRQL oldirql;
 
-	TraceInfo(TRACE_READ, "Enter");
+	TraceVerbose(TRACE_READ, "Enter");
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
@@ -1145,6 +1135,6 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		irp_done(irp, status);
 	}
 
-	TraceInfo(TRACE_READ, "Leave %!STATUS!", status);
+	TraceVerbose(TRACE_READ, "Leave %!STATUS!", status);
 	return status;
 }
