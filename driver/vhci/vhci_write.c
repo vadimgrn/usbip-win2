@@ -639,16 +639,19 @@ static NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header 
 	return st;
 }
 
-static struct usbip_header *get_usbip_hdr_from_write_irp(IRP *irp)
+/*
+* Userspace app has written data in the buffer, the driver will read them.
+*/
+static const struct usbip_header *consume_usbip_pdu_from_write_irp(IRP *irp)
 {
-	struct usbip_header *hdr = NULL;
-
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG len = irpstack->Parameters.Write.Length;
+
+	const struct usbip_header *hdr = NULL;
 	
-	if (len >= sizeof(*hdr)) {
-		irp->IoStatus.Information = len;
+	if (len >= sizeof(*hdr)) { // FIXME: check exact size using actual_length
 		hdr = irp->AssociatedIrp.SystemBuffer;
+		irp->IoStatus.Information = len; // fully consumed
 	}
 	
 	return hdr;
@@ -680,11 +683,11 @@ static void complete_irp(IRP *irp, NTSTATUS status)
 
 static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
-	struct usbip_header *hdr = get_usbip_hdr_from_write_irp(write_irp);
+	const struct usbip_header *hdr = consume_usbip_pdu_from_write_irp(write_irp);
 
 	if (hdr) {
 		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "IN %s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
+		TraceInfo(TRACE_WRITE, "IN[%u] %s", hdr->base.seqnum, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
 		TraceError(TRACE_WRITE, "usbip header expected");
 		return STATUS_INVALID_PARAMETER;
@@ -708,6 +711,9 @@ static NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 	return STATUS_SUCCESS;
 }
 
+/*
+* WriteFile -> IRP_MJ_WRITE -> vhci_write.
+*/
 PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();

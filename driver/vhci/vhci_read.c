@@ -10,23 +10,48 @@
 #include "ch9.h"
 #include "ch11.h"
 
-static void *get_read_irp_data(IRP *irp, ULONG length)
+static __inline void *get_read_irp_buffer(const IRP *irp)
 {
-	irp->IoStatus.Information = 0;
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-
-	return irpstack->Parameters.Read.Length >= length ? irp->AssociatedIrp.SystemBuffer : NULL;
+	return irp->AssociatedIrp.SystemBuffer;
 }
 
-static __inline struct usbip_header *get_usbip_hdr_from_read_irp(IRP *irp)
+static ULONG get_read_irp_buffer_size(const IRP *irp)
 {
-	return get_read_irp_data(irp, sizeof(struct usbip_header));
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation((IRP*)irp);
+	return irpstack->Parameters.Read.Length;
 }
 
-static ULONG get_read_payload_length(IRP *irp)
+/*
+ * Size of payload data after usbip_header.
+ */
+static ULONG get_read_irp_payload_size(const IRP *irp)
 {
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	return irpstack->Parameters.Read.Length - sizeof(struct usbip_header);
+	const ULONG hdr_sz = sizeof(struct usbip_header);
+
+	ULONG sz = get_read_irp_buffer_size(irp);
+	NT_ASSERT(sz >= hdr_sz);
+
+	return sz > hdr_sz ? sz - hdr_sz : 0;
+}
+
+#define TRANSFERRED(irp) ((irp)->IoStatus.Information)
+
+static void *start_read_irp_buffer(const IRP *irp, size_t min_length)
+{
+	void *buf = NULL;
+	ULONG sz = get_read_irp_buffer_size(irp);
+
+	if (sz >= min_length) {
+		buf = get_read_irp_buffer(irp);
+		NT_ASSERT(!TRANSFERRED(irp));
+	}
+
+	return buf;
+}
+
+static __inline struct usbip_header *get_usbip_hdr_from_read_irp(const IRP *irp)
+{
+	return start_read_irp_buffer(irp, sizeof(struct usbip_header));
 }
 
 /*
@@ -51,7 +76,7 @@ static NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	pkt->bRequest = USB_REQUEST_SET_FEATURE;
 	pkt->wValue.W = USB_PORT_FEAT_RESET;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -81,7 +106,7 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 	pkt->wIndex.W = r->SetupPacket.wIndex;
 	pkt->wLength = r->SetupPacket.wLength;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -120,7 +145,7 @@ static NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, struct urb_r
 	pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
 	pkt->wIndex.W = get_endpoint_address(r->PipeHandle);
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -148,6 +173,32 @@ static __inline NTSTATUS ptr_to_status(const void *p)
 	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
+static NTSTATUS urb_control_descriptor_request_copy_payload(
+	void *dst, vpdo_dev_t *vpdo, IRP *irp, const struct _URB_CONTROL_DESCRIPTOR_REQUEST *r)
+{
+	NT_ASSERT(dst);
+
+	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(dst, buf, r->TransferBufferLength);
+		TRANSFERRED(irp) += r->TransferBufferLength;
+		vpdo->len_sent_partial = 0;
+	}
+
+	return ptr_to_status(buf);
+}
+
+/*
+* usbip_header was already read. 
+*/
+static NTSTATUS urb_control_descriptor_request_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+{
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
+
+	void *dst = start_read_irp_buffer(irp, r->TransferBufferLength);
+	return dst ? urb_control_descriptor_request_copy_payload(dst, vpdo, irp, r) : STATUS_BUFFER_TOO_SMALL;
+}
+
 static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_req *urbr, bool dir_in, UCHAR recipient)
 {
 	struct usbip_header *hdr = get_usbip_hdr_from_read_irp(irp);
@@ -172,23 +223,18 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 	pkt->wIndex.W = r->LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
 	pkt->wLength = (USHORT)r->TransferBufferLength;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 
 	if (dir_in) {
 		return STATUS_SUCCESS;
 	}
 	
-	if (get_read_payload_length(irp) < r->TransferBufferLength) {
-		return STATUS_INVALID_BUFFER_SIZE;
+	if (get_read_irp_payload_size(irp) >= r->TransferBufferLength) {
+		return urb_control_descriptor_request_copy_payload(hdr + 1, urbr->vpdo, irp, r);
 	}
 
-	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
-	if (buf) {
-		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
-		irp->IoStatus.Information += r->TransferBufferLength;
-	}
-
-	return ptr_to_status(buf);
+	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
+	return STATUS_SUCCESS;
 }
 
 static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR recipient)
@@ -217,27 +263,34 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 	pkt->wIndex.W = r->Index;
 	pkt->wLength = (USHORT)r->TransferBufferLength; // must be 2
 	
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
-static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_control_vendor_class_request_copy_payload(
+	void *dst, vpdo_dev_t *vpdo, IRP *irp, const struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r)
 {
-	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
-
-	void *dst = get_read_irp_data(irp, r->TransferBufferLength);
-	if (!dst) {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
+	NT_ASSERT(dst);
 
 	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
 	if (buf) {
 		RtlCopyMemory(dst, buf, r->TransferBufferLength);
-		irp->IoStatus.Information = r->TransferBufferLength;
+		TRANSFERRED(irp) += r->TransferBufferLength;
 		vpdo->len_sent_partial = 0;
 	}
 
 	return ptr_to_status(buf);
+}
+
+/*
+ * usbip_header was already read. 
+ */
+static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+{
+	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
+
+	void *dst = start_read_irp_buffer(irp, r->TransferBufferLength);
+	return dst ? urb_control_vendor_class_request_copy_payload(dst, vpdo, irp, r) : STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR type, UCHAR recipient)
@@ -264,24 +317,18 @@ static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_
 	pkt->wIndex.W = r->Index;
 	pkt->wLength = (USHORT)r->TransferBufferLength;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 
 	if (dir_in) {
 		return STATUS_SUCCESS;
 	}
 
-	if (get_read_payload_length(irp) < r->TransferBufferLength) {
-		urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		return STATUS_SUCCESS;
-	}
-	
-	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
-	if (buf) {
-		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
-		irp->IoStatus.Information += r->TransferBufferLength;
+	if (get_read_irp_payload_size(irp) >= r->TransferBufferLength) {
+		return urb_control_vendor_class_request_copy_payload(hdr + 1, urbr->vpdo, irp, r);
 	}
 
-	return ptr_to_status(buf);
+	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
+	return STATUS_SUCCESS;
 }
 
 static NTSTATUS vendor_device(IRP *irp, URB *urb, struct urb_req *urbr)
@@ -346,7 +393,7 @@ static NTSTATUS urb_select_configuration(IRP *irp, URB *urb, struct urb_req *urb
 	pkt->bRequest = USB_REQUEST_SET_CONFIGURATION;
 	pkt->wValue.W = cd ? cd->bConfigurationValue : 0;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -371,27 +418,34 @@ static NTSTATUS urb_select_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 	pkt->wValue.W = r->Interface.AlternateSetting;
 	pkt->wIndex.W = r->Interface.InterfaceNumber;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return  STATUS_SUCCESS;
 }
 
-static NTSTATUS urb_bulk_or_interrupt_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS urb_bulk_or_interrupt_transfer_copy_payload(void *dst, vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 {
+	NT_ASSERT(dst);
+
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
+	void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
 
-	void *dst = get_read_irp_data(irp, r->TransferBufferLength);
-	if (!dst) {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	const void *buf = get_buf(r->TransferBuffer, r->TransferBufferMDL);
+	const void *buf = get_buf(buf_a, r->TransferBufferMDL);
 	if (buf) {
 		RtlCopyMemory(dst, buf, r->TransferBufferLength);
-		irp->IoStatus.Information = r->TransferBufferLength;
+		TRANSFERRED(irp) += r->TransferBufferLength;
 		vpdo->len_sent_partial = 0;
 	}
-	
+
 	return ptr_to_status(buf);
+}
+
+/*
+* usbip_header was already read. 
+*/
+static NTSTATUS urb_bulk_or_interrupt_transfer_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+{
+	void *dst = start_read_irp_buffer(irp, urb->UrbBulkOrInterruptTransfer.TransferBufferLength);
+	return dst ? urb_bulk_or_interrupt_transfer_copy_payload(dst, vpdo, irp, urb) : STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
@@ -416,32 +470,26 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 		return err;
 	}
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 
 	if (IsTransferDirectionIn(r->TransferFlags)) {
 		return STATUS_SUCCESS;
 	}
 
-	if (get_read_payload_length(irp) < r->TransferBufferLength) {
-		urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		return STATUS_SUCCESS;
+	if (get_read_irp_payload_size(irp) >= r->TransferBufferLength) {
+		return urb_bulk_or_interrupt_transfer_copy_payload(hdr + 1, urbr->vpdo, irp, urb);
 	}
 
-	void *buf_a = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
-	
-	const void *buf = get_buf(buf_a, r->TransferBufferMDL);
-	if (buf) {
-		RtlCopyMemory(hdr + 1, buf, r->TransferBufferLength);
-	}
-
-	return ptr_to_status(buf);
+	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
+	return STATUS_SUCCESS;
 }
 
 /*
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
  */
-static NTSTATUS copy_iso_data(void *dst_buf, const struct _URB_ISOCH_TRANSFER *r)
+static NTSTATUS copy_iso_data(void *dst_buf, const struct _URB_ISOCH_TRANSFER *r, ULONG *transferred)
 {
+	*transferred = 0;
 	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
 
 	const void *src_buf = get_buf(buf_a, r->TransferBufferMDL);
@@ -453,11 +501,12 @@ static NTSTATUS copy_iso_data(void *dst_buf, const struct _URB_ISOCH_TRANSFER *r
 	ULONG buf_len = dir_out ? r->TransferBufferLength : 0;
 
 	RtlCopyMemory(dst_buf, src_buf, buf_len);
+	*transferred += buf_len;
 
 	struct usbip_iso_packet_descriptor *d = (void*)((char*)dst_buf + buf_len);
 	ULONG sum = 0;
 
-	for (ULONG i = 0; i < r->NumberOfPackets; ++d) {
+	for (ULONG i = 0; i < r->NumberOfPackets; ++d, *transferred += sizeof(*d)) {
 
 		ULONG offset = r->IsoPacket[i].Offset;
 		ULONG next_offset = ++i < r->NumberOfPackets ? r->IsoPacket[i].Offset : r->TransferBufferLength;
@@ -491,19 +540,33 @@ static ULONG get_iso_payload_len(const struct _URB_ISOCH_TRANSFER *r)
 	return len;
 }
 
-static NTSTATUS urb_isoch_transfer_partial(pvpdo_dev_t vpdo, PIRP irp, PURB urb)
+static NTSTATUS urb_isoch_transfer_copy_payload(
+	void *dst, vpdo_dev_t *vpdo, IRP *irp, const struct _URB_ISOCH_TRANSFER *r, ULONG expected)
+{
+	NT_ASSERT(dst);
+
+	ULONG transferred = 0;
+	NTSTATUS err = copy_iso_data(dst, r, &transferred);
+	
+	if (!err) {
+		NT_ASSERT(transferred == expected);
+		TRANSFERRED(irp) += transferred;
+		vpdo->len_sent_partial = 0;
+	}
+
+	return err;
+}
+
+/*
+* usbip_header was already read. 
+*/
+static NTSTATUS urb_isoch_transfer_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 {
 	const struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
 	ULONG len = get_iso_payload_len(r);
 
-	void *dst = get_read_irp_data(irp, len);
-	if (dst) {
-		copy_iso_data(dst, r);
-		vpdo->len_sent_partial = 0;
-		irp->IoStatus.Information = len;
-	}
-
-	return dst ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
+	void *dst = start_read_irp_buffer(irp, len);
+	return dst ? urb_isoch_transfer_copy_payload(dst, vpdo, irp, r, len) : STATUS_BUFFER_TOO_SMALL;
 }
 
 /*
@@ -534,34 +597,38 @@ static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 	hdr->u.cmd_submit.start_frame = r->StartFrame;
 	hdr->u.cmd_submit.number_of_packets = r->NumberOfPackets;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
+	ULONG len = get_iso_payload_len(r);
 
-	if (get_read_payload_length(irp) >= get_iso_payload_len(r)) {
-		copy_iso_data(hdr + 1, r);
-		irp->IoStatus.Information += get_iso_payload_len(r);
-	} else {
-		urbr->vpdo->len_sent_partial = sizeof(*hdr);
+	if (get_read_irp_payload_size(irp) >= len) {
+		return urb_isoch_transfer_copy_payload(hdr + 1, urbr->vpdo, irp, r, len);
 	}
 
+	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
 	return STATUS_SUCCESS;
+}
+
+static NTSTATUS urb_control_transfer_copy_payload(
+	void *dst, vpdo_dev_t *vpdo, IRP *irp, void *TransferBuffer, MDL *TransferBufferMDL, ULONG TransferBufferLength)
+{
+	NT_ASSERT(dst);
+
+	const void *buf = get_buf(TransferBuffer, TransferBufferMDL);
+	if (buf) {
+		RtlCopyMemory(dst, buf, TransferBufferLength);
+		TRANSFERRED(irp) += TransferBufferLength;
+		vpdo->len_sent_partial = 0;
+	}
+
+	return ptr_to_status(buf);
 }
 
 static NTSTATUS do_urb_control_transfer_partial(
 	vpdo_dev_t *vpdo, IRP *irp, void *TransferBuffer, MDL *TransferBufferMDL, ULONG TransferBufferLength)
 {
-	void * dst = get_read_irp_data(irp, TransferBufferLength);
-	if (!dst) {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	const void *buf = get_buf(TransferBuffer, TransferBufferMDL);
-	if (buf) {
-		RtlCopyMemory(dst, buf, TransferBufferLength);
-		irp->IoStatus.Information = TransferBufferLength;
-		vpdo->len_sent_partial = 0;
-	}
-
-	return ptr_to_status(buf);
+	void *dst = start_read_irp_buffer(irp, TransferBufferLength);
+	return dst ? urb_control_transfer_copy_payload(dst, vpdo, irp, TransferBuffer, TransferBufferMDL, TransferBufferLength) : 
+			STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_control_transfer_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
@@ -600,23 +667,19 @@ static NTSTATUS do_urb_control_transfer(
 	RtlCopyMemory(hdr->u.cmd_submit.setup, SetupPacket, sizeof(hdr->u.cmd_submit.setup));
 	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(USB_DEFAULT_PIPE_SETUP_PACKET), "assert");
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 
 	if (!(dir_out && TransferBufferLength)) {
 		return STATUS_SUCCESS;
 	}
 
-	if (get_read_payload_length(irp) < TransferBufferLength) {
-		urbr->vpdo->len_sent_partial = sizeof(*hdr);
-		return STATUS_SUCCESS;
+	if (get_read_irp_payload_size(irp) >= TransferBufferLength) {
+		return urb_control_transfer_copy_payload(hdr + 1, urbr->vpdo, irp, 
+							TransferBuffer, TransferBufferMDL, TransferBufferLength);
 	}
 
-	const void *buf = get_buf(TransferBuffer, TransferBufferMDL);
-	if (buf) {
-		RtlCopyMemory(hdr + 1, buf, TransferBufferLength);
-	}
-
-	return ptr_to_status(buf);
+	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
+	return STATUS_SUCCESS;
 }
 
 static NTSTATUS urb_control_transfer(IRP *irp, URB *urb, struct urb_req* urbr)
@@ -702,7 +765,7 @@ static NTSTATUS urb_control_feature_request(IRP *irp, URB *urb, struct urb_req* 
 	pkt->wValue.W = r->FeatureSelector; 
 	pkt->wIndex.W = r->Index;
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -766,7 +829,7 @@ static NTSTATUS get_configuration(IRP *irp, URB *urb, struct urb_req* urbr)
 	pkt->bRequest = USB_REQUEST_GET_CONFIGURATION;
 	pkt->wLength = (USHORT)r->TransferBufferLength; // must be 1
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -791,7 +854,7 @@ static NTSTATUS get_interface(IRP *irp, URB *urb, struct urb_req* urbr)
 	pkt->wIndex.W = r->Interface;
 	pkt->wLength = (USHORT)r->TransferBufferLength; // must be 1
 
-	irp->IoStatus.Information = sizeof(*hdr);
+	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -913,7 +976,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 	URB *urb = URB_FROM_IRP(urbr->irp);
 	if (!urb) {
 		TraceError(TRACE_READ, "null urb");
-		irp->IoStatus.Information = 0;
+		TRANSFERRED(irp) = 0;
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
@@ -926,7 +989,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 
 	TraceError(TRACE_READ, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
 
-	irp->IoStatus.Information = 0;
+	TRANSFERRED(irp) = 0;
 	return STATUS_INVALID_PARAMETER;
 }
 
@@ -953,6 +1016,11 @@ static NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 		status = urb_control_transfer_ex_partial(urbr->vpdo, read_irp, urb);
 		break;
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:
+		status = urb_control_descriptor_request_partial(urbr->vpdo, read_irp, urb);
+		break;
 	case URB_FUNCTION_CLASS_DEVICE:
 	case URB_FUNCTION_CLASS_INTERFACE:
 	case URB_FUNCTION_CLASS_ENDPOINT:
@@ -964,7 +1032,7 @@ static NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 		status = urb_control_vendor_class_request_partial(urbr->vpdo, read_irp, urb);
 		break;
 	default:
-		read_irp->IoStatus.Information = 0;
+		TRANSFERRED(read_irp) = 0;
 		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(urb->UrbHeader.Function));
 	}
 
@@ -983,7 +1051,7 @@ static NTSTATUS store_cancelled_urbr(PIRP irp, struct urb_req *urbr)
 
 	set_cmd_unlink_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, urbr->seq_num_unlink);
 
-	irp->IoStatus.Information = sizeof(struct usbip_header);
+	TRANSFERRED(irp) += sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -1010,7 +1078,7 @@ NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
 		break;
 	default:
 		TraceWarning(TRACE_READ, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
-		read_irp->IoStatus.Information = 0;
+		TRANSFERRED(read_irp) = 0;
 	}
 
 	return status;
@@ -1033,7 +1101,7 @@ static void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 	}
 	KeReleaseSpinLock(&vpdo->lock_urbr, irql);
 
-	irp_read->IoStatus.Information = 0;
+	TRANSFERRED(irp_read) = 0;
 	irp_done(irp_read, STATUS_CANCELLED);
 }
 
@@ -1096,7 +1164,7 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 			BOOLEAN valid = IoSetCancelRoutine(irp, NULL) != NULL;
 			IoReleaseCancelSpinLock(oldirql);
 			if (valid) {
-				irp->IoStatus.Information = 0;
+				TRANSFERRED(irp) = 0;
 				irp_done(irp, STATUS_INVALID_PARAMETER);
 			}
 		}
