@@ -87,14 +87,14 @@ static NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *ur
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	USB_DESCRIPTOR_REQUEST *r = urbr->irp->AssociatedIrp.SystemBuffer;
+	const USB_DESCRIPTOR_REQUEST *r = urbr->irp->AssociatedIrp.SystemBuffer;
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(*r);
+	ULONG data_len = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(*r); // length of r->Data[]
 
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, outlen);
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, data_len);
 	if (err) {
 		return err;
 	}
@@ -174,7 +174,7 @@ static __inline NTSTATUS ptr_to_status(const void *p)
 }
 
 static NTSTATUS urb_control_descriptor_request_copy_payload(
-	void *dst, vpdo_dev_t *vpdo, IRP *irp, const struct _URB_CONTROL_DESCRIPTOR_REQUEST *r)
+	void *dst, IRP *irp, const struct _URB_CONTROL_DESCRIPTOR_REQUEST *r)
 {
 	NT_ASSERT(dst);
 
@@ -182,7 +182,6 @@ static NTSTATUS urb_control_descriptor_request_copy_payload(
 	if (buf) {
 		RtlCopyMemory(dst, buf, r->TransferBufferLength);
 		TRANSFERRED(irp) += r->TransferBufferLength;
-		vpdo->len_sent_partial = 0;
 	}
 
 	return ptr_to_status(buf);
@@ -191,12 +190,12 @@ static NTSTATUS urb_control_descriptor_request_copy_payload(
 /*
 * usbip_header was already read. 
 */
-static NTSTATUS urb_control_descriptor_request_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_control_descriptor_request_partial(IRP *irp, URB *urb)
 {
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
 	void *dst = start_read_irp_buffer(irp, r->TransferBufferLength);
-	return dst ? urb_control_descriptor_request_copy_payload(dst, vpdo, irp, r) : STATUS_BUFFER_TOO_SMALL;
+	return dst ? urb_control_descriptor_request_copy_payload(dst, irp, r) : STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_req *urbr, bool dir_in, UCHAR recipient)
@@ -230,7 +229,7 @@ static NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, struct urb_re
 	}
 	
 	if (get_read_irp_payload_size(irp) >= r->TransferBufferLength) {
-		return urb_control_descriptor_request_copy_payload(hdr + 1, urbr->vpdo, irp, r);
+		return urb_control_descriptor_request_copy_payload(hdr + 1, irp, r);
 	}
 
 	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
@@ -268,7 +267,7 @@ static NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, struct urb_re
 }
 
 static NTSTATUS urb_control_vendor_class_request_copy_payload(
-	void *dst, vpdo_dev_t *vpdo, IRP *irp, const struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r)
+	void *dst, IRP *irp, const struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r)
 {
 	NT_ASSERT(dst);
 
@@ -276,7 +275,6 @@ static NTSTATUS urb_control_vendor_class_request_copy_payload(
 	if (buf) {
 		RtlCopyMemory(dst, buf, r->TransferBufferLength);
 		TRANSFERRED(irp) += r->TransferBufferLength;
-		vpdo->len_sent_partial = 0;
 	}
 
 	return ptr_to_status(buf);
@@ -285,12 +283,12 @@ static NTSTATUS urb_control_vendor_class_request_copy_payload(
 /*
  * usbip_header was already read. 
  */
-static NTSTATUS urb_control_vendor_class_request_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_control_vendor_class_request_partial(IRP *irp, URB *urb)
 {
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
 
 	void *dst = start_read_irp_buffer(irp, r->TransferBufferLength);
-	return dst ? urb_control_vendor_class_request_copy_payload(dst, vpdo, irp, r) : STATUS_BUFFER_TOO_SMALL;
+	return dst ? urb_control_vendor_class_request_copy_payload(dst, irp, r) : STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_req *urbr, UCHAR type, UCHAR recipient)
@@ -324,7 +322,7 @@ static NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, struct urb_
 	}
 
 	if (get_read_irp_payload_size(irp) >= r->TransferBufferLength) {
-		return urb_control_vendor_class_request_copy_payload(hdr + 1, urbr->vpdo, irp, r);
+		return urb_control_vendor_class_request_copy_payload(hdr + 1, irp, r);
 	}
 
 	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
@@ -422,7 +420,7 @@ static NTSTATUS urb_select_interface(IRP *irp, URB *urb, struct urb_req *urbr)
 	return  STATUS_SUCCESS;
 }
 
-static NTSTATUS urb_bulk_or_interrupt_transfer_copy_payload(void *dst, vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_bulk_or_interrupt_transfer_copy_payload(void *dst, IRP *irp, URB *urb)
 {
 	NT_ASSERT(dst);
 
@@ -433,7 +431,6 @@ static NTSTATUS urb_bulk_or_interrupt_transfer_copy_payload(void *dst, vpdo_dev_
 	if (buf) {
 		RtlCopyMemory(dst, buf, r->TransferBufferLength);
 		TRANSFERRED(irp) += r->TransferBufferLength;
-		vpdo->len_sent_partial = 0;
 	}
 
 	return ptr_to_status(buf);
@@ -442,10 +439,10 @@ static NTSTATUS urb_bulk_or_interrupt_transfer_copy_payload(void *dst, vpdo_dev_
 /*
 * usbip_header was already read. 
 */
-static NTSTATUS urb_bulk_or_interrupt_transfer_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_bulk_or_interrupt_transfer_partial(IRP *irp, URB *urb)
 {
 	void *dst = start_read_irp_buffer(irp, urb->UrbBulkOrInterruptTransfer.TransferBufferLength);
-	return dst ? urb_bulk_or_interrupt_transfer_copy_payload(dst, vpdo, irp, urb) : STATUS_BUFFER_TOO_SMALL;
+	return dst ? urb_bulk_or_interrupt_transfer_copy_payload(dst, irp, urb) : STATUS_BUFFER_TOO_SMALL;
 }
 
 static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
@@ -477,7 +474,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 	}
 
 	if (get_read_irp_payload_size(irp) >= r->TransferBufferLength) {
-		return urb_bulk_or_interrupt_transfer_copy_payload(hdr + 1, urbr->vpdo, irp, urb);
+		return urb_bulk_or_interrupt_transfer_copy_payload(hdr + 1, irp, urb);
 	}
 
 	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
@@ -541,7 +538,7 @@ static ULONG get_iso_payload_len(const struct _URB_ISOCH_TRANSFER *r)
 }
 
 static NTSTATUS urb_isoch_transfer_copy_payload(
-	void *dst, vpdo_dev_t *vpdo, IRP *irp, const struct _URB_ISOCH_TRANSFER *r, ULONG expected)
+	void *dst, IRP *irp, const struct _URB_ISOCH_TRANSFER *r, ULONG expected)
 {
 	NT_ASSERT(dst);
 
@@ -551,7 +548,6 @@ static NTSTATUS urb_isoch_transfer_copy_payload(
 	if (!err) {
 		NT_ASSERT(transferred == expected);
 		TRANSFERRED(irp) += transferred;
-		vpdo->len_sent_partial = 0;
 	}
 
 	return err;
@@ -560,13 +556,13 @@ static NTSTATUS urb_isoch_transfer_copy_payload(
 /*
 * usbip_header was already read. 
 */
-static NTSTATUS urb_isoch_transfer_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_isoch_transfer_partial(IRP *irp, URB *urb)
 {
 	const struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
 	ULONG len = get_iso_payload_len(r);
 
 	void *dst = start_read_irp_buffer(irp, len);
-	return dst ? urb_isoch_transfer_copy_payload(dst, vpdo, irp, r, len) : STATUS_BUFFER_TOO_SMALL;
+	return dst ? urb_isoch_transfer_copy_payload(dst, irp, r, len) : STATUS_BUFFER_TOO_SMALL;
 }
 
 /*
@@ -601,7 +597,7 @@ static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 	ULONG len = get_iso_payload_len(r);
 
 	if (get_read_irp_payload_size(irp) >= len) {
-		return urb_isoch_transfer_copy_payload(hdr + 1, urbr->vpdo, irp, r, len);
+		return urb_isoch_transfer_copy_payload(hdr + 1, irp, r, len);
 	}
 
 	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
@@ -609,7 +605,7 @@ static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 }
 
 static NTSTATUS urb_control_transfer_copy_payload(
-	void *dst, vpdo_dev_t *vpdo, IRP *irp, void *TransferBuffer, MDL *TransferBufferMDL, ULONG TransferBufferLength)
+	void *dst, IRP *irp, void *TransferBuffer, MDL *TransferBufferMDL, ULONG TransferBufferLength)
 {
 	NT_ASSERT(dst);
 
@@ -617,30 +613,29 @@ static NTSTATUS urb_control_transfer_copy_payload(
 	if (buf) {
 		RtlCopyMemory(dst, buf, TransferBufferLength);
 		TRANSFERRED(irp) += TransferBufferLength;
-		vpdo->len_sent_partial = 0;
 	}
 
 	return ptr_to_status(buf);
 }
 
 static NTSTATUS do_urb_control_transfer_partial(
-	vpdo_dev_t *vpdo, IRP *irp, void *TransferBuffer, MDL *TransferBufferMDL, ULONG TransferBufferLength)
+	IRP *irp, void *TransferBuffer, MDL *TransferBufferMDL, ULONG TransferBufferLength)
 {
 	void *dst = start_read_irp_buffer(irp, TransferBufferLength);
-	return dst ? urb_control_transfer_copy_payload(dst, vpdo, irp, TransferBuffer, TransferBufferMDL, TransferBufferLength) : 
+	return dst ? urb_control_transfer_copy_payload(dst, irp, TransferBuffer, TransferBufferMDL, TransferBufferLength) : 
 			STATUS_BUFFER_TOO_SMALL;
 }
 
-static NTSTATUS urb_control_transfer_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_control_transfer_partial(IRP *irp, URB *urb)
 {
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
-	return do_urb_control_transfer_partial(vpdo, irp, r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength);
+	return do_urb_control_transfer_partial(irp, r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength);
 }
 
-static NTSTATUS urb_control_transfer_ex_partial(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+static NTSTATUS urb_control_transfer_ex_partial(IRP *irp, URB *urb)
 {
 	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
-	return do_urb_control_transfer_partial(vpdo, irp, r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength);
+	return do_urb_control_transfer_partial(irp, r->TransferBuffer, r->TransferBufferMDL, r->TransferBufferLength);
 }
 
 static NTSTATUS do_urb_control_transfer(
@@ -674,8 +669,7 @@ static NTSTATUS do_urb_control_transfer(
 	}
 
 	if (get_read_irp_payload_size(irp) >= TransferBufferLength) {
-		return urb_control_transfer_copy_payload(hdr + 1, urbr->vpdo, irp, 
-							TransferBuffer, TransferBufferMDL, TransferBufferLength);
+		return urb_control_transfer_copy_payload(hdr + 1, irp, TransferBuffer, TransferBufferMDL, TransferBufferLength);
 	}
 
 	urbr->vpdo->len_sent_partial = (ULONG)TRANSFERRED(irp);
@@ -1005,21 +999,21 @@ static NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = urb_isoch_transfer_partial(urbr->vpdo, read_irp, urb);
+		status = urb_isoch_transfer_partial(read_irp, urb);
 		break;
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-		status = urb_bulk_or_interrupt_transfer_partial(urbr->vpdo, read_irp, urb);
+		status = urb_bulk_or_interrupt_transfer_partial(read_irp, urb);
 		break;
 	case URB_FUNCTION_CONTROL_TRANSFER:
-		status = urb_control_transfer_partial(urbr->vpdo, read_irp, urb);
+		status = urb_control_transfer_partial(read_irp, urb);
 		break;
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		status = urb_control_transfer_ex_partial(urbr->vpdo, read_irp, urb);
+		status = urb_control_transfer_ex_partial(read_irp, urb);
 		break;
 	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:
 	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:
 	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:
-		status = urb_control_descriptor_request_partial(urbr->vpdo, read_irp, urb);
+		status = urb_control_descriptor_request_partial(read_irp, urb);
 		break;
 	case URB_FUNCTION_CLASS_DEVICE:
 	case URB_FUNCTION_CLASS_INTERFACE:
@@ -1029,7 +1023,7 @@ static NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 	case URB_FUNCTION_VENDOR_INTERFACE:
 	case URB_FUNCTION_VENDOR_ENDPOINT:
 	case URB_FUNCTION_VENDOR_OTHER:
-		status = urb_control_vendor_class_request_partial(urbr->vpdo, read_irp, urb);
+		status = urb_control_vendor_class_request_partial(read_irp, urb);
 		break;
 	default:
 		TRANSFERRED(read_irp) = 0;
@@ -1121,14 +1115,17 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 	}
 
 	if (vpdo->urbr_sent_partial) {
+		NT_ASSERT(vpdo->len_sent_partial);
 		urbr = vpdo->urbr_sent_partial;
+
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
-
 		status = store_urbr_partial(read_irp, urbr);
-
 		KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+
 		vpdo->len_sent_partial = 0;
 	} else {
+		NT_ASSERT(!vpdo->len_sent_partial);
+
 		urbr = find_pending_urbr(vpdo);
 		if (!urbr) {
 			vpdo->pending_read_irp = read_irp;
