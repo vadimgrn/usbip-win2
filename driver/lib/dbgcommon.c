@@ -230,11 +230,11 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cmd_submit *cmd)
 {
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
-			"cmd_submit: flags %#x, length %d, isoch[%d]{start %d}, interval %d, ",
+			"cmd_submit: flags %#x, length %d, start_frame %d, isoc[%d], interval %d, ",
 			cmd->transfer_flags, 
 			cmd->transfer_buffer_length, 
-			cmd->number_of_packets, 
 			cmd->start_frame, 
+			cmd->number_of_packets, 
 			cmd->interval);
 
 	if (!st) {
@@ -244,11 +244,11 @@ static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cm
 
 static void print_ret_submit(char *buf, size_t len, const struct usbip_header_ret_submit *cmd)
 {
-	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, isoch[%d]{start %d, errors %d}", 
+	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, start_frame %d, isoc[%d], error_count %d", 
 					cmd->status,
 					cmd->actual_length,
-					cmd->number_of_packets,
 					cmd->start_frame,
+					cmd->number_of_packets,
 					cmd->error_count);
 }
 
@@ -261,8 +261,9 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 	const char *result = buf;
 	const struct usbip_header_basic *base = &hdr->base;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s#%02x}, ",
-					base->seqnum, base->devid,			
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, ep %s[%u]}, ",
+					base->seqnum, 
+					base->devid,			
 					base->direction == USBIP_DIR_OUT ? "out" : "in",
 					base->ep);
 
@@ -298,8 +299,7 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 	const USB_DEFAULT_PIPE_SETUP_PACKET *r = packet;
 
 	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
-			"{%#02hhx(%s|%s|%s), %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
-			r->bmRequestType,
+			"{%s|%s|%s, %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
 			bmrequest_dir_str(r->bmRequestType),
 			bmrequest_type_str(r->bmRequestType),
 			bmrequest_recipient_str(r->bmRequestType),

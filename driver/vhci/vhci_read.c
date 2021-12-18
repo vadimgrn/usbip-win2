@@ -936,26 +936,32 @@ NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
 		return store_cancelled_urbr(read_irp, urbr);
 	}
 
-	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	NTSTATUS err = STATUS_INVALID_PARAMETER;
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = usb_submit_urb(read_irp, urbr);
+		err = usb_submit_urb(read_irp, urbr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		status = usb_reset_port(read_irp, urbr);
+		err = usb_reset_port(read_irp, urbr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descriptor_from_node_connection(read_irp, urbr);
+		err = get_descriptor_from_node_connection(read_irp, urbr);
 		break;
 	default:
 		TraceWarning(TRACE_READ, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
-	return status;
+	if (!err) {
+		const struct usbip_header *hdr = get_read_irp_buffer(read_irp);
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceInfo(TRACE_READ, "OUT[%u] %s", hdr->base.seqnum, dbg_usbip_hdr(buf, sizeof(buf), hdr));	
+	}
+
+	return err;
 }
 
 static PAGEABLE void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
