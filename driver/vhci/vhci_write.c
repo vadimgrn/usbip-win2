@@ -81,7 +81,7 @@ static PAGEABLE __inline NTSTATUS ptr_to_status(const void *p)
 	return p ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
-static PAGEABLE void *get_buf(void *buf, MDL *bufMDL)
+static PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
 {
 	if (buf) {
 		return buf;
@@ -109,7 +109,7 @@ static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
 	NT_ASSERT(urb->UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	void *buf = get_buf(mdl ? NULL : r->TransferBuffer, r->TransferBufferMDL);
+	void *buf = get_urb_buffer(mdl ? NULL : r->TransferBuffer, r->TransferBufferMDL);
 
 	if (buf) {
 		RtlCopyMemory(buf, src, r->TransferBufferLength);
@@ -396,7 +396,7 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 	const struct usbip_iso_packet_descriptor *src = (void*)(src_buf + src_len);
 
 	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
-	void *buf = get_buf(buf_a, r->TransferBufferMDL);
+	void *buf = get_urb_buffer(buf_a, r->TransferBufferMDL);
 	
 	return buf ? copy_isoch(r, buf, src, dir_in ? src_buf : NULL, src_len) : 
 		     ptr_to_status(buf);
