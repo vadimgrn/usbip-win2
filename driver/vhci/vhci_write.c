@@ -9,6 +9,7 @@
 #include "usbreq.h"
 #include "usbd_helper.h"
 #include "vhci_irp.h"
+#include "pdu.h"
 
 /*
  * These URBs have the same layout from the beginning of the structure.
@@ -48,13 +49,15 @@ static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offse
 
 #define TRANSFERRED(irp) ((irp)->IoStatus.Information)
 
-static PAGEABLE size_t get_ret_submit_pdu_size(const struct usbip_header *hdr)
+static PAGEABLE __inline void *get_irp_buffer(const IRP *write_irp)
 {
-	const struct usbip_header_ret_submit *r = &hdr->u.ret_submit;
-	int data_len = hdr->base.direction == USBIP_DIR_OUT ? 0 : r->actual_length; 
-	
-	return data_len >= 0 && r->number_of_packets >= 0 ? 
-		sizeof(*hdr) + data_len + r->number_of_packets*sizeof(struct usbip_iso_packet_descriptor) : 0;
+	return write_irp->AssociatedIrp.SystemBuffer;
+}
+
+static PAGEABLE ULONG get_irp_buffer_size(const IRP *write_irp)
+{
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation((IRP*)write_irp);
+	return irpstack->Parameters.Write.Length;
 }
 
 static PAGEABLE NTSTATUS assignTransferBufferLength(ULONG *TransferBufferLength, int actual_length)
@@ -602,7 +605,7 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(struct urb_req *urb
 		return irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
 	}
 
-	req = irp->AssociatedIrp.SystemBuffer;
+	req = get_irp_buffer(irp);
         RtlCopyMemory(req->Data, hdr + 1, actual_length);
 		
 	char buf[USB_SETUP_PKT_STR_BUFBZ];
@@ -647,16 +650,14 @@ static PAGEABLE NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbi
 
 static PAGEABLE const struct usbip_header *consume_ret_submit_from_write_irp(IRP *irp)
 {
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	const struct usbip_header *hdr = get_irp_buffer(irp);
+	ULONG buf_sz = get_irp_buffer_size(irp);
 
-	const struct usbip_header *hdr = irp->AssociatedIrp.SystemBuffer;
-	ULONG len = irpstack->Parameters.Write.Length;
-
-	if (len >= sizeof(*hdr)) {
+	if (buf_sz >= sizeof(*hdr)) {
 		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "IN[%u] %s", hdr->base.seqnum, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+		TraceInfo(TRACE_WRITE, "%s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
-		TraceError(TRACE_WRITE, "usbip header expected: Write.Length(%lu) < %Iu", len, sizeof(*hdr));
+		TraceError(TRACE_WRITE, "usbip header expected: buffer size %lu < %Iu", buf_sz, sizeof(*hdr));
 		return NULL;
 	}
 
@@ -665,14 +666,14 @@ static PAGEABLE const struct usbip_header *consume_ret_submit_from_write_irp(IRP
 		return NULL;
 	}
 
-	size_t expected = get_ret_submit_pdu_size(hdr); 
-	if (len == expected) {
-		TRANSFERRED(irp) = len; // fully transferred
+	size_t expected = get_pdu_size(hdr); 
+	if (buf_sz == expected) {
+		TRANSFERRED(irp) = buf_sz; // fully transferred
 		return hdr;
 	}
 	
 	TraceError(TRACE_WRITE, "Write.Length(%lu) != %Iu(hdr(%Iu) + in(%d)*actual_length(%d) + isoc(%Iu)[%d])", 
-				len, expected, sizeof(*hdr), 
+				buf_sz, expected, sizeof(*hdr), 
 				hdr->base.direction == USBIP_DIR_IN, 
 				hdr->u.ret_submit.actual_length, 
 				sizeof(struct usbip_iso_packet_descriptor),
@@ -738,7 +739,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceVerbose(TRACE_WRITE, "Enter irql %!irql!", KeGetCurrentIrql());
+	TraceVerbose(TRACE_WRITE, "Enter irql %!irql!, write buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -761,6 +762,6 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		}
 	}
 
-	TraceVerbose(TRACE_WRITE, "Leave %!STATUS!", status);
+	TraceVerbose(TRACE_WRITE, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
 	return irp_done(irp, status);
 }

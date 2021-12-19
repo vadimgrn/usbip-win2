@@ -79,10 +79,12 @@ swap_usbip_iso_descs(struct usbip_header *hdr)
 	}
 }
 
-size_t get_pdu_size(const struct usbip_header *hdr)
+size_t get_pdu_payload_size(const struct usbip_header *hdr)
 {
-	size_t len = sizeof(*hdr);
+	NT_ASSERT(hdr);
+
 	bool dir_out = hdr->base.direction == USBIP_DIR_OUT;
+	size_t len = 0;
 
 	switch (hdr->base.command) {
 	case USBIP_CMD_SUBMIT:

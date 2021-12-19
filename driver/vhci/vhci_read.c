@@ -7,6 +7,7 @@
 #include "vhci_proto.h"
 #include "vhci_internal_ioctl.h"
 #include "usbd_helper.h"
+#include "pdu.h"
 #include "ch9.h"
 #include "ch11.h"
 
@@ -910,6 +911,15 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(urb->UrbHeader.Function));
 	}
 
+	if (!status) {
+		struct usbip_header *hdr = try_get_irp_buffer(read_irp, sizeof(*hdr));
+		size_t sz = get_pdu_payload_size(hdr);
+		size_t transferred = TRANSFERRED(read_irp);
+		if (sz != transferred) {
+			TraceError(TRACE_READ, "pdu payload size %Iu != transferred %Iu", sz, transferred);
+		}
+	}
+
 	TraceVerbose(TRACE_READ, "Leave %!STATUS!", status);
 	return status;
 }
@@ -957,7 +967,7 @@ NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
 	if (!err) {
 		const struct usbip_header *hdr = get_irp_buffer(read_irp);
 		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceInfo(TRACE_READ, "OUT[%u] %s", hdr->base.seqnum, dbg_usbip_hdr(buf, sizeof(buf), hdr));	
+		TraceInfo(TRACE_READ, "%s", dbg_usbip_hdr(buf, sizeof(buf), hdr));	
 	}
 
 	return err;
@@ -1068,7 +1078,7 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceVerbose(TRACE_READ, "Enter irql %!irql!", KeGetCurrentIrql());
+	TraceVerbose(TRACE_READ, "Enter irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -1088,6 +1098,6 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		irp_done(irp, status);
 	}
 
-	TraceVerbose(TRACE_READ, "Leave %!STATUS!", status);
+	TraceVerbose(TRACE_READ, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
 	return status;
 }
