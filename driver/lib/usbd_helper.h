@@ -39,28 +39,12 @@ __inline UCHAR get_transfer_dir(const struct _URB_CONTROL_TRANSFER *r)
 	return pkt->bmRequestType.Dir;
 }
 
-__inline UCHAR get_transfer_dir_ex(const struct _URB_CONTROL_TRANSFER_EX *r)
-{
-	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)r->SetupPacket;
-	return pkt->bmRequestType.Dir;
-}
-
 __inline bool is_transfer_dir_in(const struct _URB_CONTROL_TRANSFER *r)
 {
 	return get_transfer_dir(r) == BMREQUEST_DEVICE_TO_HOST;
 }
 
-__inline bool is_transfer_dir_in_ex(const struct _URB_CONTROL_TRANSFER_EX *r)
-{
-	return get_transfer_dir_ex(r) == BMREQUEST_DEVICE_TO_HOST;
-}
-
 __inline bool is_transfer_dir_out(const struct _URB_CONTROL_TRANSFER *r)
 {
 	return get_transfer_dir(r) == BMREQUEST_HOST_TO_DEVICE;
-}
-
-__inline bool is_transfer_dir_out_ex(const struct _URB_CONTROL_TRANSFER_EX *r)
-{
-	return get_transfer_dir_ex(r) == BMREQUEST_HOST_TO_DEVICE;
 }
