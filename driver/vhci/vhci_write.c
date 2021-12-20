@@ -49,40 +49,16 @@ static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offse
 
 #define TRANSFERRED(irp) ((irp)->IoStatus.Information)
 
-static __inline void *get_irp_buffer(const IRP *write_irp)
+static __inline void *get_irp_buffer(const IRP *irp)
 {
-	return write_irp->AssociatedIrp.SystemBuffer;
+	return irp->AssociatedIrp.SystemBuffer;
 }
 
-static PAGEABLE ULONG get_irp_buffer_size(const IRP *write_irp)
+static PAGEABLE ULONG get_irp_buffer_size(const IRP *irp)
 {
 	PAGED_CODE();
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation((IRP*)write_irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation((IRP*)irp);
 	return irpstack->Parameters.Write.Length;
-}
-
-static PAGEABLE NTSTATUS assignTransferBufferLength(ULONG *TransferBufferLength, int actual_length)
-{
-	PAGED_CODE();
-
-	bool ok = actual_length >= 0 && (ULONG)actual_length <= *TransferBufferLength;
-	*TransferBufferLength = ok ? actual_length : 0;
-
-	return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
-}
-
-/*
- * Any struct with TransferBufferLength can be used.
- */
-static PAGEABLE NTSTATUS setTransferBufferLength(URB *urb, int actual_length)
-{
-	PAGED_CODE();
-	return assignTransferBufferLength(&urb->UrbControlTransfer.TransferBufferLength, actual_length);
-}
-
-static __inline NTSTATUS ptr_to_status(const void *p)
-{
-	return p ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
 static PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
@@ -107,7 +83,7 @@ static PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
 }
 
 /*
- * TransferBufferLength must already be set by assignTransferBufferLength/setTransferBufferLength.
+ * Actual TransferBufferLength must already be set.
  */
 static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
 {
@@ -128,10 +104,52 @@ static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
 	return buf;
 }
 
-static PAGEABLE void *copy_to_transfer_buffer_length(URB *urb, const void *src, int actual_length)
+static PAGEABLE NTSTATUS assign(ULONG *TransferBufferLength, int actual_length)
 {
 	PAGED_CODE();
-	return setTransferBufferLength(urb, actual_length) == STATUS_SUCCESS ? copy_to_transfer_buffer(urb, src) : NULL;
+
+	bool ok = actual_length >= 0 && (ULONG)actual_length <= *TransferBufferLength;
+	*TransferBufferLength = ok ? actual_length : 0;
+
+	return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+}
+
+/*
+ * MmGetSystemAddressForMdlSafe is the most probable source of the failure of copy_to_transfer_buffer.
+ */
+static __inline NTSTATUS get_copy_status(const void *p)
+{
+	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+}
+
+static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr, bool no_transfer_flags)
+{
+	PAGED_CODE();
+	UNREFERENCED_PARAMETER(vpdo);
+
+	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with TransferFlags can be used
+	NTSTATUS err = assign(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
+
+	if (err || no_transfer_flags || IsTransferDirectionOut(r->TransferFlags)) {
+		return err;
+	}
+
+	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
+	if (buf) {
+		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
+	}
+
+	return get_copy_status(buf);
+}
+
+static PAGEABLE NTSTATUS urb_function_without_transfer_flags(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	return urb_function_generic(vpdo, urb, hdr, true);
+}
+
+static PAGEABLE NTSTATUS urb_function_with_transfer_flags(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+{
+	return urb_function_generic(vpdo, urb, hdr, false);
 }
 
 static PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -146,15 +164,19 @@ static PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const 
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
+/*
+ * A request can read descriptor header or full descriptor to obtain its real size.
+ * F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
+ */
 static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	NTSTATUS st = assignTransferBufferLength(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
-	if (st) {
-		return st;
+	NTSTATUS err = assign(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
+	if (err) {
+		return err;
 	}
 
 	switch (r->Hdr.Function) {
@@ -167,21 +189,14 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 	const USB_COMMON_DESCRIPTOR *dsc = NULL;
 
 	if (r->TransferBufferLength < sizeof(*dsc)) {
-		TraceError(TRACE_WRITE, "Descriptor is shorter than header: TransferBufferLength(%lu) < %Iu", 
-					r->TransferBufferLength, sizeof(*dsc));
-
+		TraceError(TRACE_WRITE, "usb descriptor's header expected: TransferBufferLength(%lu)", r->TransferBufferLength);
 		r->TransferBufferLength = 0;
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	dsc = copy_to_transfer_buffer(urb, hdr + 1);
 	if (!dsc) {
-		return ptr_to_status(dsc);
-	}
-
-	if (r->TransferBufferLength < dsc->bLength) {
-		TraceError(TRACE_WRITE, "TransferBufferLength(%lu) < bLength(%d)", r->TransferBufferLength, dsc->bLength);
-		return STATUS_INVALID_PARAMETER;
+		return get_copy_status(dsc);
 	}
 
 	TraceInfo(TRACE_WRITE, "%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
@@ -190,109 +205,11 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 				dsc->bDescriptorType,
 				WppBinary(dsc, (USHORT)r->TransferBufferLength));
 
-	if (!urb->UrbHeader.Status) {
+	if (!hdr->u.ret_submit.status && r->TransferBufferLength >= dsc->bLength) {
 		try_to_cache_descriptor(vpdo, r, dsc);
 	}
 
 	return STATUS_SUCCESS;
-}
-
-static PAGEABLE NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_CONTROL_GET_STATUS_REQUEST *r = &urb->UrbControlGetStatusRequest;
-
-	void *buf = copy_to_transfer_buffer_length(urb, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (buf) {
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
-	}
-	
-	return ptr_to_status(buf);
-}
-
-static PAGEABLE NTSTATUS do_control_transfer(URB *urb, ULONG TransferFlags, ULONG *TransferBufferLength, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-
-	NTSTATUS st = assignTransferBufferLength(TransferBufferLength, hdr->u.ret_submit.actual_length);
-	if (st) {
-		return st;
-	}
-
-	if (IsTransferDirectionOut(TransferFlags)) {
-		return STATUS_SUCCESS;
-	}
-
-	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
-	if (buf) {
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)*TransferBufferLength));
-	}
-
-	return ptr_to_status(buf);
-}
-
-static PAGEABLE NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
-	return do_control_transfer(urb, r->TransferFlags, &r->TransferBufferLength, hdr);
-}
-
-static PAGEABLE NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header* hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_CONTROL_TRANSFER_EX	*r = &urb->UrbControlTransferEx;
-	return do_control_transfer(urb, r->TransferFlags, &r->TransferBufferLength, hdr);
-}
-
-static PAGEABLE NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
-
-	NTSTATUS st = assignTransferBufferLength(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
-	if (st) {
-		return st;
-	}
-
-	if (IsTransferDirectionOut(r->TransferFlags)) {
-		return STATUS_SUCCESS;
-	}
-
-	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
-	if (buf) {
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
-	}
-
-	return ptr_to_status(buf);
-}
-
-static PAGEABLE NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
-
-	NTSTATUS st = assignTransferBufferLength(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
-	if (st) {
-		return st;
-	}
-
-	if (IsTransferDirectionOut(r->TransferFlags)) {
-		return STATUS_SUCCESS;
-	}
-
-	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
-	return ptr_to_status(buf);
 }
 
 /*
@@ -308,9 +225,8 @@ static PAGEABLE NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *u
  * See: 
  * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
-
- */
-static PAGEABLE NTSTATUS copy_isoch(
+  */
+static PAGEABLE NTSTATUS copy_isoc_data(
 	struct _URB_ISOCH_TRANSFER *r, char *dst_buf, 
 	const struct usbip_iso_packet_descriptor *src, const char *src_buf, ULONG src_len)
 {
@@ -418,42 +334,11 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 
 	const struct usbip_iso_packet_descriptor *src = (void*)(src_buf + src_len);
 
-	void *buf_a = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
-	void *buf = get_urb_buffer(buf_a, r->TransferBufferMDL);
+	void *ptr = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
+	void *buf = get_urb_buffer(ptr, r->TransferBufferMDL);
 	
-	return buf ? copy_isoch(r, buf, src, dir_in ? src_buf : NULL, src_len) : 
-		     ptr_to_status(buf);
-}
-
-static PAGEABLE NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_CONTROL_GET_CONFIGURATION_REQUEST *r = &urb->UrbControlGetConfigurationRequest;
-
-	void *buf = copy_to_transfer_buffer_length(urb, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (buf) {
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
-	}
-
-	return ptr_to_status(buf);
-}
-
-static PAGEABLE NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-
-	struct _URB_CONTROL_GET_INTERFACE_REQUEST *r = &urb->UrbControlGetInterfaceRequest;
-
-	void *buf = copy_to_transfer_buffer_length(urb, hdr + 1, hdr->u.ret_submit.actual_length);
-	if (buf) {
-		TraceInfo(TRACE_WRITE, "Interface %hu alternate setting %!BIN!", 
-				r->Interface, WppBinary(buf, (USHORT)r->TransferBufferLength));
-	}
-
-	return ptr_to_status(buf);
+	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : NULL, src_len) : 
+		     get_copy_status(buf);
 }
 
 /*
@@ -498,8 +383,8 @@ static const urb_function_t urb_functions[] =
 	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
 	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
 
-	urb_control_transfer,
-	urb_bulk_or_interrupt_transfer,
+	urb_function_with_transfer_flags, // URB_FUNCTION_CONTROL_TRANSFER
+	urb_function_with_transfer_flags, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
 	urb_isoch_transfer,
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
@@ -513,28 +398,28 @@ static const urb_function_t urb_functions[] =
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
 
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
+	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
+	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
+	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
 
 	NULL, // URB_FUNCTION_RESERVED_0X0016          
 
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_DEVICE
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_INTERFACE
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_ENDPOINT
+	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_DEVICE
+	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_INTERFACE
+	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_ENDPOINT
 
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_DEVICE 
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_INTERFACE
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_ENDPOINT
+	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_DEVICE 
+	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_INTERFACE
+	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_ENDPOINT
 
 	NULL, // URB_FUNCTION_RESERVE_0X001D
 
 	urb_function_success, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL, urb_pipe_request
 
-	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_OTHER
-	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_OTHER
+	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_OTHER
+	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_OTHER
 
-	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_OTHER
+	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_OTHER
 
 	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
@@ -542,8 +427,8 @@ static const urb_function_t urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
 
-	get_configuration, // URB_FUNCTION_GET_CONFIGURATION
-	get_interface, // URB_FUNCTION_GET_INTERFACE
+	urb_function_without_transfer_flags, // URB_FUNCTION_GET_CONFIGURATION
+	urb_function_without_transfer_flags, // URB_FUNCTION_GET_INTERFACE
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
@@ -558,14 +443,14 @@ static const urb_function_t urb_functions[] =
 
 	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
 	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
-	urb_control_transfer_ex,
+	urb_function_with_transfer_flags, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
 	NULL, // URB_FUNCTION_RESERVE_0X0033
 	NULL, // URB_FUNCTION_RESERVE_0X0034                  
 
 	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
 	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
-	urb_bulk_or_interrupt_transfer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	urb_function_with_transfer_flags, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
 	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	NULL, // 0x0039
