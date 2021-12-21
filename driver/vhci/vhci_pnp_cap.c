@@ -4,16 +4,15 @@
 
 #include "vhci_irp.h"
 
-static PAGEABLE NTSTATUS
-get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
+static PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
 {
+	PAGED_CODE();
+
 	IO_STATUS_BLOCK		ioStatus;
 	PIO_STACK_LOCATION	irpstack;
 	KEVENT		pnpEvent;
 	PIRP		irp;
 	NTSTATUS	status;
-
-	PAGED_CODE();
 
 	// Initialize the capabilities that we will send down
 	RtlZeroMemory(pcaps, sizeof(DEVICE_CAPABILITIES));
@@ -55,9 +54,10 @@ get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
 	return status;
 }
 
-static PAGEABLE void
-setup_capabilities(PDEVICE_CAPABILITIES pcaps)
+static PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
 {
+	PAGED_CODE();
+
 	pcaps->LockSupported = FALSE;
 	pcaps->EjectSupported = FALSE;
 	pcaps->Removable = FALSE;
@@ -70,14 +70,13 @@ setup_capabilities(PDEVICE_CAPABILITIES pcaps)
 	pcaps->UINumber = 1;
 }
 
-static PAGEABLE NTSTATUS
-pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
+static PAGEABLE NTSTATUS pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
 {
+	PAGED_CODE();
+
 	PDEVICE_CAPABILITIES	pcaps;
 	DEVICE_CAPABILITIES	caps_parent;
 	NTSTATUS		status;
-
-	PAGED_CODE();
 
 	pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
 
@@ -178,14 +177,11 @@ pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS
-pnp_query_cap(PIO_STACK_LOCATION irpstack)
+static PAGEABLE NTSTATUS pnp_query_cap(PIO_STACK_LOCATION irpstack)
 {
-	PDEVICE_CAPABILITIES	pcaps;
-
 	PAGED_CODE();
 
-	pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
+	PDEVICE_CAPABILITIES pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
 
 	// Set the capabilities.
 	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
@@ -198,6 +194,8 @@ pnp_query_cap(PIO_STACK_LOCATION irpstack)
 
 PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
+
 	if (is_fdo(vdev->type)) {
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}

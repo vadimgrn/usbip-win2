@@ -50,9 +50,10 @@ get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
 	return value;
 }
 
-PAGEABLE PDEVICE_OBJECT
-vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
+PAGEABLE PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 {
+	PAGED_CODE();
+
 	PDEVICE_OBJECT	devobj;
 	ULONG	extsize = ext_sizes_per_devtype[type];
 	NTSTATUS	status;
@@ -93,36 +94,36 @@ vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
 	return devobj;
 }
 
-cpdo_dev_t *devobj_to_cpdo_or_null(DEVICE_OBJECT *devobj) 
-{ 
+cpdo_dev_t *devobj_to_cpdo_or_null(DEVICE_OBJECT *devobj)
+{
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_CPDO ? (cpdo_dev_t*)vdev : NULL;
 }
 
 vhci_dev_t *devobj_to_vhci_or_null(DEVICE_OBJECT *devobj)
-{ 
+{
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VHCI ? (vhci_dev_t*)vdev : NULL;
 }
 
 hpdo_dev_t *devobj_to_hpdo_or_null(DEVICE_OBJECT *devobj)
-{ 
+{
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_HPDO ? (hpdo_dev_t*)vdev : NULL;
 }
 
 vhub_dev_t *devobj_to_vhub_or_null(DEVICE_OBJECT *devobj)
-{ 
+{
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VHUB ? (vhub_dev_t*)vdev : NULL;
 }
 
 vpdo_dev_t *devobj_to_vpdo_or_null(DEVICE_OBJECT *devobj)
-{ 
+{
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VPDO ? (vpdo_dev_t*)vdev : NULL;

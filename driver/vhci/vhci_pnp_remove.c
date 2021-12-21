@@ -10,9 +10,10 @@
 #include "usbip_vhci_api.h"
 #include "usbreq.h"
 
-static PAGEABLE void
-complete_pending_read_irp(pvpdo_dev_t vpdo)
+static PAGEABLE void complete_pending_read_irp(pvpdo_dev_t vpdo)
 {
+	PAGED_CODE();
+
 	KIRQL	oldirql;
 	PIRP	irp;
 
@@ -36,9 +37,10 @@ complete_pending_read_irp(pvpdo_dev_t vpdo)
 	}
 }
 
-static PAGEABLE void
-complete_pending_irp(pvpdo_dev_t vpdo)
+static PAGEABLE void complete_pending_irp(pvpdo_dev_t vpdo)
 {
+	PAGED_CODE();
+
 	KIRQL	oldirql;
 	BOOLEAN	valid_irp;
 
@@ -83,9 +85,10 @@ complete_pending_irp(pvpdo_dev_t vpdo)
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 }
 
-static PAGEABLE void
-invalidate_vhci(pvhci_dev_t vhci)
+static PAGEABLE void invalidate_vhci(pvhci_dev_t vhci)
 {
+	PAGED_CODE();
+
 	IoSetDeviceInterfaceState(&vhci->DevIntfVhci, FALSE);
 	IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, FALSE);
 	RtlFreeUnicodeString(&vhci->DevIntfVhci);
@@ -96,9 +99,10 @@ invalidate_vhci(pvhci_dev_t vhci)
 	TraceInfo(TRACE_PNP, "invalidating vhci device object: %p", TO_DEVOBJ(vhci));
 }
 
-static PAGEABLE void
-invalidate_vhub(pvhub_dev_t vhub)
+static PAGEABLE void invalidate_vhub(pvhub_dev_t vhub)
 {
+	PAGED_CODE();
+
 	IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, FALSE);
 	RtlFreeUnicodeString(&vhub->DevIntfRootHub);
 
@@ -110,6 +114,8 @@ invalidate_vhub(pvhub_dev_t vhub)
 
 static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
+	PAGED_CODE();
+
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);
 
@@ -136,6 +142,8 @@ static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 
 static PAGEABLE void remove_device(vdev_t *vdev)
 {
+	PAGED_CODE();
+
 	if (vdev->child_pdo) {
 		vdev->child_pdo->parent = NULL;
 		if (vdev->child_pdo->fdo)
@@ -171,9 +179,10 @@ static PAGEABLE void remove_device(vdev_t *vdev)
 	IoDeleteDevice(vdev->Self);
 }
 
-PAGEABLE NTSTATUS
-pnp_remove_device(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_remove_device(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	PDEVICE_OBJECT	devobj_lower;
 
 	if (vdev->DevicePnPState == Deleted) {

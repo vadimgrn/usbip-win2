@@ -123,6 +123,8 @@ QueryControllerType(_In_opt_ PVOID Context,
 
 static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT version, INTERFACE *intf)
 {
+	PAGED_CODE();
+
 	if (version > USB_BUSIF_USBDI_VERSION_3) {
 		TraceError(TRACE_GENERAL, "Unsupported %!usb_busif_usbdi_version!", version);
 		return STATUS_INVALID_PARAMETER;
@@ -172,6 +174,8 @@ static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, US
 
 static PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INTERFACE* intf)
 {
+	PAGED_CODE();
+
 	if (version != USBCAMD_VERSION_200) {
 		TraceError(TRACE_GENERAL, "Version %d != %d", version, USBCAMD_VERSION_200);
 		return STATUS_INVALID_PARAMETER;
@@ -198,13 +202,13 @@ static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
 
 	if (vdev->type == VDEV_VPDO) {
 		vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
-		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL, 
+		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL,
 			L"%s(%u)", devcodes[vdev->type], vpdo->port);
 	} else {
 		st = RtlStringCchCopyExW(buf, sizeof(buf)/sizeof(*buf), devcodes[vdev->type],
 			NULL, &remaining, STRSAFE_FILL_BEHIND_NULL);
 	}
-	
+
 	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"
 		TraceError(TRACE_GENERAL, "%!STATUS!, remaining %Iu", st, remaining);
 		return st;
@@ -243,7 +247,7 @@ static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT versi
 
 /*
  * On success, a bus driver sets Irp->IoStatus.Information to zero.
- * If a bus driver does not export the requested interface and therefore does not handle this IRP 
+ * If a bus driver does not export the requested interface and therefore does not handle this IRP
  * for a child PDO, the bus driver leaves Irp->IoStatus.Status as is and completes the IRP.
  */
 PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)

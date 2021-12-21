@@ -7,8 +7,7 @@
 #include "vhci_ioctl_vhci.h"
 #include "vhci_ioctl_vhub.h"
 
-PAGEABLE NTSTATUS
-vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
@@ -18,7 +17,7 @@ vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceVerbose(TRACE_IOCTL, "%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)", 
+	TraceVerbose(TRACE_IOCTL, "%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
 			vdev->type, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	if (vdev->DevicePnPState == Deleted) {

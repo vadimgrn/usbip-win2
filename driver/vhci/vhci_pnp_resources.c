@@ -2,9 +2,10 @@
 #include "vhci_irp.h"
 #include "vhci.h"
 
-static PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST
-get_query_empty_resource_requirements(void)
+static PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST get_query_empty_resource_requirements(void)
 {
+	PAGED_CODE();
+
 	PIO_RESOURCE_REQUIREMENTS_LIST	reqs;
 
 	reqs = ExAllocatePoolWithTag(PagedPool, sizeof(IO_RESOURCE_REQUIREMENTS_LIST), USBIP_VHCI_POOL_TAG);
@@ -21,9 +22,10 @@ get_query_empty_resource_requirements(void)
 	return reqs;
 }
 
-static PAGEABLE PCM_RESOURCE_LIST
-get_query_empty_resources(void)
+static PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
 {
+	PAGED_CODE();
+
 	PCM_RESOURCE_LIST	rscs;
 
 	rscs = ExAllocatePoolWithTag(PagedPool, sizeof(CM_RESOURCE_LIST), USBIP_VHCI_POOL_TAG);
@@ -34,9 +36,10 @@ get_query_empty_resources(void)
 	return rscs;
 }
 
-PAGEABLE NTSTATUS
-pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	if (!is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resource_requirements();
 		return irp_done_success(irp);
@@ -45,9 +48,10 @@ pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)
 	}
 }
 
-PAGEABLE NTSTATUS
-pnp_query_resources(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_resources(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	if (!is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resources();
 		return irp_done_success(irp);
@@ -56,9 +60,10 @@ pnp_query_resources(pvdev_t vdev, PIRP irp)
 	}
 }
 
-PAGEABLE NTSTATUS
-pnp_filter_resource_requirements(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_filter_resource_requirements(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	if (is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resource_requirements();
 		return irp_done_success(irp);

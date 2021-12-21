@@ -211,7 +211,7 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 		        vpdo->serial ? vpdo->serial :
 		        L"";
 
-	NTSTATUS status = status = *serial || want_serial ? 
+	NTSTATUS status = status = *serial || want_serial ?
 		RtlStringCchCopyW(str, max_wchars, serial) :
 		RtlStringCchPrintfW(str, max_wchars, L"%04hx", vpdo->port);
 
@@ -274,6 +274,8 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
  */
 PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
@@ -281,8 +283,6 @@ PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
 	bool subst_result = false;
 
 	BUS_QUERY_ID_TYPE type = irpstack->Parameters.QueryId.IdType;
-
-	PAGED_CODE();
 
 	switch (type) {
 	case BusQueryDeviceID:

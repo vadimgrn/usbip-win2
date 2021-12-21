@@ -12,9 +12,10 @@
 #include <usbdi.h>
 #include <usbuser.h>
 
-static PAGEABLE NTSTATUS
-get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)
+static PAGEABLE NTSTATUS get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	PUSB_HCD_DRIVERKEY_NAME	pdrkey_name = (PUSB_HCD_DRIVERKEY_NAME)buffer;
 	ULONG	outlen_res, drvkey_buflen;
 	LPWSTR	drvkey;
@@ -46,9 +47,10 @@ get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)
 }
 
 /* IOCTL_USB_GET_ROOT_HUB_NAME requires a device interface symlink name with the prefix(\??\) stripped */
-static PAGEABLE SIZE_T
-get_name_prefix_size(PWCHAR name)
+static PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
 {
+	PAGED_CODE();
+
 	SIZE_T	i;
 	for (i = 1; name[i]; i++) {
 		if (name[i] == L'\\') {
@@ -58,9 +60,10 @@ get_name_prefix_size(PWCHAR name)
 	return 0;
 }
 
-PAGEABLE NTSTATUS
-vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	PUSB_ROOT_HUB_NAME	roothub_name = (PUSB_ROOT_HUB_NAME)buffer;
 	SIZE_T	roothub_namelen, prefix_len;
 
@@ -84,9 +87,10 @@ vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutle
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
 {
+	PAGED_CODE();
+
 	NTSTATUS	status = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (ioctl_code) {

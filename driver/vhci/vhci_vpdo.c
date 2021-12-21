@@ -8,6 +8,8 @@
 
 PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *cfg)
 {
+	PAGED_CODE();
+
 	if (vpdo->dsc_conf) {
 		ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
 		vpdo->dsc_conf = NULL;
@@ -42,6 +44,8 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 
 PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INTERFACE *r)
 {
+	PAGED_CODE();
+
 	if (!vpdo->dsc_conf) {
 		TraceWarning(TRACE_VPDO, "Empty configuration descriptor");
 		return STATUS_INVALID_DEVICE_REQUEST;
@@ -63,6 +67,8 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INT
 
 static PAGEABLE bool copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 {
+	PAGED_CODE();
+
 	USB_PIPE_INFO *pi = (USB_PIPE_INFO*)data + i;
 
 	RtlCopyMemory(&pi->EndpointDescriptor, d, sizeof(*d));
@@ -71,9 +77,10 @@ static PAGEABLE bool copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 	return false;
 }
 
-PAGEABLE NTSTATUS
-vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION conninfo, PULONG poutlen)
+PAGEABLE NTSTATUS vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION conninfo, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	ULONG outlen = 0;
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
@@ -121,9 +128,10 @@ vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION connin
 	return status;
 }
 
-PAGEABLE NTSTATUS
-vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX conninfo, PULONG poutlen)
+PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX conninfo, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	ULONG outlen = 0;
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
@@ -170,9 +178,9 @@ vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX 
 	return status;
 }
 
-PAGEABLE NTSTATUS
-vpdo_get_nodeconn_info_ex_v2(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX_V2 conninfo, PULONG poutlen)
+PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex_v2(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX_V2 conninfo, PULONG poutlen)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vpdo);
 
 	conninfo->SupportedUsbProtocols.ul = 0;

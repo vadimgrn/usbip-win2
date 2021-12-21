@@ -76,6 +76,8 @@ static PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 static PAGEABLE void cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
 {
+	PAGED_CODE();
+
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 
@@ -127,10 +129,12 @@ static PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 }
 
 /*
- * Set only if such value does not exist. 
+ * Set only if such value does not exist.
  */
 static PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
 {
+	PAGED_CODE();
+
 	UNICODE_STRING name;
 	RtlInitUnicodeString(&name, L"VerboseOn");
 
@@ -151,13 +155,15 @@ static PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
 
 /*
  * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
- * The default setting of zero causes the IFR to log errors, warnings, and informational events. 
+ * The default setting of zero causes the IFR to log errors, warnings, and informational events.
  * Set to one to add verbose output to the log.
- * 
+ *
  * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
  */
 static PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 {
+	PAGED_CODE();
+
 	UNICODE_STRING params;
 	RtlInitUnicodeString(&params, L"\\Parameters");
 
@@ -169,7 +175,7 @@ static PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 	if (!path.Buffer) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
-	
+
 	NTSTATUS st = RtlUnicodeStringCopy(&path, RegistryPath);
 	NT_ASSERT(!st);
 

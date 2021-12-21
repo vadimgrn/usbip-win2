@@ -7,11 +7,10 @@
 
 static PAGEABLE pvpdo_dev_t find_vpdo(pvhub_dev_t vhub, unsigned port)
 {
-	PLIST_ENTRY	entry;
+	PAGED_CODE();
 
-	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		pvpdo_dev_t	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
-
+	for (LIST_ENTRY *entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+		vpdo_dev_t *vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		if (vpdo->port == port) {
 			return vpdo;
 		}
@@ -20,9 +19,10 @@ static PAGEABLE pvpdo_dev_t find_vpdo(pvhub_dev_t vhub, unsigned port)
 	return NULL;
 }
 
-PAGEABLE pvpdo_dev_t
-vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
+PAGEABLE pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
 {
+	PAGED_CODE();
+
 	pvpdo_dev_t	vpdo;
 
 	ExAcquireFastMutex(&vhub->Mutex);
@@ -34,13 +34,12 @@ vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
 	return vpdo;
 }
 
-PAGEABLE CHAR
-vhub_get_empty_port(pvhub_dev_t vhub)
+PAGEABLE CHAR vhub_get_empty_port(pvhub_dev_t vhub)
 {
-	CHAR	i;
+	PAGED_CODE();
 
 	ExAcquireFastMutex(&vhub->Mutex);
-	for (i = 0; i < (CHAR)vhub->n_max_ports; i++) {
+	for (CHAR i = 0; i < (CHAR)vhub->n_max_ports; i++) {
 		if (find_vpdo(vhub, i) == NULL) {
 			ExReleaseFastMutex(&vhub->Mutex);
 			return i;
@@ -51,9 +50,10 @@ vhub_get_empty_port(pvhub_dev_t vhub)
 	return -1;
 }
 
-PAGEABLE void
-vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
+PAGEABLE void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 {
+	PAGED_CODE();
+
 	ExAcquireFastMutex(&vhub->Mutex);
 
 	InsertTailList(&vhub->head_vpdo, &vpdo->Link);
@@ -64,9 +64,10 @@ vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE void
-vhub_detach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
+PAGEABLE void vhub_detach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 {
+	PAGED_CODE();
+
 	ExAcquireFastMutex(&vhub->Mutex);
 
 	RemoveEntryList(&vpdo->Link);
@@ -77,9 +78,10 @@ vhub_detach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE void
-vhub_get_hub_descriptor(pvhub_dev_t vhub, PUSB_HUB_DESCRIPTOR pdesc)
+PAGEABLE void vhub_get_hub_descriptor(pvhub_dev_t vhub, PUSB_HUB_DESCRIPTOR pdesc)
 {
+	PAGED_CODE();
+
 	pdesc->bDescriptorLength = 9;
 	pdesc->bDescriptorType = 0x29;
 	pdesc->bNumberOfPorts = (UCHAR)vhub->n_max_ports;
@@ -88,9 +90,10 @@ vhub_get_hub_descriptor(pvhub_dev_t vhub, PUSB_HUB_DESCRIPTOR pdesc)
 	pdesc->bHubControlCurrent = 1;
 }
 
-PAGEABLE NTSTATUS
-vhub_get_information_ex(pvhub_dev_t vhub, PUSB_HUB_INFORMATION_EX pinfo)
+PAGEABLE NTSTATUS vhub_get_information_ex(pvhub_dev_t vhub, PUSB_HUB_INFORMATION_EX pinfo)
 {
+	PAGED_CODE();
+
 	pinfo->HubType = UsbRootHub;
 	pinfo->HighestPortNumber = (USHORT)vhub->n_max_ports;
 
@@ -99,9 +102,9 @@ vhub_get_information_ex(pvhub_dev_t vhub, PUSB_HUB_INFORMATION_EX pinfo)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-vhub_get_capabilities_ex(pvhub_dev_t vhub, PUSB_HUB_CAPABILITIES_EX pinfo)
+PAGEABLE NTSTATUS vhub_get_capabilities_ex(pvhub_dev_t vhub, PUSB_HUB_CAPABILITIES_EX pinfo)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vhub);
 
 	pinfo->CapabilityFlags.ul = 0xffffffff;
@@ -115,9 +118,10 @@ vhub_get_capabilities_ex(pvhub_dev_t vhub, PUSB_HUB_CAPABILITIES_EX pinfo)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-vhub_get_port_connector_properties(pvhub_dev_t vhub, PUSB_PORT_CONNECTOR_PROPERTIES pinfo, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(pvhub_dev_t vhub, PUSB_PORT_CONNECTOR_PROPERTIES pinfo, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	if (pinfo->ConnectionIndex > vhub->n_max_ports)
 		return STATUS_INVALID_PARAMETER;
 	if (*poutlen < sizeof(USB_PORT_CONNECTOR_PROPERTIES)) {
@@ -140,9 +144,10 @@ vhub_get_port_connector_properties(pvhub_dev_t vhub, PUSB_PORT_CONNECTOR_PROPERT
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE void
-mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
+static PAGEABLE void mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 {
+	PAGED_CODE();
+
 	if (vpdo->plugged) {
 		vpdo->plugged = FALSE;
 		NT_ASSERT(vhub->n_vpdos_plugged > 0);
@@ -151,28 +156,27 @@ mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 		IoInvalidateDeviceRelations(vhub->common.pdo, BusRelations);
 
 		TraceInfo(TRACE_VPDO, "the device is marked as unplugged: port: %u", vpdo->port);
-	}
-	else {
+	} else {
 		TraceError(TRACE_VHUB, "vpdo already unplugged: port: %u", vpdo->port);
 	}
 }
 
-PAGEABLE void
-vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
+PAGEABLE void vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 {
+	PAGED_CODE();
+
 	ExAcquireFastMutex(&vhub->Mutex);
 	mark_unplugged_vpdo(vhub, vpdo);
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE void
-vhub_mark_unplugged_all_vpdos(pvhub_dev_t vhub)
+PAGEABLE void vhub_mark_unplugged_all_vpdos(pvhub_dev_t vhub)
 {
-	PLIST_ENTRY	entry;
+	PAGED_CODE();
 
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+	for (LIST_ENTRY *entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 		pvpdo_dev_t	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		mark_unplugged_vpdo(vhub, vpdo);
 	}
@@ -180,13 +184,12 @@ vhub_mark_unplugged_all_vpdos(pvhub_dev_t vhub)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE NTSTATUS
-vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st)
+PAGEABLE NTSTATUS vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st)
 {
+	PAGED_CODE();
+
 	pvpdo_dev_t	vpdo;
 	PLIST_ENTRY	entry;
-
-	PAGED_CODE();
 
 	TraceInfo(TRACE_VHUB, "Enter");
 
@@ -207,15 +210,14 @@ vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS
-vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imported_dev_t idevs, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imported_dev_t idevs, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	pioctl_usbip_vhci_imported_dev_t	idev = idevs;
 	ULONG	n_idevs_max;
 	unsigned char	n_used_ports = 0;
 	PLIST_ENTRY	entry;
-
-	PAGED_CODE();
 
 	n_idevs_max = (ULONG)(*poutlen / sizeof(ioctl_usbip_vhci_imported_dev));
 	if (n_idevs_max == 0)

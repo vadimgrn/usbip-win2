@@ -7,6 +7,8 @@
 
 static PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	USB_POWER_INFO *pinfo = buffer;
 
 	if (inlen < sizeof(*pinfo)) {
@@ -49,6 +51,8 @@ static PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutle
 
 static PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 {
+	PAGED_CODE();
+
 	USB_CONTROLLER_INFO_0 *pinfo = buffer;
 
 	if (inlen < sizeof(*pinfo)) {
@@ -68,6 +72,7 @@ static PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG p
 
 PAGEABLE NTSTATUS vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vhci);
 
 	USBUSER_REQUEST_HEADER *hdr = buffer;

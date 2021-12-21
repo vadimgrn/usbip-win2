@@ -1,15 +1,14 @@
 #include "vhci_irp.h"
 
-PAGEABLE NTSTATUS
-irp_pass_down(PDEVICE_OBJECT devobj, PIRP irp)
+PAGEABLE NTSTATUS irp_pass_down(PDEVICE_OBJECT devobj, PIRP irp)
 {
+	PAGED_CODE();
 	irp->IoStatus.Status = STATUS_SUCCESS;
 	IoSkipCurrentIrpStackLocation(irp);
 	return IoCallDriver(devobj, irp);
 }
 
-static NTSTATUS
-irp_completion_routine(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in PVOID Context)
+static NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in PVOID Context)
 {
 	UNREFERENCED_PARAMETER(devobj);
 
@@ -22,9 +21,10 @@ irp_completion_routine(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in PVOID Con
 	return STATUS_MORE_PROCESSING_REQUIRED; // Keep this IRP
 }
 
-PAGEABLE NTSTATUS
-irp_send_synchronously(PDEVICE_OBJECT devobj, PIRP irp)
+PAGEABLE NTSTATUS irp_send_synchronously(PDEVICE_OBJECT devobj, PIRP irp)
 {
+	PAGED_CODE();
+
 	KEVENT		event;
 	NTSTATUS	status;
 

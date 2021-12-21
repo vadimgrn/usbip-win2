@@ -5,17 +5,19 @@
 #include "vhci_irp.h"
 #include "vhci.h"
 
-static PAGEABLE void
-relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)
+static PAGEABLE void relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)
 {
+	PAGED_CODE();
+
 	ObDereferenceObject(relations->Objects[idx]);
 	if (idx < relations->Count - 1)
 		RtlCopyMemory(relations->Objects + idx, relations->Objects + idx + 1, sizeof(PDEVICE_OBJECT) * (relations->Count - 1 - idx));
 }
 
-static PAGEABLE BOOLEAN
-relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJECT devobj, BOOLEAN deref)
+static PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJECT devobj, BOOLEAN deref)
 {
+	PAGED_CODE();
+
 	ULONG	i;
 
 	for (i = 0; i < relations->Count; i++) {
@@ -28,9 +30,10 @@ relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJECT devobj, BOOLEAN
 	return FALSE;
 }
 
-static PAGEABLE NTSTATUS
-get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 {
+	PAGED_CODE();
+
 	BOOLEAN	child_exist = TRUE;
 	PDEVICE_RELATIONS	relations = *pdev_relations, relations_new;
 	PDEVICE_OBJECT	devobj_cpdo;
@@ -110,9 +113,10 @@ is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, pvpdo_dev_t vpdo)
 	return FALSE;
 }
 
-static PAGEABLE NTSTATUS
-get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATIONS *pdev_relations)
 {
+	PAGED_CODE();
+
 	PDEVICE_RELATIONS	relations_old = *pdev_relations, relations;
 	ULONG			length, n_olds = 0, n_news = 0;
 	PLIST_ENTRY		entry;
@@ -172,9 +176,10 @@ get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATIONS *pdev_relations)
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE PDEVICE_RELATIONS
-get_self_dev_relation(pvdev_t vdev)
+static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(pvdev_t vdev)
 {
+	PAGED_CODE();
+
 	PDEVICE_RELATIONS	dev_relations;
 
 	dev_relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
@@ -192,9 +197,10 @@ get_self_dev_relation(pvdev_t vdev)
 	return dev_relations;
 }
 
-static PAGEABLE NTSTATUS
-get_bus_relations(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_bus_relations(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 {
+	PAGED_CODE();
+
 	switch (vdev->type) {
 	case VDEV_ROOT:
 	case VDEV_VHCI:
@@ -206,9 +212,10 @@ get_bus_relations(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 	}
 }
 
-static PAGEABLE NTSTATUS
-get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 {
+	PAGED_CODE();
+
 	if (vdev->type != VDEV_VPDO)
 		return STATUS_NOT_SUPPORTED;
 
@@ -223,6 +230,8 @@ get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
 
 PAGEABLE NTSTATUS pnp_query_device_relations(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	TraceInfo(TRACE_PNP, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
 

@@ -10,9 +10,10 @@
 
 #include <stdbool.h>
 
-static NTSTATUS
-req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
+static PAGEABLE NTSTATUS req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
 {
+	PAGED_CODE();
+
 	struct urb_req	*urbr;
 	NTSTATUS	status;
 
@@ -35,6 +36,8 @@ req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
 
 PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST *dsc_req, ULONG *psize)
 {
+	PAGED_CODE();
+
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&dsc_req->SetupPacket;
 	static_assert(sizeof(*setup) == sizeof(dsc_req->SetupPacket), "assert");
 
@@ -86,8 +89,10 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
  * need to cache a descriptor?
  * Currently, device descriptor & full configuration descriptor are cached in vpdo.
  */
-static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, const USB_COMMON_DESCRIPTOR *dsc)
+static PAGEABLE BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, const USB_COMMON_DESCRIPTOR *dsc)
 {
+	PAGED_CODE();
+
 	USB_CONFIGURATION_DESCRIPTOR *dsc_conf = NULL;
 
 	switch (urb_cdr->DescriptorType) {
@@ -116,22 +121,25 @@ static BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR
 	return TRUE;
 }
 
-static bool is_device_serial_number(
-	vpdo_dev_t *vpdo, 
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r, 
+static PAGEABLE bool is_device_serial_number(
+	vpdo_dev_t *vpdo,
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r,
 	const USB_COMMON_DESCRIPTOR *d)
 {
+	PAGED_CODE();
+
 	UCHAR idx = vpdo->dsc_dev ? vpdo->dsc_dev->iSerialNumber : 0; // not zero if has serial
 	return  idx &&
 	        d->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE &&
 		r->Index == idx;
 }
 
-static void save_serial_number(
-	vpdo_dev_t *vpdo, 
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, 
+static PAGEABLE void save_serial_number(
+	vpdo_dev_t *vpdo,
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr,
 	const USB_COMMON_DESCRIPTOR *dsc)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(urb_cdr);
 
 	USB_STRING_DESCRIPTOR *sd = (USB_STRING_DESCRIPTOR*)dsc;
@@ -157,11 +165,13 @@ static void save_serial_number(
 	}
 }
 
-void try_to_cache_descriptor(
-	vpdo_dev_t* vpdo, 
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr, 
+PAGEABLE void try_to_cache_descriptor(
+	vpdo_dev_t* vpdo,
+	struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr,
 	const USB_COMMON_DESCRIPTOR* dsc)
 {
+	PAGED_CODE();
+
 	if (is_device_serial_number(vpdo, urb_cdr, dsc)) {
 		save_serial_number(vpdo, urb_cdr, dsc);
 		return;

@@ -7,14 +7,11 @@
 #include "vhci_wmi.h"
 #include "usbip_vhci_api.h"
 
-static PAGEABLE NTSTATUS
-start_vhci(pvhci_dev_t vhci)
+static PAGEABLE NTSTATUS start_vhci(pvhci_dev_t vhci)
 {
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	status = IoRegisterDeviceInterface(vhci->common.pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, NULL, &vhci->DevIntfVhci);
+	NTSTATUS status = IoRegisterDeviceInterface(vhci->common.pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, NULL, &vhci->DevIntfVhci);
 	if (!NT_SUCCESS(status)) {
 		TraceError(TRACE_PNP, "failed to register vhci device interface: %!STATUS!", status);
 		return status;
@@ -34,13 +31,12 @@ start_vhci(pvhci_dev_t vhci)
 	return status;
 }
 
-static PAGEABLE NTSTATUS
-start_vhub(pvhub_dev_t vhub)
+static PAGEABLE NTSTATUS start_vhub(pvhub_dev_t vhub)
 {
+	PAGED_CODE();
+
 	pvhci_dev_t	vhci;
 	NTSTATUS	status;
-
-	PAGED_CODE();
 
 	status = IoRegisterDeviceInterface(vhub->common.pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HUB, NULL, &vhub->DevIntfRootHub);
 	if (NT_ERROR(status)) {
@@ -68,14 +64,11 @@ start_vhub(pvhub_dev_t vhub)
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS
-start_vpdo(pvpdo_dev_t vpdo)
+static PAGEABLE NTSTATUS start_vpdo(pvpdo_dev_t vpdo)
 {
-	NTSTATUS	status;
-
 	PAGED_CODE();
 
-	status = IoRegisterDeviceInterface(TO_DEVOBJ(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, NULL, &vpdo->usb_dev_interface);
+	NTSTATUS status = IoRegisterDeviceInterface(TO_DEVOBJ(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, NULL, &vpdo->usb_dev_interface);
 	if (NT_SUCCESS(status)) {
 		status = IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, TRUE);
 		if (NT_ERROR(status)) {
@@ -91,6 +84,8 @@ start_vpdo(pvpdo_dev_t vpdo)
 
 PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
+
 	if (is_fdo(vdev->type)) {
 		NTSTATUS status = irp_send_synchronously(vdev->devobj_lower, irp);
 		if (NT_ERROR(status)) {

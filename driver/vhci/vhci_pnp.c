@@ -20,16 +20,17 @@ NTSTATUS irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : irp_done_success(irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_query_stop_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_query_stop_device(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, StopPending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	if (vdev->DevicePnPState == StopPending) {
 		// We did receive a query-stop, so restore.
 		RESTORE_PREVIOUS_PNP_STATE(vdev);
@@ -39,16 +40,17 @@ pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_stop_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_stop_device(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, Stopped);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_query_remove_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_query_remove_device(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	switch (vdev->type) {
 	case VDEV_VPDO:
 		/* vpdo cannot be removed */
@@ -60,9 +62,10 @@ pnp_query_remove_device(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_cancel_remove_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_cancel_remove_device(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
+
 	if (vdev->DevicePnPState == RemovePending) {
 		RESTORE_PREVIOUS_PNP_STATE(vdev);
 	}
@@ -70,17 +73,17 @@ pnp_cancel_remove_device(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS
-pnp_surprise_removal(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_surprise_removal(pvdev_t vdev, PIRP irp)
 {
+	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
 static PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 {
-	UNREFERENCED_PARAMETER(vdev);
 	PAGED_CODE();
+	UNREFERENCED_PARAMETER(vdev);
 
 	PNP_BUS_INFORMATION *bi = ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
 	if (bi) {
@@ -97,18 +100,21 @@ static PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 
 static PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
 static PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
 static PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
@@ -122,6 +128,8 @@ static PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
  */
 static PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
+
 	if (vdev->type == VDEV_VPDO) {
 		vpdo_dev_t* vpdo = (vpdo_dev_t*)vdev;
 		vhub_mark_unplugged_vpdo(vhub_from_vpdo(vpdo), vpdo);
@@ -133,13 +141,16 @@ static PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 
 static PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
 static PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
+
 	irp->IoStatus.Information = 0;
 	return irp_done_success(irp);
 }
@@ -153,12 +164,14 @@ static PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
  */
 static PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done(irp, STATUS_UNSUCCESSFUL);
 }
 
 static PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
@@ -169,6 +182,7 @@ static PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp
  */
 static PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
+	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_success(irp);
 }
@@ -215,8 +229,8 @@ PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	
-	TraceVerbose(TRACE_PNP, "%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", 
+
+	TraceVerbose(TRACE_PNP, "%!vdev_type_t!: enter irql %!irql!, %!pnpmn!",
 			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	NTSTATUS status = STATUS_SUCCESS;
