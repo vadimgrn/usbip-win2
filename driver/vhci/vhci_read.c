@@ -235,14 +235,14 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct ur
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	const USB_DESCRIPTOR_REQUEST *r = urbr->irp->AssociatedIrp.SystemBuffer;
+	const USB_DESCRIPTOR_REQUEST *r = get_irp_buffer(urbr->irp);
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
-	ULONG data_len = irpstack->Parameters.DeviceIoControl.OutputBufferLength - sizeof(*r); // length of r->Data[]
+	ULONG data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // length of r->Data[]
 
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, data_len);
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, data_sz);
 	if (err) {
 		return err;
 	}
@@ -1130,6 +1130,8 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		irp_done(irp, status);
 	}
 
+	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
 	TraceVerbose(TRACE_READ, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+
 	return status;
 }

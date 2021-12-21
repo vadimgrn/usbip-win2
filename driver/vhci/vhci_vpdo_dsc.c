@@ -171,7 +171,7 @@ void try_to_cache_descriptor(
 		return;
 	}
 
-	USB_COMMON_DESCRIPTOR *dsc_new = ExAllocatePoolWithTag(PagedPool, urb_cdr->TransferBufferLength, USBIP_VHCI_POOL_TAG);
+	void *dsc_new = ExAllocatePoolWithTag(PagedPool, urb_cdr->TransferBufferLength, USBIP_VHCI_POOL_TAG);
 	if (!dsc_new) {
 		TraceError(TRACE_WRITE, "out of memory");
 		return;
@@ -181,10 +181,10 @@ void try_to_cache_descriptor(
 
 	switch (urb_cdr->DescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		vpdo->dsc_dev = (PUSB_DEVICE_DESCRIPTOR)dsc_new;
+		vpdo->dsc_dev = dsc_new;
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		vpdo->dsc_conf = (PUSB_CONFIGURATION_DESCRIPTOR)dsc_new;
+		vpdo->dsc_conf = dsc_new;
 		break;
 	default:
 		ExFreePoolWithTag(dsc_new, USBIP_VHCI_POOL_TAG);

@@ -16,7 +16,16 @@
  * Pointer to any of them can be used to access TransferBufferLength, TransferBuffer, TransferBufferMDL of any other instance 
  * of these URBs.
  */
-// const size_t off = offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength);
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferFlags), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferFlags), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_ISOCH_TRANSFER, TransferFlags), "assert");
+//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferFlags), "assert");
+//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferFlags), "assert");
+static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferFlags), "assert");
+//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferFlags), "assert");
+//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferFlags), "assert");
+//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferFlags), "assert");
+
 static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBufferLength), "assert");
 static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferLength), "assert");
 static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBufferLength), "assert");
@@ -122,21 +131,27 @@ static __inline NTSTATUS get_copy_status(const void *p)
 	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr, bool no_transfer_flags)
+static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr, bool has_transfer_flags)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vpdo);
 
-	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with TransferFlags can be used
+	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with Transfer* members can be used
 	NTSTATUS err = assign(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
 
-	if (err || no_transfer_flags || IsTransferDirectionOut(r->TransferFlags)) {
+	if (err || (has_transfer_flags && IsTransferDirectionOut(r->TransferFlags))) {
 		return err;
 	}
 
+	USHORT func = urb->UrbHeader.Function;
+
+	bool bulk = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER || 
+		    func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
+
 	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
-	if (buf) {
-		TraceInfo(TRACE_WRITE, "%!BIN!", WppBinary(buf, (USHORT)r->TransferBufferLength));
+	if (buf && !bulk) {
+		TraceInfo(TRACE_WRITE, "%s(%#04x): %!BIN!", urb_function_str(func), func, 
+					WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
 	return get_copy_status(buf);
@@ -144,12 +159,12 @@ static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const 
 
 static PAGEABLE NTSTATUS urb_function_without_transfer_flags(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	return urb_function_generic(vpdo, urb, hdr, true);
+	return urb_function_generic(vpdo, urb, hdr, false);
 }
 
 static PAGEABLE NTSTATUS urb_function_with_transfer_flags(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	return urb_function_generic(vpdo, urb, hdr, false);
+	return urb_function_generic(vpdo, urb, hdr, true);
 }
 
 static PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
@@ -205,8 +220,18 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 				dsc->bDescriptorType,
 				WppBinary(dsc, (USHORT)r->TransferBufferLength));
 
-	if (!hdr->u.ret_submit.status && r->TransferBufferLength >= dsc->bLength) {
-		try_to_cache_descriptor(vpdo, r, dsc);
+
+	if (!hdr->u.ret_submit.status) {
+
+		USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
+				((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
+
+		if (r->TransferBufferLength == dsc_len) {
+			try_to_cache_descriptor(vpdo, r, dsc);
+		} else {
+			TraceWarning(TRACE_WRITE, "%s: TransferBufferLength(%lu) != dsc_len(%d)", 
+						urb_function_str(r->Hdr.Function), r->TransferBufferLength, dsc_len);
+		}
 	}
 
 	return STATUS_SUCCESS;
@@ -302,10 +327,19 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vpdo);
 
-	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
 	const struct usbip_header_ret_submit *res = &hdr->u.ret_submit;
-
 	int cnt = res->number_of_packets;
+
+	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
+	r->ErrorCount = res->error_count;
+
+	if (cnt && cnt == res->error_count) {
+		r->Hdr.Status = USBD_STATUS_ISOCH_REQUEST_FAILED;
+	}
+
+	if (r->TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
+		r->StartFrame = res->start_frame;
+	}
 
 	if (!(cnt >= 0 && (ULONG)cnt == r->NumberOfPackets)) {
 		TraceError(TRACE_WRITE, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r->NumberOfPackets);
@@ -315,16 +349,6 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 	if (!(res->actual_length >= 0 && (ULONG)res->actual_length <= r->TransferBufferLength)) {
 		TraceError(TRACE_WRITE, "actual_length(%d) > TransferBufferLength(%lu)", res->actual_length, r->TransferBufferLength);
 		return STATUS_INVALID_PARAMETER;
-	}
-
-	r->ErrorCount = res->error_count;
-
-	if (cnt && cnt == res->error_count) {
-		r->Hdr.Status = USBD_STATUS_ISOCH_REQUEST_FAILED;
-	}
-
-	if (r->TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
-		r->StartFrame = res->start_frame;
 	}
 
 	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
@@ -476,6 +500,7 @@ static PAGEABLE NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, con
 		int err = hdr->u.ret_submit.status;
 		urb->UrbHeader.Status = err ? to_windows_status(err) : USBD_STATUS_SUCCESS;
 	} else {
+		TraceError(TRACE_WRITE, "URB is null");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -483,59 +508,51 @@ static PAGEABLE NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, con
 	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
 
 	NTSTATUS st = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
-	
+
 	if (st && !urb->UrbHeader.Status) {
 		urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
-		TraceWarning(TRACE_WRITE, "Set USBD_STATUS=%s because return is %!STATUS!", 
-					dbg_usbd_status(urb->UrbHeader.Status), st);
+		TraceInfo(TRACE_WRITE, "Set USBD_STATUS=%s because return is %!STATUS!", 
+				dbg_usbd_status(urb->UrbHeader.Status), st);
 	} else if (urb->UrbHeader.Status && !st) {
 		st = STATUS_UNSUCCESSFUL;
-		TraceWarning(TRACE_WRITE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
-					st, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
+		TraceInfo(TRACE_WRITE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
+				st, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
 	}
 
 	return st;
 }
 
-static PAGEABLE NTSTATUS get_descriptor_from_node_connection(struct urb_req *urbr, const struct usbip_header *hdr)
+static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
-	int usbip_status = hdr->u.ret_submit.status;
-	if (usbip_status) {
-		USBD_STATUS st = to_windows_status(usbip_status);
-		TraceError(TRACE_WRITE, "errno %d -> %s(%#08lX)", usbip_status, dbg_usbd_status(st), (ULONG)st);
-		return STATUS_UNSUCCESSFUL;
-	}
+	NTSTATUS *Status = &irp->IoStatus.Status;
 
-	IRP *irp = urbr->irp;
-        IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	ULONG data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // r->Data[]
 
-	USB_DESCRIPTOR_REQUEST *req = NULL;
 	int actual_length = hdr->u.ret_submit.actual_length;
 
-	ULONG sz = actual_length + sizeof(*req);
-	TRANSFERRED(irp) = sz;
-
-	ULONG OutputBufferLength = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
-        if (sz > OutputBufferLength) {
-		TraceError(TRACE_WRITE, "%lu > OutputBufferLength %lu", sz, OutputBufferLength);
-		return irp->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
+	if (!(actual_length >= 0 && (ULONG)actual_length <= data_sz)) {
+		TraceError(TRACE_WRITE, "OutputBufferLength %lu, actual_length(%d)", data_sz, actual_length);
+		return *Status = STATUS_INVALID_PARAMETER;
 	}
 
-	req = get_irp_buffer(irp);
-        RtlCopyMemory(req->Data, hdr + 1, actual_length);
-		
-	char buf[USB_SETUP_PKT_STR_BUFBZ];
-	TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, %s, Data[%!BIN!]", 
-				req->ConnectionIndex, 
-				usb_setup_pkt_str(buf, sizeof(buf), &req->SetupPacket),
-				WppBinary(req->Data, (USHORT)actual_length));
+	USB_DESCRIPTOR_REQUEST *r = get_irp_buffer(irp);
+	RtlCopyMemory(r->Data, hdr + 1, actual_length);
+	
+	{
+		char buf[USB_SETUP_PKT_STR_BUFBZ];
+		TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, %s, Data[%!BIN!]", 
+					r->ConnectionIndex, 
+					usb_setup_pkt_str(buf, sizeof(buf), &r->SetupPacket),
+					WppBinary(r->Data, (USHORT)actual_length));
+	}
 
-        return irp->IoStatus.Status = STATUS_SUCCESS;
+	return *Status = hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbip_header *hdr)
+static PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
@@ -554,7 +571,7 @@ static PAGEABLE NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbi
 		st = internal_usb_submit_urb(urbr->vpdo, URB_FROM_IRP(irp), hdr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		st = get_descriptor_from_node_connection(urbr, hdr);
+		st = get_descriptor_from_node_connection(irp, hdr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		st = STATUS_SUCCESS;
@@ -568,7 +585,7 @@ static PAGEABLE NTSTATUS process_urb_res(struct urb_req *urbr, const struct usbi
 	return st;
 }
 
-static PAGEABLE const struct usbip_header *consume_ret_submit_from_write_irp(IRP *irp)
+static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 {
 	PAGED_CODE();
 
@@ -579,28 +596,22 @@ static PAGEABLE const struct usbip_header *consume_ret_submit_from_write_irp(IRP
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceInfo(TRACE_WRITE, "%s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
-		TraceError(TRACE_WRITE, "usbip header expected: buffer size %lu < %Iu", buf_sz, sizeof(*hdr));
+		TraceError(TRACE_WRITE, "usbip header expected: write buffer %lu", buf_sz);
 		return NULL;
 	}
 
-	if (hdr->base.command != USBIP_RET_SUBMIT) {
-		TraceError(TRACE_WRITE, "USBIP_RET_SUBMIT expected, got %!usbip_request_type!", hdr->base.command);
+	if (!(hdr->base.command == USBIP_RET_SUBMIT || hdr->base.command == USBIP_RET_UNLINK)) {
+		TraceError(TRACE_WRITE, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 		return NULL;
 	}
 
-	size_t expected = get_pdu_size(hdr); 
-	if (buf_sz == expected) {
-		TRANSFERRED(irp) = buf_sz; // fully transferred
+	size_t pdu_sz = get_pdu_size(hdr); 
+	if (buf_sz == pdu_sz) {
+		TRANSFERRED(irp) = buf_sz;
 		return hdr;
 	}
 	
-	TraceError(TRACE_WRITE, "Write.Length(%lu) != %Iu(hdr(%Iu) + in(%d)*actual_length(%d) + isoc(%Iu)[%d])", 
-				buf_sz, expected, sizeof(*hdr), 
-				hdr->base.direction == USBIP_DIR_IN, 
-				hdr->u.ret_submit.actual_length, 
-				sizeof(struct usbip_iso_packet_descriptor),
-				hdr->u.ret_submit.number_of_packets);
-
+	TraceError(TRACE_WRITE, "Write buffer %lu != pdu size %Iu", buf_sz, pdu_sz);
 	return NULL;
 }
 
@@ -630,11 +641,11 @@ static PAGEABLE void complete_irp(IRP *irp, NTSTATUS status)
 	KeLowerIrql(oldirql);
 }
 
-static PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
+static PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	PAGED_CODE();
 
-	const struct usbip_header *hdr = consume_ret_submit_from_write_irp(write_irp);
+	const struct usbip_header *hdr = consume_write_irp_buffer(write_irp);
 	if (!hdr) {
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -645,11 +656,21 @@ static PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_SUCCESS;
 	}
 	
+	NTSTATUS status = STATUS_SUCCESS;
+
+	switch (hdr->base.command) {
+	case USBIP_RET_SUBMIT:
+		status = ret_submit(urbr, hdr);
+		break;
+	case USBIP_RET_UNLINK:
+		break;
+	default:
+		TraceError(TRACE_WRITE, "Unexpected %!usbip_request_type!", hdr->base.command);
+		status = STATUS_INTERNAL_ERROR;
+	}
+
 	IRP *irp = urbr->irp;
-
-	NTSTATUS status = process_urb_res(urbr, hdr);
 	free_urbr(urbr);
-
 	if (irp) {
 		complete_irp(irp, status);
 	}
@@ -681,13 +702,15 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
 		
 		if (vpdo && vpdo->plugged) {
-			status = process_write_irp(vpdo, irp);
+			status = do_write_irp(vpdo, irp);
 		} else {
 			TraceVerbose(TRACE_WRITE, "null or unplugged");
 			status = STATUS_INVALID_DEVICE_REQUEST;
 		}
 	}
 
+	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
 	TraceVerbose(TRACE_WRITE, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+
 	return irp_done(irp, status);
 }
