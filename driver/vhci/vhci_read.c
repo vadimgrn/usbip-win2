@@ -1126,12 +1126,12 @@ PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 		status = vpdo && vpdo->plugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 	}
 
+	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp)); // before irp_done()
+
 	if (status != STATUS_PENDING) {
 		irp_done(irp, status);
 	}
 
-	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
 	TraceVerbose(TRACE_READ, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
-
 	return status;
 }
