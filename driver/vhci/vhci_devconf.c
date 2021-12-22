@@ -175,12 +175,12 @@ static void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATI
 			const USBD_PIPE_INFORMATION *p = r->Pipes + j;
 
 			st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
-				"\nPipes[%lu](MaximumPacketSize %#x, EndpointAddress %#02hhx(%s#%d), Interval %#hhx, %s, "
+				"\nPipes[%lu](MaximumPacketSize %#x, EndpointAddress %#02hhx %s[%d], Interval %#hhx, %s, "
 				"PipeHandle %#Ix, MaximumTransferSize %#lx, PipeFlags %#lx)",
 				j,
 				p->MaximumPacketSize,
 				p->EndpointAddress,
-				USB_ENDPOINT_DIRECTION_IN(p->EndpointAddress) ? "in" : "out",
+				USB_ENDPOINT_DIRECTION_IN(p->EndpointAddress) ? "IN" : "OUT",
 				p->EndpointAddress & USB_ENDPOINT_ADDRESS_MASK,
 				p->Interval,
 				usbd_pipe_type_str(p->PipeType),

@@ -112,8 +112,7 @@ static PAGEABLE BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_D
 		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
-		/* string descrptor will be fetched on demand */
-		return FALSE;
+		return FALSE; // will be fetched on demand
 	default:
 		return FALSE;
 	}

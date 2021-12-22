@@ -56,7 +56,7 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INT
 
 	if (NT_SUCCESS(status)) {
 		char buf[SELECT_INTERFACE_STR_BUFSZ];
-		TraceVerbose(TRACE_VPDO, "%s", select_interface_str(buf, sizeof(buf), r));
+		TraceInfo(TRACE_VPDO, "%s", select_interface_str(buf, sizeof(buf), r));
 
 		vpdo->current_intf_num = iface->InterfaceNumber;
 		vpdo->current_intf_alt = iface->AlternateSetting;

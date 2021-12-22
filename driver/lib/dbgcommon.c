@@ -261,7 +261,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 	const char *result = buf;
 	const struct usbip_header_basic *base = &hdr->base;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, ep %s[%u]}, ",
+	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
 					base->seqnum, 
 					base->devid,			
 					base->direction == USBIP_DIR_OUT ? "out" : "in",

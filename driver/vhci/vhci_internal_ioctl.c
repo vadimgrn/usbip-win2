@@ -227,9 +227,7 @@ static NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
-
-	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? 
-				", using chained mdl" : "";
+	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : " ";
 
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
@@ -483,8 +481,7 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceVerbose(TRACE_IOCTL, "Enter irql %!irql!, %s(%#08lX)", 
-			KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceVerbose(TRACE_IOCTL, "Enter irql %!irql!, %s(%#08lX)", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
 	if (!vpdo) {

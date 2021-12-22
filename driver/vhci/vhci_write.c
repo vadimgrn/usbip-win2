@@ -229,7 +229,7 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 		if (r->TransferBufferLength == dsc_len) {
 			try_to_cache_descriptor(vpdo, r, dsc);
 		} else {
-			TraceWarning(TRACE_WRITE, "%s: TransferBufferLength(%lu) != dsc_len(%d)", 
+			TraceInfo(TRACE_WRITE, "%s: skip caching of descriptor, TransferBufferLength(%lu) != dsc_len(%d)", 
 						urb_function_str(r->Hdr.Function), r->TransferBufferLength, dsc_len);
 		}
 	}
@@ -589,15 +589,18 @@ static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 	const struct usbip_header *hdr = get_irp_buffer(irp);
 	ULONG buf_sz = get_irp_buffer_size(irp);
 
-	if (buf_sz >= sizeof(*hdr)) {
-		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceInfo(TRACE_WRITE, "%s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
-	} else {
+	if (buf_sz < sizeof(*hdr)) {
 		TraceError(TRACE_WRITE, "usbip header expected: write buffer %lu", buf_sz);
 		return NULL;
 	}
 
 	size_t pdu_sz = get_pdu_size(hdr); 
+
+	{
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceInfo(TRACE_WRITE, "IN %Iu%s", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	}
+
 	if (buf_sz == pdu_sz) {
 		TRANSFERRED(irp) = buf_sz;
 		return hdr;
@@ -678,7 +681,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceVerbose(TRACE_WRITE, "Enter, write buffer %lu", get_irp_buffer_size(irp));
+	TraceVerbose(TRACE_WRITE, "Enter irql %!irql!, write buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {

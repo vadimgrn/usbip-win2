@@ -140,4 +140,6 @@ struct usbip_header {
 	} u;
 };
 
+static_assert(sizeof(struct usbip_header) == 48, "assert");
+
 #include <POPPACK.H>
