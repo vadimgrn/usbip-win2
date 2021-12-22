@@ -170,13 +170,13 @@ static PAGEABLE NTSTATUS urb_function_with_transfer_flags(vpdo_dev_t *vpdo, URB 
 static PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
+	return hdr->u.ret_submit.status ? STATUS_SUCCESS : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
 static PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
+	return hdr->u.ret_submit.status ? STATUS_SUCCESS : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
 /*
@@ -490,11 +490,11 @@ static const urb_function_t urb_functions[] =
  * 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
  *   For example, select_configuration/select_interface immediately return STATUS_UNSUCCESSFUL in such case.
  * 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
- *   even if UrbHeader.Status != STATUS_SUCCESS. Data was sent over the network, do not ditch it.
+ *   even if UrbHeader.Status != USBD_STATUS_SUCCESS. Data was sent over the network, do not ditch it.
  */
-static PAGEABLE NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+static PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
-	PAGED_CODE();
+	PAGED_CODE(); 
 
 	if (urb) {
 		int err = hdr->u.ret_submit.status;
@@ -507,26 +507,19 @@ static PAGEABLE NTSTATUS internal_usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, con
 	USHORT func = urb->UrbHeader.Function;
 	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
 
-	NTSTATUS st = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
+	NTSTATUS err = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
 
-	if (st && !urb->UrbHeader.Status) {
+	if (err && !urb->UrbHeader.Status) {
 		urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
-		TraceInfo(TRACE_WRITE, "Set USBD_STATUS=%s because return is %!STATUS!", 
-				dbg_usbd_status(urb->UrbHeader.Status), st);
-	} else if (urb->UrbHeader.Status && !st) {
-		st = STATUS_UNSUCCESSFUL;
-		TraceInfo(TRACE_WRITE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
-				st, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
+		TraceInfo(TRACE_WRITE, "Set USBD_STATUS=%s because return is %!STATUS!", dbg_usbd_status(urb->UrbHeader.Status), err);
 	}
 
-	return st;
+	return err;
 }
 
 static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
-
-	NTSTATUS *Status = &irp->IoStatus.Status;
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // r->Data[]
@@ -535,21 +528,21 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const str
 
 	if (!(actual_length >= 0 && (ULONG)actual_length <= data_sz)) {
 		TraceError(TRACE_WRITE, "OutputBufferLength %lu, actual_length(%d)", data_sz, actual_length);
-		return *Status = STATUS_INVALID_PARAMETER;
+		return STATUS_INVALID_PARAMETER;
 	}
 
 	USB_DESCRIPTOR_REQUEST *r = get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 	
-	{
-		char buf[USB_SETUP_PKT_STR_BUFBZ];
-		TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, %s, Data[%!BIN!]", 
-					r->ConnectionIndex, 
-					usb_setup_pkt_str(buf, sizeof(buf), &r->SetupPacket),
-					WppBinary(r->Data, (USHORT)actual_length));
-	}
+	TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, Data[%!BIN!]", r->ConnectionIndex, WppBinary(r->Data, (USHORT)actual_length));
 
-	return *Status = hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+}
+
+static PAGEABLE NTSTATUS usb_reset_port(const struct usbip_header *hdr)
+{
+	PAGED_CODE();
+	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
 static PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_header *hdr)
@@ -568,21 +561,25 @@ static PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_hea
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = internal_usb_submit_urb(urbr->vpdo, URB_FROM_IRP(irp), hdr);
+		st = usb_submit_urb(urbr->vpdo, URB_FROM_IRP(irp), hdr);
+		break;
+	case IOCTL_INTERNAL_USB_RESET_PORT:
+		st = usb_reset_port(hdr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		st = get_descriptor_from_node_connection(irp, hdr);
 		break;
-	case IOCTL_INTERNAL_USB_RESET_PORT:
-		st = STATUS_SUCCESS;
-		break;
 	default:
-		char buf[URB_REQ_STR_BUFSZ];
-		TraceWarning(TRACE_WRITE, "Unhandled %s(%#08lX), %s", 
-				dbg_ioctl_code(ioctl_code), ioctl_code, urb_req_str(buf, sizeof(buf), urbr));
+		TraceError(TRACE_WRITE, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return st;
+}
+
+static PAGEABLE NTSTATUS ret_unlink(const struct usbip_header *hdr)
+{
+	PAGED_CODE();
+	return hdr->u.ret_unlink.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
 static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
@@ -597,11 +594,6 @@ static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 		TraceInfo(TRACE_WRITE, "%s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
 		TraceError(TRACE_WRITE, "usbip header expected: write buffer %lu", buf_sz);
-		return NULL;
-	}
-
-	if (!(hdr->base.command == USBIP_RET_SUBMIT || hdr->base.command == USBIP_RET_UNLINK)) {
-		TraceError(TRACE_WRITE, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 		return NULL;
 	}
 
@@ -656,17 +648,17 @@ static PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_SUCCESS;
 	}
 	
-	NTSTATUS status = STATUS_SUCCESS;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	switch (hdr->base.command) {
 	case USBIP_RET_SUBMIT:
 		status = ret_submit(urbr, hdr);
 		break;
 	case USBIP_RET_UNLINK:
+		status = ret_unlink(hdr);
 		break;
 	default:
-		TraceError(TRACE_WRITE, "Unexpected %!usbip_request_type!", hdr->base.command);
-		status = STATUS_INTERNAL_ERROR;
+		TraceError(TRACE_WRITE, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 	}
 
 	IRP *irp = urbr->irp;

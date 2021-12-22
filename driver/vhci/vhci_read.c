@@ -222,6 +222,9 @@ static PAGEABLE NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	pkt->bRequest = USB_REQUEST_SET_FEATURE;
 	pkt->wValue.W = USB_PORT_FEAT_RESET;
 
+	char buf[USB_SETUP_PKT_STR_BUFBZ];
+	TraceInfo(TRACE_READ, "%s", usb_setup_pkt_str(buf, sizeof(buf), pkt));
+
 	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
@@ -253,6 +256,10 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct ur
 	pkt->wValue.W = r->SetupPacket.wValue;
 	pkt->wIndex.W = r->SetupPacket.wIndex;
 	pkt->wLength = r->SetupPacket.wLength;
+
+	char buf[USB_SETUP_PKT_STR_BUFBZ];
+	TraceVerbose(TRACE_READ, "ConnectionIndex %lu, %s", 
+				r->ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r->SetupPacket));
 
 	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -909,11 +916,11 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 	URB *urb = URB_FROM_IRP(urbr->irp);
 	NT_ASSERT(urb);
 
-	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ISOCH_TRANSFER:
-		status = urb_isoch_transfer_partial(read_irp, urb);
+		st = urb_isoch_transfer_partial(read_irp, urb);
 		break;
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
 	case URB_FUNCTION_CONTROL_TRANSFER:
@@ -932,30 +939,13 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 	case URB_FUNCTION_VENDOR_INTERFACE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
 	case URB_FUNCTION_VENDOR_ENDPOINT:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
 	case URB_FUNCTION_VENDOR_OTHER:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-		status = transfer_partial(read_irp, urb);
+		st = transfer_partial(read_irp, urb);
 		break;
 	default:
-		TraceError(TRACE_READ, "%s: unexpected partial urbr", urb_function_str(urb->UrbHeader.Function));
+		TraceError(TRACE_READ, "%s: unexpected partial transfer", urb_function_str(urb->UrbHeader.Function));
 	}
 
-	return status;
-}
-
-static PAGEABLE NTSTATUS cmd_unlink_urb(PIRP irp, struct urb_req *urbr)
-{
-	PAGED_CODE();
-
-	TraceInfo(TRACE_READ, "Enter");
-
-	struct usbip_header *hdr = try_get_irp_buffer(irp, sizeof(*hdr));
-	if (!hdr) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	set_cmd_unlink_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, urbr->seq_num_unlink);
-
-	TRANSFERRED(irp) += sizeof(*hdr);
-	return STATUS_SUCCESS;
+	return st;
 }
 
 static PAGEABLE void debug(IRP *irp)
@@ -971,33 +961,52 @@ static PAGEABLE void debug(IRP *irp)
 	TraceInfo(TRACE_READ, "%s", dbg_usbip_hdr(buf, sizeof(buf), hdr));
 }
 
-PAGEABLE NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
+PAGEABLE NTSTATUS cmd_submit(IRP *read_irp, struct urb_req *urbr)
 {
 	PAGED_CODE();
 
-	if (!urbr->irp) {
-		return cmd_unlink_urb(read_irp, urbr);
-	}
-
-	NTSTATUS err = STATUS_INVALID_PARAMETER;
+	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(urbr->irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		err = usb_submit_urb(read_irp, urbr);
+		st = usb_submit_urb(read_irp, urbr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		err = usb_reset_port(read_irp, urbr);
+		st = usb_reset_port(read_irp, urbr);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		err = get_descriptor_from_node_connection(read_irp, urbr);
+		st = get_descriptor_from_node_connection(read_irp, urbr);
 		break;
 	default:
 		TraceWarning(TRACE_READ, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
+	return st;
+}
+
+static PAGEABLE NTSTATUS cmd_unlink(IRP *irp, struct urb_req *urbr)
+{
+	PAGED_CODE();
+
+	struct usbip_header *hdr = try_get_irp_buffer(irp, sizeof(*hdr));
+	if (!hdr) {
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	set_cmd_unlink_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, urbr->seq_num_unlink);
+
+	TRANSFERRED(irp) += sizeof(*hdr);
+	return STATUS_SUCCESS;
+}
+
+PAGEABLE NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
+{
+	PAGED_CODE();
+
+	NTSTATUS err = urbr->irp ? cmd_submit(read_irp, urbr) : cmd_unlink(read_irp, urbr);
 	if (!err) {
 		debug(read_irp);
 	}

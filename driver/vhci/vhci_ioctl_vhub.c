@@ -200,7 +200,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(pvhub_dev_t vhub, PIRP irp, ULONG ioctl_code, 
 {
 	PAGED_CODE();
 
-	NTSTATUS	status = STATUS_INVALID_DEVICE_REQUEST;
+	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (ioctl_code) {
 	case IOCTL_USB_GET_NODE_INFORMATION:
