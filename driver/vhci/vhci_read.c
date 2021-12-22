@@ -67,7 +67,7 @@ static PAGEABLE NTSTATUS do_copy_payload(void *dst_buf, const struct _URB_ISOCH_
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	ULONG buf_sz = IsTransferDirectionOut(r->TransferFlags) ? r->TransferBufferLength : 0;
+	ULONG buf_sz = is_endpoint_direction_out(r->PipeHandle) ? r->TransferBufferLength : 0; // TransferFlags can have wrong direction
 
 	RtlCopyMemory(dst_buf, src_buf, buf_sz);
 	*transferred += buf_sz;
@@ -106,7 +106,7 @@ static PAGEABLE ULONG get_payload_size(const struct _URB_ISOCH_TRANSFER *r)
 
 	ULONG len = r->NumberOfPackets*sizeof(struct usbip_iso_packet_descriptor);
 
-	if (IsTransferDirectionOut(r->TransferFlags)) {
+	if (is_endpoint_direction_out(r->PipeHandle)) {
 		len += r->TransferBufferLength;
 	}
 
@@ -313,8 +313,8 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, stru
 
 	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r = &urb->UrbControlDescriptorRequest;
 
-	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK |
-					(dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
+	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | 
+				(dir_in ? USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
 
 	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r->TransferBufferLength);
 	if (err) {
@@ -374,17 +374,18 @@ static PAGEABLE NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, st
 	}
 
 	struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST *r = &urb->UrbControlVendorClassRequest;
-	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
 
-	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid,
-						EP0, r->TransferFlags | USBD_DEFAULT_PIPE_TRANSFER, r->TransferBufferLength);
+	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
+							EP0, r->TransferFlags | USBD_DEFAULT_PIPE_TRANSFER, r->TransferBufferLength);
 
 	if (err) {
 		return err;
 	}
 
+	bool dir_out = is_transfer_direction_out(hdr); // TransferFlags can have wrong direction
+
 	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = get_submit_setup(hdr);
-	pkt->bmRequestType.B = (dir_in ? USB_DIR_IN : USB_DIR_OUT) | type | recipient;
+	pkt->bmRequestType.B = (dir_out ? USB_DIR_OUT : USB_DIR_IN) | type | recipient;
 	pkt->bRequest = r->Request;
 	pkt->wValue.W = r->Value;
 	pkt->wIndex.W = r->Index;
@@ -392,7 +393,7 @@ static PAGEABLE NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, st
 
 	TRANSFERRED(irp) = sizeof(*hdr);
 
-	if (!dir_in && r->TransferBufferLength) {
+	if (dir_out && r->TransferBufferLength) {
 		return copy_transfer_buffer(irp, urb, urbr->vpdo);
 	}
 
@@ -522,7 +523,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 
 	TRANSFERRED(irp) = sizeof(*hdr);
 
-	if (r->TransferBufferLength && IsTransferDirectionOut(r->TransferFlags)) {
+	if (r->TransferBufferLength && is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
 		return copy_transfer_buffer(irp, urb, urbr->vpdo);
 	}
 
@@ -577,16 +578,9 @@ static PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, struct urb
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer;
 	static_assert(offsetof(struct _URB_CONTROL_TRANSFER, SetupPacket) == offsetof(struct _URB_CONTROL_TRANSFER_EX, SetupPacket), "assert");
 
-	bool dir_out = is_transfer_dir_out(r);
-
 	struct usbip_header *hdr = try_get_irp_buffer(irp, sizeof(*hdr));
 	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	if (dir_out != IsTransferDirectionOut(r->TransferFlags)) {
-		TraceError(TRACE_READ, "Transfer direction differs in TransferFlags(%#lx) and SetupPacket", r->TransferFlags);
-		return STATUS_INVALID_PARAMETER;
 	}
 
 	NTSTATUS err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid,
@@ -594,6 +588,13 @@ static PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, struct urb
 
 	if (err) {
 		return err;
+	}
+
+	bool dir_out = is_transfer_direction_out(hdr); // TransferFlags can have wrong direction
+
+	if (dir_out != is_transfer_dir_out(r)) {
+		TraceError(TRACE_READ, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
+		return STATUS_INVALID_PARAMETER;
 	}
 
 	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r->SetupPacket), "assert");

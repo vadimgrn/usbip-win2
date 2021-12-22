@@ -6,26 +6,51 @@
 #include "usbip_proto.h"
 #include "usbd_helper.h"
 
+static ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
+{
+	NT_ASSERT(PipeHandle);
+
+	bool out = is_endpoint_direction_out(PipeHandle);
+
+	if (IsTransferDirectionOut(TransferFlags) == out) {
+		return TransferFlags;
+	}
+
+	TraceVerbose(TRACE_READ, "Fix direction in TransferFlags(%#Ix), PipeHandle(%#Ix)", TransferFlags, (uintptr_t)PipeHandle);
+
+	const ULONG in_flags = USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
+
+	if (out) {
+		TransferFlags &= ~in_flags;
+	} else {
+		TransferFlags |= in_flags;
+	}
+
+	NT_ASSERT(IsTransferDirectionOut(TransferFlags) == out);
+	return TransferFlags;
+}
+
+/*
+ * Direction in TransferFlags can be invalid for bulk transfer at least.
+ * Always use direction from PipeHandle if URB has one.
+ */
 NTSTATUS set_cmd_submit_usbip_header(
 	struct usbip_header* h, unsigned long seqnum, UINT32 devid,
 	USBD_PIPE_HANDLE PipeHandle, ULONG TransferFlags, ULONG TransferBufferLength)
 {
-	bool def_pipe = TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
-	if (def_pipe == !!PipeHandle) {
+	bool ep0 = TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
+	if (ep0 == !!PipeHandle) {
 		TraceError(TRACE_READ, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and PipeHandle(%#Ix)", 
 					(uintptr_t)PipeHandle);
 
 		return STATUS_INVALID_PARAMETER;
 	}
 	
-	bool dir_in = IsTransferDirectionIn(TransferFlags);
-
-	if (PipeHandle && is_endpoint_direction_in(PipeHandle) != dir_in) {
-		TraceError(TRACE_READ, "Inconsistency between transfer direction in TransferFlags(%#Ix) and PipeHandle(%#Ix)", 
-					TransferFlags, (uintptr_t)PipeHandle);
-
-			return STATUS_INVALID_PARAMETER;
+	if (PipeHandle) {
+		TransferFlags = fix_transfer_flags(TransferFlags, PipeHandle);
 	}
+
+	bool dir_in = IsTransferDirectionIn(TransferFlags); // many URBs don't have PipeHandle
 
 	struct usbip_header_basic *base = &h->base;
 	base->command = USBIP_CMD_SUBMIT;

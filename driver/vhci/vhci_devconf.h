@@ -48,14 +48,22 @@ __inline UCHAR get_endpoint_number(USBD_PIPE_HANDLE handle)
 	return addr & USB_ENDPOINT_ADDRESS_MASK;
 }
 
+/*
+ * EP0 is bidirectional. 
+ */
 __inline bool is_endpoint_direction_in(USBD_PIPE_HANDLE handle)
 {
+	NT_ASSERT(handle);
 	UCHAR addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_IN(addr);
 }
 
+/*
+* EP0 is bidirectional. 
+*/
 __inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
 {
+	NT_ASSERT(handle);
 	UCHAR addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_OUT(addr);
 }

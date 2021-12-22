@@ -131,7 +131,7 @@ static __inline NTSTATUS get_copy_status(const void *p)
 	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr, bool has_transfer_flags)
+static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vpdo);
@@ -139,7 +139,7 @@ static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with Transfer* members can be used
 	NTSTATUS err = assign(&r->TransferBufferLength, hdr->u.ret_submit.actual_length);
 
-	if (err || (has_transfer_flags && IsTransferDirectionOut(r->TransferFlags))) {
+	if (err || is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
 		return err;
 	}
 
@@ -149,7 +149,7 @@ static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const 
 		    func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
 
 	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
-	if (buf && !bulk) {
+	if (buf && !bulk) { // bulk can have sensitive data
 		TraceInfo(TRACE_WRITE, "%s(%#04x): %!BIN!", urb_function_str(func), func, 
 					WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
@@ -157,26 +157,16 @@ static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const 
 	return get_copy_status(buf);
 }
 
-static PAGEABLE NTSTATUS urb_function_without_transfer_flags(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	return urb_function_generic(vpdo, urb, hdr, false);
-}
-
-static PAGEABLE NTSTATUS urb_function_with_transfer_flags(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
-{
-	return urb_function_generic(vpdo, urb, hdr, true);
-}
-
 static PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_SUCCESS : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
+	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
 static PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_SUCCESS : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
+	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
 /*
@@ -351,7 +341,7 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	bool dir_in = IsTransferDirectionIn(r->TransferFlags);
+	bool dir_in = is_transfer_direction_in(hdr); // TransferFlags can have wrong direction
 
 	const char *src_buf = (char*)(hdr + 1);
 	ULONG src_len = dir_in ? res->actual_length : 0;
@@ -407,8 +397,8 @@ static const urb_function_t urb_functions[] =
 	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
 	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
 
-	urb_function_with_transfer_flags, // URB_FUNCTION_CONTROL_TRANSFER
-	urb_function_with_transfer_flags, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
+	urb_function_generic, // URB_FUNCTION_CONTROL_TRANSFER
+	urb_function_generic, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
 	urb_isoch_transfer,
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
@@ -422,28 +412,28 @@ static const urb_function_t urb_functions[] =
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
 
-	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
-	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
-	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
+	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
+	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
+	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
 
 	NULL, // URB_FUNCTION_RESERVED_0X0016          
 
-	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_DEVICE
-	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_INTERFACE
-	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_ENDPOINT
+	urb_function_generic, // URB_FUNCTION_VENDOR_DEVICE
+	urb_function_generic, // URB_FUNCTION_VENDOR_INTERFACE
+	urb_function_generic, // URB_FUNCTION_VENDOR_ENDPOINT
 
-	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_DEVICE 
-	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_INTERFACE
-	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_ENDPOINT
+	urb_function_generic, // URB_FUNCTION_CLASS_DEVICE 
+	urb_function_generic, // URB_FUNCTION_CLASS_INTERFACE
+	urb_function_generic, // URB_FUNCTION_CLASS_ENDPOINT
 
 	NULL, // URB_FUNCTION_RESERVE_0X001D
 
 	urb_function_success, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL, urb_pipe_request
 
-	urb_function_with_transfer_flags, // URB_FUNCTION_CLASS_OTHER
-	urb_function_with_transfer_flags, // URB_FUNCTION_VENDOR_OTHER
+	urb_function_generic, // URB_FUNCTION_CLASS_OTHER
+	urb_function_generic, // URB_FUNCTION_VENDOR_OTHER
 
-	urb_function_without_transfer_flags, // URB_FUNCTION_GET_STATUS_FROM_OTHER
+	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_OTHER
 
 	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
@@ -451,8 +441,8 @@ static const urb_function_t urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
 
-	urb_function_without_transfer_flags, // URB_FUNCTION_GET_CONFIGURATION
-	urb_function_without_transfer_flags, // URB_FUNCTION_GET_INTERFACE
+	urb_function_generic, // URB_FUNCTION_GET_CONFIGURATION
+	urb_function_generic, // URB_FUNCTION_GET_INTERFACE
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
@@ -467,14 +457,14 @@ static const urb_function_t urb_functions[] =
 
 	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
 	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
-	urb_function_with_transfer_flags, // URB_FUNCTION_CONTROL_TRANSFER_EX
+	urb_function_generic, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
 	NULL, // URB_FUNCTION_RESERVE_0X0033
 	NULL, // URB_FUNCTION_RESERVE_0X0034                  
 
 	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
 	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
-	urb_function_with_transfer_flags, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	urb_function_generic, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
 	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	NULL, // 0x0039
@@ -488,7 +478,7 @@ static const urb_function_t urb_functions[] =
 /*
  * URB function must:
  * 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
- *   For example, select_configuration/select_interface immediately return STATUS_UNSUCCESSFUL in such case.
+ *   For example, select_configuration/select_interface immediately returns in such case.
  * 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
  *   even if UrbHeader.Status != USBD_STATUS_SUCCESS. Data was sent over the network, do not ditch it.
  */
@@ -512,6 +502,10 @@ static PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 	if (err && !urb->UrbHeader.Status) {
 		urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
 		TraceInfo(TRACE_WRITE, "Set USBD_STATUS=%s because return is %!STATUS!", dbg_usbd_status(urb->UrbHeader.Status), err);
+	} else if (urb->UrbHeader.Status && !err) {
+		err = STATUS_UNSUCCESSFUL;
+		TraceInfo(TRACE_WRITE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
+					err, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
 	}
 
 	return err;

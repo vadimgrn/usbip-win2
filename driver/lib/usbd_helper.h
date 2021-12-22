@@ -1,5 +1,7 @@
 #pragma once
 
+#include "usbip_proto.h"
+
 #include <stdbool.h>
 
 #include <ntddk.h>
@@ -47,4 +49,14 @@ __inline bool is_transfer_dir_in(const struct _URB_CONTROL_TRANSFER *r)
 __inline bool is_transfer_dir_out(const struct _URB_CONTROL_TRANSFER *r)
 {
 	return get_transfer_dir(r) == BMREQUEST_HOST_TO_DEVICE;
+}
+
+__inline bool is_transfer_direction_in(const struct usbip_header *h)
+{
+	return h->base.direction == USBIP_DIR_IN;
+}
+
+__inline bool is_transfer_direction_out(const struct usbip_header *h)
+{
+	return h->base.direction == USBIP_DIR_OUT;
 }
