@@ -604,10 +604,11 @@ static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 	return NULL;
 }
 
-static PAGEABLE void complete_irp(IRP *irp, NTSTATUS status)
+/*
+ * Code must be in nonpaged section if it acquires spinlock.
+ */
+static void complete_irp(IRP *irp, NTSTATUS status)
 {
-	PAGED_CODE();
-
 	KIRQL oldirql;
 
 	IoAcquireCancelSpinLock(&oldirql);

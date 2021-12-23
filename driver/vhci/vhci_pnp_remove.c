@@ -10,10 +10,11 @@
 #include "usbip_vhci_api.h"
 #include "usbreq.h"
 
-static PAGEABLE void complete_pending_read_irp(pvpdo_dev_t vpdo)
+/*
+* Code must be in nonpaged section if it acquires spinlock.
+*/
+static void complete_pending_read_irp(pvpdo_dev_t vpdo)
 {
-	PAGED_CODE();
-
 	KIRQL	oldirql;
 	PIRP	irp;
 
@@ -37,12 +38,12 @@ static PAGEABLE void complete_pending_read_irp(pvpdo_dev_t vpdo)
 	}
 }
 
-static PAGEABLE void complete_pending_irp(pvpdo_dev_t vpdo)
+/*
+* Code must be in nonpaged section if it acquires spinlock.
+*/
+static void complete_pending_irp(pvpdo_dev_t vpdo)
 {
-	PAGED_CODE();
-
 	KIRQL	oldirql;
-	BOOLEAN	valid_irp;
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 	while (!IsListEmpty(&vpdo->head_urbr)) {
@@ -66,7 +67,7 @@ static PAGEABLE void complete_pending_irp(pvpdo_dev_t vpdo)
 		if (irp != NULL) {
 			// urbr irps have cancel routine
 			IoAcquireCancelSpinLock(&oldirql);
-			valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
+			bool valid_irp = IoSetCancelRoutine(irp, NULL);
 			IoReleaseCancelSpinLock(oldirql);
 			if (valid_irp) {
 				irp->IoStatus.Information = 0;

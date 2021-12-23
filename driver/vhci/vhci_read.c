@@ -1019,9 +1019,11 @@ NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
 	return err;
 }
 
-static PAGEABLE void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
+/*
+* Code must be in nonpaged section if it acquires spinlock.
+*/
+static void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 {
-	PAGED_CODE();
 	UNREFERENCED_PARAMETER(devobj);
 
 	TraceInfo(TRACE_READ, "pending irp read cancelled %p", irp_read);
@@ -1041,10 +1043,11 @@ static PAGEABLE void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *i
 	irp_done(irp_read, STATUS_CANCELLED);
 }
 
-static PAGEABLE NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
+/*
+* Code must be in nonpaged section if it acquires spinlock.
+*/
+static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	PAGED_CODE();
-
 	NTSTATUS status = STATUS_SUCCESS;
 	struct urb_req *urbr = NULL;
 	KIRQL oldirql;

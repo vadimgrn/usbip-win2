@@ -23,6 +23,9 @@ static NTSTATUS submit_urbr_irp(vpdo_dev_t* vpdo, IRP* irp)
 	return status;
 }
 
+/*
+* Code must be in nonpaged section if it acquires spinlock.
+*/
 static NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 {
 	TraceVerbose(TRACE_IOCTL, "PipeHandle %#Ix", (uintptr_t)hPipe);

@@ -90,8 +90,7 @@ static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 	free_urbr(urbr);
 }
 
-static void
-cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
+static void cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(devobj);
 
