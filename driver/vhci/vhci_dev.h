@@ -134,8 +134,8 @@ typedef struct
 	USHORT	vendor, product, revision;
 	UCHAR	usbclass, subclass, protocol, inum;
 
-	PWCHAR	serial; // device serial number
-	PWCHAR	serial_usr; // user-defined serial number
+	PWSTR	serial; // device serial number
+	PWSTR	serial_usr; // user-defined serial number
 
 	ULONG	port; // unique port number of the device on the bus
 

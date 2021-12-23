@@ -10,192 +10,167 @@
 
 #include <stdbool.h>
 
-static PAGEABLE NTSTATUS req_fetch_dsc(pvpdo_dev_t vpdo, PIRP irp)
+static PAGEABLE bool is_valid_length(const USB_CONFIGURATION_DESCRIPTOR *d)
+{
+	PAGED_CODE();
+	NT_ASSERT(d->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE);
+
+	return d->bLength == sizeof(*d) && d->wTotalLength > d->bLength;
+}
+
+static PAGEABLE bool equal(const USB_CONFIGURATION_DESCRIPTOR *a, const USB_CONFIGURATION_DESCRIPTOR *b)
 {
 	PAGED_CODE();
 
-	struct urb_req	*urbr;
-	NTSTATUS	status;
+	return a && b && a->wTotalLength == b->wTotalLength &&
+		RtlCompareMemory(a, b, a->wTotalLength) == a->wTotalLength;
+}
 
-	urbr = create_urbr(vpdo, irp, 0);
-	if (urbr == NULL)
-		status = STATUS_INSUFFICIENT_RESOURCES;
-	else {
+static PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
+{
+	PAGED_CODE();
+
+	NTSTATUS status = STATUS_INSUFFICIENT_RESOURCES;
+	struct urb_req *urbr = create_urbr(vpdo, irp, 0);
+
+	if (urbr) {
 		status = submit_urbr(vpdo, urbr);
 		if (NT_SUCCESS(status)) {
 			return STATUS_PENDING;
-		} else {
-			char buf[URB_REQ_STR_BUFSZ];
-			TraceInfo(TRACE_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr));
-			free_urbr(urbr);
-			status = STATUS_UNSUCCESSFUL;
 		}
+
+		char buf[URB_REQ_STR_BUFSZ];
+		TraceInfo(TRACE_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr));
+
+		free_urbr(urbr);
+		status = STATUS_UNSUCCESSFUL;
 	}
+
 	return irp_done(irp, status);
 }
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST *dsc_req, ULONG *psize)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST *r, ULONG *psize)
 {
 	PAGED_CODE();
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&dsc_req->SetupPacket;
-	static_assert(sizeof(*setup) == sizeof(dsc_req->SetupPacket), "assert");
+	USB_DEFAULT_PIPE_SETUP_PACKET *setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&r->SetupPacket;
+	static_assert(sizeof(*setup) == sizeof(r->SetupPacket), "assert");
 
-	PVOID		dsc_data = NULL;
-	ULONG		dsc_len = 0;
-	NTSTATUS	status = STATUS_INVALID_PARAMETER;
+	NTSTATUS status = STATUS_INVALID_PARAMETER;
+
+	void *dsc_data = NULL;
+	ULONG dsc_len = 0;
 
 	switch (setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		dsc_data = vpdo->dsc_dev;
-		if (dsc_data != NULL)
-			dsc_len = sizeof(USB_DEVICE_DESCRIPTOR);
+		if (dsc_data) {
+			dsc_len = vpdo->dsc_dev->bLength;
+		}
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 		dsc_data = vpdo->dsc_conf;
-		if (dsc_data != NULL)
+		if (dsc_data) {
 			dsc_len = vpdo->dsc_conf->wTotalLength;
+		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
 		status = req_fetch_dsc(vpdo, irp);
 		break;
 	default:
-		TraceError(TRACE_GENERAL, "unhandled %!usb_descriptor_type!", setup->wValue.HiByte);
-		break;
+		TraceError(TRACE_GENERAL, "Unhandled %!usb_descriptor_type!", setup->wValue.HiByte);
 	}
 
 	if (dsc_data) {
-		ULONG	outlen = sizeof(*dsc_req) + dsc_len;
-		ULONG	ncopy = outlen;
+		ULONG outlen = sizeof(*r) + dsc_len;
+		ULONG ncopy = outlen;
 
-		if (*psize < sizeof(*dsc_req)) {
+		if (*psize < sizeof(*r)) {
 			*psize = outlen;
 			return STATUS_BUFFER_TOO_SMALL;
 		}
 		if (*psize < outlen) {
-			ncopy = *psize - sizeof(*dsc_req);
+			ncopy = *psize - sizeof(*r);
 		}
 		status = STATUS_SUCCESS;
 		if (ncopy > 0)
-			RtlCopyMemory(dsc_req->Data, dsc_data, ncopy);
-		if (ncopy == outlen)
+			RtlCopyMemory(r->Data, dsc_data, ncopy);
+		if (ncopy == outlen) {
 			*psize = outlen;
+		}
 	}
 
 	return status;
 }
 
-/*
- * need to cache a descriptor?
- * Currently, device descriptor & full configuration descriptor are cached in vpdo.
- */
-static PAGEABLE BOOLEAN need_caching_dsc(vpdo_dev_t *vpdo, struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr, const USB_COMMON_DESCRIPTOR *dsc)
+static PAGEABLE bool is_device_serial_number(const USB_DEVICE_DESCRIPTOR *dd, int string_idx)
+{
+	PAGED_CODE();
+	int idx = dd ? dd->iSerialNumber : 0; // not zero if has serial
+	return idx && idx == string_idx;
+}
+
+static PAGEABLE PWSTR copy_wstring(const USB_STRING_DESCRIPTOR *sd, USHORT LanguageId)
 {
 	PAGED_CODE();
 
-	USB_CONFIGURATION_DESCRIPTOR *dsc_conf = NULL;
+	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
+	PWSTR str = ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
-	switch (urb_cdr->DescriptorType) {
+	if (str) {
+		NTSTATUS st = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
+		NT_ASSERT(!st);
+
+		TraceInfo(TRACE_VPDO, "Serial '%S', LanguageId %#04hx", str, LanguageId);
+	} else {
+		TraceError(TRACE_VPDO, "Can't allocate memory");
+	}
+
+	return str;
+}
+
+PAGEABLE void *clone(const void *src, ULONG length)
+{
+	void *buf = ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
+	
+	if (buf) {
+		RtlCopyMemory(buf, src, length);
+	} else { 
+		TraceError(TRACE_VPDO, "Can't allocate %lu bytes", length);
+	}
+
+	return buf;
+}
+
+PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCRIPTOR_REQUEST *r, const USB_COMMON_DESCRIPTOR *dsc)
+{
+	PAGED_CODE();
+
+	NT_ASSERT(dsc->bLength > sizeof(*dsc));
+
+	USB_STRING_DESCRIPTOR *sd = NULL;
+	USB_CONFIGURATION_DESCRIPTOR *cfgd = NULL;
+
+	switch (dsc->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (vpdo->dsc_dev) {
-			return FALSE;
-		}
-		break;
-	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		if (vpdo->dsc_conf) {
-			return FALSE;
-		}
-		dsc_conf = (USB_CONFIGURATION_DESCRIPTOR*)dsc;
-		if (urb_cdr->TransferBufferLength < dsc_conf->wTotalLength) {
-			TraceInfo(TRACE_WRITE, "ignore non-full configuration descriptor");
-			return FALSE;
+		if (dsc->bLength == sizeof(USB_DEVICE_DESCRIPTOR) && !vpdo->dsc_dev) {
+			vpdo->dsc_dev = clone(dsc, dsc->bLength);
 		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
-		return FALSE; // will be fetched on demand
-	default:
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
-static PAGEABLE bool is_device_serial_number(
-	vpdo_dev_t *vpdo,
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *r,
-	const USB_COMMON_DESCRIPTOR *d)
-{
-	PAGED_CODE();
-
-	UCHAR idx = vpdo->dsc_dev ? vpdo->dsc_dev->iSerialNumber : 0; // not zero if has serial
-	return  idx &&
-	        d->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE &&
-		r->Index == idx;
-}
-
-static PAGEABLE void save_serial_number(
-	vpdo_dev_t *vpdo,
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST *urb_cdr,
-	const USB_COMMON_DESCRIPTOR *dsc)
-{
-	PAGED_CODE();
-	UNREFERENCED_PARAMETER(urb_cdr);
-
-	USB_STRING_DESCRIPTOR *sd = (USB_STRING_DESCRIPTOR*)dsc;
-	UCHAR cch = (dsc->bLength - sizeof(*dsc))/sizeof(*sd->bString) + 1;
-
-	if (vpdo->serial) {
-		TraceWarning(TRACE_VPDO, "prior serial '%S'", vpdo->serial);
-		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
-	}
-
-	vpdo->serial = ExAllocatePoolWithTag(PagedPool, cch*sizeof(*vpdo->serial), USBIP_VHCI_POOL_TAG);
-
-	if (vpdo->serial) {
-		NTSTATUS st = RtlStringCchCopyNW(vpdo->serial, cch, sd->bString, cch - 1);
-		if (st == STATUS_SUCCESS) {
-			TraceInfo(TRACE_VPDO, "serial '%S', LangId %#04x", vpdo->serial, urb_cdr->LanguageId);
-		} else {
-			NT_ASSERT(!"RtlStringCchCopyNW failed");
-		}
-	} else {
-		TraceError(TRACE_VPDO, "can't allocate memory: Index %d, bLength %d, LangId %#04x",
-			urb_cdr->Index, sd->bLength, urb_cdr->LanguageId);
-	}
-}
-
-PAGEABLE void try_to_cache_descriptor(
-	vpdo_dev_t* vpdo,
-	struct _URB_CONTROL_DESCRIPTOR_REQUEST* urb_cdr,
-	const USB_COMMON_DESCRIPTOR* dsc)
-{
-	PAGED_CODE();
-
-	if (is_device_serial_number(vpdo, urb_cdr, dsc)) {
-		save_serial_number(vpdo, urb_cdr, dsc);
-		return;
-	}
-
-	if (!need_caching_dsc(vpdo, urb_cdr, dsc)) {
-		return;
-	}
-
-	void *dsc_new = ExAllocatePoolWithTag(PagedPool, urb_cdr->TransferBufferLength, USBIP_VHCI_POOL_TAG);
-	if (!dsc_new) {
-		TraceError(TRACE_WRITE, "out of memory");
-		return;
-	}
-
-	RtlCopyMemory(dsc_new, dsc, urb_cdr->TransferBufferLength);
-
-	switch (urb_cdr->DescriptorType) {
-	case USB_DEVICE_DESCRIPTOR_TYPE:
-		vpdo->dsc_dev = dsc_new;
+		sd = (USB_STRING_DESCRIPTOR*)dsc;
+		if (!vpdo->serial && sd->bLength >= sizeof(*sd) && is_device_serial_number(vpdo->dsc_dev, r->Index)) {
+			vpdo->serial = copy_wstring(sd, r->LanguageId);
+		} 
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		vpdo->dsc_conf = dsc_new;
+		cfgd = (USB_CONFIGURATION_DESCRIPTOR*)dsc;
+		if (is_valid_length(cfgd) && !equal(cfgd, vpdo->dsc_conf)) { // can have several configurations
+			if (vpdo->dsc_conf) {
+				ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
+			}
+			vpdo->dsc_conf = clone(cfgd, cfgd->wTotalLength);
+		}
 		break;
-	default:
-		ExFreePoolWithTag(dsc_new, USBIP_VHCI_POOL_TAG);
 	}
 }

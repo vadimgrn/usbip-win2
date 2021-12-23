@@ -210,18 +210,18 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 				dsc->bDescriptorType,
 				WppBinary(dsc, (USHORT)r->TransferBufferLength));
 
+	if (hdr->u.ret_submit.status) {
+		return STATUS_UNSUCCESSFUL;
+	}
 
-	if (!hdr->u.ret_submit.status) {
+	USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
+			((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
 
-		USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
-				((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
-
-		if (r->TransferBufferLength == dsc_len) {
-			try_to_cache_descriptor(vpdo, r, dsc);
-		} else {
-			TraceInfo(TRACE_WRITE, "%s: skip caching of descriptor, TransferBufferLength(%lu) != dsc_len(%d)", 
-						urb_function_str(r->Hdr.Function), r->TransferBufferLength, dsc_len);
-		}
+	if (dsc_len > sizeof(*dsc) && dsc_len == r->TransferBufferLength) { // full descriptor
+		cache_descriptor(vpdo, r, dsc);
+	} else {
+		TraceInfo(TRACE_WRITE, "%s: skip caching of descriptor: TransferBufferLength(%lu), dsc_len(%d)", 
+					urb_function_str(r->Hdr.Function), r->TransferBufferLength, dsc_len);
 	}
 
 	return STATUS_SUCCESS;

@@ -115,7 +115,7 @@ static void cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 	irp_done(irp, STATUS_CANCELLED);
 }
 
-struct urb_req *create_urbr(pvpdo_dev_t vpdo, PIRP irp, unsigned long seq_num_unlink)
+struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_unlink)
 {
 	struct urb_req *urbr = ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
