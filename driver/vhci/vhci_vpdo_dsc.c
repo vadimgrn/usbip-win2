@@ -69,9 +69,9 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 		}
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		dsc_data = vpdo->dsc_conf;
+		dsc_data = vpdo->actconfig;
 		if (dsc_data) {
-			dsc_len = vpdo->dsc_conf->wTotalLength;
+			dsc_len = vpdo->actconfig->wTotalLength;
 		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
@@ -93,8 +93,9 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 			ncopy = *psize - sizeof(*r);
 		}
 		status = STATUS_SUCCESS;
-		if (ncopy > 0)
+		if (ncopy > 0) {
 			RtlCopyMemory(r->Data, dsc_data, ncopy);
+		}
 		if (ncopy == outlen) {
 			*psize = outlen;
 		}
@@ -165,11 +166,11 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCR
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 		cfgd = (USB_CONFIGURATION_DESCRIPTOR*)dsc;
-		if (is_valid_length(cfgd) && !equal(cfgd, vpdo->dsc_conf)) { // can have several configurations
-			if (vpdo->dsc_conf) {
-				ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
+		if (is_valid_length(cfgd) && !equal(cfgd, vpdo->actconfig)) { // can have several configurations
+			if (vpdo->actconfig) {
+				ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
 			}
-			vpdo->dsc_conf = clone(cfgd, cfgd->wTotalLength);
+			vpdo->actconfig = clone(cfgd, cfgd->wTotalLength);
 		}
 		break;
 	}

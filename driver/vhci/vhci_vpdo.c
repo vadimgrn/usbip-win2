@@ -6,37 +6,37 @@
 #include "usbreq.h"
 #include "devconf.h"
 
-PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *cfg)
+PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *r)
 {
 	PAGED_CODE();
 
-	if (vpdo->dsc_conf) {
-		ExFreePoolWithTag(vpdo->dsc_conf, USBIP_VHCI_POOL_TAG);
-		vpdo->dsc_conf = NULL;
+	if (vpdo->actconfig) {
+		ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
+		vpdo->actconfig = NULL;
 	}
 
-	USB_CONFIGURATION_DESCRIPTOR *new_conf = cfg->ConfigurationDescriptor;
-	if (!new_conf) {
+	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor;
+	if (!cd) {
 		TraceInfo(TRACE_VPDO, "Going to unconfigured state");
 		return STATUS_SUCCESS;
 	}
 
-	vpdo->dsc_conf = ExAllocatePoolWithTag(NonPagedPool, new_conf->wTotalLength, USBIP_VHCI_POOL_TAG);
+	vpdo->actconfig = ExAllocatePoolWithTag(NonPagedPool, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
 
-	if (vpdo->dsc_conf) {
-		RtlCopyMemory(vpdo->dsc_conf, new_conf, new_conf->wTotalLength);
+	if (vpdo->actconfig) {
+		RtlCopyMemory(vpdo->actconfig, cd, cd->wTotalLength);
 	} else {
 		TraceError(TRACE_VPDO, "Failed to allocate configuration descriptor");
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	NTSTATUS status = setup_config(cfg, vpdo->speed);
+	NTSTATUS status = setup_config(r, vpdo->speed);
 
 	if (NT_SUCCESS(status)) {
-		cfg->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)0x12345678; // meaningless value, handle value is not used
+		r->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)(0x100 | cd->bConfigurationValue);
 
 		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceVerbose(TRACE_VPDO, "%s", select_configuration_str(buf, sizeof(buf), cfg));
+		TraceInfo(TRACE_VPDO, "%s", select_configuration_str(buf, sizeof(buf), r));
 	}
 
 	return status;
@@ -46,13 +46,13 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INT
 {
 	PAGED_CODE();
 
-	if (!vpdo->dsc_conf) {
-		TraceWarning(TRACE_VPDO, "Empty configuration descriptor");
+	if (!vpdo->actconfig) {
+		TraceError(TRACE_VPDO, "Device is unconfigured");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
 	USBD_INTERFACE_INFORMATION *iface = &r->Interface;
-	NTSTATUS status = setup_intf(iface, vpdo->speed, vpdo->dsc_conf);
+	NTSTATUS status = setup_intf(iface, vpdo->speed, vpdo->actconfig);
 
 	if (NT_SUCCESS(status)) {
 		char buf[SELECT_INTERFACE_STR_BUFSZ];
@@ -102,13 +102,13 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_
 
 		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(*vpdo->dsc_dev));
 
-		if (vpdo->dsc_conf) {
-			conninfo->CurrentConfigurationValue = vpdo->dsc_conf->bConfigurationValue;
+		if (vpdo->actconfig) {
+			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;
 		}
 
 		conninfo->LowSpeed = vpdo->speed == USB_SPEED_LOW || vpdo->speed == USB_SPEED_FULL;
 
-		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt);
 		if (dsc_intf) {
 			conninfo->NumberOfOpenPipes = dsc_intf->bNumEndpoints;
 		}
@@ -118,7 +118,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_
 			status = STATUS_BUFFER_TOO_SMALL;
 		} else {
 			if (conninfo->NumberOfOpenPipes > 0) {
-				dsc_for_each_endpoint(vpdo->dsc_conf, dsc_intf, copy_ep, conninfo->PipeList);
+				dsc_for_each_endpoint(vpdo->actconfig, dsc_intf, copy_ep, conninfo->PipeList);
 			}
 			status = STATUS_SUCCESS;
 		}
@@ -152,13 +152,13 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTI
 		conninfo->ConnectionStatus = DeviceConnected;
 		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(USB_DEVICE_DESCRIPTOR));
 
-		if (vpdo->dsc_conf) {
-			conninfo->CurrentConfigurationValue = vpdo->dsc_conf->bConfigurationValue;
+		if (vpdo->actconfig) {
+			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;
 		}
 
 		conninfo->Speed = vpdo->speed;
 
-		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->dsc_conf, vpdo->current_intf_num, vpdo->current_intf_alt);
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt);
 		if (dsc_intf) {
 			conninfo->NumberOfOpenPipes = dsc_intf->bNumEndpoints;
 		}
@@ -168,7 +168,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTI
 			status = STATUS_BUFFER_TOO_SMALL;
 		} else {
 			if (conninfo->NumberOfOpenPipes > 0) {
-				dsc_for_each_endpoint(vpdo->dsc_conf, dsc_intf, copy_ep, conninfo->PipeList);
+				dsc_for_each_endpoint(vpdo->actconfig, dsc_intf, copy_ep, conninfo->PipeList);
 			}
 			status = STATUS_SUCCESS;
 		}
