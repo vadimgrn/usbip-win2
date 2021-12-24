@@ -10,22 +10,6 @@
 
 #include <stdbool.h>
 
-static PAGEABLE bool is_valid_length(const USB_CONFIGURATION_DESCRIPTOR *d)
-{
-	PAGED_CODE();
-	NT_ASSERT(d->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE);
-
-	return d->bLength == sizeof(*d) && d->wTotalLength > d->bLength;
-}
-
-static PAGEABLE bool equal(const USB_CONFIGURATION_DESCRIPTOR *a, const USB_CONFIGURATION_DESCRIPTOR *b)
-{
-	PAGED_CODE();
-
-	return a && b && a->wTotalLength == b->wTotalLength &&
-		RtlCompareMemory(a, b, a->wTotalLength) == a->wTotalLength;
-}
-
 static PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
 {
 	PAGED_CODE();
@@ -143,6 +127,10 @@ PAGEABLE void *clone(const void *src, ULONG length)
 	return buf;
 }
 
+/*
+ * Configuration descriptor will be saved on usb request select configuration.
+ * A usb device can have several configurations, thus it's needed to cache all or none of them.
+ */
 PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCRIPTOR_REQUEST *r, const USB_COMMON_DESCRIPTOR *dsc)
 {
 	PAGED_CODE();
@@ -150,7 +138,6 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCR
 	NT_ASSERT(dsc->bLength > sizeof(*dsc));
 
 	USB_STRING_DESCRIPTOR *sd = NULL;
-	USB_CONFIGURATION_DESCRIPTOR *cfgd = NULL;
 
 	switch (dsc->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
@@ -163,15 +150,6 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCR
 		if (!vpdo->serial && sd->bLength >= sizeof(*sd) && is_device_serial_number(vpdo->dsc_dev, r->Index)) {
 			vpdo->serial = copy_wstring(sd, r->LanguageId);
 		} 
-		break;
-	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		cfgd = (USB_CONFIGURATION_DESCRIPTOR*)dsc;
-		if (is_valid_length(cfgd) && !equal(cfgd, vpdo->actconfig)) { // can have several configurations
-			if (vpdo->actconfig) {
-				ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
-			}
-			vpdo->actconfig = clone(cfgd, cfgd->wTotalLength);
-		}
 		break;
 	}
 }

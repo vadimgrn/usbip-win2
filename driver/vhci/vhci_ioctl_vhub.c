@@ -94,25 +94,25 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(pvhub_dev_t vhub, PVOID buffer,
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(pvhub_dev_t vhub, PIRP irp, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	PUSB_DESCRIPTOR_REQUEST	dsc_req = (PUSB_DESCRIPTOR_REQUEST)buffer;
-	pvpdo_dev_t	vpdo;
-	NTSTATUS	status;
+	USB_DESCRIPTOR_REQUEST *r = (USB_DESCRIPTOR_REQUEST*)buffer;
 
-	if (inlen < sizeof(USB_DESCRIPTOR_REQUEST)) {
-		*poutlen = sizeof(USB_DESCRIPTOR_REQUEST);
+	if (inlen < sizeof(*r)) {
+		*poutlen = sizeof(*r);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	vpdo = vhub_find_vpdo(vhub, dsc_req->ConnectionIndex);
-	if (vpdo == NULL)
+	vpdo_dev_t *vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex);
+	if (!vpdo) {
 		return STATUS_NO_SUCH_DEVICE;
+	}
 
-	status = vpdo_get_dsc_from_nodeconn(vpdo, irp, dsc_req, poutlen);
-	vdev_del_ref((pvdev_t)vpdo);
+	NTSTATUS status = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
+	vdev_del_ref((vdev_t*)vpdo);
+
 	return status;
 }
 
@@ -122,8 +122,10 @@ static PAGEABLE NTSTATUS get_hub_information_ex(pvhub_dev_t vhub, PVOID buffer, 
 
 	PUSB_HUB_INFORMATION_EX	pinfo = (PUSB_HUB_INFORMATION_EX)buffer;
 
-	if (*poutlen < sizeof(USB_HUB_INFORMATION_EX))
+	if (*poutlen < sizeof(USB_HUB_INFORMATION_EX)) {
 		return STATUS_BUFFER_TOO_SMALL;
+	}
+
 	return vhub_get_information_ex(vhub, pinfo);
 }
 
