@@ -144,7 +144,7 @@ struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_un
 void free_urbr(struct urb_req *urbr)
 {
 	NT_ASSERT(IsListEmpty(&urbr->list_all));
-	NT_ASSERT(IsListEmpty(&urbr->list_state));
+	NT_ASSERT(IsListEmpty(&urbr->list_state)); // FAIL
 
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }

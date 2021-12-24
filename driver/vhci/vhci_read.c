@@ -52,11 +52,11 @@ static const void *get_urb_buffer(void *buf, MDL *bufMDL)
 }
 
 /*
-* USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
-*/
-static PAGEABLE NTSTATUS do_copy_payload(void *dst_buf, const struct _URB_ISOCH_TRANSFER *r, ULONG *transferred)
+ * PAGED_CODE() fails.
+ * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
+ */
+static NTSTATUS do_copy_payload(void *dst_buf, const struct _URB_ISOCH_TRANSFER *r, ULONG *transferred)
 {
-	PAGED_CODE();
 	NT_ASSERT(dst_buf);
 
 	*transferred = 0;
@@ -100,10 +100,11 @@ static PAGEABLE NTSTATUS do_copy_payload(void *dst_buf, const struct _URB_ISOCH_
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE ULONG get_payload_size(const struct _URB_ISOCH_TRANSFER *r)
+/*
+ * PAGED_CODE() fails.
+ */
+static ULONG get_payload_size(const struct _URB_ISOCH_TRANSFER *r)
 {
-	PAGED_CODE();
-
 	ULONG len = r->NumberOfPackets*sizeof(struct usbip_iso_packet_descriptor);
 
 	if (is_endpoint_direction_out(r->PipeHandle)) {
@@ -131,10 +132,11 @@ static NTSTATUS do_copy_transfer_buffer(void *dst, const URB *urb, IRP *irp)
 	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static PAGEABLE NTSTATUS copy_payload(void *dst, IRP *irp, const struct _URB_ISOCH_TRANSFER *r, ULONG expected)
+/*
+* PAGED_CODE() fails.
+*/
+static NTSTATUS copy_payload(void *dst, IRP *irp, const struct _URB_ISOCH_TRANSFER *r, ULONG expected)
 {
-	PAGED_CODE();
-
 	ULONG transferred = 0;
 	NTSTATUS err = do_copy_payload(dst, r, &transferred);
 
@@ -147,8 +149,8 @@ static PAGEABLE NTSTATUS copy_payload(void *dst, IRP *irp, const struct _URB_ISO
 }
 
 /*
-* PAGED_CODE() fails.
-*/
+ * PAGED_CODE() fails.
+ */
 static NTSTATUS copy_transfer_buffer(IRP *irp, const URB *urb, vpdo_dev_t *vpdo)
 {
 	const struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with Transfer* members can be used
@@ -528,12 +530,11 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 }
 
 /*
+ * PAGED_CODE() fails.
  * USBD_START_ISO_TRANSFER_ASAP is appended because _URB_GET_CURRENT_FRAME_NUMBER is not implemented.
  */
-static PAGEABLE NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
+static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 {
-	PAGED_CODE();
-
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
 	USBD_PIPE_TYPE type = get_endpoint_type(r->PipeHandle);
 
@@ -891,7 +892,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 {
 	URB *urb = URB_FROM_IRP(urbr->irp);
 	if (!urb) {
-		TraceError(TRACE_READ, "null urb");
+		TraceVerbose(TRACE_READ, "Null URB");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
@@ -910,10 +911,13 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 {
 	PAGED_CODE();
 
-	TraceVerbose(TRACE_READ, "Transfer data");
-
 	URB *urb = URB_FROM_IRP(urbr->irp);
-	NT_ASSERT(urb);
+	if (!urb) {
+		TraceVerbose(TRACE_READ, "Null URB");
+		return STATUS_INVALID_DEVICE_REQUEST;
+	}
+
+	TraceVerbose(TRACE_READ, "Transfer data");
 
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
@@ -1094,8 +1098,8 @@ static NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 		RemoveEntryListInit(&urbr->list_all);
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		PIRP irp = urbr->irp;
-		free_urbr(urbr);
+		IRP *irp = urbr->irp;
+		free_urbr(urbr); // FAIL
 
 		if (irp) {
 			// urbr irp has cancel routine, if the IoSetCancelRoutine returns NULL that means IRP was cancelled
