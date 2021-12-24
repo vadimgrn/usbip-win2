@@ -64,7 +64,7 @@ static const struct command cmds[] = {
 	{
 		.name  = "attach",
 		.fn    = usbip_attach,
-		.help  = "Attach a remote USB device(WDM or ude)",
+		.help  = "Attach a remote USB device",
 		.usage = usbip_attach_usage
 	},
 	{

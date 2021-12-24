@@ -104,6 +104,7 @@ static PAGEABLE PWSTR copy_wstring(const USB_STRING_DESCRIPTOR *sd, USHORT Langu
 
 	if (str) {
 		NTSTATUS st = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
+		DBG_UNREFERENCED_LOCAL_VARIABLE(st);
 		NT_ASSERT(!st);
 
 		TraceInfo(TRACE_VPDO, "Serial '%S', LanguageId %#04hx", str, LanguageId);

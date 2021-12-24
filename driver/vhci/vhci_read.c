@@ -137,6 +137,8 @@ static NTSTATUS do_copy_transfer_buffer(void *dst, const URB *urb, IRP *irp)
 */
 static NTSTATUS copy_payload(void *dst, IRP *irp, const struct _URB_ISOCH_TRANSFER *r, ULONG expected)
 {
+	UNREFERENCED_PARAMETER(expected);
+
 	ULONG transferred = 0;
 	NTSTATUS err = do_copy_payload(dst, r, &transferred);
 
@@ -613,6 +615,8 @@ static PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, struct urb
 static PAGEABLE NTSTATUS urb_function_unexpected(IRP *irp, URB *urb, struct urb_req* urbr)
 {
 	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(irp);
 	UNREFERENCED_PARAMETER(urbr);
 
 	USHORT func = urb->UrbHeader.Function;
@@ -954,7 +958,9 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 static PAGEABLE void debug(IRP *irp)
 {
 	struct usbip_header *hdr = get_irp_buffer(irp);
+
 	size_t transferred = TRANSFERRED(irp);
+	DBG_UNREFERENCED_LOCAL_VARIABLE(transferred);
 
 	size_t pdu_sz = get_pdu_size(hdr);
 	NT_ASSERT(transferred == sizeof(*hdr) || (transferred > sizeof(*hdr) && transferred == pdu_sz));

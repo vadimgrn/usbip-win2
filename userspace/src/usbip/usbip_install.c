@@ -11,7 +11,6 @@
 typedef enum {
 	DRIVER_ROOT,
 	DRIVER_VHCI_WDM,
-	DRIVER_VHCI_UDE,
 } drv_type_t;
 
 typedef struct {
@@ -26,20 +25,17 @@ typedef struct {
 
 static drv_info_t	drv_infos[] = {
 	{ "root", "usbip_root.inf", "Standard.NTamd64", "usbip-win VHCI Root", "USBIPWIN\\root\0", "ROOT\\USBIP\\root", "System" },
-	{ "vhci(wdm)", "usbip_vhci.inf", "Standard.NTamd64", "usbip-win VHCI", "USBIPWIN\\vhci", NULL, NULL },
-	{ "vhci(ude)", "usbip_vhci_ude.inf", "Standard.NTamd64", "usbip-win VHCI(ude)", "root\\vhci_ude", "ROOT\\USB\\0000", "USB" }
+	{ "vhci", "usbip_vhci.inf", "Standard.NTamd64", "usbip-win VHCI", "USBIPWIN\\vhci", NULL, NULL },
 };
 
-static BOOL	only_wdm, only_ude, force;
+static BOOL force;
 
 void
 usbip_install_usage(void)
 {
 	printf(
 "usage: usbip install\n"
-"    install usbip VHCI drivers\n"
-"    -w, --wdm    install only wdm version\n"
-"    -u, --ude    install only ude version\n"
+"    install usbip VHCI driver\n"
 "    -f, --force  install forcefully\n"
 );
 }
@@ -49,9 +45,7 @@ usbip_uninstall_usage(void)
 {
 	printf(
 "usage: usbip uninstall\n"
-"    uninstall usbip VHCI drivers\n"
-"    -w, --wdm    uninstall only wdm version\n"
-"    -u, --ude    uninstall only ude version\n"
+"    uninstall usbip VHCI driver\n"
 "    -f, --force  uninstall forcefully\n"
 );
 }
@@ -358,8 +352,7 @@ install_device(drv_info_t *pinfo)
 	return 0;
 }
 
-static int
-install_vhci(int type)
+static int do_install_vhci(int type)
 {
 	drv_info_t	*pinfo = &drv_infos[type];
 	int	ret;
@@ -406,7 +399,7 @@ install_vhci(int type)
 }
 
 static BOOL
-check_files(const char *fnames[], BOOL verbose)
+do_check_files(const char *fnames[], BOOL verbose)
 {
 	int	i;
 
@@ -421,31 +414,20 @@ check_files(const char *fnames[], BOOL verbose)
 }
 
 static BOOL
-check_files_wdm(BOOL verbose)
+check_files(BOOL verbose)
 {
-	const char	*fnames[] = { "usbip_vhci.sys", "usbip_vhci.inf", "usbip_vhci.cat", "usbip_root.inf", NULL };
-
-	return check_files(fnames, verbose);
+	const char *fnames[] = { "usbip_vhci.sys", "usbip_vhci.inf", "usbip_vhci.cat", "usbip_root.inf", NULL };
+	return do_check_files(fnames, verbose);
 }
 
-static BOOL
-check_files_ude(BOOL verbose)
+static int install_vhci()
 {
-	const char	*fnames[] = { "usbip_vhci_ude.sys", "usbip_vhci_ude.inf", "usbip_vhci_ude.cat", NULL };
-
-	return check_files(fnames, verbose);
-}
-
-static int
-install_vhci_wdm(void)
-{
-	int	ret;
-
-	if (!check_files_wdm(TRUE)) {
-		err("cannot install vhci(wdm) driver");
+	if (!check_files(TRUE)) {
+		err("cannot install vhci driver");
 		return 2;
 	}
-	ret = install_driver_package(&drv_infos[DRIVER_VHCI_WDM]);
+
+	int ret = install_driver_package(&drv_infos[DRIVER_VHCI_WDM]);
 	if (ret < 0) {
 		switch (ret) {
 		case ERR_ACCESS:
@@ -457,43 +439,15 @@ install_vhci_wdm(void)
 		}
 		return 5;
 	}
-	ret = install_vhci(DRIVER_ROOT);
+	ret = do_install_vhci(DRIVER_ROOT);
 	if (ret != 0)
 		return ret;
 
-	info("vhci(wdm) driver installed successfully");
-	return 0;
+	info("vhci driver installed successfully");
+	return EXIT_SUCCESS;
 }
 
-static int
-install_vhci_ude(void)
-{
-	int	ret;
-
-	if (!check_files_ude(TRUE)) {
-		err("cannot install vhci(ude) driver");
-		return 2;
-	}
-	ret = install_vhci(DRIVER_VHCI_UDE);
-	if (ret == 0) {
-		info("vhci(ude) driver installed successfully");
-	}
-	return ret;
-}
-
-static int
-install_vhci_both(void)
-{
-	if (!check_files_ude(FALSE)) {
-		if (!check_files_wdm(TRUE))
-			err("cannot install vhci driver packages");
-		return install_vhci_wdm();
-	}
-	return install_vhci_ude();
-}
-
-static int
-uninstall_vhci(int type)
+static int do_uninstall_vhci(int type)
 {
 	drv_info_t	*pinfo = &drv_infos[type];
 
@@ -518,81 +472,36 @@ uninstall_vhci(int type)
 	return 0;
 }
 
-static int
-uninstall_vhci_wdm(void)
+static int uninstall_vhci()
 {
-	int	ret;
-
-	ret = uninstall_vhci(DRIVER_ROOT);
-	if (ret != 0)
+	int ret = do_uninstall_vhci(DRIVER_ROOT);
+	if (ret != 0) {
 		return ret;
+	}
+	
 	if (!uninstall_driver_package(&drv_infos[DRIVER_VHCI_WDM])) {
-		err("cannot uninstall vhci(wdm) driver package");
+		err("cannot uninstall vhci driver package");
 		return 5;
 	}
 
-	info("vhci(wdm) drivers uninstalled");
-	return 0;
+	info("vhci driver uninstalled");
+	return EXIT_SUCCESS;
 }
 
-static int
-uninstall_vhci_ude(void)
-{
-	int	ret;
-
-	ret = uninstall_vhci(DRIVER_VHCI_UDE);
-	if (ret == 0) {
-		info("vhci(ude) driver uninstalled");
-	}
-	return ret;
-}
-
-static int
-uninstall_vhci_both(void)
-{
-	int	ret;
-
-	if (!is_exist_driver_package(&drv_infos[DRIVER_VHCI_UDE])) {
-		if (!is_exist_driver_package(&drv_infos[DRIVER_VHCI_WDM])) {
-			if (force)
-				return 0;
-			err("no vhci driver found");
-			return 5;
-		}
-		return uninstall_vhci_wdm();
-	}
-	if (!is_exist_driver_package(&drv_infos[DRIVER_VHCI_WDM])) {
-		return uninstall_vhci_ude();
-	}
-	ret = uninstall_vhci_wdm();
-	if (ret != 0)
-		return ret;
-	return uninstall_vhci_ude();
-}
-
-static int
-parse_opts(int argc, char *argv[])
+static int parse_opts(int argc, char *argv[])
 {
 	static const struct option opts[] = {
-		{ "wdm", required_argument, NULL, 'w' },
-		{ "ude", required_argument, NULL, 'u' },
 		{ "force", required_argument, NULL, 'f' },
 		{ NULL, 0, NULL, 0 }
 	};
 
 	for (;;) {
-		int	opt = getopt_long(argc, argv, "wuf", opts, NULL);
-
-		if (opt == -1)
+		int opt = getopt_long(argc, argv, "f", opts, NULL);
+		if (opt == -1) {
 			break;
+		}
 
 		switch (opt) {
-		case 'w':
-			only_wdm = TRUE;
-			break;
-		case 'u':
-			only_ude = TRUE;
-			break;
 		case 'f':
 			force = TRUE;
 			break;
@@ -600,35 +509,26 @@ parse_opts(int argc, char *argv[])
 			return FALSE;
 		}
 	}
-	if (only_wdm && only_ude)
-		only_wdm = only_ude = FALSE;
+
 	return TRUE;
 }
 
-int
-usbip_install(int argc, char *argv[])
+int usbip_install(int argc, char *argv[])
 {
-	if (!parse_opts(argc, argv)) {
+	if (parse_opts(argc, argv)) {
+		return install_vhci();
+	} else {
 		usbip_install_usage();
-		return 1;
+		return EXIT_FAILURE;
 	}
-	if (only_wdm)
-		return install_vhci_wdm();
-	if (only_ude)
-		return install_vhci_ude();
-	return install_vhci_both();
 }
 
-int
-usbip_uninstall(int argc, char *argv[])
+int usbip_uninstall(int argc, char *argv[])
 {
-	if (!parse_opts(argc, argv)) {
+	if (parse_opts(argc, argv)) {
+		return uninstall_vhci();
+	} else {
 		usbip_uninstall_usage();
-		return 1;
+		return EXIT_FAILURE;
 	}
-	if (only_wdm)
-		return uninstall_vhci_wdm();
-	if (only_ude)
-		return uninstall_vhci_ude();
-	return uninstall_vhci_both();
 }
