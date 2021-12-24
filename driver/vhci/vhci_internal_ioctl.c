@@ -230,7 +230,7 @@ static NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_BULK_OR_INTERRUPT_TRANSFER *r = &urb->UrbBulkOrInterruptTransfer;
-	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : " ";
+	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
 
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
@@ -248,9 +248,7 @@ static NTSTATUS isoch_transfer(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	struct _URB_ISOCH_TRANSFER *r = &urb->UrbIsochronousTransfer;
-
-	const char *func = urb->UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? 
-				", using chained mdl" : "";
+	const char *func = urb->UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
 
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
@@ -288,7 +286,7 @@ static NTSTATUS usb_function_deprecated(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
-	TraceInfo(TRACE_IOCTL, "%s -> not supported", urb_function_str(urb->UrbHeader.Function));
+	TraceInfo(TRACE_IOCTL, "%s not supported", urb_function_str(urb->UrbHeader.Function));
 
 	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 	return STATUS_NOT_SUPPORTED;

@@ -218,9 +218,6 @@ static PAGEABLE NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	pkt->bRequest = USB_REQUEST_SET_FEATURE;
 	pkt->wValue.W = USB_PORT_FEAT_RESET;
 
-	char buf[USB_SETUP_PKT_STR_BUFBZ];
-	TraceInfo(TRACE_READ, "%s", usb_setup_pkt_str(buf, sizeof(buf), pkt));
-
 	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
@@ -1026,7 +1023,7 @@ static void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 {
 	UNREFERENCED_PARAMETER(devobj);
 
-	TraceInfo(TRACE_READ, "pending irp read cancelled %p", irp_read);
+	TraceInfo(TRACE_READ, "Pending irp read cancelled %p", irp_read);
 
 	IoReleaseCancelSpinLock(irp_read->CancelIrql);
 

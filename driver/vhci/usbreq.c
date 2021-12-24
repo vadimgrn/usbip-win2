@@ -206,7 +206,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 		
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		TraceInfo(TRACE_URB, "STATUS_PENDING");
+		TraceVerbose(TRACE_URB, "STATUS_PENDING");
 		return STATUS_PENDING;
 	}
 
@@ -215,7 +215,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 	IoReleaseCancelSpinLock(oldirql_cancel);
 
 	if (!valid_irp) {
-		TraceInfo(TRACE_URB, "Read irp was cancelled");
+		TraceVerbose(TRACE_URB, "Read irp was cancelled");
 		status = STATUS_INVALID_PARAMETER;
 		vpdo->pending_read_irp = NULL;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
