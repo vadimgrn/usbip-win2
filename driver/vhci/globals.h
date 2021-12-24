@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ntdef.h>
 
 typedef struct _GLOBALS
@@ -9,3 +13,7 @@ typedef struct _GLOBALS
 } GLOBALS;
 
 extern GLOBALS Globals;
+
+#ifdef __cplusplus
+}
+#endif

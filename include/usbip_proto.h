@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <basetsd.h>
 
 /*
@@ -143,3 +147,7 @@ struct usbip_header {
 static_assert(sizeof(struct usbip_header) == 48, "assert");
 
 #include <POPPACK.H>
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ntddk.h>
 #include <usbdi.h>
 
@@ -33,3 +37,7 @@ USB_ENDPOINT_DESCRIPTOR *dsc_find_intf_ep(USB_CONFIGURATION_DESCRIPTOR *dsc_conf
 
 ULONG dsc_get_infs_length(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_INTERFACE_DESCRIPTOR *dsc_intf);
 ULONG dsc_conf_get_n_intfs(USB_CONFIGURATION_DESCRIPTOR *dsc_conf);
+
+#ifdef __cplusplus
+}
+#endif

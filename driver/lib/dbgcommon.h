@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ntddk.h>
 #include <usb.h>
 
@@ -29,3 +33,7 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet);
 
 enum { USBD_TRANSFER_FLAGS_BUFBZ = 36 };
 const char *usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags);
+
+#ifdef __cplusplus
+}
+#endif

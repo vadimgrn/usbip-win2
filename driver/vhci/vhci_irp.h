@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "basetype.h"
 #include <wdm.h>
 
@@ -17,3 +21,7 @@ __inline NTSTATUS irp_done_iostatus(IRP *irp)
 {
 	return irp_done(irp, irp->IoStatus.Status);
 }
+
+#ifdef __cplusplus
+}
+#endif

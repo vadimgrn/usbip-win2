@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ntddk.h>
 #include <wmilib.h>	// required for WMILIB_CONTEXT
 
@@ -218,3 +222,7 @@ vhci_dev_t *devobj_to_vhci_or_null(DEVICE_OBJECT *devobj);
 hpdo_dev_t *devobj_to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *devobj_to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *devobj_to_vpdo_or_null(DEVICE_OBJECT *devobj);
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * USB directions
  *
@@ -34,3 +38,7 @@ enum {
 	USB_RECIP_PORT      = 0x04,
 	USB_RECIP_RPIPE     = 0x05
 };
+
+#ifdef __cplusplus
+}
+#endif

@@ -2,8 +2,11 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#ifndef _USBIP_COMMON_H
-#define _USBIP_COMMON_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -137,4 +140,6 @@ void usbip_names_free(void);
 void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t product);
 void usbip_names_get_class(char *buff, size_t size, uint8_t class, uint8_t subclass, uint8_t protocol);
 
+#ifdef __cplusplus
+}
 #endif

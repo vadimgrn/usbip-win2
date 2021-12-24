@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "basetype.h"
 #include "vhci_dev.h"
 #include "usbip_vhci_api.h"
@@ -20,3 +24,7 @@ PAGEABLE void vhub_mark_unplugged_all_vpdos(pvhub_dev_t vhub);
 
 PAGEABLE NTSTATUS vhub_get_ports_status(pvhub_dev_t vhub, ioctl_usbip_vhci_get_ports_status *st);
 PAGEABLE NTSTATUS vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imported_dev_t idevs, PULONG poutlen);
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ntdef.h> 
 #include <wdm.h>
 #include <usbdi.h>
@@ -67,3 +71,7 @@ __inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
 	UCHAR addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_OUT(addr);
 }
+
+#ifdef __cplusplus
+}
+#endif

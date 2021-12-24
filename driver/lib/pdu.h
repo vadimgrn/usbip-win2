@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "usbip_proto.h"
 
 #include <ntddk.h>
@@ -13,3 +17,7 @@ __inline size_t get_pdu_size(const struct usbip_header *hdr)
 {
 	return sizeof(*hdr) + get_pdu_payload_size(hdr);
 }
+
+#ifdef __cplusplus
+}
+#endif

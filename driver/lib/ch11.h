@@ -9,6 +9,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // #include <linux/types.h>	/* __u8 etc */
 
 /* This is arbitrary.
@@ -310,3 +314,7 @@ enum hub_led_mode {
 #define HUB_TTTT_16_BITS	0x20
 #define HUB_TTTT_24_BITS	0x40
 #define HUB_TTTT_32_BITS	0x60
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "usbip_proto.h"
 
 #include <stdbool.h>
@@ -60,3 +64,7 @@ __inline bool is_transfer_direction_out(const struct usbip_header *h)
 {
 	return h->base.direction == USBIP_DIR_OUT;
 }
+
+#ifdef __cplusplus
+}
+#endif

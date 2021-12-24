@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <guiddef.h>
 #ifdef _NTDDK_
 #include <ntddk.h>
@@ -30,3 +34,7 @@ typedef struct _ioctl_usbip_stub_devinfo
 } ioctl_usbip_stub_devinfo_t;
 
 #include <POPPACK.H>
+
+#ifdef __cplusplus
+}
+#endif

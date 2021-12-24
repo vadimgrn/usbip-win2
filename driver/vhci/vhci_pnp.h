@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "basetype.h"
 #include "vhci_dev.h"
 
@@ -27,3 +31,7 @@
 
 #define RESTORE_PREVIOUS_PNP_STATE(vdev)   \
         do { (vdev)->DevicePnPState = (vdev)->PreviousPnPState; } while (0)
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <guiddef.h>
 
 #ifdef _NTDDK_
@@ -95,3 +99,7 @@ typedef struct usbip_imported_device {
 	unsigned short product;
 	enum usb_device_speed speed; 
 } ioctl_usbip_vhci_imported_dev, *pioctl_usbip_vhci_imported_dev_t;
+
+#ifdef __cplusplus
+}
+#endif
