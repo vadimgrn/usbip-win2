@@ -35,7 +35,7 @@ enum {
  */
 USBD_STATUS to_windows_status(int usbip_status)
 {
-	switch (abs(usbip_status)) {
+	switch (usbip_status >= 0 ? usbip_status : -usbip_status) {
 	case 0:
 		return USBD_STATUS_SUCCESS;
 	case EPIPE_LNX:

@@ -5,6 +5,7 @@ extern "C" {
 #endif
 
 #include "usbip_proto.h"
+#include "ch9.h"
 
 #include <stdbool.h>
 
@@ -39,20 +40,18 @@ __inline bool IsTransferDirectionOut(ULONG TransferFlags)
 	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
 }
 
-__inline UCHAR get_transfer_dir(const struct _URB_CONTROL_TRANSFER *r)
-{
-	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)r->SetupPacket;
-	return pkt->bmRequestType.Dir;
-}
-
 __inline bool is_transfer_dir_in(const struct _URB_CONTROL_TRANSFER *r)
 {
-	return get_transfer_dir(r) == BMREQUEST_DEVICE_TO_HOST;
+	USB_DEFAULT_PIPE_SETUP_PACKET *pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)r->SetupPacket;
+
+	static_assert(USB_DIR_IN, "assert");
+	return pkt->bmRequestType.B & USB_DIR_IN; // C: bmRequestType.Dir, C++: bmRequestType.s.Dir
 }
 
 __inline bool is_transfer_dir_out(const struct _URB_CONTROL_TRANSFER *r)
 {
-	return get_transfer_dir(r) == BMREQUEST_HOST_TO_DEVICE;
+	static_assert(!USB_DIR_OUT, "assert");
+	return !is_transfer_dir_in(r);
 }
 
 __inline bool is_transfer_direction_in(const struct usbip_header *h)

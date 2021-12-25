@@ -9,11 +9,6 @@ extern "C" {
 
 struct usbip_header;
 
-__inline const char *bmrequest_dir_str(BM_REQUEST_TYPE r)
-{
-	return r.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
-}
-
 const char *bmrequest_type_str(BM_REQUEST_TYPE r);
 const char *bmrequest_recipient_str(BM_REQUEST_TYPE r);
 

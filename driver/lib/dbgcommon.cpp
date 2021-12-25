@@ -6,18 +6,23 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
+constexpr const char *bmrequest_dir_str(BM_REQUEST_TYPE r)
+{
+	return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
+}
+
 const char *bmrequest_type_str(BM_REQUEST_TYPE r)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
-	NT_ASSERT(r.Type < ARRAYSIZE(v));
-	return v[r.Type];
+	NT_ASSERT(r.s.Type < ARRAYSIZE(v));
+	return v[r.s.Type];
 }
 
 const char *bmrequest_recipient_str(BM_REQUEST_TYPE r)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
-	NT_ASSERT(r.Recipient < ARRAYSIZE(v));
-	return v[r.Recipient];
+	NT_ASSERT(r.s.Recipient < ARRAYSIZE(v));
+	return v[r.s.Recipient];
 }
 
 const char *brequest_str(UCHAR bRequest)
@@ -296,7 +301,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 
 const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 {
-	const USB_DEFAULT_PIPE_SETUP_PACKET *r = packet;
+	auto r  = static_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(packet);
 
 	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
 			"{%s|%s|%s, %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",

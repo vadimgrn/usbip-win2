@@ -15,7 +15,7 @@ LPWSTR libdrv_strdupW(LPCWSTR str)
 
 	size_t sz = ++len*sizeof(*str);
 
-	LPWSTR s = ExAllocatePoolWithTag(PagedPool, sz, libdrv_pooltag);
+	auto s = (LPWSTR)ExAllocatePoolWithTag(PagedPool, sz, libdrv_pooltag);
 	if (s) {
 		RtlCopyMemory(s, str, sz);
 	}

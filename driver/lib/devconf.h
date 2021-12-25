@@ -12,7 +12,7 @@ extern "C" {
 __inline USB_COMMON_DESCRIPTOR *dsc_next(USB_COMMON_DESCRIPTOR *d)
 {
 	void *end = d ? (char*)d + d->bLength : NULL;
-	return end;
+	return (USB_COMMON_DESCRIPTOR*)end;
 }
 
 USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_COMMON_DESCRIPTOR *from, int type);

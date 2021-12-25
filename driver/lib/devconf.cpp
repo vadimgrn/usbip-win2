@@ -1,5 +1,8 @@
 #include "devconf.h"
+
+extern "C" {
 #include <usbdlib.h>
+}
 
 USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_COMMON_DESCRIPTOR *from, int type)
 {
@@ -55,7 +58,7 @@ USB_ENDPOINT_DESCRIPTOR *dsc_find_intf_ep(
 static bool match_ep(int i, USB_ENDPOINT_DESCRIPTOR *a, void *data)
 {
 	UNREFERENCED_PARAMETER(i);
-	USB_ENDPOINT_DESCRIPTOR *b = data;
+	auto b = static_cast<USB_ENDPOINT_DESCRIPTOR*>(data);
 	return a->bLength == b->bLength && RtlCompareMemory(a, b, a->bLength) == a->bLength;
 }
 
