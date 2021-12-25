@@ -47,7 +47,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info(pvhub_dev_t vhub, PVOID buffer, ULONG
 		return STATUS_NO_SUCH_DEVICE;
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info(vpdo, conninfo, poutlen);
-	if (vpdo != NULL)
+	if (vpdo != nullptr)
 		vdev_del_ref((pvdev_t)vpdo);
 	return status;
 }
@@ -68,7 +68,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex(pvhub_dev_t vhub, PVOID buffer, UL
 		return STATUS_NO_SUCH_DEVICE;
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info_ex(vpdo, conninfo, poutlen);
-	if (vpdo != NULL)
+	if (vpdo != nullptr)
 		vdev_del_ref((pvdev_t)vpdo);
 	return status;
 }
@@ -89,7 +89,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(pvhub_dev_t vhub, PVOID buffer,
 		return STATUS_NO_SUCH_DEVICE;
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info_ex_v2(vpdo, conninfo, poutlen);
-	if (vpdo != NULL)
+	if (vpdo != nullptr)
 		vdev_del_ref((pvdev_t)vpdo);
 	return status;
 }
@@ -167,10 +167,10 @@ static PAGEABLE NTSTATUS get_node_driverkey_name(pvhub_dev_t vhub, PVOID buffer,
 		return STATUS_INVALID_PARAMETER;
 
 	vpdo = vhub_find_vpdo(vhub, pdrvkey_name->ConnectionIndex);
-	if (vpdo == NULL)
+	if (vpdo == nullptr)
 		return STATUS_NO_SUCH_DEVICE;
 	driverkey = get_device_prop(vpdo->common.Self, DevicePropertyDriverKeyName, &driverkeylen);
-	if (driverkey == NULL) {
+	if (driverkey == nullptr) {
 		TraceWarning(TRACE_IOCTL, "failed to get vpdo driver key");
 		status = STATUS_UNSUCCESSFUL;
 	}

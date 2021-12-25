@@ -1,18 +1,10 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <ntdef.h> 
 #include <wdm.h>
 #include <usbdi.h>
 
-#include <stdbool.h>
-
 #include "usbip_proto.h" 
-
-extern const USBD_PIPE_HANDLE EP0;
 
 NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed);
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);
@@ -28,50 +20,56 @@ const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT
 /*
  * @return bEndpointAddress of endpoint descriptor 
  */
-__inline UCHAR get_endpoint_address(USBD_PIPE_HANDLE handle)
+inline auto get_endpoint_address(USBD_PIPE_HANDLE handle)
 {
-	UCHAR *v = (UCHAR*)&handle;
+	auto v = reinterpret_cast<UCHAR*>(&handle);
 	return v[0];
 }
 
-__inline UCHAR get_endpoint_interval(USBD_PIPE_HANDLE handle)
+inline auto get_endpoint_interval(USBD_PIPE_HANDLE handle)
 {
-	UCHAR *v = (UCHAR*)&handle;
+	auto v = reinterpret_cast<UCHAR*>(&handle);
 	return v[1];
 }
 
-__inline USBD_PIPE_TYPE get_endpoint_type(USBD_PIPE_HANDLE handle)
+inline auto get_endpoint_type(USBD_PIPE_HANDLE handle)
 {
-	UCHAR *v = (UCHAR*)&handle;
-	return v[2];
+	auto v = reinterpret_cast<UCHAR*>(&handle);
+	return static_cast<USBD_PIPE_TYPE>(v[2]);
 }
 
-__inline UCHAR get_endpoint_number(USBD_PIPE_HANDLE handle)
+inline UCHAR get_endpoint_number(USBD_PIPE_HANDLE handle)
 {
-	UCHAR addr = get_endpoint_address(handle);
+	auto addr = get_endpoint_address(handle);
 	return addr & USB_ENDPOINT_ADDRESS_MASK;
 }
 
 /*
  * EP0 is bidirectional. 
  */
-__inline bool is_endpoint_direction_in(USBD_PIPE_HANDLE handle)
+inline bool is_endpoint_direction_in(USBD_PIPE_HANDLE handle)
 {
 	NT_ASSERT(handle);
-	UCHAR addr = get_endpoint_address(handle);
+	auto addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_IN(addr);
 }
 
 /*
 * EP0 is bidirectional. 
 */
-__inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
+inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
 {
 	NT_ASSERT(handle);
-	UCHAR addr = get_endpoint_address(handle);
+	auto addr = get_endpoint_address(handle);
 	return USB_ENDPOINT_DIRECTION_OUT(addr);
 }
 
-#ifdef __cplusplus
-}
-#endif
+const USBD_PIPE_HANDLE EP0 = 0; // make_pipe_handle(USB_DEFAULT_ENDPOINT_ADDRESS, UsbdPipeTypeControl, 0);
+/*
+static_assert(!EP0, "assert");
+static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");
+static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl, "assert");
+static_assert(!get_endpoint_number(EP0), "assert");
+static_assert(!get_endpoint_interval(EP0), "assert");
+*/
+

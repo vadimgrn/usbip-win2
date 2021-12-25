@@ -39,12 +39,12 @@ static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIO
 	PDEVICE_OBJECT	devobj_cpdo;
 	ULONG	size;
 
-	if (vdev->child_pdo == NULL || vdev->child_pdo->DevicePnPState == Deleted)
+	if (vdev->child_pdo == nullptr || vdev->child_pdo->DevicePnPState == Deleted)
 		child_exist = FALSE;
 
-	if (relations == NULL) {
+	if (relations == nullptr) {
 		relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
-		if (relations == NULL) {
+		if (relations == nullptr) {
 			TraceError(TRACE_PNP, "no relations will be reported: out of memory");
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
@@ -71,7 +71,7 @@ static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIO
 	// Need to allocate a new relations structure and add vhub to it
 	size = sizeof(DEVICE_RELATIONS) + relations->Count * sizeof(PDEVICE_OBJECT);
 	relations_new = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, size, USBIP_VHCI_POOL_TAG);
-	if (relations_new == NULL) {
+	if (relations_new == nullptr) {
 		TraceError(TRACE_VHUB, "old relations will be used: out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -97,7 +97,7 @@ find_managed_vpdo(pvhub_dev_t vhub, PDEVICE_OBJECT devobj)
 			return vpdo;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 static BOOLEAN
@@ -131,7 +131,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 	length = sizeof(DEVICE_RELATIONS) + (vhub->n_vpdos_plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
 
 	relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
-	if (relations == NULL) {
+	if (relations == nullptr) {
 		TraceError(TRACE_VHUB, "failed to allocate a new relation: out of memory");
 
 		ExReleaseFastMutex(&vhub->Mutex);
@@ -142,7 +142,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 		pvpdo_dev_t	vpdo;
 		PDEVICE_OBJECT	devobj = relations_old->Objects[i];
 		vpdo = find_managed_vpdo(vhub, devobj);
-		if (vpdo == NULL || vpdo->plugged) {
+		if (vpdo == nullptr || vpdo->plugged) {
 			relations->Objects[n_news] = devobj;
 			n_news++;
 		}
@@ -183,8 +183,8 @@ static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(pvdev_t vdev)
 	PDEVICE_RELATIONS	dev_relations;
 
 	dev_relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
-	if (dev_relations == NULL)
-		return NULL;
+	if (dev_relations == nullptr)
+		return nullptr;
 
 	// There is only one vpdo in the structure
 	// for this relation type. The PnP Manager removes
@@ -219,10 +219,10 @@ static PAGEABLE NTSTATUS get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pd
 	if (vdev->type != VDEV_VPDO)
 		return STATUS_NOT_SUPPORTED;
 
-	if (*pdev_relations != NULL) {
+	if (*pdev_relations) {
 		// Only vpdo can handle this request. Somebody above
 		// is not playing by rule.
-		ASSERTMSG("Someone above is handling TagerDeviceRelation", FALSE);
+		NT_ASSERT(!"Someone above is handling TagerDeviceRelation");
 	}
 	*pdev_relations = get_self_dev_relation(vdev);
 	return STATUS_SUCCESS;

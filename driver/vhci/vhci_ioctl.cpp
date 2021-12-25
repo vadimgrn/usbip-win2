@@ -7,9 +7,11 @@
 #include "vhci_ioctl_vhci.h"
 #include "vhci_ioctl_vhub.h"
 
-PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
+
+	auto buffer = irp->AssociatedIrp.SystemBuffer;
 
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
@@ -20,15 +22,13 @@ PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	TraceVerbose(TRACE_IOCTL, "%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
 			vdev->type, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
+	ULONG inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
+	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+
 	if (vdev->DevicePnPState == Deleted) {
 		status = STATUS_NO_SUCH_DEVICE;
 		goto END;
 	}
-
-	PVOID buffer = irp->AssociatedIrp.SystemBuffer;
-
-	ULONG inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
-	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
 	switch (vdev->type) {
 	case VDEV_VHCI:

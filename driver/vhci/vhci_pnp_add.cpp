@@ -3,6 +3,7 @@
 #include "vhci_pnp_add.tmh"
 
 #include "vhci.h"
+#include <ntstrsafe.h>
 
 enum { MAX_HUB_PORTS = 6 };
 
@@ -14,8 +15,8 @@ static PAGEABLE BOOLEAN is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
 	UNICODE_STRING	ustr_hwid_devprop, ustr_hwid;
 	BOOLEAN	res;
 
-	hwid = get_device_prop(devobj, DevicePropertyHardwareID, NULL);
-	if (hwid == NULL)
+	hwid = get_device_prop(devobj, DevicePropertyHardwareID, nullptr);
+	if (hwid == nullptr)
 		return FALSE;
 
 	RtlInitUnicodeString(&ustr_hwid_devprop, hwid);
@@ -45,7 +46,7 @@ static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t 
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 static PAGEABLE pvdev_t create_child_pdo(pvdev_t vdev, vdev_type_t type)
@@ -56,7 +57,7 @@ static PAGEABLE pvdev_t create_child_pdo(pvdev_t vdev, vdev_type_t type)
 
 	DEVICE_OBJECT *devobj = vdev_create(vdev->Self->DriverObject, type);
 	if (!devobj) {
-		return NULL;
+		return nullptr;
 	}
 
 	devobj->Flags &= ~DO_DEVICE_INITIALIZING;
@@ -79,8 +80,8 @@ static PAGEABLE void init_dev_vhci(pvdev_t vdev)
 	pvhci_dev_t	vhci = (pvhci_dev_t)vdev;
 
 	vdev->child_pdo = create_child_pdo(vdev, VDEV_HPDO);
-	RtlUnicodeStringInitEx(&vhci->DevIntfVhci, NULL, STRSAFE_IGNORE_NULLS);
-	RtlUnicodeStringInitEx(&vhci->DevIntfUSBHC, NULL, STRSAFE_IGNORE_NULLS);
+	RtlUnicodeStringInitEx(&vhci->DevIntfVhci, nullptr, STRSAFE_IGNORE_NULLS);
+	RtlUnicodeStringInitEx(&vhci->DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 }
 
 static PAGEABLE void init_dev_vhub(pvdev_t vdev)
@@ -125,7 +126,7 @@ static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 	// The return value of IoAttachDeviceToDeviceStack is the top of the
 	// attachment chain.  This is where all the IRPs should be routed.
 	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, pdo);
-	if (vdev->devobj_lower == NULL) {
+	if (vdev->devobj_lower == nullptr) {
 		TraceError(TRACE_PNP, "failed to attach device stack");
 		IoDeleteDevice(devobj);
 		return STATUS_NO_SUCH_DEVICE;
@@ -152,7 +153,7 @@ static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
+extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 {
 	PAGED_CODE();
 
@@ -162,7 +163,7 @@ PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 	}
 
 	root_dev_t *root = (root_dev_t*)get_vdev_from_driver(drvobj, VDEV_ROOT);
-	vhci_dev_t *vhci = NULL;
+	vhci_dev_t *vhci = nullptr;
 	vdev_type_t type;
 
 	if (root) {

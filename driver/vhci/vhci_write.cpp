@@ -58,7 +58,7 @@ static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offse
 
 #define TRANSFERRED(irp) ((irp)->IoStatus.Information)
 
-static __inline void *get_irp_buffer(const IRP *irp)
+static inline auto get_irp_buffer(const IRP *irp)
 {
 	return irp->AssociatedIrp.SystemBuffer;
 }
@@ -80,7 +80,7 @@ static PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
 
 	if (!bufMDL) {
 		TraceError(TRACE_WRITE, "TransferBuffer and TransferBufferMDL are NULL");
-		return NULL;
+		return nullptr;
 	}
 
 	buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority | MdlMappingNoExecute);
@@ -102,7 +102,7 @@ static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
 	NT_ASSERT(urb->UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	void *buf = get_urb_buffer(mdl ? NULL : r->TransferBuffer, r->TransferBufferMDL);
+	void *buf = get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL);
 
 	if (buf) {
 		RtlCopyMemory(buf, src, r->TransferBufferLength);
@@ -126,7 +126,7 @@ static PAGEABLE NTSTATUS assign(ULONG *TransferBufferLength, int actual_length)
 /*
  * MmGetSystemAddressForMdlSafe is the most probable source of the failure of copy_to_transfer_buffer.
  */
-static __inline NTSTATUS get_copy_status(const void *p)
+static constexpr auto get_copy_status(const void *p)
 {
 	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
@@ -191,7 +191,7 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 		return STATUS_SUCCESS; // USB_DIR_OUT
 	}
 
-	const USB_COMMON_DESCRIPTOR *dsc = NULL;
+	const USB_COMMON_DESCRIPTOR *dsc = nullptr;
 
 	if (r->TransferBufferLength < sizeof(*dsc)) {
 		TraceError(TRACE_WRITE, "usb descriptor's header expected: TransferBufferLength(%lu)", r->TransferBufferLength);
@@ -199,7 +199,7 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	dsc = copy_to_transfer_buffer(urb, hdr + 1);
+	dsc = (USB_COMMON_DESCRIPTOR*)copy_to_transfer_buffer(urb, hdr + 1);
 	if (!dsc) {
 		return get_copy_status(dsc);
 	}
@@ -346,12 +346,12 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 	const char *src_buf = (char*)(hdr + 1);
 	ULONG src_len = dir_in ? res->actual_length : 0;
 
-	const struct usbip_iso_packet_descriptor *src = (void*)(src_buf + src_len);
+	auto src = reinterpret_cast<const usbip_iso_packet_descriptor*>(src_buf + src_len);
 
-	void *ptr = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? NULL : r->TransferBuffer;
-	void *buf = get_urb_buffer(ptr, r->TransferBufferMDL);
+	void *ptr = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? nullptr : r->TransferBuffer;
+	auto buf = (char*)get_urb_buffer(ptr, r->TransferBufferMDL);
 	
-	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : NULL, src_len) : 
+	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : nullptr, src_len) : 
 		     get_copy_status(buf);
 }
 
@@ -416,7 +416,7 @@ static const urb_function_t urb_functions[] =
 	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
 	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
 
-	NULL, // URB_FUNCTION_RESERVED_0X0016          
+	nullptr, // URB_FUNCTION_RESERVED_0X0016          
 
 	urb_function_generic, // URB_FUNCTION_VENDOR_DEVICE
 	urb_function_generic, // URB_FUNCTION_VENDOR_INTERFACE
@@ -426,7 +426,7 @@ static const urb_function_t urb_functions[] =
 	urb_function_generic, // URB_FUNCTION_CLASS_INTERFACE
 	urb_function_generic, // URB_FUNCTION_CLASS_ENDPOINT
 
-	NULL, // URB_FUNCTION_RESERVE_0X001D
+	nullptr, // URB_FUNCTION_RESERVE_0X001D
 
 	urb_function_success, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL, urb_pipe_request
 
@@ -449,28 +449,28 @@ static const urb_function_t urb_functions[] =
 
 	urb_function_unexpected, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
 
-	NULL, // URB_FUNCTION_RESERVE_0X002B
-	NULL, // URB_FUNCTION_RESERVE_0X002C
-	NULL, // URB_FUNCTION_RESERVE_0X002D
-	NULL, // URB_FUNCTION_RESERVE_0X002E
-	NULL, // URB_FUNCTION_RESERVE_0X002F
+	nullptr, // URB_FUNCTION_RESERVE_0X002B
+	nullptr, // URB_FUNCTION_RESERVE_0X002C
+	nullptr, // URB_FUNCTION_RESERVE_0X002D
+	nullptr, // URB_FUNCTION_RESERVE_0X002E
+	nullptr, // URB_FUNCTION_RESERVE_0X002F
 
 	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
 	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
 	urb_function_generic, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
-	NULL, // URB_FUNCTION_RESERVE_0X0033
-	NULL, // URB_FUNCTION_RESERVE_0X0034                  
+	nullptr, // URB_FUNCTION_RESERVE_0X0033
+	nullptr, // URB_FUNCTION_RESERVE_0X0034                  
 
 	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
 	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
 	urb_function_generic, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
 	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
-	NULL, // 0x0039
-	NULL, // 0x003A        
-	NULL, // 0x003B        
-	NULL, // 0x003C        
+	nullptr, // 0x0039
+	nullptr, // 0x003A        
+	nullptr, // 0x003B        
+	nullptr, // 0x003C        
 
 	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
@@ -495,7 +495,7 @@ static PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 	}
 
 	USHORT func = urb->UrbHeader.Function;
-	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
+	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
 
 	NTSTATUS err = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
 
@@ -525,7 +525,7 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const str
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	USB_DESCRIPTOR_REQUEST *r = get_irp_buffer(irp);
+	auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 	
 	TraceVerbose(TRACE_WRITE, "ConnectionIndex %lu, Data[%!BIN!]", r->ConnectionIndex, WppBinary(r->Data, (USHORT)actual_length));
@@ -555,7 +555,7 @@ static PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_hea
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = usb_submit_urb(urbr->vpdo, URB_FROM_IRP(irp), hdr);
+		st = usb_submit_urb(urbr->vpdo, (URB*)URB_FROM_IRP(irp), hdr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		st = usb_reset_port(hdr);
@@ -580,12 +580,12 @@ static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 {
 	PAGED_CODE();
 
-	const struct usbip_header *hdr = get_irp_buffer(irp);
+	const auto hdr = (usbip_header*)get_irp_buffer(irp);
 	ULONG buf_sz = get_irp_buffer_size(irp);
 
 	if (buf_sz < sizeof(*hdr)) {
 		TraceError(TRACE_WRITE, "usbip header expected: write buffer %lu", buf_sz);
-		return NULL;
+		return nullptr;
 	}
 
 	size_t pdu_sz = get_pdu_size(hdr); 
@@ -601,7 +601,7 @@ static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 	}
 	
 	TraceError(TRACE_WRITE, "Write buffer %lu != pdu size %Iu", buf_sz, pdu_sz);
-	return NULL;
+	return nullptr;
 }
 
 /*
@@ -612,7 +612,7 @@ static void complete_irp(IRP *irp, NTSTATUS status)
 	KIRQL oldirql;
 
 	IoAcquireCancelSpinLock(&oldirql);
-	bool valid_irp = IoSetCancelRoutine(irp, NULL);
+	bool valid_irp = IoSetCancelRoutine(irp, nullptr);
 	IoReleaseCancelSpinLock(oldirql);
 
 	if (!valid_irp) {
@@ -671,7 +671,7 @@ static PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 /*
 * WriteFile -> IRP_MJ_WRITE -> vhci_write
 */
-PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
+extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
@@ -689,7 +689,7 @@ PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 	if (vhci->common.DevicePnPState != Deleted) {
 
 		IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-		vpdo_dev_t *vpdo = irpstack->FileObject->FsContext;
+		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
 		
 		if (vpdo && vpdo->plugged) {
 			status = do_write_irp(vpdo, irp);

@@ -6,34 +6,30 @@ static PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST get_query_empty_resource_requirem
 {
 	PAGED_CODE();
 
-	PIO_RESOURCE_REQUIREMENTS_LIST	reqs;
-
-	reqs = ExAllocatePoolWithTag(PagedPool, sizeof(IO_RESOURCE_REQUIREMENTS_LIST), USBIP_VHCI_POOL_TAG);
-	if (reqs == NULL) {
-		return NULL;
+	IO_RESOURCE_REQUIREMENTS_LIST *r = (IO_RESOURCE_REQUIREMENTS_LIST*)ExAllocatePoolWithTag(PagedPool, sizeof(*r), USBIP_VHCI_POOL_TAG);
+	if (r) {
+		r->ListSize = sizeof(*r);
+		r->BusNumber = 10;
+		r->SlotNumber = 1;
+		r->AlternativeLists = 0;
+		r->List[0].Version = 1;
+		r->List[0].Revision = 1;
+		r->List[0].Count = 0;
 	}
-	reqs->ListSize = sizeof(IO_RESOURCE_REQUIREMENTS_LIST);
-	reqs->BusNumber = 10;
-	reqs->SlotNumber = 1;
-	reqs->AlternativeLists = 0;
-	reqs->List[0].Version = 1;
-	reqs->List[0].Revision = 1;
-	reqs->List[0].Count = 0;
-	return reqs;
+
+	return r;
 }
 
 static PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
 {
 	PAGED_CODE();
 
-	PCM_RESOURCE_LIST	rscs;
-
-	rscs = ExAllocatePoolWithTag(PagedPool, sizeof(CM_RESOURCE_LIST), USBIP_VHCI_POOL_TAG);
-	if (rscs == NULL) {
-		return NULL;
+	CM_RESOURCE_LIST *r = (CM_RESOURCE_LIST*)ExAllocatePoolWithTag(PagedPool, sizeof(*r), USBIP_VHCI_POOL_TAG);
+	if (r) {
+		r->Count = 0;
 	}
-	rscs->Count = 0;
-	return rscs;
+
+	return r;
 }
 
 PAGEABLE NTSTATUS pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)

@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <ntddk.h>
 #include <usbdi.h>
 
@@ -37,7 +33,3 @@ struct urb_req *find_pending_urbr(pvpdo_dev_t vpdo);
 
 enum { URB_REQ_STR_BUFSZ = 64 };
 const char* urb_req_str(char* buf, size_t len, const struct urb_req *urbr);
-
-#ifdef __cplusplus
-}
-#endif

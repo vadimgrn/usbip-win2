@@ -85,7 +85,7 @@ static PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 
-	PNP_BUS_INFORMATION *bi = ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
+	PNP_BUS_INFORMATION *bi = (PNP_BUS_INFORMATION*)ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
 	if (bi) {
 		bi->BusTypeGuid = GUID_BUS_TYPE_USB;
 		bi->LegacyBusType = PNPBus;
@@ -223,7 +223,7 @@ static const pnpmn_func_t pnpmn_functions[] =
 	pnp_device_enumerated // IRP_MN_DEVICE_ENUMERATED, since WIN7
 };
 
-PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 

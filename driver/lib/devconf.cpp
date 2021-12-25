@@ -38,7 +38,7 @@ void *dsc_for_each_endpoint(
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 static bool match_epaddr(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
@@ -64,13 +64,13 @@ static bool match_ep(int i, USB_ENDPOINT_DESCRIPTOR *a, void *data)
 
 USB_INTERFACE_DESCRIPTOR *dsc_find_intf_by_ep(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_ENDPOINT_DESCRIPTOR *dsc_ep)
 {
-	for (USB_INTERFACE_DESCRIPTOR *cur = NULL; (cur = dsc_find_next_intf(dsc_conf, cur)) != NULL; ) {
+	for (USB_INTERFACE_DESCRIPTOR *cur = nullptr; (cur = dsc_find_next_intf(dsc_conf, cur)) != nullptr; ) {
 		if (dsc_for_each_endpoint(dsc_conf, cur, match_ep, dsc_ep)) {
 			return cur;
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 /*
@@ -80,7 +80,7 @@ USB_INTERFACE_DESCRIPTOR *dsc_find_intf_by_ep(USB_CONFIGURATION_DESCRIPTOR *dsc_
 ULONG dsc_conf_get_n_intfs(USB_CONFIGURATION_DESCRIPTOR *dsc_conf)
 {
 	ULONG n_intfs = 0;
-	for (USB_INTERFACE_DESCRIPTOR *cur = NULL; (cur = dsc_find_next_intf(dsc_conf, cur)) != NULL; ++n_intfs);
+	for (USB_INTERFACE_DESCRIPTOR *cur = nullptr; (cur = dsc_find_next_intf(dsc_conf, cur)) != nullptr; ++n_intfs);
 
 	NT_ASSERT(n_intfs >= dsc_conf->bNumInterfaces);
 	return n_intfs;

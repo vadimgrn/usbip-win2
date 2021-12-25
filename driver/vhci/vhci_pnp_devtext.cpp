@@ -4,6 +4,7 @@
 
 #include "vhci.h"
 #include "vhci_irp.h"
+#include "strutil.h"
 
 static LPCWSTR vdev_descs[] = {
 	L"usbip-win ROOT", L"usbip-win CPDO", L"usbip-win VHCI", L"usbip-win HPDO", L"usbip-win VHUB", L"usbip-win VPDO"

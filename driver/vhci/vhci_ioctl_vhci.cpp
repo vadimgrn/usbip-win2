@@ -11,6 +11,7 @@
 
 #include <usbdi.h>
 #include <usbuser.h>
+#include <ntstrsafe.h>
 
 static PAGEABLE NTSTATUS get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)
 {
@@ -21,7 +22,7 @@ static PAGEABLE NTSTATUS get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, 
 	LPWSTR	drvkey;
 
 	drvkey = get_device_prop(vhci->common.child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
-	if (drvkey == NULL) {
+	if (drvkey == nullptr) {
 		TraceWarning(TRACE_IOCTL, "failed to get vhci driver key");
 		return STATUS_UNSUCCESSFUL;
 	}

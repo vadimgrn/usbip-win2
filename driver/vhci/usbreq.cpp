@@ -7,6 +7,8 @@
 #include "vhci_read.h"
 #include "vhci_irp.h"
 
+#include <ntstrsafe.h>
+
 const char *urb_req_str(char *buf, size_t len, const struct urb_req *urbr)
 {
 	if (!urbr) {
@@ -21,7 +23,7 @@ const char *urb_req_str(char *buf, size_t len, const struct urb_req *urbr)
 
 struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 {
-	struct urb_req *result = NULL;
+	struct urb_req *result = nullptr;
 
 	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
@@ -43,7 +45,7 @@ struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 {
 	if (IsListEmpty(&vpdo->head_urbr_pending)) {
-		return NULL;
+		return nullptr;
 	}
 
 	struct urb_req *urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, struct urb_req, list_state);
@@ -56,7 +58,7 @@ struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 
 static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 {
-	struct urb_req *urbr_unlink = create_urbr(vpdo, NULL, seq_num_unlink);
+	struct urb_req *urbr_unlink = create_urbr(vpdo, nullptr, seq_num_unlink);
 	if (urbr_unlink) {
 		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
 		if (NT_ERROR(status)) {
@@ -76,7 +78,7 @@ static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 	RemoveEntryListInit(&urbr->list_state);
 	RemoveEntryListInit(&urbr->list_all);
 	if (vpdo->urbr_sent_partial == urbr) {
-		vpdo->urbr_sent_partial = NULL;
+		vpdo->urbr_sent_partial = nullptr;
 		vpdo->len_sent_partial = 0;
 	}
 
@@ -117,10 +119,10 @@ static void cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 
 struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_unlink)
 {
-	struct urb_req *urbr = ExAllocateFromNPagedLookasideList(&g_lookaside);
+	auto urbr = (urb_req*)ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
 		TraceError(TRACE_URB, "out of memory");
-		return NULL;
+		return nullptr;
 	}
 
 	RtlZeroMemory(urbr, sizeof(*urbr));
@@ -155,7 +157,7 @@ bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle)
 		return false;
 	}
 
-	URB *urb = URB_FROM_IRP(irp);
+	auto urb = (URB*)URB_FROM_IRP(irp);
 	if (!urb) {
 		return false;
 	}
@@ -164,10 +166,10 @@ bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle)
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_CONTROL_TRANSFER:
-		hPipe = urb->UrbControlTransfer.PipeHandle; // NULL if (TransferFlags & USBD_DEFAULT_PIPE_TRANSFER)
+		hPipe = urb->UrbControlTransfer.PipeHandle; // nullptr if (TransferFlags & USBD_DEFAULT_PIPE_TRANSFER)
 		break;
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		hPipe = urb->UrbControlTransferEx.PipeHandle; // NULL if (TransferFlags & USBD_DEFAULT_PIPE_TRANSFER)
+		hPipe = urb->UrbControlTransferEx.PipeHandle; // nullptr if (TransferFlags & USBD_DEFAULT_PIPE_TRANSFER)
 		break;
 	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
 		hPipe = urb->UrbBulkOrInterruptTransfer.PipeHandle;
@@ -211,13 +213,13 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 	}
 
 	IoAcquireCancelSpinLock(&oldirql_cancel);
-	bool valid_irp = IoSetCancelRoutine(vpdo->pending_read_irp, NULL);
+	bool valid_irp = IoSetCancelRoutine(vpdo->pending_read_irp, nullptr);
 	IoReleaseCancelSpinLock(oldirql_cancel);
 
 	if (!valid_irp) {
 		TraceVerbose(TRACE_URB, "Read irp was cancelled");
 		status = STATUS_INVALID_PARAMETER;
-		vpdo->pending_read_irp = NULL;
+		vpdo->pending_read_irp = nullptr;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 		return status;
 	}
@@ -242,19 +244,19 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 		}
 
 		if (!vpdo->len_sent_partial) {
-			vpdo->urbr_sent_partial = NULL;
+			vpdo->urbr_sent_partial = nullptr;
 			InsertTailList(&vpdo->head_urbr_sent, &urbr->list_state);
 		}
 
 		InsertTailList(&vpdo->head_urbr, &urbr->list_all);
 
-		vpdo->pending_read_irp = NULL;
+		vpdo->pending_read_irp = nullptr;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
 		irp_done_success(read_irp);
 		status = STATUS_PENDING;
 	} else {
-		vpdo->urbr_sent_partial = NULL;
+		vpdo->urbr_sent_partial = nullptr;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
 		status = STATUS_INVALID_PARAMETER;

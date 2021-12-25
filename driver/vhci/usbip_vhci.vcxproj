@@ -11,35 +11,35 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="vhci.c" />
-    <ClCompile Include="vhci_dev.c" />
-    <ClCompile Include="vhci_devconf.c" />
-    <ClCompile Include="vhci_internal_ioctl.c" />
-    <ClCompile Include="vhci_ioctl.c" />
-    <ClCompile Include="vhci_ioctl_usrreq.c" />
-    <ClCompile Include="vhci_ioctl_vhci.c" />
-    <ClCompile Include="vhci_ioctl_vhub.c" />
-    <ClCompile Include="vhci_irp.c" />
-    <ClCompile Include="vhci_pnp_add.c" />
-    <ClCompile Include="vhci_pnp_cap.c" />
-    <ClCompile Include="vhci_pnp_devtext.c" />
-    <ClCompile Include="vhci_pnp_id.c" />
-    <ClCompile Include="vhci_pnp_intf.c" />
-    <ClCompile Include="vhci_pnp_relations.c" />
-    <ClCompile Include="vhci_pnp_remove.c" />
-    <ClCompile Include="vhci_pnp_resources.c" />
-    <ClCompile Include="vhci_pnp_start.c" />
-    <ClCompile Include="vhci_vhub.c" />
-    <ClCompile Include="vhci_vpdo.c" />
-    <ClCompile Include="vhci_read.c" />
-    <ClCompile Include="vhci_vpdo_dsc.c" />
-    <ClCompile Include="vhci_write.c" />
-    <ClCompile Include="vhci_plugin.c" />
-    <ClCompile Include="vhci_pnp.c" />
-    <ClCompile Include="vhci_power.c" />
-    <ClCompile Include="vhci_proto.c" />
-    <ClCompile Include="usbreq.c" />
-    <ClCompile Include="vhci_wmi.c" />
+    <ClCompile Include="vhci.cpp" />
+    <ClCompile Include="vhci_dev.cpp" />
+    <ClCompile Include="vhci_devconf.cpp" />
+    <ClCompile Include="vhci_internal_ioctl.cpp" />
+    <ClCompile Include="vhci_ioctl.cpp" />
+    <ClCompile Include="vhci_ioctl_usrreq.cpp" />
+    <ClCompile Include="vhci_ioctl_vhci.cpp" />
+    <ClCompile Include="vhci_ioctl_vhub.cpp" />
+    <ClCompile Include="vhci_irp.cpp" />
+    <ClCompile Include="vhci_pnp_add.cpp" />
+    <ClCompile Include="vhci_pnp_cap.cpp" />
+    <ClCompile Include="vhci_pnp_devtext.cpp" />
+    <ClCompile Include="vhci_pnp_id.cpp" />
+    <ClCompile Include="vhci_pnp_intf.cpp" />
+    <ClCompile Include="vhci_pnp_relations.cpp" />
+    <ClCompile Include="vhci_pnp_remove.cpp" />
+    <ClCompile Include="vhci_pnp_resources.cpp" />
+    <ClCompile Include="vhci_pnp_start.cpp" />
+    <ClCompile Include="vhci_vhub.cpp" />
+    <ClCompile Include="vhci_vpdo.cpp" />
+    <ClCompile Include="vhci_read.cpp" />
+    <ClCompile Include="vhci_vpdo_dsc.cpp" />
+    <ClCompile Include="vhci_write.cpp" />
+    <ClCompile Include="vhci_plugin.cpp" />
+    <ClCompile Include="vhci_pnp.cpp" />
+    <ClCompile Include="vhci_power.cpp" />
+    <ClCompile Include="vhci_proto.cpp" />
+    <ClCompile Include="usbreq.cpp" />
+    <ClCompile Include="vhci_wmi.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip_vhci_api.h" />
@@ -49,7 +49,6 @@
     <ClInclude Include="vhci_dev.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="vhci_devconf.h" />
-    <ClInclude Include="vhci_internal_ioctl.h" />
     <ClInclude Include="vhci_ioctl_usrreq.h" />
     <ClInclude Include="vhci_ioctl_vhci.h" />
     <ClInclude Include="vhci_ioctl_vhub.h" />
@@ -141,11 +140,12 @@
       <Inf2CatAdditionalOptions>/driver:aaaa\temp\</Inf2CatAdditionalOptions>
       <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/kernel %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;$(DDK_LIB_PATH)usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Inf>
       <TimeStamp>0.3.5.0</TimeStamp>
@@ -169,11 +169,12 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/kernel %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;$(DDK_LIB_PATH)usbd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <Inf>
       <TimeStamp>0.3.5.0</TimeStamp>

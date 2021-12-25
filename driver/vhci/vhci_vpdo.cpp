@@ -12,7 +12,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 
 	if (vpdo->actconfig) {
 		ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
-		vpdo->actconfig = NULL;
+		vpdo->actconfig = nullptr;
 	}
 
 	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor;
@@ -21,7 +21,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 		return STATUS_SUCCESS;
 	}
 
-	vpdo->actconfig = ExAllocatePoolWithTag(NonPagedPool, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
+	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(NonPagedPool, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
 
 	if (vpdo->actconfig) {
 		RtlCopyMemory(vpdo->actconfig, cd, cd->wTotalLength);
@@ -88,7 +88,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTION_
 	conninfo->NumberOfOpenPipes = 0;
 	conninfo->DeviceIsHub = FALSE;
 
-	if (vpdo == NULL) {
+	if (vpdo == nullptr) {
 		conninfo->ConnectionStatus = NoDeviceConnected;
 		conninfo->LowSpeed = FALSE;
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
@@ -156,9 +156,9 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(pvpdo_dev_t vpdo, PUSB_NODE_CONNECTI
 			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;
 		}
 
-		conninfo->Speed = vpdo->speed;
+		conninfo->Speed = static_cast<UCHAR>(vpdo->speed);
 
-		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt);
+		auto dsc_intf = dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt);
 		if (dsc_intf) {
 			conninfo->NumberOfOpenPipes = dsc_intf->bNumEndpoints;
 		}

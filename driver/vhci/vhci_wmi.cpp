@@ -9,28 +9,160 @@
 
 #include <wmistr.h>
 
-static WMI_SET_DATAITEM_CALLBACK	vhci_SetWmiDataItem;
-static WMI_SET_DATABLOCK_CALLBACK	vhci_SetWmiDataBlock;
-static WMI_QUERY_DATABLOCK_CALLBACK	vhci_QueryWmiDataBlock;
-static WMI_QUERY_REGINFO_CALLBACK	vhci_QueryWmiRegInfo;
+namespace
+{
 
-#ifdef ALLOC_PRAGMA
-#pragma alloc_text(PAGE, vhci_SetWmiDataItem)
-#pragma alloc_text(PAGE, vhci_SetWmiDataBlock)
-#pragma alloc_text(PAGE, vhci_QueryWmiDataBlock)
-#pragma alloc_text(PAGE, vhci_QueryWmiRegInfo)
-#endif
+const wchar_t MOFRESOURCENAME[] = L"USBIPVhciWMI";
+enum { WMI_USBIP_BUS_DRIVER_INFORMATION };
 
-#define MOFRESOURCENAME L"USBIPVhciWMI"
-
-#define WMI_USBIP_BUS_DRIVER_INFORMATION  0
-
-static WMIGUIDREGINFO USBIPBusWmiGuidList[] = {
+WMIGUIDREGINFO USBIPBusWmiGuidList[] = 
+{
 	{ &USBIP_BUS_WMI_STD_DATA_GUID, 1, 0 } // driver information
 };
 
-PAGEABLE NTSTATUS
-vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+} // namespace
+
+
+extern "C" {
+
+WMI_QUERY_REGINFO_CALLBACK vhci_QueryWmiRegInfo;
+WMI_QUERY_DATABLOCK_CALLBACK vhci_QueryWmiDataBlock;
+WMI_SET_DATABLOCK_CALLBACK vhci_SetWmiDataBlock;
+WMI_SET_DATAITEM_CALLBACK vhci_SetWmiDataItem;
+
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(PAGE, vhci_QueryWmiRegInfo)
+#pragma alloc_text(PAGE, vhci_QueryWmiDataBlock)
+#pragma alloc_text(PAGE, vhci_SetWmiDataBlock)
+#pragma alloc_text(PAGE, vhci_SetWmiDataItem)
+#endif
+
+NTSTATUS vhci_SetWmiDataItem(
+	__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
+	__in ULONG InstanceIndex, __in ULONG DataItemId, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR Buffer)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(InstanceIndex);
+	UNREFERENCED_PARAMETER(Buffer);
+
+	ULONG		requiredSize = 0;
+	NTSTATUS	status;
+
+	switch (GuidIndex) {
+	case WMI_USBIP_BUS_DRIVER_INFORMATION:
+		if (DataItemId == 2) {
+			requiredSize = sizeof(ULONG);
+
+			if (BufferSize < requiredSize) {
+				status = STATUS_BUFFER_TOO_SMALL;
+				break;
+			}
+			status = STATUS_SUCCESS;
+		}
+		else {
+			status = STATUS_WMI_READ_ONLY;
+		}
+		break;
+	default:
+		status = STATUS_WMI_GUID_NOT_FOUND;
+	}
+
+	status = WmiCompleteRequest(devobj, irp, status, requiredSize, IO_NO_INCREMENT);
+
+	return status;
+}
+
+NTSTATUS vhci_SetWmiDataBlock(
+	__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
+	__in ULONG InstanceIndex, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR Buffer)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(InstanceIndex);
+	UNREFERENCED_PARAMETER(Buffer);
+
+	ULONG		requiredSize = 0;
+	NTSTATUS	status;
+
+	switch(GuidIndex) {
+	case WMI_USBIP_BUS_DRIVER_INFORMATION:
+		requiredSize = sizeof(USBIP_BUS_WMI_STD_DATA);
+
+		if (BufferSize < requiredSize) {
+			status = STATUS_BUFFER_TOO_SMALL;
+			break;
+		}
+
+		status = STATUS_SUCCESS;
+		break;
+	default:
+		status = STATUS_WMI_GUID_NOT_FOUND;
+		break;
+	}
+
+	status = WmiCompleteRequest(devobj, irp, status, requiredSize, IO_NO_INCREMENT);
+
+	return(status);
+}
+
+NTSTATUS vhci_QueryWmiDataBlock(
+	__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
+	__in ULONG InstanceIndex, __in ULONG InstanceCount, __inout PULONG InstanceLengthArray,
+	__in ULONG OutBufferSize, __out_bcount(OutBufferSize) PUCHAR Buffer)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(InstanceIndex);
+	UNREFERENCED_PARAMETER(InstanceCount);
+
+	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
+	ULONG		size = 0;
+	NTSTATUS	status;
+
+	// Only ever registers 1 instance per guid
+	NT_ASSERT(!InstanceIndex && InstanceCount == 1);
+
+	switch (GuidIndex) {
+	case WMI_USBIP_BUS_DRIVER_INFORMATION:
+		size = sizeof (USBIP_BUS_WMI_STD_DATA);
+		if (OutBufferSize < size) {
+			status = STATUS_BUFFER_TOO_SMALL;
+			break;
+		}
+
+		*(PUSBIP_BUS_WMI_STD_DATA)Buffer = vhci->StdUSBIPBusData;
+		*InstanceLengthArray = size;
+		status = STATUS_SUCCESS;
+		break;
+	default:
+		status = STATUS_WMI_GUID_NOT_FOUND;
+	}
+
+	status = WmiCompleteRequest(devobj, irp, status, size, IO_NO_INCREMENT);
+	return status;
+}
+
+NTSTATUS vhci_QueryWmiRegInfo(
+	__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PUNICODE_STRING InstanceName,
+	__out PUNICODE_STRING *RegistryPath, __out PUNICODE_STRING MofResourceName, __out PDEVICE_OBJECT *Pdo)
+{
+	PAGED_CODE();
+	UNREFERENCED_PARAMETER(InstanceName);
+
+	vdev_t *vdev = devobj_to_vdev(devobj);
+
+	*RegFlags = WMIREG_FLAG_INSTANCE_PDO;
+	*RegistryPath = &Globals.RegistryPath;
+	*Pdo = vdev->pdo;
+	RtlInitUnicodeString(MofResourceName, MOFRESOURCENAME);
+
+	return STATUS_SUCCESS;
+}
+
+} // extern "C"
+
+extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
@@ -81,131 +213,6 @@ vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	return status;
 }
 
-// WMI System Call back functions
-static NTSTATUS
-vhci_SetWmiDataItem(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
-	__in ULONG InstanceIndex, __in ULONG DataItemId, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR Buffer)
-{
-	ULONG		requiredSize = 0;
-	NTSTATUS	status;
-
-	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(InstanceIndex);
-	UNREFERENCED_PARAMETER(Buffer);
-
-	switch (GuidIndex) {
-	case WMI_USBIP_BUS_DRIVER_INFORMATION:
-		if (DataItemId == 2) {
-			requiredSize = sizeof(ULONG);
-
-			if (BufferSize < requiredSize) {
-				status = STATUS_BUFFER_TOO_SMALL;
-				break;
-			}
-			status = STATUS_SUCCESS;
-		}
-		else {
-			status = STATUS_WMI_READ_ONLY;
-		}
-		break;
-	default:
-		status = STATUS_WMI_GUID_NOT_FOUND;
-	}
-
-	status = WmiCompleteRequest(devobj, irp, status, requiredSize, IO_NO_INCREMENT);
-
-	return status;
-}
-
-static NTSTATUS
-vhci_SetWmiDataBlock(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
-	__in ULONG InstanceIndex, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR Buffer)
-{
-	ULONG		requiredSize = 0;
-	NTSTATUS	status;
-
-	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(InstanceIndex);
-	UNREFERENCED_PARAMETER(Buffer);
-
-	switch(GuidIndex) {
-	case WMI_USBIP_BUS_DRIVER_INFORMATION:
-		requiredSize = sizeof(USBIP_BUS_WMI_STD_DATA);
-
-		if (BufferSize < requiredSize) {
-			status = STATUS_BUFFER_TOO_SMALL;
-			break;
-		}
-
-		status = STATUS_SUCCESS;
-		break;
-	default:
-		status = STATUS_WMI_GUID_NOT_FOUND;
-		break;
-	}
-
-	status = WmiCompleteRequest(devobj, irp, status, requiredSize, IO_NO_INCREMENT);
-
-	return(status);
-}
-
-static NTSTATUS
-vhci_QueryWmiDataBlock(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
-	__in ULONG InstanceIndex, __in ULONG InstanceCount, __inout PULONG InstanceLengthArray,
-	__in ULONG OutBufferSize, __out_bcount(OutBufferSize) PUCHAR Buffer)
-{
-	UNREFERENCED_PARAMETER(InstanceIndex);
-	UNREFERENCED_PARAMETER(InstanceCount);
-
-	PAGED_CODE();
-
-	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
-	ULONG		size = 0;
-	NTSTATUS	status;
-
-	// Only ever registers 1 instance per guid
-	NT_ASSERT(!InstanceIndex && InstanceCount == 1);
-
-	switch (GuidIndex) {
-	case WMI_USBIP_BUS_DRIVER_INFORMATION:
-		size = sizeof (USBIP_BUS_WMI_STD_DATA);
-		if (OutBufferSize < size) {
-			status = STATUS_BUFFER_TOO_SMALL;
-			break;
-		}
-
-		*(PUSBIP_BUS_WMI_STD_DATA)Buffer = vhci->StdUSBIPBusData;
-		*InstanceLengthArray = size;
-		status = STATUS_SUCCESS;
-		break;
-	default:
-		status = STATUS_WMI_GUID_NOT_FOUND;
-	}
-
-	status = WmiCompleteRequest(devobj, irp, status, size, IO_NO_INCREMENT);
-	return status;
-}
-
-static NTSTATUS
-vhci_QueryWmiRegInfo(__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PUNICODE_STRING InstanceName,
-	__out PUNICODE_STRING *RegistryPath, __out PUNICODE_STRING MofResourceName, __out PDEVICE_OBJECT *Pdo)
-{
-	UNREFERENCED_PARAMETER(InstanceName);
-
-	PAGED_CODE();
-
-	vdev_t *vdev = devobj_to_vdev(devobj);
-
-	*RegFlags = WMIREG_FLAG_INSTANCE_PDO;
-	*RegistryPath = &Globals.RegistryPath;
-	*Pdo = vdev->pdo;
-	RtlInitUnicodeString(MofResourceName, MOFRESOURCENAME);
-
-	return STATUS_SUCCESS;
-}
-
 PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
@@ -216,8 +223,8 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	vhci->WmiLibInfo.QueryWmiDataBlock = vhci_QueryWmiDataBlock;
 	vhci->WmiLibInfo.SetWmiDataBlock = vhci_SetWmiDataBlock;
 	vhci->WmiLibInfo.SetWmiDataItem = vhci_SetWmiDataItem;
-	vhci->WmiLibInfo.ExecuteWmiMethod = NULL;
-	vhci->WmiLibInfo.WmiFunctionControl = NULL;
+	vhci->WmiLibInfo.ExecuteWmiMethod = nullptr;
+	vhci->WmiLibInfo.WmiFunctionControl = nullptr;
 
 	// Register with WMI
 	NTSTATUS status = IoWMIRegistrationControl(TO_DEVOBJ(vhci), WMIREG_ACTION_REGISTER);

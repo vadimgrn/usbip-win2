@@ -44,7 +44,7 @@ PAGEABLE NTSTATUS irp_send_synchronously(PDEVICE_OBJECT devobj, PIRP irp)
 	// KernelMode wait instead of UserMode to prevent
 	// the stack from getting paged out.
 	if (status == STATUS_PENDING) {
-		KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, NULL);
+		KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, nullptr);
 		status = irp->IoStatus.Status;
 	}
 

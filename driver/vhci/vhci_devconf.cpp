@@ -7,52 +7,49 @@
 #include "devconf.h"
 #include "dbgcommon.h"
 
-static __inline USBD_INTERFACE_INFORMATION *next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end)
+#include <ntstrsafe.h>
+
+namespace
 {
-	void *next = (char*)iface + iface->Length;
+
+auto next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end)
+{
+	const void *next = (char*)iface + iface->Length;
 	if (!cfg_end) {
-		return next;
+		return (USBD_INTERFACE_INFORMATION*)next;
 	}
 
 	NT_ASSERT((void*)iface < cfg_end);
-	return next < cfg_end ? next : NULL;
+	return (USBD_INTERFACE_INFORMATION*)(next < cfg_end ? next : nullptr);
 }
 
-static __inline const void *get_configuration_end(const struct _URB_SELECT_CONFIGURATION *cfg)
+} // namespace
+
+static inline const void *get_configuration_end(const struct _URB_SELECT_CONFIGURATION *cfg)
 {
 	return (char*)cfg + cfg->Hdr.Length;
 }
 
-static __inline USBD_PIPE_HANDLE make_pipe_handle(
-	UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
+static inline auto make_pipe_handle(UCHAR EndpointAddress, USBD_PIPE_TYPE PipeType, UCHAR Interval)
 {
-	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = {EndpointAddress, Interval, PipeType};
+	UCHAR v[sizeof(USBD_PIPE_HANDLE)] = { EndpointAddress, Interval, static_cast<UCHAR>(PipeType) };
 	NT_ASSERT(*(USBD_PIPE_HANDLE*)v);
 	return *(USBD_PIPE_HANDLE*)v;
 }
 
-const USBD_PIPE_HANDLE EP0 = 0; // make_pipe_handle(USB_DEFAULT_ENDPOINT_ADDRESS, UsbdPipeTypeControl, 0);
-/*
-static_assert(!EP0, "assert");
-static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");
-static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl, "assert");
-static_assert(!get_endpoint_number(EP0), "assert");
-static_assert(!get_endpoint_interval(EP0), "assert");
-*/
-
-static __inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
+static inline USBD_INTERFACE_HANDLE make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 {
 	UCHAR v[sizeof(USBD_INTERFACE_HANDLE)] = { altsetting, ifnum, 1 }; // must be != 0
 	return *(USBD_INTERFACE_HANDLE*)v; 
 }
 
-static __inline UCHAR get_interface_altsettings(USBD_INTERFACE_HANDLE handle)
+static inline UCHAR get_interface_altsettings(USBD_INTERFACE_HANDLE handle)
 {
 	UCHAR *v = (UCHAR*)&handle;
 	return v[0]; 
 }
 
-static __inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
+static inline UCHAR get_interface_number(USBD_INTERFACE_HANDLE handle)
 {
 	UCHAR *v = (UCHAR*)&handle;
 	return v[1]; 
@@ -71,7 +68,7 @@ static void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_de
 	
 	pipe->EndpointAddress = ep_desc->bEndpointAddress;
 	pipe->Interval = ep_desc->bInterval;
-	pipe->PipeType = ep_desc->bmAttributes & USB_ENDPOINT_TYPE_MASK;
+	pipe->PipeType = static_cast<USBD_PIPE_TYPE>(ep_desc->bmAttributes & USB_ENDPOINT_TYPE_MASK);
 	
 	pipe->PipeHandle = make_pipe_handle(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
 	NT_ASSERT(pipe->PipeHandle);
@@ -89,7 +86,7 @@ struct init_ep_data
 
 static bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 {
-	struct init_ep_data *params = data;
+	auto params = static_cast<init_ep_data*>(data);
 	USBD_PIPE_INFORMATION *pi = params->pi + i;
 
 	set_pipe(pi, d, params->speed);
@@ -233,7 +230,7 @@ const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT
 						"ConfigurationHandle %#Ix", (uintptr_t)iface->ConfigurationHandle);
 
 	if (st == STATUS_SUCCESS) {
-		interfaces_str(buf, len, &iface->Interface, 1, NULL);
+		interfaces_str(buf, len, &iface->Interface, 1, nullptr);
 	}
 
 	return result && *result ? result : "select_interface_str error";

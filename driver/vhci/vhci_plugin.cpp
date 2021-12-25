@@ -72,7 +72,7 @@ static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIP
 	}
 
 	if (vpdo->inum == 1) {
-		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_next_intf(dsc_conf, NULL);
+		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_next_intf(dsc_conf, nullptr);
 		if (dsc_intf) {
 			vpdo->usbclass = dsc_intf->bInterfaceClass;
 			vpdo->subclass = dsc_intf->bInterfaceSubClass;
@@ -117,7 +117,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);
 	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
 
-	vpdo->serial_usr = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : NULL;
+	vpdo->serial_usr = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
 
 	vpdo_dev_t *devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
 	if (devpdo_old) {
@@ -147,7 +147,7 @@ PAGEABLE NTSTATUS vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 	pvhub_dev_t	vhub = vhub_from_vhci(vhci);
 	pvpdo_dev_t	vpdo;
 
-	if (vhub == NULL) {
+	if (vhub == nullptr) {
 		TraceInfo(TRACE_PNP, "vhub has gone");
 		return STATUS_NO_SUCH_DEVICE;
 	}
@@ -161,7 +161,7 @@ PAGEABLE NTSTATUS vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 	TraceInfo(TRACE_PNP, "plugging out device: port %u", port);
 
 	vpdo = vhub_find_vpdo(vhub, port);
-	if (vpdo == NULL) {
+	if (vpdo == nullptr) {
 		TraceInfo(TRACE_PNP, "no matching vpdo: port %u", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}

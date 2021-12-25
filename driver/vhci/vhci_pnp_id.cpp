@@ -7,7 +7,7 @@
 #include "usbip_vhci_api.h"
 #include "vhci_irp.h"
 
-#include <stdbool.h>
+#include <ntstrsafe.h>
 
 #define DEVID_VHCI	HWID_VHCI
 #define DEVID_VHUB	HWID_VHUB
@@ -24,9 +24,9 @@
 
 // vdev_type_t is an index
 static const LPCWSTR vdev_devids[] = {
-	NULL, DEVID_VHCI,
-	NULL, DEVID_VHUB,
-	NULL, L"USB\\VID_%04hx&PID_%04hx" // 21 chars after formatting
+	nullptr, DEVID_VHCI,
+	nullptr, DEVID_VHUB,
+	nullptr, L"USB\\VID_%04hx&PID_%04hx" // 21 chars after formatting
 };
 
 static const size_t vdev_devid_size[] = {
@@ -36,9 +36,9 @@ static const size_t vdev_devid_size[] = {
 };
 
 static const LPCWSTR vdev_hwids[] = {
-	NULL, HWIDS_VHCI,
-	NULL, HWIDS_VHUB,
-	NULL, L"USB\\VID_%04hx&PID_%04hx&REV_%04hx;" // 31 chars after formatting
+	nullptr, HWIDS_VHCI,
+	nullptr, HWIDS_VHUB,
+	nullptr, L"USB\\VID_%04hx&PID_%04hx&REV_%04hx;" // 31 chars after formatting
 	      L"USB\\VID_%04hx&PID_%04hx;" // 22 chars after formatting
 };
 
@@ -103,7 +103,7 @@ setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	size_t str_sz = vdev_devid_size[vdev->type];
 
-	PWCHAR id_dev = ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
+	auto id_dev = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
 		TraceError(TRACE_PNP, "%!vdev_type_t!: query device id: out of memory", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -137,7 +137,7 @@ setup_hw_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	size_t str_sz = vdev_hwids_size[vdev->type];
 
-	PWCHAR ids_hw = ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
+	auto ids_hw = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
 		TraceError(TRACE_PNP, "%!vdev_type_t!: query hw ids: out of memory", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -201,15 +201,15 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 
 	vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
 
-	WCHAR *str = ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*str), USBIP_VHCI_POOL_TAG);
 	if (!str) {
 		TraceError(TRACE_PNP, "vpdo: %s: out of memory", want_serial ? "DeviceSerialNumber" : "InstanceID");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	WCHAR *serial = vpdo->serial_usr ? vpdo->serial_usr :
-		        vpdo->serial ? vpdo->serial :
-		        L"";
+	auto serial = vpdo->serial_usr ? vpdo->serial_usr :
+		      vpdo->serial ? vpdo->serial :
+		      L"";
 
 	NTSTATUS status = status = *serial || want_serial ?
 		RtlStringCchCopyW(str, max_wchars, serial) :
@@ -239,15 +239,15 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 	const wchar_t comp[] = L"USB\\COMPOSITE\0";
 	const size_t max_wchars = 33 + 25 + 13 + ARRAYSIZE(comp);
 
-	pvpdo_dev_t vpdo = (pvpdo_dev_t)vdev;
+	auto vpdo = (vpdo_dev_t*)vdev;
 
-	PWCHAR ids_compat = ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(wchar_t), USBIP_VHCI_POOL_TAG);
+	PWSTR ids_compat = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*ids_compat), USBIP_VHCI_POOL_TAG);
 	if (!ids_compat) {
 		TraceError(TRACE_PNP, "vpdo: query compatible id: out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	NTSTRSAFE_PWSTR dest_end = NULL;
+	NTSTRSAFE_PWSTR dest_end = nullptr;
 	size_t remaining = 0;
 
 	NTSTATUS status = RtlStringCchPrintfExW(ids_compat, max_wchars, &dest_end, &remaining, 0, fmt,
@@ -279,7 +279,7 @@ PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
-	PWCHAR result = NULL;
+	PWCHAR result = nullptr;
 	bool subst_result = false;
 
 	BUS_QUERY_ID_TYPE type = irpstack->Parameters.QueryId.IdType;
@@ -313,7 +313,7 @@ PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
 		TraceWarning(TRACE_PNP, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->type, type, status);
 		if (result) {
 			ExFreePoolWithTag(result, USBIP_VHCI_POOL_TAG);
-			result = NULL;
+			result = nullptr;
 		}
 	}
 

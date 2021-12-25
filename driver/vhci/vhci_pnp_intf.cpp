@@ -15,19 +15,24 @@
 #include <strmini.h>
 #include <usbcamdi.h>
 
-static void ref_interface(__in PVOID Context)
+namespace
 {
-	vdev_add_ref(Context);
+
+inline void ref_interface(__in PVOID Context)
+{
+	vdev_add_ref(static_cast<vdev_t*>(Context));
 }
 
-static void deref_interface(__in PVOID Context)
+inline void deref_interface(__in PVOID Context)
 {
-	vdev_del_ref(Context);
+	vdev_del_ref(static_cast<vdev_t*>(Context));
 }
 
-static BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(PVOID context)
+} // namespace
+
+static BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(void *context)
 {
-	vpdo_dev_t *vpdo = context;
+	auto vpdo = static_cast<vpdo_dev_t*>(context);
 	TraceInfo(TRACE_GENERAL, "%!usb_device_speed!", vpdo->speed);
 	return vpdo->speed == USB_SPEED_HIGH;
 }
@@ -145,10 +150,10 @@ static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, US
 	switch (version) {
 	case USB_BUSIF_USBDI_VERSION_3:
 		r->QueryControllerType = QueryControllerType;
-		r->QueryBusTimeEx = NULL;
+		r->QueryBusTimeEx = nullptr;
 		/* passthrough */
 	case USB_BUSIF_USBDI_VERSION_2:
-		r->EnumLogEntry = NULL;
+		r->EnumLogEntry = nullptr;
 		/* passthrough */
 	case USB_BUSIF_USBDI_VERSION_1:
 		r->IsDeviceHighSpeed = IsDeviceHighSpeed;
@@ -192,9 +197,9 @@ static PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INT
 	return STATUS_NOT_SUPPORTED;
 }
 
-static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
+static NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 {
-	vdev_t *vdev = Context;
+	auto vdev = static_cast<vdev_t*>(Context);
 	NTSTATUS st = STATUS_SUCCESS;
 
 	WCHAR buf[32];
@@ -202,11 +207,11 @@ static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
 
 	if (vdev->type == VDEV_VPDO) {
 		vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
-		st = RtlStringCchPrintfExW(buf, sizeof(buf)/sizeof(*buf), NULL, &remaining, STRSAFE_FILL_BEHIND_NULL,
-			L"%s(%u)", devcodes[vdev->type], vpdo->port);
+		st = RtlStringCchPrintfExW(buf, ARRAYSIZE(buf), nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL,
+						L"%s(%u)", devcodes[vdev->type], vpdo->port);
 	} else {
-		st = RtlStringCchCopyExW(buf, sizeof(buf)/sizeof(*buf), devcodes[vdev->type],
-			NULL, &remaining, STRSAFE_FILL_BEHIND_NULL);
+		st = RtlStringCchCopyExW(buf, ARRAYSIZE(buf), devcodes[vdev->type],
+					nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL);
 	}
 
 	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"
@@ -217,7 +222,7 @@ static NTSTATUS get_location_string(PVOID Context, PZZWSTR *ploc_str)
 	remaining -= 2;
 	size_t sz = sizeof(buf) - remaining*sizeof(*buf);
 
-	*ploc_str = ExAllocatePoolWithTag(PagedPool, sz, USBIP_VHCI_POOL_TAG);
+	*ploc_str = (PZZWSTR)ExAllocatePoolWithTag(PagedPool, sz, USBIP_VHCI_POOL_TAG);
 	if (*ploc_str) {
 		RtlCopyMemory(*ploc_str, buf, sz);
 		return STATUS_SUCCESS;
@@ -254,20 +259,20 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	const GUID *intf_type = irpstack->Parameters.QueryInterface.InterfaceType;
+	auto intf_type = irpstack->Parameters.QueryInterface.InterfaceType;
 	USHORT size = irpstack->Parameters.QueryInterface.Size;
 	USHORT version = irpstack->Parameters.QueryInterface.Version;
 	INTERFACE *intf = irpstack->Parameters.QueryInterface.Interface;
 
 	NTSTATUS status = irp->IoStatus.Status;
 
-	if (IsEqualGUID(intf_type, &GUID_PNP_LOCATION_INTERFACE)) {
+	if (IsEqualGUID(*intf_type, GUID_PNP_LOCATION_INTERFACE)) {
 		status = query_interface_location(vdev, size, version, intf);
-	} else if (IsEqualGUID(intf_type, &GUID_USBCAMD_INTERFACE)) {
+	} else if (IsEqualGUID(*intf_type, GUID_USBCAMD_INTERFACE)) {
 		status = query_interface_usbcam(size, version, intf);
-	} else if (IsEqualGUID(intf_type, &USB_BUS_INTERFACE_USBDI_GUID) && vdev->type == VDEV_VPDO) {
+	} else if (IsEqualGUID(*intf_type, USB_BUS_INTERFACE_USBDI_GUID) && vdev->type == VDEV_VPDO) {
 		status = query_interface_usbdi((vpdo_dev_t*)vdev, size, version, intf);
 	}
 

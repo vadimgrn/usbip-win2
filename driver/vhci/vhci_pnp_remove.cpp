@@ -9,6 +9,7 @@
 #include "vhci_vhub.h"
 #include "usbip_vhci_api.h"
 #include "usbreq.h"
+#include "strutil.h"
 
 /*
 * Code must be in nonpaged section if it acquires spinlock.
@@ -20,16 +21,16 @@ static void complete_pending_read_irp(pvpdo_dev_t vpdo)
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 	irp = vpdo->pending_read_irp;
-	vpdo->pending_read_irp = NULL;
+	vpdo->pending_read_irp = nullptr;
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-	if (irp != NULL) {
+	if (irp != nullptr) {
 		TraceInfo(TRACE_PNP, "complete pending read irp: %p", irp);
 
 		// We got pending_read_irp before submit_urbr
 		BOOLEAN valid_irp;
 		IoAcquireCancelSpinLock(&oldirql);
-		valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
+		valid_irp = IoSetCancelRoutine(irp, nullptr) != nullptr;
 		IoReleaseCancelSpinLock(oldirql);
 		if (valid_irp) {
 			irp->IoStatus.Information = 0;
@@ -64,10 +65,10 @@ static void complete_pending_irp(pvpdo_dev_t vpdo)
 
 		irp = urbr->irp;
 		free_urbr(urbr);
-		if (irp != NULL) {
+		if (irp != nullptr) {
 			// urbr irps have cancel routine
 			IoAcquireCancelSpinLock(&oldirql);
-			bool valid_irp = IoSetCancelRoutine(irp, NULL);
+			bool valid_irp = IoSetCancelRoutine(irp, nullptr);
 			IoReleaseCancelSpinLock(oldirql);
 			if (valid_irp) {
 				irp->IoStatus.Information = 0;
@@ -78,7 +79,7 @@ static void complete_pending_irp(pvpdo_dev_t vpdo)
 		KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 	}
 
-	vpdo->urbr_sent_partial = NULL; // sure?
+	vpdo->urbr_sent_partial = nullptr; // sure?
 	vpdo->len_sent_partial = 0;
 	InitializeListHead(&vpdo->head_urbr_sent);
 	InitializeListHead(&vpdo->head_urbr_pending);
@@ -126,18 +127,18 @@ static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 
 	if (vpdo->serial) {
 		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
-		vpdo->serial = NULL;
+		vpdo->serial = nullptr;
 	}
 
 	if (vpdo->serial_usr) {
 		libdrv_free(vpdo->serial_usr);
-		vpdo->serial_usr = NULL;
+		vpdo->serial_usr = nullptr;
 	}
 
 	//FIXME
 	if (vpdo->fo) {
-		vpdo->fo->FsContext = NULL;
-		vpdo->fo = NULL;
+		vpdo->fo->FsContext = nullptr;
+		vpdo->fo = nullptr;
 	}
 }
 
@@ -146,15 +147,15 @@ static PAGEABLE void remove_device(vdev_t *vdev)
 	PAGED_CODE();
 
 	if (vdev->child_pdo) {
-		vdev->child_pdo->parent = NULL;
+		vdev->child_pdo->parent = nullptr;
 		if (vdev->child_pdo->fdo)
-			vdev->child_pdo->fdo->parent = NULL;
+			vdev->child_pdo->fdo->parent = nullptr;
 	}
 	if (vdev->fdo) {
-		vdev->fdo->pdo = NULL;
+		vdev->fdo->pdo = nullptr;
 	}
 	if (vdev->pdo && vdev->type != VDEV_ROOT) {
-		devobj_to_vdev(vdev->pdo)->fdo = NULL;
+		devobj_to_vdev(vdev->pdo)->fdo = nullptr;
 	}
 
 	switch (vdev->type) {
@@ -172,7 +173,7 @@ static PAGEABLE void remove_device(vdev_t *vdev)
 	// Detach from the underlying devices.
 	if (vdev->devobj_lower) {
 		IoDetachDevice(vdev->devobj_lower);
-		vdev->devobj_lower = NULL;
+		vdev->devobj_lower = nullptr;
 	}
 
 	TraceInfo(TRACE_VDEV, "deleting device object(%!vdev_type_t!): %p", vdev->type, vdev->Self);

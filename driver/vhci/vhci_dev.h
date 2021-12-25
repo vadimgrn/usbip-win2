@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <ntddk.h>
 #include <wmilib.h>	// required for WMILIB_CONTEXT
 
@@ -175,14 +171,14 @@ typedef struct
 	UCHAR	current_intf_num, current_intf_alt;
 } vpdo_dev_t, *pvpdo_dev_t;
 
-PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
+extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 
-__inline void vdev_add_ref(vdev_t *vdev)
+inline void vdev_add_ref(vdev_t *vdev)
 {
 	InterlockedIncrement(&vdev->n_refs);
 }
 
-__inline void vdev_del_ref(vdev_t *vdev)
+inline void vdev_del_ref(vdev_t *vdev)
 {
 	InterlockedDecrement(&vdev->n_refs);
 }
@@ -195,26 +191,26 @@ LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG
 
 #define TO_DEVOBJ(vdev)		((vdev)->common.Self)
 
-__inline bool is_fdo(vdev_type_t type)
+inline bool is_fdo(vdev_type_t type)
 {
 	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
 }
 
-__inline vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
+inline vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
 {	
 	struct _vdev *child_pdo = vhci->common.child_pdo;
 	return child_pdo ? (vhub_dev_t*)child_pdo->fdo : NULL;
 }
 
-__inline vhub_dev_t *vhub_from_vpdo(vpdo_dev_t *vpdo)
+inline vhub_dev_t *vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
 	return (vhub_dev_t*)(vpdo->common.parent);
 }
 
-__inline vdev_t *devobj_to_vdev(DEVICE_OBJECT *devobj) 
+inline auto devobj_to_vdev(DEVICE_OBJECT *devobj)
 { 
 	NT_ASSERT(devobj);
-	return devobj->DeviceExtension; 
+	return static_cast<vdev_t*>(devobj->DeviceExtension); 
 }
 
 cpdo_dev_t *devobj_to_cpdo_or_null(DEVICE_OBJECT *devobj);
@@ -222,7 +218,3 @@ vhci_dev_t *devobj_to_vhci_or_null(DEVICE_OBJECT *devobj);
 hpdo_dev_t *devobj_to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *devobj_to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *devobj_to_vpdo_or_null(DEVICE_OBJECT *devobj);
-
-#ifdef __cplusplus
-}
-#endif

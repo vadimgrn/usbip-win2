@@ -24,8 +24,8 @@ static PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_
 	KeInitializeEvent(&pnpEvent, NotificationEvent, FALSE);
 
 	// Build an Irp
-	irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, NULL, 0, NULL, &pnpEvent, &ioStatus);
-	if (irp == NULL) {
+	irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ioStatus);
+	if (irp == nullptr) {
 		TraceWarning(TRACE_PNP, "failed to create irp");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -47,7 +47,7 @@ static PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_
 		// the memory for an event in the stack you must do a
 		// KernelMode wait instead of UserMode to prevent
 		// the stack from getting paged out.
-		KeWaitForSingleObject(&pnpEvent, Executive, KernelMode, FALSE, NULL);
+		KeWaitForSingleObject(&pnpEvent, Executive, KernelMode, FALSE, nullptr);
 		status = ioStatus.Status;
 	}
 

@@ -1,4 +1,3 @@
-#include "vhci_internal_ioctl.h"
 #include "dbgcommon.h"
 #include "trace.h"
 #include "vhci_internal_ioctl.tmh"
@@ -56,7 +55,7 @@ static NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 
 			KIRQL oldirql_cancel;
 			IoAcquireCancelSpinLock(&oldirql_cancel);
-			BOOLEAN	valid_irp = IoSetCancelRoutine(irp, NULL) != NULL;
+			BOOLEAN	valid_irp = IoSetCancelRoutine(irp, nullptr) != nullptr;
 			IoReleaseCancelSpinLock(oldirql_cancel);
 
 			if (valid_irp) {
@@ -384,7 +383,7 @@ static const urb_function_t urb_functions[] =
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
 	urb_control_get_status_request, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
 
-	NULL, // URB_FUNCTION_RESERVED_0X0016          
+	nullptr, // URB_FUNCTION_RESERVED_0X0016          
 
 	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_DEVICE
 	urb_control_vendor_class_request, // URB_FUNCTION_VENDOR_INTERFACE
@@ -394,7 +393,7 @@ static const urb_function_t urb_functions[] =
 	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_INTERFACE
 	urb_control_vendor_class_request, // URB_FUNCTION_CLASS_ENDPOINT
 
-	NULL, // URB_FUNCTION_RESERVE_0X001D
+	nullptr, // URB_FUNCTION_RESERVE_0X001D
 
 	urb_pipe_request, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL
 
@@ -417,42 +416,42 @@ static const urb_function_t urb_functions[] =
 
 	get_ms_feature_descriptor,
 
-	NULL, // URB_FUNCTION_RESERVE_0X002B
-	NULL, // URB_FUNCTION_RESERVE_0X002C
-	NULL, // URB_FUNCTION_RESERVE_0X002D
-	NULL, // URB_FUNCTION_RESERVE_0X002E
-	NULL, // URB_FUNCTION_RESERVE_0X002F
+	nullptr, // URB_FUNCTION_RESERVE_0X002B
+	nullptr, // URB_FUNCTION_RESERVE_0X002C
+	nullptr, // URB_FUNCTION_RESERVE_0X002D
+	nullptr, // URB_FUNCTION_RESERVE_0X002E
+	nullptr, // URB_FUNCTION_RESERVE_0X002F
 
 	urb_pipe_request, // URB_FUNCTION_SYNC_RESET_PIPE
 	urb_pipe_request, // URB_FUNCTION_SYNC_CLEAR_STALL
 	urb_control_transfer_ex,
 
-	NULL, // URB_FUNCTION_RESERVE_0X0033
-	NULL, // URB_FUNCTION_RESERVE_0X0034                  
+	nullptr, // URB_FUNCTION_RESERVE_0X0033
+	nullptr, // URB_FUNCTION_RESERVE_0X0034                  
 
 	open_static_streams,
 	urb_pipe_request, // URB_FUNCTION_CLOSE_STATIC_STREAMS
 	bulk_or_interrupt_transfer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
 	isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
-	NULL, // 0x0039
-	NULL, // 0x003A        
-	NULL, // 0x003B
-	NULL, // 0x003C        
+	nullptr, // 0x0039
+	nullptr, // 0x003A        
+	nullptr, // 0x003B
+	nullptr, // 0x003C        
 
 	get_isoch_pipe_transfer_path_delays // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
 static NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 {
-	URB *urb = URB_FROM_IRP(irp);
+	auto urb = (URB*)URB_FROM_IRP(irp);
 	if (!urb) {
 		TraceError(TRACE_IOCTL, "null urb");
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	USHORT func = urb->UrbHeader.Function;
-	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : NULL;
+	urb_function_t pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
 
 	if (pfunc) {
 		NTSTATUS st = pfunc(vpdo, urb);
@@ -477,7 +476,7 @@ static NTSTATUS usb_get_port_status(ULONG *status)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+extern "C" NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
@@ -503,13 +502,13 @@ NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 		status = usb_submit_urb(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
-		status = usb_get_port_status(irpStack->Parameters.Others.Argument1);
+		status = usb_get_port_status(static_cast<ULONG*>(irpStack->Parameters.Others.Argument1));
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		status = submit_urbr_irp(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
-		status = setup_topology_address(vpdo, irpStack->Parameters.Others.Argument1);
+		status = setup_topology_address(vpdo, static_cast<USB_TOPOLOGY_ADDRESS*>(irpStack->Parameters.Others.Argument1));
 		break;
 	default:
 		TraceWarning(TRACE_IOCTL, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);

@@ -10,7 +10,7 @@ LPWSTR libdrv_strdupW(LPCWSTR str)
 	size_t len = 0;
 	NTSTATUS st = RtlStringCchLengthW(str, NTSTRSAFE_MAX_CCH, &len);
 	if (st != STATUS_SUCCESS) {
-		return NULL;
+		return nullptr;
 	}
 
 	size_t sz = ++len*sizeof(*str);

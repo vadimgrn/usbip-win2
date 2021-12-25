@@ -97,8 +97,7 @@ vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 	return irp_done_iostatus(irp);
 }
 
-NTSTATUS
-vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);

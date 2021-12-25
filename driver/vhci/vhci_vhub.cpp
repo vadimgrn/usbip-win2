@@ -16,7 +16,7 @@ static PAGEABLE pvpdo_dev_t find_vpdo(pvhub_dev_t vhub, unsigned port)
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 PAGEABLE pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
@@ -40,7 +40,7 @@ PAGEABLE CHAR vhub_get_empty_port(pvhub_dev_t vhub)
 
 	ExAcquireFastMutex(&vhub->Mutex);
 	for (CHAR i = 0; i < (CHAR)vhub->n_max_ports; i++) {
-		if (find_vpdo(vhub, i) == NULL) {
+		if (find_vpdo(vhub, i) == nullptr) {
 			ExReleaseFastMutex(&vhub->Mutex);
 			return i;
 		}
@@ -228,25 +228,26 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(pvhub_dev_t vhub, pioctl_usbip_vhci_imp
 	ExAcquireFastMutex(&vhub->Mutex);
 
 	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		pvpdo_dev_t	vpdo;
 
-		if (n_used_ports == n_idevs_max - 1)
+		if (n_used_ports == n_idevs_max - 1) {
 			break;
-		vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+		}
 
-		idev->port = (CHAR)(vpdo->port);
-		idev->status = 2; /* SDEV_ST_USED */;
+		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+
+		idev->port = char(vpdo->port);
+		idev->status = usbip_device_status(2); // SDEV_ST_USED
 		idev->vendor = vpdo->vendor;
 		idev->product = vpdo->product;
 		idev->speed = vpdo->speed;
 		idev++;
 
-		n_used_ports++;
+		++n_used_ports;
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
 
-	idev->port = 0xff; /* end of mark */
+	idev->port = -1; /* end of mark */
 
 	return STATUS_SUCCESS;
 }

@@ -8,7 +8,7 @@
 #include "usbip_proto.h"
 #include "vhci_irp.h"
 
-#include <stdbool.h>
+#include <ntstrsafe.h>
 
 static PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
 {
@@ -42,7 +42,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
-	void *dsc_data = NULL;
+	void *dsc_data = nullptr;
 	ULONG dsc_len = 0;
 
 	switch (setup->wValue.HiByte) {
@@ -100,7 +100,7 @@ static PAGEABLE PWSTR copy_wstring(const USB_STRING_DESCRIPTOR *sd, USHORT Langu
 	PAGED_CODE();
 
 	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
-	PWSTR str = ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
 	if (str) {
 		NTSTATUS st = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
@@ -138,12 +138,12 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCR
 
 	NT_ASSERT(dsc->bLength > sizeof(*dsc));
 
-	USB_STRING_DESCRIPTOR *sd = NULL;
+	USB_STRING_DESCRIPTOR *sd = nullptr;
 
 	switch (dsc->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (dsc->bLength == sizeof(USB_DEVICE_DESCRIPTOR) && !vpdo->dsc_dev) {
-			vpdo->dsc_dev = clone(dsc, dsc->bLength);
+			vpdo->dsc_dev = (USB_DEVICE_DESCRIPTOR*)clone(dsc, dsc->bLength);
 		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:

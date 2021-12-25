@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 //
 // Define the tracing flags.
 //
@@ -60,7 +56,3 @@ extern "C" {
 // FUNC TraceEvents(LEVEL, FLAGS, MSG, ...);
 // end_wpp
 //
-
-#ifdef __cplusplus
-}
-#endif
