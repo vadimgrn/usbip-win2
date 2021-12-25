@@ -57,7 +57,8 @@
       <AdditionalIncludeDirectories>..\..\..\include; ..\..\lib; windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE_CONFIG_H</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -76,7 +77,8 @@
       <AdditionalIncludeDirectories>..\..\..\include; ..\..\lib; windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>HAVE_CONFIG_H</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
