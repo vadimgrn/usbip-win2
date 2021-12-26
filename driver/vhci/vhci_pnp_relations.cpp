@@ -45,7 +45,7 @@ static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIO
 	if (relations == nullptr) {
 		relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
 		if (relations == nullptr) {
-			TraceError(TRACE_PNP, "no relations will be reported: out of memory");
+			TraceError(FLAG_GENERAL, "no relations will be reported: out of memory");
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 		relations->Count = 0;
@@ -72,7 +72,7 @@ static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIO
 	size = sizeof(DEVICE_RELATIONS) + relations->Count * sizeof(PDEVICE_OBJECT);
 	relations_new = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, size, USBIP_VHCI_POOL_TAG);
 	if (relations_new == nullptr) {
-		TraceError(TRACE_VHUB, "old relations will be used: out of memory");
+		TraceError(FLAG_GENERAL, "old relations will be used: out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 	RtlCopyMemory(relations_new->Objects, relations->Objects, sizeof(PDEVICE_OBJECT) * relations->Count);
@@ -132,7 +132,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 
 	relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
 	if (relations == nullptr) {
-		TraceError(TRACE_VHUB, "failed to allocate a new relation: out of memory");
+		TraceError(FLAG_GENERAL, "failed to allocate a new relation: out of memory");
 
 		ExReleaseFastMutex(&vhub->Mutex);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -165,7 +165,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 
 	relations->Count = n_news;
 
-	TraceInfo(TRACE_VHUB, "vhub vpdos: total:%u,plugged:%u: bus relations: old:%u,new:%u", vhub->n_vpdos, vhub->n_vpdos_plugged, n_olds, n_news);
+	TraceInfo(FLAG_GENERAL, "vhub vpdos: total:%u,plugged:%u: bus relations: old:%u,new:%u", vhub->n_vpdos, vhub->n_vpdos_plugged, n_olds, n_news);
 
 	if (relations_old)
 		ExFreePool(relations_old);
@@ -233,7 +233,7 @@ PAGEABLE NTSTATUS pnp_query_device_relations(pvdev_t vdev, PIRP irp)
 	PAGED_CODE();
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	TraceInfo(TRACE_PNP, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
+	TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
 
 	DEVICE_RELATIONS *dev_relations = (DEVICE_RELATIONS*)irp->IoStatus.Information;
 	NTSTATUS status = STATUS_SUCCESS;
@@ -253,7 +253,7 @@ PAGEABLE NTSTATUS pnp_query_device_relations(pvdev_t vdev, PIRP irp)
 		status = STATUS_SUCCESS;
 		break;
 	default:
-		TraceInfo(TRACE_PNP, "skip: %!DEVICE_RELATION_TYPE!", irpstack->Parameters.QueryDeviceRelations.Type);
+		TraceInfo(FLAG_GENERAL, "skip: %!DEVICE_RELATION_TYPE!", irpstack->Parameters.QueryDeviceRelations.Type);
 		status = irp->IoStatus.Status;
 	}
 

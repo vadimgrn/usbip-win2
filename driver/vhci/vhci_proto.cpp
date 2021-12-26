@@ -16,7 +16,7 @@ static ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle
 		return TransferFlags;
 	}
 
-	TraceVerbose(TRACE_READ, "Fix direction in TransferFlags(%#Ix), PipeHandle(%#Ix)", TransferFlags, (uintptr_t)PipeHandle);
+	TraceVerbose(FLAG_GENERAL, "Fix direction in TransferFlags(%#Ix), PipeHandle(%#Ix)", TransferFlags, (uintptr_t)PipeHandle);
 
 	const ULONG in_flags = USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
@@ -40,7 +40,7 @@ NTSTATUS set_cmd_submit_usbip_header(
 {
 	bool ep0 = TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
 	if (ep0 == !!PipeHandle) {
-		TraceError(TRACE_READ, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and PipeHandle(%#Ix)", 
+		TraceError(FLAG_GENERAL, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and PipeHandle(%#Ix)", 
 					(uintptr_t)PipeHandle);
 
 		return STATUS_INVALID_PARAMETER;

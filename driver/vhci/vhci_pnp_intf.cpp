@@ -33,7 +33,7 @@ inline void deref_interface(__in PVOID Context)
 static BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(void *context)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(context);
-	TraceInfo(TRACE_GENERAL, "%!usb_device_speed!", vpdo->speed);
+	TraceInfo(FLAG_GENERAL, "%!usb_device_speed!", vpdo->speed);
 	return vpdo->speed == USB_SPEED_HIGH;
 }
 
@@ -47,7 +47,7 @@ QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN OUT PVOID BusInforma
 	UNREFERENCED_PARAMETER(BusInformationBufferLength);
 	UNREFERENCED_PARAMETER(BusInformationActualLength);
 
-	TraceInfo(TRACE_GENERAL, "Enter");
+	TraceInfo(FLAG_GENERAL, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
@@ -57,7 +57,7 @@ SubmitIsoOutUrb(IN PVOID context, IN PURB urb)
 	UNREFERENCED_PARAMETER(context);
 	UNREFERENCED_PARAMETER(urb);
 
-	TraceInfo(TRACE_GENERAL, "Enter");
+	TraceInfo(FLAG_GENERAL, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
@@ -67,7 +67,7 @@ QueryBusTime(IN PVOID context, IN OUT PULONG currentusbframe)
 	UNREFERENCED_PARAMETER(context);
 	UNREFERENCED_PARAMETER(currentusbframe);
 
-	TraceInfo(TRACE_GENERAL, "Enter");
+	TraceInfo(FLAG_GENERAL, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
@@ -76,7 +76,7 @@ GetUSBDIVersion(IN PVOID context, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT P
 {
 	UNREFERENCED_PARAMETER(context);
 
-	TraceInfo(TRACE_GENERAL, "Enter");
+	TraceInfo(FLAG_GENERAL, "Enter");
 
 	*HcdCapabilities = 0;
 	inf->USBDI_Version = USBDI_VERSION;
@@ -131,7 +131,7 @@ static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, US
 	PAGED_CODE();
 
 	if (version > USB_BUSIF_USBDI_VERSION_3) {
-		TraceError(TRACE_GENERAL, "Unsupported %!usb_busif_usbdi_version!", version);
+		TraceError(FLAG_GENERAL, "Unsupported %!usb_busif_usbdi_version!", version);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -141,7 +141,7 @@ static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, US
 	};
 
 	if (size < iface_size[version]) {
-		TraceError(TRACE_GENERAL, "%!usb_busif_usbdi_version!: size %d < %d", version, size, iface_size[version]);
+		TraceError(FLAG_GENERAL, "%!usb_busif_usbdi_version!: size %d < %d", version, size, iface_size[version]);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -173,7 +173,7 @@ static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, US
 		break;
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!usb_busif_usbdi_version!", version);
+	TraceInfo(FLAG_GENERAL, "%!usb_busif_usbdi_version!", version);
 	return STATUS_SUCCESS;
 }
 
@@ -182,18 +182,18 @@ static PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INT
 	PAGED_CODE();
 
 	if (version != USBCAMD_VERSION_200) {
-		TraceError(TRACE_GENERAL, "Version %d != %d", version, USBCAMD_VERSION_200);
+		TraceError(FLAG_GENERAL, "Version %d != %d", version, USBCAMD_VERSION_200);
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	USBCAMD_INTERFACE *r = (USBCAMD_INTERFACE*)intf;
 	if (size < sizeof(*r)) {
-		TraceError(TRACE_GENERAL, "Size %d < %Iu", size, sizeof(*r));
+		TraceError(FLAG_GENERAL, "Size %d < %Iu", size, sizeof(*r));
 		return STATUS_INVALID_PARAMETER;
 	}
 
 
-	TraceWarning(TRACE_GENERAL, "Not implemented");
+	TraceWarning(FLAG_GENERAL, "Not implemented");
 	return STATUS_NOT_SUPPORTED;
 }
 
@@ -215,7 +215,7 @@ static NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 	}
 
 	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"
-		TraceError(TRACE_GENERAL, "%!STATUS!, remaining %Iu", st, remaining);
+		TraceError(FLAG_GENERAL, "%!STATUS!, remaining %Iu", st, remaining);
 		return st;
 	}
 
@@ -228,7 +228,7 @@ static NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 		return STATUS_SUCCESS;
 	}
 
-	TraceError(TRACE_GENERAL, "Can't allocate memory: size %Iu", sz);
+	TraceError(FLAG_GENERAL, "Can't allocate memory: size %Iu", sz);
 	return STATUS_INSUFFICIENT_RESOURCES;
 }
 
@@ -236,7 +236,7 @@ static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT versi
 {
 	PNP_LOCATION_INTERFACE *r = (PNP_LOCATION_INTERFACE*)intf;
 	if (size < sizeof(*r)) {
-		TraceError(TRACE_GENERAL, "Size %d < %Iu, version %d", size, sizeof(*r), version);
+		TraceError(FLAG_GENERAL, "Size %d < %Iu, version %d", size, sizeof(*r), version);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -276,7 +276,7 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 		status = query_interface_usbdi((vpdo_dev_t*)vdev, size, version, intf);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!GUID! -> %!STATUS!", intf_type, status);
+	TraceInfo(FLAG_GENERAL, "%!GUID! -> %!STATUS!", intf_type, status);
 
 	if (status == STATUS_SUCCESS) {
 		irp->IoStatus.Information = 0;

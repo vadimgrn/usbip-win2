@@ -105,7 +105,7 @@ setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	auto id_dev = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
-		TraceError(TRACE_PNP, "%!vdev_type_t!: query device id: out of memory", vdev->type);
+		TraceError(FLAG_GENERAL, "%!vdev_type_t!: query device id: out of memory", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -139,7 +139,7 @@ setup_hw_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	auto ids_hw = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
-		TraceError(TRACE_PNP, "%!vdev_type_t!: query hw ids: out of memory", vdev->type);
+		TraceError(FLAG_GENERAL, "%!vdev_type_t!: query hw ids: out of memory", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -203,7 +203,7 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 
 	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*str), USBIP_VHCI_POOL_TAG);
 	if (!str) {
-		TraceError(TRACE_PNP, "vpdo: %s: out of memory", want_serial ? "DeviceSerialNumber" : "InstanceID");
+		TraceError(FLAG_GENERAL, "vpdo: %s: out of memory", want_serial ? "DeviceSerialNumber" : "InstanceID");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -243,7 +243,7 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 
 	PWSTR ids_compat = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*ids_compat), USBIP_VHCI_POOL_TAG);
 	if (!ids_compat) {
-		TraceError(TRACE_PNP, "vpdo: query compatible id: out of memory");
+		TraceError(FLAG_GENERAL, "vpdo: query compatible id: out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -305,12 +305,12 @@ PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		TraceInfo(TRACE_PNP, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S", vdev->type, type, result);
+		TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S", vdev->type, type, result);
 		if (subst_result) {
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		TraceWarning(TRACE_PNP, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->type, type, status);
+		TraceWarning(FLAG_GENERAL, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->type, type, status);
 		if (result) {
 			ExFreePoolWithTag(result, USBIP_VHCI_POOL_TAG);
 			result = nullptr;

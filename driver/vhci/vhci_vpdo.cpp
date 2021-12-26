@@ -17,7 +17,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 
 	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor;
 	if (!cd) {
-		TraceInfo(TRACE_VPDO, "Going to unconfigured state");
+		TraceInfo(FLAG_GENERAL, "Going to unconfigured state");
 		return STATUS_SUCCESS;
 	}
 
@@ -26,7 +26,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 	if (vpdo->actconfig) {
 		RtlCopyMemory(vpdo->actconfig, cd, cd->wTotalLength);
 	} else {
-		TraceError(TRACE_VPDO, "Failed to allocate configuration descriptor");
+		TraceError(FLAG_GENERAL, "Failed to allocate configuration descriptor");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -36,7 +36,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 		r->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)(0x100 | cd->bConfigurationValue);
 
 		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceInfo(TRACE_VPDO, "%s", select_configuration_str(buf, sizeof(buf), r));
+		TraceInfo(FLAG_GENERAL, "%s", select_configuration_str(buf, sizeof(buf), r));
 	}
 
 	return status;
@@ -47,7 +47,7 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INT
 	PAGED_CODE();
 
 	if (!vpdo->actconfig) {
-		TraceError(TRACE_VPDO, "Device is unconfigured");
+		TraceError(FLAG_GENERAL, "Device is unconfigured");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
@@ -56,7 +56,7 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INT
 
 	if (NT_SUCCESS(status)) {
 		char buf[SELECT_INTERFACE_STR_BUFSZ];
-		TraceInfo(TRACE_VPDO, "%s", select_interface_str(buf, sizeof(buf), r));
+		TraceInfo(FLAG_GENERAL, "%s", select_interface_str(buf, sizeof(buf), r));
 
 		vpdo->current_intf_num = iface->InterfaceNumber;
 		vpdo->current_intf_alt = iface->AlternateSetting;

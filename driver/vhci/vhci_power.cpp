@@ -9,10 +9,10 @@ static void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const
 {
 	switch (type) {
 	case SystemPowerState:
-		TraceInfo(TRACE_POWER, "%s: %!SYSTEM_POWER_STATE!", caller, state->SystemState);
+		TraceInfo(FLAG_GENERAL, "%s: %!SYSTEM_POWER_STATE!", caller, state->SystemState);
 		break;
 	case DevicePowerState:
-		TraceInfo(TRACE_POWER, "%s: %!DEVICE_POWER_STATE!", caller, state->DeviceState);
+		TraceInfo(FLAG_GENERAL, "%s: %!DEVICE_POWER_STATE!", caller, state->DeviceState);
 		break;
 	}
 }
@@ -102,11 +102,11 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceVerbose(TRACE_POWER, "%!vdev_type_t!: irql %!irql!, %!powermn!", 
+	TraceVerbose(FLAG_GENERAL, "%!vdev_type_t!: irql %!irql!, %!powermn!", 
 			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	if (vdev->DevicePnPState == Deleted) {
-		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
+		TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		PoStartNextPowerIrp(irp);
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
@@ -115,6 +115,6 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 			vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
 			vhci_power_vdev(vdev, irp, irpstack);
 
-	TraceVerbose(TRACE_POWER, "%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
+	TraceVerbose(FLAG_GENERAL, "%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
 	return st;
 }

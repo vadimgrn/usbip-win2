@@ -63,7 +63,7 @@ static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
 		if (NT_ERROR(status)) {
 			char buf[URB_REQ_STR_BUFSZ];
-			TraceError(TRACE_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr_unlink));
+			TraceError(FLAG_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr_unlink));
 			free_urbr(urbr_unlink);
 		}
 	}
@@ -87,7 +87,7 @@ static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
 	submit_urbr_unlink(vpdo, urbr->seq_num);
 
 	char buf[URB_REQ_STR_BUFSZ];
-	TraceInfo(TRACE_GENERAL, "cancelled urb destroyed %s", urb_req_str(buf, sizeof(buf), urbr));
+	TraceInfo(FLAG_GENERAL, "cancelled urb destroyed %s", urb_req_str(buf, sizeof(buf), urbr));
 	
 	free_urbr(urbr);
 }
@@ -106,7 +106,7 @@ static void cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 	
 	{
 		char buf[URB_REQ_STR_BUFSZ];
-		TraceInfo(TRACE_GENERAL, "irp will be cancelled %s", urb_req_str(buf, sizeof(buf), urbr));
+		TraceInfo(FLAG_GENERAL, "irp will be cancelled %s", urb_req_str(buf, sizeof(buf), urbr));
 	}
 
 	IoReleaseCancelSpinLock(irp->CancelIrql);
@@ -121,7 +121,7 @@ struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_un
 {
 	auto urbr = (urb_req*)ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
-		TraceError(TRACE_URB, "out of memory");
+		TraceError(FLAG_GENERAL, "out of memory");
 		return nullptr;
 	}
 
@@ -208,7 +208,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 		
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		TraceVerbose(TRACE_URB, "STATUS_PENDING");
+		TraceVerbose(FLAG_GENERAL, "STATUS_PENDING");
 		return STATUS_PENDING;
 	}
 
@@ -217,7 +217,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 	IoReleaseCancelSpinLock(oldirql_cancel);
 
 	if (!valid_irp) {
-		TraceVerbose(TRACE_URB, "Read irp was cancelled");
+		TraceVerbose(FLAG_GENERAL, "Read irp was cancelled");
 		status = STATUS_INVALID_PARAMETER;
 		vpdo->pending_read_irp = nullptr;
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
@@ -262,6 +262,6 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 		status = STATUS_INVALID_PARAMETER;
 	}
 
-	TraceVerbose(TRACE_URB, "%!STATUS!", status);
+	TraceVerbose(FLAG_GENERAL, "%!STATUS!", status);
 	return status;
 }

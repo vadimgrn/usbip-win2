@@ -24,7 +24,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 	LPCWSTR str = (PWSTR)irp->IoStatus.Information;
 
 	if (str) {
-		TraceWarning(TRACE_PNP, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> pre-filled '%!WSTR!', %!STATUS!",
+		TraceWarning(FLAG_GENERAL, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> pre-filled '%!WSTR!', %!STATUS!",
 			type, irpstack->Parameters.QueryDeviceText.LocaleId, str, irp->IoStatus.Status);
 
 		return irp_done_iostatus(irp);
@@ -42,7 +42,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 	NTSTATUS status = str ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 	irp->IoStatus.Information = (ULONG_PTR)str;
 
-	TraceInfo(TRACE_PNP, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!",
+	TraceInfo(FLAG_GENERAL, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!",
 		type, irpstack->Parameters.QueryDeviceText.LocaleId, str, status);
 
 	return irp_done(irp, status);

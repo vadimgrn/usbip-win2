@@ -123,11 +123,11 @@ static PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
-		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
+		TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+	TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
 	return irp_done_success(Irp);
@@ -140,11 +140,11 @@ static PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
-		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
+		TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+	TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	if (vdev->type == VDEV_VHCI) {
 		cleanup_vpdo((vhci_dev_t*)vdev, irp);
@@ -161,11 +161,11 @@ static PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
-		TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
+		TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: no such device", vdev->type);
 		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceInfo(TRACE_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+	TraceInfo(FLAG_GENERAL, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
 	return irp_done_success(Irp);
@@ -174,7 +174,7 @@ static PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 static PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
-	TraceInfo(TRACE_GENERAL, "Enter");
+	TraceInfo(FLAG_GENERAL, "Enter");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
 	NT_ASSERT(!drvobj->DeviceObject);
@@ -195,12 +195,12 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 	WPP_INIT_TRACING(drvobj, RegistryPath);
 
 	if (st) {
-		TraceCritical(TRACE_GENERAL, "Can't set IFR parameter: %!STATUS!", st);
+		TraceCritical(FLAG_GENERAL, "Can't set IFR parameter: %!STATUS!", st);
 		WPP_CLEANUP(drvobj);
 		return st;
 	}
 
-	TraceInfo(TRACE_GENERAL, "RegistryPath '%!USTR!'", RegistryPath);
+	TraceInfo(FLAG_GENERAL, "RegistryPath '%!USTR!'", RegistryPath);
 
 	ExInitializeNPagedLookasideList(&g_lookaside, nullptr, nullptr, 0, sizeof(struct urb_req), 'USBV', 0);
 
@@ -212,7 +212,7 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 	if (Globals.RegistryPath.Buffer) {
 		RtlCopyUnicodeString(&Globals.RegistryPath, RegistryPath);
 	} else {
-		TraceCritical(TRACE_GENERAL, "ExAllocatePoolWithTag failed");
+		TraceCritical(FLAG_GENERAL, "ExAllocatePoolWithTag failed");
 		vhci_driverUnload(drvobj);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}

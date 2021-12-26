@@ -166,18 +166,18 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 {
 	PAGED_CODE();
 
-	TraceVerbose(TRACE_WMI, "Enter irql %!irql!", KeGetCurrentIrql());
+	TraceVerbose(FLAG_GENERAL, "Enter irql %!irql!", KeGetCurrentIrql());
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
 		// The vpdo, just complete the request with the current status
-		TraceInfo(TRACE_WMI, "skip %!sysctrl!", irpstack->MinorFunction);
+		TraceInfo(FLAG_GENERAL, "skip %!sysctrl!", irpstack->MinorFunction);
 		return irp_done_iostatus(irp);
 	}
 
-	TraceInfo(TRACE_WMI, "%!sysctrl!", irpstack->MinorFunction);
+	TraceInfo(FLAG_GENERAL, "%!sysctrl!", irpstack->MinorFunction);
 
 	if (vhci->common.DevicePnPState == Deleted) {
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
@@ -209,7 +209,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 		status = IoCallDriver(vhci->common.devobj_lower, irp);
 	}
 
-	TraceVerbose(TRACE_WMI, "Leave %!STATUS!", status);
+	TraceVerbose(FLAG_GENERAL, "Leave %!STATUS!", status);
 	return status;
 }
 
@@ -232,7 +232,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	// Initialize the Std device data structure
 	vhci->StdUSBIPBusData.ErrorCount = 0;
 
-	TraceVerbose(TRACE_GENERAL, "irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
+	TraceVerbose(FLAG_GENERAL, "irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
 	return status;
 }
 

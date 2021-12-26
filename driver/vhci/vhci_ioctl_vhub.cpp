@@ -171,7 +171,7 @@ static PAGEABLE NTSTATUS get_node_driverkey_name(pvhub_dev_t vhub, PVOID buffer,
 		return STATUS_NO_SUCH_DEVICE;
 	driverkey = get_device_prop(vpdo->common.Self, DevicePropertyDriverKeyName, &driverkeylen);
 	if (driverkey == nullptr) {
-		TraceWarning(TRACE_IOCTL, "failed to get vpdo driver key");
+		TraceWarning(FLAG_GENERAL, "failed to get vpdo driver key");
 		status = STATUS_UNSUCCESSFUL;
 	}
 	else {
@@ -233,7 +233,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(pvhub_dev_t vhub, PIRP irp, ULONG ioctl_code, 
 		status = get_node_driverkey_name(vhub, buffer, inlen, poutlen);
 		break;
 	default:
-		TraceError(TRACE_IOCTL, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		TraceError(FLAG_GENERAL, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return status;
