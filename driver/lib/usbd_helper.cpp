@@ -1,5 +1,4 @@
 #include "usbd_helper.h"
-#include "pdu.h"
 
 /*
  * Linux error codes.
@@ -200,56 +199,3 @@ UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
 	return flags;
 }
 
-void to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN as_result)
-{
-	for (ULONG i = 0; i < n_pkts; ++i) {
-
-		USBD_ISO_PACKET_DESCRIPTOR *dest = usbd_iso_desc + i;
-		const struct usbip_iso_packet_descriptor *src = iso_desc + i;
-
-		dest->Offset = src->offset;
-		if (as_result) {
-			dest->Length = src->actual_length;
-			dest->Status = to_windows_status(src->status);
-		}
-	}
-}
-
-void to_iso_descs(ULONG n_pkts, struct usbip_iso_packet_descriptor *iso_desc, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, BOOLEAN as_result)
-{
-	for (ULONG i = 0; i < n_pkts; ++i) {
-
-		struct usbip_iso_packet_descriptor *dest = iso_desc + i;
-		const USBD_ISO_PACKET_DESCRIPTOR *src = usbd_iso_desc + i;
-
-		dest->offset = src->Offset;
-		if (as_result) {
-			dest->actual_length = src->Length;
-			dest->status = to_linux_status(src->Status);
-		}
-	}
-}
-
-ULONG get_iso_descs_len(ULONG n_pkts, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN is_actual)
-{
-	ULONG len = 0;
-		
-	for (ULONG i = 0; i < n_pkts; ++i) {
-		const struct usbip_iso_packet_descriptor *pkt = iso_desc + i;
-		len += is_actual ? pkt->actual_length: pkt->length;
-	}
-
-	return len;
-}
-
-ULONG get_usbd_iso_descs_len(ULONG n_pkts, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc)
-{
-	ULONG len = 0;
-
-	for (ULONG i = 0; i < n_pkts; ++i) {
-		len += usbd_iso_desc[i].Length;
-		
-	}
-
-	return len;
-}

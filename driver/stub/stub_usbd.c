@@ -16,6 +16,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include "stub_usbd.h"
 #include "stub_driver.h"
 #include "stub_trace.h"
 #include "stub_usbd.tmh"
@@ -36,6 +37,36 @@ typedef struct {
 	cb_urb_done_t	cb_urb_done;
 	stub_res_t	*sres;
 } safe_completion_t;
+
+static void to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN as_result)
+{
+	for (ULONG i = 0; i < n_pkts; ++i) {
+
+		USBD_ISO_PACKET_DESCRIPTOR *dest = usbd_iso_desc + i;
+		const struct usbip_iso_packet_descriptor *src = iso_desc + i;
+
+		dest->Offset = src->offset;
+		if (as_result) {
+			dest->Length = src->actual_length;
+			dest->Status = to_windows_status(src->status);
+		}
+	}
+}
+
+static void to_iso_descs(ULONG n_pkts, struct usbip_iso_packet_descriptor *iso_desc, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc, BOOLEAN as_result)
+{
+	for (ULONG i = 0; i < n_pkts; ++i) {
+
+		struct usbip_iso_packet_descriptor *dest = iso_desc + i;
+		const USBD_ISO_PACKET_DESCRIPTOR *src = usbd_iso_desc + i;
+
+		dest->offset = src->Offset;
+		if (as_result) {
+			dest->actual_length = src->Length;
+			dest->status = to_linux_status(src->Status);
+		}
+	}
+}
 
 static NTSTATUS
 do_safe_completion(PDEVICE_OBJECT devobj, PIRP irp, PVOID ctx)
@@ -608,3 +639,16 @@ submit_control_transfer(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_PACKET
 	}
 	return FALSE;
 }
+
+ULONG get_usbd_iso_descs_len(ULONG n_pkts, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc)
+{
+	ULONG len = 0;
+
+	for (ULONG i = 0; i < n_pkts; ++i) {
+		len += usbd_iso_desc[i].Length;
+
+	}
+
+	return len;
+}
+

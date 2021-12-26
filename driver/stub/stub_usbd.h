@@ -10,7 +10,7 @@ BOOLEAN get_usb_device_desc(usbip_stub_dev_t *devstub, PUSB_DEVICE_DESCRIPTOR pd
 BOOLEAN get_usb_desc(usbip_stub_dev_t *devstub, UCHAR descType, UCHAR idx, USHORT idLang, PVOID buff, ULONG *pbufflen);
 
 BOOLEAN select_usb_conf(usbip_stub_dev_t *devstub, USHORT idx);
-BOOLEAN select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, USHORT alt_setting);
+BOOLEAN select_usb_intf(usbip_stub_dev_t *devstub, UCHAR intf_num, UCHAR alt_setting);
 
 BOOLEAN reset_pipe(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe);
 int set_feature(usbip_stub_dev_t *devstub, USHORT func, USHORT feature, USHORT index);
@@ -27,3 +27,5 @@ submit_iso_transfer(usbip_stub_dev_t *devstub, USBD_PIPE_HANDLE hPipe, unsigned 
 
 BOOLEAN
 submit_control_transfer(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_PACKET *csp, PVOID data, PULONG pdata_len);
+
+ULONG get_usbd_iso_descs_len(ULONG n_pkts, const USBD_ISO_PACKET_DESCRIPTOR *usbd_iso_desc);

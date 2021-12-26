@@ -31,6 +31,19 @@
 #define HDR_IS_CONTROL_TRANSFER(hdr)	((hdr)->base.ep == 0)
 enum { USB_REQUEST_RESET_PIPE = 0xfe };
 
+
+static ULONG get_iso_descs_len(ULONG n_pkts, const struct usbip_iso_packet_descriptor *iso_desc, BOOLEAN is_actual)
+{
+	ULONG len = 0;
+
+	for (ULONG i = 0; i < n_pkts; ++i) {
+		const struct usbip_iso_packet_descriptor *pkt = iso_desc + i;
+		len += is_actual ? pkt->actual_length: pkt->length;
+	}
+
+	return len;
+}
+
 static void
 process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
@@ -168,7 +181,7 @@ process_select_conf(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_
 static void
 process_select_intf(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
 {
-	if (select_usb_intf(devstub, (UCHAR)csp->wIndex.W, csp->wValue.W))
+	if (select_usb_intf(devstub, (UCHAR)csp->wIndex.W, (UCHAR)csp->wValue.W))
 		reply_stub_req_hdr(devstub, USBIP_RET_SUBMIT, seqnum);
 	else
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
