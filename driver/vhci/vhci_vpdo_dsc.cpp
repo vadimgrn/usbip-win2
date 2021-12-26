@@ -24,7 +24,7 @@ static PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
 		}
 
 		char buf[URB_REQ_STR_BUFSZ];
-		TraceInfo(FLAG_GENERAL, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr));
+		Trace(TRACE_LEVEL_INFORMATION, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr));
 
 		free_urbr(urbr);
 		status = STATUS_UNSUCCESSFUL;
@@ -62,7 +62,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 		status = req_fetch_dsc(vpdo, irp);
 		break;
 	default:
-		TraceError(FLAG_GENERAL, "Unhandled %!usb_descriptor_type!", setup->wValue.HiByte);
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %!usb_descriptor_type!", setup->wValue.HiByte);
 	}
 
 	if (dsc_data) {
@@ -107,9 +107,9 @@ static PAGEABLE PWSTR copy_wstring(const USB_STRING_DESCRIPTOR *sd, USHORT Langu
 		DBG_UNREFERENCED_LOCAL_VARIABLE(st);
 		NT_ASSERT(!st);
 
-		TraceInfo(FLAG_GENERAL, "Serial '%S', LanguageId %#04hx", str, LanguageId);
+		Trace(TRACE_LEVEL_INFORMATION, "Serial '%S', LanguageId %#04hx", str, LanguageId);
 	} else {
-		TraceError(FLAG_GENERAL, "Can't allocate memory");
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate memory");
 	}
 
 	return str;
@@ -122,7 +122,7 @@ PAGEABLE void *clone(const void *src, ULONG length)
 	if (buf) {
 		RtlCopyMemory(buf, src, length);
 	} else { 
-		TraceError(FLAG_GENERAL, "Can't allocate %lu bytes", length);
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", length);
 	}
 
 	return buf;

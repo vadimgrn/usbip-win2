@@ -38,13 +38,13 @@ static const void *get_urb_buffer(void *buf, MDL *bufMDL)
 	}
 
 	if (!bufMDL) {
-		TraceError(FLAG_GENERAL, "TransferBuffer and TransferBufferMDL are nullptr");
+		Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are nullptr");
 		return nullptr;
 	}
 
 	buf = MmGetSystemAddressForMdlSafe(bufMDL, LowPagePriority | MdlMappingNoExecute | MdlMappingNoWrite);
 	if (!buf) {
-		TraceError(FLAG_GENERAL, "MmGetSystemAddressForMdlSafe error");
+		Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
 	}
 
 	return buf;
@@ -86,7 +86,7 @@ static NTSTATUS do_copy_payload(void *dst_buf, const struct _URB_ISOCH_TRANSFER 
 			dsc->status = 0;
 			sum += dsc->length;
 		} else {
-			TraceError(FLAG_GENERAL, "[%lu] next_offset(%lu) >= offset(%lu) && next_offset <= r->TransferBufferLength(%lu)",
+			Trace(TRACE_LEVEL_ERROR, "[%lu] next_offset(%lu) >= offset(%lu) && next_offset <= r->TransferBufferLength(%lu)",
 						i, next_offset, offset, r->TransferBufferLength);
 
 			return STATUS_INVALID_PARAMETER;
@@ -254,7 +254,7 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct ur
 	pkt->wLength = r->SetupPacket.wLength;
 
 	char buf[USB_SETUP_PKT_STR_BUFBZ];
-	TraceUrb("ConnectionIndex %lu, %s", r->ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r->SetupPacket));
+	TraceURB("ConnectionIndex %lu, %s", r->ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r->SetupPacket));
 
 	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -504,7 +504,7 @@ static NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, struct urb_re
 	USBD_PIPE_TYPE type = get_endpoint_type(r->PipeHandle);
 
 	if (!(type == UsbdPipeTypeBulk || type == UsbdPipeTypeInterrupt)) {
-		TraceError(FLAG_GENERAL, "%!USBD_PIPE_TYPE!", type);
+		Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -539,7 +539,7 @@ static NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, struct urb_req *urbr)
 	USBD_PIPE_TYPE type = get_endpoint_type(r->PipeHandle);
 
 	if (type != UsbdPipeTypeIsochronous) {
-		TraceError(FLAG_GENERAL, "%!USBD_PIPE_TYPE!", type);
+		Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -591,7 +591,7 @@ static PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, struct urb
 	bool dir_out = is_transfer_direction_out(hdr); // TransferFlags can have wrong direction
 
 	if (dir_out != is_transfer_dir_out(r)) {
-		TraceError(FLAG_GENERAL, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
+		Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -618,7 +618,7 @@ static PAGEABLE NTSTATUS urb_function_unexpected(IRP *irp, URB *urb, struct urb_
 	UNREFERENCED_PARAMETER(urbr);
 
 	USHORT func = urb->UrbHeader.Function;
-	TraceError(FLAG_GENERAL, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
+	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
 
 	NT_ASSERT(!TRANSFERRED(irp));
 	return STATUS_INTERNAL_ERROR;
@@ -894,7 +894,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 {
 	auto urb = (URB*)URB_FROM_IRP(urbr->irp);
 	if (!urb) {
-		TraceVerbose(FLAG_GENERAL, "Null URB");
+		Trace(TRACE_LEVEL_VERBOSE, "Null URB");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
@@ -905,7 +905,7 @@ static NTSTATUS usb_submit_urb(IRP *irp, struct urb_req *urbr)
 		return pfunc(irp, urb, urbr);
 	}
 
-	TraceError(FLAG_GENERAL, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
+	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
 	return STATUS_INVALID_PARAMETER;
 }
 
@@ -915,11 +915,11 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 
 	auto urb = (URB*)URB_FROM_IRP(urbr->irp);
 	if (!urb) {
-		TraceVerbose(FLAG_GENERAL, "Null URB");
+		Trace(TRACE_LEVEL_VERBOSE, "Null URB");
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	TraceVerbose(FLAG_GENERAL, "Transfer data");
+	Trace(TRACE_LEVEL_VERBOSE, "Transfer data");
 
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
@@ -947,7 +947,7 @@ static PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, struct urb_req *urbr)
 		st = transfer_partial(read_irp, urb);
 		break;
 	default:
-		TraceError(FLAG_GENERAL, "%s: unexpected partial transfer", urb_function_str(urb->UrbHeader.Function));
+		Trace(TRACE_LEVEL_ERROR, "%s: unexpected partial transfer", urb_function_str(urb->UrbHeader.Function));
 	}
 
 	return st;
@@ -964,7 +964,8 @@ static PAGEABLE void debug(IRP *irp)
 	NT_ASSERT(transferred == sizeof(*hdr) || (transferred > sizeof(*hdr) && transferred == pdu_sz));
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
-	TraceInfo(FLAG_USBIP, "OUT %Iu%s", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	TraceEvents(TRACE_LEVEL_INFORMATION, FLAG_USBIP, 
+			"OUT %Iu%s", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 }
 
 /*
@@ -988,7 +989,7 @@ NTSTATUS cmd_submit(IRP *read_irp, struct urb_req *urbr)
 		st = get_descriptor_from_node_connection(read_irp, urbr);
 		break;
 	default:
-		TraceWarning(FLAG_GENERAL, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		Trace(TRACE_LEVEL_WARNING, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return st;
@@ -1014,7 +1015,7 @@ static PAGEABLE NTSTATUS cmd_unlink(IRP *irp, struct urb_req *urbr)
  */
 NTSTATUS store_urbr(IRP *read_irp, struct urb_req *urbr)
 {
-	TraceVerbose(FLAG_GENERAL, "Transfer header");
+	Trace(TRACE_LEVEL_VERBOSE, "Transfer header");
 
 	NTSTATUS err = urbr->irp ? cmd_submit(read_irp, urbr) : cmd_unlink(read_irp, urbr);
 	if (!err) {
@@ -1031,7 +1032,7 @@ static void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 {
 	UNREFERENCED_PARAMETER(devobj);
 
-	TraceUrb("Pending irp read cancelled %p", irp_read);
+	TraceURB("Pending irp read cancelled %p", irp_read);
 
 	IoReleaseCancelSpinLock(irp_read->CancelIrql);
 
@@ -1134,11 +1135,11 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceVerbose(FLAG_GENERAL, "Enter irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
+	Trace(TRACE_LEVEL_VERBOSE, "Enter irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
-		TraceError(FLAG_GENERAL, "read for non-vhci is not allowed");
+		Trace(TRACE_LEVEL_ERROR, "read for non-vhci is not allowed");
 		return  irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
@@ -1156,6 +1157,6 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 		irp_done(irp, status);
 	}
 
-	TraceVerbose(FLAG_GENERAL, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+	Trace(TRACE_LEVEL_VERBOSE, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
 	return status;
 }

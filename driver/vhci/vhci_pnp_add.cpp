@@ -53,7 +53,7 @@ static PAGEABLE pvdev_t create_child_pdo(pvdev_t vdev, vdev_type_t type)
 {
 	PAGED_CODE();
 
-	TraceInfo(FLAG_GENERAL, "creating child %!vdev_type_t!", type);
+	Trace(TRACE_LEVEL_INFORMATION, "creating child %!vdev_type_t!", type);
 
 	DEVICE_OBJECT *devobj = vdev_create(vdev->Self->DriverObject, type);
 	if (!devobj) {
@@ -106,7 +106,7 @@ static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 {
 	PAGED_CODE();
 
-	TraceInfo(FLAG_GENERAL, "adding %!vdev_type_t!: pdo: %p", type, pdo);
+	Trace(TRACE_LEVEL_INFORMATION, "adding %!vdev_type_t!: pdo: %p", type, pdo);
 
 	DEVICE_OBJECT *devobj = vdev_create(drvobj, type);
 	if (!devobj) {
@@ -127,7 +127,7 @@ static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 	// attachment chain.  This is where all the IRPs should be routed.
 	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, pdo);
 	if (vdev->devobj_lower == nullptr) {
-		TraceError(FLAG_GENERAL, "failed to attach device stack");
+		Trace(TRACE_LEVEL_ERROR, "failed to attach device stack");
 		IoDeleteDevice(devobj);
 		return STATUS_NO_SUCH_DEVICE;
 	}
@@ -144,7 +144,7 @@ static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 		break;
 	}
 
-	TraceInfo(FLAG_GENERAL, "%!vdev_type_t! added: vdev: %p", type, vdev);
+	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! added: vdev: %p", type, vdev);
 
 	// We are done with initializing, so let's indicate that and return.
 	// This should be the final step in the AddDevice process.
@@ -158,7 +158,7 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PD
 	PAGED_CODE();
 
 	if (!is_valid_vdev_hwid(pdo)) {
-		TraceError(FLAG_GENERAL, "invalid hw id");
+		Trace(TRACE_LEVEL_ERROR, "invalid hw id");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -173,7 +173,7 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PD
 		type = VDEV_ROOT;
 	}
 
-	TraceVerbose(FLAG_GENERAL, "irql %!irql!", KeGetCurrentIrql());
+	Trace(TRACE_LEVEL_VERBOSE, "irql %!irql!", KeGetCurrentIrql());
 
 	return add_vdev(drvobj, pdo, type);
 }

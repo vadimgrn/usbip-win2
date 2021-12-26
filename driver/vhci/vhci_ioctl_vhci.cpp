@@ -23,7 +23,7 @@ static PAGEABLE NTSTATUS get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, 
 
 	drvkey = get_device_prop(vhci->common.child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
 	if (drvkey == nullptr) {
-		TraceWarning(FLAG_GENERAL, "failed to get vhci driver key");
+		Trace(TRACE_LEVEL_WARNING, "failed to get vhci driver key");
 		return STATUS_UNSUCCESSFUL;
 	}
 
@@ -72,7 +72,7 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG in
 
 	prefix_len = get_name_prefix_size(vhub->DevIntfRootHub.Buffer);
 	if (prefix_len == 0) {
-		TraceError(FLAG_GENERAL, "inavlid root hub format: %S", vhub->DevIntfRootHub.Buffer);
+		Trace(TRACE_LEVEL_ERROR, "inavlid root hub format: %S", vhub->DevIntfRootHub.Buffer);
 		return STATUS_INVALID_PARAMETER;
 	}
 	roothub_namelen = sizeof(USB_ROOT_HUB_NAME) + vhub->DevIntfRootHub.Length - prefix_len * sizeof(WCHAR);
@@ -121,7 +121,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack,
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);
 		break;
 	default:
-		TraceError(FLAG_GENERAL, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		Trace(TRACE_LEVEL_ERROR, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return status;

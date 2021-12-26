@@ -98,13 +98,13 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
 	NT_ASSERT(cfgd);
 
 	if (intf->Length < sizeof(*intf) - sizeof(intf->Pipes)) { // can have zero pipes
-		TraceError(FLAG_GENERAL, "Interface length %d is too short", intf->Length);
+		Trace(TRACE_LEVEL_ERROR, "Interface length %d is too short", intf->Length);
 		return STATUS_SUCCESS;
 	}
 
 	USB_INTERFACE_DESCRIPTOR *ifd = dsc_find_intf(cfgd, intf->InterfaceNumber, intf->AlternateSetting);
 	if (!ifd) {
-		TraceWarning(FLAG_GENERAL, "Can't find descriptor: InterfaceNumber %d, AlternateSetting %d",
+		Trace(TRACE_LEVEL_WARNING, "Can't find descriptor: InterfaceNumber %d, AlternateSetting %d",
 					intf->InterfaceNumber, intf->AlternateSetting);
 
 		return STATUS_INVALID_DEVICE_REQUEST;

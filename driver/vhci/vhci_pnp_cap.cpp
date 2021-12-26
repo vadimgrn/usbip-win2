@@ -26,7 +26,7 @@ static PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_
 	// Build an Irp
 	irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ioStatus);
 	if (irp == nullptr) {
-		TraceWarning(FLAG_GENERAL, "failed to create irp");
+		Trace(TRACE_LEVEL_WARNING, "failed to create irp");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -82,14 +82,14 @@ static PAGEABLE NTSTATUS pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION
 
 	// Set the capabilities.
 	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
-		TraceWarning(FLAG_GENERAL, "invalid device capabilities: version: %u, size: %u", pcaps->Version, pcaps->Size);
+		Trace(TRACE_LEVEL_WARNING, "invalid device capabilities: version: %u, size: %u", pcaps->Version, pcaps->Size);
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	// Get the device capabilities of the root pdo
 	status = get_device_capabilities(vpdo->common.parent->parent->parent->devobj_lower, &caps_parent);
 	if (!NT_SUCCESS(status)) {
-		TraceError(FLAG_GENERAL, "failed to get device capabilities from root device: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "failed to get device capabilities from root device: %!STATUS!", status);
 		return status;
 	}
 
@@ -185,7 +185,7 @@ static PAGEABLE NTSTATUS pnp_query_cap(PIO_STACK_LOCATION irpstack)
 
 	// Set the capabilities.
 	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
-		TraceWarning(FLAG_GENERAL, "invalid device capabilities: version: %u, size: %u", pcaps->Version, pcaps->Size);
+		Trace(TRACE_LEVEL_WARNING, "invalid device capabilities: version: %u, size: %u", pcaps->Version, pcaps->Size);
 		return STATUS_UNSUCCESSFUL;
 	}
 	setup_capabilities(pcaps);

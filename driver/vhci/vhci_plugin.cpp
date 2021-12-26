@@ -12,7 +12,7 @@ static PAGEABLE void vhci_init_vpdo(pvpdo_dev_t vpdo)
 {
 	PAGED_CODE();
 
-	TraceInfo(FLAG_GENERAL, "vhci_init_vpdo: %p", vpdo);
+	Trace(TRACE_LEVEL_INFORMATION, "vhci_init_vpdo: %p", vpdo);
 
 	vpdo->plugged = TRUE;
 
@@ -78,7 +78,7 @@ static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIP
 			vpdo->subclass = dsc_intf->bInterfaceSubClass;
 			vpdo->protocol = dsc_intf->bInterfaceProtocol;
 		} else {
-			TraceError(FLAG_GENERAL, "interface descriptor not found");
+			Trace(TRACE_LEVEL_ERROR, "interface descriptor not found");
 		}
 	}
 }
@@ -88,14 +88,14 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	PAGED_CODE();
 
 	if (inlen < sizeof(*pluginfo)) {
-		TraceError(FLAG_GENERAL, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
+		Trace(TRACE_LEVEL_ERROR, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	USHORT wTotalLength = pluginfo->dscr_conf.wTotalLength;
 
 	if (inlen != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
-		TraceError(FLAG_GENERAL, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
+		Trace(TRACE_LEVEL_ERROR, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -104,7 +104,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_END_OF_FILE;
 	}
 
-	TraceInfo(FLAG_GENERAL, "Plugin vpdo: port %d", (int)pluginfo->port);
+	Trace(TRACE_LEVEL_INFORMATION, "Plugin vpdo: port %d", (int)pluginfo->port);
 
 	PDEVICE_OBJECT devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
@@ -121,7 +121,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	vpdo_dev_t *devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
 	if (devpdo_old) {
-		TraceInfo(FLAG_GENERAL, "you can't plugin again");
+		Trace(TRACE_LEVEL_INFORMATION, "you can't plugin again");
 		IoDeleteDevice(devobj);
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -148,21 +148,21 @@ PAGEABLE NTSTATUS vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 	pvpdo_dev_t	vpdo;
 
 	if (vhub == nullptr) {
-		TraceInfo(FLAG_GENERAL, "vhub has gone");
+		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
 	if (port < 0) {
-		TraceInfo(FLAG_GENERAL, "plugging out all the devices!");
+		Trace(TRACE_LEVEL_INFORMATION, "plugging out all the devices!");
 		vhub_mark_unplugged_all_vpdos(vhub);
 		return STATUS_SUCCESS;
 	}
 
-	TraceInfo(FLAG_GENERAL, "plugging out device: port %u", port);
+	Trace(TRACE_LEVEL_INFORMATION, "plugging out device: port %u", port);
 
 	vpdo = vhub_find_vpdo(vhub, port);
 	if (vpdo == nullptr) {
-		TraceInfo(FLAG_GENERAL, "no matching vpdo: port %u", port);
+		Trace(TRACE_LEVEL_INFORMATION, "no matching vpdo: port %u", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}
 

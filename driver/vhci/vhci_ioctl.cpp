@@ -19,7 +19,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP ir
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceVerbose(FLAG_GENERAL, "%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
+	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
 			vdev->type, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	ULONG inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
@@ -38,7 +38,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP ir
 		status = vhci_ioctl_vhub((vhub_dev_t*)vdev, irp, ioctl_code, buffer, inlen, &outlen);
 		break;
 	default:
-		TraceWarning(FLAG_GENERAL, "ioctl for %!vdev_type_t! is not allowed", vdev->type);
+		Trace(TRACE_LEVEL_WARNING, "ioctl for %!vdev_type_t! is not allowed", vdev->type);
 		outlen = 0;
 	}
 
@@ -49,6 +49,6 @@ END:
 		irp_done(irp, status);
 	}
 
-	TraceVerbose(FLAG_GENERAL, "%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
+	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
 	return status;
 }

@@ -230,7 +230,7 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceVerbose(FLAG_GENERAL, "%!vdev_type_t!: enter irql %!irql!, %!pnpmn!",
+	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: enter irql %!irql!, %!pnpmn!",
 			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	NTSTATUS status = STATUS_SUCCESS;
@@ -240,10 +240,10 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	} else if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
 		status = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
 	} else {
-		TraceWarning(FLAG_GENERAL, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
+		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
 		status = irp_done_iostatus(irp);
 	}
 
-	TraceVerbose(FLAG_GENERAL, "%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
+	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
 	return status;
 }
