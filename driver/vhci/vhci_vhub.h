@@ -4,7 +4,7 @@
 #include "vhci_dev.h"
 #include "usbip_vhci_api.h"
 
-PAGEABLE pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, unsigned port);
+PAGEABLE pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, ULONG port);
 PAGEABLE CHAR vhub_get_empty_port(pvhub_dev_t vhub);
 
 PAGEABLE void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);

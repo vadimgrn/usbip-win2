@@ -183,7 +183,7 @@ inline void vdev_del_ref(vdev_t *vdev)
 	InterlockedDecrement(&vdev->n_refs);
 }
 
-pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, unsigned port);
+pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, ULONG port);
 
 void vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
 
@@ -191,7 +191,7 @@ LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG
 
 #define TO_DEVOBJ(vdev)		((vdev)->common.Self)
 
-inline bool is_fdo(vdev_type_t type)
+inline auto is_fdo(vdev_type_t type)
 {
 	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
 }
@@ -199,10 +199,10 @@ inline bool is_fdo(vdev_type_t type)
 inline vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
 {	
 	struct _vdev *child_pdo = vhci->common.child_pdo;
-	return child_pdo ? (vhub_dev_t*)child_pdo->fdo : NULL;
+	return child_pdo ? (vhub_dev_t*)child_pdo->fdo : nullptr;
 }
 
-inline vhub_dev_t *vhub_from_vpdo(vpdo_dev_t *vpdo)
+inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
 	return (vhub_dev_t*)(vpdo->common.parent);
 }

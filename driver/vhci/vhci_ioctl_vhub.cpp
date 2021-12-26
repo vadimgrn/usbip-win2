@@ -98,20 +98,20 @@ static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp
 {
 	PAGED_CODE();
 
-	USB_DESCRIPTOR_REQUEST *r = (USB_DESCRIPTOR_REQUEST*)buffer;
+	auto r = static_cast<USB_DESCRIPTOR_REQUEST*>(buffer);
 
 	if (inlen < sizeof(*r)) {
 		*poutlen = sizeof(*r);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	vpdo_dev_t *vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex);
+	auto vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex);
 	if (!vpdo) {
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
-	NTSTATUS status = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
-	vdev_del_ref((vdev_t*)vpdo);
+	auto status = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
+	vdev_del_ref(reinterpret_cast<vdev_t*>(vpdo));
 
 	return status;
 }

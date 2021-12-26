@@ -5,12 +5,12 @@
 #include "vhci_dev.h"
 #include "usbip_vhci_api.h"
 
-static PAGEABLE pvpdo_dev_t find_vpdo(pvhub_dev_t vhub, unsigned port)
+static PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, ULONG port)
 {
 	PAGED_CODE();
 
-	for (LIST_ENTRY *entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		vpdo_dev_t *vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		if (vpdo->port == port) {
 			return vpdo;
 		}
@@ -19,18 +19,18 @@ static PAGEABLE pvpdo_dev_t find_vpdo(pvhub_dev_t vhub, unsigned port)
 	return nullptr;
 }
 
-PAGEABLE pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, unsigned port)
+PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, ULONG port)
 {
 	PAGED_CODE();
 
-	pvpdo_dev_t	vpdo;
-
 	ExAcquireFastMutex(&vhub->Mutex);
-	vpdo = find_vpdo(vhub, port);
-	if (vpdo)
-		vdev_add_ref((pvdev_t)vpdo);
-	ExReleaseFastMutex(&vhub->Mutex);
+	
+	auto vpdo = find_vpdo(vhub, port);
+	if (vpdo) {
+		vdev_add_ref((vdev_t*)vpdo);
+	}
 
+	ExReleaseFastMutex(&vhub->Mutex);
 	return vpdo;
 }
 
@@ -38,16 +38,18 @@ PAGEABLE CHAR vhub_get_empty_port(pvhub_dev_t vhub)
 {
 	PAGED_CODE();
 
+	CHAR port = -1;
 	ExAcquireFastMutex(&vhub->Mutex);
-	for (CHAR i = 0; i < (CHAR)vhub->n_max_ports; i++) {
-		if (find_vpdo(vhub, i) == nullptr) {
-			ExReleaseFastMutex(&vhub->Mutex);
-			return i;
+
+	for (CHAR i = 0; i < (CHAR)vhub->n_max_ports; ++i) {
+		if (!find_vpdo(vhub, i)) {
+			port = i;
+			break;
 		}
 	}
-	ExReleaseFastMutex(&vhub->Mutex);
 
-	return -1;
+	ExReleaseFastMutex(&vhub->Mutex);
+	return port;
 }
 
 PAGEABLE void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
@@ -57,9 +59,10 @@ PAGEABLE void vhub_attach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 	ExAcquireFastMutex(&vhub->Mutex);
 
 	InsertTailList(&vhub->head_vpdo, &vpdo->Link);
-	vhub->n_vpdos++;
-	if (vpdo->plugged)
-		vhub->n_vpdos_plugged++;
+	++vhub->n_vpdos;
+	if (vpdo->plugged) {
+		++vhub->n_vpdos_plugged;
+	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
 }
@@ -73,21 +76,21 @@ PAGEABLE void vhub_detach_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo)
 	RemoveEntryList(&vpdo->Link);
 	InitializeListHead(&vpdo->Link);
 	NT_ASSERT(vhub->n_vpdos > 0);
-	vhub->n_vpdos--;
+	--vhub->n_vpdos;
 
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE void vhub_get_hub_descriptor(pvhub_dev_t vhub, PUSB_HUB_DESCRIPTOR pdesc)
+PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR *d)
 {
 	PAGED_CODE();
 
-	pdesc->bDescriptorLength = 9;
-	pdesc->bDescriptorType = 0x29;
-	pdesc->bNumberOfPorts = (UCHAR)vhub->n_max_ports;
-	pdesc->wHubCharacteristics = 0;
-	pdesc->bPowerOnToPowerGood = 1;
-	pdesc->bHubControlCurrent = 1;
+	d->bDescriptorLength = 9;
+	d->bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE; // USB_30_HUB_DESCRIPTOR_TYPE
+	d->bNumberOfPorts = (UCHAR)vhub->n_max_ports;
+	d->wHubCharacteristics = 0;
+	d->bPowerOnToPowerGood = 1;
+	d->bHubControlCurrent = 1;
 }
 
 PAGEABLE NTSTATUS vhub_get_information_ex(pvhub_dev_t vhub, PUSB_HUB_INFORMATION_EX pinfo)
