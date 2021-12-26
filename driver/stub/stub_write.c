@@ -29,6 +29,7 @@
 #include "pdu.h"
 
 #define HDR_IS_CONTROL_TRANSFER(hdr)	((hdr)->base.ep == 0)
+enum { USB_REQUEST_RESET_PIPE = 0xfe };
 
 static void
 process_get_status(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIPE_SETUP_PACKET *csp)
