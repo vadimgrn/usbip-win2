@@ -16,61 +16,69 @@
  * Pointer to any of them can be used to access TransferBufferLength, TransferBuffer, TransferBufferMDL of any other instance 
  * of these URBs.
  */
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferFlags), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferFlags), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_ISOCH_TRANSFER, TransferFlags), "assert");
-//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferFlags), "assert");
-//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferFlags), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferFlags), "assert");
-//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferFlags), "assert");
-//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferFlags), "assert");
-//static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferFlags) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferFlags), "assert");
+const auto off_flags = offsetof(_URB_CONTROL_TRANSFER, TransferFlags);
+static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferFlags) == off_flags, "assert");
+static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferFlags) == off_flags, "assert");
+static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferFlags) == off_flags, "assert");
+//static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferFlags) == off_flags, "assert");
+//static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferFlags) == off_flags, "assert");
+static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferFlags) == off_flags, "assert");
+//static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferFlags) == off_flags, "assert");
+//static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferFlags) == off_flags, "assert");
+//static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferFlags) == off_flags, "assert");
 
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferLength), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferLength) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferLength), "assert");
+const auto off_len = offsetof(_URB_CONTROL_TRANSFER, TransferBufferLength);
+static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferLength) == off_len, "assert");
+static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferLength) == off_len, "assert");
 
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBuffer), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBuffer) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBuffer), "assert");
+const auto off_buf = offsetof(_URB_CONTROL_TRANSFER, TransferBuffer);
+static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBuffer) == off_buf, "assert");
+static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBuffer) == off_buf, "assert");
 
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_TRANSFER_EX, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_ISOCH_TRANSFER, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_GET_STATUS_REQUEST, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferMDL), "assert");
-static_assert(offsetof(struct _URB_CONTROL_TRANSFER, TransferBufferMDL) == offsetof(struct _URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferMDL), "assert");
+const auto off_mdl = offsetof(_URB_CONTROL_TRANSFER, TransferBufferMDL);
+static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferMDL) == off_mdl, "assert");
+static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferMDL) == off_mdl, "assert");
 
-#define TRANSFERRED(irp) ((irp)->IoStatus.Information)
+namespace
+{
 
-static inline auto get_irp_buffer(const IRP *irp)
+inline auto& TRANSFERRED(IRP *irp) { return irp->IoStatus.Information; }
+inline auto TRANSFERRED(const IRP *irp) { return irp->IoStatus.Information; }
+
+inline auto get_irp_buffer(const IRP *irp)
 {
 	return irp->AssociatedIrp.SystemBuffer;
 }
 
-static PAGEABLE ULONG get_irp_buffer_size(const IRP *irp)
+PAGEABLE auto get_irp_buffer_size(const IRP *irp)
 {
 	PAGED_CODE();
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation((IRP*)irp);
 	return irpstack->Parameters.Write.Length;
 }
 
-static PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
+PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
 {
 	PAGED_CODE();
 
@@ -92,9 +100,9 @@ static PAGEABLE void *get_urb_buffer(void *buf, MDL *bufMDL)
 }
 
 /*
- * Actual TransferBufferLength must already be set.
- */
-static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
+* Actual TransferBufferLength must already be set.
+*/
+PAGEABLE auto copy_to_transfer_buffer(URB *urb, const void *src)
 {
 	PAGED_CODE();
 
@@ -102,7 +110,7 @@ static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
 	NT_ASSERT(urb->UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
 	struct _URB_CONTROL_TRANSFER *r = &urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	void *buf = get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL);
+	auto buf = get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL);
 
 	if (buf) {
 		RtlCopyMemory(buf, src, r->TransferBufferLength);
@@ -113,7 +121,7 @@ static PAGEABLE void *copy_to_transfer_buffer(URB *urb, const void *src)
 	return buf;
 }
 
-static PAGEABLE NTSTATUS assign(ULONG *TransferBufferLength, int actual_length)
+PAGEABLE NTSTATUS assign(ULONG *TransferBufferLength, int actual_length)
 {
 	PAGED_CODE();
 
@@ -124,14 +132,14 @@ static PAGEABLE NTSTATUS assign(ULONG *TransferBufferLength, int actual_length)
 }
 
 /*
- * MmGetSystemAddressForMdlSafe is the most probable source of the failure of copy_to_transfer_buffer.
- */
-static constexpr auto get_copy_status(const void *p)
+* MmGetSystemAddressForMdlSafe is the most probable source of the failure of copy_to_transfer_buffer.
+*/
+constexpr auto get_copy_status(const void *p)
 {
 	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vpdo);
@@ -151,29 +159,29 @@ static PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const 
 	void *buf = copy_to_transfer_buffer(urb, hdr + 1);
 	if (buf && !bulk) { // bulk can have sensitive data
 		TraceURB("%s(%#04x): %!BIN!", urb_function_str(func), func, 
-					WppBinary(buf, (USHORT)r->TransferBufferLength));
+			WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
 	return get_copy_status(buf);
 }
 
-static PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
-static PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
 /*
- * A request can read descriptor header or full descriptor to obtain its real size.
- * F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
- */
-static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+* A request can read descriptor header or full descriptor to obtain its real size.
+* F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
+*/
+PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
@@ -205,43 +213,43 @@ static PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *u
 	}
 
 	TraceURB("%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
-				urb_function_str(r->Hdr.Function), 
-				dsc->bLength,
-				dsc->bDescriptorType,
-				WppBinary(dsc, (USHORT)r->TransferBufferLength));
+		urb_function_str(r->Hdr.Function), 
+		dsc->bLength,
+		dsc->bDescriptorType,
+		WppBinary(dsc, (USHORT)r->TransferBufferLength));
 
 	if (hdr->u.ret_submit.status) {
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
-			((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
+		((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
 
 	if (dsc_len > sizeof(*dsc) && dsc_len == r->TransferBufferLength) { // full descriptor
 		cache_descriptor(vpdo, r, dsc);
 	} else {
 		TraceURB("%s: skip caching of descriptor: TransferBufferLength(%lu), dsc_len(%d)", 
-					urb_function_str(r->Hdr.Function), r->TransferBufferLength, dsc_len);
+			urb_function_str(r->Hdr.Function), r->TransferBufferLength, dsc_len);
 	}
 
 	return STATUS_SUCCESS;
 }
 
 /*
- * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == src_len, 
- * src->offset is ignored for that reason.
- *
- * For isochronous packets: actual length is the sum of
- * the actual length of the individual, packets, but as
- * the packet offsets are not changed there will be
- * padding between the packets. To optimally use the
- * bandwidth the padding is not transmitted.
- *
- * See: 
- * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
- * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
-  */
-static PAGEABLE NTSTATUS copy_isoc_data(
+* Buffer from the server has no gaps (compacted), SUM(src->actual_length) == src_len, 
+* src->offset is ignored for that reason.
+*
+* For isochronous packets: actual length is the sum of
+* the actual length of the individual, packets, but as
+* the packet offsets are not changed there will be
+* padding between the packets. To optimally use the
+* bandwidth the padding is not transmitted.
+*
+* See: 
+* <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
+* <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
+*/
+PAGEABLE NTSTATUS copy_isoc_data(
 	struct _URB_ISOCH_TRANSFER *r, char *dst_buf, 
 	const struct usbip_iso_packet_descriptor *src, const char *src_buf, ULONG src_len)
 {
@@ -249,14 +257,14 @@ static PAGEABLE NTSTATUS copy_isoc_data(
 
 	bool dir_out = !src_buf;
 	USBD_ISO_PACKET_DESCRIPTOR *dst = r->IsoPacket;
-	
+
 	ULONG src_offset = r->NumberOfPackets ? src->offset : 0;
 	NT_ASSERT(!src_offset);
 
 	for (ULONG i = 0; i < r->NumberOfPackets; ++i, ++src, ++dst) {
-	
+
 		dst->Status = src->status ? to_windows_status(src->status) : USBD_STATUS_SUCCESS;
-		
+
 		if (dir_out) {
 			continue; // dst->Length not used for OUT transfers
 		}
@@ -283,7 +291,7 @@ static PAGEABLE NTSTATUS copy_isoc_data(
 
 		if (src_offset + src->actual_length > src_len) {
 			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)", 
-						src_offset, src->actual_length, src_len);
+				src_offset, src->actual_length, src_len);
 
 			return STATUS_INVALID_PARAMETER;
 		}
@@ -296,7 +304,7 @@ static PAGEABLE NTSTATUS copy_isoc_data(
 		}
 
 		RtlCopyMemory(dst_buf + dst->Offset, src_buf + src_offset, src->actual_length);
-		
+
 		dst->Length = src->actual_length;
 		src_offset += src->actual_length;
 	}
@@ -310,9 +318,9 @@ static PAGEABLE NTSTATUS copy_isoc_data(
 }
 
 /*
- * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[].
- */
-static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+* Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[].
+*/
+PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vpdo);
@@ -350,26 +358,26 @@ static PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const st
 
 	void *ptr = r->Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? nullptr : r->TransferBuffer;
 	auto buf = (char*)get_urb_buffer(ptr, r->TransferBufferMDL);
-	
+
 	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : nullptr, src_len) : 
-		     get_copy_status(buf);
+		get_copy_status(buf);
 }
 
 /*
 * Nothing to handle.
 */
-static PAGEABLE NTSTATUS urb_function_success(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS urb_function_success(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
 	UNREFERENCED_PARAMETER(vpdo);
 	UNREFERENCED_PARAMETER(urb);
 	UNREFERENCED_PARAMETER(hdr);
-	
+
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
@@ -384,7 +392,7 @@ static PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, con
 
 typedef NTSTATUS (*urb_function_t)(vpdo_dev_t*, URB*, const struct usbip_header*);
 
-static const urb_function_t urb_functions[] =
+const urb_function_t urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,
@@ -476,13 +484,13 @@ static const urb_function_t urb_functions[] =
 };
 
 /*
- * URB function must:
- * 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
- *   For example, select_configuration/select_interface immediately returns in such case.
- * 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
- *   even if UrbHeader.Status != USBD_STATUS_SUCCESS. Data was sent over the network, do not ditch it.
- */
-static PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
+* URB function must:
+* 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
+*   For example, select_configuration/select_interface immediately returns in such case.
+* 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
+*   even if UrbHeader.Status != USBD_STATUS_SUCCESS. Data was sent over the network, do not ditch it.
+*/
+PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct usbip_header *hdr)
 {
 	PAGED_CODE(); 
 
@@ -505,13 +513,13 @@ static PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const struct
 	} else if (urb->UrbHeader.Status && !err) {
 		err = STATUS_UNSUCCESSFUL;
 		Trace(TRACE_LEVEL_VERBOSE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
-					err, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
+			err, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
 	}
 
 	return err;
 }
 
-static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
@@ -527,20 +535,20 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const str
 
 	auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
-	
+
 	TraceURB("ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
 		r->ConnectionIndex, data_sz, actual_length, WppBinary(r->Data, (USHORT)actual_length));
 
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS usb_reset_port(const struct usbip_header *hdr)
+PAGEABLE NTSTATUS usb_reset_port(const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_header *hdr)
+PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 
@@ -571,13 +579,13 @@ static PAGEABLE NTSTATUS ret_submit(struct urb_req *urbr, const struct usbip_hea
 	return st;
 }
 
-static PAGEABLE NTSTATUS ret_unlink(const struct usbip_header *hdr)
+PAGEABLE NTSTATUS ret_unlink(const struct usbip_header *hdr)
 {
 	PAGED_CODE();
 	return hdr->u.ret_unlink.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
+PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 {
 	PAGED_CODE();
 
@@ -594,22 +602,22 @@ static PAGEABLE const struct usbip_header *consume_write_irp_buffer(IRP *irp)
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_INFORMATION, FLAG_USBIP, "IN %Iu%s", 
-				pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+			pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	}
 
 	if (buf_sz == pdu_sz) {
 		TRANSFERRED(irp) = buf_sz;
 		return hdr;
 	}
-	
+
 	Trace(TRACE_LEVEL_ERROR, "Write buffer %lu != pdu size %Iu", buf_sz, pdu_sz);
 	return nullptr;
 }
 
 /*
- * Code must be in nonpaged section if it acquires spinlock.
- */
-static void complete_irp(IRP *irp, NTSTATUS status)
+* Code must be in nonpaged section if it acquires spinlock.
+*/
+void complete_irp(IRP *irp, NTSTATUS status)
 {
 	KIRQL oldirql;
 
@@ -633,7 +641,7 @@ static void complete_irp(IRP *irp, NTSTATUS status)
 	KeLowerIrql(oldirql);
 }
 
-static PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
+PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	PAGED_CODE();
 
@@ -647,7 +655,7 @@ static PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		Trace(TRACE_LEVEL_VERBOSE, "urb_req not found (cancelled?), seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
-	
+
 	NTSTATUS status = STATUS_INVALID_PARAMETER;
 
 	switch (hdr->base.command) {
@@ -669,6 +677,9 @@ static PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 
 	return STATUS_SUCCESS;
 }
+
+} // namespace
+
 
 /*
 * WriteFile -> IRP_MJ_WRITE -> vhci_write
