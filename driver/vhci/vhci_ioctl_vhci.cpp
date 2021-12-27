@@ -13,7 +13,7 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
-static PAGEABLE NTSTATUS get_hcd_driverkey_name(pvhci_dev_t vhci, PVOID buffer, PULONG poutlen)
+static PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t * vhci, PVOID buffer, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -61,7 +61,7 @@ static PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
 	return 0;
 }
 
-PAGEABLE NTSTATUS vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -88,7 +88,7 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(pvhub_dev_t vhub, PVOID buffer, ULONG in
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhci(pvhci_dev_t vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 

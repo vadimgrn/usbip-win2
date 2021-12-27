@@ -9,7 +9,7 @@
 #include <initguid.h> // required for GUID definitions
 #include "usbip_vhci_api.h"
 
-static PAGEABLE NTSTATUS start_vhci(pvhci_dev_t vhci)
+static PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
@@ -33,11 +33,11 @@ static PAGEABLE NTSTATUS start_vhci(pvhci_dev_t vhci)
 	return status;
 }
 
-static PAGEABLE NTSTATUS start_vhub(pvhub_dev_t vhub)
+static PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
 {
 	PAGED_CODE();
 
-	pvhci_dev_t	vhci;
+	vhci_dev_t *	vhci;
 	NTSTATUS	status;
 
 	status = IoRegisterDeviceInterface(vhub->common.pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HUB, nullptr, &vhub->DevIntfRootHub);
@@ -51,7 +51,7 @@ static PAGEABLE NTSTATUS start_vhub(pvhub_dev_t vhub)
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	vhci = (pvhci_dev_t)vhub->common.parent;
+	vhci = (vhci_dev_t *)vhub->common.parent;
 	status = IoSetDeviceInterfaceState(&vhci->DevIntfVhci, TRUE);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to enable vhci device interface: %!STATUS!", status);
@@ -66,7 +66,7 @@ static PAGEABLE NTSTATUS start_vhub(pvhub_dev_t vhub)
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS start_vpdo(pvpdo_dev_t vpdo)
+static PAGEABLE NTSTATUS start_vpdo(vpdo_dev_t * vpdo)
 {
 	PAGED_CODE();
 

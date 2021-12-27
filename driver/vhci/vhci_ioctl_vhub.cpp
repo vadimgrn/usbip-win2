@@ -10,7 +10,7 @@
 #include "vhci_vpdo_dsc.h"
 #include "vhci_vhub.h"
 
-static PAGEABLE NTSTATUS get_node_info(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_node_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -31,12 +31,12 @@ static PAGEABLE NTSTATUS get_node_info(pvhub_dev_t vhub, PVOID buffer, ULONG inl
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS get_nodeconn_info(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_nodeconn_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
 	PUSB_NODE_CONNECTION_INFORMATION	conninfo = (PUSB_NODE_CONNECTION_INFORMATION)buffer;
-	pvpdo_dev_t	vpdo;
+	vpdo_dev_t *	vpdo;
 	NTSTATUS	status;
 
 	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION)) {
@@ -48,16 +48,16 @@ static PAGEABLE NTSTATUS get_nodeconn_info(pvhub_dev_t vhub, PVOID buffer, ULONG
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info(vpdo, conninfo, poutlen);
 	if (vpdo != nullptr)
-		vdev_del_ref((pvdev_t)vpdo);
+		vdev_del_ref((vdev_t *)vpdo);
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_nodeconn_info_ex(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_nodeconn_info_ex(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
 	PUSB_NODE_CONNECTION_INFORMATION_EX	conninfo = (PUSB_NODE_CONNECTION_INFORMATION_EX)buffer;
-	pvpdo_dev_t	vpdo;
+	vpdo_dev_t *	vpdo;
 	NTSTATUS	status;
 
 	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX) || *poutlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX)) {
@@ -69,16 +69,16 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex(pvhub_dev_t vhub, PVOID buffer, UL
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info_ex(vpdo, conninfo, poutlen);
 	if (vpdo != nullptr)
-		vdev_del_ref((pvdev_t)vpdo);
+		vdev_del_ref((vdev_t *)vpdo);
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
 	PUSB_NODE_CONNECTION_INFORMATION_EX_V2	conninfo = (PUSB_NODE_CONNECTION_INFORMATION_EX_V2)buffer;
-	pvpdo_dev_t	vpdo;
+	vpdo_dev_t *	vpdo;
 	NTSTATUS	status;
 
 	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2) || *poutlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2)) {
@@ -90,7 +90,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(pvhub_dev_t vhub, PVOID buffer,
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info_ex_v2(vpdo, conninfo, poutlen);
 	if (vpdo != nullptr)
-		vdev_del_ref((pvdev_t)vpdo);
+		vdev_del_ref((vdev_t *)vpdo);
 	return status;
 }
 
@@ -116,7 +116,7 @@ static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_hub_information_ex(pvhub_dev_t vhub, PVOID buffer, PULONG poutlen)
+static PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -129,7 +129,7 @@ static PAGEABLE NTSTATUS get_hub_information_ex(pvhub_dev_t vhub, PVOID buffer, 
 	return vhub_get_information_ex(vhub, pinfo);
 }
 
-static PAGEABLE NTSTATUS get_hub_capabilities_ex(pvhub_dev_t vhub, PVOID buffer, PULONG poutlen)
+static PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -140,7 +140,7 @@ static PAGEABLE NTSTATUS get_hub_capabilities_ex(pvhub_dev_t vhub, PVOID buffer,
 	return vhub_get_capabilities_ex(vhub, pinfo);
 }
 
-static PAGEABLE NTSTATUS get_port_connector_properties(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -153,12 +153,12 @@ static PAGEABLE NTSTATUS get_port_connector_properties(pvhub_dev_t vhub, PVOID b
 	return vhub_get_port_connector_properties(vhub, pinfo, poutlen);
 }
 
-static PAGEABLE NTSTATUS get_node_driverkey_name(pvhub_dev_t vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+static PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
 	PUSB_NODE_CONNECTION_DRIVERKEY_NAME	pdrvkey_name = (PUSB_NODE_CONNECTION_DRIVERKEY_NAME)buffer;
-	pvpdo_dev_t	vpdo;
+	vpdo_dev_t *	vpdo;
 	LPWSTR		driverkey;
 	ULONG		driverkeylen;
 	NTSTATUS	status;
@@ -193,12 +193,12 @@ static PAGEABLE NTSTATUS get_node_driverkey_name(pvhub_dev_t vhub, PVOID buffer,
 		}
 		ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
 	}
-	vdev_del_ref((pvdev_t)vpdo);
+	vdev_del_ref((vdev_t *)vpdo);
 
 	return status;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhub(pvhub_dev_t vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t * vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 

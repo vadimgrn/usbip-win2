@@ -8,7 +8,7 @@
 #include "usb_util.h"
 #include "devconf.h"
 
-static PAGEABLE void vhci_init_vpdo(pvpdo_dev_t vpdo)
+static PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 {
 	PAGED_CODE();
 
@@ -41,7 +41,7 @@ static PAGEABLE void vhci_init_vpdo(pvpdo_dev_t vpdo)
 }
 
 static void
-setup_vpdo_with_dsc_dev(pvpdo_dev_t vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
+setup_vpdo_with_dsc_dev(vpdo_dev_t * vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
 {
 	NT_ASSERT(dsc_dev);
 
@@ -140,12 +140,12 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
+PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, CHAR port)
 {
 	PAGED_CODE();
 
-	pvhub_dev_t	vhub = vhub_from_vhci(vhci);
-	pvpdo_dev_t	vpdo;
+	vhub_dev_t *	vhub = vhub_from_vhci(vhci);
+	vpdo_dev_t *	vpdo;
 
 	if (vhub == nullptr) {
 		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
@@ -167,7 +167,7 @@ PAGEABLE NTSTATUS vhci_unplug_port(pvhci_dev_t vhci, CHAR port)
 	}
 
 	vhub_mark_unplugged_vpdo(vhub, vpdo);
-	vdev_del_ref((pvdev_t)vpdo);
+	vdev_del_ref((vdev_t *)vpdo);
 
 	return STATUS_SUCCESS;
 }

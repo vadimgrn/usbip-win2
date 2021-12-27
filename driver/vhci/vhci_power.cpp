@@ -18,7 +18,7 @@ static void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const
 }
 
 static NTSTATUS
-vhci_power_vhci(pvhci_dev_t vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
+vhci_power_vhci(vhci_dev_t * vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 {
 	POWER_STATE		powerState;
 	POWER_STATE_TYPE	powerType;
@@ -39,7 +39,7 @@ vhci_power_vhci(pvhci_dev_t vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 }
 
 static NTSTATUS
-vhci_power_vdev(pvdev_t vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+vhci_power_vdev(vdev_t * vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 {
 	POWER_STATE		powerState;
 	POWER_STATE_TYPE	powerType;

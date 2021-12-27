@@ -70,7 +70,7 @@ static PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG p
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(pvhci_dev_t vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t * vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vhci);

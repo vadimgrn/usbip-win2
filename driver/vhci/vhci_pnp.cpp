@@ -20,14 +20,14 @@ NTSTATUS irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : irp_done_success(irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_stop_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, StopPending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -40,21 +40,21 @@ static PAGEABLE NTSTATUS pnp_cancel_stop_device(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_stop_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_stop_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, Stopped);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_remove_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
 	switch (vdev->type) {
 	case VDEV_VPDO:
 		/* vpdo cannot be removed */
-		vhub_mark_unplugged_vpdo(vhub_from_vpdo((pvpdo_dev_t)vdev), (pvpdo_dev_t)vdev);
+		vhub_mark_unplugged_vpdo(vhub_from_vpdo((vpdo_dev_t *)vdev), (vpdo_dev_t *)vdev);
 		break;
 	}
 
@@ -62,7 +62,7 @@ static PAGEABLE NTSTATUS pnp_query_remove_device(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_cancel_remove_device(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -73,7 +73,7 @@ static PAGEABLE NTSTATUS pnp_cancel_remove_device(pvdev_t vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_surprise_removal(pvdev_t vdev, PIRP irp)
+static PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);

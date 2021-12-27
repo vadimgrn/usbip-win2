@@ -49,7 +49,7 @@ static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t 
 	return nullptr;
 }
 
-static PAGEABLE pvdev_t create_child_pdo(pvdev_t vdev, vdev_type_t type)
+static PAGEABLE vdev_t * create_child_pdo(vdev_t * vdev, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -68,27 +68,27 @@ static PAGEABLE pvdev_t create_child_pdo(pvdev_t vdev, vdev_type_t type)
 	return vdev_child;
 }
 
-static PAGEABLE void init_dev_root(pvdev_t vdev)
+static PAGEABLE void init_dev_root(vdev_t * vdev)
 {
 	PAGED_CODE();
 	vdev->child_pdo = create_child_pdo(vdev, VDEV_CPDO);
 }
 
-static PAGEABLE void init_dev_vhci(pvdev_t vdev)
+static PAGEABLE void init_dev_vhci(vdev_t * vdev)
 {
 	PAGED_CODE();
-	pvhci_dev_t	vhci = (pvhci_dev_t)vdev;
+	vhci_dev_t *	vhci = (vhci_dev_t *)vdev;
 
 	vdev->child_pdo = create_child_pdo(vdev, VDEV_HPDO);
 	RtlUnicodeStringInitEx(&vhci->DevIntfVhci, nullptr, STRSAFE_IGNORE_NULLS);
 	RtlUnicodeStringInitEx(&vhci->DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 }
 
-static PAGEABLE void init_dev_vhub(pvdev_t vdev)
+static PAGEABLE void init_dev_vhub(vdev_t * vdev)
 {
 	PAGED_CODE();
 
-	pvhub_dev_t	vhub = (pvhub_dev_t)vdev;
+	vhub_dev_t *	vhub = (vhub_dev_t *)vdev;
 
 	ExInitializeFastMutex(&vhub->Mutex);
 	InitializeListHead(&vhub->head_vpdo);

@@ -17,7 +17,7 @@ NPAGED_LOOKASIDE_LIST g_lookaside;
 namespace
 {
 
-PAGEABLE void cleanup_vpdo(pvhci_dev_t vhci, PIRP irp)
+PAGEABLE void cleanup_vpdo(vhci_dev_t * vhci, PIRP irp)
 {
 	PAGED_CODE();
 

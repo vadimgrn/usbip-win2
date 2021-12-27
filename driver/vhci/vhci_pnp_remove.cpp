@@ -14,7 +14,7 @@
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-static void complete_pending_read_irp(pvpdo_dev_t vpdo)
+static void complete_pending_read_irp(vpdo_dev_t * vpdo)
 {
 	KIRQL	oldirql;
 	PIRP	irp;
@@ -42,7 +42,7 @@ static void complete_pending_read_irp(pvpdo_dev_t vpdo)
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-static void complete_pending_irp(pvpdo_dev_t vpdo)
+static void complete_pending_irp(vpdo_dev_t * vpdo)
 {
 	KIRQL	oldirql;
 
@@ -87,7 +87,7 @@ static void complete_pending_irp(pvpdo_dev_t vpdo)
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 }
 
-static PAGEABLE void invalidate_vhci(pvhci_dev_t vhci)
+static PAGEABLE void invalidate_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
@@ -101,7 +101,7 @@ static PAGEABLE void invalidate_vhci(pvhci_dev_t vhci)
 	Trace(TRACE_LEVEL_INFORMATION, "invalidating vhci device object: %p", TO_DEVOBJ(vhci));
 }
 
-static PAGEABLE void invalidate_vhub(pvhub_dev_t vhub)
+static PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
 {
 	PAGED_CODE();
 
@@ -181,7 +181,7 @@ static PAGEABLE void remove_device(vdev_t *vdev)
 	IoDeleteDevice(vdev->Self);
 }
 
-PAGEABLE NTSTATUS pnp_remove_device(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_remove_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 

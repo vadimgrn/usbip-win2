@@ -32,7 +32,7 @@ static PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
 	return r;
 }
 
-PAGEABLE NTSTATUS pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_resource_requirements(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -44,7 +44,7 @@ PAGEABLE NTSTATUS pnp_query_resource_requirements(pvdev_t vdev, PIRP irp)
 	}
 }
 
-PAGEABLE NTSTATUS pnp_query_resources(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_resources(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -56,7 +56,7 @@ PAGEABLE NTSTATUS pnp_query_resources(pvdev_t vdev, PIRP irp)
 	}
 }
 
-PAGEABLE NTSTATUS pnp_filter_resource_requirements(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_filter_resource_requirements(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 

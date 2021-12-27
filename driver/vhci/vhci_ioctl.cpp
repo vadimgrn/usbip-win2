@@ -7,23 +7,23 @@
 #include "vhci_ioctl_vhci.h"
 #include "vhci_ioctl_vhub.h"
 
-extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
-	auto buffer = irp->AssociatedIrp.SystemBuffer;
+	auto vdev = devobj_to_vdev(devobj);
+	auto status = STATUS_INVALID_DEVICE_REQUEST;
 
-	vdev_t *vdev = devobj_to_vdev(devobj);
-	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
-
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	ULONG ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
 	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
 			vdev->type, KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
-	ULONG inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
-	ULONG outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+	auto buffer = irp->AssociatedIrp.SystemBuffer;
+
+	auto inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
+	auto outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
 	if (vdev->DevicePnPState == Deleted) {
 		status = STATUS_NO_SUCH_DEVICE;
@@ -42,6 +42,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP ir
 		outlen = 0;
 	}
 
+	NT_ASSERT(outlen <= inlen);
 	irp->IoStatus.Information = outlen;
 
 END:

@@ -30,7 +30,7 @@ static PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVIC
 	return FALSE;
 }
 
-static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -86,13 +86,13 @@ static PAGEABLE NTSTATUS get_bus_relations_1_child(pvdev_t vdev, PDEVICE_RELATIO
 	return STATUS_SUCCESS;
 }
 
-static pvpdo_dev_t
-find_managed_vpdo(pvhub_dev_t vhub, PDEVICE_OBJECT devobj)
+static vpdo_dev_t *
+find_managed_vpdo(vhub_dev_t * vhub, PDEVICE_OBJECT devobj)
 {
 	PLIST_ENTRY	entry;
 
 	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		pvpdo_dev_t	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+		vpdo_dev_t *	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		if (vpdo->common.Self == devobj) {
 			return vpdo;
 		}
@@ -101,7 +101,7 @@ find_managed_vpdo(pvhub_dev_t vhub, PDEVICE_OBJECT devobj)
 }
 
 static BOOLEAN
-is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, pvpdo_dev_t vpdo)
+is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
 {
 	ULONG	i;
 
@@ -113,7 +113,7 @@ is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, pvpdo_dev_t vpdo)
 	return FALSE;
 }
 
-static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -139,7 +139,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 	}
 
 	for (i = 0; i < n_olds; i++) {
-		pvpdo_dev_t	vpdo;
+		vpdo_dev_t *	vpdo;
 		PDEVICE_OBJECT	devobj = relations_old->Objects[i];
 		vpdo = find_managed_vpdo(vhub, devobj);
 		if (vpdo == nullptr || vpdo->plugged) {
@@ -152,7 +152,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 	}
 
 	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		pvpdo_dev_t	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+		vpdo_dev_t *	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 
 		if (is_in_dev_relations(relations->Objects, n_news, vpdo))
 			continue;
@@ -176,7 +176,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(pvhub_dev_t vhub, PDEVICE_RELATI
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(pvdev_t vdev)
+static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(vdev_t * vdev)
 {
 	PAGED_CODE();
 
@@ -197,7 +197,7 @@ static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(pvdev_t vdev)
 	return dev_relations;
 }
 
-static PAGEABLE NTSTATUS get_bus_relations(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -206,13 +206,13 @@ static PAGEABLE NTSTATUS get_bus_relations(pvdev_t vdev, PDEVICE_RELATIONS *pdev
 	case VDEV_VHCI:
 		return get_bus_relations_1_child(vdev, pdev_relations);
 	case VDEV_VHUB:
-		return get_bus_relations_vhub((pvhub_dev_t)vdev, pdev_relations);
+		return get_bus_relations_vhub((vhub_dev_t *)vdev, pdev_relations);
 	default:
 		return STATUS_NOT_SUPPORTED;
 	}
 }
 
-static PAGEABLE NTSTATUS get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pdev_relations)
+static PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -228,7 +228,7 @@ static PAGEABLE NTSTATUS get_target_relation(pvdev_t vdev, PDEVICE_RELATIONS *pd
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS pnp_query_device_relations(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 

@@ -89,7 +89,7 @@ static bool is_composite(vpdo_dev_t *vpdo)
  * USB\VID_xxxx&PID_yyyy
  */
 static NTSTATUS
-setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
+setup_device_id(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(subst_result);
 	UNREFERENCED_PARAMETER(irp);
@@ -110,7 +110,7 @@ setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 	}
 
 	if (vdev->type == VDEV_VPDO) {
-		pvpdo_dev_t vpdo = (pvpdo_dev_t)vdev;
+		vpdo_dev_t * vpdo = (vpdo_dev_t *)vdev;
 		status = RtlStringCbPrintfW(id_dev, str_sz, str, vpdo->vendor, vpdo->product);
 	} else {
 		RtlCopyMemory(id_dev, str, str_sz);
@@ -124,7 +124,7 @@ setup_device_id(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 }
 
 static NTSTATUS
-setup_hw_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
+setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(irp);
 
@@ -146,7 +146,7 @@ setup_hw_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
 	*subst_result = vdev->type == VDEV_VPDO;
 
 	if (*subst_result) {
-		pvpdo_dev_t vpdo = (pvpdo_dev_t)vdev;
+		vpdo_dev_t * vpdo = (vpdo_dev_t *)vdev;
 		status = RtlStringCbPrintfW(ids_hw, str_sz, str,
 					    vpdo->vendor, vpdo->product, vpdo->revision,
 					    vpdo->vendor, vpdo->product);
@@ -223,7 +223,7 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 }
 
 static NTSTATUS
-setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
+setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(irp);
 
@@ -272,7 +272,7 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, pvdev_t vdev, PIRP irp)
  * that points to the requested information. On error, a driver sets
  * Irp->IoStatus.Information to zero.
  */
-PAGEABLE NTSTATUS pnp_query_id(pvdev_t vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_id(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 

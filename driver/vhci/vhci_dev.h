@@ -10,8 +10,9 @@ extern LPCWSTR devcodes[];
 // These are the states a vpdo or vhub transition upon
 // receiving a specific PnP Irp. Refer to the PnP Device States
 // diagram in DDK documentation for better understanding.
-typedef enum _DEVICE_PNP_STATE {
-	NotStarted = 0,		// Not started yet
+enum DEVICE_PNP_STATE 
+{
+	NotStarted,		// Not started yet
 	Started,		// Device has received the START_DEVICE IRP
 	StopPending,		// Device has received the QUERY_STOP IRP
 	Stopped,		// Device has received the STOP_DEVICE IRP
@@ -19,26 +20,26 @@ typedef enum _DEVICE_PNP_STATE {
 	SurpriseRemovePending,	// Device has received the SURPRISE_REMOVE IRP
 	Deleted,		// Device has received the REMOVE_DEVICE IRP
 	UnKnown			// Unknown state
-} DEVICE_PNP_STATE;
+} ;
 
 // Structure for reporting data to WMI
-typedef struct _USBIP_BUS_WMI_STD_DATA
+struct USBIP_BUS_WMI_STD_DATA
 {
-	// The error Count
-	UINT32   ErrorCount;
-} USBIP_BUS_WMI_STD_DATA, *PUSBIP_BUS_WMI_STD_DATA;
+	UINT32 ErrorCount;
+} ;
 
-typedef enum {
+enum vdev_type_t {
 	VDEV_ROOT,
 	VDEV_CPDO,
 	VDEV_VHCI,
 	VDEV_HPDO,
 	VDEV_VHUB,
 	VDEV_VPDO
-} vdev_type_t;
+};
 
 // A common header for the device extensions of the vhub and vpdo
-typedef struct _vdev {
+struct vdev_t 
+{
 	// A back pointer to the device object for which this is the extension
 	PDEVICE_OBJECT	Self;
 
@@ -59,46 +60,42 @@ typedef struct _vdev {
 
 
 	// root and vhci have cpdo and hpdo each
-	struct _vdev	*child_pdo, *parent, *fdo;
+	vdev_t *child_pdo;
+	vdev_t *parent;
+	vdev_t *fdo;
+
 	PDEVICE_OBJECT	pdo;
 	PDEVICE_OBJECT	devobj_lower;
-} vdev_t, *pvdev_t;
+};
 
-struct urb_req;
-struct _cpdo;
-struct _vhub;
-struct _hpdo;
-
-typedef struct
+struct root_dev_t
 {
 	vdev_t	common;
-} root_dev_t, *proot_dev_t;
+};
 
-typedef struct _cpdo
+struct cpdo_dev_t
 {
 	vdev_t	common;
-} cpdo_dev_t, *pcpdo_dev_t;
+};
 
-typedef struct
+struct vhci_dev_t
 {
 	vdev_t	common;
 
 	UNICODE_STRING	DevIntfVhci;
 	UNICODE_STRING	DevIntfUSBHC;
 
-	// WMI Information
 	WMILIB_CONTEXT	WmiLibInfo;
-
 	USBIP_BUS_WMI_STD_DATA	StdUSBIPBusData;
-} vhci_dev_t, *pvhci_dev_t;
+};
 
-typedef struct _hpdo
+struct hpdo_dev_t
 {
 	vdev_t	common;
-} hpdo_dev_t, *phpdo_dev_t;
+};
 
 // The device extension of the vhub.  From whence vpdo's are born.
-typedef struct _vhub
+struct vhub_dev_t
 {
 	vdev_t	common;
 
@@ -123,11 +120,11 @@ typedef struct _vhub
 	// requests have been completed before we can actually delete the device
 	// object. This event is when the Outstanding IO count goes to zero
 	KEVENT		RemoveEvent;
-} vhub_dev_t, *pvhub_dev_t;
+};
 
 // The device extension for the vpdo.
 // That's of the USBIP device which this bus driver enumerates.
-typedef struct
+struct vpdo_dev_t
 {
 	vdev_t	common;
 
@@ -169,7 +166,7 @@ typedef struct
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 	UNICODE_STRING	usb_dev_interface;
 	UCHAR	current_intf_num, current_intf_alt;
-} vpdo_dev_t, *pvpdo_dev_t;
+};
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 
@@ -183,28 +180,28 @@ inline void vdev_del_ref(vdev_t *vdev)
 	InterlockedDecrement(&vdev->n_refs);
 }
 
-pvpdo_dev_t vhub_find_vpdo(pvhub_dev_t vhub, ULONG port);
+vpdo_dev_t *vhub_find_vpdo(vhub_dev_t * vhub, ULONG port);
 
-void vhub_mark_unplugged_vpdo(pvhub_dev_t vhub, pvpdo_dev_t vpdo);
+void vhub_mark_unplugged_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo);
 
 LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
 
-#define TO_DEVOBJ(vdev)		((vdev)->common.Self)
+#define TO_DEVOBJ(vdev)	((vdev)->common.Self)
 
-inline auto is_fdo(vdev_type_t type)
+constexpr auto is_fdo(vdev_type_t type)
 {
 	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
 }
 
 inline vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
 {	
-	struct _vdev *child_pdo = vhci->common.child_pdo;
-	return child_pdo ? (vhub_dev_t*)child_pdo->fdo : nullptr;
+	auto child_pdo = vhci->common.child_pdo;
+	return child_pdo ? reinterpret_cast<vhub_dev_t*>(child_pdo->fdo) : nullptr;
 }
 
 inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
-	return (vhub_dev_t*)(vpdo->common.parent);
+	return reinterpret_cast<vhub_dev_t*>(vpdo->common.parent);
 }
 
 inline auto devobj_to_vdev(DEVICE_OBJECT *devobj)

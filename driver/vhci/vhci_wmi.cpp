@@ -131,7 +131,7 @@ NTSTATUS vhci_QueryWmiDataBlock(
 			break;
 		}
 
-		*(PUSBIP_BUS_WMI_STD_DATA)Buffer = vhci->StdUSBIPBusData;
+		*(USBIP_BUS_WMI_STD_DATA*)Buffer = vhci->StdUSBIPBusData;
 		*InstanceLengthArray = size;
 		status = STATUS_SUCCESS;
 		break;
@@ -237,7 +237,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 }
 
 PAGEABLE NTSTATUS
-dereg_wmi(pvhci_dev_t vhci)
+dereg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
 

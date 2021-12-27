@@ -70,7 +70,7 @@ static PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
 	pcaps->UINumber = 1;
 }
 
-static PAGEABLE NTSTATUS pnp_query_cap_vpdo(pvpdo_dev_t vpdo, PIO_STACK_LOCATION irpstack)
+static PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpstack)
 {
 	PAGED_CODE();
 

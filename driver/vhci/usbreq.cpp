@@ -69,7 +69,7 @@ static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 	}
 }
 
-static void remove_cancelled_urbr(pvpdo_dev_t vpdo, struct urb_req *urbr)
+static void remove_cancelled_urbr(vpdo_dev_t * vpdo, struct urb_req *urbr)
 {
 	KIRQL	oldirql;
 
@@ -96,13 +96,10 @@ static void cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(devobj);
 
-	pvpdo_dev_t	vpdo;
-	struct urb_req	*urbr;
+	auto vpdo = (vpdo_dev_t *)irp->Tail.Overlay.DriverContext[0];
+	auto urbr = (struct urb_req *)irp->Tail.Overlay.DriverContext[1];
 
-	vpdo = (pvpdo_dev_t)irp->Tail.Overlay.DriverContext[0];
-	urbr = (struct urb_req *)irp->Tail.Overlay.DriverContext[1];
-
-	vpdo = (pvpdo_dev_t)devobj->DeviceExtension;
+	vpdo = (vpdo_dev_t *)devobj->DeviceExtension;
 	
 	{
 		char buf[URB_REQ_STR_BUFSZ];
