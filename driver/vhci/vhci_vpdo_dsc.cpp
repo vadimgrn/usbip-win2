@@ -87,9 +87,9 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 	switch (setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		dsc_data = vpdo->dsc_dev;
+		dsc_data = vpdo->descriptor;
 		if (dsc_data) {
-			dsc_len = vpdo->dsc_dev->bLength;
+			dsc_len = vpdo->descriptor->bLength;
 		}
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
@@ -137,13 +137,13 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCR
 
 	switch (dsc->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (dsc->bLength == sizeof(USB_DEVICE_DESCRIPTOR) && !vpdo->dsc_dev) {
-			vpdo->dsc_dev = (USB_DEVICE_DESCRIPTOR*)clone(dsc, dsc->bLength);
+		if (!vpdo->descriptor && dsc->bLength == sizeof(*vpdo->descriptor)) {
+			vpdo->descriptor = (USB_DEVICE_DESCRIPTOR*)clone(dsc, dsc->bLength);
 		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE:
 		sd = (USB_STRING_DESCRIPTOR*)dsc;
-		if (!vpdo->serial && sd->bLength >= sizeof(*sd) && is_device_serial_number(vpdo->dsc_dev, r->Index)) {
+		if (!vpdo->serial && sd->bLength >= sizeof(*sd) && is_device_serial_number(vpdo->descriptor, r->Index)) {
 			vpdo->serial = copy_wstring(sd, r->LanguageId);
 		} 
 		break;

@@ -154,7 +154,7 @@ struct vpdo_dev_t : vdev_t
 	PFILE_OBJECT	fo;
 	unsigned int	devid;
 	unsigned long	seq_num;
-	USB_DEVICE_DESCRIPTOR *dsc_dev;
+	USB_DEVICE_DESCRIPTOR *descriptor;
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 	UNICODE_STRING	usb_dev_interface;
 	UCHAR	current_intf_num, current_intf_alt;

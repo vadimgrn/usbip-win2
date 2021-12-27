@@ -94,13 +94,13 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t * vpdo, PUSB_NODE_CONNECTION
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
 		status = STATUS_SUCCESS;
 	} else {
-		if (!vpdo->dsc_dev) {
+		if (!vpdo->descriptor) {
 			return STATUS_INVALID_PARAMETER;
 		}
 
 		conninfo->ConnectionStatus = DeviceConnected;
 
-		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(*vpdo->dsc_dev));
+		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->descriptor, sizeof(*vpdo->descriptor));
 
 		if (vpdo->actconfig) {
 			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;
@@ -145,12 +145,12 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(vpdo_dev_t * vpdo, PUSB_NODE_CONNECT
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
 		status = STATUS_SUCCESS;
 	} else {
-		if (!vpdo->dsc_dev) {
+		if (!vpdo->descriptor) {
 			return STATUS_INVALID_PARAMETER;
 		}
 
 		conninfo->ConnectionStatus = DeviceConnected;
-		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->dsc_dev, sizeof(USB_DEVICE_DESCRIPTOR));
+		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->descriptor, sizeof(conninfo->DeviceDescriptor));
 
 		if (vpdo->actconfig) {
 			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;

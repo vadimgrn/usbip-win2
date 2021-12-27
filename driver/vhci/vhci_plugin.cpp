@@ -40,19 +40,16 @@ static PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;
 }
 
-static void
-setup_vpdo_with_dsc_dev(vpdo_dev_t * vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
+static void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
-	NT_ASSERT(dsc_dev);
-
-	vpdo->vendor = dsc_dev->idVendor;
-	vpdo->product = dsc_dev->idProduct;
-	vpdo->revision = dsc_dev->bcdDevice;
-	vpdo->usbclass = dsc_dev->bDeviceClass;
-	vpdo->subclass = dsc_dev->bDeviceSubClass;
-	vpdo->protocol = dsc_dev->bDeviceProtocol;
-	vpdo->speed = get_usb_speed(dsc_dev->bcdUSB);
-	vpdo->num_configurations = dsc_dev->bNumConfigurations;
+	vpdo->vendor = d.idVendor;
+	vpdo->product = d.idProduct;
+	vpdo->revision = d.bcdDevice;
+	vpdo->usbclass = d.bDeviceClass;
+	vpdo->subclass = d.bDeviceSubClass;
+	vpdo->protocol = d.bDeviceProtocol;
+	vpdo->speed = get_usb_speed(d.bcdUSB);
+	vpdo->num_configurations = d.bNumConfigurations;
 }
 
 /*
@@ -61,22 +58,21 @@ setup_vpdo_with_dsc_dev(vpdo_dev_t * vpdo, PUSB_DEVICE_DESCRIPTOR dsc_dev)
  * USB class, subclass and protocol numbers should be setup before importing.
  * Because windows vhci driver builds a device compatible id with those numbers.
  */
-static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *dsc_conf)
+static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *d)
 {
-	NT_ASSERT(dsc_conf);
+	NT_ASSERT(d);
 
-	vpdo->inum = dsc_conf->bNumInterfaces;
+	vpdo->inum = d->bNumInterfaces;
 
 	if (vpdo->usbclass || vpdo->subclass || vpdo->protocol) {
 		return;
 	}
 
 	if (vpdo->inum == 1) {
-		USB_INTERFACE_DESCRIPTOR *dsc_intf = dsc_find_next_intf(dsc_conf, nullptr);
-		if (dsc_intf) {
-			vpdo->usbclass = dsc_intf->bInterfaceClass;
-			vpdo->subclass = dsc_intf->bInterfaceSubClass;
-			vpdo->protocol = dsc_intf->bInterfaceProtocol;
+		if (auto i = dsc_find_next_intf(d, nullptr)) {
+			vpdo->usbclass = i->bInterfaceClass;
+			vpdo->subclass = i->bInterfaceSubClass;
+			vpdo->protocol = i->bInterfaceProtocol;
 		} else {
 			Trace(TRACE_LEVEL_ERROR, "interface descriptor not found");
 		}
@@ -114,7 +110,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
 	vpdo->parent = vhub_from_vhci(vhci);
 
-	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);
+	setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev);
 	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
 
 	vpdo->serial_usr = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
