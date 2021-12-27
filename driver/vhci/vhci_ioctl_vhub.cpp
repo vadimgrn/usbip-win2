@@ -47,8 +47,9 @@ static PAGEABLE NTSTATUS get_nodeconn_info(vhub_dev_t * vhub, PVOID buffer, ULON
 		return STATUS_NO_SUCH_DEVICE;
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info(vpdo, conninfo, poutlen);
-	if (vpdo != nullptr)
-		vdev_del_ref((vdev_t *)vpdo);
+	if (vpdo) {
+		vdev_del_ref(vpdo);
+	}
 	return status;
 }
 
@@ -68,8 +69,9 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex(vhub_dev_t * vhub, PVOID buffer, U
 		return STATUS_NO_SUCH_DEVICE;
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info_ex(vpdo, conninfo, poutlen);
-	if (vpdo != nullptr)
-		vdev_del_ref((vdev_t *)vpdo);
+	if (vpdo) {
+		vdev_del_ref(vpdo);
+	}
 	return status;
 }
 
@@ -89,8 +91,9 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer
 		return STATUS_NO_SUCH_DEVICE;
 	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
 	status = vpdo_get_nodeconn_info_ex_v2(vpdo, conninfo, poutlen);
-	if (vpdo != nullptr)
-		vdev_del_ref((vdev_t *)vpdo);
+	if (vpdo) {
+		vdev_del_ref(vpdo);
+	}
 	return status;
 }
 
@@ -111,7 +114,7 @@ static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp
 	}
 
 	auto status = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
-	vdev_del_ref(reinterpret_cast<vdev_t*>(vpdo));
+	vdev_del_ref(vpdo);
 
 	return status;
 }
@@ -193,7 +196,7 @@ static PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer
 		}
 		ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
 	}
-	vdev_del_ref((vdev_t *)vpdo);
+	vdev_del_ref(vpdo);
 
 	return status;
 }
@@ -233,7 +236,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t * vhub, PIRP irp, ULONG ioctl_code,
 		status = get_node_driverkey_name(vhub, buffer, inlen, poutlen);
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return status;

@@ -167,7 +167,7 @@ PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, CHAR port)
 	}
 
 	vhub_mark_unplugged_vpdo(vhub, vpdo);
-	vdev_del_ref((vdev_t *)vpdo);
+	vdev_del_ref(vpdo);
 
 	return STATUS_SUCCESS;
 }

@@ -42,7 +42,6 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		outlen = 0;
 	}
 
-	NT_ASSERT(outlen <= inlen);
 	irp->IoStatus.Information = outlen;
 
 END:
