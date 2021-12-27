@@ -52,7 +52,7 @@ PAGEABLE CHAR vhub_get_empty_port(vhub_dev_t * vhub)
 	return port;
 }
 
-PAGEABLE void vhub_attach_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo)
+PAGEABLE void vhub_attach_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
@@ -67,7 +67,7 @@ PAGEABLE void vhub_attach_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE void vhub_detach_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo)
+PAGEABLE void vhub_detach_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
@@ -93,78 +93,80 @@ PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR *d)
 	d->bHubControlCurrent = 1;
 }
 
-PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t * vhub, PUSB_HUB_INFORMATION_EX pinfo)
+PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX *p)
 {
 	PAGED_CODE();
 
-	pinfo->HubType = UsbRootHub;
-	pinfo->HighestPortNumber = (USHORT)vhub->n_max_ports;
+	p->HubType = UsbRootHub;
+	p->HighestPortNumber = (USHORT)vhub->n_max_ports;
 
-	vhub_get_hub_descriptor(vhub, &pinfo->u.UsbHubDescriptor);
+	vhub_get_hub_descriptor(vhub, &p->u.UsbHubDescriptor);
 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t * vhub, PUSB_HUB_CAPABILITIES_EX pinfo)
+PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t * vhub, PUSB_HUB_CAPABILITIES_EX p)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vhub);
 
-	pinfo->CapabilityFlags.ul = 0xffffffff;
-	pinfo->CapabilityFlags.HubIsHighSpeedCapable = FALSE;
-	pinfo->CapabilityFlags.HubIsHighSpeed = FALSE;
-	pinfo->CapabilityFlags.HubIsMultiTtCapable = TRUE;
-	pinfo->CapabilityFlags.HubIsMultiTt = TRUE;
-	pinfo->CapabilityFlags.HubIsRoot = TRUE;
-	pinfo->CapabilityFlags.HubIsBusPowered = FALSE;
+	p->CapabilityFlags.ul = 0xffffffff;
+	p->CapabilityFlags.HubIsHighSpeedCapable = FALSE;
+	p->CapabilityFlags.HubIsHighSpeed = FALSE;
+	p->CapabilityFlags.HubIsMultiTtCapable = TRUE;
+	p->CapabilityFlags.HubIsMultiTt = TRUE;
+	p->CapabilityFlags.HubIsRoot = TRUE;
+	p->CapabilityFlags.HubIsBusPowered = FALSE;
 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t * vhub, PUSB_PORT_CONNECTOR_PROPERTIES pinfo, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES *p, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	if (pinfo->ConnectionIndex > vhub->n_max_ports)
+	if (p->ConnectionIndex > vhub->n_max_ports) {
 		return STATUS_INVALID_PARAMETER;
-	if (*poutlen < sizeof(USB_PORT_CONNECTOR_PROPERTIES)) {
-		*poutlen = sizeof(USB_PORT_CONNECTOR_PROPERTIES);
+	}
+	
+	if (*poutlen < sizeof(*p)) {
+		*poutlen = sizeof(*p);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	pinfo->ActualLength = sizeof(USB_PORT_CONNECTOR_PROPERTIES);
-	pinfo->UsbPortProperties.ul = 0xffffffff;
-	pinfo->UsbPortProperties.PortIsUserConnectable = TRUE;
-	pinfo->UsbPortProperties.PortIsDebugCapable = TRUE;
-	pinfo->UsbPortProperties.PortHasMultipleCompanions = FALSE;
-	pinfo->UsbPortProperties.PortConnectorIsTypeC = FALSE;
-	pinfo->CompanionIndex = 0;
-	pinfo->CompanionPortNumber = 0;
-	pinfo->CompanionHubSymbolicLinkName[0] = L'\0';
+	p->ActualLength = sizeof(*p);
+	p->UsbPortProperties.ul = 0xffffffff;
+	p->UsbPortProperties.PortIsUserConnectable = TRUE;
+	p->UsbPortProperties.PortIsDebugCapable = TRUE;
+	p->UsbPortProperties.PortHasMultipleCompanions = FALSE;
+	p->UsbPortProperties.PortConnectorIsTypeC = FALSE;
+	p->CompanionIndex = 0;
+	p->CompanionPortNumber = 0;
+	p->CompanionHubSymbolicLinkName[0] = L'\0';
 
-	*poutlen = sizeof(USB_PORT_CONNECTOR_PROPERTIES);
-
+	*poutlen = sizeof(*p);
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE void mark_unplugged_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo)
+static PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
 	if (vpdo->plugged) {
-		vpdo->plugged = FALSE;
-		NT_ASSERT(vhub->n_vpdos_plugged > 0);
-		vhub->n_vpdos_plugged--;
-
-		IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
-
-		Trace(TRACE_LEVEL_INFORMATION, "the device is marked as unplugged: port: %u", vpdo->port);
-	} else {
 		Trace(TRACE_LEVEL_ERROR, "vpdo already unplugged: port: %u", vpdo->port);
+		return;
 	}
+
+	vpdo->plugged = false;
+
+	NT_ASSERT(vhub->n_vpdos_plugged > 0);
+	--vhub->n_vpdos_plugged;
+
+	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
+	Trace(TRACE_LEVEL_INFORMATION, "the device is marked as unplugged: port: %u", vpdo->port);
 }
 
-PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo)
+PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
@@ -179,8 +181,8 @@ PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t * vhub)
 
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	for (LIST_ENTRY *entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		vpdo_dev_t *	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		mark_unplugged_vpdo(vhub, vpdo);
 	}
 
@@ -191,22 +193,20 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t * vhub, ioctl_usbip_vhci_get_
 {
 	PAGED_CODE();
 
-	vpdo_dev_t *	vpdo;
-	PLIST_ENTRY	entry;
-
 	Trace(TRACE_LEVEL_INFORMATION, "Enter");
 
 	RtlZeroMemory(st, sizeof(*st));
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		vpdo = CONTAINING_RECORD (entry, vpdo_dev_t, Link);
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+		auto vpdo = CONTAINING_RECORD (entry, vpdo_dev_t, Link);
 		if (vpdo->port >= 127) {
 			Trace(TRACE_LEVEL_ERROR, "strange port");
 			continue;
 		}
 		st->port_status[vpdo->port] = 1;
 	}
+
 	ExReleaseFastMutex(&vhub->Mutex);
 
 	st->n_max_ports = 127;

@@ -5,6 +5,7 @@
 
 #include "vhci_devconf.h"
 
+struct urb_req;
 extern LPCWSTR devcodes[];
 
 // These are the states a vpdo or vhub transition upon
@@ -132,15 +133,15 @@ struct vpdo_dev_t : vdev_t
 
 	// set to TRUE when the vpdo is exposed via PlugIn IOCTL,
 	// and set to FALSE when a UnPlug IOCTL is received.
-	BOOLEAN		plugged;
+	bool plugged;
 
-	enum usb_device_speed speed; 
+	usb_device_speed speed; 
 	UCHAR	num_configurations; // Number of Possible Configurations
 
 	// a pending irp when no urb is requested
 	PIRP	pending_read_irp;
 	// a partially transferred urb_req
-	struct urb_req	*urbr_sent_partial;
+	urb_req	*urbr_sent_partial;
 	// a partially transferred length of urbr_sent_partial
 	ULONG	len_sent_partial;
 	// all urb_req's. This list will be used for clear or cancellation.

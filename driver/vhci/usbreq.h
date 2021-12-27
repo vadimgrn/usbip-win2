@@ -21,15 +21,15 @@ struct urb_req
 #define RemoveEntryListInit(le) \
 do { RemoveEntryList(le); InitializeListHead(le); } while (0)
 
-NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr);
+NTSTATUS submit_urbr(vpdo_dev_t *vpdo, urb_req *urbr);
 
-struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_unlink);
-void free_urbr(struct urb_req *urbr);
+urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_unlink);
+void free_urbr(urb_req *urbr);
 
 bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle);
 
-struct urb_req *find_sent_urbr(vpdo_dev_t * vpdo, unsigned long seqnum);
-struct urb_req *find_pending_urbr(vpdo_dev_t * vpdo);
+urb_req *find_sent_urbr(vpdo_dev_t * vpdo, unsigned long seqnum);
+urb_req *find_pending_urbr(vpdo_dev_t * vpdo);
 
 enum { URB_REQ_STR_BUFSZ = 64 };
-const char* urb_req_str(char* buf, size_t len, const struct urb_req *urbr);
+const char* urb_req_str(char* buf, size_t len, const urb_req *urbr);
