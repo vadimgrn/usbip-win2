@@ -93,7 +93,7 @@ find_managed_vpdo(vhub_dev_t * vhub, PDEVICE_OBJECT devobj)
 
 	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 		vpdo_dev_t *	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
-		if (vpdo->common.Self == devobj) {
+		if (vpdo->Self == devobj) {
 			return vpdo;
 		}
 	}
@@ -106,7 +106,7 @@ is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
 	ULONG	i;
 
 	for (i = 0; i < n_counts; i++) {
-		if (vpdo->common.Self == devobjs[i]) {
+		if (vpdo->Self == devobjs[i]) {
 			return TRUE;
 		}
 	}
@@ -157,9 +157,9 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELAT
 		if (is_in_dev_relations(relations->Objects, n_news, vpdo))
 			continue;
 		if (vpdo->plugged) {
-			relations->Objects[n_news] = vpdo->common.Self;
+			relations->Objects[n_news] = vpdo->Self;
 			n_news++;
-			ObReferenceObject(vpdo->common.Self);
+			ObReferenceObject(vpdo->Self);
 		}
 	}
 

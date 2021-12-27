@@ -68,20 +68,16 @@ struct vdev_t
 	PDEVICE_OBJECT	devobj_lower;
 };
 
-struct root_dev_t
+struct root_dev_t : vdev_t
 {
-	vdev_t	common;
 };
 
-struct cpdo_dev_t
+struct cpdo_dev_t : vdev_t
 {
-	vdev_t	common;
 };
 
-struct vhci_dev_t
+struct vhci_dev_t : vdev_t
 {
-	vdev_t	common;
-
 	UNICODE_STRING	DevIntfVhci;
 	UNICODE_STRING	DevIntfUSBHC;
 
@@ -89,16 +85,13 @@ struct vhci_dev_t
 	USBIP_BUS_WMI_STD_DATA	StdUSBIPBusData;
 };
 
-struct hpdo_dev_t
+struct hpdo_dev_t : vdev_t
 {
-	vdev_t	common;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
-struct vhub_dev_t
+struct vhub_dev_t : vdev_t
 {
-	vdev_t	common;
-
 	// List of vpdo's created so far
 	LIST_ENTRY	head_vpdo;
 
@@ -124,10 +117,8 @@ struct vhub_dev_t
 
 // The device extension for the vpdo.
 // That's of the USBIP device which this bus driver enumerates.
-struct vpdo_dev_t
+struct vpdo_dev_t : vdev_t
 {
-	vdev_t	common;
-
 	USHORT	vendor, product, revision;
 	UCHAR	usbclass, subclass, protocol, inum;
 
@@ -186,22 +177,22 @@ void vhub_mark_unplugged_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo);
 
 LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
 
-#define TO_DEVOBJ(vdev)	((vdev)->common.Self)
+constexpr auto to_devobj(vdev_t *vdev) { return vdev->Self; }
 
 constexpr auto is_fdo(vdev_type_t type)
 {
 	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
 }
 
-inline vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
+inline auto vhub_from_vhci(vhci_dev_t *vhci)
 {	
-	auto child_pdo = vhci->common.child_pdo;
+	auto child_pdo = vhci->child_pdo;
 	return child_pdo ? reinterpret_cast<vhub_dev_t*>(child_pdo->fdo) : nullptr;
 }
 
 inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
-	return reinterpret_cast<vhub_dev_t*>(vpdo->common.parent);
+	return reinterpret_cast<vhub_dev_t*>(vpdo->parent);
 }
 
 inline auto devobj_to_vdev(DEVICE_OBJECT *devobj)

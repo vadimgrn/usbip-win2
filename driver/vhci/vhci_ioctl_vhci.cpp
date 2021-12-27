@@ -21,7 +21,7 @@ static PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t * vhci, PVOID buffer,
 	ULONG	outlen_res, drvkey_buflen;
 	LPWSTR	drvkey;
 
-	drvkey = get_device_prop(vhci->common.child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
+	drvkey = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
 	if (drvkey == nullptr) {
 		Trace(TRACE_LEVEL_WARNING, "failed to get vhci driver key");
 		return STATUS_UNSUCCESSFUL;
@@ -115,7 +115,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 		status = get_hcd_driverkey_name(vhci, buffer, poutlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		status = vhub_get_roothub_name(devobj_to_vhub_or_null(vhci->common.child_pdo->fdo->Self), buffer, inlen, poutlen);
+		status = vhub_get_roothub_name(devobj_to_vhub_or_null(vhci->child_pdo->fdo->Self), buffer, inlen, poutlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);

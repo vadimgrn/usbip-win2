@@ -156,7 +156,7 @@ static PAGEABLE void mark_unplugged_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo)
 		NT_ASSERT(vhub->n_vpdos_plugged > 0);
 		vhub->n_vpdos_plugged--;
 
-		IoInvalidateDeviceRelations(vhub->common.pdo, BusRelations);
+		IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
 
 		Trace(TRACE_LEVEL_INFORMATION, "the device is marked as unplugged: port: %u", vpdo->port);
 	} else {

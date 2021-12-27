@@ -179,7 +179,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 
 	Trace(TRACE_LEVEL_INFORMATION, "%!sysctrl!", irpstack->MinorFunction);
 
-	if (vhci->common.DevicePnPState == Deleted) {
+	if (vhci->DevicePnPState == Deleted) {
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
@@ -200,13 +200,13 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 		// This irp is either not a WMI irp or is a WMI irp targetted
 		// at a device lower in the stack.
 		IoSkipCurrentIrpStackLocation(irp);
-		status = IoCallDriver(vhci->common.devobj_lower, irp);
+		status = IoCallDriver(vhci->devobj_lower, irp);
 		break;
 	default:
 		// We really should never get here, but if we do just forward....
 		NT_ASSERT(FALSE);
 		IoSkipCurrentIrpStackLocation(irp);
-		status = IoCallDriver(vhci->common.devobj_lower, irp);
+		status = IoCallDriver(vhci->devobj_lower, irp);
 	}
 
 	Trace(TRACE_LEVEL_VERBOSE, "Leave %!STATUS!", status);
@@ -227,7 +227,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	vhci->WmiLibInfo.WmiFunctionControl = nullptr;
 
 	// Register with WMI
-	NTSTATUS status = IoWMIRegistrationControl(TO_DEVOBJ(vhci), WMIREG_ACTION_REGISTER);
+	NTSTATUS status = IoWMIRegistrationControl(to_devobj(vhci), WMIREG_ACTION_REGISTER);
 
 	// Initialize the Std device data structure
 	vhci->StdUSBIPBusData.ErrorCount = 0;
@@ -241,5 +241,5 @@ dereg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
 
-	return IoWMIRegistrationControl(TO_DEVOBJ(vhci), WMIREG_ACTION_DEREGISTER);
+	return IoWMIRegistrationControl(to_devobj(vhci), WMIREG_ACTION_DEREGISTER);
 }

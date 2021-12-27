@@ -27,15 +27,15 @@ vhci_power_vhci(vhci_dev_t * vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 	powerState = irpstack->Parameters.Power.State;
 
 	// If the device is not stated yet, just pass it down.
-	if (vhci->common.DevicePnPState == NotStarted) {
-		return irp_pass_down(vhci->common.devobj_lower, irp);
+	if (vhci->DevicePnPState == NotStarted) {
+		return irp_pass_down(vhci->devobj_lower, irp);
 	}
 
 	if (irpstack->MinorFunction == IRP_MN_SET_POWER) {
 		log_set_power(powerType, &powerState, __func__);
 	}
 
-	return irp_pass_down(vhci->common.devobj_lower, irp);
+	return irp_pass_down(vhci->devobj_lower, irp);
 }
 
 static NTSTATUS

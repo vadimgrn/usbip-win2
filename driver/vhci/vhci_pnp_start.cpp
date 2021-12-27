@@ -13,12 +13,12 @@ static PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
-	NTSTATUS status = IoRegisterDeviceInterface(vhci->common.pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, nullptr, &vhci->DevIntfVhci);
+	NTSTATUS status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, nullptr, &vhci->DevIntfVhci);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to register vhci device interface: %!STATUS!", status);
 		return status;
 	}
-	status = IoRegisterDeviceInterface(vhci->common.pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HOST_CONTROLLER, nullptr, &vhci->DevIntfUSBHC);
+	status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HOST_CONTROLLER, nullptr, &vhci->DevIntfUSBHC);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to register USB Host controller device interface: %!STATUS!", status);
 		return status;
@@ -40,7 +40,7 @@ static PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
 	vhci_dev_t *	vhci;
 	NTSTATUS	status;
 
-	status = IoRegisterDeviceInterface(vhub->common.pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HUB, nullptr, &vhub->DevIntfRootHub);
+	status = IoRegisterDeviceInterface(vhub->pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HUB, nullptr, &vhub->DevIntfRootHub);
 	if (NT_ERROR(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to register USB root hub device interface: %!STATUS!", status);
 		return STATUS_UNSUCCESSFUL;
@@ -51,7 +51,7 @@ static PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	vhci = (vhci_dev_t *)vhub->common.parent;
+	vhci = (vhci_dev_t *)vhub->parent;
 	status = IoSetDeviceInterfaceState(&vhci->DevIntfVhci, TRUE);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to enable vhci device interface: %!STATUS!", status);
@@ -70,7 +70,7 @@ static PAGEABLE NTSTATUS start_vpdo(vpdo_dev_t * vpdo)
 {
 	PAGED_CODE();
 
-	NTSTATUS status = IoRegisterDeviceInterface(TO_DEVOBJ(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, nullptr, &vpdo->usb_dev_interface);
+	NTSTATUS status = IoRegisterDeviceInterface(to_devobj(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, nullptr, &vpdo->usb_dev_interface);
 	if (NT_SUCCESS(status)) {
 		status = IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, TRUE);
 		if (NT_ERROR(status)) {

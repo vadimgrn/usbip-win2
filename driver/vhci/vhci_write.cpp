@@ -687,7 +687,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
 
-	if (vhci->common.DevicePnPState != Deleted) {
+	if (vhci->DevicePnPState != Deleted) {
 
 		IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);

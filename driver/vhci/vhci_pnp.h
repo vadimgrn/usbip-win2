@@ -18,8 +18,8 @@
 	L"&REV_" VHUB_REV
 
 #define INITIALIZE_PNP_STATE(_Data_)    \
-        (_Data_)->common.DevicePnPState =  NotStarted;\
-        (_Data_)->common.PreviousPnPState = NotStarted;
+        (_Data_)->DevicePnPState =  NotStarted;\
+        (_Data_)->PreviousPnPState = NotStarted;
 
 #define SET_NEW_PNP_STATE(vdev, _state_) \
         do { (vdev)->PreviousPnPState = (vdev)->DevicePnPState;\

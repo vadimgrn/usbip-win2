@@ -87,7 +87,7 @@ static PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATIO
 	}
 
 	// Get the device capabilities of the root pdo
-	status = get_device_capabilities(vpdo->common.parent->parent->parent->devobj_lower, &caps_parent);
+	status = get_device_capabilities(vpdo->parent->parent->parent->devobj_lower, &caps_parent);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to get device capabilities from root device: %!STATUS!", status);
 		return status;

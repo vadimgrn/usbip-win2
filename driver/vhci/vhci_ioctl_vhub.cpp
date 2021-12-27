@@ -169,7 +169,7 @@ static PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer
 	vpdo = vhub_find_vpdo(vhub, pdrvkey_name->ConnectionIndex);
 	if (vpdo == nullptr)
 		return STATUS_NO_SUCH_DEVICE;
-	driverkey = get_device_prop(vpdo->common.Self, DevicePropertyDriverKeyName, &driverkeylen);
+	driverkey = get_device_prop(vpdo->Self, DevicePropertyDriverKeyName, &driverkeylen);
 	if (driverkey == nullptr) {
 		Trace(TRACE_LEVEL_WARNING, "failed to get vpdo driver key");
 		status = STATUS_UNSUCCESSFUL;

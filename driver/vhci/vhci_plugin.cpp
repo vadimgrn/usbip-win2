@@ -22,22 +22,22 @@ static PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 	INITIALIZE_PNP_STATE(vpdo);
 
 	// vpdo usually starts its life at D3
-	vpdo->common.DevicePowerState = PowerDeviceD3;
-	vpdo->common.SystemPowerState = PowerSystemWorking;
+	vpdo->DevicePowerState = PowerDeviceD3;
+	vpdo->SystemPowerState = PowerSystemWorking;
 
 	InitializeListHead(&vpdo->head_urbr);
 	InitializeListHead(&vpdo->head_urbr_pending);
 	InitializeListHead(&vpdo->head_urbr_sent);
 	KeInitializeSpinLock(&vpdo->lock_urbr);
 
-	TO_DEVOBJ(vpdo)->Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
+	to_devobj(vpdo)->Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
 	InitializeListHead(&vpdo->Link);
 
 	vhub_attach_vpdo(vhub_from_vpdo(vpdo), vpdo);
 
 	// This should be the last step in initialization.
-	TO_DEVOBJ(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;
+	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;
 }
 
 static void
@@ -106,13 +106,13 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	Trace(TRACE_LEVEL_INFORMATION, "Plugin vpdo: port %d", (int)pluginfo->port);
 
-	PDEVICE_OBJECT devobj = vdev_create(TO_DEVOBJ(vhci)->DriverObject, VDEV_VPDO);
+	PDEVICE_OBJECT devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
-	vpdo->common.parent = &vhub_from_vhci(vhci)->common;
+	vpdo->parent = vhub_from_vhci(vhci);
 
 	setup_vpdo_with_dsc_dev(vpdo, &pluginfo->dscr_dev);
 	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
@@ -135,7 +135,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	// Device Relation changes if a new vpdo is created. So let
 	// the PNP system now about that. This forces it to send bunch of pnp
 	// queries and cause the function driver to be loaded.
-	IoInvalidateDeviceRelations(vhci->common.pdo, BusRelations);
+	IoInvalidateDeviceRelations(vhci->pdo, BusRelations);
 
 	return STATUS_SUCCESS;
 }
