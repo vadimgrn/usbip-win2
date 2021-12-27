@@ -121,7 +121,8 @@ struct vhub_dev_t : vdev_t
 struct vpdo_dev_t : vdev_t
 {
 	USHORT	vendor, product, revision;
-	UCHAR	usbclass, subclass, protocol, inum;
+	UCHAR	usbclass, subclass, protocol;
+	UCHAR NumInterfaces; // from active configuration
 
 	PWSTR	serial; // device serial number
 	PWSTR	serial_usr; // user-defined serial number
@@ -136,7 +137,7 @@ struct vpdo_dev_t : vdev_t
 	bool plugged;
 
 	usb_device_speed speed; 
-	UCHAR	num_configurations; // Number of Possible Configurations
+	UCHAR NumConfigurations; // from device descriptor
 
 	// a pending irp when no urb is requested
 	PIRP	pending_read_irp;

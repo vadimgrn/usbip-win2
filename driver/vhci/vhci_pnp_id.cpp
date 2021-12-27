@@ -81,7 +81,7 @@ static bool is_composite(vpdo_dev_t *vpdo)
 		   vpdo->subclass == 0x02 &&
 		   vpdo->protocol == 0x01); // IAD composite device
 
-	return ok && vpdo->inum > 1 && vpdo->num_configurations == 1;
+	return ok && vpdo->NumInterfaces > 1 && vpdo->NumConfigurations == 1;
 }
 
 /*

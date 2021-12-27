@@ -45,11 +45,13 @@ static void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCR
 	vpdo->vendor = d.idVendor;
 	vpdo->product = d.idProduct;
 	vpdo->revision = d.bcdDevice;
+
 	vpdo->usbclass = d.bDeviceClass;
 	vpdo->subclass = d.bDeviceSubClass;
 	vpdo->protocol = d.bDeviceProtocol;
+	
 	vpdo->speed = get_usb_speed(d.bcdUSB);
-	vpdo->num_configurations = d.bNumConfigurations;
+	vpdo->NumConfigurations = d.bNumConfigurations;
 }
 
 /*
@@ -62,13 +64,13 @@ static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIP
 {
 	NT_ASSERT(d);
 
-	vpdo->inum = d->bNumInterfaces;
+	vpdo->NumInterfaces = d->bNumInterfaces;
 
 	if (vpdo->usbclass || vpdo->subclass || vpdo->protocol) {
 		return;
 	}
 
-	if (vpdo->inum == 1) {
+	if (vpdo->NumInterfaces == 1) {
 		if (auto i = dsc_find_next_intf(d, nullptr)) {
 			vpdo->usbclass = i->bInterfaceClass;
 			vpdo->subclass = i->bInterfaceSubClass;
