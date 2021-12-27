@@ -528,7 +528,8 @@ static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const str
 	auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 	
-	Trace(TRACE_LEVEL_VERBOSE, "ConnectionIndex %lu, Data[%!BIN!]", r->ConnectionIndex, WppBinary(r->Data, (USHORT)actual_length));
+	TraceURB("ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
+		r->ConnectionIndex, data_sz, actual_length, WppBinary(r->Data, (USHORT)actual_length));
 
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }

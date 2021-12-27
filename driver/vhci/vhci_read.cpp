@@ -225,6 +225,9 @@ static PAGEABLE NTSTATUS usb_reset_port(IRP *irp, struct urb_req *urbr)
 	return STATUS_SUCCESS;
 }
 
+/*
+ * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> req_fetch_dsc -> submit_urbr -> vhci_read
+ */
 static PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, struct urb_req *urbr)
 {
 	PAGED_CODE();
