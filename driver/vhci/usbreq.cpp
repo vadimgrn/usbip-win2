@@ -18,7 +18,7 @@ struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 
 	for (LIST_ENTRY *le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
 		struct urb_req *urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
-		if (urbr->seq_num == seqnum) {
+		if (urbr->seqnum == seqnum) {
 			RemoveEntryListInit(&urbr->list_all);
 			RemoveEntryListInit(&urbr->list_state);
 			result = urbr;
@@ -38,7 +38,7 @@ struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 
 	struct urb_req *urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, struct urb_req, list_state);
 
-	urbr->seq_num = ++vpdo->seq_num;
+	urbr->seqnum = ++vpdo->seqnum;
 	RemoveEntryListInit(&urbr->list_state);
 
 	return urbr;
@@ -74,8 +74,8 @@ static void remove_cancelled_urbr(vpdo_dev_t *vpdo, urb_req *urbr)
 
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-	submit_urbr_unlink(vpdo, urbr->seq_num);
-	Trace(TRACE_LEVEL_VERBOSE, "Cancelled urb destroyed, seq_num %lu", urbr->seq_num);
+	submit_urbr_unlink(vpdo, urbr->seqnum);
+	Trace(TRACE_LEVEL_VERBOSE, "Cancelled urb destroyed, seqnum %lu", urbr->seqnum);
 	free_urbr(urbr);
 }
 
@@ -85,7 +85,7 @@ static void cancel_urbr(DEVICE_OBJECT *devobj, IRP *irp)
 	NT_ASSERT(vpdo);
 
 	auto urbr = (urb_req*)irp->Tail.Overlay.DriverContext[1];
-	Trace(TRACE_LEVEL_INFORMATION, "Irp will be cancelled, seq_num %lu", urbr->seq_num);
+	Trace(TRACE_LEVEL_INFORMATION, "Irp will be cancelled, seqnum %lu", urbr->seqnum);
 
 	IoReleaseCancelSpinLock(irp->CancelIrql);
 
@@ -95,7 +95,7 @@ static void cancel_urbr(DEVICE_OBJECT *devobj, IRP *irp)
 	irp_done(irp, STATUS_CANCELLED);
 }
 
-struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_unlink)
+struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seqnum_unlink)
 {
 	auto urbr = (urb_req*)ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
@@ -113,7 +113,7 @@ struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_un
 		irp->Tail.Overlay.DriverContext[1] = urbr;
 	}
 
-	urbr->seq_num_unlink = seq_num_unlink;
+	urbr->seqnum_unlink = seqnum_unlink;
 
 	InitializeListHead(&urbr->list_all);
 	InitializeListHead(&urbr->list_state);
@@ -205,7 +205,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 	read_irp = vpdo->pending_read_irp;
 	vpdo->urbr_sent_partial = urbr;
 
-	urbr->seq_num = ++vpdo->seq_num;
+	urbr->seqnum = ++vpdo->seqnum;
 
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 

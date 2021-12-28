@@ -51,7 +51,7 @@ static void complete_pending_irp(vpdo_dev_t *vpdo)
 	while (!IsListEmpty(&vpdo->head_urbr)) {
 
 		auto urbr = CONTAINING_RECORD(vpdo->head_urbr.Flink, struct urb_req, list_all);
-		Trace(TRACE_LEVEL_VERBOSE, "Complete pending urbr, seq_num %lu", urbr->seq_num);
+		Trace(TRACE_LEVEL_VERBOSE, "Complete pending urbr, seqnum %lu", urbr->seqnum);
 
 		RemoveEntryListInit(&urbr->list_all);
 		RemoveEntryListInit(&urbr->list_state);

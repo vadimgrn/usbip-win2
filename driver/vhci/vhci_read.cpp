@@ -221,7 +221,7 @@ PAGEABLE NTSTATUS usb_reset_port(IRP *irp, urb_req *urbr)
 
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -254,7 +254,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, urb_req *urbr)
 
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, data_sz);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, data_sz);
 	if (err) {
 		return err;
 	}
@@ -299,7 +299,7 @@ PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(IRP *irp, URB *urb, urb_req *u
 	auto &r = urb->UrbPipeRequest;
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -328,7 +328,7 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(IRP *irp, URB *urb, urb_req *ur
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | 
 		(dir_in ? USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
 	if (err) {
 		return err;
 	}
@@ -361,7 +361,7 @@ PAGEABLE NTSTATUS urb_control_get_status_request(IRP *irp, URB *urb, urb_req *ur
 	auto &r = urb->UrbControlGetStatusRequest;
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
 	if (err) {
 		return err;
 	}
@@ -387,7 +387,7 @@ PAGEABLE NTSTATUS urb_control_vendor_class_request(IRP *irp, URB *urb, urb_req *
 
 	auto &r = urb->UrbControlVendorClassRequest;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, 
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, 
 		EP0, r.TransferFlags | USBD_DEFAULT_PIPE_TRANSFER, r.TransferBufferLength);
 
 	if (err) {
@@ -466,7 +466,7 @@ PAGEABLE NTSTATUS urb_select_configuration(IRP *irp, URB *urb, urb_req *urbr)
 
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -492,7 +492,7 @@ PAGEABLE NTSTATUS urb_select_interface(IRP *irp, URB *urb, urb_req *urbr)
 	auto &r = urb->UrbSelectInterface;
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -526,7 +526,7 @@ NTSTATUS urb_bulk_or_interrupt_transfer(IRP *irp, URB *urb, urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid,
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid,
 		r.PipeHandle, r.TransferFlags, r.TransferBufferLength);
 
 	if (err) {
@@ -561,7 +561,7 @@ NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, urb_req *urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid,
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid,
 						r.PipeHandle, r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength);
 
 	if (err) {
@@ -594,7 +594,7 @@ PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, urb_req* urbr)
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid,
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid,
 							r.PipeHandle, r.TransferFlags, r.TransferBufferLength);
 
 	if (err) {
@@ -679,7 +679,7 @@ PAGEABLE NTSTATUS urb_control_feature_request(IRP *irp, URB *urb, urb_req* urbr,
 	auto &r = urb->UrbControlFeatureRequest;
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, 0);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, 0);
 	if (err) {
 		return err;
 	}
@@ -746,7 +746,7 @@ PAGEABLE NTSTATUS get_configuration(IRP *irp, URB *urb, urb_req* urbr)
 	auto &r = urb->UrbControlGetConfigurationRequest;
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
 	if (err) {
 		return err;
 	}
@@ -772,7 +772,7 @@ PAGEABLE NTSTATUS get_interface(IRP *irp, URB *urb, urb_req* urbr)
 	auto &r = urb->UrbControlGetInterfaceRequest;
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-	auto err = set_cmd_submit_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
+	auto err = set_cmd_submit_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, EP0, TransferFlags, r.TransferBufferLength);
 	if (err) {
 		return err;
 	}
@@ -1015,7 +1015,7 @@ PAGEABLE NTSTATUS cmd_unlink(IRP *irp, urb_req *urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	set_cmd_unlink_usbip_header(hdr, urbr->seq_num, urbr->vpdo->devid, urbr->seq_num_unlink);
+	set_cmd_unlink_usbip_header(hdr, urbr->seqnum, urbr->vpdo->devid, urbr->seqnum_unlink);
 
 	TRANSFERRED(irp) += sizeof(*hdr);
 	return STATUS_SUCCESS;

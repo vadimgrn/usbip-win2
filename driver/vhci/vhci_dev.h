@@ -154,7 +154,7 @@ struct vpdo_dev_t : vdev_t
 	KSPIN_LOCK	lock_urbr;
 	PFILE_OBJECT	fo;
 	unsigned int	devid;
-	unsigned long	seq_num;
+	unsigned long	seqnum;
 	USB_DEVICE_DESCRIPTOR *descriptor;
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 	UNICODE_STRING	usb_dev_interface;

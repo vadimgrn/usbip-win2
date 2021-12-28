@@ -12,8 +12,8 @@ struct urb_req
 	vpdo_dev_t *vpdo;
 	IRP *irp;
 	KEVENT *event;
-	unsigned long seq_num;
-	unsigned long seq_num_unlink;
+	unsigned long seqnum;
+	unsigned long seqnum_unlink;
 	LIST_ENTRY list_all;
 	LIST_ENTRY list_state;
 };

@@ -45,7 +45,7 @@ static NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 			continue;
 		}
 
-		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seq_num %lu", urbr_local->seq_num);
+		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seqnum %lu", urbr_local->seqnum);
 
 		if (urbr_local->irp) {
 			PIRP irp = urbr_local->irp;
