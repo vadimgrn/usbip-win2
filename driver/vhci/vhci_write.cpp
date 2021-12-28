@@ -580,7 +580,11 @@ PAGEABLE NTSTATUS ret_submit(urb_req *urbr, const usbip_header *hdr)
 PAGEABLE NTSTATUS ret_unlink(const usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_unlink.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+
+	auto st = to_windows_status(hdr->u.ret_unlink.status);
+	TraceURB("%s", dbg_usbd_status(st));
+
+	return st == USBD_STATUS_CANCELED ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL; // FIXME: always success?
 }
 
 PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
