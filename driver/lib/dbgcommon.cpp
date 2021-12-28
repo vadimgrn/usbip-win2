@@ -289,9 +289,6 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 	case USBIP_RET_UNLINK:
 		RtlStringCbPrintfA(buf, len, "ret_unlink: status %d", hdr->u.ret_unlink.status);
 		break;
-	case USBIP_RESET_DEV:
-		RtlStringCbCopyA(buf, len, "reset_dev");
-		break;
 	default:
 		RtlStringCbPrintfA(buf, len, "command %u", base->command);
 	}
