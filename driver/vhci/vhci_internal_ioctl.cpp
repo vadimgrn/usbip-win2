@@ -36,8 +36,8 @@ static NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
-	// remove all URBRs of the aborted pipe
-	for (auto le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr; ) {
+	for (auto le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr; ) { // remove all URBRs of the aborted pipe
+
 		auto urbr_local = CONTAINING_RECORD(le, struct urb_req, list_all);
 		le = le->Flink;
 
@@ -45,10 +45,7 @@ static NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 			continue;
 		}
 
-		{
-			char buf[URB_REQ_STR_BUFSZ];
-			Trace(TRACE_LEVEL_VERBOSE, "aborted urbr removed %s", urb_req_str(buf, sizeof(buf), urbr_local));
-		}
+		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seq_num %lu", urbr_local->seq_num);
 
 		if (urbr_local->irp) {
 			PIRP irp = urbr_local->irp;

@@ -42,30 +42,25 @@ static void complete_pending_read_irp(vpdo_dev_t * vpdo)
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-static void complete_pending_irp(vpdo_dev_t * vpdo)
+static void complete_pending_irp(vpdo_dev_t *vpdo)
 {
 	KIRQL	oldirql;
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+
 	while (!IsListEmpty(&vpdo->head_urbr)) {
-		struct urb_req *urbr;
-		PIRP	irp;
 
-		urbr = CONTAINING_RECORD(vpdo->head_urbr.Flink, struct urb_req, list_all);
-
-		{
-			char buf[URB_REQ_STR_BUFSZ];
-			Trace(TRACE_LEVEL_INFORMATION, "complete pending %s", urb_req_str(buf, sizeof(buf), urbr));
-		}
+		auto urbr = CONTAINING_RECORD(vpdo->head_urbr.Flink, struct urb_req, list_all);
+		Trace(TRACE_LEVEL_VERBOSE, "Complete pending urbr, seq_num %lu", urbr->seq_num);
 
 		RemoveEntryListInit(&urbr->list_all);
 		RemoveEntryListInit(&urbr->list_state);
 		/* FIMXE event */
 		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-		irp = urbr->irp;
+		auto irp = urbr->irp;
 		free_urbr(urbr);
-		if (irp != nullptr) {
+		if (irp) {
 			// urbr irps have cancel routine
 			IoAcquireCancelSpinLock(&oldirql);
 			bool valid_irp = IoSetCancelRoutine(irp, nullptr);

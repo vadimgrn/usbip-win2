@@ -9,18 +9,6 @@
 
 #include <ntstrsafe.h>
 
-const char *urb_req_str(char *buf, size_t len, const struct urb_req *urbr)
-{
-	if (!urbr) {
-		return "urb_req{null}";
-	}
-
-	NTSTATUS st = RtlStringCbPrintfA(buf, len, "urb_req{irp %#p, seq_num %lu, seq_num_unlink %lu}", 
-							urbr->irp, urbr->seq_num, urbr->seq_num_unlink);
-
-	return st != STATUS_INVALID_PARAMETER ? buf : "dbg_urbr invalid parameter";
-}
-
 struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 {
 	struct urb_req *result = nullptr;
@@ -58,25 +46,27 @@ struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 
 static void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
 {
-	struct urb_req *urbr_unlink = create_urbr(vpdo, nullptr, seq_num_unlink);
-	if (urbr_unlink) {
-		NTSTATUS status = submit_urbr(vpdo, urbr_unlink);
-		if (NT_ERROR(status)) {
-			char buf[URB_REQ_STR_BUFSZ];
-			Trace(TRACE_LEVEL_ERROR, "failed to submit unlink urb %s", urb_req_str(buf, sizeof(buf), urbr_unlink));
-			free_urbr(urbr_unlink);
-		}
+	auto urbr_unlink = create_urbr(vpdo, nullptr, seq_num_unlink);
+	if (!urbr_unlink) {
+		return;
+	}
+
+	auto status = submit_urbr(vpdo, urbr_unlink);
+	if (NT_ERROR(status)) {
+		Trace(TRACE_LEVEL_ERROR, "Failed to submit unlink, seq_num_unlink %lu", seq_num_unlink);
+		free_urbr(urbr_unlink);
 	}
 }
 
-static void remove_cancelled_urbr(vpdo_dev_t * vpdo, struct urb_req *urbr)
+static void remove_cancelled_urbr(vpdo_dev_t *vpdo, urb_req *urbr)
 {
-	KIRQL	oldirql;
+	KIRQL oldirql;
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
 	RemoveEntryListInit(&urbr->list_state);
 	RemoveEntryListInit(&urbr->list_all);
+
 	if (vpdo->urbr_sent_partial == urbr) {
 		vpdo->urbr_sent_partial = nullptr;
 		vpdo->len_sent_partial = 0;
@@ -85,26 +75,17 @@ static void remove_cancelled_urbr(vpdo_dev_t * vpdo, struct urb_req *urbr)
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
 	submit_urbr_unlink(vpdo, urbr->seq_num);
-
-	char buf[URB_REQ_STR_BUFSZ];
-	Trace(TRACE_LEVEL_INFORMATION, "cancelled urb destroyed %s", urb_req_str(buf, sizeof(buf), urbr));
-	
+	Trace(TRACE_LEVEL_VERBOSE, "Cancelled urb destroyed, seq_num %lu", urbr->seq_num);
 	free_urbr(urbr);
 }
 
-static void cancel_urbr(PDEVICE_OBJECT devobj, PIRP irp)
+static void cancel_urbr(DEVICE_OBJECT *devobj, IRP *irp)
 {
-	UNREFERENCED_PARAMETER(devobj);
+	auto vpdo = devobj_to_vpdo_or_null(devobj); // irp->Tail.Overlay.DriverContext[0]
+	NT_ASSERT(vpdo);
 
-	auto vpdo = (vpdo_dev_t *)irp->Tail.Overlay.DriverContext[0];
-	auto urbr = (struct urb_req *)irp->Tail.Overlay.DriverContext[1];
-
-	vpdo = (vpdo_dev_t *)devobj->DeviceExtension;
-	
-	{
-		char buf[URB_REQ_STR_BUFSZ];
-		Trace(TRACE_LEVEL_INFORMATION, "irp will be cancelled %s", urb_req_str(buf, sizeof(buf), urbr));
-	}
+	auto urbr = (urb_req*)irp->Tail.Overlay.DriverContext[1];
+	Trace(TRACE_LEVEL_INFORMATION, "Irp will be cancelled, seq_num %lu", urbr->seq_num);
 
 	IoReleaseCancelSpinLock(irp->CancelIrql);
 
@@ -118,7 +99,7 @@ struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seq_num_un
 {
 	auto urbr = (urb_req*)ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
-		Trace(TRACE_LEVEL_ERROR, "out of memory");
+		Trace(TRACE_LEVEL_ERROR, "Out of memory");
 		return nullptr;
 	}
 

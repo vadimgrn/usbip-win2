@@ -30,6 +30,3 @@ bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle);
 
 urb_req *find_sent_urbr(vpdo_dev_t * vpdo, unsigned long seqnum);
 urb_req *find_pending_urbr(vpdo_dev_t * vpdo);
-
-enum { URB_REQ_STR_BUFSZ = 64 };
-const char* urb_req_str(char* buf, size_t len, const urb_req *urbr);
