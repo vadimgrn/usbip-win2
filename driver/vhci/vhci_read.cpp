@@ -1036,7 +1036,7 @@ void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 	auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
 
 	KIRQL irql;
-	KeAcquireSpinLock(&vpdo->lock_urbr, &irql);
+	KeAcquireSpinLock(&vpdo->lock_urbr, &irql); // FIMXE: IRQL_NOT_LESS_OR_EQUAL
 	if (vpdo->pending_read_irp == irp_read) {
 		vpdo->pending_read_irp = nullptr;
 	}

@@ -121,14 +121,6 @@ struct usbip_header_ret_unlink {
 	INT32	status;
 };
 
-/* the same as usb_iso_packet_descriptor but packed for pdu */
-struct usbip_iso_packet_descriptor {
-	UINT32	offset;
-	UINT32	length;            /* expected length */
-	UINT32	actual_length;
-	UINT32	status;
-};
-
 /*
 * All usbip packets use a common header to keep code simple.
 */
@@ -144,6 +136,14 @@ struct usbip_header {
 };
 
 static_assert(sizeof(struct usbip_header) == 48, "assert");
+
+/* the same as usb_iso_packet_descriptor but packed for pdu */
+struct usbip_iso_packet_descriptor {
+	UINT32	offset;
+	UINT32	length;            /* expected length */
+	UINT32	actual_length;
+	UINT32	status;
+};
 
 #include <POPPACK.H>
 
