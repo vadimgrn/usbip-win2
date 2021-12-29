@@ -2,10 +2,9 @@
 
 #include <ntdef.h>
 
-typedef struct _GLOBALS
+struct GLOBALS
 {
-	// Path to the driver's Services Key in the registry
-	UNICODE_STRING RegistryPath;
-} GLOBALS;
+	UNICODE_STRING RegistryPath; // Path to the driver's Services Key in the registry
+};
 
 extern GLOBALS Globals;

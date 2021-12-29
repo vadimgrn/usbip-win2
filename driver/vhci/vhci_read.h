@@ -2,4 +2,4 @@
 
 #include "usbreq.h"
 
-NTSTATUS store_urbr(IRP *irp, struct urb_req *urbr);
+NTSTATUS store_urbr(IRP *irp, urb_req *urbr);

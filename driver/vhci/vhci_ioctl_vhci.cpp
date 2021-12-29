@@ -102,7 +102,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		status = vhci_plugin_vpdo(vhci, (pvhci_pluginfo_t)buffer, inlen, irpstack->FileObject);
+		status = vhci_plugin_vpdo(vhci, (vhci_pluginfo_t*)buffer, inlen, irpstack->FileObject);
 		*poutlen = sizeof(vhci_pluginfo_t);
 		break;
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
@@ -110,7 +110,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 			status = vhub_get_ports_status(vhub_from_vhci(vhci), (ioctl_usbip_vhci_get_ports_status *)buffer);
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
-		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (pioctl_usbip_vhci_imported_dev_t)buffer, poutlen);
+		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, poutlen);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		if (inlen == sizeof(ioctl_usbip_vhci_unplug))

@@ -6,7 +6,7 @@
 #include "vhci_devconf.h"
 
 struct urb_req;
-extern LPCWSTR devcodes[];
+extern const LPCWSTR devcodes[];
 
 // These are the states a vpdo or vhub transition upon
 // receiving a specific PnP Irp. Refer to the PnP Device States

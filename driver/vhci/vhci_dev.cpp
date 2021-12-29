@@ -10,7 +10,7 @@
 DEFINE_GUID(GUID_SD_USBIP_VHCI,
 	0x9d3039dd, 0xcca5, 0x4b4d, 0xb3, 0x3d, 0xe2, 0xdd, 0xc8, 0xa8, 0xc5, 0x2f);
 
-LPCWSTR devcodes[] = {
+const LPCWSTR devcodes[] = {
 	L"ROOT", L"CPDO", L"VHCI", L"HPDO", L"VHUB", L"VPDO"
 };
 

@@ -19,4 +19,4 @@ PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t * vpdo);
 PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t *vhub);
 
 PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status *st);
-PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, pioctl_usbip_vhci_imported_dev_t idevs, PULONG poutlen);
+PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, PULONG poutlen);

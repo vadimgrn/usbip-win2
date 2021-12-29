@@ -219,24 +219,23 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t * vhub, ioctl_usbip_vhci_get_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, pioctl_usbip_vhci_imported_dev_t idevs, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, ioctl_usbip_vhci_imported_dev *idevs, PULONG poutlen)
 {
 	PAGED_CODE();
 
-	pioctl_usbip_vhci_imported_dev_t	idev = idevs;
-	ULONG	n_idevs_max;
+	auto idev = idevs;
 	unsigned char	n_used_ports = 0;
-	PLIST_ENTRY	entry;
 
-	n_idevs_max = (ULONG)(*poutlen / sizeof(ioctl_usbip_vhci_imported_dev));
-	if (n_idevs_max == 0)
+	auto n_idevs_max = (ULONG)(*poutlen/sizeof(*idevs));
+	if (!n_idevs_max) {
 		return STATUS_INVALID_PARAMETER;
+	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+	TraceCall("Enter");
 
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 
 		if (n_used_ports == n_idevs_max - 1) {
 			break;
@@ -257,6 +256,5 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, pioctl_usbip_vhci_im
 	ExReleaseFastMutex(&vhub->Mutex);
 
 	idev->port = -1; /* end of mark */
-
 	return STATUS_SUCCESS;
 }

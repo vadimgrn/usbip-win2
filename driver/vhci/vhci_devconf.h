@@ -6,16 +6,16 @@
 
 #include "usbip_proto.h" 
 
-NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed);
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);
+NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, usb_device_speed speed);
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);
 
 enum { 
 	SELECT_CONFIGURATION_STR_BUFSZ = 1024, 
 	SELECT_INTERFACE_STR_BUFSZ = SELECT_CONFIGURATION_STR_BUFSZ 
 };
 
-const char *select_configuration_str(char *buf, size_t len, const struct _URB_SELECT_CONFIGURATION *cfg);
-const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT_INTERFACE *iface);
+const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg);
+const char *select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE *iface);
 
 /*
  * @return bEndpointAddress of endpoint descriptor 
