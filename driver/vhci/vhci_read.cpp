@@ -267,7 +267,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, urb_req *urbr)
 	pkt->wLength = r.SetupPacket.wLength;
 
 	char buf[USB_SETUP_PKT_STR_BUFBZ];
-	TraceURB("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
+	TraceUrb("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
 
 	TRANSFERRED(irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -976,7 +976,7 @@ PAGEABLE void debug(IRP *irp)
 	NT_ASSERT(transferred == sizeof(*hdr) || (transferred > sizeof(*hdr) && transferred == pdu_sz));
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
-	TraceEvents(TRACE_LEVEL_INFORMATION, FLAG_USBIP, "OUT %Iu%s", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 }
 
 /*
@@ -1028,7 +1028,7 @@ void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
 {
 	UNREFERENCED_PARAMETER(devobj);
 
-	TraceURB("Pending irp read cancelled %p", irp_read);
+	TraceUrb("Pending irp read cancelled %p", irp_read);
 
 	IoReleaseCancelSpinLock(irp_read->CancelIrql);
 
@@ -1149,7 +1149,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	Trace(TRACE_LEVEL_VERBOSE, "Enter irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
+	TraceCall("Enter irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
 	auto vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -1171,6 +1171,6 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 		irp_done(irp, status);
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+	TraceCall("Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
 	return status;
 }

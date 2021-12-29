@@ -102,7 +102,7 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	vdev_t *vdev = devobj_to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: irql %!irql!, %!powermn!", 
+	TraceCall("%!vdev_type_t!: irql %!irql!, %!powermn!", 
 			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	if (vdev->DevicePnPState == Deleted) {
@@ -115,6 +115,6 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 			vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
 			vhci_power_vdev(vdev, irp, irpstack);
 
-	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
+	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
 	return st;
 }

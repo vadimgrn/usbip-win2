@@ -158,7 +158,7 @@ PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const usbip_h
 
 	auto buf = copy_to_transfer_buffer(urb, hdr + 1);
 	if (buf && !bulk) { // bulk can have sensitive data
-		TraceURB("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r.TransferBufferLength));
+		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r.TransferBufferLength));
 	}
 
 	return get_copy_status(buf);
@@ -211,7 +211,7 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, con
 		return get_copy_status(dsc);
 	}
 
-	TraceURB("%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
+	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
 			urb_function_str(r.Hdr.Function), 
 			dsc->bLength,
 			dsc->bDescriptorType,
@@ -227,7 +227,7 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, con
 	if (dsc_len > sizeof(*dsc) && dsc_len == r.TransferBufferLength) { // full descriptor
 		cache_descriptor(vpdo, &r, dsc);
 	} else {
-		TraceURB("%s: skip caching of descriptor: TransferBufferLength(%lu), dsc_len(%d)", 
+		TraceUrb("%s: skip caching of descriptor: TransferBufferLength(%lu), dsc_len(%d)", 
 			urb_function_str(r.Hdr.Function), r.TransferBufferLength, dsc_len);
 	}
 
@@ -534,7 +534,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_head
 	auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 
-	TraceURB("ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
+	TraceUrb("ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
 		r->ConnectionIndex, data_sz, actual_length, WppBinary(r->Data, (USHORT)actual_length));
 
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
@@ -582,7 +582,7 @@ PAGEABLE NTSTATUS ret_unlink(const usbip_header *hdr)
 	PAGED_CODE();
 
 	auto st = to_windows_status(hdr->u.ret_unlink.status);
-	TraceURB("%s", dbg_usbd_status(st));
+	TraceUrb("%s", dbg_usbd_status(st));
 
 	return st == USBD_STATUS_CANCELED ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL; // FIXME: always success?
 }
@@ -603,7 +603,7 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceEvents(TRACE_LEVEL_INFORMATION, FLAG_USBIP, "IN %Iu%s",  pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s",  pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	}
 
 	if (buf_sz == pdu_sz) {
@@ -690,7 +690,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	Trace(TRACE_LEVEL_VERBOSE, "Enter irql %!irql!, write buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
+	TraceCall("Enter irql %!irql!, write buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
 	auto vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -714,7 +714,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	}
 
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
-	Trace(TRACE_LEVEL_VERBOSE, "Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+	TraceCall("Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
 
 	return irp_done(irp, status);
 }

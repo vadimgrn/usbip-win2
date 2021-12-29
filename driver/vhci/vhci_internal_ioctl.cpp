@@ -76,7 +76,7 @@ static NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb)
 
 	auto &r = urb->UrbControlGetStatusRequest;
 	
-	TraceURB("%s: TransferBufferLength %lu (must be 2), Index %hd", 
+	TraceUrb("%s: TransferBufferLength %lu (must be 2), Index %hd", 
 		urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 	
 	return STATUS_SUBMIT_URBR_IRP;
@@ -89,7 +89,7 @@ static NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, URB *urb)
 	auto &r = urb->UrbControlVendorClassRequest;
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceURB("%s: %s, TransferBufferLength %lu, %s(%!#XBYTE!), Value %#hx, Index %#hx",
+	TraceUrb("%s: %s, TransferBufferLength %lu, %s(%!#XBYTE!), Value %#hx, Index %#hx",
 			urb_function_str(r.Hdr.Function), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags), 
 			r.TransferBufferLength, brequest_str(r.Request), r.Request, r.Value, r.Index);
 
@@ -102,7 +102,7 @@ static NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb)
 	
 	auto &r = urb->UrbControlDescriptorRequest;
 
-	TraceURB("%s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
+	TraceUrb("%s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
 					urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
 					r.Index, r.DescriptorType, r.LanguageId);
 
@@ -115,7 +115,7 @@ static NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, URB *urb)
 	
 	auto &r = urb->UrbControlFeatureRequest;
 
-	TraceURB("%s: FeatureSelector %#hx, Index %#hx", 
+	TraceUrb("%s: FeatureSelector %#hx, Index %#hx", 
 			urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
 	return STATUS_SUBMIT_URBR_IRP;
@@ -126,7 +126,7 @@ static NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-	TraceURB("%s", select_configuration_str(buf, sizeof(buf), &urb->UrbSelectConfiguration));
+	TraceUrb("%s", select_configuration_str(buf, sizeof(buf), &urb->UrbSelectConfiguration));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -136,7 +136,7 @@ static NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	char buf[SELECT_INTERFACE_STR_BUFSZ];
-	TraceURB("%s", select_interface_str(buf, sizeof(buf), &urb->UrbSelectInterface));
+	TraceUrb("%s", select_interface_str(buf, sizeof(buf), &urb->UrbSelectInterface));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -175,7 +175,7 @@ static NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb)
 		break;
 	}
 
-	TraceURB("%s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d) -> %!STATUS!",
+	TraceUrb("%s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d) -> %!STATUS!",
 				urb_function_str(r.Hdr.Function), 
 				(uintptr_t)r.PipeHandle, 
 				get_endpoint_address(r.PipeHandle), 
@@ -197,7 +197,7 @@ static NTSTATUS urb_get_current_frame_number(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 	UNREFERENCED_PARAMETER(urb);
 
-	TraceURB("Not supported");
+	TraceUrb("Not supported");
 	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 
 	return STATUS_NOT_SUPPORTED;
@@ -212,7 +212,7 @@ static NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb)
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
 	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
-	TraceURB("PipeHandle %#Ix, %s, TransferBufferLength %lu, %s",
+	TraceUrb("PipeHandle %#Ix, %s, TransferBufferLength %lu, %s",
 			(uintptr_t)r.PipeHandle, 
 			usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
 			r.TransferBufferLength,
@@ -230,7 +230,7 @@ static NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb)
 
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceURB("PipeHandle %#Ix, %s, TransferBufferLength %lu%s",
+	TraceUrb("PipeHandle %#Ix, %s, TransferBufferLength %lu%s",
 			(uintptr_t)r.PipeHandle,
 			usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
 			r.TransferBufferLength,
@@ -248,7 +248,7 @@ static NTSTATUS isoch_transfer(vpdo_dev_t *vpdo, URB *urb)
 
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
-	TraceURB("PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
+	TraceUrb("PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
 			(uintptr_t)r.PipeHandle,	
 			usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
 			r.TransferBufferLength, 
@@ -268,7 +268,7 @@ static NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb)
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
 	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
-	TraceURB("PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
+	TraceUrb("PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
 			(uintptr_t)r.PipeHandle,
 			usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
 			r.TransferBufferLength,
@@ -282,7 +282,7 @@ static NTSTATUS usb_function_deprecated(vpdo_dev_t *vpdo, URB *urb)
 {
 	UNREFERENCED_PARAMETER(vpdo);
 
-	TraceURB("%s not supported", urb_function_str(urb->UrbHeader.Function));
+	TraceUrb("%s not supported", urb_function_str(urb->UrbHeader.Function));
 
 	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 	return STATUS_NOT_SUPPORTED;
@@ -293,7 +293,7 @@ static NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	auto &r = urb->UrbControlGetConfigurationRequest;
-	TraceURB("TransferBufferLength %lu (must be 1)", r.TransferBufferLength);
+	TraceUrb("TransferBufferLength %lu (must be 1)", r.TransferBufferLength);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -303,7 +303,7 @@ static NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb)
 	UNREFERENCED_PARAMETER(vpdo);
 
 	auto &r = urb->UrbControlGetInterfaceRequest;
-	TraceURB("TransferBufferLength %lu (must be 1), Interface %hu", r.TransferBufferLength, r.Interface);
+	TraceUrb("TransferBufferLength %lu (must be 1), Interface %hu", r.TransferBufferLength, r.Interface);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -314,7 +314,7 @@ static NTSTATUS get_ms_feature_descriptor(vpdo_dev_t *vpdo, URB *urb)
 
 	auto &r = urb->UrbOSFeatureDescriptorRequest;
 
-	TraceURB("TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
+	TraceUrb("TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
 			r.TransferBufferLength, r.Recipient, r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
 
 	return STATUS_NOT_IMPLEMENTED;
@@ -326,7 +326,7 @@ static NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t *vpdo, URB *urb)
 
 	auto &r = urb->UrbGetIsochPipeTransferPathDelays;
 
-	TraceURB("PipeHandle %#Ix, MaximumSendPathDelayInMilliSeconds %lu, MaximumCompletionPathDelayInMilliSeconds %lu",
+	TraceUrb("PipeHandle %#Ix, MaximumSendPathDelayInMilliSeconds %lu, MaximumCompletionPathDelayInMilliSeconds %lu",
 				(uintptr_t)r.PipeHandle, 
 				r.MaximumSendPathDelayInMilliSeconds, 
 				r.MaximumCompletionPathDelayInMilliSeconds);
@@ -340,7 +340,7 @@ static NTSTATUS open_static_streams(vpdo_dev_t *vpdo, URB *urb)
 
 	auto &r = urb->UrbOpenStaticStreams;
 
-	TraceURB("PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",
+	TraceUrb("PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",
 				(uintptr_t)r.PipeHandle, r.NumberOfStreams, r.StreamInfoVersion, r.StreamInfoSize);
 
 	return STATUS_NOT_IMPLEMENTED;
@@ -478,7 +478,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Ir
 	IO_STACK_LOCATION *irpStack = IoGetCurrentIrpStackLocation(Irp);
 	ULONG ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	Trace(TRACE_LEVEL_VERBOSE, "Enter irql %!irql!, %s(%#08lX)", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceCall("Enter irql %!irql!, %s(%#08lX)", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
 	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -516,6 +516,6 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in PDEVICE_OBJECT devobj, __in PIRP Ir
 		irp_done(Irp, status);
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Leave %!STATUS!", status);
+	TraceCall("Leave %!STATUS!", status);
 	return status;
 }

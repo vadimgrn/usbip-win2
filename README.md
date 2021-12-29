@@ -105,15 +105,15 @@ usbip.exe list -l
 - `usbip-win` is not yet ready for production use. We could find the problems with detailed logs.
 
 #### How to get Windows kernel log for drivers
-- All drivers use WPP Software Tracing
+- Drivers use WPP Software Tracing
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
 - Use these tracing GUIDs
-  - `682e9961-054c-482b-a86d-d94f6cd5f555` for stub driver
   - `8b56380d-5174-4b15-b6f4-4c47008801a4` for vhci driver
+  - `682e9961-054c-482b-a86d-d94f6cd5f555` for stub driver
 - Example of a log session for vhci driver using command-line tools
   - Start a new log session
-    - `tracelog.exe -start usbip-vhci -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f usbip-vhci.etl -flag 0xFFFF -level 5`
+    - `tracelog.exe -start usbip-vhci -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f usbip-vhci.etl -flag 0xF -level 5`
   - Stop the log session
     - `tracelog.exe -stop usbip-vhci`
   - Format binary event trace log `usbip-vhci.etl` as text

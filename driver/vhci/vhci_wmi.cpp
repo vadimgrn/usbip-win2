@@ -166,14 +166,14 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 {
 	PAGED_CODE();
 
-	Trace(TRACE_LEVEL_VERBOSE, "Enter irql %!irql!", KeGetCurrentIrql());
+	TraceCall("Enter irql %!irql!", KeGetCurrentIrql());
 
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	if (!vhci) {
 		// The vpdo, just complete the request with the current status
-		Trace(TRACE_LEVEL_INFORMATION, "skip %!sysctrl!", irpstack->MinorFunction);
+		Trace(TRACE_LEVEL_INFORMATION, "Skip %!sysctrl!", irpstack->MinorFunction);
 		return irp_done_iostatus(irp);
 	}
 
@@ -209,7 +209,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 		status = IoCallDriver(vhci->devobj_lower, irp);
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Leave %!STATUS!", status);
+	TraceCall("Leave %!STATUS!", status);
 	return status;
 }
 
