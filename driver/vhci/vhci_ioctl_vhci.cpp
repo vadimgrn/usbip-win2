@@ -13,7 +13,10 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
-static PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t * vhci, PVOID buffer, PULONG poutlen)
+namespace
+{
+
+PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t * vhci, PVOID buffer, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -48,7 +51,7 @@ static PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t * vhci, PVOID buffer,
 }
 
 /* IOCTL_USB_GET_ROOT_HUB_NAME requires a device interface symlink name with the prefix(\??\) stripped */
-static PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
+PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
 {
 	PAGED_CODE();
 
@@ -60,6 +63,9 @@ static PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
 	}
 	return 0;
 }
+
+} // namespace
+
 
 PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {

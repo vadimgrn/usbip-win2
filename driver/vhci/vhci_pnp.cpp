@@ -15,19 +15,22 @@
 
 #include <wdmguid.h>
 
-NTSTATUS irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
+namespace
+{
+
+PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 {
 	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : irp_done_success(irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, StopPending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -40,14 +43,14 @@ static PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t * vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_stop_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_stop_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, Stopped);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -62,7 +65,7 @@ static PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t * vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 
@@ -73,14 +76,14 @@ static PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t * vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t * vdev, PIRP irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
@@ -98,21 +101,21 @@ static PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 	return irp_done(irp, st);
 }
 
-static PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
-static PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
-static PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
@@ -120,13 +123,13 @@ static PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 }
 
 /*
- * For the device to be ejected, the device must be in the D3
- * device power state (off) and must be unlocked
- * (if the device supports locking). Any driver that returns success
- * for this IRP must wait until the device has been ejected before
- * completing the IRP.
- */
-static PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
+* For the device to be ejected, the device must be in the D3
+* device power state (off) and must be unlocked
+* (if the device supports locking). Any driver that returns success
+* for this IRP must wait until the device has been ejected before
+* completing the IRP.
+*/
+PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
@@ -139,14 +142,14 @@ static PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 	return irp_done_iostatus(irp);
 }
 
-static PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
-static PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
@@ -156,20 +159,20 @@ static PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 }
 
 /*
- * OPTIONAL for bus drivers.
- * This bus drivers any of the bus's descendants
- * (child device, child of a child device, etc.) do not
- * contain a memory file namely paging file, dump file,
- * or hibernation file. So we  fail this Irp.
- */
-static PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
+* OPTIONAL for bus drivers.
+* This bus drivers any of the bus's descendants
+* (child device, child of a child device, etc.) do not
+* contain a memory file namely paging file, dump file,
+* or hibernation file. So we  fail this Irp.
+*/
+PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
 	return irp_done(irp, STATUS_UNSUCCESSFUL);
 }
 
-static PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
@@ -177,10 +180,10 @@ static PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp
 }
 
 /*
- * This request notifies bus drivers that a device object exists and
- * that it has been fully enumerated by the plug and play manager.
- */
-static PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
+* This request notifies bus drivers that a device object exists and
+* that it has been fully enumerated by the plug and play manager.
+*/
+PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	UNREFERENCED_PARAMETER(vdev);
@@ -189,7 +192,7 @@ static PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 
 typedef NTSTATUS (*pnpmn_func_t)(vdev_t*, IRP*);
 
-static const pnpmn_func_t pnpmn_functions[] =
+const pnpmn_func_t pnpmn_functions[] =
 {
 	pnp_start_device, // IRP_MN_START_DEVICE
 	pnp_query_remove_device,
@@ -222,6 +225,8 @@ static const pnpmn_func_t pnpmn_functions[] =
 	pnp_query_legacy_bus_information, // IRP_MN_QUERY_LEGACY_BUS_INFORMATION
 	pnp_device_enumerated // IRP_MN_DEVICE_ENUMERATED, since WIN7
 };
+
+} // namespace
 
 extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {

@@ -6,13 +6,19 @@
 #include "vhci_irp.h"
 #include "strutil.h"
 
-static LPCWSTR vdev_descs[] = {
+namespace
+{
+
+const LPCWSTR vdev_descs[] = {
 	L"usbip-win ROOT", L"usbip-win CPDO", L"usbip-win VHCI", L"usbip-win HPDO", L"usbip-win VHUB", L"usbip-win VPDO"
 };
 
-static LPCWSTR vdev_locinfos[] = {
+const LPCWSTR vdev_locinfos[] = {
 	L"None", L"Root", L"Root", L"VHCI", L"VHCI", L"HPDO"
 };
+
+} // namespace
+
 
 PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 {

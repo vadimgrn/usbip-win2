@@ -11,10 +11,13 @@
 #include "usbreq.h"
 #include "strutil.h"
 
+namespace
+{
+
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-static void complete_pending_read_irp(vpdo_dev_t * vpdo)
+void complete_pending_read_irp(vpdo_dev_t * vpdo)
 {
 	KIRQL	oldirql;
 	PIRP	irp;
@@ -42,7 +45,7 @@ static void complete_pending_read_irp(vpdo_dev_t * vpdo)
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-static void complete_pending_irp(vpdo_dev_t *vpdo)
+void complete_pending_irp(vpdo_dev_t *vpdo)
 {
 	KIRQL	oldirql;
 
@@ -82,7 +85,7 @@ static void complete_pending_irp(vpdo_dev_t *vpdo)
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 }
 
-static PAGEABLE void invalidate_vhci(vhci_dev_t * vhci)
+PAGEABLE void invalidate_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
@@ -96,7 +99,7 @@ static PAGEABLE void invalidate_vhci(vhci_dev_t * vhci)
 	Trace(TRACE_LEVEL_INFORMATION, "invalidating vhci device object: %p", to_devobj(vhci));
 }
 
-static PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
+PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
 {
 	PAGED_CODE();
 
@@ -109,7 +112,7 @@ static PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
 	Trace(TRACE_LEVEL_INFORMATION, "invalidating vhub device object: %p", to_devobj(vhub));
 }
 
-static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
@@ -137,7 +140,7 @@ static PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 	}
 }
 
-static PAGEABLE void remove_device(vdev_t *vdev)
+PAGEABLE void remove_device(vdev_t *vdev)
 {
 	PAGED_CODE();
 
@@ -175,6 +178,9 @@ static PAGEABLE void remove_device(vdev_t *vdev)
 
 	IoDeleteDevice(vdev->Self);
 }
+
+} // namespace
+
 
 PAGEABLE NTSTATUS pnp_remove_device(vdev_t * vdev, PIRP irp)
 {

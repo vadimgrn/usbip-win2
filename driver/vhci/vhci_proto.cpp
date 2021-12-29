@@ -6,7 +6,10 @@
 #include "usbip_proto.h"
 #include "usbd_helper.h"
 
-static ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
+namespace
+{
+
+ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
 {
 	NT_ASSERT(PipeHandle);
 
@@ -29,6 +32,8 @@ static ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle
 	NT_ASSERT(IsTransferDirectionOut(TransferFlags) == out);
 	return TransferFlags;
 }
+
+} // namespace
 
 /*
  * Direction in TransferFlags can be invalid for bulk transfer at least.
@@ -70,8 +75,7 @@ NTSTATUS set_cmd_submit_usbip_header(
 	return STATUS_SUCCESS;
 }
 
-void
-set_cmd_unlink_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid, unsigned long seqnum_unlink)
+void set_cmd_unlink_usbip_header(struct usbip_header *h, unsigned long seqnum, unsigned int devid, unsigned long seqnum_unlink)
 {
 	h->base.command = USBIP_CMD_UNLINK;
 	h->base.seqnum = seqnum;

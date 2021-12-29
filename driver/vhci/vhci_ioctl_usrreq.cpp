@@ -5,7 +5,10 @@
 #include <usbdi.h>
 #include <usbuser.h>
 
-static PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
+namespace
+{
+
+PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -49,7 +52,7 @@ static PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutle
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -69,6 +72,8 @@ static PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG p
 	*poutlen = sizeof(*pinfo);
 	return STATUS_SUCCESS;
 }
+
+} // namespace
 
 PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t * vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
 {

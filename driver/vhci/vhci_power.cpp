@@ -5,7 +5,10 @@
 #include "vhci_dev.h"
 #include "vhci_irp.h"
 
-static void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const char *caller)
+namespace
+{
+
+void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const char *caller)
 {
 	switch (type) {
 	case SystemPowerState:
@@ -17,8 +20,8 @@ static void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const
 	}
 }
 
-static NTSTATUS
-vhci_power_vhci(vhci_dev_t * vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
+NTSTATUS
+	vhci_power_vhci(vhci_dev_t * vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 {
 	POWER_STATE		powerState;
 	POWER_STATE_TYPE	powerType;
@@ -38,8 +41,8 @@ vhci_power_vhci(vhci_dev_t * vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
 	return irp_pass_down(vhci->devobj_lower, irp);
 }
 
-static NTSTATUS
-vhci_power_vdev(vdev_t * vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+NTSTATUS
+	vhci_power_vdev(vdev_t * vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 {
 	POWER_STATE		powerState;
 	POWER_STATE_TYPE	powerType;
@@ -96,6 +99,9 @@ vhci_power_vdev(vdev_t * vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
 
 	return irp_done_iostatus(irp);
 }
+
+} // namespace
+
 
 extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {

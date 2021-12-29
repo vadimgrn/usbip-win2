@@ -14,7 +14,10 @@ LPCWSTR devcodes[] = {
 	L"ROOT", L"CPDO", L"VHCI", L"HPDO", L"VHUB", L"VPDO"
 };
 
-static ULONG ext_sizes_per_devtype[] = {
+namespace
+{
+
+const ULONG ext_sizes_per_devtype[] = {
 	sizeof(root_dev_t),
 	sizeof(cpdo_dev_t),
 	sizeof(vhci_dev_t),
@@ -23,8 +26,9 @@ static ULONG ext_sizes_per_devtype[] = {
 	sizeof(vpdo_dev_t)
 };
 
-LPWSTR
-get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
+} // namespace
+
+LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
 {
 	ULONG buflen = 0;
 

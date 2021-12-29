@@ -8,7 +8,10 @@
 #include "usb_util.h"
 #include "devconf.h"
 
-static PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
+namespace
+{
+
+PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 {
 	PAGED_CODE();
 
@@ -40,7 +43,7 @@ static PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;
 }
 
-static void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &d)
+void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
 	vpdo->vendor = d.idVendor;
 	vpdo->product = d.idProduct;
@@ -49,18 +52,18 @@ static void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCR
 	vpdo->usbclass = d.bDeviceClass;
 	vpdo->subclass = d.bDeviceSubClass;
 	vpdo->protocol = d.bDeviceProtocol;
-	
+
 	vpdo->speed = get_usb_speed(d.bcdUSB);
 	vpdo->NumConfigurations = d.bNumConfigurations;
 }
 
 /*
- * Many devices have 0 usb class number in a device descriptor.
- * 0 value means that class number is determined at interface level.
- * USB class, subclass and protocol numbers should be setup before importing.
- * Because windows vhci driver builds a device compatible id with those numbers.
- */
-static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *d)
+* Many devices have 0 usb class number in a device descriptor.
+* 0 value means that class number is determined at interface level.
+* USB class, subclass and protocol numbers should be setup before importing.
+* Because windows vhci driver builds a device compatible id with those numbers.
+*/
+void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *d)
 {
 	NT_ASSERT(d);
 
@@ -80,6 +83,9 @@ static void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIP
 		}
 	}
 }
+
+
+} // namespace
 
 PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_OBJECT *fo)
 {

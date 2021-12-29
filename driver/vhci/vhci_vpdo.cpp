@@ -6,6 +6,23 @@
 #include "usbreq.h"
 #include "devconf.h"
 
+namespace
+{
+
+PAGEABLE bool copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
+{
+	PAGED_CODE();
+
+	USB_PIPE_INFO *pi = (USB_PIPE_INFO*)data + i;
+
+	RtlCopyMemory(&pi->EndpointDescriptor, d, sizeof(*d));
+	pi->ScheduleOffset = 0; // TODO
+
+	return false;
+}
+
+} // namespace
+
 PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *r)
 {
 	PAGED_CODE();
@@ -63,18 +80,6 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, struct _URB_SELECT_INT
 	}
 
 	return status;
-}
-
-static PAGEABLE bool copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
-{
-	PAGED_CODE();
-
-	USB_PIPE_INFO *pi = (USB_PIPE_INFO*)data + i;
-
-	RtlCopyMemory(&pi->EndpointDescriptor, d, sizeof(*d));
-	pi->ScheduleOffset = 0; // TODO
-
-	return false;
 }
 
 PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t * vpdo, PUSB_NODE_CONNECTION_INFORMATION conninfo, PULONG poutlen)

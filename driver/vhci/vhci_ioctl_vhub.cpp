@@ -10,7 +10,10 @@
 #include "vhci_vpdo_dsc.h"
 #include "vhci_vhub.h"
 
-static PAGEABLE NTSTATUS get_node_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+namespace
+{
+
+PAGEABLE NTSTATUS get_node_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -31,7 +34,7 @@ static PAGEABLE NTSTATUS get_node_info(vhub_dev_t * vhub, PVOID buffer, ULONG in
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS get_nodeconn_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_nodeconn_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -53,7 +56,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info(vhub_dev_t * vhub, PVOID buffer, ULON
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_nodeconn_info_ex(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_nodeconn_info_ex(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -75,7 +78,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex(vhub_dev_t * vhub, PVOID buffer, U
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -97,7 +100,7 @@ static PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
@@ -119,7 +122,7 @@ static PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp
 	return status;
 }
 
-static PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
+PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -132,7 +135,7 @@ static PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t * vhub, PVOID buffer,
 	return vhub_get_information_ex(vhub, pinfo);
 }
 
-static PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
+PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -143,7 +146,7 @@ static PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t * vhub, PVOID buffer
 	return vhub_get_capabilities_ex(vhub, pinfo);
 }
 
-static PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -156,7 +159,7 @@ static PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t * vhub, PVOID 
 	return vhub_get_port_connector_properties(vhub, pinfo, poutlen);
 }
 
-static PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
@@ -200,6 +203,8 @@ static PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer
 
 	return status;
 }
+
+} // namespace
 
 PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t * vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
 {

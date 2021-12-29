@@ -4,7 +4,10 @@
 
 #include "vhci_irp.h"
 
-static PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
+namespace
+{
+
+PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
 {
 	PAGED_CODE();
 
@@ -54,7 +57,7 @@ static PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_
 	return status;
 }
 
-static PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
+PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
 {
 	PAGED_CODE();
 
@@ -70,7 +73,7 @@ static PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
 	pcaps->UINumber = 1;
 }
 
-static PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpstack)
 {
 	PAGED_CODE();
 
@@ -177,7 +180,7 @@ static PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATIO
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS pnp_query_cap(PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_cap(PIO_STACK_LOCATION irpstack)
 {
 	PAGED_CODE();
 
@@ -191,6 +194,9 @@ static PAGEABLE NTSTATUS pnp_query_cap(PIO_STACK_LOCATION irpstack)
 	setup_capabilities(pcaps);
 	return STATUS_SUCCESS;
 }
+
+} // namespace
+
 
 PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp)
 {

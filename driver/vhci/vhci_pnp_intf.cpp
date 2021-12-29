@@ -28,16 +28,14 @@ inline void deref_interface(__in PVOID Context)
 	vdev_del_ref(static_cast<vdev_t*>(Context));
 }
 
-} // namespace
-
-static BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(void *context)
+BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(void *context)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(context);
 	Trace(TRACE_LEVEL_INFORMATION, "%!usb_device_speed!", vpdo->speed);
 	return vpdo->speed == USB_SPEED_HIGH;
 }
 
-static NTSTATUS USB_BUSIFFN
+NTSTATUS USB_BUSIFFN
 QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN OUT PVOID BusInformationBuffer,
 	IN OUT PULONG BusInformationBufferLength, OUT PULONG BusInformationActualLength)
 {
@@ -51,7 +49,7 @@ QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN OUT PVOID BusInforma
 	return STATUS_UNSUCCESSFUL;
 }
 
-static NTSTATUS USB_BUSIFFN
+NTSTATUS USB_BUSIFFN
 SubmitIsoOutUrb(IN PVOID context, IN PURB urb)
 {
 	UNREFERENCED_PARAMETER(context);
@@ -61,7 +59,7 @@ SubmitIsoOutUrb(IN PVOID context, IN PURB urb)
 	return STATUS_UNSUCCESSFUL;
 }
 
-static NTSTATUS USB_BUSIFFN
+NTSTATUS USB_BUSIFFN
 QueryBusTime(IN PVOID context, IN OUT PULONG currentusbframe)
 {
 	UNREFERENCED_PARAMETER(context);
@@ -71,7 +69,7 @@ QueryBusTime(IN PVOID context, IN OUT PULONG currentusbframe)
 	return STATUS_UNSUCCESSFUL;
 }
 
-static VOID USB_BUSIFFN
+VOID USB_BUSIFFN
 GetUSBDIVersion(IN PVOID context, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT PULONG HcdCapabilities)
 {
 	UNREFERENCED_PARAMETER(context);
@@ -83,7 +81,7 @@ GetUSBDIVersion(IN PVOID context, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT P
 	inf->Supported_USB_Version = 0x200; // binary-coded decimal USB specification version number, USB 2.0
 }
 
-static NTSTATUS
+NTSTATUS
 QueryControllerType(_In_opt_ PVOID Context,
 	_Out_opt_ PULONG HcdiOptionFlags,
 	_Out_opt_ PUSHORT PciVendorId,
@@ -126,7 +124,7 @@ QueryControllerType(_In_opt_ PVOID Context,
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT version, INTERFACE *intf)
+PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT version, INTERFACE *intf)
 {
 	PAGED_CODE();
 
@@ -177,7 +175,7 @@ static PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, US
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INTERFACE* intf)
+PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INTERFACE* intf)
 {
 	PAGED_CODE();
 
@@ -197,7 +195,7 @@ static PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INT
 	return STATUS_NOT_SUPPORTED;
 }
 
-static NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
+NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 {
 	auto vdev = static_cast<vdev_t*>(Context);
 	NTSTATUS st = STATUS_SUCCESS;
@@ -208,10 +206,10 @@ static NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 	if (vdev->type == VDEV_VPDO) {
 		vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
 		st = RtlStringCchPrintfExW(buf, ARRAYSIZE(buf), nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL,
-						L"%s(%u)", devcodes[vdev->type], vpdo->port);
+			L"%s(%u)", devcodes[vdev->type], vpdo->port);
 	} else {
 		st = RtlStringCchCopyExW(buf, ARRAYSIZE(buf), devcodes[vdev->type],
-					nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL);
+			nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL);
 	}
 
 	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"
@@ -232,7 +230,7 @@ static NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 	return STATUS_INSUFFICIENT_RESOURCES;
 }
 
-static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INTERFACE *intf)
+NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INTERFACE *intf)
 {
 	PNP_LOCATION_INTERFACE *r = (PNP_LOCATION_INTERFACE*)intf;
 	if (size < sizeof(*r)) {
@@ -249,6 +247,8 @@ static NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT versi
 	r->GetLocationString = get_location_string;
 	return STATUS_SUCCESS;
 }
+
+} // namespace
 
 /*
  * On success, a bus driver sets Irp->IoStatus.Information to zero.

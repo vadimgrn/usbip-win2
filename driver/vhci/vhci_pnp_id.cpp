@@ -9,13 +9,16 @@
 
 #include <ntstrsafe.h>
 
+namespace
+{
+
 #define DEVID_VHCI	HWID_VHCI
 #define DEVID_VHUB	HWID_VHUB
 
 /*
- * The first hardware ID in the list should be the device ID, and
- * the remaining IDs should be listed in order of decreasing suitability.
- */
+* The first hardware ID in the list should be the device ID, and
+* the remaining IDs should be listed in order of decreasing suitability.
+*/
 #define HWIDS_VHCI	DEVID_VHCI L"\0"
 
 #define HWIDS_VHUB \
@@ -23,32 +26,32 @@
 	VHUB_PREFIX L"&VID_" VHUB_VID L"&PID_" VHUB_PID L"\0"
 
 // vdev_type_t is an index
-static const LPCWSTR vdev_devids[] = {
+const LPCWSTR vdev_devids[] = {
 	nullptr, DEVID_VHCI,
 	nullptr, DEVID_VHUB,
 	nullptr, L"USB\\VID_%04hx&PID_%04hx" // 21 chars after formatting
 };
 
-static const size_t vdev_devid_size[] = {
+const size_t vdev_devid_size[] = {
 	0, sizeof(DEVID_VHCI),
 	0, sizeof(DEVID_VHUB),
 	0, (21 + 1)*sizeof(WCHAR)
 };
 
-static const LPCWSTR vdev_hwids[] = {
+const LPCWSTR vdev_hwids[] = {
 	nullptr, HWIDS_VHCI,
 	nullptr, HWIDS_VHUB,
 	nullptr, L"USB\\VID_%04hx&PID_%04hx&REV_%04hx;" // 31 chars after formatting
-	      L"USB\\VID_%04hx&PID_%04hx;" // 22 chars after formatting
+	L"USB\\VID_%04hx&PID_%04hx;" // 22 chars after formatting
 };
 
-static const size_t vdev_hwids_size[] = {
+const size_t vdev_hwids_size[] = {
 	0, sizeof(HWIDS_VHCI),
 	0, sizeof(HWIDS_VHUB),
 	0, (31 + 22 + 1)*sizeof(WCHAR)
 };
 
-static void subst_char(wchar_t *s, wchar_t ch, wchar_t rep)
+void subst_char(wchar_t *s, wchar_t ch, wchar_t rep)
 {
 	for ( ; *s; ++s) {
 		if (*s == ch) {
@@ -58,38 +61,38 @@ static void subst_char(wchar_t *s, wchar_t ch, wchar_t rep)
 }
 
 /*
-  Enumeration of USB Composite Devices.
+Enumeration of USB Composite Devices.
 
-  The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
-  if the device meets the following requirements:
-  * The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
-    or the class (bDeviceClass), subclass (bDeviceSubClass), and protocol (bDeviceProtocol) fields
-    of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
-    in USB Interface Association Descriptor.
-  * The device must have multiple interfaces.
-  * The device must have a single configuration.
+The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
+if the device meets the following requirements:
+* The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
+or the class (bDeviceClass), subclass (bDeviceSubClass), and protocol (bDeviceProtocol) fields
+of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
+in USB Interface Association Descriptor.
+* The device must have multiple interfaces.
+* The device must have a single configuration.
 
-  The bus driver also checks the device class (bDeviceClass), subclass (bDeviceSubClass),
-  and protocol (bDeviceProtocol) fields of the device descriptor. If these fields are zero,
-  the device is a composite device, and the bus driver reports an extra compatible
-  identifier (ID) of USB\COMPOSITE for the PDO.
+The bus driver also checks the device class (bDeviceClass), subclass (bDeviceSubClass),
+and protocol (bDeviceProtocol) fields of the device descriptor. If these fields are zero,
+the device is a composite device, and the bus driver reports an extra compatible
+identifier (ID) of USB\COMPOSITE for the PDO.
 */
-static bool is_composite(vpdo_dev_t *vpdo)
+bool is_composite(vpdo_dev_t *vpdo)
 {
 	bool ok = !vpdo->usbclass || // generic composite device
-		  (vpdo->usbclass == 0xEF &&
-		   vpdo->subclass == 0x02 &&
-		   vpdo->protocol == 0x01); // IAD composite device
+		(vpdo->usbclass == 0xEF &&
+			vpdo->subclass == 0x02 &&
+			vpdo->protocol == 0x01); // IAD composite device
 
 	return ok && vpdo->NumInterfaces > 1 && vpdo->NumConfigurations == 1;
 }
 
 /*
- * For all USB devices, the USB bus driver reports a device ID with the following format:
- * USB\VID_xxxx&PID_yyyy
- */
-static NTSTATUS
-setup_device_id(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
+* For all USB devices, the USB bus driver reports a device ID with the following format:
+* USB\VID_xxxx&PID_yyyy
+*/
+NTSTATUS
+	setup_device_id(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(subst_result);
 	UNREFERENCED_PARAMETER(irp);
@@ -123,8 +126,8 @@ setup_device_id(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 	return status;
 }
 
-static NTSTATUS
-setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
+NTSTATUS
+	setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(irp);
 
@@ -148,8 +151,8 @@ setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 	if (*subst_result) {
 		vpdo_dev_t * vpdo = (vpdo_dev_t *)vdev;
 		status = RtlStringCbPrintfW(ids_hw, str_sz, str,
-					    vpdo->vendor, vpdo->product, vpdo->revision,
-					    vpdo->vendor, vpdo->product);
+			vpdo->vendor, vpdo->product, vpdo->revision,
+			vpdo->vendor, vpdo->product);
 	} else {
 		RtlCopyMemory(ids_hw, str, str_sz);
 	}
@@ -178,16 +181,16 @@ of a device instance ID.
 
 The UniqueID member of the DEVICE_CAPABILITIES structure for a device indicates
 if a bus-supplied instance ID is unique across the system, as follows:
- * If UniqueID is FALSE, the bus-supplied instance ID for a device is unique
-   only to the device's bus. The Plug and Play (PnP) manager modifies
-   the bus-supplied instance ID, and combines it with the corresponding device ID,
-   to create a device instance ID that is unique in the system.
- * If UniqueID is TRUE, the device instance ID, formed from the bus-supplied
-   device ID and instance ID, uniquely identifies a device in the system.
+* If UniqueID is FALSE, the bus-supplied instance ID for a device is unique
+only to the device's bus. The Plug and Play (PnP) manager modifies
+the bus-supplied instance ID, and combines it with the corresponding device ID,
+to create a device instance ID that is unique in the system.
+* If UniqueID is TRUE, the device instance ID, formed from the bus-supplied
+device ID and instance ID, uniquely identifies a device in the system.
 
 An instance ID is persistent across system restarts.
 */
-static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP *irp, bool want_serial)
+NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP *irp, bool want_serial)
 {
 	UNREFERENCED_PARAMETER(subst_result);
 	UNREFERENCED_PARAMETER(irp);
@@ -197,7 +200,7 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 	}
 
 	const size_t max_wchars = MAX_VHCI_SERIAL_ID + 1;
-//	static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN, "assert");
+	//	static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN, "assert");
 
 	vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
 
@@ -208,8 +211,8 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 	}
 
 	auto serial = vpdo->serial_usr ? vpdo->serial_usr :
-		      vpdo->serial ? vpdo->serial :
-		      L"";
+		vpdo->serial ? vpdo->serial :
+		L"";
 
 	NTSTATUS status = status = *serial || want_serial ?
 		RtlStringCchCopyW(str, max_wchars, serial) :
@@ -222,8 +225,7 @@ static NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev
 	return status;
 }
 
-static NTSTATUS
-setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
+NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 {
 	UNREFERENCED_PARAMETER(irp);
 
@@ -251,9 +253,9 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 	size_t remaining = 0;
 
 	NTSTATUS status = RtlStringCchPrintfExW(ids_compat, max_wchars, &dest_end, &remaining, 0, fmt,
-						vpdo->usbclass, vpdo->subclass, vpdo->protocol,
-						vpdo->usbclass, vpdo->subclass,
-						vpdo->usbclass);
+		vpdo->usbclass, vpdo->subclass, vpdo->protocol,
+		vpdo->usbclass, vpdo->subclass,
+		vpdo->usbclass);
 
 	if (status == STATUS_SUCCESS) {
 		*result = ids_compat;
@@ -266,6 +268,9 @@ setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
 
 	return status;
 }
+
+} // namespace
+
 
 /*
  * On success, a driver sets Irp->IoStatus.Information to a WCHAR pointer

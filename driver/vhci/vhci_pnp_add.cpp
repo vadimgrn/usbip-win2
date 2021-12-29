@@ -5,9 +5,12 @@
 #include "vhci.h"
 #include <ntstrsafe.h>
 
+namespace
+{
+
 enum { MAX_HUB_PORTS = 6 };
 
-static PAGEABLE BOOLEAN is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
+PAGEABLE BOOLEAN is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
 {
 	PAGED_CODE();
 
@@ -35,7 +38,7 @@ static PAGEABLE BOOLEAN is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
 	return res;
 }
 
-static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
+PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -49,7 +52,7 @@ static PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t 
 	return nullptr;
 }
 
-static PAGEABLE vdev_t * create_child_pdo(vdev_t * vdev, vdev_type_t type)
+PAGEABLE vdev_t * create_child_pdo(vdev_t * vdev, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -68,13 +71,13 @@ static PAGEABLE vdev_t * create_child_pdo(vdev_t * vdev, vdev_type_t type)
 	return vdev_child;
 }
 
-static PAGEABLE void init_dev_root(vdev_t * vdev)
+PAGEABLE void init_dev_root(vdev_t * vdev)
 {
 	PAGED_CODE();
 	vdev->child_pdo = create_child_pdo(vdev, VDEV_CPDO);
 }
 
-static PAGEABLE void init_dev_vhci(vdev_t * vdev)
+PAGEABLE void init_dev_vhci(vdev_t * vdev)
 {
 	PAGED_CODE();
 	vhci_dev_t *	vhci = (vhci_dev_t *)vdev;
@@ -84,7 +87,7 @@ static PAGEABLE void init_dev_vhci(vdev_t * vdev)
 	RtlUnicodeStringInitEx(&vhci->DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 }
 
-static PAGEABLE void init_dev_vhub(vdev_t * vdev)
+PAGEABLE void init_dev_vhub(vdev_t * vdev)
 {
 	PAGED_CODE();
 
@@ -102,7 +105,7 @@ static PAGEABLE void init_dev_vhub(vdev_t * vdev)
 	vhub->n_max_ports = MAX_HUB_PORTS;
 }
 
-static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
+PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -152,6 +155,8 @@ static PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJEC
 
 	return STATUS_SUCCESS;
 }
+
+} // namespace
 
 extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
 {

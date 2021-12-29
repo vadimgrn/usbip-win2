@@ -2,7 +2,10 @@
 #include "vhci_irp.h"
 #include "vhci.h"
 
-static PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST get_query_empty_resource_requirements(void)
+namespace
+{
+
+PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST get_query_empty_resource_requirements(void)
 {
 	PAGED_CODE();
 
@@ -20,7 +23,7 @@ static PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST get_query_empty_resource_requirem
 	return r;
 }
 
-static PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
+PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
 {
 	PAGED_CODE();
 
@@ -31,6 +34,10 @@ static PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
 
 	return r;
 }
+
+
+} // namespace
+
 
 PAGEABLE NTSTATUS pnp_query_resource_requirements(vdev_t * vdev, PIRP irp)
 {

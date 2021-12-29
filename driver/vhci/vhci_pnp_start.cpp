@@ -9,7 +9,10 @@
 #include <initguid.h> // required for GUID definitions
 #include "usbip_vhci_api.h"
 
-static PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
+namespace
+{
+
+PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
@@ -33,7 +36,7 @@ static PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 	return status;
 }
 
-static PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
+PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
 {
 	PAGED_CODE();
 
@@ -66,7 +69,7 @@ static PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE NTSTATUS start_vpdo(vpdo_dev_t * vpdo)
+PAGEABLE NTSTATUS start_vpdo(vpdo_dev_t * vpdo)
 {
 	PAGED_CODE();
 
@@ -83,6 +86,9 @@ static PAGEABLE NTSTATUS start_vpdo(vpdo_dev_t * vpdo)
 
 	return status;
 }
+
+} // namespace
+
 
 PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 {

@@ -5,7 +5,10 @@
 #include "vhci_irp.h"
 #include "vhci.h"
 
-static PAGEABLE void relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)
+namespace
+{
+
+PAGEABLE void relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)
 {
 	PAGED_CODE();
 
@@ -14,7 +17,7 @@ static PAGEABLE void relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG i
 		RtlCopyMemory(relations->Objects + idx, relations->Objects + idx + 1, sizeof(PDEVICE_OBJECT) * (relations->Count - 1 - idx));
 }
 
-static PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJECT devobj, BOOLEAN deref)
+PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJECT devobj, BOOLEAN deref)
 {
 	PAGED_CODE();
 
@@ -30,7 +33,7 @@ static PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVIC
 	return FALSE;
 }
 
-static PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -86,8 +89,8 @@ static PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATI
 	return STATUS_SUCCESS;
 }
 
-static vpdo_dev_t *
-find_managed_vpdo(vhub_dev_t * vhub, PDEVICE_OBJECT devobj)
+vpdo_dev_t *
+	find_managed_vpdo(vhub_dev_t * vhub, PDEVICE_OBJECT devobj)
 {
 	PLIST_ENTRY	entry;
 
@@ -100,8 +103,8 @@ find_managed_vpdo(vhub_dev_t * vhub, PDEVICE_OBJECT devobj)
 	return nullptr;
 }
 
-static BOOLEAN
-is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
+BOOLEAN
+	is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
 {
 	ULONG	i;
 
@@ -113,7 +116,7 @@ is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
 	return FALSE;
 }
 
-static PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -176,7 +179,7 @@ static PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELAT
 	return STATUS_SUCCESS;
 }
 
-static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(vdev_t * vdev)
+PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(vdev_t * vdev)
 {
 	PAGED_CODE();
 
@@ -197,7 +200,7 @@ static PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(vdev_t * vdev)
 	return dev_relations;
 }
 
-static PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -212,7 +215,7 @@ static PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pde
 	}
 }
 
-static PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
@@ -227,6 +230,9 @@ static PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *p
 	*pdev_relations = get_self_dev_relation(vdev);
 	return STATUS_SUCCESS;
 }
+
+} // namespace
+
 
 PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t * vdev, PIRP irp)
 {

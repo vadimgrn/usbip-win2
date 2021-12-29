@@ -33,6 +33,77 @@ PAGEABLE void cleanup_vpdo(vhci_dev_t * vhci, PIRP irp)
 	}
 }
 
+PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+{
+	PAGED_CODE();
+
+	auto vdev = devobj_to_vdev(devobj);
+
+	if (vdev->DevicePnPState == Deleted) {
+		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
+		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
+	}
+
+	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+
+	Irp->IoStatus.Information = 0;
+	return irp_done_success(Irp);
+}
+
+PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+{
+	PAGED_CODE();
+
+	vdev_t *vdev = devobj_to_vdev(devobj);
+
+	if (vdev->DevicePnPState == Deleted) {
+		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
+		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
+	}
+
+	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+
+	if (vdev->type == VDEV_VHCI) {
+		cleanup_vpdo((vhci_dev_t*)vdev, irp);
+	}
+
+	irp->IoStatus.Information = 0;
+	return irp_done_success(irp);
+}
+
+PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+{
+	PAGED_CODE();
+
+	vdev_t *vdev = devobj_to_vdev(devobj);
+
+	if (vdev->DevicePnPState == Deleted) {
+		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
+		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
+	}
+
+	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+
+	Irp->IoStatus.Information = 0;
+	return irp_done_success(Irp);
+}
+
+PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
+{
+	PAGED_CODE();
+	TraceCall("Enter");
+
+	ExDeleteNPagedLookasideList(&g_lookaside);
+	NT_ASSERT(!drvobj->DeviceObject);
+
+	if (Globals.RegistryPath.Buffer) {
+		ExFreePool(Globals.RegistryPath.Buffer);
+		Globals.RegistryPath.Buffer = nullptr;
+	}
+
+	WPP_CLEANUP(drvobj);
+}
+
 /*
 * Set only if such value does not exist.
 */
@@ -116,77 +187,6 @@ PAGEABLE __drv_dispatchType(IRP_MJ_PNP) DRIVER_DISPATCH vhci_pnp;
 PAGEABLE __drv_dispatchType(IRP_MJ_SYSTEM_CONTROL) DRIVER_DISPATCH vhci_system_control;
 	 __drv_dispatchType(IRP_MJ_POWER) DRIVER_DISPATCH vhci_power;
 
-static PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
-{
-	PAGED_CODE();
-
-	vdev_t *vdev = devobj_to_vdev(devobj);
-
-	if (vdev->DevicePnPState == Deleted) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
-	}
-
-	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
-
-	Irp->IoStatus.Information = 0;
-	return irp_done_success(Irp);
-}
-
-static PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
-{
-	PAGED_CODE();
-
-	vdev_t *vdev = devobj_to_vdev(devobj);
-
-	if (vdev->DevicePnPState == Deleted) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
-	}
-
-	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
-
-	if (vdev->type == VDEV_VHCI) {
-		cleanup_vpdo((vhci_dev_t*)vdev, irp);
-	}
-
-	irp->IoStatus.Information = 0;
-	return irp_done_success(irp);
-}
-
-static PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
-{
-	PAGED_CODE();
-
-	vdev_t *vdev = devobj_to_vdev(devobj);
-
-	if (vdev->DevicePnPState == Deleted) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
-	}
-
-	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
-
-	Irp->IoStatus.Information = 0;
-	return irp_done_success(Irp);
-}
-
-static PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
-{
-	PAGED_CODE();
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
-
-	ExDeleteNPagedLookasideList(&g_lookaside);
-	NT_ASSERT(!drvobj->DeviceObject);
-
-	if (Globals.RegistryPath.Buffer) {
-		ExFreePool(Globals.RegistryPath.Buffer);
-		Globals.RegistryPath.Buffer = nullptr;
-	}
-
-	WPP_CLEANUP(drvobj);
-}
-
 PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
@@ -200,7 +200,7 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 		return st;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "RegistryPath '%!USTR!'", RegistryPath);
+	TraceCall("RegistryPath '%!USTR!'", RegistryPath);
 
 	ExInitializeNPagedLookasideList(&g_lookaside, nullptr, nullptr, 0, sizeof(struct urb_req), 'USBV', 0);
 

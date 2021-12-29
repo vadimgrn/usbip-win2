@@ -5,7 +5,10 @@
 #include "vhci_dev.h"
 #include "usbip_vhci_api.h"
 
-static PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, ULONG port)
+namespace
+{
+
+PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, ULONG port)
 {
 	PAGED_CODE();
 
@@ -18,6 +21,27 @@ static PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, ULONG port)
 
 	return nullptr;
 }
+
+PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
+{
+	PAGED_CODE();
+
+	if (vpdo->plugged) {
+		Trace(TRACE_LEVEL_ERROR, "vpdo already unplugged: port: %u", vpdo->port);
+		return;
+	}
+
+	vpdo->plugged = false;
+
+	NT_ASSERT(vhub->n_vpdos_plugged > 0);
+	--vhub->n_vpdos_plugged;
+
+	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
+	Trace(TRACE_LEVEL_INFORMATION, "the device is marked as unplugged: port: %u", vpdo->port);
+}
+
+} // namespace
+
 
 PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, ULONG port)
 {
@@ -146,24 +170,6 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_
 
 	*poutlen = sizeof(*p);
 	return STATUS_SUCCESS;
-}
-
-static PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
-{
-	PAGED_CODE();
-
-	if (vpdo->plugged) {
-		Trace(TRACE_LEVEL_ERROR, "vpdo already unplugged: port: %u", vpdo->port);
-		return;
-	}
-
-	vpdo->plugged = false;
-
-	NT_ASSERT(vhub->n_vpdos_plugged > 0);
-	--vhub->n_vpdos_plugged;
-
-	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
-	Trace(TRACE_LEVEL_INFORMATION, "the device is marked as unplugged: port: %u", vpdo->port);
 }
 
 PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
