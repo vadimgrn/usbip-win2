@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basetype.h"
+#include "pageable.h"
 #include "vhci_dev.h"
 
 PAGEABLE NTSTATUS pnp_remove_device(vdev_t * vdev, PIRP irp);

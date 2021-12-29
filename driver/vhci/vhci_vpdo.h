@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basetype.h"
+#include "pageable.h"
 #include "vhci_dev.h"
 
 PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION *cfg);

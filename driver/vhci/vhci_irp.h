@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basetype.h"
+#include "pageable.h"
 #include <wdm.h>
 
 PAGEABLE NTSTATUS irp_pass_down(PDEVICE_OBJECT devobj, PIRP irp);

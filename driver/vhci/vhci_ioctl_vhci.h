@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basetype.h"
+#include "pageable.h"
 #include "vhci_dev.h"
 
 PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen);

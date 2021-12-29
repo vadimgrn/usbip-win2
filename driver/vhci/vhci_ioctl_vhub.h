@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basetype.h"
+#include "pageable.h"
 #include "vhci_dev.h"
 
 PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t * vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen);

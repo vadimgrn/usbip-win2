@@ -1,7 +1,7 @@
 #include "vhci_dev.h"
 #include "trace.h"
 #include "vhci_dev.tmh"
-#include "basetype.h"
+#include "pageable.h"
 #include "vhci.h"
 
 #include <wdmsec.h>
