@@ -4,7 +4,6 @@
 
 #include "vhci.h"
 #include "usbip_vhci_api.h"
-#include "globals.h"
 #include "vhci_irp.h"
 
 #include <wmistr.h>

@@ -3,7 +3,6 @@
 #include "vhci.tmh"
 
 #include "vhci_plugin.h"
-#include "globals.h"
 #include "usbreq.h"
 #include "vhci_pnp.h"
 #include "vhci_irp.h"

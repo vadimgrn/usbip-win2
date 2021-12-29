@@ -47,7 +47,6 @@
     <ClInclude Include="basetype.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="vhci_dev.h" />
-    <ClInclude Include="globals.h" />
     <ClInclude Include="vhci_devconf.h" />
     <ClInclude Include="vhci_ioctl_usrreq.h" />
     <ClInclude Include="vhci_ioctl_vhci.h" />
