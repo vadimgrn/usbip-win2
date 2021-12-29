@@ -111,7 +111,7 @@ PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR *d)
 
 	d->bDescriptorLength = 9;
 	d->bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE; // USB_30_HUB_DESCRIPTOR_TYPE
-	d->bNumberOfPorts = (UCHAR)vhub->n_max_ports;
+	d->bNumberOfPorts = (UCHAR)vhub->n_max_ports; 
 	d->wHubCharacteristics = 0;
 	d->bPowerOnToPowerGood = 1;
 	d->bHubControlCurrent = 1;
@@ -195,11 +195,11 @@ PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t * vhub)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t * vhub, ioctl_usbip_vhci_get_ports_status *st)
+PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status *st)
 {
 	PAGED_CODE();
 
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+	TraceCall("Enter");
 
 	RtlZeroMemory(st, sizeof(*st));
 	ExAcquireFastMutex(&vhub->Mutex);

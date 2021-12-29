@@ -65,6 +65,8 @@ inline bool is_endpoint_direction_out(USBD_PIPE_HANDLE handle)
 }
 
 const USBD_PIPE_HANDLE EP0 = 0; // make_pipe_handle(USB_DEFAULT_ENDPOINT_ADDRESS, UsbdPipeTypeControl, 0);
+static_assert(!USB_DEFAULT_ENDPOINT_ADDRESS);
+static_assert(!UsbdPipeTypeControl);
 /*
 static_assert(!EP0, "assert");
 static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");

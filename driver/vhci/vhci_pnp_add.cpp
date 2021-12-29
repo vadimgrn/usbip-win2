@@ -87,11 +87,11 @@ PAGEABLE void init_dev_vhci(vdev_t * vdev)
 	RtlUnicodeStringInitEx(&vhci->DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 }
 
-PAGEABLE void init_dev_vhub(vdev_t * vdev)
+PAGEABLE void init_dev_vhub(vdev_t *vdev)
 {
 	PAGED_CODE();
 
-	vhub_dev_t *	vhub = (vhub_dev_t *)vdev;
+	auto vhub = static_cast<vhub_dev_t*>(vdev);
 
 	ExInitializeFastMutex(&vhub->Mutex);
 	InitializeListHead(&vhub->head_vpdo);
@@ -111,16 +111,16 @@ PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, 
 
 	Trace(TRACE_LEVEL_INFORMATION, "adding %!vdev_type_t!: pdo: %p", type, pdo);
 
-	DEVICE_OBJECT *devobj = vdev_create(drvobj, type);
+	auto devobj = vdev_create(drvobj, type);
 	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	vdev_t *vdev = devobj_to_vdev(devobj);
+	auto vdev = devobj_to_vdev(devobj);
 	vdev->pdo = pdo;
 
 	if (type != VDEV_ROOT) {
-		vdev_t *vdev_pdo = devobj_to_vdev(vdev->pdo);
+		auto vdev_pdo = devobj_to_vdev(vdev->pdo);
 		vdev->parent = vdev_pdo->parent;
 		vdev_pdo->fdo = vdev;
 	}
@@ -129,7 +129,7 @@ PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, 
 	// The return value of IoAttachDeviceToDeviceStack is the top of the
 	// attachment chain.  This is where all the IRPs should be routed.
 	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, pdo);
-	if (vdev->devobj_lower == nullptr) {
+	if (!vdev->devobj_lower) {
 		Trace(TRACE_LEVEL_ERROR, "failed to attach device stack");
 		IoDeleteDevice(devobj);
 		return STATUS_NO_SUCH_DEVICE;
@@ -163,19 +163,15 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PD
 	PAGED_CODE();
 
 	if (!is_valid_vdev_hwid(pdo)) {
-		Trace(TRACE_LEVEL_ERROR, "invalid hw id");
+		Trace(TRACE_LEVEL_ERROR, "Invalid hwid");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	root_dev_t *root = (root_dev_t*)get_vdev_from_driver(drvobj, VDEV_ROOT);
-	vhci_dev_t *vhci = nullptr;
-	vdev_type_t type;
+	auto type = VDEV_ROOT;
 
-	if (root) {
-		vhci = (vhci_dev_t*)get_vdev_from_driver(drvobj, VDEV_VHCI);
+	if (auto root = (root_dev_t*)get_vdev_from_driver(drvobj, VDEV_ROOT)) {
+		auto vhci = (vhci_dev_t*)get_vdev_from_driver(drvobj, VDEV_VHCI);
 		type = vhci ? VDEV_VHUB : VDEV_VHCI;
-	} else {
-		type = VDEV_ROOT;
 	}
 
 	Trace(TRACE_LEVEL_VERBOSE, "irql %!irql!", KeGetCurrentIrql());

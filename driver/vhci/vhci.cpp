@@ -20,10 +20,9 @@ PAGEABLE void cleanup_vpdo(vhci_dev_t * vhci, PIRP irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
-	auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	if (vpdo) {
+	if (auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext)) {
 		vpdo->fo = nullptr;
 		irpstack->FileObject->FsContext = nullptr;
 		if (vpdo->plugged) {
@@ -90,7 +89,8 @@ PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
-	TraceCall("Enter");
+
+	TraceCall("Unload driver");
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
 	NT_ASSERT(!drvobj->DeviceObject);

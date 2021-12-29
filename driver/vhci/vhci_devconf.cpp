@@ -23,7 +23,7 @@ auto next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end
 	return (USBD_INTERFACE_INFORMATION*)(next < cfg_end ? next : nullptr);
 }
 
-inline const void *get_configuration_end(const struct _URB_SELECT_CONFIGURATION *cfg)
+inline const void *get_configuration_end(const _URB_SELECT_CONFIGURATION *cfg)
 {
 	return (char*)cfg + cfg->Hdr.Length;
 }
@@ -43,13 +43,13 @@ inline auto make_interface_handle(UCHAR ifnum, UCHAR altsetting)
 
 inline auto get_interface_altsettings(USBD_INTERFACE_HANDLE handle)
 {
-	UCHAR *v = (UCHAR*)&handle;
+	auto v = (UCHAR*)&handle;
 	return v[0]; 
 }
 
 inline auto get_interface_number(USBD_INTERFACE_HANDLE handle)
 {
-	UCHAR *v = (UCHAR*)&handle;
+	auto v = (UCHAR*)&handle;
 	return v[1]; 
 }
 
@@ -132,6 +132,7 @@ void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, 
 
 } // namespace
 
+
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd)
 {
 	NT_ASSERT(cfgd);
@@ -141,7 +142,7 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
 		return STATUS_SUCCESS;
 	}
 
-	USB_INTERFACE_DESCRIPTOR *ifd = dsc_find_intf(cfgd, intf->InterfaceNumber, intf->AlternateSetting);
+	auto ifd = dsc_find_intf(cfgd, intf->InterfaceNumber, intf->AlternateSetting);
 	if (!ifd) {
 		Trace(TRACE_LEVEL_WARNING, "Can't find descriptor: InterfaceNumber %d, AlternateSetting %d",
 					intf->InterfaceNumber, intf->AlternateSetting);
@@ -158,7 +159,7 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
 
 	intf->NumberOfPipes = ifd->bNumEndpoints;
 
-	struct init_ep_data data = { intf->Pipes, speed };
+	init_ep_data data{ intf->Pipes, speed };
 	dsc_for_each_endpoint(cfgd, ifd, init_ep, &data);
 
 	return STATUS_SUCCESS;
@@ -169,28 +170,26 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
  * followed by a sequence of variable-length array of USBD_INTERFACE_INFORMATION structures, 
  * each element in the array for each unique interface number in the configuration. 
  */
-NTSTATUS setup_config(struct _URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed)
+NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed)
 {
-	USB_CONFIGURATION_DESCRIPTOR *cd = cfg->ConfigurationDescriptor;
+	auto cd = cfg->ConfigurationDescriptor;
 	NT_ASSERT(cd);
 
-	USBD_INTERFACE_INFORMATION *iface = &cfg->Interface;
-	const void *cfg_end = get_configuration_end(cfg);
+	auto iface = &cfg->Interface;
+	auto cfg_end = get_configuration_end(cfg);
 
 	for (int i = 0; i < cd->bNumInterfaces; ++i, iface = next_interface(iface, cfg_end)) {
-		
-		NTSTATUS status = setup_intf(iface, speed, cd);
-		if (status != STATUS_SUCCESS) {
-			return status;
+		if (auto err = setup_intf(iface, speed, cd)) {
+			return err;
 		}
 	}
 
 	return STATUS_SUCCESS;
 }
 
-const char *select_configuration_str(char *buf, size_t len, const struct _URB_SELECT_CONFIGURATION *cfg)
+const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg)
 {
-	const USB_CONFIGURATION_DESCRIPTOR *cd = cfg->ConfigurationDescriptor;
+	auto cd = cfg->ConfigurationDescriptor;
 	if (!cd) {
 		NTSTATUS st = RtlStringCbPrintfA(buf, len, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
 							(uintptr_t)cfg->ConfigurationHandle);
@@ -216,14 +215,14 @@ const char *select_configuration_str(char *buf, size_t len, const struct _URB_SE
 			cd->MaxPower);
 
 	if (st == STATUS_SUCCESS) {
-		const void *cfg_end = get_configuration_end(cfg);
+		auto cfg_end = get_configuration_end(cfg);
 		interfaces_str(buf, len, &cfg->Interface, cd->bNumInterfaces, cfg_end);
 	}
 
 	return result && *result ? result : "select_configuration_str error";
 }
 
-const char *select_interface_str(char *buf, size_t len, const struct _URB_SELECT_INTERFACE *iface)
+const char *select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE *iface)
 {
 	const char *result = buf;
 	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,  
