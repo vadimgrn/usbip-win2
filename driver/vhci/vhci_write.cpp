@@ -145,7 +145,7 @@ PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const usbip_h
 	UNREFERENCED_PARAMETER(vpdo);
 
 	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	NTSTATUS err = assign(r.TransferBufferLength, hdr->u.ret_submit.actual_length);
+	auto err = assign(r.TransferBufferLength, hdr->u.ret_submit.actual_length);
 
 	if (err || is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
 		return err;
@@ -186,7 +186,7 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, con
 
 	auto &r = urb->UrbControlDescriptorRequest;
 
-	NTSTATUS err = assign(r.TransferBufferLength, hdr->u.ret_submit.actual_length);
+	auto err = assign(r.TransferBufferLength, hdr->u.ret_submit.actual_length);
 	if (err) {
 		return err;
 	}
@@ -388,9 +388,9 @@ PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const usbi
 	return STATUS_INTERNAL_ERROR;
 }	
 
-typedef NTSTATUS (*urb_function_t)(vpdo_dev_t*, URB*, const usbip_header*);
+using urb_function_t = NTSTATUS(vpdo_dev_t*, URB*, const usbip_header*);
 
-const urb_function_t urb_functions[] =
+urb_function_t *urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,
@@ -534,8 +534,11 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_head
 	auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 
-	TraceUrb("ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
-		r->ConnectionIndex, data_sz, actual_length, WppBinary(r->Data, (USHORT)actual_length));
+	auto uirp = reinterpret_cast<uintptr_t>(irp);
+
+	TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
+			static_cast<UINT32>(uirp), r->ConnectionIndex, data_sz, actual_length, 
+			WppBinary(r->Data, (USHORT)actual_length));
 
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
@@ -599,20 +602,14 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 		return nullptr;
 	}
 
-	auto pdu_sz = get_pdu_size(hdr); 
-
-	{
-		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s",  pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	auto pdu_sz = get_pdu_size(hdr);
+	if (buf_sz != pdu_sz) {
+		Trace(TRACE_LEVEL_ERROR, "Write buffer %lu != pdu size %Iu", buf_sz, pdu_sz);
+		return nullptr;
 	}
 
-	if (buf_sz == pdu_sz) {
-		TRANSFERRED(irp) = buf_sz;
-		return hdr;
-	}
-
-	Trace(TRACE_LEVEL_ERROR, "Write buffer %lu != pdu size %Iu", buf_sz, pdu_sz);
-	return nullptr;
+	TRANSFERRED(irp) = buf_sz;
+	return hdr;
 }
 
 /*
@@ -652,7 +649,13 @@ PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 	}
 
 	auto urbr = find_sent_urbr(vpdo, hdr->base.seqnum);
-	if (!urbr) {
+
+	if (urbr) {
+		auto uirp = reinterpret_cast<uintptr_t>(urbr->irp);
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s", 
+				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	} else {
 		Trace(TRACE_LEVEL_VERBOSE, "urb_req not found (cancelled?), seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}

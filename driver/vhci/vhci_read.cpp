@@ -966,17 +966,19 @@ PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp, urb_req *urbr)
 	return st;
 }
 
-PAGEABLE void debug(IRP *irp)
+PAGEABLE void debug(IRP *read_irp, IRP *irp)
 {
-	auto hdr = (usbip_header*)get_irp_buffer(irp);
-
-	[[maybe_unused]] auto transferred = TRANSFERRED(irp);
-
+	auto hdr = (usbip_header*)get_irp_buffer(read_irp);
 	auto pdu_sz = get_pdu_size(hdr);
+
+	auto transferred = TRANSFERRED(read_irp);
 	NT_ASSERT(transferred == sizeof(*hdr) || (transferred > sizeof(*hdr) && transferred == pdu_sz));
 
+	auto uirp = reinterpret_cast<uintptr_t>(irp);
+
 	char buf[DBG_USBIP_HDR_BUFSZ];
-	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
+	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
+			static_cast<UINT32>(uirp), pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), hdr));
 }
 
 /*
@@ -1131,11 +1133,12 @@ NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
  */
 NTSTATUS store_urbr(IRP *read_irp, urb_req *urbr)
 {
-	Trace(TRACE_LEVEL_VERBOSE, "Transfer header");
+	[[maybe_unused]] auto uirp = reinterpret_cast<uintptr_t>(urbr->irp);
+	TraceCall("irp %04x: Transfer header", static_cast<UINT32>(uirp));
 
-	NTSTATUS err = urbr->irp ? cmd_submit(read_irp, urbr) : cmd_unlink(read_irp, urbr);
+	auto err = urbr->irp ? cmd_submit(read_irp, urbr) : cmd_unlink(read_irp, urbr);
 	if (!err) {
-		debug(read_irp);
+		debug(read_irp, urbr->irp);
 	}
 
 	return err;
