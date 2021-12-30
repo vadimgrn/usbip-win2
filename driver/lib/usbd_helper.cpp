@@ -23,37 +23,39 @@ enum {
 	ECONNRESET_LNX = 104,
 	ESHUTDOWN_LNX = 108,
 	ETIMEDOUT_LNX = 110,
+	EHOSTUNREACH_LNX = 113,
 	EINPROGRESS_LNX = 115,
 	EREMOTEIO_LNX = 121,
 };
 
 /*
- * See:
- * <kernel>/doc/Documentation/usb/error-codes.txt
- * winddk, usb.h
+ * Status can be from usb_submit_urb or urb->status, we cannot know its origin.
+ * Meaning of some errors differs for usb_submit_urb and urb->status, we would prefer urb->status.
+ * See: https://elixir.bootlin.com/linux/v4.11.12/source/Documentation/usb/error-codes.txt
  */
-USBD_STATUS to_windows_status(int usbip_status)
+USBD_STATUS to_windows_status(int usbip_status, bool isoch)
 {
 	switch (usbip_status >= 0 ? usbip_status : -usbip_status) {
 	case 0:
 		return USBD_STATUS_SUCCESS;
 	case EPIPE_LNX:
-		return USBD_STATUS_STALL_PID; /* usb_submit_urb returns USBD_STATUS_ENDPOINT_HALTED */
+		return USBD_STATUS_STALL_PID;
 	case EREMOTEIO_LNX:
 		return USBD_STATUS_ERROR_SHORT_TRANSFER;
 	case ETIME_LNX:
 		return USBD_STATUS_DEV_NOT_RESPONDING;
 	case ETIMEDOUT_LNX:
 		return USBD_STATUS_TIMEOUT;
-	case ENOENT_LNX:
-	case ECONNRESET_LNX:
+	case ENOENT_LNX: // URB was synchronously unlinked by usb_unlink_urb
+	case ECONNRESET_LNX: // URB was asynchronously unlinked by usb_unlink_urb
 		return USBD_STATUS_CANCELED;
 //	case EINPROGRESS_LNX:
 //		return USBD_STATUS_PENDING; // don't send this to Windows
 	case EOVERFLOW_LNX:
 		return USBD_STATUS_BABBLE_DETECTED;
 	case ENODEV_LNX:
-	case ESHUTDOWN_LNX:
+	case ESHUTDOWN_LNX: // The device or host controller has been disabled
+	case EHOSTUNREACH_LNX: // URB was rejected because the device is suspended
 		return USBD_STATUS_DEVICE_GONE;
 	case EILSEQ_LNX:
 		return USBD_STATUS_CRC;
@@ -68,19 +70,16 @@ USBD_STATUS to_windows_status(int usbip_status)
 	case ENOSPC_LNX:
 		return USBD_STATUS_NO_BANDWIDTH;
 	case EXDEV_LNX:
-		return USBD_STATUS_ISOCH_REQUEST_FAILED;
+		return isoch ? USBD_STATUS_ISO_TD_ERROR : USBD_STATUS_ISOCH_REQUEST_FAILED;
 	case ENXIO_LNX:
 		return USBD_STATUS_INTERNAL_HC_ERROR;
+	case EBUSY_LNX:
+		return USBD_STATUS_ERROR_BUSY;
 	}
 
 	return USBD_STATUS_INVALID_PARAMETER;
 }
 
-/*
- * See:
- * winddk, usb.h
- * <kernel>/doc/Documentation/usb/error-codes.txt
- */
 int to_linux_status(USBD_STATUS status)
 {
 	int err = 0;

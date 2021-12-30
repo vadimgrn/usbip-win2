@@ -286,7 +286,7 @@ PAGEABLE NTSTATUS copy_isoc_data(
 
 	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++src, ++dst) {
 
-		dst->Status = src->status ? to_windows_status(src->status) : USBD_STATUS_SUCCESS;
+		dst->Status = src->status ? to_windows_status(src->status, true) : USBD_STATUS_SUCCESS;
 
 		if (dir_out) {
 			continue; // dst->Length not used for OUT transfers
@@ -510,7 +510,7 @@ urb_function_t *urb_functions[] =
 * 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
 *   For example, select_configuration/select_interface immediately returns in such case.
 * 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
-*   even if UrbHeader.Status != USBD_STATUS_SUCCESS. Data was sent over the network, do not ditch it.
+*   even if UrbHeader.Status != USBD_STATUS_SUCCESS.
 */
 PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
 {
@@ -518,9 +518,9 @@ PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header 
 
 	if (urb) {
 		auto err = hdr->u.ret_submit.status;
-		urb->UrbHeader.Status = err ? to_windows_status(err) : USBD_STATUS_SUCCESS;
+		urb->UrbHeader.Status = err ? to_windows_status(err, false) : USBD_STATUS_SUCCESS;
 	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "URB is null");
+		Trace(TRACE_LEVEL_VERBOSE, "URB is null");
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -603,11 +603,8 @@ PAGEABLE NTSTATUS ret_submit(urb_req *urbr, const usbip_header *hdr)
 PAGEABLE NTSTATUS ret_unlink(const usbip_header *hdr)
 {
 	PAGED_CODE();
-
-	auto st = to_windows_status(hdr->u.ret_unlink.status);
-	TraceUrb("%s", dbg_usbd_status(st));
-
-	return st == USBD_STATUS_CANCELED ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL; // FIXME: always success?
+	TraceUrb("%s", dbg_usbd_status(to_windows_status(hdr->u.ret_unlink.status, false)));
+	return STATUS_SUCCESS; // it's OK if can't unlink (too late, etc.)
 }
 
 PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)

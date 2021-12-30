@@ -48,7 +48,7 @@ static void to_usbd_iso_descs(ULONG n_pkts, USBD_ISO_PACKET_DESCRIPTOR *usbd_iso
 		dest->Offset = src->offset;
 		if (as_result) {
 			dest->Length = src->actual_length;
-			dest->Status = to_windows_status(src->status);
+			dest->Status = to_windows_status(src->status, true);
 		}
 	}
 }

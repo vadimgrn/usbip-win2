@@ -14,7 +14,7 @@ extern "C" {
 
 struct usbip_iso_packet_descriptor;
 
-USBD_STATUS to_windows_status(int usbip_status);
+USBD_STATUS to_windows_status(int usbip_status, bool isoch);
 int to_linux_status(USBD_STATUS usbd_status);
 
 ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in);
