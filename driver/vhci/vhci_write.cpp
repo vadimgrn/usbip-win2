@@ -569,14 +569,10 @@ PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS ret_submit(urb_req *urbr, const usbip_header *hdr)
+PAGEABLE NTSTATUS ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
 {
 	PAGED_CODE();
-
-	auto irp = urbr->irp;
-	if (!irp) {
-		return STATUS_SUCCESS;
-	}
+	NT_ASSERT(irp);
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
@@ -585,7 +581,7 @@ PAGEABLE NTSTATUS ret_submit(urb_req *urbr, const usbip_header *hdr)
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = usb_submit_urb(urbr->vpdo, (URB*)URB_FROM_IRP(irp), hdr);
+		st = usb_submit_urb(vpdo, (URB*)URB_FROM_IRP(irp), hdr);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		st = usb_reset_port(hdr);
@@ -600,9 +596,17 @@ PAGEABLE NTSTATUS ret_submit(urb_req *urbr, const usbip_header *hdr)
 	return st;
 }
 
+/*
+ * status: This is similar to the status of USBIP_RET_SUBMIT (share the same memory offset).
+ * When UNLINK is successful, status is -ECONNRESET;
+ * when USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
+ * 
+ * See: <kernel>/Documentation/usb/usbip_protocol.rst
+ */
 PAGEABLE NTSTATUS ret_unlink(const usbip_header *hdr)
 {
 	PAGED_CODE();
+	
 	TraceUrb("%s", dbg_usbd_status(to_windows_status(hdr->u.ret_unlink.status, false)));
 	return STATUS_SUCCESS; // it's OK if can't unlink (too late, etc.)
 }
@@ -677,20 +681,21 @@ PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_SUCCESS;
 	}
 
-	NTSTATUS status = STATUS_INVALID_PARAMETER;
+	auto irp = urbr->irp;
+	auto status = STATUS_INVALID_PARAMETER;
 
 	switch (hdr->base.command) {
 	case USBIP_RET_SUBMIT:
-		status = ret_submit(urbr, hdr);
+		status = ret_submit(urbr->vpdo, irp, hdr);
 		break;
 	case USBIP_RET_UNLINK:
+		NT_ASSERT(!irp);
 		status = ret_unlink(hdr);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 	}
 
-	auto irp = urbr->irp;
 	free_urbr(urbr);
 	if (irp) {
 		complete_irp(irp, status);
