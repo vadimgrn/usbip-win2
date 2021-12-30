@@ -10,6 +10,7 @@
 #include "usbd_helper.h"
 #include "vhci_irp.h"
 #include "pdu.h"
+#include "devconf.h"
 
 /*
  * These URBs have the same layout from the beginning of the structure.
@@ -170,10 +171,33 @@ PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const usb
 	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
+/*
+ * usb_set_interface can return -EPIPE, especially if a device's interface has only one altsetting.
+ * 
+ * Note that control and isochronous endpoints don't halt, although control
+ * endpoints report "protocol stall" (for unsupported requests) using the
+ * same status code used to report a true stall.
+ *
+ * See: drivers/usb/core/message.c, usb_set_interface, usb_clear_halt. 
+ */
 PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
+
+	auto err = urb->UrbHeader.Status;
+
+	if (err && err == USBD_STATUS_STALL_PID) { // hdr->u.ret_submit.status == -EPIPE(32)
+
+		auto ifnum = urb->UrbSelectInterface.Interface.InterfaceNumber;
+
+		Trace(TRACE_LEVEL_WARNING, "Ignoring %s (linux status %d), InterfaceNumber %d, num_altsetting %d", 
+					dbg_usbd_status(err), hdr->u.ret_submit.status, ifnum, 
+					get_intf_num_altsetting(vpdo->actconfig, ifnum));
+
+		err = USBD_STATUS_SUCCESS;
+	}
+
+	return err ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
 /*
@@ -505,13 +529,9 @@ PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header 
 
 	auto err = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
 
-	if (err && !urb->UrbHeader.Status) {
+	if (err && !urb->UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err), see urb_select_interface
 		urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
 		Trace(TRACE_LEVEL_VERBOSE, "Set USBD_STATUS=%s because return is %!STATUS!", dbg_usbd_status(urb->UrbHeader.Status), err);
-	} else if (urb->UrbHeader.Status && !err) {
-		err = STATUS_UNSUCCESSFUL;
-		Trace(TRACE_LEVEL_VERBOSE, "Return %!STATUS! because USBD_STATUS=%s(%#08lX)", 
-			err, dbg_usbd_status(urb->UrbHeader.Status), (ULONG)urb->UrbHeader.Status);
 	}
 
 	return err;

@@ -6,7 +6,7 @@ extern "C" {
 
 USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_COMMON_DESCRIPTOR *from, int type)
 {
-	USB_COMMON_DESCRIPTOR *start = dsc_next(from ? from : (USB_COMMON_DESCRIPTOR*)dsc_conf);
+	auto start = dsc_next(from ? from : (USB_COMMON_DESCRIPTOR*)dsc_conf);
 	NT_ASSERT(start > (USB_COMMON_DESCRIPTOR*)dsc_conf);
 
 	return USBD_ParseDescriptors(dsc_conf, dsc_conf->wTotalLength, start, type);
@@ -15,6 +15,22 @@ USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB
 USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num, UCHAR alt_setting)
 {
 	return USBD_ParseConfigurationDescriptorEx(dsc_conf, dsc_conf, intf_num, alt_setting, -1, -1, -1);
+}
+
+/*
+ * @return number of alternate settings for given interface
+ */
+int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num)
+{
+	int cnt = 0;
+	void *from = dsc_conf;
+
+	while (auto iface = USBD_ParseConfigurationDescriptorEx(dsc_conf, from, intf_num, -1, -1, -1, -1)) {
+		from = dsc_next(reinterpret_cast<USB_COMMON_DESCRIPTOR*>(iface));
+		++cnt;
+	}
+
+	return cnt;
 }
 
 void *dsc_for_each_endpoint(

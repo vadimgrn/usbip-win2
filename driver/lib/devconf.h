@@ -31,6 +31,7 @@ void *dsc_for_each_endpoint(
 	void *data);
 
 USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num, UCHAR alt_setting);
+int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num);
 
 #ifdef __cplusplus
 }
