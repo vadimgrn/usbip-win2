@@ -807,9 +807,9 @@ PAGEABLE NTSTATUS get_status_from_other(IRP *irp, URB *urb, urb_req* urbr)
 	return urb_control_get_status_request(irp, urb, urbr, USB_RECIP_OTHER);
 }
 
-typedef NTSTATUS (*urb_function_t)(IRP *irp, URB *urb, urb_req*);
+using urb_function_t = NTSTATUS(IRP *irp, URB *urb, urb_req*);
 
-const urb_function_t urb_functions[] =
+urb_function_t* const urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,

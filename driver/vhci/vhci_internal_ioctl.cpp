@@ -322,6 +322,9 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	return STATUS_NOT_IMPLEMENTED;
 }
 
+/*
+ * See: <kernel>/drivers/usb/core/message.c, usb_set_isoch_delay.
+ */
 NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 {
 	UNREFERENCED_PARAMETER(vpdo);
@@ -350,7 +353,7 @@ NTSTATUS open_static_streams(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 
 using urb_function_t = NTSTATUS(vpdo_dev_t*, URB*, UINT32);
 
-urb_function_t *urb_functions[] =
+urb_function_t* const urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,

@@ -414,7 +414,7 @@ PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const usbi
 
 using urb_function_t = NTSTATUS(vpdo_dev_t*, URB*, const usbip_header*);
 
-urb_function_t *urb_functions[] =
+urb_function_t* const urb_functions[] =
 {
 	urb_select_configuration,
 	urb_select_interface,
