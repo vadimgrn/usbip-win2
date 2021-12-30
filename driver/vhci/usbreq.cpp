@@ -47,12 +47,14 @@ void remove_cancelled_urbr(vpdo_dev_t *vpdo, urb_req *urbr)
 	free_urbr(urbr);
 }
 
-void cancel_urbr(DEVICE_OBJECT *devobj, IRP *irp)
+void cancel_urbr(DEVICE_OBJECT*, IRP *irp)
 {
-	auto vpdo = devobj_to_vpdo_or_null(devobj); // irp->Tail.Overlay.DriverContext[0]
+	auto vpdo = (vpdo_dev_t*)irp->Tail.Overlay.DriverContext[0];
 	NT_ASSERT(vpdo);
 
 	auto urbr = (urb_req*)irp->Tail.Overlay.DriverContext[1];
+	NT_ASSERT(urbr);
+
 	Trace(TRACE_LEVEL_INFORMATION, "Irp will be cancelled, seqnum %lu", urbr->seqnum);
 
 	IoReleaseCancelSpinLock(irp->CancelIrql);
