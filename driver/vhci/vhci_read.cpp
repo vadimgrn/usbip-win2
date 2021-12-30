@@ -971,7 +971,7 @@ PAGEABLE void debug(IRP *read_irp, IRP *irp)
 	auto hdr = (usbip_header*)get_irp_buffer(read_irp);
 	auto pdu_sz = get_pdu_size(hdr);
 
-	auto transferred = TRANSFERRED(read_irp);
+	[[maybe_unused]] auto transferred = TRANSFERRED(read_irp);
 	NT_ASSERT(transferred == sizeof(*hdr) || (transferred > sizeof(*hdr) && transferred == pdu_sz));
 
 	auto uirp = reinterpret_cast<uintptr_t>(irp);
