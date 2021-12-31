@@ -33,7 +33,7 @@ enum {
  * Meaning of some errors differs for usb_submit_urb and urb->status, we would prefer urb->status.
  * See: https://elixir.bootlin.com/linux/v4.11.12/source/Documentation/usb/error-codes.txt
  */
-USBD_STATUS to_windows_status(int usbip_status, bool isoch)
+USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
 {
 	switch (usbip_status >= 0 ? usbip_status : -usbip_status) {
 	case 0:

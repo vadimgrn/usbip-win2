@@ -295,7 +295,7 @@ PAGEABLE NTSTATUS copy_isoc_data(
 
 	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++src, ++dst) {
 
-		dst->Status = src->status ? to_windows_status(src->status, true) : USBD_STATUS_SUCCESS;
+		dst->Status = src->status ? to_windows_status_isoch(src->status) : USBD_STATUS_SUCCESS;
 
 		if (dir_out) {
 			continue; // dst->Length not used for OUT transfers
@@ -527,7 +527,7 @@ PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header 
 
 	if (urb) {
 		auto err = hdr->u.ret_submit.status;
-		urb->UrbHeader.Status = err ? to_windows_status(err, false) : USBD_STATUS_SUCCESS;
+		urb->UrbHeader.Status = err ? to_windows_status(err) : USBD_STATUS_SUCCESS;
 	} else {
 		Trace(TRACE_LEVEL_VERBOSE, "URB is null");
 		return STATUS_INVALID_PARAMETER;
@@ -577,7 +577,7 @@ PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 	PAGED_CODE();
 
 	auto err = hdr->u.ret_submit.status;
-	auto win_err = to_windows_status(err, false);
+	auto win_err = to_windows_status(err);
 
 	if (win_err == EndpointStalled) { // control pipe stall is not an error, it can't stall
 		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", dbg_usbd_status(win_err), err);
@@ -625,7 +625,7 @@ PAGEABLE NTSTATUS ret_unlink(const usbip_header *hdr)
 {
 	PAGED_CODE();
 	
-	TraceUrb("%s", dbg_usbd_status(to_windows_status(hdr->u.ret_unlink.status, false)));
+	TraceUrb("%s", dbg_usbd_status(to_windows_status(hdr->u.ret_unlink.status)));
 	return STATUS_SUCCESS; // it's OK if can't unlink (too late, etc.)
 }
 
