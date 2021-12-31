@@ -185,19 +185,16 @@ PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const usbip_h
 	PAGED_CODE();
 
 	auto err = urb->UrbHeader.Status;
+	bool ep0_stall = err == USBD_STATUS_STALL_PID; // hdr->u.ret_submit.status == -EPIPE(32)
 
-	if (err && err == USBD_STATUS_STALL_PID) { // hdr->u.ret_submit.status == -EPIPE(32)
-
+	if (ep0_stall) {
 		auto ifnum = urb->UrbSelectInterface.Interface.InterfaceNumber;
-
 		Trace(TRACE_LEVEL_WARNING, "Ignoring %s (linux status %d), InterfaceNumber %d, num_altsetting %d", 
 					dbg_usbd_status(err), hdr->u.ret_submit.status, ifnum, 
 					get_intf_num_altsetting(vpdo->actconfig, ifnum));
-
-		err = USBD_STATUS_SUCCESS;
 	}
 
-	return err ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
+	return !err || ep0_stall ? vpdo_select_interface(vpdo, &urb->UrbSelectInterface) : STATUS_UNSUCCESSFUL;
 }
 
 /*
