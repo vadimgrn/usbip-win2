@@ -14,6 +14,8 @@ extern "C" {
 
 struct usbip_iso_packet_descriptor;
 
+enum { EndpointStalled = USBD_STATUS_STALL_PID }; // FIXME: for what USBD_STATUS_ENDPOINT_HALTED?
+
 USBD_STATUS to_windows_status(int usbip_status, bool isoch);
 int to_linux_status(USBD_STATUS usbd_status);
 

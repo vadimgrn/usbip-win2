@@ -1,3 +1,4 @@
+//#define DEBUG_PDU
 #include "usbip_windows.h"
 
 #include <signal.h>

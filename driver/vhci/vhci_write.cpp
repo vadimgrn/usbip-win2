@@ -165,10 +165,21 @@ PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const usbip_h
 	return get_copy_status(buf);
 }
 
+/*
+ * EP0 stall is not an error, control endpoint cannot stall. 
+ */
 PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
+
+	auto err = urb->UrbHeader.Status;
+
+	if (err == EndpointStalled) {
+		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", dbg_usbd_status(err), hdr->u.ret_submit.status);
+		err = USBD_STATUS_SUCCESS;
+	}
+
+	return err ? STATUS_UNSUCCESSFUL : vpdo_select_config(vpdo, &urb->UrbSelectConfiguration);
 }
 
 /*
@@ -185,16 +196,17 @@ PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, const usbip_h
 	PAGED_CODE();
 
 	auto err = urb->UrbHeader.Status;
-	bool ep0_stall = err == USBD_STATUS_STALL_PID; // hdr->u.ret_submit.status == -EPIPE(32)
 
-	if (ep0_stall) {
+	if (err == EndpointStalled) {
 		auto ifnum = urb->UrbSelectInterface.Interface.InterfaceNumber;
-		Trace(TRACE_LEVEL_WARNING, "Ignoring %s (linux status %d), InterfaceNumber %d, num_altsetting %d", 
-					dbg_usbd_status(err), hdr->u.ret_submit.status, ifnum, 
+		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d, InterfaceNumber %d, num_altsetting %d", 
+					dbg_usbd_status(err), hdr->u.ret_submit.status, ifnum,
 					get_intf_num_altsetting(vpdo->actconfig, ifnum));
+
+		err = USBD_STATUS_SUCCESS;
 	}
 
-	return !err || ep0_stall ? vpdo_select_interface(vpdo, &urb->UrbSelectInterface) : STATUS_UNSUCCESSFUL;
+	return err ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb->UrbSelectInterface);
 }
 
 /*
@@ -563,7 +575,16 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_head
 PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 {
 	PAGED_CODE();
-	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+
+	auto err = hdr->u.ret_submit.status;
+	auto win_err = to_windows_status(err, false);
+
+	if (win_err == EndpointStalled) { // control pipe stall is not an error, it can't stall
+		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", dbg_usbd_status(win_err), err);
+		err = 0;
+	}
+
+	return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
 PAGEABLE NTSTATUS ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)

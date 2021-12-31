@@ -39,7 +39,7 @@ USBD_STATUS to_windows_status(int usbip_status, bool isoch)
 	case 0:
 		return USBD_STATUS_SUCCESS;
 	case EPIPE_LNX:
-		return USBD_STATUS_STALL_PID;
+		return EndpointStalled;
 	case EREMOTEIO_LNX:
 		return USBD_STATUS_ERROR_SHORT_TRANSFER;
 	case ETIME_LNX:
@@ -87,7 +87,7 @@ int to_linux_status(USBD_STATUS status)
 	switch (status) {
 	case USBD_STATUS_SUCCESS:
 		break;
-	case USBD_STATUS_STALL_PID:
+	case EndpointStalled:
 	case USBD_STATUS_ENDPOINT_HALTED:
 		err = EPIPE_LNX;
 		break;
