@@ -178,16 +178,17 @@ NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 
 /*
 * Can't be implemented without server's support.
-* In any case the result will not be relevant due to network latency.
+* In any case the result will be irrelevant due to network latency.
 * 
 * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number. 
 */
 NTSTATUS urb_get_current_frame_number(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	TraceUrb("irp %04x: not supported", irp);
-	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
+	urb->UrbGetCurrentFrameNumber.FrameNumber = 0; // FIXME: get usb_get_current_frame_number() on Linux server
+	TraceUrb("irp %04x: FrameNumber %lu", irp, urb->UrbGetCurrentFrameNumber.FrameNumber);
 
-	return STATUS_NOT_SUPPORTED;
+	urb->UrbHeader.Status = USBD_STATUS_SUCCESS;
+	return STATUS_SUCCESS;
 }
 
 NTSTATUS urb_control_transfer_any(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -274,7 +275,7 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t*, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
 		irp, r.TransferBufferLength, r.Recipient, r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
 
-	return STATUS_NOT_IMPLEMENTED;
+	return STATUS_NOT_SUPPORTED;
 }
 
 /*
@@ -289,7 +290,7 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t*, URB *urb, UINT32 irp)
 		r.MaximumSendPathDelayInMilliSeconds, 
 		r.MaximumCompletionPathDelayInMilliSeconds);
 
-	return STATUS_NOT_IMPLEMENTED;
+	return STATUS_NOT_SUPPORTED;
 }
 
 NTSTATUS open_static_streams(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -299,7 +300,7 @@ NTSTATUS open_static_streams(vpdo_dev_t*, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",
 		irp, (uintptr_t)r.PipeHandle, r.NumberOfStreams, r.StreamInfoVersion, r.StreamInfoSize);
 
-	return STATUS_NOT_IMPLEMENTED;
+	return STATUS_NOT_SUPPORTED;
 }
 
 using urb_function_t = NTSTATUS(vpdo_dev_t*, URB*, UINT32);
