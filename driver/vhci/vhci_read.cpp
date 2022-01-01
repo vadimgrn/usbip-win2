@@ -6,6 +6,7 @@
 #include "vhci_irp.h"
 #include "vhci_proto.h"
 #include "usbd_helper.h"
+#include "urbtransfer.h"
 #include "pdu.h"
 #include "ch9.h"
 #include "ch11.h"
@@ -130,12 +131,12 @@ NTSTATUS do_copy_transfer_buffer(void *dst, const URB *urb, IRP *irp)
 	bool mdl = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
 	NT_ASSERT(urb->UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
-	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
+	auto r = AsUrbTransfer(urb);
 
-	auto buf = get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL);
+	auto buf = get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL);
 	if (buf) {
-		RtlCopyMemory(dst, buf, r.TransferBufferLength);
-		TRANSFERRED(irp) += r.TransferBufferLength;
+		RtlCopyMemory(dst, buf, r->TransferBufferLength);
+		TRANSFERRED(irp) += r->TransferBufferLength;
 	}
 
 	return buf ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
@@ -162,15 +163,15 @@ NTSTATUS copy_payload(void *dst, IRP *irp, const _URB_ISOCH_TRANSFER &r, [[maybe
 */
 NTSTATUS copy_transfer_buffer(IRP *irp, const URB *urb, vpdo_dev_t *vpdo)
 {
-	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	NT_ASSERT(r.TransferBufferLength);
+	auto r = AsUrbTransfer(urb);
+	NT_ASSERT(r->TransferBufferLength);
 
 	auto buf_sz = get_irp_buffer_size(irp);
 	auto transferred = (ULONG)TRANSFERRED(irp);
 
 	NT_ASSERT(buf_sz >= transferred);
 
-	if (buf_sz - transferred >= r.TransferBufferLength) {
+	if (buf_sz - transferred >= r->TransferBufferLength) {
 		auto buf = (char*)get_irp_buffer(irp);
 		return do_copy_transfer_buffer(buf + transferred, urb, irp);
 	}
@@ -187,8 +188,8 @@ PAGEABLE NTSTATUS transfer_partial(IRP *irp, URB *urb)
 {
 	PAGED_CODE();
 
-	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	auto dst = try_get_irp_buffer(irp, r.TransferBufferLength);
+	auto r = AsUrbTransfer(urb);
+	auto dst = try_get_irp_buffer(irp, r->TransferBufferLength);
 
 	return dst ? do_copy_transfer_buffer(dst, urb, irp) : STATUS_BUFFER_TOO_SMALL;
 }
@@ -585,7 +586,7 @@ PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, urb_req* urbr)
 	PAGED_CODE();
 
 	auto &r = urb->UrbControlTransfer;
-	static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket), "assert");
+	static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
 
 	auto hdr = get_usbip_header(irp);
 	if (!hdr) {
@@ -606,7 +607,7 @@ PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, urb_req* urbr)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r.SetupPacket), "assert");
+	static_assert(sizeof(hdr->u.cmd_submit.setup) == sizeof(r.SetupPacket));
 	RtlCopyMemory(hdr->u.cmd_submit.setup, r.SetupPacket, sizeof(hdr->u.cmd_submit.setup));
 
 	TRANSFERRED(irp) = sizeof(*hdr);

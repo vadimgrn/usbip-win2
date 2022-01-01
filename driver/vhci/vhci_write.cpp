@@ -11,55 +11,7 @@
 #include "vhci_irp.h"
 #include "pdu.h"
 #include "devconf.h"
-
-/*
- * These URBs have the same layout from the beginning of the structure.
- * Pointer to any of them can be used to access TransferBufferLength, TransferBuffer, TransferBufferMDL of any other instance 
- * of these URBs.
- */
-const auto off_flags = offsetof(_URB_CONTROL_TRANSFER, TransferFlags);
-static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferFlags) == off_flags, "assert");
-static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferFlags) == off_flags, "assert");
-static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferFlags) == off_flags, "assert");
-//static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferFlags) == off_flags, "assert");
-//static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferFlags) == off_flags, "assert");
-static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferFlags) == off_flags, "assert");
-//static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferFlags) == off_flags, "assert");
-//static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferFlags) == off_flags, "assert");
-//static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferFlags) == off_flags, "assert");
-
-const auto off_len = offsetof(_URB_CONTROL_TRANSFER, TransferBufferLength);
-static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferLength) == off_len, "assert");
-static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferLength) == off_len, "assert");
-
-const auto off_buf = offsetof(_URB_CONTROL_TRANSFER, TransferBuffer);
-static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBuffer) == off_buf, "assert");
-static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBuffer) == off_buf, "assert");
-
-const auto off_mdl = offsetof(_URB_CONTROL_TRANSFER, TransferBufferMDL);
-static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_BULK_OR_INTERRUPT_TRANSFER, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_ISOCH_TRANSFER, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_CONTROL_DESCRIPTOR_REQUEST, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_STATUS_REQUEST, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_CONTROL_VENDOR_OR_CLASS_REQUEST, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_INTERFACE_REQUEST, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_CONTROL_GET_CONFIGURATION_REQUEST, TransferBufferMDL) == off_mdl, "assert");
-static_assert(offsetof(_URB_OS_FEATURE_DESCRIPTOR_REQUEST, TransferBufferMDL) == off_mdl, "assert");
+#include "urbtransfer.h"
 
 namespace
 {
@@ -110,13 +62,13 @@ PAGEABLE auto copy_to_transfer_buffer(URB *urb, const void *src)
 	bool mdl = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
 	NT_ASSERT(urb->UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
-	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	auto buf = get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL);
+	auto r = AsUrbTransfer(urb);
+	auto buf = get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL);
 
 	if (buf) {
-		RtlCopyMemory(buf, src, r.TransferBufferLength);
+		RtlCopyMemory(buf, src, r->TransferBufferLength);
 	} else {
-		r.TransferBufferLength = 0;
+		r->TransferBufferLength = 0;
 	}
 
 	return buf;
@@ -144,8 +96,8 @@ PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t*, URB *urb, const usbip_header
 {
 	PAGED_CODE();
 
-	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
-	auto err = assign(r.TransferBufferLength, hdr->u.ret_submit.actual_length);
+	auto r = AsUrbTransfer(urb);
+	auto err = assign(r->TransferBufferLength, hdr->u.ret_submit.actual_length);
 
 	if (err || is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
 		return err;
@@ -158,7 +110,7 @@ PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t*, URB *urb, const usbip_header
 
 	auto buf = copy_to_transfer_buffer(urb, hdr + 1);
 	if (buf && !bulk) { // bulk can have sensitive data
-		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r.TransferBufferLength));
+		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
 	return get_copy_status(buf);

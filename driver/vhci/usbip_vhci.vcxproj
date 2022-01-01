@@ -45,6 +45,7 @@
     <ClInclude Include="..\..\include\usbip_vhci_api.h" />
     <ClInclude Include="..\..\include\usbip_proto.h" />
     <ClInclude Include="pageable.h" />
+    <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="vhci_dev.h" />
     <ClInclude Include="vhci_devconf.h" />

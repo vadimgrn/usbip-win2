@@ -190,17 +190,19 @@ NTSTATUS urb_get_current_frame_number(vpdo_dev_t*, URB *urb, UINT32 irp)
 	return STATUS_NOT_SUPPORTED;
 }
 
-NTSTATUS urb_control_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
+NTSTATUS urb_control_transfer_any(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	auto &r = urb->UrbControlTransfer;
+	static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
+	auto &r = urb->UrbControlTransferEx;
 
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
 	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
-	TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu, %s",
-		irp, (uintptr_t)r.PipeHandle, 
+	TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
+		irp, (uintptr_t)r.PipeHandle,
 		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
 		r.TransferBufferLength,
+		urb->UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
 		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
 
 	return STATUS_SUBMIT_URBR_IRP;
@@ -237,22 +239,6 @@ NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 		r.NumberOfPackets, 
 		r.ErrorCount,
 		func);
-
-	return STATUS_SUBMIT_URBR_IRP;
-}
-NTSTATUS urb_control_transfer_ex(vpdo_dev_t*, URB *urb, UINT32 irp)
-{
-	auto &r = urb->UrbControlTransferEx;
-
-	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
-	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
-
-	TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
-		irp, (uintptr_t)r.PipeHandle,
-		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
-		r.TransferBufferLength,
-		r.Timeout,
-		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
@@ -331,7 +317,7 @@ urb_function_t* const urb_functions[] =
 	usb_function_deprecated, // URB_FUNCTION_SET_FRAME_LENGTH
 	urb_get_current_frame_number,
 
-	urb_control_transfer,
+	urb_control_transfer_any,
 	bulk_or_interrupt_transfer,
 	isoch_transfer,
 
@@ -391,7 +377,7 @@ urb_function_t* const urb_functions[] =
 
 	urb_pipe_request, // URB_FUNCTION_SYNC_RESET_PIPE
 	urb_pipe_request, // URB_FUNCTION_SYNC_CLEAR_STALL
-	urb_control_transfer_ex,
+	urb_control_transfer_any,
 
 	nullptr, // URB_FUNCTION_RESERVE_0X0033
 	nullptr, // URB_FUNCTION_RESERVE_0X0034                  
