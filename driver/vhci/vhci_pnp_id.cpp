@@ -190,7 +190,7 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool*, vdev_t *vdev, IRP*, bool
 	}
 
 	const size_t max_wchars = MAX_VHCI_SERIAL_ID + 1;
-	//	static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN, "assert");
+	//	static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN);
 
 	vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
 

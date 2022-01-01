@@ -68,10 +68,10 @@ const USBD_PIPE_HANDLE EP0 = 0; // make_pipe_handle(USB_DEFAULT_ENDPOINT_ADDRESS
 static_assert(!USB_DEFAULT_ENDPOINT_ADDRESS);
 static_assert(!UsbdPipeTypeControl);
 /*
-static_assert(!EP0, "assert");
-static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS, "assert");
-static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl, "assert");
-static_assert(!get_endpoint_number(EP0), "assert");
-static_assert(!get_endpoint_interval(EP0), "assert");
+static_assert(!EP0);
+static_assert(get_endpoint_address(EP0) == USB_DEFAULT_ENDPOINT_ADDRESS);
+static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl);
+static_assert(!get_endpoint_number(EP0));
+static_assert(!get_endpoint_interval(EP0));
 */
 

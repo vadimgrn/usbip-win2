@@ -80,7 +80,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 	PAGED_CODE();
 
 	auto setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&r->SetupPacket;
-	static_assert(sizeof(*setup) == sizeof(r->SetupPacket), "assert");
+	static_assert(sizeof(*setup) == sizeof(r->SetupPacket));
 
 	void *dsc_data = nullptr;
 	ULONG dsc_len = 0;
