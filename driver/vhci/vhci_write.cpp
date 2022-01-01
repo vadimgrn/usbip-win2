@@ -140,10 +140,9 @@ constexpr auto get_copy_status(const void *p)
 	return p ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
-PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
+PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t*, URB *urb, const usbip_header *hdr)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
 
 	auto &r = urb->UrbControlTransfer; // any struct with Transfer* members can be used
 	auto err = assign(r.TransferBufferLength, hdr->u.ret_submit.actual_length);
@@ -250,10 +249,6 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, con
 			dsc->bDescriptorType,
 			WppBinary(dsc, (USHORT)r.TransferBufferLength));
 
-	if (hdr->u.ret_submit.status) {
-		return STATUS_UNSUCCESSFUL;
-	}
-
 	USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
 			((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
 
@@ -352,10 +347,9 @@ PAGEABLE NTSTATUS copy_isoc_data(
 /*
 * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[].
 */
-PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
+PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t*, URB *urb, const usbip_header *hdr)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
 
 	auto &res = hdr->u.ret_submit;
 	auto cnt = res.number_of_packets;
@@ -397,23 +391,15 @@ PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const usbip_hea
 /*
 * Nothing to handle.
 */
-PAGEABLE NTSTATUS urb_function_success(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
+PAGEABLE NTSTATUS urb_function_success(vpdo_dev_t*, URB*, const usbip_header*)
 {
 	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(vpdo);
-	UNREFERENCED_PARAMETER(urb);
-	UNREFERENCED_PARAMETER(hdr);
-
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
+PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t*, URB *urb, const usbip_header*)
 {
 	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(vpdo);
-	UNREFERENCED_PARAMETER(hdr);
 
 	auto func = urb->UrbHeader.Function;
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
@@ -515,12 +501,9 @@ urb_function_t* const urb_functions[] =
 };
 
 /*
-* URB function must:
-* 1.Take into account UrbHeader.Status which was mapped from ret_submit.status.
-*   For example, select_configuration/select_interface immediately returns in such case.
-* 2.If response from a server has data (actual_length > 0), the function MUST copy it to URB 
-*   even if UrbHeader.Status != USBD_STATUS_SUCCESS.
-*/
+ * If response from a server has data (actual_length > 0), URB function MUST copy it to URB 
+ * even if UrbHeader.Status != USBD_STATUS_SUCCESS.
+ */
 PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
 {
 	PAGED_CODE(); 
@@ -529,7 +512,7 @@ PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header 
 		auto err = hdr->u.ret_submit.status;
 		urb->UrbHeader.Status = err ? to_windows_status(err) : USBD_STATUS_SUCCESS;
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "URB is null");
+		Trace(TRACE_LEVEL_WARNING, "URB is null"); // FIXME: what is going on?
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -538,7 +521,7 @@ PAGEABLE NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, URB *urb, const usbip_header 
 
 	auto err = pfunc ? pfunc(vpdo, urb, hdr) : STATUS_INVALID_PARAMETER;
 
-	if (err && !urb->UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err), see urb_select_interface
+	if (err && !urb->UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err)
 		urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
 		Trace(TRACE_LEVEL_VERBOSE, "Set USBD_STATUS=%s because return is %!STATUS!", dbg_usbd_status(urb->UrbHeader.Status), err);
 	}
@@ -569,7 +552,8 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_head
 			static_cast<UINT32>(uirp), r->ConnectionIndex, data_sz, actual_length, 
 			WppBinary(r->Data, (USHORT)actual_length));
 
-	return hdr->u.ret_submit.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+	auto err = to_windows_status(hdr->u.ret_submit.status);
+	return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
 PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
@@ -579,7 +563,7 @@ PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 	auto err = hdr->u.ret_submit.status;
 	auto win_err = to_windows_status(err);
 
-	if (win_err == EndpointStalled) { // control pipe stall is not an error, it can't stall
+	if (win_err == EndpointStalled) { // control pipe stall is not an error, see urb_select_interface
 		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", dbg_usbd_status(win_err), err);
 		err = 0;
 	}
