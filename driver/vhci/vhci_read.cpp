@@ -144,10 +144,8 @@ NTSTATUS do_copy_transfer_buffer(void *dst, const URB *urb, IRP *irp)
 /*
 * PAGED_CODE() fails.
 */
-NTSTATUS copy_payload(void *dst, IRP *irp, const _URB_ISOCH_TRANSFER &r, ULONG expected)
+NTSTATUS copy_payload(void *dst, IRP *irp, const _URB_ISOCH_TRANSFER &r, [[maybe_unused]] ULONG expected)
 {
-	UNREFERENCED_PARAMETER(expected);
-
 	ULONG transferred = 0;
 	NTSTATUS err = do_copy_payload(dst, r, &transferred);
 
@@ -623,12 +621,9 @@ PAGEABLE NTSTATUS urb_control_transfer_any(IRP *irp, URB *urb, urb_req* urbr)
 /*
 * vhci_internal_ioctl.c handles such functions itself.
 */
-PAGEABLE NTSTATUS urb_function_unexpected(IRP *irp, URB *urb, urb_req* urbr)
+PAGEABLE NTSTATUS urb_function_unexpected([[maybe_unused]] IRP *irp, URB *urb, urb_req*)
 {
 	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(irp);
-	UNREFERENCED_PARAMETER(urbr);
 
 	auto func = urb->UrbHeader.Function;
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
@@ -1026,10 +1021,8 @@ PAGEABLE NTSTATUS cmd_unlink(IRP *irp, urb_req *urbr)
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-void on_pending_irp_read_cancelled(DEVICE_OBJECT *devobj, IRP *irp_read)
+void on_pending_irp_read_cancelled(DEVICE_OBJECT*, IRP *irp_read)
 {
-	UNREFERENCED_PARAMETER(devobj);
-
 	TraceUrb("Pending irp read cancelled %p", irp_read);
 
 	IoReleaseCancelSpinLock(irp_read->CancelIrql);

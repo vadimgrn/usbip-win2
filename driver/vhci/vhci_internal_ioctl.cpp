@@ -73,10 +73,8 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlGetStatusRequest;
 
 	TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
@@ -97,10 +95,8 @@ NTSTATUS urb_control_vendor_class_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_control_descriptor_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlDescriptorRequest;
 
 	TraceUrb("irp %04x -> %s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
@@ -110,10 +106,8 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_control_feature_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlFeatureRequest;
 
 	TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx", 
@@ -122,20 +116,16 @@ NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_select_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
 	TraceUrb("irp %04x -> %s", irp, select_configuration_str(buf, sizeof(buf), &urb->UrbSelectConfiguration));
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_select_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	char buf[SELECT_INTERFACE_STR_BUFSZ];
 	TraceUrb("irp %04x -> %s", irp, select_interface_str(buf, sizeof(buf), &urb->UrbSelectInterface));
 
@@ -157,8 +147,6 @@ NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 */
 NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbPipeRequest;
 	NTSTATUS st = STATUS_NOT_SUPPORTED;
 
@@ -194,21 +182,16 @@ NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 * 
 * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number. 
 */
-NTSTATUS urb_get_current_frame_number(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_get_current_frame_number(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-	UNREFERENCED_PARAMETER(urb);
-
 	TraceUrb("irp %04x: not supported", irp);
 	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 
 	return STATUS_NOT_SUPPORTED;
 }
 
-NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_control_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlTransfer;
 
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
@@ -223,10 +206,8 @@ NTSTATUS urb_control_transfer(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbBulkOrInterruptTransfer;
 	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
 
@@ -241,10 +222,8 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS isoch_transfer(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbIsochronousTransfer;
 	const char *func = urb->UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
 
@@ -261,10 +240,8 @@ NTSTATUS isoch_transfer(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
-NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS urb_control_transfer_ex(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlTransferEx;
 
 	char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
@@ -280,40 +257,32 @@ NTSTATUS urb_control_transfer_ex(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS usb_function_deprecated(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS usb_function_deprecated(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	TraceUrb("irp %04x: %s not supported", irp, urb_function_str(urb->UrbHeader.Function));
 
 	urb->UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
 	return STATUS_NOT_SUPPORTED;
 }
 
-NTSTATUS get_configuration(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS get_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlGetConfigurationRequest;
 	TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1)", irp, r.TransferBufferLength);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS get_interface(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS get_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbControlGetInterfaceRequest;
 	TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1), Interface %hu", irp, r.TransferBufferLength, r.Interface);
 
 	return STATUS_SUBMIT_URBR_IRP;
 }
 
-NTSTATUS get_ms_feature_descriptor(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS get_ms_feature_descriptor(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbOSFeatureDescriptorRequest;
 
 	TraceUrb("irp %04x -> TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
@@ -325,10 +294,8 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 /*
  * See: <kernel>/drivers/usb/core/message.c, usb_set_isoch_delay.
  */
-NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbGetIsochPipeTransferPathDelays;
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, MaximumSendPathDelayInMilliSeconds %lu, MaximumCompletionPathDelayInMilliSeconds %lu",
@@ -339,10 +306,8 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t *vpdo, URB *urb, UINT32 
 	return STATUS_NOT_IMPLEMENTED;
 }
 
-NTSTATUS open_static_streams(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
+NTSTATUS open_static_streams(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
-	UNREFERENCED_PARAMETER(vpdo);
-
 	auto &r = urb->UrbOpenStaticStreams;
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",

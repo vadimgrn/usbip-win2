@@ -38,12 +38,9 @@ WMI_SET_DATAITEM_CALLBACK vhci_SetWmiDataItem;
 
 NTSTATUS vhci_SetWmiDataItem(
 	__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
-	__in ULONG InstanceIndex, __in ULONG DataItemId, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR Buffer)
+	__in ULONG /*InstanceIndex*/, __in ULONG DataItemId, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR /*Buffer*/)
 {
 	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(InstanceIndex);
-	UNREFERENCED_PARAMETER(Buffer);
 
 	ULONG		requiredSize = 0;
 	NTSTATUS	status;
@@ -74,12 +71,9 @@ NTSTATUS vhci_SetWmiDataItem(
 
 NTSTATUS vhci_SetWmiDataBlock(
 	__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
-	__in ULONG InstanceIndex, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR Buffer)
+	__in ULONG /*InstanceIndex*/, __in ULONG BufferSize, __in_bcount(BufferSize) PUCHAR /*Buffer*/)
 {
 	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(InstanceIndex);
-	UNREFERENCED_PARAMETER(Buffer);
 
 	ULONG		requiredSize = 0;
 	NTSTATUS	status;
@@ -107,13 +101,10 @@ NTSTATUS vhci_SetWmiDataBlock(
 
 NTSTATUS vhci_QueryWmiDataBlock(
 	__in PDEVICE_OBJECT devobj, __in PIRP irp, __in ULONG GuidIndex,
-	__in ULONG InstanceIndex, __in ULONG InstanceCount, __inout PULONG InstanceLengthArray,
+	[[maybe_unused]] __in ULONG InstanceIndex, [[maybe_unused]] __in ULONG InstanceCount, __inout PULONG InstanceLengthArray,
 	__in ULONG OutBufferSize, __out_bcount(OutBufferSize) PUCHAR Buffer)
 {
 	PAGED_CODE();
-
-	UNREFERENCED_PARAMETER(InstanceIndex);
-	UNREFERENCED_PARAMETER(InstanceCount);
 
 	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
 	ULONG		size = 0;
@@ -143,13 +134,12 @@ NTSTATUS vhci_QueryWmiDataBlock(
 }
 
 NTSTATUS vhci_QueryWmiRegInfo(
-	__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PUNICODE_STRING InstanceName,
+	__in PDEVICE_OBJECT devobj, __out ULONG *RegFlags, __out PUNICODE_STRING /*InstanceName*/,
 	__out PUNICODE_STRING *RegistryPath, __out PUNICODE_STRING MofResourceName, __out PDEVICE_OBJECT *Pdo)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(InstanceName);
 
-	vdev_t *vdev = devobj_to_vdev(devobj);
+	auto vdev = devobj_to_vdev(devobj);
 
 	*RegFlags = WMIREG_FLAG_INSTANCE_PDO;
 	*RegistryPath = &Globals.RegistryPath;

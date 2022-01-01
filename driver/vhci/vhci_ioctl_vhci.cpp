@@ -67,14 +67,12 @@ PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
 } // namespace
 
 
-PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG, PULONG poutlen)
 {
 	PAGED_CODE();
 
 	PUSB_ROOT_HUB_NAME	roothub_name = (PUSB_ROOT_HUB_NAME)buffer;
 	SIZE_T	roothub_namelen, prefix_len;
-
-	UNREFERENCED_PARAMETER(inlen);
 
 	prefix_len = get_name_prefix_size(vhub->DevIntfRootHub.Buffer);
 	if (prefix_len == 0) {

@@ -75,10 +75,9 @@ PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
 
 } // namespace
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t * vhci, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vhci);
 
 	auto hdr = static_cast<USBUSER_REQUEST_HEADER*>(buffer);
 	if (inlen < sizeof(*hdr)) {

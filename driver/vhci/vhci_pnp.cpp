@@ -83,10 +83,9 @@ PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t * vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 
 	PNP_BUS_INFORMATION *bi = (PNP_BUS_INFORMATION*)ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
 	if (bi) {
@@ -101,24 +100,21 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 	return irp_done(irp, st);
 }
 
-PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_0x0E(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_read_config(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_write_config(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
@@ -142,17 +138,15 @@ PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_set_lock(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 
 	irp->IoStatus.Information = 0;
 	return irp_done_success(irp);
@@ -165,17 +159,15 @@ PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 * contain a memory file namely paging file, dump file,
 * or hibernation file. So we  fail this Irp.
 */
-PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done(irp, STATUS_UNSUCCESSFUL);
 }
 
-PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_iostatus(irp);
 }
 
@@ -183,10 +175,9 @@ PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 * This request notifies bus drivers that a device object exists and
 * that it has been fully enumerated by the plug and play manager.
 */
-PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vdev);
 	return irp_done_success(irp);
 }
 

@@ -129,10 +129,9 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t * vhub, PUSB_HUB_CAPABILITIES_EX p)
+PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t*, PUSB_HUB_CAPABILITIES_EX p)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vhub);
 
 	p->CapabilityFlags.ul = 0xffffffff;
 	p->CapabilityFlags.HubIsHighSpeedCapable = FALSE;

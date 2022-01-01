@@ -183,10 +183,9 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(vpdo_dev_t * vpdo, PUSB_NODE_CONNECT
 	return status;
 }
 
-PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex_v2(vpdo_dev_t * vpdo, PUSB_NODE_CONNECTION_INFORMATION_EX_V2 conninfo, PULONG poutlen)
+PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex_v2(vpdo_dev_t *, PUSB_NODE_CONNECTION_INFORMATION_EX_V2 conninfo, PULONG poutlen)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
 
 	conninfo->SupportedUsbProtocols.ul = 0;
 	conninfo->SupportedUsbProtocols.Usb110 = TRUE;

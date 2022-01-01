@@ -3,14 +3,12 @@
 namespace
 {
 
-NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT devobj, __in PIRP irp, __in PVOID Context)
+NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT, __in PIRP irp, __in PVOID Context)
 {
-	UNREFERENCED_PARAMETER(devobj);
-
 	// If the lower driver didn't return STATUS_PENDING, we don't need to
 	// set the event because we won't be waiting on it.
 	// This optimization avoids grabbing the dispatcher lock and improves perf.
-	if (irp->PendingReturned == TRUE) {
+	if (irp->PendingReturned) {
 		KeSetEvent((PKEVENT)Context, IO_NO_INCREMENT, FALSE);
 	}
 	return STATUS_MORE_PROCESSING_REQUIRED; // Keep this IRP

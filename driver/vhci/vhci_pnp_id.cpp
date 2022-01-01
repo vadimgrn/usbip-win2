@@ -91,20 +91,16 @@ bool is_composite(vpdo_dev_t *vpdo)
 * For all USB devices, the USB bus driver reports a device ID with the following format:
 * USB\VID_xxxx&PID_yyyy
 */
-NTSTATUS
-	setup_device_id(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
+NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
 {
-	UNREFERENCED_PARAMETER(subst_result);
-	UNREFERENCED_PARAMETER(irp);
-
 	NTSTATUS status = STATUS_SUCCESS;
 
-	LPCWSTR str = vdev_devids[vdev->type];
+	auto str = vdev_devids[vdev->type];
 	if (!str) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	size_t str_sz = vdev_devid_size[vdev->type];
+	auto str_sz = vdev_devid_size[vdev->type];
 
 	auto id_dev = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
@@ -113,7 +109,7 @@ NTSTATUS
 	}
 
 	if (vdev->type == VDEV_VPDO) {
-		vpdo_dev_t * vpdo = (vpdo_dev_t *)vdev;
+		auto vpdo = (vpdo_dev_t*)vdev;
 		status = RtlStringCbPrintfW(id_dev, str_sz, str, vpdo->vendor, vpdo->product);
 	} else {
 		RtlCopyMemory(id_dev, str, str_sz);
@@ -126,11 +122,8 @@ NTSTATUS
 	return status;
 }
 
-NTSTATUS
-	setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
+NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 {
-	UNREFERENCED_PARAMETER(irp);
-
 	NTSTATUS status = STATUS_SUCCESS;
 
 	LPCWSTR str = vdev_hwids[vdev->type];
@@ -190,11 +183,8 @@ device ID and instance ID, uniquely identifies a device in the system.
 
 An instance ID is persistent across system restarts.
 */
-NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP *irp, bool want_serial)
+NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool*, vdev_t *vdev, IRP*, bool want_serial)
 {
-	UNREFERENCED_PARAMETER(subst_result);
-	UNREFERENCED_PARAMETER(irp);
-
 	if (vdev->type != VDEV_VPDO) {
 		return STATUS_NOT_SUPPORTED;
 	}
@@ -225,10 +215,8 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool *subst_result, vdev_t *vde
 	return status;
 }
 
-NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t * vdev, PIRP irp)
+NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 {
-	UNREFERENCED_PARAMETER(irp);
-
 	if (vdev->type != VDEV_VPDO) {
 		return STATUS_NOT_SUPPORTED;
 	}

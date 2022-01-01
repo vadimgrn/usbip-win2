@@ -35,54 +35,36 @@ BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(void *context)
 	return vpdo->speed == USB_SPEED_HIGH;
 }
 
-NTSTATUS USB_BUSIFFN
-QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN OUT PVOID BusInformationBuffer,
-	IN OUT PULONG BusInformationBufferLength, OUT PULONG BusInformationActualLength)
+NTSTATUS USB_BUSIFFN QueryBusInformation(IN PVOID /*BusContext*/, IN ULONG /*Level*/, IN OUT PVOID /*BusInformationBuffer*/,
+	IN OUT PULONG /*BusInformationBufferLength*/, OUT PULONG /*BusInformationActualLength*/)
 {
-	UNREFERENCED_PARAMETER(BusContext);
-	UNREFERENCED_PARAMETER(Level);
-	UNREFERENCED_PARAMETER(BusInformationBuffer);
-	UNREFERENCED_PARAMETER(BusInformationBufferLength);
-	UNREFERENCED_PARAMETER(BusInformationActualLength);
+	TraceCall("Enter");
+	return STATUS_UNSUCCESSFUL;
+}
 
+NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
+{
+	TraceCall("Enter");
+	return STATUS_UNSUCCESSFUL;
+}
+
+NTSTATUS USB_BUSIFFN QueryBusTime(IN PVOID, IN OUT ULONG* /*currentusbframe*/)
+{
 	Trace(TRACE_LEVEL_INFORMATION, "Enter");
 	return STATUS_UNSUCCESSFUL;
 }
 
-NTSTATUS USB_BUSIFFN
-SubmitIsoOutUrb(IN PVOID context, IN PURB urb)
+VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT PULONG HcdCapabilities)
 {
-	UNREFERENCED_PARAMETER(context);
-	UNREFERENCED_PARAMETER(urb);
-
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
-	return STATUS_UNSUCCESSFUL;
-}
-
-NTSTATUS USB_BUSIFFN
-QueryBusTime(IN PVOID context, IN OUT PULONG currentusbframe)
-{
-	UNREFERENCED_PARAMETER(context);
-	UNREFERENCED_PARAMETER(currentusbframe);
-
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
-	return STATUS_UNSUCCESSFUL;
-}
-
-VOID USB_BUSIFFN
-GetUSBDIVersion(IN PVOID context, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT PULONG HcdCapabilities)
-{
-	UNREFERENCED_PARAMETER(context);
-
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+	TraceCall("Enter");
 
 	*HcdCapabilities = 0;
 	inf->USBDI_Version = USBDI_VERSION;
 	inf->Supported_USB_Version = 0x200; // binary-coded decimal USB specification version number, USB 2.0
 }
 
-NTSTATUS
-QueryControllerType(_In_opt_ PVOID Context,
+NTSTATUS QueryControllerType(
+	_In_opt_ PVOID,
 	_Out_opt_ PULONG HcdiOptionFlags,
 	_Out_opt_ PUSHORT PciVendorId,
 	_Out_opt_ PUSHORT PciDeviceId,
@@ -91,8 +73,6 @@ QueryControllerType(_In_opt_ PVOID Context,
 	_Out_opt_ PUCHAR PciRevisionId,
 	_Out_opt_ PUCHAR PciProgIf)
 {
-	UNREFERENCED_PARAMETER(Context);
-
 	if (HcdiOptionFlags) {
 		*HcdiOptionFlags = 0;
 	}
