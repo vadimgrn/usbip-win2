@@ -94,7 +94,7 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 		bi->BusNumber = 10; // arbitrary
 	}
 
-	irp->IoStatus.Information = (ULONG_PTR)bi;
+	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(bi);
 
 	NTSTATUS st = bi ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 	return irp_done(irp, st);
@@ -181,9 +181,9 @@ PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t*, IRP *irp)
 	return irp_done_success(irp);
 }
 
-typedef NTSTATUS (*pnpmn_func_t)(vdev_t*, IRP*);
+using pnpmn_func_t = NTSTATUS(vdev_t*, IRP*);
 
-const pnpmn_func_t pnpmn_functions[] =
+pnpmn_func_t* const pnpmn_functions[] =
 {
 	pnp_start_device, // IRP_MN_START_DEVICE
 	pnp_query_remove_device,
@@ -223,11 +223,10 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
-	vdev_t *vdev = devobj_to_vdev(devobj);
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto vdev = devobj_to_vdev(devobj);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceCall("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!",
-			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
+	TraceCall("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	NTSTATUS status = STATUS_SUCCESS;
 
