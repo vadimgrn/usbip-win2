@@ -2,10 +2,10 @@
 #include "trace.h"
 #include "vhci.tmh"
 
-#include "vhci_plugin.h"
+#include "plugin.h"
 #include "usbreq.h"
-#include "vhci_pnp.h"
-#include "vhci_irp.h"
+#include "pnp.h"
+#include "irp.h"
 
 #include <ntstrsafe.h>
 #include <usbdi.h>

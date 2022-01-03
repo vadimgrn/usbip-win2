@@ -6,7 +6,7 @@
 #include "dbgcommon.h"
 #include "stub_dbg.h"
 #include "stub_usbd.h"
-#include "devconf.h"
+#include "usbdsc.h"
 
 #include "strutil.h"
 

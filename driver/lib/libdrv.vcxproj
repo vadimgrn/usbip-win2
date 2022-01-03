@@ -12,7 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dbgcommon.cpp" />
-    <ClCompile Include="devconf.cpp" />
+    <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
     <ClCompile Include="strutil.cpp" />
     <ClCompile Include="usb_util.cpp" />
@@ -117,7 +117,7 @@
     <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="dbgcommon.h" />
-    <ClInclude Include="devconf.h" />
+    <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
     <ClInclude Include="strutil.h" />
     <ClInclude Include="usbd_helper.h" />

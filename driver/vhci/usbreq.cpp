@@ -4,8 +4,8 @@
 
 #include "vhci.h"
 #include "usbip_proto.h"
-#include "vhci_read.h"
-#include "vhci_irp.h"
+#include "read.h"
+#include "irp.h"
 
 #include <ntstrsafe.h>
 

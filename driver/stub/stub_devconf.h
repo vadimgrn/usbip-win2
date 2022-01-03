@@ -3,7 +3,7 @@
 #include <ntddk.h>
 #include <usbspec.h>
 
-#include "devconf.h"
+#include "usbdsc.h"
 
 #define INFO_INTF_SIZE(info_intf)	(sizeof(USBD_INTERFACE_INFORMATION) + ((info_intf)->NumberOfPipes - 1) * sizeof(USBD_PIPE_INFORMATION))
 

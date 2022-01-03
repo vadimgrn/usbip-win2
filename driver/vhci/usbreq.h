@@ -5,7 +5,7 @@
 
 #include "usb_util.h"
 
-#include "vhci_dev.h"
+#include "dev.h"
 
 struct urb_req
 {
