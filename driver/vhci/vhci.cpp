@@ -90,16 +90,14 @@ PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
 
-	TraceCall("Unload driver");
+	TraceCall("Unloading");
+
+	// NT_ASSERT(!drvobj->DeviceObject);
+
+	NT_ASSERT(Globals.RegistryPath.Buffer);
+	ExFreePoolWithTag(Globals.RegistryPath.Buffer, USBIP_VHCI_POOL_TAG);
 
 	ExDeleteNPagedLookasideList(&g_lookaside);
-	NT_ASSERT(!drvobj->DeviceObject);
-
-	if (Globals.RegistryPath.Buffer) {
-		ExFreePool(Globals.RegistryPath.Buffer);
-		Globals.RegistryPath.Buffer = nullptr;
-	}
-
 	WPP_CLEANUP(drvobj);
 }
 
@@ -151,24 +149,44 @@ PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	NTSTATUS st = RtlUnicodeStringCopy(&path, RegistryPath);
-	NT_ASSERT(!st);
+	NTSTATUS err = RtlUnicodeStringCopy(&path, RegistryPath);
+	NT_ASSERT(!err);
 
-	st = RtlUnicodeStringCat(&path, &params);
-	NT_ASSERT(!st);
+	err = RtlUnicodeStringCat(&path, &params);
+	NT_ASSERT(!err);
 
 	OBJECT_ATTRIBUTES attrs;
 	InitializeObjectAttributes(&attrs, &path, OBJ_KERNEL_HANDLE, nullptr, nullptr);
 
 	HANDLE h = nullptr;
-	st = ZwCreateKey(&h, KEY_WRITE, &attrs, 0, nullptr, 0, nullptr);
-	if (!st) {
-		st = set_verbose_on(h);
+	err = ZwCreateKey(&h, KEY_WRITE, &attrs, 0, nullptr, 0, nullptr);
+	if (!err) {
+		err = set_verbose_on(h);
 		ZwClose(h);
 	}
 
 	ExFreePoolWithTag(path.Buffer, USBIP_VHCI_POOL_TAG);
-	return st;
+	return err;
+}
+
+PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
+{
+	auto &path = Globals.RegistryPath;
+	USHORT max_len = RegistryPath->Length + sizeof(UNICODE_NULL);
+
+	path.Buffer = (PWCH)ExAllocatePoolWithTag(NonPagedPool, max_len, USBIP_VHCI_POOL_TAG);
+	if (!path.Buffer) {
+		Trace(TRACE_LEVEL_CRITICAL, "Can't allocate %hu bytes", max_len);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	NT_ASSERT(!path.Length);
+	path.MaximumLength = max_len;
+
+	RtlCopyUnicodeString(&path, RegistryPath);
+	TraceCall("%!USTR!", &path);
+
+	return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -199,22 +217,14 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 		return st;
 	}
 
-	TraceCall("RegistryPath '%!USTR!'", RegistryPath);
+	TraceCall("Loading");
+
+	if (auto err = save_registry_path(RegistryPath)) {
+		WPP_CLEANUP(drvobj);
+		return err;
+	}
 
 	ExInitializeNPagedLookasideList(&g_lookaside, nullptr, nullptr, 0, sizeof(struct urb_req), 'USBV', 0);
-
-	// Save the RegistryPath for WMI
-	Globals.RegistryPath.MaximumLength = RegistryPath->Length + sizeof(UNICODE_NULL);
-	Globals.RegistryPath.Length = RegistryPath->Length;
-	Globals.RegistryPath.Buffer = (PWCH)ExAllocatePoolWithTag(PagedPool, Globals.RegistryPath.MaximumLength, USBIP_VHCI_POOL_TAG);
-
-	if (Globals.RegistryPath.Buffer) {
-		RtlCopyUnicodeString(&Globals.RegistryPath, RegistryPath);
-	} else {
-		Trace(TRACE_LEVEL_CRITICAL, "ExAllocatePoolWithTag failed");
-		vhci_driverUnload(drvobj);
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
 
 	drvobj->MajorFunction[IRP_MJ_CREATE] = vhci_create;
 	drvobj->MajorFunction[IRP_MJ_CLEANUP] = vhci_cleanup;
