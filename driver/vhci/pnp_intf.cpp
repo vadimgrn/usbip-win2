@@ -8,6 +8,7 @@
 #include "usbip_proto.h"
 #include "irp.h"
 #include "strutil.h"
+#include "ch9.h"
 
 #include <ntstrsafe.h>
 #include <wdmguid.h>
@@ -18,21 +19,24 @@
 namespace
 {
 
-void ref_interface(__in PVOID Context)
+void InterfaceReference(__in PVOID Context)
 {
 	vdev_add_ref(static_cast<vdev_t*>(Context));
 }
 
-void deref_interface(__in PVOID Context)
+void InterfaceDereference(__in PVOID Context)
 {
 	vdev_del_ref(static_cast<vdev_t*>(Context));
 }
 
+/*
+ * @return true if device is operating at high speed
+ */
 BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(__in PVOID Context)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(Context);
 	Trace(TRACE_LEVEL_VERBOSE, "%!usb_device_speed!", vpdo->speed);
-	return vpdo->speed == USB_SPEED_HIGH;
+	return vpdo->speed >= USB_SPEED_HIGH; // as Windows compares
 }
 
 /*
@@ -98,8 +102,12 @@ auto setControllerName(vpdo_dev_t *vpdo, USB_BUS_INFORMATION_LEVEL_1 &r,
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS USB_BUSIFFN QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN OUT PVOID BusInformationBuffer,
-	IN OUT PULONG BusInformationBufferLength, OUT PULONG BusInformationActualLength)
+NTSTATUS USB_BUSIFFN QueryBusInformation(
+	IN PVOID BusContext, 
+	IN ULONG Level, 
+	IN OUT PVOID BusInformationBuffer, 
+	IN OUT PULONG BusInformationBufferLength, 
+	OUT PULONG BusInformationActualLength)
 {
 	if (Level > 1) {
 		Trace(TRACE_LEVEL_ERROR, "Unexpected Level %lu", Level);
@@ -138,23 +146,47 @@ NTSTATUS USB_BUSIFFN QueryBusInformation(IN PVOID BusContext, IN ULONG Level, IN
 
 NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
 {
-	TraceCall("Reserved");
+	TraceCall("Not supported");
 	return STATUS_NOT_SUPPORTED;
 }
 
-NTSTATUS USB_BUSIFFN QueryBusTime(IN PVOID, IN OUT ULONG *CurrentFrame)
+/*
+ * @return the current 32-bit USB frame number
+ * If return zero, this function will be called again and again.
+ */
+NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID, _Out_opt_ ULONG *CurrentUsbFrame)
 {
-	*CurrentFrame = 0;
-	Trace(TRACE_LEVEL_VERBOSE, "CurrentFrame %lu", *CurrentFrame);
+	static LONG fake;
+	*CurrentUsbFrame = InterlockedAdd(&fake, 50);
+
+	TraceCall("CurrentUsbFrame -> %lu", *CurrentUsbFrame);
 	return STATUS_SUCCESS;
 }
 
-VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT PULONG HcdCapabilities)
+/*
+ * @return the current USB 2.0 frame/micro-frame number when called for
+ *         a USB device attached to a USB 2.0 host controller
+ *
+ * The lowest 3 bits of the returned micro-frame value will contain the current 125us
+ * micro-frame, while the upper 29 bits will contain the current 1ms USB frame number.
+ */
+NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID, _Out_opt_ ULONG *HighSpeedFrameCounter)
 {
-	inf->USBDI_Version = USBDI_VERSION;
-	inf->Supported_USB_Version = 0x200; // binary-coded decimal USB specification version number, USB 2.0
+	static LONG fake;
+	*HighSpeedFrameCounter = InterlockedAdd(&fake, 50) << 3;
 
-	*HcdCapabilities = 0;
+	TraceCall("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter);
+	return STATUS_SUCCESS;
+}
+
+VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID BusContext, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT PULONG HcdCapabilities)
+{
+	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
+
+	inf->USBDI_Version = USBDI_VERSION;
+	inf->Supported_USB_Version = vpdo->descriptor ? vpdo->descriptor->bcdUSB : bcdUSB20;
+
+	*HcdCapabilities = 0; // see USB_HCD_CAPS_SUPPORTS_RT_THREADS
 
 	Trace(TRACE_LEVEL_VERBOSE, "USBDI_Version %#04lx, Supported_USB_Version %#04lx, HcdCapabilities %#04lx", 
 				inf->USBDI_Version, inf->Supported_USB_Version, *HcdCapabilities);
@@ -230,10 +262,10 @@ NTSTATUS QueryControllerType(
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS USB_BUSIFFN EnumLogEntry(_In_ PVOID, _In_ ULONG, _In_ ULONG, _In_ ULONG, _In_ ULONG)
+NTSTATUS USB_BUSIFFN EnumLogEntry(_In_ PVOID /*BusContext*/, _In_ ULONG DriverTag, _In_ ULONG EnumTag, _In_ ULONG P1, _In_ ULONG P2)
 {
-	TraceCall("Reserved");
-	return STATUS_NOT_IMPLEMENTED;
+	TraceCall("DriverTag %lu, EnumTag %lu, P1 %lu, P2 %lu -> not supported", DriverTag, EnumTag, P1, P2);
+	return STATUS_NOT_SUPPORTED;
 }
 
 PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT version, INTERFACE *intf)
@@ -259,7 +291,7 @@ PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT ve
 
 	switch (version) {
 	case USB_BUSIF_USBDI_VERSION_3:
-		r.QueryBusTimeEx = QueryBusTime;
+		r.QueryBusTimeEx = QueryBusTimeEx;
 		r.QueryControllerType = QueryControllerType;
 		[[fallthrough]];
 	case USB_BUSIF_USBDI_VERSION_2:
@@ -273,21 +305,20 @@ PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT ve
 		r.Version = version;
 		//
 		r.BusContext = vpdo;
-		r.InterfaceReference = ref_interface;
-		r.InterfaceDereference = deref_interface;
+		r.InterfaceReference = InterfaceReference;
+		r.InterfaceDereference = InterfaceDereference;
 		//
 		r.GetUSBDIVersion = GetUSBDIVersion;
 		r.QueryBusTime = QueryBusTime;
 		r.SubmitIsoOutUrb = SubmitIsoOutUrb;
 		r.QueryBusInformation = QueryBusInformation;
-		break;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "%!usb_busif_usbdi_version!", version);
+	Trace(TRACE_LEVEL_VERBOSE, "%!usb_busif_usbdi_version!", version);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, const INTERFACE* intf)
+PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INTERFACE* intf)
 {
 	PAGED_CODE();
 
@@ -296,9 +327,9 @@ PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, const INTE
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto r = (USBCAMD_INTERFACE*)intf;
-	if (size < sizeof(*r)) {
-		Trace(TRACE_LEVEL_ERROR, "Size %d < %Iu", size, sizeof(*r));
+	auto &r = *reinterpret_cast<USBCAMD_INTERFACE*>(intf);
+	if (size != sizeof(r)) {
+		Trace(TRACE_LEVEL_ERROR, "Size %d != %Iu", size, sizeof(r));
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -307,7 +338,11 @@ PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, const INTE
 	return STATUS_NOT_SUPPORTED;
 }
 
-NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
+NTSTATUS GetLocationString(
+	_Inout_opt_ PVOID Context,
+	_Outptr_
+	_At_(*LocationStrings, _When_(return == 0, __drv_allocatesMem(Mem)))
+	PZZWSTR *LocationStrings)
 {
 	auto vdev = static_cast<vdev_t*>(Context);
 	NTSTATUS st = STATUS_SUCCESS;
@@ -316,7 +351,7 @@ NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 	size_t remaining = 0;
 
 	if (vdev->type == VDEV_VPDO) {
-		auto vpdo = (vpdo_dev_t*)vdev;
+		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
 		st = RtlStringCchPrintfExW(buf, ARRAYSIZE(buf), nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL,
 			L"%s(%u)", devcodes[vdev->type], vpdo->port);
 	} else {
@@ -330,11 +365,11 @@ NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 	}
 
 	remaining -= 2;
-	size_t sz = sizeof(buf) - remaining*sizeof(*buf);
+	auto sz = sizeof(buf) - remaining*sizeof(*buf);
 
-	*ploc_str = (PZZWSTR)ExAllocatePoolWithTag(PagedPool, sz, USBIP_VHCI_POOL_TAG);
-	if (*ploc_str) {
-		RtlCopyMemory(*ploc_str, buf, sz);
+	*LocationStrings = (PZZWSTR)ExAllocatePoolWithTag(PagedPool, sz, USBIP_VHCI_POOL_TAG);
+	if (*LocationStrings) {
+		RtlCopyMemory(*LocationStrings, buf, sz);
 		return STATUS_SUCCESS;
 	}
 
@@ -345,17 +380,17 @@ NTSTATUS get_location_string(void *Context, PZZWSTR *ploc_str)
 NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INTERFACE *intf)
 {
 	auto &r = *reinterpret_cast<PNP_LOCATION_INTERFACE*>(intf);
-	if (size < sizeof(r)) {
-		Trace(TRACE_LEVEL_ERROR, "Size %d < %Iu, version %d", size, sizeof(r), version);
+	if (size != sizeof(r)) {
+		Trace(TRACE_LEVEL_ERROR, "Size %d != %Iu, version %d", size, sizeof(r), version);
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	r.Size = sizeof(r);
 	r.Version = 1;
 	r.Context = vdev;
-	r.InterfaceReference = ref_interface;
-	r.InterfaceDereference = deref_interface;
-	r.GetLocationString = get_location_string;
+	r.InterfaceReference = InterfaceReference;
+	r.InterfaceDereference = InterfaceDereference;
+	r.GetLocationString = GetLocationString;
 
 	return STATUS_SUCCESS;
 }
@@ -384,11 +419,10 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 		status = query_interface_usbdi((vpdo_dev_t*)vdev, qi.Size, qi.Version, qi.Interface);
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "%!GUID! -> %!STATUS!", qi.InterfaceType, status);
-
 	if (status == STATUS_SUCCESS) {
 		irp->IoStatus.Information = 0;
 	}
 
+	TraceCall("%!GUID! -> %!STATUS!", qi.InterfaceType, status);
 	return irp_done(irp, status);
 }

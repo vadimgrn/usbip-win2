@@ -136,7 +136,7 @@ struct vpdo_dev_t : vdev_t
 	// and set to FALSE when a UnPlug IOCTL is received.
 	bool plugged;
 
-	usb_device_speed speed; 
+	usb_device_speed speed; // mapped from bcdUSB (USB Specification Number which device complies too)
 	UCHAR NumConfigurations; // from device descriptor
 
 	// a pending irp when no urb is requested
