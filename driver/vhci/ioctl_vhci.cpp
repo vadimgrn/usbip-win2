@@ -96,7 +96,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 {
 	PAGED_CODE();
 
-	NTSTATUS	status = STATUS_INVALID_DEVICE_REQUEST;
+	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:

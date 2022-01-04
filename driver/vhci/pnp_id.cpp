@@ -83,13 +83,12 @@ bool is_composite(vpdo_dev_t *vpdo)
 		 vpdo->bDeviceSubClass == 0x02 &&
 		 vpdo->bDeviceProtocol == 0x01); // IAD composite device
 
-	return ok && vpdo->NumInterfaces > 1 && vpdo->NumConfigurations == 1;
+	return ok && vpdo->actconfig->bNumInterfaces > 1 && vpdo->descriptor->bNumConfigurations == 1;
 }
 
 /*
-* For all USB devices, the USB bus driver reports a device ID with the following format:
-* USB\VID_xxxx&PID_yyyy
-*/
+ * For all USB devices, the USB bus driver reports a device ID with the following format: USB\VID_xxxx&PID_yyyy
+ */
 NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -109,7 +108,7 @@ NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
 
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = (vpdo_dev_t*)vdev;
-		status = RtlStringCbPrintfW(id_dev, str_sz, str, vpdo->vendor, vpdo->product);
+		status = RtlStringCbPrintfW(id_dev, str_sz, str, vpdo->descriptor->idVendor, vpdo->descriptor->idProduct);
 	} else {
 		RtlCopyMemory(id_dev, str, str_sz);
 	}
@@ -141,10 +140,11 @@ NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 	*subst_result = vdev->type == VDEV_VPDO;
 
 	if (*subst_result) {
-		vpdo_dev_t * vpdo = (vpdo_dev_t *)vdev;
+		auto vpdo = (vpdo_dev_t *)vdev;
+		auto &dd = *vpdo->descriptor;
 		status = RtlStringCbPrintfW(ids_hw, str_sz, str,
-			vpdo->vendor, vpdo->product, vpdo->revision,
-			vpdo->vendor, vpdo->product);
+						dd.idVendor, dd.idProduct, dd.bcdDevice,
+						dd.idVendor, dd.idProduct);
 	} else {
 		RtlCopyMemory(ids_hw, str, str_sz);
 	}

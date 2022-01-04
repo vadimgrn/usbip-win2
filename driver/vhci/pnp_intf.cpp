@@ -228,11 +228,11 @@ NTSTATUS QueryControllerType(
 	}
 
 	if (PciVendorId) {
-		*PciVendorId = dd ? dd->idVendor : vpdo->vendor; // Vendor ID (Assigned by USB Org)
+		*PciVendorId = dd->idVendor;
 	}
 
 	if (PciDeviceId) {
-		*PciDeviceId = dd ? dd->idProduct : vpdo->product; // Product ID (Assigned by Manufacturer)
+		*PciDeviceId = dd->idProduct;
 	}
 
 	if (PciClass) {
@@ -244,7 +244,7 @@ NTSTATUS QueryControllerType(
 	}
 
 	if (PciRevisionId) { // FIXME: really bcdDevice?
-		*PciRevisionId = static_cast<UCHAR>(dd ? dd->bcdDevice : vpdo->product); // Device Release Number
+		*PciRevisionId = static_cast<UCHAR>(dd->bcdDevice); // Device Release Number
 	}
 
 	if (PciProgIf) {

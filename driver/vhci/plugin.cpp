@@ -45,16 +45,11 @@ PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 
 void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
-	vpdo->vendor = d.idVendor;
-	vpdo->product = d.idProduct;
-	vpdo->revision = d.bcdDevice;
-
 	vpdo->bDeviceClass = d.bDeviceClass;
 	vpdo->bDeviceSubClass = d.bDeviceSubClass;
 	vpdo->bDeviceProtocol = d.bDeviceProtocol;
 
 	vpdo->speed = get_usb_speed(d.bcdUSB);
-	vpdo->NumConfigurations = d.bNumConfigurations;
 }
 
 /*
@@ -67,13 +62,11 @@ void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *d)
 {
 	NT_ASSERT(d);
 
-	vpdo->NumInterfaces = d->bNumInterfaces;
-
 	if (vpdo->bDeviceClass || vpdo->bDeviceSubClass || vpdo->bDeviceProtocol) {
 		return;
 	}
 
-	if (vpdo->NumInterfaces == 1) {
+	if (d->bNumInterfaces == 1) {
 		if (auto i = dsc_find_next_intf(d, nullptr)) {
 			vpdo->bDeviceClass = i->bInterfaceClass;
 			vpdo->bDeviceSubClass = i->bInterfaceSubClass;

@@ -244,10 +244,10 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, ioctl_usbip_vhci_imp
 
 		idev->port = char(vpdo->port);
 		idev->status = usbip_device_status(2); // SDEV_ST_USED
-		idev->vendor = vpdo->vendor;
-		idev->product = vpdo->product;
+		idev->vendor = vpdo->descriptor->idVendor;
+		idev->product = vpdo->descriptor->idProduct;
 		idev->speed = vpdo->speed;
-		idev++;
+		++idev;
 
 		++n_used_ports;
 	}

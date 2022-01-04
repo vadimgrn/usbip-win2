@@ -122,12 +122,7 @@ struct vpdo_dev_t : vdev_t
 {
 	USB_DEVICE_DESCRIPTOR *descriptor;
 
-	UCHAR NumConfigurations; // descriptor->bNumConfigurations
 	usb_device_speed speed; // corresponding speed for descriptor->bcdUSB 
-
-	USHORT vendor;
-	USHORT product;
-	USHORT revision;
 
 	// class/subclass/proto can differ from corresponding members of usb_device_descriptor
 	UCHAR bDeviceClass;
@@ -140,7 +135,6 @@ struct vpdo_dev_t : vdev_t
 	PWSTR SerialNumberUser; // user-defined serial number
 
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-	UCHAR NumInterfaces; // actconfig->bNumInterfaces
 
 	UNICODE_STRING usb_dev_interface;
 
