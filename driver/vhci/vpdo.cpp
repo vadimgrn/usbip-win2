@@ -23,6 +23,7 @@ PAGEABLE bool copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 
 } // namespace
 
+
 PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIGURATION *r)
 {
 	PAGED_CODE();
@@ -32,13 +33,13 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, struct _URB_SELECT_CONFIG
 		vpdo->actconfig = nullptr;
 	}
 
-	USB_CONFIGURATION_DESCRIPTOR *cd = r->ConfigurationDescriptor;
+	auto cd = r->ConfigurationDescriptor;
 	if (!cd) {
 		Trace(TRACE_LEVEL_INFORMATION, "Going to unconfigured state");
 		return STATUS_SUCCESS;
 	}
 
-	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(NonPagedPool, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
+	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(PagedPool, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
 
 	if (vpdo->actconfig) {
 		RtlCopyMemory(vpdo->actconfig, cd, cd->wTotalLength);
@@ -93,19 +94,19 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t * vpdo, PUSB_NODE_CONNECTION
 	conninfo->NumberOfOpenPipes = 0;
 	conninfo->DeviceIsHub = FALSE;
 
-	if (vpdo == nullptr) {
+	if (!vpdo) {
 		conninfo->ConnectionStatus = NoDeviceConnected;
 		conninfo->LowSpeed = FALSE;
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
 		status = STATUS_SUCCESS;
 	} else {
-		if (!vpdo->descriptor) {
+		if (!is_valid_dsc(&vpdo->descriptor)) {
+			Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
 			return STATUS_INVALID_PARAMETER;
 		}
 
 		conninfo->ConnectionStatus = DeviceConnected;
-
-		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->descriptor, sizeof(*vpdo->descriptor));
+		RtlCopyMemory(&conninfo->DeviceDescriptor, &vpdo->descriptor, sizeof(conninfo->DeviceDescriptor));
 
 		if (vpdo->actconfig) {
 			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;
@@ -150,12 +151,13 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(vpdo_dev_t * vpdo, PUSB_NODE_CONNECT
 		outlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
 		status = STATUS_SUCCESS;
 	} else {
-		if (!vpdo->descriptor) {
+		if (!is_valid_dsc(&vpdo->descriptor)) {
+			Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
 			return STATUS_INVALID_PARAMETER;
 		}
 
 		conninfo->ConnectionStatus = DeviceConnected;
-		RtlCopyMemory(&conninfo->DeviceDescriptor, vpdo->descriptor, sizeof(conninfo->DeviceDescriptor));
+		RtlCopyMemory(&conninfo->DeviceDescriptor, &vpdo->descriptor, sizeof(conninfo->DeviceDescriptor));
 
 		if (vpdo->actconfig) {
 			conninfo->CurrentConfigurationValue = vpdo->actconfig->bConfigurationValue;

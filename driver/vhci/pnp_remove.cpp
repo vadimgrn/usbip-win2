@@ -89,6 +89,8 @@ PAGEABLE void invalidate_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
+	TraceCall("%p", vhci);
+
 	IoSetDeviceInterfaceState(&vhci->DevIntfVhci, FALSE);
 	IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, FALSE);
 	RtlFreeUnicodeString(&vhci->DevIntfVhci);
@@ -114,6 +116,8 @@ PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
 
 PAGEABLE void free_strings(vpdo_dev_t &d)
 {
+	PAGED_CODE();
+
 	PWSTR *v[] { &d.Manufacturer, &d.Product, &d.SerialNumber };
 
 	for (auto ptr: v) {
@@ -125,6 +129,8 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
+
+	TraceCall("%p", vpdo);
 
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);
@@ -138,6 +144,11 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 	if (vpdo->SerialNumberUser) {
 		libdrv_free(vpdo->SerialNumberUser);
 		vpdo->SerialNumberUser = nullptr;
+	}
+
+	if (vpdo->actconfig) {
+		ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
+		vpdo->actconfig = nullptr;
 	}
 
 	if (vpdo->fo) { // FIXME

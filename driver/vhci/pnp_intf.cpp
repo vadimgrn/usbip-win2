@@ -9,6 +9,7 @@
 #include "irp.h"
 #include "strutil.h"
 #include "ch9.h"
+#include "usbdsc.h"
 
 #include <ntstrsafe.h>
 #include <wdmguid.h>
@@ -186,12 +187,12 @@ VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID BusContext, IN OUT PUSBD_VERSION_INFOR
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
 	inf->USBDI_Version = USBDI_VERSION;
-	inf->Supported_USB_Version = vpdo->descriptor ? vpdo->descriptor->bcdUSB : bcdUSB20;
+	inf->Supported_USB_Version = get_descriptor(vpdo).bcdUSB;
 
 	*HcdCapabilities = 0; // see USB_HCD_CAPS_SUPPORTS_RT_THREADS
 
-	Trace(TRACE_LEVEL_VERBOSE, "USBDI_Version %#04lx, Supported_USB_Version %#04lx, HcdCapabilities %#04lx", 
-				inf->USBDI_Version, inf->Supported_USB_Version, *HcdCapabilities);
+	TraceCall("USBDI_Version %#04lx, Supported_USB_Version %#04lx, HcdCapabilities %#04lx", 
+			inf->USBDI_Version, inf->Supported_USB_Version, *HcdCapabilities);
 }
 
 UCHAR getPciProgIf(USHORT idProduct)
@@ -221,18 +222,18 @@ NTSTATUS QueryControllerType(
 	_Out_opt_ PUCHAR PciProgIf)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
-	auto dd = vpdo->descriptor;
+	auto &d = get_descriptor(vpdo);
 
 	if (HcdiOptionFlags) {
 		*HcdiOptionFlags = 0;
 	}
 
 	if (PciVendorId) {
-		*PciVendorId = dd->idVendor;
+		*PciVendorId = d.idVendor;
 	}
 
 	if (PciDeviceId) {
-		*PciDeviceId = dd->idProduct;
+		*PciDeviceId = d.idProduct;
 	}
 
 	if (PciClass) {
@@ -244,7 +245,7 @@ NTSTATUS QueryControllerType(
 	}
 
 	if (PciRevisionId) { // FIXME: really bcdDevice?
-		*PciRevisionId = static_cast<UCHAR>(dd->bcdDevice); // Device Release Number
+		*PciRevisionId = static_cast<UCHAR>(d.bcdDevice); // Device Release Number
 	}
 
 	if (PciProgIf) {

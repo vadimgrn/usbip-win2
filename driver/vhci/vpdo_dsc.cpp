@@ -7,6 +7,7 @@
 #include "usbreq.h"
 #include "usbip_proto.h"
 #include "irp.h"
+#include "usbdsc.h"
 
 #include <ntstrsafe.h>
 
@@ -69,6 +70,11 @@ PAGEABLE auto clone(const void *src, ULONG length)
 PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
 {
 	NT_ASSERT(Index);
+	
+	if (!is_valid_dsc(&dd)) {
+		Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
+		return;
+	}
 
 	struct {
 		UCHAR idx;
@@ -104,9 +110,9 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 	switch (setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		dsc_data = vpdo->descriptor;
+		dsc_data = is_valid_dsc(&vpdo->descriptor) ? &vpdo->descriptor : nullptr;
 		if (dsc_data) {
-			dsc_len = vpdo->descriptor->bLength;
+			dsc_len = vpdo->descriptor.bLength;
 		}
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
@@ -155,13 +161,16 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_R
 	switch (dsc->bDescriptorType) {
 	case USB_STRING_DESCRIPTOR_TYPE:
 		sd = reinterpret_cast<const USB_STRING_DESCRIPTOR*>(dsc);
-		if (vpdo->descriptor && r.Index && sd->bLength >= sizeof(*sd)) {
-			save_string(vpdo, *vpdo->descriptor, *sd, r.Index);
+		if (r.Index && sd->bLength >= sizeof(*sd)) {
+			save_string(vpdo, vpdo->descriptor, *sd, r.Index);
 		}
 		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (!vpdo->descriptor && dsc->bLength == sizeof(*vpdo->descriptor)) {
-			vpdo->descriptor = (USB_DEVICE_DESCRIPTOR*)clone(dsc, dsc->bLength);
+		if (!is_valid_dsc(reinterpret_cast<const USB_DEVICE_DESCRIPTOR*>(dsc))) {
+			Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
+		} else if (!RtlEqualMemory(&vpdo->descriptor, dsc, sizeof(vpdo->descriptor))) {
+			Trace(TRACE_LEVEL_WARNING, "Device descriptor is not the same");
+			RtlCopyMemory(&vpdo->descriptor, dsc, sizeof(vpdo->descriptor));
 		}
 		break;
 	}

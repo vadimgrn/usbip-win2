@@ -4,6 +4,7 @@
 
 #include "dev.h"
 #include "usbip_vhci_api.h"
+#include "usbdsc.h"
 
 namespace
 {
@@ -241,11 +242,12 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, ioctl_usbip_vhci_imp
 		}
 
 		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+		auto &dd = get_descriptor(vpdo);
 
 		idev->port = char(vpdo->port);
 		idev->status = usbip_device_status(2); // SDEV_ST_USED
-		idev->vendor = vpdo->descriptor->idVendor;
-		idev->product = vpdo->descriptor->idProduct;
+		idev->vendor = dd.idVendor;
+		idev->product = dd.idProduct;
 		idev->speed = vpdo->speed;
 		++idev;
 

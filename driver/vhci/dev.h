@@ -4,6 +4,7 @@
 #include <wmilib.h>	// required for WMILIB_CONTEXT
 
 #include "devconf.h"
+#include "usbdsc.h"
 
 struct urb_req;
 extern const LPCWSTR devcodes[];
@@ -120,28 +121,27 @@ struct vhub_dev_t : vdev_t
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
-	USB_DEVICE_DESCRIPTOR *descriptor;
+	USB_DEVICE_DESCRIPTOR descriptor; // use is_valid_dsc() to check if it is initialized
 
-	usb_device_speed speed; // corresponding speed for descriptor->bcdUSB 
+	usb_device_speed speed; // corresponding speed for descriptor.bcdUSB 
 
 	// class/subclass/proto can differ from corresponding members of usb_device_descriptor
 	UCHAR bDeviceClass;
 	UCHAR bDeviceSubClass;
 	UCHAR bDeviceProtocol;
 
-	PWSTR Manufacturer; // for descriptor->iManufacturer
-	PWSTR Product; // for descriptor->iProduct
-	PWSTR SerialNumber; // for descriptor->iSerialNumber
+	PWSTR Manufacturer; // for descriptor.iManufacturer
+	PWSTR Product; // for descriptor.iProduct
+	PWSTR SerialNumber; // for descriptor.iSerialNumber
 	PWSTR SerialNumberUser; // user-defined serial number
 
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-
-	UNICODE_STRING usb_dev_interface;
 
 	UCHAR current_intf_num;
 	UCHAR current_intf_alt;
 	ULONG current_frame_number;
 
+	UNICODE_STRING usb_dev_interface;
 	ULONG port; // unique port number of the device on the bus
 
 	// Link point to hold all the vpdos for a single bus together
@@ -168,6 +168,16 @@ struct vpdo_dev_t : vdev_t
 	unsigned int	devid;
 	unsigned long	seqnum;
 };
+
+inline auto& get_descriptor(vpdo_dev_t *vpdo)
+{
+	NT_ASSERT(vpdo);
+
+	auto &d = vpdo->descriptor;
+	NT_ASSERT(is_valid_dsc(&d));
+
+	return d;
+}
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 

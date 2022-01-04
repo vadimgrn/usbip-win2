@@ -7,6 +7,7 @@
 #include "pnp.h"
 #include "usb_util.h"
 #include "usbdsc.h"
+#include "vhci.h"
 
 namespace
 {
@@ -43,13 +44,25 @@ PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;
 }
 
-void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &d)
+PAGEABLE auto setup_vpdo_with_descriptor(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
+	PAGED_CODE();
+
+	if (is_valid_dsc(&d)) {
+		NT_ASSERT(!is_valid_dsc(&vpdo->descriptor)); // first time initialization
+		RtlCopyMemory(&vpdo->descriptor, &d, sizeof(d));
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	vpdo->speed = get_usb_speed(d.bcdUSB);
+
 	vpdo->bDeviceClass = d.bDeviceClass;
 	vpdo->bDeviceSubClass = d.bDeviceSubClass;
 	vpdo->bDeviceProtocol = d.bDeviceProtocol;
 
-	vpdo->speed = get_usb_speed(d.bcdUSB);
+	return STATUS_SUCCESS;
 }
 
 /*
@@ -58,27 +71,39 @@ void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &
 * USB class, subclass and protocol numbers should be setup before importing.
 * Because windows vhci driver builds a device compatible id with those numbers.
 */
-void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *d)
+PAGEABLE auto setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 {
-	NT_ASSERT(d);
+	PAGED_CODE();
+
+	NT_ASSERT(!vpdo->actconfig); // first time initialization
+	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(PagedPool, d.wTotalLength, USBIP_VHCI_POOL_TAG);
+
+	if (vpdo->actconfig) {
+		RtlCopyMemory(vpdo->actconfig, &d, d.wTotalLength);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Cannot allocate configuration descriptor, wTotalLength %d", d.wTotalLength);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
 
 	if (vpdo->bDeviceClass || vpdo->bDeviceSubClass || vpdo->bDeviceProtocol) {
-		return;
+		return STATUS_SUCCESS;
 	}
 
-	if (d->bNumInterfaces == 1) {
-		if (auto i = dsc_find_next_intf(d, nullptr)) {
-			vpdo->bDeviceClass = i->bInterfaceClass;
-			vpdo->bDeviceSubClass = i->bInterfaceSubClass;
-			vpdo->bDeviceProtocol = i->bInterfaceProtocol;
-		} else {
-			Trace(TRACE_LEVEL_ERROR, "interface descriptor not found");
-		}
+	if (auto i = dsc_find_next_intf(vpdo->actconfig, nullptr)) {
+		vpdo->bDeviceClass = i->bInterfaceClass;
+		vpdo->bDeviceSubClass = i->bInterfaceSubClass;
+		vpdo->bDeviceProtocol = i->bInterfaceProtocol;
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
+		return STATUS_INVALID_PARAMETER;
 	}
+
+	return STATUS_SUCCESS;
 }
 
 
 } // namespace
+
 
 PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_OBJECT *fo)
 {
@@ -101,7 +126,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_END_OF_FILE;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Plugin vpdo: port %d", (int)pluginfo->port);
+	Trace(TRACE_LEVEL_INFORMATION, "Port #%d", pluginfo->port);
 
 	auto devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
@@ -111,8 +136,15 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	auto vpdo = devobj_to_vpdo_or_null(devobj);
 	vpdo->parent = vhub_from_vhci(vhci);
 
-	setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev);
-	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
+	if (auto err = setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev)) {
+		IoDeleteDevice(devobj);
+		return err;
+	}
+	
+	if (auto err = setup_vpdo_with_dsc_conf(vpdo, pluginfo->dscr_conf)) {
+		IoDeleteDevice(devobj);
+		return err;
+	}
 
 	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
 

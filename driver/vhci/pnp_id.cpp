@@ -6,6 +6,7 @@
 #include "pnp.h"
 #include "usbip_vhci_api.h"
 #include "irp.h"
+#include "usbdsc.h"
 
 #include <ntstrsafe.h>
 
@@ -83,7 +84,7 @@ bool is_composite(vpdo_dev_t *vpdo)
 		 vpdo->bDeviceSubClass == 0x02 &&
 		 vpdo->bDeviceProtocol == 0x01); // IAD composite device
 
-	return ok && vpdo->actconfig->bNumInterfaces > 1 && vpdo->descriptor->bNumConfigurations == 1;
+	return ok && get_descriptor(vpdo).bNumConfigurations == 1 && vpdo->actconfig->bNumInterfaces > 1;
 }
 
 /*
@@ -108,7 +109,8 @@ NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
 
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = (vpdo_dev_t*)vdev;
-		status = RtlStringCbPrintfW(id_dev, str_sz, str, vpdo->descriptor->idVendor, vpdo->descriptor->idProduct);
+		auto &d = get_descriptor(vpdo);
+		status = RtlStringCbPrintfW(id_dev, str_sz, str, d.idVendor, d.idProduct);
 	} else {
 		RtlCopyMemory(id_dev, str, str_sz);
 	}
@@ -141,10 +143,10 @@ NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 
 	if (*subst_result) {
 		auto vpdo = (vpdo_dev_t *)vdev;
-		auto &dd = *vpdo->descriptor;
+		auto &d = get_descriptor(vpdo);
 		status = RtlStringCbPrintfW(ids_hw, str_sz, str,
-						dd.idVendor, dd.idProduct, dd.bcdDevice,
-						dd.idVendor, dd.idProduct);
+						d.idVendor, d.idProduct, d.bcdDevice,
+						d.idVendor, d.idProduct);
 	} else {
 		RtlCopyMemory(ids_hw, str, str_sz);
 	}
