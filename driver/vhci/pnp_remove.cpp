@@ -112,6 +112,16 @@ PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
 	Trace(TRACE_LEVEL_INFORMATION, "invalidating vhub device object: %p", to_devobj(vhub));
 }
 
+PAGEABLE void free_strings(vpdo_dev_t &d)
+{
+	PWSTR *v[] { &d.Manufacturer, &d.Product, &d.serial };
+
+	for (auto ptr: v) {
+		ExFreePoolWithTag(*ptr, USBIP_VHCI_POOL_TAG);
+		*ptr = nullptr;
+	}
+}
+
 PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
@@ -123,18 +133,14 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 
 	IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, FALSE);
 
-	if (vpdo->serial) {
-		ExFreePoolWithTag(vpdo->serial, USBIP_VHCI_POOL_TAG);
-		vpdo->serial = nullptr;
-	}
+	free_strings(*vpdo);
 
 	if (vpdo->serial_usr) {
 		libdrv_free(vpdo->serial_usr);
 		vpdo->serial_usr = nullptr;
 	}
 
-	//FIXME
-	if (vpdo->fo) {
+	if (vpdo->fo) { // FIXME
 		vpdo->fo->FsContext = nullptr;
 		vpdo->fo = nullptr;
 	}

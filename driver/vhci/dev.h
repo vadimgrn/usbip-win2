@@ -130,7 +130,9 @@ struct vpdo_dev_t : vdev_t
 
 	UCHAR NumInterfaces; // from active configuration
 
-	PWSTR serial; // device serial number
+	PWSTR Manufacturer;
+	PWSTR Product;
+	PWSTR serial;
 	PWSTR serial_usr; // user-defined serial number
 
 	ULONG port; // unique port number of the device on the bus

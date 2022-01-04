@@ -35,14 +35,7 @@ PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
 	return irp_done(irp, status);
 }
 
-PAGEABLE bool is_device_serial_number(const USB_DEVICE_DESCRIPTOR *dd, int string_idx)
-{
-	PAGED_CODE();
-	int idx = dd ? dd->iSerialNumber : 0; // not zero if has serial
-	return idx && idx == string_idx;
-}
-
-PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, USHORT LanguageId)
+PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 {
 	PAGED_CODE();
 
@@ -50,9 +43,9 @@ PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, USHORT LanguageId)
 	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
 	if (str) {
-		[[maybe_unused]] auto st = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
-		NT_ASSERT(!st);
-		Trace(TRACE_LEVEL_INFORMATION, "Serial '%S', LanguageId %#04hx", str, LanguageId);
+		[[maybe_unused]] auto err = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
+		NT_ASSERT(!err);
+		Trace(TRACE_LEVEL_INFORMATION, "%s '%S'", what, str);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate memory");
 	}
@@ -72,6 +65,30 @@ PAGEABLE auto clone(const void *src, ULONG length)
 
 	return buf;
 }
+
+PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
+{
+	NT_ASSERT(Index);
+
+	struct {
+		UCHAR idx;
+		PWSTR &str;
+		const char *name;
+	} v[] = {
+		{ dd.iManufacturer, vpdo->Manufacturer, "Manufacturer" },
+		{ dd.iProduct, vpdo->Product, "Product" },
+		{ dd.iSerialNumber, vpdo->serial, "SerialNumber" },
+	};
+
+	for (auto& [idx, str, name] : v) {
+		if (idx == Index) {
+			if (!str) {
+				str = copy_wstring(&sd, name);
+			}
+			break;
+		}
+	}
+} 
 
 } // namespace
 
@@ -127,25 +144,25 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
  * Configuration descriptor will be saved on usb request select configuration.
  * A usb device can have several configurations, thus it's needed to cache all or none of them.
  */
-PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const struct _URB_CONTROL_DESCRIPTOR_REQUEST *r, const USB_COMMON_DESCRIPTOR *dsc)
+PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_REQUEST &r, const USB_COMMON_DESCRIPTOR *dsc)
 {
 	PAGED_CODE();
 
 	NT_ASSERT(dsc->bLength > sizeof(*dsc));
 
-	USB_STRING_DESCRIPTOR *sd = nullptr;
+	const USB_STRING_DESCRIPTOR *sd = nullptr;
 
 	switch (dsc->bDescriptorType) {
+	case USB_STRING_DESCRIPTOR_TYPE:
+		sd = reinterpret_cast<const USB_STRING_DESCRIPTOR*>(dsc);
+		if (vpdo->descriptor && r.Index && sd->bLength >= sizeof(*sd)) {
+			save_string(vpdo, *vpdo->descriptor, *sd, r.Index);
+		}
+		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (!vpdo->descriptor && dsc->bLength == sizeof(*vpdo->descriptor)) {
 			vpdo->descriptor = (USB_DEVICE_DESCRIPTOR*)clone(dsc, dsc->bLength);
 		}
-		break;
-	case USB_STRING_DESCRIPTOR_TYPE:
-		sd = (USB_STRING_DESCRIPTOR*)dsc;
-		if (!vpdo->serial && sd->bLength >= sizeof(*sd) && is_device_serial_number(vpdo->descriptor, r->Index)) {
-			vpdo->serial = copy_wstring(sd, r->LanguageId);
-		} 
 		break;
 	}
 }

@@ -205,7 +205,7 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, URB *urb, con
 			((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
 
 	if (dsc_len > sizeof(*dsc) && dsc_len == r.TransferBufferLength) { // full descriptor
-		cache_descriptor(vpdo, &r, dsc);
+		cache_descriptor(vpdo, r, dsc);
 	} else {
 		TraceUrb("%s: skip caching of descriptor: TransferBufferLength(%lu), dsc_len(%d)", 
 			urb_function_str(r.Hdr.Function), r.TransferBufferLength, dsc_len);
