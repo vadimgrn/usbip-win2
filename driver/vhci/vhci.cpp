@@ -94,10 +94,11 @@ PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 
 	// NT_ASSERT(!drvobj->DeviceObject);
 
+	ExDeleteNPagedLookasideList(&g_lookaside);
+
 	NT_ASSERT(Globals.RegistryPath.Buffer);
 	ExFreePoolWithTag(Globals.RegistryPath.Buffer, USBIP_VHCI_POOL_TAG);
 
-	ExDeleteNPagedLookasideList(&g_lookaside);
 	WPP_CLEANUP(drvobj);
 }
 

@@ -299,7 +299,7 @@ PAGEABLE NTSTATUS copy_isoc_data(
 /*
 * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[].
 */
-PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t*, URB *urb, const usbip_header *hdr)
+PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, URB *urb, const usbip_header *hdr)
 {
 	PAGED_CODE();
 
@@ -326,6 +326,8 @@ PAGEABLE NTSTATUS urb_isoch_transfer(vpdo_dev_t*, URB *urb, const usbip_header *
 		Trace(TRACE_LEVEL_ERROR, "actual_length(%d) > TransferBufferLength(%lu)", res.actual_length, r.TransferBufferLength);
 		return STATUS_INVALID_PARAMETER;
 	}
+
+	vpdo->current_frame_number = res.start_frame;
 
 	bool dir_in = is_transfer_direction_in(hdr); // TransferFlags can have wrong direction
 

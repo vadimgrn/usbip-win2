@@ -571,7 +571,7 @@ NTSTATUS urb_isoch_transfer(IRP *irp, URB *urb, urb_req *urbr)
 	hdr->u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
 	TRANSFERRED(irp) = sizeof(*hdr);
-	ULONG sz = get_payload_size(r);
+	auto sz = get_payload_size(r);
 
 	if (get_irp_buffer_size(irp) - TRANSFERRED(irp) >= sz) {
 		return copy_payload(hdr + 1, irp, r, sz);

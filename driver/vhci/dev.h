@@ -120,17 +120,23 @@ struct vhub_dev_t : vdev_t
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
-	USHORT	vendor, product, revision;
-	UCHAR	usbclass, subclass, protocol;
+	USHORT vendor;
+	USHORT product;
+	USHORT revision;
+
+	UCHAR usbclass;
+	UCHAR subclass;
+	UCHAR protocol;
+
 	UCHAR NumInterfaces; // from active configuration
 
-	PWSTR	serial; // device serial number
-	PWSTR	serial_usr; // user-defined serial number
+	PWSTR serial; // device serial number
+	PWSTR serial_usr; // user-defined serial number
 
-	ULONG	port; // unique port number of the device on the bus
+	ULONG port; // unique port number of the device on the bus
 
 	// Link point to hold all the vpdos for a single bus together
-	LIST_ENTRY	Link;
+	LIST_ENTRY Link;
 
 	// set to TRUE when the vpdo is exposed via PlugIn IOCTL,
 	// and set to FALSE when a UnPlug IOCTL is received.
@@ -155,10 +161,14 @@ struct vpdo_dev_t : vdev_t
 	PFILE_OBJECT	fo;
 	unsigned int	devid;
 	unsigned long	seqnum;
+
 	USB_DEVICE_DESCRIPTOR *descriptor;
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 	UNICODE_STRING	usb_dev_interface;
-	UCHAR	current_intf_num, current_intf_alt;
+
+	UCHAR current_intf_num;
+	UCHAR current_intf_alt;
+	ULONG current_frame_number;
 };
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);

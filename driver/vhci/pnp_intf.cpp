@@ -154,12 +154,13 @@ NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
  * @return the current 32-bit USB frame number
  * If return zero, this function will be called again and again.
  */
-NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID, _Out_opt_ ULONG *CurrentUsbFrame)
+NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID BusContext, _Out_opt_ ULONG *CurrentUsbFrame)
 {
-	static LONG fake;
-	*CurrentUsbFrame = InterlockedAdd(&fake, 50);
+	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
+	*CurrentUsbFrame = vpdo->current_frame_number ? vpdo->current_frame_number : 100;
 	TraceCall("CurrentUsbFrame -> %lu", *CurrentUsbFrame);
+
 	return STATUS_SUCCESS;
 }
 
@@ -170,12 +171,13 @@ NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID, _Out_opt_ ULONG *CurrentUsbFrame)
  * The lowest 3 bits of the returned micro-frame value will contain the current 125us
  * micro-frame, while the upper 29 bits will contain the current 1ms USB frame number.
  */
-NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID, _Out_opt_ ULONG *HighSpeedFrameCounter)
+NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID BusContext, _Out_opt_ ULONG *HighSpeedFrameCounter)
 {
-	static LONG fake;
-	*HighSpeedFrameCounter = InterlockedAdd(&fake, 50) << 3;
+	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
+	*HighSpeedFrameCounter = (vpdo->current_frame_number ? vpdo->current_frame_number : 100)  << 3;
 	TraceCall("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter);
+
 	return STATUS_SUCCESS;
 }
 
