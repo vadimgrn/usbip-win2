@@ -49,9 +49,9 @@ void setup_vpdo_with_descriptor(vpdo_dev_t * vpdo, const USB_DEVICE_DESCRIPTOR &
 	vpdo->product = d.idProduct;
 	vpdo->revision = d.bcdDevice;
 
-	vpdo->usbclass = d.bDeviceClass;
-	vpdo->subclass = d.bDeviceSubClass;
-	vpdo->protocol = d.bDeviceProtocol;
+	vpdo->bDeviceClass = d.bDeviceClass;
+	vpdo->bDeviceSubClass = d.bDeviceSubClass;
+	vpdo->bDeviceProtocol = d.bDeviceProtocol;
 
 	vpdo->speed = get_usb_speed(d.bcdUSB);
 	vpdo->NumConfigurations = d.bNumConfigurations;
@@ -69,15 +69,15 @@ void setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, USB_CONFIGURATION_DESCRIPTOR *d)
 
 	vpdo->NumInterfaces = d->bNumInterfaces;
 
-	if (vpdo->usbclass || vpdo->subclass || vpdo->protocol) {
+	if (vpdo->bDeviceClass || vpdo->bDeviceSubClass || vpdo->bDeviceProtocol) {
 		return;
 	}
 
 	if (vpdo->NumInterfaces == 1) {
 		if (auto i = dsc_find_next_intf(d, nullptr)) {
-			vpdo->usbclass = i->bInterfaceClass;
-			vpdo->subclass = i->bInterfaceSubClass;
-			vpdo->protocol = i->bInterfaceProtocol;
+			vpdo->bDeviceClass = i->bInterfaceClass;
+			vpdo->bDeviceSubClass = i->bInterfaceSubClass;
+			vpdo->bDeviceProtocol = i->bInterfaceProtocol;
 		} else {
 			Trace(TRACE_LEVEL_ERROR, "interface descriptor not found");
 		}
@@ -96,7 +96,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	USHORT wTotalLength = pluginfo->dscr_conf.wTotalLength;
+	auto wTotalLength = pluginfo->dscr_conf.wTotalLength;
 
 	if (inlen != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
 		Trace(TRACE_LEVEL_ERROR, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
@@ -110,20 +110,20 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	Trace(TRACE_LEVEL_INFORMATION, "Plugin vpdo: port %d", (int)pluginfo->port);
 
-	PDEVICE_OBJECT devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
+	auto devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	vpdo_dev_t *vpdo = devobj_to_vpdo_or_null(devobj);
+	auto vpdo = devobj_to_vpdo_or_null(devobj);
 	vpdo->parent = vhub_from_vhci(vhci);
 
 	setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev);
 	setup_vpdo_with_dsc_conf(vpdo, &pluginfo->dscr_conf);
 
-	vpdo->serial_usr = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
+	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
 
-	vpdo_dev_t *devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
+	auto devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
 	if (devpdo_old) {
 		Trace(TRACE_LEVEL_INFORMATION, "you can't plugin again");
 		IoDeleteDevice(devobj);

@@ -77,7 +77,7 @@ PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, con
 	} v[] = {
 		{ dd.iManufacturer, vpdo->Manufacturer, "Manufacturer" },
 		{ dd.iProduct, vpdo->Product, "Product" },
-		{ dd.iSerialNumber, vpdo->serial, "SerialNumber" },
+		{ dd.iSerialNumber, vpdo->SerialNumber, "SerialNumber" },
 	};
 
 	for (auto& [idx, str, name] : v) {

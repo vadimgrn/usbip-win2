@@ -158,7 +158,7 @@ PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpst
 	pcaps->SurpriseRemovalOK = TRUE;
 
 	// If a custom instance id is used, assume that it is system-wide unique */
-	pcaps->UniqueID = vpdo->serial_usr || vpdo->serial;
+	pcaps->UniqueID = vpdo->SerialNumberUser || vpdo->SerialNumber;
 
 	// Specify whether the Device Manager should suppress all
 	// installation pop-ups except required pop-ups such as

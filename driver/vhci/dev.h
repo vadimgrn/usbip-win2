@@ -120,20 +120,33 @@ struct vhub_dev_t : vdev_t
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
+	USB_DEVICE_DESCRIPTOR *descriptor;
+
+	UCHAR NumConfigurations; // descriptor->bNumConfigurations
+	usb_device_speed speed; // corresponding speed for descriptor->bcdUSB 
+
 	USHORT vendor;
 	USHORT product;
 	USHORT revision;
 
-	UCHAR usbclass;
-	UCHAR subclass;
-	UCHAR protocol;
+	// class/subclass/proto can differ from corresponding members of usb_device_descriptor
+	UCHAR bDeviceClass;
+	UCHAR bDeviceSubClass;
+	UCHAR bDeviceProtocol;
 
-	UCHAR NumInterfaces; // from active configuration
+	PWSTR Manufacturer; // for descriptor->iManufacturer
+	PWSTR Product; // for descriptor->iProduct
+	PWSTR SerialNumber; // for descriptor->iSerialNumber
+	PWSTR SerialNumberUser; // user-defined serial number
 
-	PWSTR Manufacturer;
-	PWSTR Product;
-	PWSTR serial;
-	PWSTR serial_usr; // user-defined serial number
+	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
+	UCHAR NumInterfaces; // actconfig->bNumInterfaces
+
+	UNICODE_STRING usb_dev_interface;
+
+	UCHAR current_intf_num;
+	UCHAR current_intf_alt;
+	ULONG current_frame_number;
 
 	ULONG port; // unique port number of the device on the bus
 
@@ -143,9 +156,6 @@ struct vpdo_dev_t : vdev_t
 	// set to TRUE when the vpdo is exposed via PlugIn IOCTL,
 	// and set to FALSE when a UnPlug IOCTL is received.
 	bool plugged;
-
-	usb_device_speed speed; // mapped from bcdUSB (USB Specification Number which device complies too)
-	UCHAR NumConfigurations; // from device descriptor
 
 	// a pending irp when no urb is requested
 	PIRP	pending_read_irp;
@@ -163,14 +173,6 @@ struct vpdo_dev_t : vdev_t
 	PFILE_OBJECT	fo;
 	unsigned int	devid;
 	unsigned long	seqnum;
-
-	USB_DEVICE_DESCRIPTOR *descriptor;
-	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-	UNICODE_STRING	usb_dev_interface;
-
-	UCHAR current_intf_num;
-	UCHAR current_intf_alt;
-	ULONG current_frame_number;
 };
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);

@@ -114,7 +114,7 @@ PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
 
 PAGEABLE void free_strings(vpdo_dev_t &d)
 {
-	PWSTR *v[] { &d.Manufacturer, &d.Product, &d.serial };
+	PWSTR *v[] { &d.Manufacturer, &d.Product, &d.SerialNumber };
 
 	for (auto ptr: v) {
 		ExFreePoolWithTag(*ptr, USBIP_VHCI_POOL_TAG);
@@ -135,9 +135,9 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 
 	free_strings(*vpdo);
 
-	if (vpdo->serial_usr) {
-		libdrv_free(vpdo->serial_usr);
-		vpdo->serial_usr = nullptr;
+	if (vpdo->SerialNumberUser) {
+		libdrv_free(vpdo->SerialNumberUser);
+		vpdo->SerialNumberUser = nullptr;
 	}
 
 	if (vpdo->fo) { // FIXME

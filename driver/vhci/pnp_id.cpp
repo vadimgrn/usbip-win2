@@ -66,23 +66,22 @@ Enumeration of USB Composite Devices.
 The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
 if the device meets the following requirements:
 * The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
-or the class (bDeviceClass), subclass (bDeviceSubClass), and protocol (bDeviceProtocol) fields
+or the class (bDeviceClass), bDeviceSubClass, and bDeviceProtocol fields
 of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
 in USB Interface Association Descriptor.
 * The device must have multiple interfaces.
 * The device must have a single configuration.
 
-The bus driver also checks the device class (bDeviceClass), subclass (bDeviceSubClass),
-and protocol (bDeviceProtocol) fields of the device descriptor. If these fields are zero,
-the device is a composite device, and the bus driver reports an extra compatible
+The bus driver also checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol fields of the device descriptor. 
+If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
 identifier (ID) of USB\COMPOSITE for the PDO.
 */
 bool is_composite(vpdo_dev_t *vpdo)
 {
-	bool ok = !vpdo->usbclass || // generic composite device
-		(vpdo->usbclass == 0xEF &&
-			vpdo->subclass == 0x02 &&
-			vpdo->protocol == 0x01); // IAD composite device
+	bool ok = vpdo->bDeviceClass == USB_DEVICE_CLASS_RESERVED || // generic composite device
+		(vpdo->bDeviceClass == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
+		 vpdo->bDeviceSubClass == 0x02 &&
+		 vpdo->bDeviceProtocol == 0x01); // IAD composite device
 
 	return ok && vpdo->NumInterfaces > 1 && vpdo->NumConfigurations == 1;
 }
@@ -200,12 +199,12 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool*, vdev_t *vdev, IRP*, bool
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	auto serial = vpdo->serial_usr ? vpdo->serial_usr :
-		vpdo->serial ? vpdo->serial :
-		L"";
+	auto SerialNumber = vpdo->SerialNumberUser ? vpdo->SerialNumberUser :
+				vpdo->SerialNumber ? vpdo->SerialNumber :
+				L"";
 
-	NTSTATUS status = status = *serial || want_serial ?
-		RtlStringCchCopyW(str, max_wchars, serial) :
+	NTSTATUS status = status = *SerialNumber || want_serial ?
+		RtlStringCchCopyW(str, max_wchars, SerialNumber) :
 		RtlStringCchPrintfW(str, max_wchars, L"%04hx", vpdo->port);
 
 	if (status == STATUS_SUCCESS) {
@@ -241,9 +240,9 @@ NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*
 	size_t remaining = 0;
 
 	NTSTATUS status = RtlStringCchPrintfExW(ids_compat, max_wchars, &dest_end, &remaining, 0, fmt,
-		vpdo->usbclass, vpdo->subclass, vpdo->protocol,
-		vpdo->usbclass, vpdo->subclass,
-		vpdo->usbclass);
+						vpdo->bDeviceClass, vpdo->bDeviceSubClass, vpdo->bDeviceProtocol,
+						vpdo->bDeviceClass, vpdo->bDeviceSubClass,
+						vpdo->bDeviceClass);
 
 	if (status == STATUS_SUCCESS) {
 		*result = ids_compat;
