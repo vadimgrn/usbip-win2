@@ -27,18 +27,16 @@ PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	if (vpdo->plugged) {
-		Trace(TRACE_LEVEL_ERROR, "vpdo already unplugged: port: %u", vpdo->port);
+	if (!vpdo->plugged) {
+		Trace(TRACE_LEVEL_WARNING, "Device was already marked as unplugged, port #%lu", vpdo->port);
 		return;
 	}
 
 	vpdo->plugged = false;
-
-	NT_ASSERT(vhub->n_vpdos_plugged > 0);
-	--vhub->n_vpdos_plugged;
+	NT_VERIFY(vhub->n_vpdos_plugged-- > 0);
 
 	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
-	Trace(TRACE_LEVEL_INFORMATION, "the device is marked as unplugged: port: %u", vpdo->port);
+	Trace(TRACE_LEVEL_INFORMATION, "Device is marked as unplugged, port #%lu", vpdo->port);
 }
 
 } // namespace
@@ -100,8 +98,7 @@ PAGEABLE void vhub_detach_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 
 	RemoveEntryList(&vpdo->Link);
 	InitializeListHead(&vpdo->Link);
-	NT_ASSERT(vhub->n_vpdos > 0);
-	--vhub->n_vpdos;
+	NT_VERIFY(vhub->n_vpdos-- > 0);
 
 	ExReleaseFastMutex(&vhub->Mutex);
 }
@@ -112,7 +109,7 @@ PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR *d)
 
 	d->bDescriptorLength = 9;
 	d->bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE; // USB_30_HUB_DESCRIPTOR_TYPE
-	d->bNumberOfPorts = (UCHAR)vhub->n_max_ports; 
+	d->bNumberOfPorts = vhub->n_max_ports; 
 	d->wHubCharacteristics = 0;
 	d->bPowerOnToPowerGood = 1;
 	d->bHubControlCurrent = 1;
@@ -123,7 +120,7 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 	PAGED_CODE();
 
 	p->HubType = UsbRootHub;
-	p->HighestPortNumber = (USHORT)vhub->n_max_ports;
+	p->HighestPortNumber = vhub->n_max_ports;
 
 	vhub_get_hub_descriptor(vhub, &p->u.UsbHubDescriptor);
 
