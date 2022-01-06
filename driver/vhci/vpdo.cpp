@@ -101,7 +101,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t * vpdo, PUSB_NODE_CONNECTION
 		status = STATUS_SUCCESS;
 	} else {
 		if (!is_valid_dsc(&vpdo->descriptor)) {
-			Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
+			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized");
 			return STATUS_INVALID_PARAMETER;
 		}
 
@@ -152,7 +152,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex(vpdo_dev_t * vpdo, PUSB_NODE_CONNECT
 		status = STATUS_SUCCESS;
 	} else {
 		if (!is_valid_dsc(&vpdo->descriptor)) {
-			Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
+			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized");
 			return STATUS_INVALID_PARAMETER;
 		}
 

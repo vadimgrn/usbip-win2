@@ -93,6 +93,8 @@ PAGEABLE auto setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, const USB_CONFIGURATION
 		vpdo->bDeviceClass = i->bInterfaceClass;
 		vpdo->bDeviceSubClass = i->bInterfaceSubClass;
 		vpdo->bDeviceProtocol = i->bInterfaceProtocol;
+		Trace(TRACE_LEVEL_VERBOSE, "Set Class/SubClass/Protocol from bInterfaceNumber %d, bAlternateSetting %d",
+						i->bInterfaceNumber, i->bAlternateSetting);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
 		return STATUS_INVALID_PARAMETER;
@@ -100,7 +102,6 @@ PAGEABLE auto setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, const USB_CONFIGURATION
 
 	return STATUS_SUCCESS;
 }
-
 
 } // namespace
 

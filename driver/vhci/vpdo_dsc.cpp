@@ -70,11 +70,7 @@ PAGEABLE auto clone(const void *src, ULONG length)
 PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
 {
 	NT_ASSERT(Index);
-	
-	if (!is_valid_dsc(&dd)) {
-		Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
-		return;
-	}
+	NT_ASSERT(is_valid_dsc(&dd));
 
 	struct {
 		UCHAR idx;
@@ -97,6 +93,7 @@ PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, con
 } 
 
 } // namespace
+
 
 PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST *r, ULONG *psize)
 {
@@ -148,7 +145,6 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 /*
  * Configuration descriptor will be saved on usb request select configuration.
- * A usb device can have several configurations, thus it's needed to cache all or none of them.
  */
 PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_REQUEST &r, const USB_COMMON_DESCRIPTOR *dsc)
 {
@@ -156,22 +152,18 @@ PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_R
 
 	NT_ASSERT(dsc->bLength > sizeof(*dsc));
 
-	const USB_STRING_DESCRIPTOR *sd = nullptr;
-
-	switch (dsc->bDescriptorType) {
-	case USB_STRING_DESCRIPTOR_TYPE:
-		sd = reinterpret_cast<const USB_STRING_DESCRIPTOR*>(dsc);
+	if (dsc->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE) {
+		auto sd = reinterpret_cast<const USB_STRING_DESCRIPTOR*>(dsc);
 		if (r.Index && sd->bLength >= sizeof(*sd)) {
 			save_string(vpdo, vpdo->descriptor, *sd, r.Index);
 		}
-		break;
-	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (!is_valid_dsc(reinterpret_cast<const USB_DEVICE_DESCRIPTOR*>(dsc))) {
-			Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
-		} else if (!RtlEqualMemory(&vpdo->descriptor, dsc, sizeof(vpdo->descriptor))) {
+	} else if (dsc->bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE) {
+		auto dd = reinterpret_cast<const USB_DEVICE_DESCRIPTOR*>(dsc);
+		if (!is_valid_dsc(dd)) {
+			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized");
+		} else if (!RtlEqualMemory(&vpdo->descriptor, dd, sizeof(*dd))) {
 			Trace(TRACE_LEVEL_WARNING, "Device descriptor is not the same");
-			RtlCopyMemory(&vpdo->descriptor, dsc, sizeof(vpdo->descriptor));
+			RtlCopyMemory(&vpdo->descriptor, dd, sizeof(*dd));
 		}
-		break;
 	}
 }

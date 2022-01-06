@@ -242,12 +242,14 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, ioctl_usbip_vhci_imp
 		}
 
 		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
-		auto &dd = get_descriptor(vpdo);
+
+		auto &d = vpdo->descriptor;
+		NT_ASSERT(is_valid_dsc(&d));
 
 		idev->port = char(vpdo->port);
 		idev->status = usbip_device_status(2); // SDEV_ST_USED
-		idev->vendor = dd.idVendor;
-		idev->product = dd.idProduct;
+		idev->vendor = d.idVendor;
+		idev->product = d.idProduct;
 		idev->speed = vpdo->speed;
 		++idev;
 

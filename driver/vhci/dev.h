@@ -121,11 +121,11 @@ struct vhub_dev_t : vdev_t
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
-	USB_DEVICE_DESCRIPTOR descriptor; // use is_valid_dsc() to check if it is initialized
+	USB_DEVICE_DESCRIPTOR descriptor;
 
 	usb_device_speed speed; // corresponding speed for descriptor.bcdUSB 
 
-	// class/subclass/proto can differ from corresponding members of usb_device_descriptor
+	// use instead of corresponding members of usb_device_descriptor
 	UCHAR bDeviceClass;
 	UCHAR bDeviceSubClass;
 	UCHAR bDeviceProtocol;
@@ -168,16 +168,6 @@ struct vpdo_dev_t : vdev_t
 	unsigned int	devid;
 	unsigned long	seqnum;
 };
-
-inline auto& get_descriptor(vpdo_dev_t *vpdo)
-{
-	NT_ASSERT(vpdo);
-
-	auto &d = vpdo->descriptor;
-	NT_ASSERT(is_valid_dsc(&d));
-
-	return d;
-}
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 

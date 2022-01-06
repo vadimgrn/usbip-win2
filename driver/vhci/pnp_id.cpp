@@ -77,14 +77,17 @@ The bus driver also checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol
 If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
 identifier (ID) of USB\COMPOSITE for the PDO.
 */
-bool is_composite(vpdo_dev_t *vpdo)
+auto is_composite(const vpdo_dev_t &vpdo)
 {
-	bool ok = vpdo->bDeviceClass == USB_DEVICE_CLASS_RESERVED || // generic composite device
-		(vpdo->bDeviceClass == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
-		 vpdo->bDeviceSubClass == 0x02 &&
-		 vpdo->bDeviceProtocol == 0x01); // IAD composite device
+	bool ok = vpdo.bDeviceClass == USB_DEVICE_CLASS_RESERVED || // generic composite device
+		(vpdo.bDeviceClass == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
+		 vpdo.bDeviceSubClass == 0x02 &&
+		 vpdo.bDeviceProtocol == 0x01); // IAD composite device
 
-	return ok && get_descriptor(vpdo).bNumConfigurations == 1 && vpdo->actconfig->bNumInterfaces > 1;
+	NT_ASSERT(is_valid_dsc(&vpdo.descriptor));
+	NT_ASSERT(vpdo.actconfig);
+
+	return ok && vpdo.descriptor.bNumConfigurations == 1 && vpdo.actconfig->bNumInterfaces > 1;
 }
 
 /*
@@ -108,8 +111,11 @@ NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
 	}
 
 	if (vdev->type == VDEV_VPDO) {
-		auto vpdo = (vpdo_dev_t*)vdev;
-		auto &d = get_descriptor(vpdo);
+		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
+
+		auto &d = vpdo->descriptor;
+		NT_ASSERT(is_valid_dsc(&d));
+
 		status = RtlStringCbPrintfW(id_dev, str_sz, str, d.idVendor, d.idProduct);
 	} else {
 		RtlCopyMemory(id_dev, str, str_sz);
@@ -142,8 +148,11 @@ NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 	*subst_result = vdev->type == VDEV_VPDO;
 
 	if (*subst_result) {
-		auto vpdo = (vpdo_dev_t *)vdev;
-		auto &d = get_descriptor(vpdo);
+		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
+		
+		auto &d = vpdo->descriptor;
+		NT_ASSERT(is_valid_dsc(&d));
+
 		status = RtlStringCbPrintfW(ids_hw, str_sz, str,
 						d.idVendor, d.idProduct, d.bcdDevice,
 						d.idVendor, d.idProduct);
@@ -249,7 +258,7 @@ NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*
 	if (status == STATUS_SUCCESS) {
 		*result = ids_compat;
 		*subst_result = true;
-		if (is_composite(vpdo)) {
+		if (is_composite(*vpdo)) {
 			NT_ASSERT(remaining == ARRAYSIZE(comp));
 			RtlCopyMemory(dest_end, comp, sizeof(comp));
 		}
