@@ -69,22 +69,25 @@ PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS start_vpdo(vpdo_dev_t * vpdo)
+PAGEABLE auto start_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	NTSTATUS status = IoRegisterDeviceInterface(to_devobj(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, nullptr, &vpdo->usb_dev_interface);
-	if (NT_SUCCESS(status)) {
-		status = IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, TRUE);
-		if (NT_ERROR(status)) {
-			Trace(TRACE_LEVEL_WARNING, "failed to activate USB device interface: %!STATUS!", status);
-		}
-	}
-	else {
-		Trace(TRACE_LEVEL_WARNING, "failed to register USB device interface: %!STATUS!", status);
+	auto iface = &vpdo->usb_dev_interface;
+	NT_ASSERT(!iface->Buffer);
+
+	if (auto err = IoRegisterDeviceInterface(to_devobj(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, nullptr, iface)) {
+		Trace(TRACE_LEVEL_ERROR, "IoRegisterDeviceInterface %!STATUS!", err);
+		return err;
 	}
 
-	return status;
+	if (auto err = IoSetDeviceInterfaceState(iface, TRUE)) {
+		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState('%!USTR!') %!STATUS!", iface, err);
+		return err;
+	}
+
+	TraceCall("SymbolicLinkName '%!USTR!'", iface);
+	return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -95,7 +98,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 
 	if (is_fdo(vdev->type)) {
-		NTSTATUS status = irp_send_synchronously(vdev->devobj_lower, irp);
+		auto status = irp_send_synchronously(vdev->devobj_lower, irp);
 		if (NT_ERROR(status)) {
 			return irp_done(irp, status);
 		}
@@ -123,7 +126,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 		ps.DeviceState = PowerDeviceD0;
 		PoSetPowerState(vdev->Self, DevicePowerState, ps);
 
-		Trace(TRACE_LEVEL_INFORMATION, "device(%!vdev_type_t!) started", vdev->type);
+		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! started", vdev->type);
 	}
 
 	return irp_done(irp, status);

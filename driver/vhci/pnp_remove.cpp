@@ -126,6 +126,23 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 	}
 }
 
+PAGEABLE void free_usb_dev_interface(UNICODE_STRING *iface)
+{
+	PAGED_CODE();
+	
+	if (iface->Buffer) {
+		if (auto err = IoSetDeviceInterfaceState(iface, FALSE)) {
+			Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState %!STATUS!", err);
+		}
+
+		RtlFreeUnicodeString(iface);
+		iface->Buffer = nullptr;
+	}
+
+	iface->Length = 0;
+	iface->MaximumLength = 0;
+}
+
 PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
@@ -137,8 +154,7 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 
 	vhub_detach_vpdo(vhub_from_vpdo(vpdo), vpdo);
 
-	IoSetDeviceInterfaceState(&vpdo->usb_dev_interface, FALSE);
-
+	free_usb_dev_interface(&vpdo->usb_dev_interface);
 	free_strings(*vpdo);
 
 	if (vpdo->SerialNumberUser) {
@@ -191,7 +207,7 @@ PAGEABLE void remove_device(vdev_t *vdev)
 		vdev->devobj_lower = nullptr;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "deleting device object(%!vdev_type_t!): %p", vdev->type, vdev->Self);
+	TraceCall("Deleting device object(%!vdev_type_t!): %p", vdev->type, vdev->Self);
 
 	IoDeleteDevice(vdev->Self);
 }
