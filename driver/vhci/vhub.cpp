@@ -59,14 +59,14 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, ULONG port)
 	return vpdo;
 }
 
-PAGEABLE CHAR vhub_get_empty_port(vhub_dev_t * vhub)
+PAGEABLE CHAR vhub_get_empty_port(vhub_dev_t *vhub)
 {
 	PAGED_CODE();
 
 	CHAR port = -1;
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	for (CHAR i = 0; i < (CHAR)vhub->n_max_ports; ++i) {
+	for (UCHAR i = 1; i <= vhub->n_max_ports; ++i) {
 		if (!find_vpdo(vhub, i)) {
 			port = i;
 			break;

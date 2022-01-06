@@ -64,14 +64,14 @@ DEFINE_GUID(USBIP_NOTIFY_DEVICE_ARRIVAL_EVENT,
 #define IOCTL_USBIP_VHCI_GET_PORTS_STATUS	USBIP_VHCI_IOCTL(0x3)
 #define IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES	USBIP_VHCI_IOCTL(0x4)
 
-#define MAX_VHCI_SERIAL_ID	127
+enum { MAX_VHCI_SERIAL_ID = 127 };
 
 typedef struct _vhci_pluginfo
 {
 	/* vhci_pluginfo_t structure size */
 	unsigned long	size;
 	unsigned int	devid;
-	signed char	port;
+	char	port;
 	wchar_t		wserial[MAX_VHCI_SERIAL_ID + 1];
 	USB_DEVICE_DESCRIPTOR dscr_dev;
 	/* variable length. It's a full-length configuration descriptor */

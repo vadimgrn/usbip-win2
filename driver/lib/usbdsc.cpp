@@ -6,6 +6,8 @@ extern "C" {
 
 USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_COMMON_DESCRIPTOR *from, int type)
 {
+	NT_ASSERT(dsc_conf);
+
 	auto start = dsc_next(from ? from : (USB_COMMON_DESCRIPTOR*)dsc_conf);
 	NT_ASSERT(start > (USB_COMMON_DESCRIPTOR*)dsc_conf);
 
@@ -14,6 +16,7 @@ USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB
 
 USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num, UCHAR alt_setting)
 {
+	NT_ASSERT(dsc_conf);
 	return USBD_ParseConfigurationDescriptorEx(dsc_conf, dsc_conf, intf_num, alt_setting, -1, -1, -1);
 }
 

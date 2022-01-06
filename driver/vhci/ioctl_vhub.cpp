@@ -34,69 +34,48 @@ PAGEABLE NTSTATUS get_node_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PU
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_nodeconn_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen, bool ex)
 {
 	PAGED_CODE();
 
-	PUSB_NODE_CONNECTION_INFORMATION	conninfo = (PUSB_NODE_CONNECTION_INFORMATION)buffer;
-	vpdo_dev_t *	vpdo;
-	NTSTATUS	status;
+	static_assert(sizeof(USB_NODE_CONNECTION_INFORMATION) == sizeof(USB_NODE_CONNECTION_INFORMATION_EX));
+	auto &ci = *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX*>(buffer);
 
-	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION)) {
-		*poutlen = sizeof(USB_NODE_CONNECTION_INFORMATION);
+	if (!(inlen >= sizeof(ci) && *poutlen >= sizeof(ci))) {
+		*poutlen = sizeof(ci);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
-	if (conninfo->ConnectionIndex > vhub->n_max_ports)
+
+	if (ci.ConnectionIndex > vhub->n_max_ports) {
 		return STATUS_NO_SUCH_DEVICE;
-	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
-	status = vpdo_get_nodeconn_info(vpdo, conninfo, poutlen);
-	if (vpdo) {
-		vdev_del_ref(vpdo);
 	}
-	return status;
-}
 
-PAGEABLE NTSTATUS get_nodeconn_info_ex(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
-{
-	PAGED_CODE();
+	auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex);
+	auto st = vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
+	vdev_del_ref(vpdo);
 
-	PUSB_NODE_CONNECTION_INFORMATION_EX	conninfo = (PUSB_NODE_CONNECTION_INFORMATION_EX)buffer;
-	vpdo_dev_t *	vpdo;
-	NTSTATUS	status;
-
-	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX) || *poutlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX)) {
-		*poutlen = sizeof(USB_NODE_CONNECTION_INFORMATION_EX);
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-	if (conninfo->ConnectionIndex > vhub->n_max_ports)
-		return STATUS_NO_SUCH_DEVICE;
-	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
-	status = vpdo_get_nodeconn_info_ex(vpdo, conninfo, poutlen);
-	if (vpdo) {
-		vdev_del_ref(vpdo);
-	}
-	return status;
+	return st;
 }
 
 PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
 {
 	PAGED_CODE();
 
-	PUSB_NODE_CONNECTION_INFORMATION_EX_V2	conninfo = (PUSB_NODE_CONNECTION_INFORMATION_EX_V2)buffer;
-	vpdo_dev_t *	vpdo;
-	NTSTATUS	status;
+	auto conninfo = (USB_NODE_CONNECTION_INFORMATION_EX_V2*)buffer;
 
 	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2) || *poutlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2)) {
 		*poutlen = sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
-	if (conninfo->ConnectionIndex > vhub->n_max_ports)
+
+	if (conninfo->ConnectionIndex > vhub->n_max_ports) {
 		return STATUS_NO_SUCH_DEVICE;
-	vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
-	status = vpdo_get_nodeconn_info_ex_v2(vpdo, conninfo, poutlen);
-	if (vpdo) {
-		vdev_del_ref(vpdo);
 	}
+
+	auto vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
+	auto status = vpdo_get_nodeconn_info_ex_v2(vpdo, *conninfo, poutlen);
+	vdev_del_ref(vpdo);
+
 	return status;
 }
 
@@ -206,7 +185,8 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer, ULONG
 
 } // namespace
 
-PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t * vhub, PIRP irp, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
+
+PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
@@ -217,10 +197,10 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t * vhub, PIRP irp, ULONG ioctl_code,
 		status = get_node_info(vhub, buffer, inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION:
-		status = get_nodeconn_info(vhub, buffer, inlen, poutlen);
+		status = get_nodeconn_info(vhub, buffer, inlen, poutlen, false);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX:
-		status = get_nodeconn_info_ex(vhub, buffer, inlen, poutlen);
+		status = get_nodeconn_info(vhub, buffer, inlen, poutlen, true);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2:
 		status = get_nodeconn_info_ex_v2(vhub, buffer, inlen, poutlen);

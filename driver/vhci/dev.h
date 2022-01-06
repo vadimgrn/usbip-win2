@@ -97,7 +97,7 @@ struct vhub_dev_t : vdev_t
 	// List of vpdo's created so far
 	LIST_ENTRY	head_vpdo;
 
-	ULONG		n_max_ports;
+	UCHAR		n_max_ports;
 
 	// the number of current vpdo's
 	ULONG		n_vpdos;
@@ -173,12 +173,15 @@ extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 
 inline void vdev_add_ref(vdev_t *vdev)
 {
+	NT_ASSERT(vdev);
 	InterlockedIncrement(&vdev->n_refs);
 }
 
 inline void vdev_del_ref(vdev_t *vdev)
 {
-	InterlockedDecrement(&vdev->n_refs);
+	if (vdev) {
+		InterlockedDecrement(&vdev->n_refs);
+	}
 }
 
 vpdo_dev_t *vhub_find_vpdo(vhub_dev_t * vhub, ULONG port);
