@@ -12,13 +12,13 @@
 namespace
 {
 
-PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
+PAGEABLE void vhci_init_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	Trace(TRACE_LEVEL_INFORMATION, "vhci_init_vpdo: %p", vpdo);
+	TraceCall("%p, port %lu", vpdo, vpdo->port);
 
-	vpdo->plugged = TRUE;
+	vpdo->plugged = true;
 
 	vpdo->current_intf_num = 0;
 	vpdo->current_intf_alt = 0;
@@ -40,8 +40,7 @@ PAGEABLE void vhci_init_vpdo(vpdo_dev_t * vpdo)
 
 	vhub_attach_vpdo(vhub_from_vpdo(vpdo), vpdo);
 
-	// This should be the last step in initialization.
-	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING;
+	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
 }
 
 PAGEABLE auto setup_vpdo_with_descriptor(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &d)
@@ -122,20 +121,28 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	pluginfo->port = vhub_get_empty_port(vhub_from_vhci(vhci));
-	if (pluginfo->port < 0) {
+	auto vhub = vhub_from_vhci(vhci);
+
+	auto port = acquire_port(*vhub);
+	if (!port) {
+		Trace(TRACE_LEVEL_ERROR, "Can't acquire free port");
 		return STATUS_END_OF_FILE;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Port #%d", pluginfo->port);
+	pluginfo->port = static_cast<char>(port);
+	NT_ASSERT(pluginfo->port == port);
 
 	auto devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
+		release_port(*vhub, port);
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	auto vpdo = devobj_to_vpdo_or_null(devobj);
-	vpdo->parent = vhub_from_vhci(vhci);
+
+	vpdo->devid = pluginfo->devid;
+	vpdo->parent = vhub;
+	vpdo->port = port;
 
 	if (auto err = setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev)) {
 		IoDeleteDevice(devobj);
@@ -149,17 +156,14 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
 
-	auto devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, 0);
+	auto devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr);
 	if (devpdo_old) {
-		Trace(TRACE_LEVEL_INFORMATION, "you can't plugin again");
+		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
 		IoDeleteDevice(devobj);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	vpdo->port = pluginfo->port;
 	vpdo->fo = fo;
-	vpdo->devid = pluginfo->devid;
-
 	vhci_init_vpdo(vpdo);
 
 	// Device Relation changes if a new vpdo is created. So let
@@ -174,10 +178,8 @@ PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, CHAR port)
 {
 	PAGED_CODE();
 
-	vhub_dev_t *	vhub = vhub_from_vhci(vhci);
-	vpdo_dev_t *	vpdo;
-
-	if (vhub == nullptr) {
+	auto vhub = vhub_from_vhci(vhci);
+	if (!vhub) {
 		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
 		return STATUS_NO_SUCH_DEVICE;
 	}
@@ -190,8 +192,8 @@ PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, CHAR port)
 
 	Trace(TRACE_LEVEL_INFORMATION, "plugging out device: port %u", port);
 
-	vpdo = vhub_find_vpdo(vhub, port);
-	if (vpdo == nullptr) {
+	auto vpdo = vhub_find_vpdo(vhub, port);
+	if (!vpdo) {
 		Trace(TRACE_LEVEL_INFORMATION, "no matching vpdo: port %u", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}

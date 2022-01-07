@@ -23,14 +23,14 @@ PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : irp_done_success(irp);
 }
 
-PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, StopPending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
@@ -43,29 +43,26 @@ PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t * vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-PAGEABLE NTSTATUS pnp_stop_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, Stopped);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
-	switch (vdev->type) {
-	case VDEV_VPDO:
-		/* vpdo cannot be removed */
-		vhub_mark_unplugged_vpdo(vhub_from_vpdo((vpdo_dev_t *)vdev), (vpdo_dev_t *)vdev);
-		break;
+	if (vdev->type == VDEV_VPDO) { // cannot be removed
+		vhub_mark_unplugged_vpdo(vhub_from_vpdo((vpdo_dev_t*)vdev), (vpdo_dev_t*)vdev);
 	}
 
 	SET_NEW_PNP_STATE(vdev, RemovePending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
@@ -76,7 +73,7 @@ PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t * vdev, PIRP irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
-PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);
@@ -219,7 +216,7 @@ pnpmn_func_t* const pnpmn_functions[] =
 
 } // namespace
 
-extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in PIRP irp)
+extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 

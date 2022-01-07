@@ -55,7 +55,7 @@ LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG
 	return value;
 }
 
-PAGEABLE PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type)
+PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	PAGED_CODE();
 

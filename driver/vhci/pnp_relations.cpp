@@ -4,6 +4,7 @@
 
 #include "irp.h"
 #include "vhci.h"
+#include "vhub.h"
 
 namespace
 {
@@ -116,49 +117,49 @@ BOOLEAN
 	return FALSE;
 }
 
-PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
-	PDEVICE_RELATIONS	relations_old = *pdev_relations, relations;
-	ULONG			length, n_olds = 0, n_news = 0;
-	PLIST_ENTRY		entry;
-	ULONG	i;
+	auto relations_old = *pdev_relations;
+
+	ULONG n_olds = 0;
+	ULONG n_news = 0;
 
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	if (relations_old)
+	if (relations_old) {
 		n_olds = relations_old->Count;
+	}
 
 	// Need to allocate a new relations structure and add our vpdos to it
-	length = sizeof(DEVICE_RELATIONS) + (vhub->n_vpdos_plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
+	ULONG length = sizeof(DEVICE_RELATIONS) + (vhub->n_vpdos_plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
 
-	relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
-	if (relations == nullptr) {
-		Trace(TRACE_LEVEL_ERROR, "failed to allocate a new relation: out of memory");
-
+	auto relations = (DEVICE_RELATIONS*)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
+	if (!relations) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", length);
 		ExReleaseFastMutex(&vhub->Mutex);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	for (i = 0; i < n_olds; i++) {
-		vpdo_dev_t *	vpdo;
-		PDEVICE_OBJECT	devobj = relations_old->Objects[i];
-		vpdo = find_managed_vpdo(vhub, devobj);
-		if (vpdo == nullptr || vpdo->plugged) {
+	for (ULONG i = 0; i < n_olds; ++i) {
+		auto devobj = relations_old->Objects[i];
+		auto vpdo = find_managed_vpdo(vhub, devobj);
+		if (!vpdo || vpdo->plugged) {
 			relations->Objects[n_news] = devobj;
 			n_news++;
-		}
-		else {
+		} else {
 			ObDereferenceObject(devobj);
 		}
 	}
 
-	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		vpdo_dev_t *	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 
-		if (is_in_dev_relations(relations->Objects, n_news, vpdo))
+		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+		if (is_in_dev_relations(relations->Objects, n_news, vpdo)) {
 			continue;
+		}
+
 		if (vpdo->plugged) {
 			relations->Objects[n_news] = vpdo->Self;
 			n_news++;
@@ -168,10 +169,12 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t * vhub, PDEVICE_RELATIONS *p
 
 	relations->Count = n_news;
 
-	Trace(TRACE_LEVEL_INFORMATION, "vhub vpdos: total:%u,plugged:%u: bus relations: old:%u,new:%u", vhub->n_vpdos, vhub->n_vpdos_plugged, n_olds, n_news);
+	Trace(TRACE_LEVEL_INFORMATION, "vhub vpdos: total %d, plugged %d; bus relations: old %lu, new %lu", 
+					get_vpdo_count(*vhub), vhub->n_vpdos_plugged, n_olds, n_news);
 
-	if (relations_old)
+	if (relations_old) {
 		ExFreePool(relations_old);
+	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
 

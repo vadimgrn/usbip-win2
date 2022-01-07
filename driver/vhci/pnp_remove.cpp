@@ -20,15 +20,14 @@ namespace
 void complete_pending_read_irp(vpdo_dev_t * vpdo)
 {
 	KIRQL	oldirql;
-	PIRP	irp;
 
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
-	irp = vpdo->pending_read_irp;
+	auto irp = vpdo->pending_read_irp;
 	vpdo->pending_read_irp = nullptr;
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
-	if (irp != nullptr) {
-		Trace(TRACE_LEVEL_INFORMATION, "complete pending read irp: %p", irp);
+	if (irp) {
+		Trace(TRACE_LEVEL_VERBOSE, "Complete pending read irp %p", irp);
 
 		// We got pending_read_irp before submit_urbr
 		BOOLEAN valid_irp;
@@ -98,20 +97,22 @@ PAGEABLE void invalidate_vhci(vhci_dev_t * vhci)
 	// Inform WMI to remove this DeviceObject from its list of providers.
 	dereg_wmi(vhci);
 
-	Trace(TRACE_LEVEL_INFORMATION, "invalidating vhci device object: %p", to_devobj(vhci));
+	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object: %p", to_devobj(vhci));
 }
 
-PAGEABLE void invalidate_vhub(vhub_dev_t * vhub)
+PAGEABLE void invalidate_vhub(vhub_dev_t *vhub)
 {
 	PAGED_CODE();
 
 	IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, FALSE);
 	RtlFreeUnicodeString(&vhub->DevIntfRootHub);
 
-	/* At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos */
-	Trace(TRACE_LEVEL_INFORMATION, "VHUB has no vpdos: current # of vpdos: %u", vhub->n_vpdos);
+	// At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos.
+	if (vhub->bm_ports != vhub->PORTS_MASK) {
+		Trace(TRACE_LEVEL_ERROR, "Some ports are still acquired, bm_ports %#04lx", vhub->bm_ports);
+	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "invalidating vhub device object: %p", to_devobj(vhub));
+	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhub device object %p", to_devobj(vhub));
 }
 
 PAGEABLE void free_strings(vpdo_dev_t &d)
@@ -147,12 +148,12 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	TraceCall("%p", vpdo);
+	TraceCall("%p, port %lu", vpdo, vpdo->port);
 
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);
 
-	vhub_detach_vpdo(vhub_from_vpdo(vpdo), vpdo);
+	vhub_detach_vpdo_and_release_port(vhub_from_vpdo(vpdo), vpdo);
 
 	free_usb_dev_interface(&vpdo->usb_dev_interface);
 	free_strings(*vpdo);
@@ -177,14 +178,19 @@ PAGEABLE void remove_device(vdev_t *vdev)
 {
 	PAGED_CODE();
 
+	TraceCall("%p", vdev);
+
 	if (vdev->child_pdo) {
 		vdev->child_pdo->parent = nullptr;
-		if (vdev->child_pdo->fdo)
+		if (vdev->child_pdo->fdo) {
 			vdev->child_pdo->fdo->parent = nullptr;
+		}
 	}
+
 	if (vdev->fdo) {
 		vdev->fdo->pdo = nullptr;
 	}
+
 	if (vdev->pdo && vdev->type != VDEV_ROOT) {
 		devobj_to_vdev(vdev->pdo)->fdo = nullptr;
 	}
@@ -201,35 +207,30 @@ PAGEABLE void remove_device(vdev_t *vdev)
 		break;
 	}
 
-	// Detach from the underlying devices.
-	if (vdev->devobj_lower) {
+	if (vdev->devobj_lower) { // detach from the underlying devices
 		IoDetachDevice(vdev->devobj_lower);
 		vdev->devobj_lower = nullptr;
 	}
 
-	TraceCall("Deleting device object(%!vdev_type_t!): %p", vdev->type, vdev->Self);
-
+	Trace(TRACE_LEVEL_VERBOSE, "%!vdev_type_t!: deleting device object %p", vdev->type, vdev->Self);
 	IoDeleteDevice(vdev->Self);
 }
 
 } // namespace
 
 
-PAGEABLE NTSTATUS pnp_remove_device(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-
-	PDEVICE_OBJECT	devobj_lower;
 
 	if (vdev->DevicePnPState == Deleted) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: already removed", vdev->type);
 		return irp_done_success(irp);
 	}
 
-	devobj_lower = vdev->devobj_lower;
+	auto devobj_lower = vdev->devobj_lower;
 
 	SET_NEW_PNP_STATE(vdev, Deleted);
-
 	remove_device(vdev);
 
 	if (is_fdo(vdev->type)) {

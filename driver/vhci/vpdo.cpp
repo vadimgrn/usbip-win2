@@ -69,6 +69,8 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION
 	auto cd = r->ConfigurationDescriptor;
 	if (!cd) {
 		Trace(TRACE_LEVEL_INFORMATION, "Going to unconfigured state");
+		vpdo->current_intf_num = 0;
+		vpdo->current_intf_alt = 0;
 		return STATUS_SUCCESS;
 	}
 

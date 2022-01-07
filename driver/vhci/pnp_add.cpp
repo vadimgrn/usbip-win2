@@ -8,8 +8,6 @@
 namespace
 {
 
-enum { MAX_HUB_PORTS = 6 };
-
 PAGEABLE BOOLEAN is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
 {
 	PAGED_CODE();
@@ -52,7 +50,7 @@ PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 	return nullptr;
 }
 
-PAGEABLE vdev_t * create_child_pdo(vdev_t * vdev, vdev_type_t type)
+PAGEABLE vdev_t *create_child_pdo(vdev_t * vdev, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -77,12 +75,13 @@ PAGEABLE void init_dev_root(vdev_t * vdev)
 	vdev->child_pdo = create_child_pdo(vdev, VDEV_CPDO);
 }
 
-PAGEABLE void init_dev_vhci(vdev_t * vdev)
+PAGEABLE void init_dev_vhci(vdev_t *vdev)
 {
 	PAGED_CODE();
-	vhci_dev_t *	vhci = (vhci_dev_t *)vdev;
 
+	auto vhci = (vhci_dev_t*)vdev;
 	vdev->child_pdo = create_child_pdo(vdev, VDEV_HPDO);
+
 	RtlUnicodeStringInitEx(&vhci->DevIntfVhci, nullptr, STRSAFE_IGNORE_NULLS);
 	RtlUnicodeStringInitEx(&vhci->DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 }
@@ -93,6 +92,8 @@ PAGEABLE void init_dev_vhub(vdev_t *vdev)
 
 	auto vhub = static_cast<vhub_dev_t*>(vdev);
 
+	vhub->bm_ports = vhub->PORTS_MASK;
+
 	ExInitializeFastMutex(&vhub->Mutex);
 	InitializeListHead(&vhub->head_vpdo);
 
@@ -101,8 +102,6 @@ PAGEABLE void init_dev_vhub(vdev_t *vdev)
 	// Initialize the remove event to Not-Signaled.  This event
 	// will be set when the OutstandingIO will become 0.
 	KeInitializeEvent(&vhub->RemoveEvent, SynchronizationEvent, FALSE);
-
-	vhub->n_max_ports = MAX_HUB_PORTS;
 }
 
 PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
@@ -130,7 +129,7 @@ PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, 
 	// attachment chain.  This is where all the IRPs should be routed.
 	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, pdo);
 	if (!vdev->devobj_lower) {
-		Trace(TRACE_LEVEL_ERROR, "failed to attach device stack");
+		Trace(TRACE_LEVEL_ERROR, "IoAttachDeviceToDeviceStack error");
 		IoDeleteDevice(devobj);
 		return STATUS_NO_SUCH_DEVICE;
 	}
@@ -147,7 +146,7 @@ PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, 
 		break;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! added: vdev: %p", type, vdev);
+	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! added %p", type, vdev);
 
 	// We are done with initializing, so let's indicate that and return.
 	// This should be the final step in the AddDevice process.

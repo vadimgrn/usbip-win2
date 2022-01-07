@@ -275,17 +275,17 @@ NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*
  * that points to the requested information. On error, a driver sets
  * Irp->IoStatus.Information to zero.
  */
-PAGEABLE NTSTATUS pnp_query_id(vdev_t * vdev, PIRP irp)
+PAGEABLE NTSTATUS pnp_query_id(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
 	PWCHAR result = nullptr;
 	bool subst_result = false;
 
-	BUS_QUERY_ID_TYPE type = irpstack->Parameters.QueryId.IdType;
+	auto type = irpstack->Parameters.QueryId.IdType;
 
 	switch (type) {
 	case BusQueryDeviceID:
@@ -313,13 +313,13 @@ PAGEABLE NTSTATUS pnp_query_id(vdev_t * vdev, PIRP irp)
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->type, type, status);
+		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->type, type, status);
 		if (result) {
 			ExFreePoolWithTag(result, USBIP_VHCI_POOL_TAG);
 			result = nullptr;
 		}
 	}
 
-	irp->IoStatus.Information = (ULONG_PTR)result;
+	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(result);
 	return irp_done(irp, status);
 }

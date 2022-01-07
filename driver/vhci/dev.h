@@ -3,6 +3,7 @@
 #include <ntddk.h>
 #include <wmilib.h>	// required for WMILIB_CONTEXT
 
+#include "ch11.h"
 #include "devconf.h"
 #include "usbdsc.h"
 
@@ -43,22 +44,22 @@ enum vdev_type_t {
 struct vdev_t 
 {
 	// A back pointer to the device object for which this is the extension
-	PDEVICE_OBJECT	Self;
+	DEVICE_OBJECT *Self;
 
-	vdev_type_t		type;
+	vdev_type_t type;
 	// reference count for maintaining vdev validity
-	LONG	n_refs;
+	LONG n_refs;
 
 	// We track the state of the device with every PnP Irp
 	// that affects the device through these two variables.
-	DEVICE_PNP_STATE	DevicePnPState;
-	DEVICE_PNP_STATE	PreviousPnPState;
+	DEVICE_PNP_STATE DevicePnPState;
+	DEVICE_PNP_STATE PreviousPnPState;
 
 	// Stores the current system power state
-	SYSTEM_POWER_STATE	SystemPowerState;
+	SYSTEM_POWER_STATE SystemPowerState;
 
 	// Stores current device power state
-	DEVICE_POWER_STATE	DevicePowerState;
+	DEVICE_POWER_STATE DevicePowerState;
 
 
 	// root and vhci have cpdo and hpdo each
@@ -66,8 +67,8 @@ struct vdev_t
 	vdev_t *parent;
 	vdev_t *fdo;
 
-	PDEVICE_OBJECT	pdo;
-	PDEVICE_OBJECT	devobj_lower;
+	DEVICE_OBJECT *pdo;
+	DEVICE_OBJECT *devobj_lower;
 };
 
 struct root_dev_t : vdev_t
@@ -95,26 +96,25 @@ struct hpdo_dev_t : vdev_t
 struct vhub_dev_t : vdev_t
 {
 	// List of vpdo's created so far
-	LIST_ENTRY	head_vpdo;
+	LIST_ENTRY head_vpdo;
 
-	UCHAR		n_max_ports;
+	enum { NUM_PORTS = USB_SS_MAXPORTS, PORTS_MASK = ~(ULONG(-1) << NUM_PORTS) };
+	ULONG bm_ports; // bitmap of free/used ports
 
-	// the number of current vpdo's
-	ULONG		n_vpdos;
-	ULONG		n_vpdos_plugged;
+	int n_vpdos_plugged; // the number of plugged vpdo's
 
-	// A synchronization for access to the device extension.
-	FAST_MUTEX	Mutex;
+	// A synchronization for access to the device extension
+	FAST_MUTEX Mutex;
 
 	// The number of IRPs sent from the bus to the underlying device object
-	LONG		OutstandingIO; // Biased to 1
+	LONG OutstandingIO; // Biased to 1
 
-	UNICODE_STRING	DevIntfRootHub;
+	UNICODE_STRING DevIntfRootHub;
 
 	// On remove device plug & play request we must wait until all outstanding
 	// requests have been completed before we can actually delete the device
 	// object. This event is when the Outstanding IO count goes to zero
-	KEVENT		RemoveEvent;
+	KEVENT RemoveEvent;
 };
 
 // The device extension for the vpdo.
@@ -125,7 +125,7 @@ struct vpdo_dev_t : vdev_t
 
 	usb_device_speed speed; // corresponding speed for descriptor.bcdUSB 
 
-	// use instead of corresponding members of usb_device_descriptor
+	// use instead of corresponding members of device descriptor
 	UCHAR bDeviceClass;
 	UCHAR bDeviceSubClass;
 	UCHAR bDeviceProtocol;

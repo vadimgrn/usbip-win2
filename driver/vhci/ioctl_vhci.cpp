@@ -111,8 +111,9 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, poutlen);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
-		if (inlen == sizeof(ioctl_usbip_vhci_unplug))
+		if (inlen == sizeof(ioctl_usbip_vhci_unplug)) {
 			status = vhci_unplug_port(vhci, ((ioctl_usbip_vhci_unplug *)buffer)->addr);
+		}
 		*poutlen = 0;
 		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:

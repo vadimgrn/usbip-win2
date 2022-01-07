@@ -46,7 +46,7 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (ci.ConnectionIndex > vhub->n_max_ports) {
+	if (ci.ConnectionIndex > vhub->NUM_PORTS) {
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
@@ -68,7 +68,7 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (conninfo->ConnectionIndex > vhub->n_max_ports) {
+	if (conninfo->ConnectionIndex > vhub->NUM_PORTS) {
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
