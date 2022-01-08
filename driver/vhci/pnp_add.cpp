@@ -92,8 +92,6 @@ PAGEABLE void init_dev_vhub(vdev_t *vdev)
 
 	auto vhub = static_cast<vhub_dev_t*>(vdev);
 
-	vhub->bm_ports = vhub->PORTS_MASK;
-
 	ExInitializeFastMutex(&vhub->Mutex);
 	InitializeListHead(&vhub->head_vpdo);
 

@@ -108,7 +108,8 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 			status = vhub_get_ports_status(vhub_from_vhci(vhci), (ioctl_usbip_vhci_get_ports_status *)buffer);
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
-		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, poutlen);
+		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
+						*poutlen/sizeof(ioctl_usbip_vhci_imported_dev));
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		if (inlen == sizeof(ioctl_usbip_vhci_unplug)) {

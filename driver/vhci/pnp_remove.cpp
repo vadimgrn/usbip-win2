@@ -107,12 +107,12 @@ PAGEABLE void invalidate_vhub(vhub_dev_t *vhub)
 	IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, FALSE);
 	RtlFreeUnicodeString(&vhub->DevIntfRootHub);
 
+	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhub device object %p", to_devobj(vhub));
+
 	// At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos.
-	if (vhub->bm_ports != vhub->PORTS_MASK) {
+	if (vhub->bm_ports) {
 		Trace(TRACE_LEVEL_ERROR, "Some ports are still acquired, bm_ports %#04lx", vhub->bm_ports);
 	}
-
-	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhub device object %p", to_devobj(vhub));
 }
 
 PAGEABLE void free_strings(vpdo_dev_t &d)

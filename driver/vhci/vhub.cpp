@@ -50,15 +50,11 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
 
-	if (port > vhub->NUM_PORTS) {
-		return nullptr;
-	}
-
 	ExAcquireFastMutex(&vhub->Mutex);
 	
 	auto vpdo = find_vpdo(vhub, port);
 	if (vpdo) {
-		vdev_add_ref((vdev_t*)vpdo);
+		vdev_add_ref(vpdo);
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
@@ -194,71 +190,52 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_p
 {
 	PAGED_CODE();
 
-	TraceCall("Enter");
-
-	RtlZeroMemory(st, sizeof(*st));
-	st->n_max_ports = vhub->NUM_PORTS;
-
 	ExAcquireFastMutex(&vhub->Mutex);
+	auto bm_ports = vhub->bm_ports;
+	ExReleaseFastMutex(&vhub->Mutex);
 
-	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+	st->n_max_ports = vhub->NUM_PORTS;
+	NT_ASSERT(st->n_max_ports == vhub->NUM_PORTS);
 
-		auto vpdo = CONTAINING_RECORD (entry, vpdo_dev_t, Link);
-		auto i = vpdo->port - 1;
-
-		if (i < st->n_max_ports) {
-			st->port_status[i] = 1;
-		} else {
-			Trace(TRACE_LEVEL_ERROR, "Invalid port %d", vpdo->port);
-		}
+	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
+		st->port_status[i] = bool(bm_ports & (1 << i));
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
+	TraceCall("bm_ports %#04lx, max ports %d", bm_ports, vhub->NUM_PORTS);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, ULONG *poutlen)
+PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *dev, size_t cnt)
 {
 	PAGED_CODE();
 
-	auto idev = idevs;
-	unsigned char n_used_ports = 0;
+	TraceCall("cnt %Iu", cnt);
 
-	auto n_idevs_max = (ULONG)(*poutlen/sizeof(*idevs));
-	if (!n_idevs_max) {
+	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	TraceCall("Enter");
-
 	ExAcquireFastMutex(&vhub->Mutex);
 
-	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-
-		if (n_used_ports == n_idevs_max - 1) {
-			break;
-		}
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo && --cnt; entry = entry->Flink, ++dev) {
 
 		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 
 		auto &d = vpdo->descriptor;
 		NT_ASSERT(is_valid_dsc(&d));
 
-		idev->port = static_cast<char>(vpdo->port);
-		NT_ASSERT(idev->port == vpdo->port);
+		dev->port = static_cast<char>(vpdo->port);
+		NT_ASSERT(dev->port == vpdo->port);
 
-		idev->status = usbip_device_status(2); // SDEV_ST_USED
-		idev->vendor = d.idVendor;
-		idev->product = d.idProduct;
-		idev->speed = vpdo->speed;
-		++idev;
-
-		++n_used_ports;
+		dev->status = usbip_device_status(2); // SDEV_ST_USED
+		dev->vendor = d.idVendor;
+		dev->product = d.idProduct;
+		dev->speed = vpdo->speed;
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
 
-	idev->port = -1; /* end of mark */
+	dev->port = -1; // end of mark
 	return STATUS_SUCCESS;
 }
 
@@ -269,9 +246,12 @@ PAGEABLE int acquire_port(vhub_dev_t &vhub)
 	ULONG idx = 0;
 	ExAcquireFastMutex(&vhub.Mutex);
 
-	auto found = BitScanForward(&idx, vhub.bm_ports);
+	auto mask = ~vhub.bm_ports & vhub.PORTS_MASK;
+	auto found = BitScanForward(&idx, mask);
+
 	if (found) {
-		NT_VERIFY(BitTestAndReset(reinterpret_cast<LONG*>(&vhub.bm_ports), idx));
+		[[maybe_unused]] auto was_set = BitTestAndSet(reinterpret_cast<LONG*>(&vhub.bm_ports), idx);
+		NT_ASSERT(!was_set);
 	}
 
 	ExReleaseFastMutex(&vhub.Mutex);
@@ -303,8 +283,7 @@ PAGEABLE NTSTATUS release_port(vhub_dev_t &vhub, int port, bool lock)
 		ExAcquireFastMutex(&vhub.Mutex);
 	}
 
-	[[maybe_unused]] auto old = BitTestAndSet(reinterpret_cast<LONG*>(&vhub.bm_ports), port - 1);
-	NT_ASSERT(!old); // was acquired
+	NT_VERIFY(BitTestAndReset(reinterpret_cast<LONG*>(&vhub.bm_ports), port - 1));
 
 	if (lock) {
 		ExReleaseFastMutex(&vhub.Mutex);
@@ -317,9 +296,7 @@ PAGEABLE int get_vpdo_count(const vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	auto n = ~static_cast<ULONG64>(vhub.bm_ports) & vhub.PORTS_MASK;
-
-	auto cnt = PopulationCount64(n);
+	auto cnt = PopulationCount64(vhub.bm_ports & vhub.PORTS_MASK);
 	NT_ASSERT(cnt <= vhub.NUM_PORTS);
 
 	return static_cast<int>(cnt);
