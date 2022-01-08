@@ -121,9 +121,11 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 
 	PWSTR *v[] { &d.Manufacturer, &d.Product, &d.SerialNumber };
 
-	for (auto ptr: v) {
-		ExFreePoolWithTag(*ptr, USBIP_VHCI_POOL_TAG);
-		*ptr = nullptr;
+	for (auto i: v) {
+		if (auto &ptr = *i) {
+			ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
+			ptr = nullptr;
+		}
 	}
 }
 

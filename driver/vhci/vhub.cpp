@@ -89,7 +89,7 @@ PAGEABLE void vhub_detach_vpdo_and_release_port(vhub_dev_t *vhub, vpdo_dev_t *vp
 		RemoveEntryList(&vpdo->Link);
 		InitializeListHead(&vpdo->Link);
 
-		auto err = release_port(*vhub, vpdo->port, false);
+		[[maybe_unused]] auto err = release_port(*vhub, vpdo->port, false);
 		NT_ASSERT(!err);
 	}
 	ExReleaseFastMutex(&vhub->Mutex);
@@ -294,7 +294,7 @@ PAGEABLE NTSTATUS release_port(vhub_dev_t &vhub, int port, bool lock)
 		ExAcquireFastMutex(&vhub.Mutex);
 	}
 
-	auto old = BitTestAndSet(reinterpret_cast<LONG*>(&vhub.bm_ports), port - 1);
+	[[maybe_unused]] auto old = BitTestAndSet(reinterpret_cast<LONG*>(&vhub.bm_ports), port - 1);
 	NT_ASSERT(!old); // was acquired
 
 	if (lock) {
