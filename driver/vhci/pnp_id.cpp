@@ -216,7 +216,7 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool*, vdev_t *vdev, IRP*, bool
 
 	NTSTATUS status = *SerialNumber || want_serial ?
 			RtlStringCchCopyW(str, max_wchars, SerialNumber) :
-			RtlStringCchPrintfW(str, max_wchars, L"%04hx", vpdo->port);
+			RtlStringCchPrintfW(str, max_wchars, L"%d", vpdo->port);
 
 	if (status == STATUS_SUCCESS) {
 		*result = str;

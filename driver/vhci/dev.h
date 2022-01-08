@@ -142,7 +142,7 @@ struct vpdo_dev_t : vdev_t
 	ULONG current_frame_number;
 
 	UNICODE_STRING usb_dev_interface;
-	ULONG port; // unique port number of the device on the bus
+	int port; // unique port number of the device on the bus, [1, vhub_dev_t::NUM_PORTS]
 
 	// Link point to hold all the vpdos for a single bus together
 	LIST_ENTRY Link;
@@ -184,11 +184,11 @@ inline void vdev_del_ref(vdev_t *vdev)
 	}
 }
 
-vpdo_dev_t *vhub_find_vpdo(vhub_dev_t * vhub, ULONG port);
+vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port);
 
-void vhub_mark_unplugged_vpdo(vhub_dev_t * vhub, vpdo_dev_t * vpdo);
+void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo);
 
-LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen);
+LPWSTR get_device_prop(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, ULONG *plen);
 
 constexpr auto to_devobj(vdev_t *vdev) { return vdev->Self; }
 

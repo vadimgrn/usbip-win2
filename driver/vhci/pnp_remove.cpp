@@ -150,7 +150,7 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	TraceCall("%p, port %lu", vpdo, vpdo->port);
+	TraceCall("%p, port %d", vpdo, vpdo->port);
 
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);

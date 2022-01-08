@@ -16,7 +16,7 @@ PAGEABLE void vhci_init_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	TraceCall("%p, port %lu", vpdo, vpdo->port);
+	TraceCall("%p, port %d", vpdo, vpdo->port);
 
 	vpdo->plugged = true;
 
@@ -174,7 +174,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, CHAR port)
+PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, int port)
 {
 	PAGED_CODE();
 
@@ -185,18 +185,18 @@ PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, CHAR port)
 	}
 
 	if (port < 0) {
-		Trace(TRACE_LEVEL_INFORMATION, "plugging out all the devices!");
+		Trace(TRACE_LEVEL_INFORMATION, "Plugging out all the devices!");
 		vhub_mark_unplugged_all_vpdos(vhub);
 		return STATUS_SUCCESS;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "plugging out device: port %u", port);
-
 	auto vpdo = vhub_find_vpdo(vhub, port);
 	if (!vpdo) {
-		Trace(TRACE_LEVEL_INFORMATION, "no matching vpdo: port %u", port);
+		Trace(TRACE_LEVEL_INFORMATION, "No matching vpdo, port %d", port);
 		return STATUS_NO_SUCH_DEVICE;
 	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Plugging out device, port %d", port);
 
 	vhub_mark_unplugged_vpdo(vhub, vpdo);
 	vdev_del_ref(vpdo);

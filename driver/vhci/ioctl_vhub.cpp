@@ -46,15 +46,13 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (ci.ConnectionIndex > vhub->NUM_PORTS) {
-		return STATUS_NO_SUCH_DEVICE;
+	if (auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex)) {
+		auto st = vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
+		vdev_del_ref(vpdo);
+		return st;
 	}
 
-	auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex);
-	auto st = vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
-	vdev_del_ref(vpdo);
-
-	return st;
+	return STATUS_NO_SUCH_DEVICE;
 }
 
 PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
@@ -68,15 +66,13 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (conninfo->ConnectionIndex > vhub->NUM_PORTS) {
-		return STATUS_NO_SUCH_DEVICE;
+	if (auto vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex)) {
+		auto st = vpdo_get_nodeconn_info_ex_v2(vpdo, *conninfo, poutlen);
+		vdev_del_ref(vpdo);
+		return st;
 	}
 
-	auto vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex);
-	auto status = vpdo_get_nodeconn_info_ex_v2(vpdo, *conninfo, poutlen);
-	vdev_del_ref(vpdo);
-
-	return status;
+	return STATUS_NO_SUCH_DEVICE;
 }
 
 PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void *buffer, ULONG inlen, ULONG *poutlen)
@@ -90,15 +86,13 @@ PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void 
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex);
-	if (!vpdo) {
-		return STATUS_NO_SUCH_DEVICE;
+	if (auto vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex)) {
+		auto st = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
+		vdev_del_ref(vpdo);
+		return st;
 	}
 
-	auto status = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
-	vdev_del_ref(vpdo);
-
-	return status;
+	return STATUS_NO_SUCH_DEVICE;
 }
 
 PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
@@ -142,44 +136,47 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer, ULONG
 {
 	PAGED_CODE();
 
-	PUSB_NODE_CONNECTION_DRIVERKEY_NAME	pdrvkey_name = (PUSB_NODE_CONNECTION_DRIVERKEY_NAME)buffer;
-	vpdo_dev_t *	vpdo;
-	LPWSTR		driverkey;
-	ULONG		driverkeylen;
-	NTSTATUS	status;
-
-	if (inlen < sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME))
+	if (inlen < sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
 		return STATUS_INVALID_PARAMETER;
+	}
 
-	vpdo = vhub_find_vpdo(vhub, pdrvkey_name->ConnectionIndex);
-	if (vpdo == nullptr)
+	auto pdrvkey_name = (PUSB_NODE_CONNECTION_DRIVERKEY_NAME)buffer;
+
+	auto vpdo = vhub_find_vpdo(vhub, pdrvkey_name->ConnectionIndex);
+	if (!vpdo) {
 		return STATUS_NO_SUCH_DEVICE;
-	driverkey = get_device_prop(vpdo->Self, DevicePropertyDriverKeyName, &driverkeylen);
-	if (driverkey == nullptr) {
+	}
+
+	NTSTATUS status = STATUS_SUCCESS;
+
+	ULONG driverkeylen = 0;
+	auto driverkey = get_device_prop(vpdo->Self, DevicePropertyDriverKeyName, &driverkeylen);
+
+	if (!driverkey) {
 		Trace(TRACE_LEVEL_WARNING, "failed to get vpdo driver key");
 		status = STATUS_UNSUCCESSFUL;
-	}
-	else {
-		ULONG	outlen_res = sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + driverkeylen - sizeof(WCHAR);
+	} else {
+		ULONG outlen_res = sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + driverkeylen - sizeof(WCHAR);
 
 		if (*poutlen < sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			*poutlen = outlen_res;
-		}
-		else {
+		} else {
 			pdrvkey_name->ActualLength = outlen_res;
 			if (*poutlen >= outlen_res) {
 				RtlCopyMemory(pdrvkey_name->DriverKeyName, driverkey, driverkeylen);
 				*poutlen = outlen_res;
-			}
-			else
+			} else {
 				RtlCopyMemory(pdrvkey_name->DriverKeyName, driverkey, *poutlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
+			}
+
 			status = STATUS_SUCCESS;
 		}
+
 		ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
 	}
-	vdev_del_ref(vpdo);
 
+	vdev_del_ref(vpdo);
 	return status;
 }
 

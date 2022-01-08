@@ -26,7 +26,7 @@ PAGEABLE void cleanup_vpdo(vhci_dev_t * vhci, PIRP irp)
 		vpdo->fo = nullptr;
 		irpstack->FileObject->FsContext = nullptr;
 		if (vpdo->plugged) {
-			vhci_unplug_port(vhci, (CHAR)vpdo->port);
+			vhci_unplug_port(vhci, vpdo->port);
 		}
 	}
 }

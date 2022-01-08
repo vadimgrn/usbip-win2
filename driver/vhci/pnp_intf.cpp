@@ -361,7 +361,7 @@ NTSTATUS GetLocationString(
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
 		st = RtlStringCchPrintfExW(buf, ARRAYSIZE(buf), nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL,
-			L"%s(%u)", devcodes[vdev->type], vpdo->port);
+			L"%s(%d)", devcodes[vdev->type], vpdo->port);
 	} else {
 		st = RtlStringCchCopyExW(buf, ARRAYSIZE(buf), devcodes[vdev->type],
 			nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL);

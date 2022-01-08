@@ -418,7 +418,9 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 
 auto setup_topology_address(vpdo_dev_t *vpdo, USB_TOPOLOGY_ADDRESS &r)
 {
-	r.RootHubPortNumber = (USHORT)vpdo->port;
+	r.RootHubPortNumber = static_cast<USHORT>(vpdo->port);
+	NT_ASSERT(r.RootHubPortNumber == vpdo->port);
+
 	TraceUrb("RootHubPortNumber %d", r.RootHubPortNumber);
 	return STATUS_SUCCESS;
 }

@@ -11,7 +11,7 @@
 namespace
 {
 
-PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, ULONG port)
+PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
 
@@ -30,7 +30,7 @@ PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 	PAGED_CODE();
 
 	if (!vpdo->plugged) {
-		Trace(TRACE_LEVEL_INFORMATION, "Device was already marked as unplugged, port %lu", vpdo->port);
+		Trace(TRACE_LEVEL_INFORMATION, "Device was already marked as unplugged, port %d", vpdo->port);
 		return;
 	}
 
@@ -40,15 +40,19 @@ PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 	--vhub->n_vpdos_plugged;
 
 	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
-	Trace(TRACE_LEVEL_INFORMATION, "Device is marked as unplugged, port %lu", vpdo->port);
+	Trace(TRACE_LEVEL_INFORMATION, "Device is marked as unplugged, port %d", vpdo->port);
 }
 
 } // namespace
 
 
-PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, ULONG port)
+PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
+
+	if (port > vhub->NUM_PORTS) {
+		return nullptr;
+	}
 
 	ExAcquireFastMutex(&vhub->Mutex);
 	
@@ -82,7 +86,7 @@ PAGEABLE void vhub_detach_vpdo_and_release_port(vhub_dev_t *vhub, vpdo_dev_t *vp
 {
 	PAGED_CODE();
 
-	TraceCall("%p, port %lu", vpdo, vpdo->port);
+	TraceCall("%p, port %d", vpdo, vpdo->port);
 
 	ExAcquireFastMutex(&vhub->Mutex);
 	{
@@ -193,29 +197,32 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_p
 	TraceCall("Enter");
 
 	RtlZeroMemory(st, sizeof(*st));
+	st->n_max_ports = vhub->NUM_PORTS;
+
 	ExAcquireFastMutex(&vhub->Mutex);
 
 	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+
 		auto vpdo = CONTAINING_RECORD (entry, vpdo_dev_t, Link);
-		if (vpdo->port >= 127) {
-			Trace(TRACE_LEVEL_ERROR, "strange port");
-			continue;
+		auto i = vpdo->port - 1;
+
+		if (i < st->n_max_ports) {
+			st->port_status[i] = 1;
+		} else {
+			Trace(TRACE_LEVEL_ERROR, "Invalid port %d", vpdo->port);
 		}
-		st->port_status[vpdo->port] = 1;
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
-
-	st->n_max_ports = 127;
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, ioctl_usbip_vhci_imported_dev *idevs, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, ULONG *poutlen)
 {
 	PAGED_CODE();
 
 	auto idev = idevs;
-	unsigned char	n_used_ports = 0;
+	unsigned char n_used_ports = 0;
 
 	auto n_idevs_max = (ULONG)(*poutlen/sizeof(*idevs));
 	if (!n_idevs_max) {
@@ -237,7 +244,9 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t * vhub, ioctl_usbip_vhci_imp
 		auto &d = vpdo->descriptor;
 		NT_ASSERT(is_valid_dsc(&d));
 
-		idev->port = char(vpdo->port);
+		idev->port = static_cast<char>(vpdo->port);
+		NT_ASSERT(idev->port == vpdo->port);
+
 		idev->status = usbip_device_status(2); // SDEV_ST_USED
 		idev->vendor = d.idVendor;
 		idev->product = d.idProduct;
