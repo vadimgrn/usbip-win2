@@ -167,21 +167,28 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex_v2(vpdo_dev_t*, USB_NODE_CONNECTION_
 {
 	PAGED_CODE();
 
-	*poutlen = sizeof(ci);
+	if (*poutlen != sizeof(ci)) {
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
 
 	if (ci.Length != sizeof(ci)) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
+	*poutlen = sizeof(ci);
+
 	ci.SupportedUsbProtocols.ul = 0;
-	ci.SupportedUsbProtocols.Usb110 = TRUE;
-	ci.SupportedUsbProtocols.Usb200 = TRUE;
+	ci.SupportedUsbProtocols.Usb110 = true;
+	ci.SupportedUsbProtocols.Usb200 = true;
+//	ci.SupportedUsbProtocols.Usb300 = true;
 
 	ci.Flags.ul = 0;
-	ci.Flags.DeviceIsOperatingAtSuperSpeedOrHigher = FALSE;
-	ci.Flags.DeviceIsSuperSpeedCapableOrHigher = FALSE;
-	ci.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher = FALSE;
-	ci.Flags.DeviceIsSuperSpeedPlusCapableOrHigher = FALSE;
+/*
+	ci.Flags.DeviceIsOperatingAtSuperSpeedOrHigher = false;
+	ci.Flags.DeviceIsSuperSpeedCapableOrHigher = false;
+	ci.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher = false;
+	ci.Flags.DeviceIsSuperSpeedPlusCapableOrHigher = false;
+*/
 
 	return STATUS_SUCCESS;
 }

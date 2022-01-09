@@ -16,22 +16,21 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t * vhci, PVOID buffer, PULONG poutlen)
+PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, void *buffer, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	PUSB_HCD_DRIVERKEY_NAME	pdrkey_name = (PUSB_HCD_DRIVERKEY_NAME)buffer;
-	ULONG	outlen_res, drvkey_buflen;
-	LPWSTR	drvkey;
+	auto pdrkey_name = (USB_HCD_DRIVERKEY_NAME*)buffer;
+	ULONG drvkey_buflen = 0;
 
-	drvkey = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
-	if (drvkey == nullptr) {
+	auto drvkey = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
+	if (!drvkey) {
 		Trace(TRACE_LEVEL_WARNING, "failed to get vhci driver key");
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	outlen_res = (ULONG)(sizeof(USB_HCD_DRIVERKEY_NAME) + drvkey_buflen - sizeof(WCHAR));
-	if (*poutlen < sizeof(USB_HCD_DRIVERKEY_NAME)) {
+	auto outlen_res = (ULONG)(sizeof(*pdrkey_name) + drvkey_buflen - sizeof(WCHAR));
+	if (*poutlen < sizeof(*pdrkey_name)) {
 		*poutlen = outlen_res;
 		ExFreePoolWithTag(drvkey, USBIP_VHCI_POOL_TAG);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -71,24 +70,29 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG, 
 {
 	PAGED_CODE();
 
-	PUSB_ROOT_HUB_NAME	roothub_name = (PUSB_ROOT_HUB_NAME)buffer;
-	SIZE_T	roothub_namelen, prefix_len;
+	auto roothub_name = (USB_ROOT_HUB_NAME*)buffer;
+	auto prefix_len = get_name_prefix_size(vhub->DevIntfRootHub.Buffer);
 
-	prefix_len = get_name_prefix_size(vhub->DevIntfRootHub.Buffer);
-	if (prefix_len == 0) {
+	if (!prefix_len) {
 		Trace(TRACE_LEVEL_ERROR, "inavlid root hub format: %S", vhub->DevIntfRootHub.Buffer);
 		return STATUS_INVALID_PARAMETER;
 	}
-	roothub_namelen = sizeof(USB_ROOT_HUB_NAME) + vhub->DevIntfRootHub.Length - prefix_len * sizeof(WCHAR);
+
+	auto roothub_namelen = sizeof(USB_ROOT_HUB_NAME) + vhub->DevIntfRootHub.Length - prefix_len * sizeof(WCHAR);
+
 	if (*poutlen < sizeof(USB_ROOT_HUB_NAME)) {
 		*poutlen = (ULONG)roothub_namelen;
 		return STATUS_BUFFER_TOO_SMALL;
 	}
+
 	roothub_name->ActualLength = (ULONG)roothub_namelen;
 	RtlStringCchCopyW(roothub_name->RootHubName, (*poutlen - sizeof(USB_ROOT_HUB_NAME) + sizeof(WCHAR)) / sizeof(WCHAR),
-		vhub->DevIntfRootHub.Buffer + prefix_len);
-	if (*poutlen > roothub_namelen)
+			vhub->DevIntfRootHub.Buffer + prefix_len);
+
+	if (*poutlen > roothub_namelen) {
 		*poutlen = (ULONG)roothub_namelen;
+	}
+
 	return STATUS_SUCCESS;
 }
 

@@ -76,69 +76,93 @@ PAGEABLE void vhub_detach_vpdo_and_release_port(vhub_dev_t *vhub, vpdo_dev_t *vp
 	vpdo->port = 0;
 }
 
-PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR *d)
+PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
-	d->bDescriptorLength = 9;
-	d->bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE; // USB_30_HUB_DESCRIPTOR_TYPE
-	d->bNumberOfPorts = vhub->NUM_PORTS; 
-	d->wHubCharacteristics = 0;
-	d->bPowerOnToPowerGood = 1;
-	d->bHubControlCurrent = 1;
+	d.bDescriptorLength = USB_DT_HUB_NONVAR_SIZE + 2;
+	d.bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE;
+	d.bNumberOfPorts = vhub->NUM_PORTS; 
+	d.wHubCharacteristics = 0;
+	d.bPowerOnToPowerGood = 1;
+	d.bHubControlCurrent = 1;
+	//d.bRemoveAndPowerMask = 0;
 }
 
-PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX *p)
+PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_30_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
-	p->HubType = UsbRootHub;
-	p->HighestPortNumber = vhub->NUM_PORTS;
+	static_assert(sizeof(d) == USB_DT_SS_HUB_SIZE);
 
-	vhub_get_hub_descriptor(vhub, &p->u.UsbHubDescriptor);
+	d.bLength = sizeof(d);
+	d.bDescriptorType = USB_30_HUB_DESCRIPTOR_TYPE;
+	d.bNumberOfPorts = vhub->NUM_PORTS; 
+	d.wHubCharacteristics = 0;
+	d.bPowerOnToPowerGood = 0;
+	d.bHubControlCurrent = 0;
+	d.bHubHdrDecLat = 0; // The hub packet header decode latency
+	d.wHubDelay = 0; // The average delay, in nanoseconds, that is introduced by the hub
+	d.DeviceRemovable = USHORT(-1 << 1); // Indicates whether a removable device is attached to each port
+}
+
+PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &p)
+{
+	PAGED_CODE();
+
+	p.HubType = UsbRootHub; // Usb30Hub
+	p.HighestPortNumber = vhub->NUM_PORTS;
+
+	vhub_get_hub_descriptor(vhub, p.u.UsbHubDescriptor);
+	return STATUS_SUCCESS;
+}
+
+PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t*, USB_HUB_CAPABILITIES_EX &p)
+{
+	PAGED_CODE();
+
+	auto &f = p.CapabilityFlags;
+	f.ul = 0;
+
+//	f.HubIsHighSpeedCapable = false;
+//	f.HubIsHighSpeed = false;
+	
+	f.HubIsMultiTtCapable = true;
+	f.HubIsMultiTt = true;
+	
+	f.HubIsRoot = true;
+	//f.HubIsArmedWakeOnConnect = true; // the hub is armed to wake when a device is connected to the hub
+//	f.HubIsBusPowered = false;
 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t*, PUSB_HUB_CAPABILITIES_EX p)
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES *p, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	p->CapabilityFlags.ul = 0xffffffff;
-	p->CapabilityFlags.HubIsHighSpeedCapable = FALSE;
-	p->CapabilityFlags.HubIsHighSpeed = FALSE;
-	p->CapabilityFlags.HubIsMultiTtCapable = TRUE;
-	p->CapabilityFlags.HubIsMultiTt = TRUE;
-	p->CapabilityFlags.HubIsRoot = TRUE;
-	p->CapabilityFlags.HubIsBusPowered = FALSE;
-
-	return STATUS_SUCCESS;
-}
-
-PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES *p, ULONG *poutlen)
-{
-	PAGED_CODE();
-
-	if (p->ConnectionIndex > vhub->NUM_PORTS) {
+	if (!is_valid_port(p->ConnectionIndex)) {
 		return STATUS_INVALID_PARAMETER;
 	}
-	
+
 	if (*poutlen < sizeof(*p)) {
-		*poutlen = sizeof(*p);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
+	*poutlen = sizeof(*p);
+
 	p->ActualLength = sizeof(*p);
-	p->UsbPortProperties.ul = 0xffffffff;
-	p->UsbPortProperties.PortIsUserConnectable = TRUE;
-	p->UsbPortProperties.PortIsDebugCapable = TRUE;
-	p->UsbPortProperties.PortHasMultipleCompanions = FALSE;
-	p->UsbPortProperties.PortConnectorIsTypeC = FALSE;
+
+	p->UsbPortProperties.ul = 0;
+	p->UsbPortProperties.PortIsUserConnectable = true;
+	p->UsbPortProperties.PortIsDebugCapable = true;
+//	p->UsbPortProperties.PortHasMultipleCompanions = FALSE;
+//	p->UsbPortProperties.PortConnectorIsTypeC = FALSE;
+
 	p->CompanionIndex = 0;
 	p->CompanionPortNumber = 0;
 	p->CompanionHubSymbolicLinkName[0] = L'\0';
 
-	*poutlen = sizeof(*p);
 	return STATUS_SUCCESS;
 }
 

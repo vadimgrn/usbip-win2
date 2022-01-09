@@ -13,22 +13,21 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_node_info(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &nodeinfo, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	PUSB_NODE_INFORMATION	nodeinfo = (PUSB_NODE_INFORMATION)buffer;
+	*poutlen = sizeof(nodeinfo);
 
-	if (inlen < sizeof(USB_NODE_INFORMATION)) {
-		*poutlen = sizeof(USB_NODE_INFORMATION);
-		return STATUS_BUFFER_TOO_SMALL;
+	if (inlen != sizeof(nodeinfo)) {
+		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	if (nodeinfo->NodeType == UsbMIParent)
-		nodeinfo->u.MiParentInformation.NumberOfInterfaces = 1;
-	else {
-		vhub_get_hub_descriptor(vhub, &nodeinfo->u.HubInformation.HubDescriptor);
-		nodeinfo->u.HubInformation.HubIsBusPowered = FALSE;
+	if (nodeinfo.NodeType == UsbMIParent) {
+		nodeinfo.u.MiParentInformation.NumberOfInterfaces = 1;
+	} else {
+		vhub_get_hub_descriptor(vhub, nodeinfo.u.HubInformation.HubDescriptor);
+		nodeinfo.u.HubInformation.HubIsBusPowered = FALSE;
 	}
 
 	return STATUS_SUCCESS;
@@ -55,14 +54,14 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 	return STATUS_NO_SUCH_DEVICE;
 }
 
-PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
 	auto conninfo = (USB_NODE_CONNECTION_INFORMATION_EX_V2*)buffer;
 
-	if (inlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2) || *poutlen < sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2)) {
-		*poutlen = sizeof(USB_NODE_CONNECTION_INFORMATION_EX_V2);
+	if (inlen < sizeof(*conninfo) || *poutlen < sizeof(*conninfo)) {
+		*poutlen = sizeof(*conninfo);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
@@ -95,52 +94,54 @@ PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void 
 	return STATUS_NO_SUCH_DEVICE;
 }
 
-PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
+PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t *vhub, void *buffer, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	PUSB_HUB_INFORMATION_EX	pinfo = (PUSB_HUB_INFORMATION_EX)buffer;
-
-	if (*poutlen < sizeof(USB_HUB_INFORMATION_EX)) {
-		return STATUS_BUFFER_TOO_SMALL;
+	auto r = (USB_HUB_INFORMATION_EX*)buffer;
+	if (*poutlen == sizeof(*r)) {
+		return vhub_get_information_ex(vhub, *r);
 	}
 
-	return vhub_get_information_ex(vhub, pinfo);
+	*poutlen = sizeof(*r);
+	return STATUS_INVALID_BUFFER_SIZE;
 }
 
-PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t * vhub, PVOID buffer, PULONG poutlen)
+PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t * vhub, void *buffer, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	PUSB_HUB_CAPABILITIES_EX	pinfo = (PUSB_HUB_CAPABILITIES_EX)buffer;
-
-	if (*poutlen < sizeof(USB_HUB_CAPABILITIES_EX))
-		return STATUS_BUFFER_TOO_SMALL;
-	return vhub_get_capabilities_ex(vhub, pinfo);
-}
-
-PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
-{
-	PAGED_CODE();
-
-	PUSB_PORT_CONNECTOR_PROPERTIES	pinfo = (PUSB_PORT_CONNECTOR_PROPERTIES)buffer;
-
-	if (inlen < sizeof(USB_PORT_CONNECTOR_PROPERTIES)) {
-		*poutlen = sizeof(USB_PORT_CONNECTOR_PROPERTIES);
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-	return vhub_get_port_connector_properties(vhub, pinfo, poutlen);
-}
-
-PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t * vhub, PVOID buffer, ULONG inlen, PULONG poutlen)
-{
-	PAGED_CODE();
-
-	if (inlen < sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
-		return STATUS_INVALID_PARAMETER;
+	auto r = (USB_HUB_CAPABILITIES_EX*)buffer;
+	if (*poutlen == sizeof(*r)) {
+		return vhub_get_capabilities_ex(vhub, *r);
 	}
 
-	auto pdrvkey_name = (PUSB_NODE_CONNECTION_DRIVERKEY_NAME)buffer;
+	*poutlen = sizeof(*r);
+	return STATUS_INVALID_BUFFER_SIZE;
+}
+
+PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto r = (USB_PORT_CONNECTOR_PROPERTIES*)buffer;
+	if (inlen >= sizeof(*r)) {
+		return vhub_get_port_connector_properties(vhub, r, poutlen);
+	}
+
+	*poutlen = sizeof(*r);
+	return STATUS_BUFFER_TOO_SMALL;
+}
+
+PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto pdrvkey_name = (USB_NODE_CONNECTION_DRIVERKEY_NAME*)buffer;
+
+	if (inlen < sizeof(*pdrvkey_name)) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
 
 	auto vpdo = vhub_find_vpdo(vhub, pdrvkey_name->ConnectionIndex);
 	if (!vpdo) {
@@ -191,7 +192,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, 
 
 	switch (ioctl_code) {
 	case IOCTL_USB_GET_NODE_INFORMATION:
-		status = get_node_info(vhub, buffer, inlen, poutlen);
+		status = get_node_info(vhub, *static_cast<USB_NODE_INFORMATION*>(buffer), inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION:
 		status = get_nodeconn_info(vhub, buffer, inlen, poutlen, false);
