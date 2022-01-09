@@ -18,29 +18,12 @@ PAGEABLE vpdo_dev_t *find_vpdo(vhub_dev_t *vhub, int port)
 	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		if (vpdo->port == port) {
+			vdev_add_ref(vpdo);
 			return vpdo;
 		}
 	}
 
 	return nullptr;
-}
-
-PAGEABLE void mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
-{
-	PAGED_CODE();
-
-	if (!vpdo->plugged) {
-		Trace(TRACE_LEVEL_INFORMATION, "Device was already marked as unplugged, port %d", vpdo->port);
-		return;
-	}
-
-	vpdo->plugged = false;
-
-	NT_ASSERT(vhub->n_vpdos_plugged > 0);
-	--vhub->n_vpdos_plugged;
-
-	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
-	Trace(TRACE_LEVEL_INFORMATION, "Device is marked as unplugged, port %d", vpdo->port);
 }
 
 } // namespace
@@ -50,14 +33,14 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
 
-	ExAcquireFastMutex(&vhub->Mutex);
-	
-	auto vpdo = find_vpdo(vhub, port);
-	if (vpdo) {
-		vdev_add_ref(vpdo);
+	vpdo_dev_t *vpdo{};
+
+	if (is_valid_port(port)) {
+		ExAcquireFastMutex(&vhub->Mutex);
+		vpdo = find_vpdo(vhub, port);
+		ExReleaseFastMutex(&vhub->Mutex);
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
 	return vpdo;
 }
 
@@ -70,10 +53,6 @@ PAGEABLE void vhub_attach_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 	ExAcquireFastMutex(&vhub->Mutex);
 	{
 		InsertTailList(&vhub->head_vpdo, &vpdo->Link);
-		if (vpdo->plugged) {
-			++vhub->n_vpdos_plugged;
-			NT_ASSERT(vhub->n_vpdos_plugged <= get_vpdo_count(*vhub));
-		}
 	}
 	ExReleaseFastMutex(&vhub->Mutex);
 }
@@ -88,11 +67,11 @@ PAGEABLE void vhub_detach_vpdo_and_release_port(vhub_dev_t *vhub, vpdo_dev_t *vp
 	{
 		RemoveEntryList(&vpdo->Link);
 		InitializeListHead(&vpdo->Link);
-
-		[[maybe_unused]] auto err = release_port(*vhub, vpdo->port, false);
-		NT_ASSERT(!err);
 	}
 	ExReleaseFastMutex(&vhub->Mutex);
+
+	[[maybe_unused]] auto err = release_port(*vhub, vpdo->port);
+	NT_ASSERT(!err);
 
 	vpdo->port = 0;
 }
@@ -167,9 +146,14 @@ PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	ExAcquireFastMutex(&vhub->Mutex);
-	mark_unplugged_vpdo(vhub, vpdo);
-	ExReleaseFastMutex(&vhub->Mutex);
+	static_assert(sizeof(vpdo->plugged) == sizeof(CHAR));
+
+	if (InterlockedExchange8(reinterpret_cast<volatile CHAR*>(&vpdo->plugged), false)) {
+		IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
+		Trace(TRACE_LEVEL_INFORMATION, "Device is marked as unplugged, port %d", vpdo->port);
+	} else {
+		Trace(TRACE_LEVEL_INFORMATION, "Device was already marked as unplugged, port %d", vpdo->port);
+	}
 }
 
 PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t *vhub)
@@ -180,7 +164,7 @@ PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t *vhub)
 
 	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
 		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
-		mark_unplugged_vpdo(vhub, vpdo);
+		vhub_mark_unplugged_vpdo(vhub, vpdo);
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
@@ -190,12 +174,10 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_p
 {
 	PAGED_CODE();
 
-	ExAcquireFastMutex(&vhub->Mutex);
-	auto bm_ports = vhub->bm_ports;
-	ExReleaseFastMutex(&vhub->Mutex);
-
 	st->n_max_ports = vhub->NUM_PORTS;
 	NT_ASSERT(st->n_max_ports == vhub->NUM_PORTS);
+
+	auto bm_ports = vhub->bm_ports;
 
 	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
 		st->port_status[i] = bool(bm_ports & (1 << i));
@@ -243,61 +225,64 @@ PAGEABLE int acquire_port(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	ULONG idx = 0;
-	ExAcquireFastMutex(&vhub.Mutex);
+	int port = 0;
 
-	auto mask = ~vhub.bm_ports & vhub.PORTS_MASK;
-	auto found = BitScanForward(&idx, mask);
-
-	if (found) {
-		[[maybe_unused]] auto was_set = BitTestAndSet(reinterpret_cast<LONG*>(&vhub.bm_ports), idx);
-		NT_ASSERT(!was_set);
+	for (ULONG i = 0; BitScanForward(&i, ~vhub.bm_ports & vhub.PORTS_MASK); ) {
+		if (!InterlockedBitTestAndSet(&vhub.bm_ports, i)) { // if was not set
+			port = i + 1;
+			NT_ASSERT(is_valid_port(port));
+			break;
+		}
 	}
-
-	ExReleaseFastMutex(&vhub.Mutex);
-	
-	if (!found) {
-		return 0;
-	}
-
-	int port = idx + 1;
-
-	NT_ASSERT(port > 0);
-	NT_ASSERT(port <= vhub.NUM_PORTS);
 
 	TraceCall("%d", port);
 	return port;
 }
 
-PAGEABLE NTSTATUS release_port(vhub_dev_t &vhub, int port, bool lock)
+PAGEABLE NTSTATUS release_port(vhub_dev_t &vhub, int port)
 {
 	PAGED_CODE();
 
 	TraceCall("%d", port);
 
-	if (!(port > 0 && port <= vhub.NUM_PORTS)) {
-		return STATUS_INVALID_PARAMETER;
+	if (is_valid_port(port)) {
+		NT_VERIFY(InterlockedBitTestAndReset(&vhub.bm_ports, port - 1));
+		return STATUS_SUCCESS;
 	}
 
-	if (lock) {
-		ExAcquireFastMutex(&vhub.Mutex);
-	}
-
-	NT_VERIFY(BitTestAndReset(reinterpret_cast<LONG*>(&vhub.bm_ports), port - 1));
-
-	if (lock) {
-		ExReleaseFastMutex(&vhub.Mutex);
-	}
-
-	return STATUS_SUCCESS;
+	return STATUS_INVALID_PARAMETER;
 }
 
 PAGEABLE int get_vpdo_count(const vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	auto cnt = PopulationCount64(vhub.bm_ports & vhub.PORTS_MASK);
+	auto cnt = PopulationCount64(vhub.bm_ports);
 	NT_ASSERT(cnt <= vhub.NUM_PORTS);
 
 	return static_cast<int>(cnt);
+}
+
+PAGEABLE int get_plugged_vpdo_count(vhub_dev_t &vhub, bool lock)
+{
+	PAGED_CODE();
+	
+	int plugged = 0;
+
+	if (lock) {
+		ExAcquireFastMutex(&vhub.Mutex);
+	}
+
+	for (auto entry = vhub.head_vpdo.Flink; entry != &vhub.head_vpdo; entry = entry->Flink) {
+		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
+		if (vpdo->plugged) {
+			++plugged;
+		}
+	}
+
+	if (lock) {
+		ExReleaseFastMutex(&vhub.Mutex);
+	}
+	
+	return plugged;
 }

@@ -99,9 +99,7 @@ struct vhub_dev_t : vdev_t
 	LIST_ENTRY head_vpdo;
 
 	enum { NUM_PORTS = USB_SS_MAXPORTS, PORTS_MASK = ~(ULONG(-1) << NUM_PORTS) };
-	ULONG bm_ports; // bitmap of free/used ports
-
-	int n_vpdos_plugged; // the number of plugged vpdo's
+	volatile LONG bm_ports; // bitmap of free/used ports
 
 	// A synchronization for access to the device extension
 	FAST_MUTEX Mutex;
@@ -147,9 +145,8 @@ struct vpdo_dev_t : vdev_t
 	// Link point to hold all the vpdos for a single bus together
 	LIST_ENTRY Link;
 
-	// set to TRUE when the vpdo is exposed via PlugIn IOCTL,
-	// and set to FALSE when a UnPlug IOCTL is received.
-	bool plugged;
+	// set to true when the vpdo is exposed via PlugIn IOCTL, and set to false when a UnPlug IOCTL is received
+	volatile bool plugged;
 
 	// a pending irp when no urb is requested
 	PIRP	pending_read_irp;

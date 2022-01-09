@@ -131,9 +131,11 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	if (relations_old) {
 		n_olds = relations_old->Count;
 	}
+	
+	auto plugged = get_plugged_vpdo_count(*vhub, false);
 
 	// Need to allocate a new relations structure and add our vpdos to it
-	ULONG length = sizeof(DEVICE_RELATIONS) + (vhub->n_vpdos_plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
+	ULONG length = sizeof(DEVICE_RELATIONS) + (plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
 
 	auto relations = (DEVICE_RELATIONS*)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
 	if (!relations) {
@@ -153,7 +155,9 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 		}
 	}
 
-	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
+	int total = 0;
+
+	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink, ++total) {
 
 		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		if (is_in_dev_relations(relations->Objects, n_news, vpdo)) {
@@ -161,8 +165,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 		}
 
 		if (vpdo->plugged) {
-			relations->Objects[n_news] = vpdo->Self;
-			n_news++;
+			relations->Objects[n_news++] = vpdo->Self;
 			ObReferenceObject(vpdo->Self);
 		}
 	}
@@ -170,7 +173,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	relations->Count = n_news;
 
 	Trace(TRACE_LEVEL_INFORMATION, "vhub vpdos: total %d, plugged %d; bus relations: old %lu, new %lu", 
-					get_vpdo_count(*vhub), vhub->n_vpdos_plugged, n_olds, n_news);
+					total, plugged, n_olds, n_news);
 
 	if (relations_old) {
 		ExFreePool(relations_old);
