@@ -12,11 +12,9 @@
 namespace
 {
 
-PAGEABLE void vhci_init_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE auto vhci_init_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
-
-	TraceCall("%p, port %d", vpdo, vpdo->port);
 
 	vpdo->plugged = true;
 
@@ -34,13 +32,18 @@ PAGEABLE void vhci_init_vpdo(vpdo_dev_t *vpdo)
 	InitializeListHead(&vpdo->head_urbr_sent);
 	KeInitializeSpinLock(&vpdo->lock_urbr);
 
-	to_devobj(vpdo)->Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
+	auto &Flags = to_devobj(vpdo)->Flags;
+	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
-	InitializeListHead(&vpdo->Link);
+	if (auto port = vhub_attach_vpdo(vpdo)) {
+		TraceCall("%p port %d", vpdo, port);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Can't acquire free port");
+		return STATUS_END_OF_FILE;
+	}
 
-	vhub_attach_vpdo(vhub_from_vpdo(vpdo), vpdo);
-
-	to_devobj(vpdo)->Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
+	Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
+	return STATUS_SUCCESS;
 }
 
 PAGEABLE auto setup_vpdo_with_descriptor(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &d)
@@ -121,28 +124,15 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto vhub = vhub_from_vhci(vhci);
-
-	auto port = acquire_port(*vhub);
-	if (!port) {
-		Trace(TRACE_LEVEL_ERROR, "Can't acquire free port");
-		return STATUS_END_OF_FILE;
-	}
-
-	pluginfo->port = static_cast<char>(port);
-	NT_ASSERT(pluginfo->port == port);
-
 	auto devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
 	if (!devobj) {
-		release_port(*vhub, port);
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	auto vpdo = devobj_to_vpdo_or_null(devobj);
 
 	vpdo->devid = pluginfo->devid;
-	vpdo->parent = vhub;
-	vpdo->port = port;
+	vpdo->parent = vhub_from_vhci(vhci);
 
 	if (auto err = setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev)) {
 		IoDeleteDevice(devobj);
@@ -156,15 +146,21 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
 
-	auto devpdo_old = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr);
-	if (devpdo_old) {
+	if (InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr)) {
 		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
 		IoDeleteDevice(devobj);
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	vpdo->fo = fo;
-	vhci_init_vpdo(vpdo);
+	
+	if (auto err = vhci_init_vpdo(vpdo)) {
+		IoDeleteDevice(devobj);
+		return err;
+	}
+
+	pluginfo->port = static_cast<char>(vpdo->port);
+	NT_ASSERT(pluginfo->port == vpdo->port);
 
 	// Device Relation changes if a new vpdo is created. So let
 	// the PNP system now about that. This forces it to send bunch of pnp

@@ -93,8 +93,6 @@ PAGEABLE void init_dev_vhub(vdev_t *vdev)
 	auto vhub = static_cast<vhub_dev_t*>(vdev);
 
 	ExInitializeFastMutex(&vhub->Mutex);
-	InitializeListHead(&vhub->head_vpdo);
-
 	vhub->OutstandingIO = 1;
 
 	// Initialize the remove event to Not-Signaled.  This event

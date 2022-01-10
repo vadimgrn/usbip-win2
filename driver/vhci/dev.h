@@ -3,7 +3,6 @@
 #include <ntddk.h>
 #include <wmilib.h>	// required for WMILIB_CONTEXT
 
-#include "ch11.h"
 #include "devconf.h"
 #include "usbdsc.h"
 
@@ -92,29 +91,6 @@ struct hpdo_dev_t : vdev_t
 {
 };
 
-// The device extension of the vhub.  From whence vpdo's are born.
-struct vhub_dev_t : vdev_t
-{
-	// List of vpdo's created so far
-	LIST_ENTRY head_vpdo;
-
-	enum { NUM_PORTS = USB_SS_MAXPORTS, PORTS_MASK = ~(ULONG(-1) << NUM_PORTS) };
-	volatile LONG bm_ports; // bitmap of free/used ports
-
-	// A synchronization for access to the device extension
-	FAST_MUTEX Mutex;
-
-	// The number of IRPs sent from the bus to the underlying device object
-	LONG OutstandingIO; // Biased to 1
-
-	UNICODE_STRING DevIntfRootHub;
-
-	// On remove device plug & play request we must wait until all outstanding
-	// requests have been completed before we can actually delete the device
-	// object. This event is when the Outstanding IO count goes to zero
-	KEVENT RemoveEvent;
-};
-
 // The device extension for the vpdo.
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
@@ -142,9 +118,6 @@ struct vpdo_dev_t : vdev_t
 	UNICODE_STRING usb_dev_interface;
 	int port; // unique port number of the device on the bus, [1, vhub_dev_t::NUM_PORTS]
 
-	// Link point to hold all the vpdos for a single bus together
-	LIST_ENTRY Link;
-
 	// set to true when the vpdo is exposed via PlugIn IOCTL, and set to false when a UnPlug IOCTL is received
 	volatile bool plugged;
 
@@ -164,6 +137,26 @@ struct vpdo_dev_t : vdev_t
 	PFILE_OBJECT	fo;
 	unsigned int	devid;
 	unsigned long	seqnum;
+};
+
+// The device extension of the vhub.  From whence vpdo's are born.
+struct vhub_dev_t : vdev_t
+{
+	// A synchronization for access to the device extension
+	FAST_MUTEX Mutex;
+
+	enum { NUM_PORTS = 8 }; // see USB_SS_MAXPORTS
+	vpdo_dev_t *vpdo[NUM_PORTS];
+
+	// The number of IRPs sent from the bus to the underlying device object
+	LONG OutstandingIO; // Biased to 1
+
+	UNICODE_STRING DevIntfRootHub;
+
+	// On remove device plug & play request we must wait until all outstanding
+	// requests have been completed before we can actually delete the device
+	// object. This event is when the Outstanding IO count goes to zero
+	KEVENT RemoveEvent;
 };
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);

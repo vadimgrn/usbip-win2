@@ -90,17 +90,14 @@ PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pd
 	return STATUS_SUCCESS;
 }
 
-vpdo_dev_t *
-	find_managed_vpdo(vhub_dev_t * vhub, PDEVICE_OBJECT devobj)
+vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
 {
-	PLIST_ENTRY	entry;
-
-	for (entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink) {
-		vpdo_dev_t *	vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
-		if (vpdo->Self == devobj) {
-			return vpdo;
+	for (auto i: vhub->vpdo) {
+		if (i && i->Self == devobj) {
+			return i;
 		}
 	}
+
 	return nullptr;
 }
 
@@ -132,7 +129,14 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 		n_olds = relations_old->Count;
 	}
 	
-	auto plugged = get_plugged_vpdo_count(*vhub, false);
+	int total = 0;
+	int plugged = 0;
+	for (auto i: vhub->vpdo) { 
+		if (i) {
+			plugged += i->plugged;
+			++total;
+		}
+	}
 
 	// Need to allocate a new relations structure and add our vpdos to it
 	ULONG length = sizeof(DEVICE_RELATIONS) + (plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
@@ -155,11 +159,12 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 		}
 	}
 
-	int total = 0;
+	for (auto vpdo: vhub->vpdo) {
 
-	for (auto entry = vhub->head_vpdo.Flink; entry != &vhub->head_vpdo; entry = entry->Flink, ++total) {
+		if (!vpdo) {
+			continue;
+		}
 
-		auto vpdo = CONTAINING_RECORD(entry, vpdo_dev_t, Link);
 		if (is_in_dev_relations(relations->Objects, n_news, vpdo)) {
 			continue;
 		}

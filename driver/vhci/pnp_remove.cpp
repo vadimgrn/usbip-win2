@@ -110,8 +110,10 @@ PAGEABLE void invalidate_vhub(vhub_dev_t *vhub)
 	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhub device object %p", to_devobj(vhub));
 
 	// At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos.
-	if (vhub->bm_ports) {
-		Trace(TRACE_LEVEL_ERROR, "Some ports are still acquired, bm_ports %#04lx", vhub->bm_ports);
+	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
+		if (auto p = vhub->vpdo[i]) {
+			Trace(TRACE_LEVEL_ERROR, "Port[%d] is still acquired by %p", i, p);
+		}
 	}
 }
 
@@ -155,7 +157,7 @@ PAGEABLE void invalidate_vpdo(vpdo_dev_t *vpdo)
 	complete_pending_read_irp(vpdo);
 	complete_pending_irp(vpdo);
 
-	vhub_detach_vpdo_and_release_port(vhub_from_vpdo(vpdo), vpdo);
+	vhub_detach_vpdo(vpdo);
 
 	free_usb_dev_interface(&vpdo->usb_dev_interface);
 	free_strings(*vpdo);
