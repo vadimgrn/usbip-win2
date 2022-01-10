@@ -12,6 +12,7 @@
 #include "pnp_start.h"
 #include "pnp_remove.h"
 #include "pnp_resources.h"
+#include "vhub.h"
 
 #include <wdmguid.h>
 
@@ -26,6 +27,8 @@ PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
+
 	SET_NEW_PNP_STATE(vdev, StopPending);
 	return irp_pass_down_or_success(vdev, irp);
 }
@@ -33,6 +36,7 @@ PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 
 	if (vdev->DevicePnPState == StopPending) {
 		// We did receive a query-stop, so restore.
@@ -46,6 +50,8 @@ PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
+
 	SET_NEW_PNP_STATE(vdev, Stopped);
 	return irp_pass_down_or_success(vdev, irp);
 }
@@ -53,9 +59,10 @@ PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 
-	if (vdev->type == VDEV_VPDO) { // cannot be removed
-		vhub_mark_unplugged_vpdo(vhub_from_vpdo((vpdo_dev_t*)vdev), (vpdo_dev_t*)vdev);
+	if (vdev->type == VDEV_VPDO) {
+		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
 	}
 
 	SET_NEW_PNP_STATE(vdev, RemovePending);
@@ -65,6 +72,7 @@ PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 
 	if (vdev->DevicePnPState == RemovePending) {
 		RESTORE_PREVIOUS_PNP_STATE(vdev);
@@ -76,6 +84,8 @@ PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
+
 	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);
 	return irp_pass_down_or_success(vdev, irp);
 }
@@ -93,25 +103,28 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 
 	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(bi);
 
-	NTSTATUS st = bi ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+	auto st = bi ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 	return irp_done(irp, st);
 }
 
-PAGEABLE NTSTATUS pnp_0x0E(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_read_config(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_write_config(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done_iostatus(irp);
 }
 
@@ -125,25 +138,27 @@ PAGEABLE NTSTATUS pnp_write_config(vdev_t*, IRP *irp)
 PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 
 	if (vdev->type == VDEV_VPDO) {
-		vpdo_dev_t* vpdo = (vpdo_dev_t*)vdev;
-		vhub_mark_unplugged_vpdo(vhub_from_vpdo(vpdo), vpdo);
+		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
 		return irp_done_success(irp);
 	}
 
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_set_lock(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done_iostatus(irp);
 }
 
-PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 
 	irp->IoStatus.Information = 0;
 	return irp_done_success(irp);
@@ -156,15 +171,17 @@ PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t*, IRP *irp)
 * contain a memory file namely paging file, dump file,
 * or hibernation file. So we  fail this Irp.
 */
-PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done(irp, STATUS_UNSUCCESSFUL);
 }
 
-PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done_iostatus(irp);
 }
 
@@ -172,9 +189,10 @@ PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t*, IRP *irp)
 * This request notifies bus drivers that a device object exists and
 * that it has been fully enumerated by the plug and play manager.
 */
-PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceCall("%p", vdev);
 	return irp_done_success(irp);
 }
 

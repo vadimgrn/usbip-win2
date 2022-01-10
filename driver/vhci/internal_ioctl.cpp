@@ -447,7 +447,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 		return irp_done(Irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
-	if (!vpdo->plugged) {
+	if (vpdo->unplugged) {
 		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
 		Trace(TRACE_LEVEL_VERBOSE, "%!STATUS!", st);
 		return irp_done(Irp, st);

@@ -133,7 +133,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	int plugged = 0;
 	for (auto i: vhub->vpdo) { 
 		if (i) {
-			plugged += i->plugged;
+			plugged += !i->unplugged;
 			++total;
 		}
 	}
@@ -151,11 +151,11 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	for (ULONG i = 0; i < n_olds; ++i) {
 		auto devobj = relations_old->Objects[i];
 		auto vpdo = find_managed_vpdo(vhub, devobj);
-		if (!vpdo || vpdo->plugged) {
-			relations->Objects[n_news] = devobj;
-			n_news++;
-		} else {
+		if (vpdo && vpdo->unplugged) {
 			ObDereferenceObject(devobj);
+		} else {
+			relations->Objects[n_news] = devobj;
+			++n_news;
 		}
 	}
 
@@ -169,7 +169,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 			continue;
 		}
 
-		if (vpdo->plugged) {
+		if (!vpdo->unplugged) {
 			relations->Objects[n_news++] = vpdo->Self;
 			ObReferenceObject(vpdo->Self);
 		}

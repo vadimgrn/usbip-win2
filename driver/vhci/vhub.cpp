@@ -29,7 +29,7 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 	return vpdo;
 }
 
-PAGEABLE int vhub_attach_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
@@ -59,6 +59,10 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 	PAGED_CODE();
 
 	TraceCall("%p, port %d", vpdo, vpdo->port);
+
+	if (!vpdo->port) { // was not attached
+		return;
+	}
 
 	auto vhub = vhub_from_vpdo(vpdo);
 
@@ -163,22 +167,23 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo)
+PAGEABLE void vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
 	NT_ASSERT(vpdo);
-	static_assert(sizeof(vpdo->plugged) == sizeof(CHAR));
+	static_assert(sizeof(vpdo->unplugged) == sizeof(CHAR));
 
-	if (InterlockedExchange8(reinterpret_cast<volatile CHAR*>(&vpdo->plugged), false)) {
-		IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
-		Trace(TRACE_LEVEL_INFORMATION, "Device is marked as unplugged, port %d", vpdo->port);
+	if (InterlockedExchange8(reinterpret_cast<volatile CHAR*>(&vpdo->unplugged), true)) {
+		Trace(TRACE_LEVEL_INFORMATION, "Device was already unplugged, port %d", vpdo->port);
 	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "Device was already marked as unplugged, port %d", vpdo->port);
+		Trace(TRACE_LEVEL_INFORMATION, "Unplugging device %p on port %d", vpdo, vpdo->port);
+		auto vhub = vhub_from_vpdo(vpdo);
+		IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
 	}
 }
 
-PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t *vhub)
+PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
 {
 	PAGED_CODE();
 
@@ -186,19 +191,24 @@ PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t *vhub)
 
 	for (auto i: vhub->vpdo) {
 		if (i) {
-			vhub_mark_unplugged_vpdo(vhub, i);
+			vhub_unplug_vpdo(i);
 		}
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status *st)
+PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	st->n_max_ports = vhub->NUM_PORTS;
-	NT_ASSERT(st->n_max_ports == vhub->NUM_PORTS);
+	if (*poutlen != sizeof(st)) {
+		*poutlen = sizeof(st);
+		STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	st.n_max_ports = vhub->NUM_PORTS;
+	NT_ASSERT(st.n_max_ports == vhub->NUM_PORTS);
 
 	int acquired = 0;
 
@@ -206,7 +216,7 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_p
 
 	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
 		bool busy = vhub->vpdo[i];
-		st->port_status[i] = busy;
+		st.port_status[i] = busy;
 		acquired += busy;
 	}
 

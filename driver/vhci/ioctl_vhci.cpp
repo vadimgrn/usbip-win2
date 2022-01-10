@@ -104,22 +104,21 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		status = vhci_plugin_vpdo(vhci, (vhci_pluginfo_t*)buffer, inlen, irpstack->FileObject);
+		status = vhci_plugin_vpdo(vhci, static_cast<vhci_pluginfo_t*>(buffer), inlen, irpstack->FileObject);
 		*poutlen = sizeof(vhci_pluginfo_t);
 		break;
+	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
+		*poutlen = 0;
+		status = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
+			vhci_unplug_vpdo(vhci, static_cast<ioctl_usbip_vhci_unplug*>(buffer)->addr) :
+			STATUS_INVALID_BUFFER_SIZE;
+		break;
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
-		if (*poutlen == sizeof(ioctl_usbip_vhci_get_ports_status))
-			status = vhub_get_ports_status(vhub_from_vhci(vhci), (ioctl_usbip_vhci_get_ports_status *)buffer);
+		status = vhub_get_ports_status(vhub_from_vhci(vhci), *static_cast<ioctl_usbip_vhci_get_ports_status*>(buffer), poutlen);
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
 		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
 						*poutlen/sizeof(ioctl_usbip_vhci_imported_dev));
-		break;
-	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
-		if (inlen == sizeof(ioctl_usbip_vhci_unplug)) {
-			status = vhci_unplug_port(vhci, ((ioctl_usbip_vhci_unplug *)buffer)->addr);
-		}
-		*poutlen = 0;
 		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:
 		status = get_hcd_driverkey_name(vhci, buffer, poutlen);

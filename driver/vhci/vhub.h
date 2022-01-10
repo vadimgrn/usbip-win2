@@ -6,7 +6,7 @@
 
 PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port);
 
-PAGEABLE int vhub_attach_vpdo(vpdo_dev_t *vpdo);
+PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo);
 PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo);
 
 PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &pdesc);
@@ -16,14 +16,11 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t *vhub, USB_HUB_CAPABILITIES_EX &pinfo);
 PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES *pinfo, ULONG *poutlen);
 
-PAGEABLE void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo);
-PAGEABLE void vhub_mark_unplugged_all_vpdos(vhub_dev_t *vhub);
+PAGEABLE void vhub_unplug_vpdo(vpdo_dev_t *vpdo);
+PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub);
 
-PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status *st);
+PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG *poutlen);
 PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, size_t cnt);
-
-PAGEABLE int get_vpdo_count(const vhub_dev_t &vhub);
-PAGEABLE int get_plugged_vpdo_count(vhub_dev_t &vhub, bool lock = true);
 
 PAGEABLE constexpr auto is_valid_port(int port)
 {

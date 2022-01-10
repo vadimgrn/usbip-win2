@@ -686,10 +686,10 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		auto irpstack = IoGetCurrentIrpStackLocation(irp);
 		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
 		
-		if (vpdo && vpdo->plugged) {
+		if (vpdo && !vpdo->unplugged) {
 			status = do_write_irp(vpdo, irp);
 		} else {
-			Trace(TRACE_LEVEL_VERBOSE, "null or unplugged");
+			Trace(TRACE_LEVEL_VERBOSE, "Null or unplugged");
 			status = STATUS_INVALID_DEVICE_REQUEST;
 		}
 	}

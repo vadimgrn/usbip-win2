@@ -93,6 +93,9 @@ struct hpdo_dev_t : vdev_t
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
+	int port; // unique port number of the device on the bus, [1, vhub_dev_t::NUM_PORTS]
+	volatile bool unplugged; // see IOCTL_USBIP_VHCI_UNPLUG_HARDWARE
+
 	USB_DEVICE_DESCRIPTOR descriptor;
 
 	usb_device_speed speed; // corresponding speed for descriptor.bcdUSB 
@@ -114,10 +117,6 @@ struct vpdo_dev_t : vdev_t
 	ULONG current_frame_number;
 
 	UNICODE_STRING usb_dev_interface;
-	int port; // unique port number of the device on the bus, [1, vhub_dev_t::NUM_PORTS]
-
-	// set to true when the vpdo is exposed via PlugIn IOCTL, and set to false when a UnPlug IOCTL is received
-	volatile bool plugged;
 
 	// a pending irp when no urb is requested
 	PIRP	pending_read_irp;
@@ -164,7 +163,7 @@ inline void vdev_del_ref(vdev_t*) {}
 
 vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port);
 
-void vhub_mark_unplugged_vpdo(vhub_dev_t *vhub, vpdo_dev_t *vpdo);
+void vhub_mark_unplugged_vpdo(vpdo_dev_t *vpdo);
 
 LPWSTR get_device_prop(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, ULONG *plen);
 

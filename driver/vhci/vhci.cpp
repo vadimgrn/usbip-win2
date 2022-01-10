@@ -2,10 +2,10 @@
 #include "trace.h"
 #include "vhci.tmh"
 
-#include "plugin.h"
 #include "usbreq.h"
 #include "pnp.h"
 #include "irp.h"
+#include "vhub.h"
 
 #include <ntstrsafe.h>
 #include <usbdi.h>
@@ -16,18 +16,17 @@ NPAGED_LOOKASIDE_LIST g_lookaside;
 namespace
 {
 
-PAGEABLE void cleanup_vpdo(vhci_dev_t * vhci, PIRP irp)
+PAGEABLE void cleanup_vpdo(IRP *irp)
 {
 	PAGED_CODE();
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto &FsContext = irpstack->FileObject->FsContext;
 
-	if (auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext)) {
+	if (auto vpdo = static_cast<vpdo_dev_t*>(FsContext)) {
 		vpdo->fo = nullptr;
-		irpstack->FileObject->FsContext = nullptr;
-		if (vpdo->plugged) {
-			vhci_unplug_port(vhci, vpdo->port);
-		}
+		FsContext = nullptr;
+		vhub_unplug_vpdo(vpdo);
 	}
 }
 
@@ -52,7 +51,7 @@ PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
-	vdev_t *vdev = devobj_to_vdev(devobj);
+	auto vdev = devobj_to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
@@ -62,7 +61,7 @@ PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	if (vdev->type == VDEV_VHCI) {
-		cleanup_vpdo((vhci_dev_t*)vdev, irp);
+		cleanup_vpdo(irp);
 	}
 
 	irp->IoStatus.Information = 0;

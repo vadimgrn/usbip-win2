@@ -8,6 +8,7 @@
 #include "usb_util.h"
 #include "usbdsc.h"
 #include "vhci.h"
+#include "pnp_remove.h"
 
 namespace
 {
@@ -15,8 +16,6 @@ namespace
 PAGEABLE auto vhci_init_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
-
-	vpdo->plugged = true;
 
 	vpdo->current_intf_num = 0;
 	vpdo->current_intf_alt = 0;
@@ -35,9 +34,7 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t *vpdo)
 	auto &Flags = to_devobj(vpdo)->Flags;
 	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
-	if (auto port = vhub_attach_vpdo(vpdo)) {
-		TraceCall("%p port %d", vpdo, port);
-	} else {
+	if (!vhub_attach_vpdo(vpdo)) {
 		Trace(TRACE_LEVEL_ERROR, "Can't acquire free port");
 		return STATUS_END_OF_FILE;
 	}
@@ -95,8 +92,9 @@ PAGEABLE auto setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, const USB_CONFIGURATION
 		vpdo->bDeviceClass = i->bInterfaceClass;
 		vpdo->bDeviceSubClass = i->bInterfaceSubClass;
 		vpdo->bDeviceProtocol = i->bInterfaceProtocol;
-		Trace(TRACE_LEVEL_VERBOSE, "Set Class/SubClass/Protocol from bInterfaceNumber %d, bAlternateSetting %d",
-						i->bInterfaceNumber, i->bAlternateSetting);
+		Trace(TRACE_LEVEL_VERBOSE, "Set Class(%#02x)/SubClass(%#02x)/Protocol(%#02x) from bInterfaceNumber %d, bAlternateSetting %d",
+					vpdo->bDeviceClass, vpdo->bDeviceSubClass, vpdo->bDeviceProtocol,
+					i->bInterfaceNumber, i->bAlternateSetting);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
 		return STATUS_INVALID_PARAMETER;
@@ -135,33 +133,33 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	vpdo->parent = vhub_from_vhci(vhci);
 
 	if (auto err = setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev)) {
-		IoDeleteDevice(devobj);
+		destroy_device(vpdo);
 		return err;
 	}
 	
 	if (auto err = setup_vpdo_with_dsc_conf(vpdo, pluginfo->dscr_conf)) {
-		IoDeleteDevice(devobj);
+		destroy_device(vpdo);
 		return err;
 	}
 
-	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
-
-	if (InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr)) {
-		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
-		IoDeleteDevice(devobj);
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	vpdo->fo = fo;
-	
 	if (auto err = vhci_init_vpdo(vpdo)) {
-		IoDeleteDevice(devobj);
+		destroy_device(vpdo);
 		return err;
 	}
 
 	pluginfo->port = static_cast<char>(vpdo->port);
 	NT_ASSERT(pluginfo->port == vpdo->port);
 
+	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
+
+	if (InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr)) {
+		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
+		destroy_device(vpdo);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	vpdo->fo = fo;
+	
 	// Device Relation changes if a new vpdo is created. So let
 	// the PNP system now about that. This forces it to send bunch of pnp
 	// queries and cause the function driver to be loaded.
@@ -170,7 +168,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t *vhci, int port)
+PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)
 {
 	PAGED_CODE();
 
@@ -181,21 +179,17 @@ PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t *vhci, int port)
 	}
 
 	if (port < 0) {
-		Trace(TRACE_LEVEL_INFORMATION, "Plugging out all the devices!");
-		vhub_mark_unplugged_all_vpdos(vhub);
+		Trace(TRACE_LEVEL_INFORMATION, "Plugging out all the devices");
+		vhub_unplug_all_vpdo(vhub);
 		return STATUS_SUCCESS;
 	}
 
-	auto vpdo = vhub_find_vpdo(vhub, port);
-	if (!vpdo) {
-		Trace(TRACE_LEVEL_INFORMATION, "No matching vpdo, port %d", port);
-		return STATUS_NO_SUCH_DEVICE;
+	if (auto vpdo = vhub_find_vpdo(vhub, port)) {
+		vhub_unplug_vpdo(vpdo);
+		vdev_del_ref(vpdo);
+		return STATUS_SUCCESS;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Plugging out device, port %d", port);
-
-	vhub_mark_unplugged_vpdo(vhub, vpdo);
-	vdev_del_ref(vpdo);
-
-	return STATUS_SUCCESS;
+	Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", port);
+	return STATUS_NO_SUCH_DEVICE;
 }
