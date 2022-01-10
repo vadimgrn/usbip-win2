@@ -170,7 +170,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t * vhci, int port)
+PAGEABLE NTSTATUS vhci_unplug_port(vhci_dev_t *vhci, int port)
 {
 	PAGED_CODE();
 
