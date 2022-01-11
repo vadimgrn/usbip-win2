@@ -22,7 +22,6 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 	auto vpdo = vhub->vpdo[port - 1];
 	if (vpdo) {
 		NT_ASSERT(vpdo->port == port);
-		vdev_add_ref(vpdo);
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);

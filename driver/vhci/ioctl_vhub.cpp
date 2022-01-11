@@ -47,7 +47,6 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 
 	if (auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex)) {
 		auto st = vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
-		vdev_del_ref(vpdo);
 		return st;
 	}
 
@@ -67,7 +66,6 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, void *buffer, ULONG 
 
 	if (auto vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex)) {
 		auto st = vpdo_get_nodeconn_info_ex_v2(vpdo, *conninfo, poutlen);
-		vdev_del_ref(vpdo);
 		return st;
 	}
 
@@ -87,7 +85,6 @@ PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void 
 
 	if (auto vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex)) {
 		auto st = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
-		vdev_del_ref(vpdo);
 		return st;
 	}
 
@@ -177,7 +174,6 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, void *buffer, ULONG 
 		ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
 	}
 
-	vdev_del_ref(vpdo);
 	return status;
 }
 

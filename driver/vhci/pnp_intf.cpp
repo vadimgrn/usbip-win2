@@ -20,15 +20,8 @@
 namespace
 {
 
-void InterfaceReference(__in PVOID Context)
-{
-	vdev_add_ref(static_cast<vdev_t*>(Context));
-}
-
-void InterfaceDereference(__in PVOID Context)
-{
-	vdev_del_ref(static_cast<vdev_t*>(Context));
-}
+void InterfaceReference(__in PVOID /*Context*/) {}
+void InterfaceDereference(__in PVOID /*Context*/) {}
 
 /*
  * @return true if device is operating at high speed

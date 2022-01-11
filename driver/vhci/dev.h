@@ -150,9 +150,6 @@ struct vhub_dev_t : vdev_t
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 
-inline void vdev_add_ref(vdev_t*) {}
-inline void vdev_del_ref(vdev_t*) {}
-
 vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port);
 
 void vhub_mark_unplugged_vpdo(vpdo_dev_t *vpdo);
