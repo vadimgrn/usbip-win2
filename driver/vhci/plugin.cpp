@@ -31,7 +31,7 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t *vpdo)
 	InitializeListHead(&vpdo->head_urbr_sent);
 	KeInitializeSpinLock(&vpdo->lock_urbr);
 
-	auto &Flags = to_devobj(vpdo)->Flags;
+	auto &Flags = vpdo->Self->Flags;
 	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
 	if (!vhub_attach_vpdo(vpdo)) {
@@ -122,7 +122,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto devobj = vdev_create(to_devobj(vhci)->DriverObject, VDEV_VPDO);
+	auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
 	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
 	}

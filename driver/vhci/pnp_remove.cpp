@@ -98,7 +98,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t *vhci)
 	// Inform WMI to remove this DeviceObject from its list of providers.
 	dereg_wmi(vhci);
 
-	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object: %p", to_devobj(vhci));
+	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object: %p", vhci->Self);
 }
 
 PAGEABLE void destroy_vhub(vhub_dev_t *vhub)

@@ -205,6 +205,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
+	TraceCall("%p", vhci);
 
 	vhci->WmiLibInfo.GuidCount = ARRAYSIZE(USBIPBusWmiGuidList);
 	vhci->WmiLibInfo.GuidList = USBIPBusWmiGuidList;
@@ -216,7 +217,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	vhci->WmiLibInfo.WmiFunctionControl = nullptr;
 
 	// Register with WMI
-	NTSTATUS status = IoWMIRegistrationControl(to_devobj(vhci), WMIREG_ACTION_REGISTER);
+	NTSTATUS status = IoWMIRegistrationControl(vhci->Self, WMIREG_ACTION_REGISTER);
 
 	// Initialize the Std device data structure
 	vhci->StdUSBIPBusData.ErrorCount = 0;
@@ -229,6 +230,6 @@ PAGEABLE NTSTATUS
 dereg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
-
-	return IoWMIRegistrationControl(to_devobj(vhci), WMIREG_ACTION_DEREGISTER);
+	TraceCall("%p", vhci);
+	return IoWMIRegistrationControl(vhci->Self, WMIREG_ACTION_DEREGISTER);
 }

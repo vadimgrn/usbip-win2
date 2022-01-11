@@ -77,7 +77,7 @@ PAGEABLE auto start_vpdo(vpdo_dev_t *vpdo)
 	auto iface = &vpdo->usb_dev_interface;
 	NT_ASSERT(!iface->Buffer);
 
-	if (auto err = IoRegisterDeviceInterface(to_devobj(vpdo), &GUID_DEVINTERFACE_USB_DEVICE, nullptr, iface)) {
+	if (auto err = IoRegisterDeviceInterface(vpdo->Self, &GUID_DEVINTERFACE_USB_DEVICE, nullptr, iface)) {
 		Trace(TRACE_LEVEL_ERROR, "IoRegisterDeviceInterface %!STATUS!", err);
 		return err;
 	}
