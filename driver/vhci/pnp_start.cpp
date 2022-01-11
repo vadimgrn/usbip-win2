@@ -36,36 +36,37 @@ PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 	return status;
 }
 
-PAGEABLE NTSTATUS start_vhub(vhub_dev_t * vhub)
+PAGEABLE NTSTATUS start_vhub(vhub_dev_t *vhub)
 {
 	PAGED_CODE();
 
-	vhci_dev_t *	vhci;
-	NTSTATUS	status;
-
-	status = IoRegisterDeviceInterface(vhub->pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HUB, nullptr, &vhub->DevIntfRootHub);
+	auto status = IoRegisterDeviceInterface(vhub->pdo, &GUID_DEVINTERFACE_USB_HUB, nullptr, &vhub->DevIntfRootHub);
 	if (NT_ERROR(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to register USB root hub device interface: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "IoRegisterDeviceInterface %!STATUS!", status);
 		return STATUS_UNSUCCESSFUL;
 	}
+
 	status = IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, TRUE);
 	if (NT_ERROR(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to activate USB root hub device interface: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState(RootHub) %!STATUS!", status);
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	vhci = (vhci_dev_t *)vhub->parent;
+	auto vhci = static_cast<vhci_dev_t*>(vhub->parent);
+
 	status = IoSetDeviceInterfaceState(&vhci->DevIntfVhci, TRUE);
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to enable vhci device interface: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState(Vhci) %!STATUS!", status);
 		return status;
 	}
+	
 	status = IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, TRUE);
 	if (!NT_SUCCESS(status)) {
 		IoSetDeviceInterfaceState(&vhci->DevIntfVhci, FALSE);
-		Trace(TRACE_LEVEL_ERROR, "failed to enable USB host controller device interface: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState(USBHC) %!STATUS!", status);
 		return status;
 	}
+	
 	return STATUS_SUCCESS;
 }
 

@@ -73,15 +73,11 @@ PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
 	pcaps->UINumber = 1;
 }
 
-PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpstack)
+PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t *vpdo, IO_STACK_LOCATION *irpstack)
 {
 	PAGED_CODE();
 
-	PDEVICE_CAPABILITIES	pcaps;
-	DEVICE_CAPABILITIES	caps_parent;
-	NTSTATUS		status;
-
-	pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
+	auto pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
 
 	// Set the capabilities.
 	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
@@ -90,7 +86,9 @@ PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpst
 	}
 
 	// Get the device capabilities of the root pdo
-	status = get_device_capabilities(vpdo->parent->parent->parent->devobj_lower, &caps_parent);
+	DEVICE_CAPABILITIES caps_parent{};
+
+	auto status = get_device_capabilities(vpdo->parent->parent->parent->devobj_lower, &caps_parent);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to get device capabilities from root device: %!STATUS!", status);
 		return status;
@@ -112,14 +110,17 @@ PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t * vpdo, PIO_STACK_LOCATION irpst
 	// Our device just supports D0 and D3.
 	pcaps->DeviceState[PowerSystemWorking] = PowerDeviceD0;
 
-	if (pcaps->DeviceState[PowerSystemSleeping1] != PowerDeviceD0)
+	if (pcaps->DeviceState[PowerSystemSleeping1] != PowerDeviceD0) {
 		pcaps->DeviceState[PowerSystemSleeping1] = PowerDeviceD1;
+	}
 
-	if (pcaps->DeviceState[PowerSystemSleeping2] != PowerDeviceD0)
+	if (pcaps->DeviceState[PowerSystemSleeping2] != PowerDeviceD0) {
 		pcaps->DeviceState[PowerSystemSleeping2] = PowerDeviceD3;
+	}
 
-	if (pcaps->DeviceState[PowerSystemSleeping3] != PowerDeviceD0)
+	if (pcaps->DeviceState[PowerSystemSleeping3] != PowerDeviceD0) {
 		pcaps->DeviceState[PowerSystemSleeping3] = PowerDeviceD3;
+	}
 
 	// We can wake the system from D1
 	pcaps->DeviceWake = PowerDeviceD0;
