@@ -139,7 +139,6 @@ struct vpdo_dev_t : vdev_t
 // The device extension of the vhub.  From whence vpdo's are born.
 struct vhub_dev_t : vdev_t
 {
-	// A synchronization for access to the device extension
 	FAST_MUTEX Mutex;
 
 	enum { NUM_PORTS = 8 }; // see USB_SS_MAXPORTS
@@ -168,14 +167,14 @@ inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 	return reinterpret_cast<vhub_dev_t*>(vpdo->parent);
 }
 
-inline auto devobj_to_vdev(DEVICE_OBJECT *devobj)
+inline auto to_vdev(DEVICE_OBJECT *devobj)
 { 
 	NT_ASSERT(devobj);
 	return static_cast<vdev_t*>(devobj->DeviceExtension); 
 }
 
-cpdo_dev_t *devobj_to_cpdo_or_null(DEVICE_OBJECT *devobj);
-vhci_dev_t *devobj_to_vhci_or_null(DEVICE_OBJECT *devobj);
-hpdo_dev_t *devobj_to_hpdo_or_null(DEVICE_OBJECT *devobj);
-vhub_dev_t *devobj_to_vhub_or_null(DEVICE_OBJECT *devobj);
-vpdo_dev_t *devobj_to_vpdo_or_null(DEVICE_OBJECT *devobj);
+cpdo_dev_t *to_cpdo_or_null(DEVICE_OBJECT *devobj);
+vhci_dev_t *to_vhci_or_null(DEVICE_OBJECT *devobj);
+hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
+vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
+vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);

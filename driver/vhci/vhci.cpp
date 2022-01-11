@@ -34,7 +34,7 @@ PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
 	PAGED_CODE();
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
@@ -51,7 +51,7 @@ PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
@@ -72,7 +72,7 @@ PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
 	PAGED_CODE();
 
-	vdev_t *vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 
 	if (vdev->DevicePnPState == Deleted) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);

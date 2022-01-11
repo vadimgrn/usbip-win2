@@ -238,7 +238,7 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 {
 	PAGED_CODE();
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	TraceCall("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);

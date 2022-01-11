@@ -83,7 +83,7 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 		return nullptr;
 	}
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 
 	vdev->DevicePnPState = NotStarted;
 	vdev->PreviousPnPState = NotStarted;
@@ -99,37 +99,37 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 	return devobj;
 }
 
-cpdo_dev_t *devobj_to_cpdo_or_null(DEVICE_OBJECT *devobj)
+cpdo_dev_t *to_cpdo_or_null(DEVICE_OBJECT *devobj)
 {
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_CPDO ? static_cast<cpdo_dev_t*>(vdev) : nullptr;
 }
 
-vhci_dev_t *devobj_to_vhci_or_null(DEVICE_OBJECT *devobj)
+vhci_dev_t *to_vhci_or_null(DEVICE_OBJECT *devobj)
 {
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VHCI ? static_cast<vhci_dev_t*>(vdev) : nullptr;
 }
 
-hpdo_dev_t *devobj_to_hpdo_or_null(DEVICE_OBJECT *devobj)
+hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj)
 {
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_HPDO ? static_cast<hpdo_dev_t*>(vdev) : nullptr;
 }
 
-vhub_dev_t *devobj_to_vhub_or_null(DEVICE_OBJECT *devobj)
+vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj)
 {
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VHUB ? static_cast<vhub_dev_t*>(vdev) : nullptr;
 }
 
-vpdo_dev_t *devobj_to_vpdo_or_null(DEVICE_OBJECT *devobj)
+vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)
 {
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VPDO ? static_cast<vpdo_dev_t*>(vdev) : nullptr;
 }

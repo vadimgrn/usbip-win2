@@ -106,7 +106,7 @@ NTSTATUS vhci_QueryWmiDataBlock(
 {
 	PAGED_CODE();
 
-	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
+	auto vhci = to_vhci_or_null(devobj);
 	ULONG		size = 0;
 	NTSTATUS	status;
 
@@ -139,7 +139,7 @@ NTSTATUS vhci_QueryWmiRegInfo(
 {
 	PAGED_CODE();
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 
 	*RegFlags = WMIREG_FLAG_INSTANCE_PDO;
 	*RegistryPath = &Globals.RegistryPath;
@@ -157,9 +157,9 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 
 	TraceCall("Enter irql %!irql!", KeGetCurrentIrql());
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	vhci_dev_t *vhci = devobj_to_vhci_or_null(devobj);
+	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
 		// The vpdo, just complete the request with the current status
 		Trace(TRACE_LEVEL_INFORMATION, "Skip %!sysctrl!", irpstack->MinorFunction);

@@ -41,7 +41,7 @@ PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 	PAGED_CODE();
 
 	for (DEVICE_OBJECT *devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
-		vdev_t *vdev = devobj_to_vdev(devobj);
+		vdev_t *vdev = to_vdev(devobj);
 		if (vdev->type == type) {
 			return vdev;
 		}
@@ -63,7 +63,7 @@ PAGEABLE vdev_t *create_child_pdo(vdev_t * vdev, vdev_type_t type)
 
 	devobj->Flags &= ~DO_DEVICE_INITIALIZING;
 
-	vdev_t *vdev_child = devobj_to_vdev(devobj);
+	auto vdev_child = to_vdev(devobj);
 	vdev_child->parent = vdev;
 
 	return vdev_child;
@@ -105,11 +105,11 @@ PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, 
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	vdev->pdo = pdo;
 
 	if (type != VDEV_ROOT) {
-		auto vdev_pdo = devobj_to_vdev(vdev->pdo);
+		auto vdev_pdo = to_vdev(vdev->pdo);
 		vdev->parent = vdev_pdo->parent;
 		vdev_pdo->fdo = vdev;
 	}

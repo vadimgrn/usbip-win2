@@ -127,7 +127,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	auto vpdo = devobj_to_vpdo_or_null(devobj);
+	auto vpdo = to_vpdo_or_null(devobj);
 
 	vpdo->devid = pluginfo->devid;
 	vpdo->parent = vhub_from_vhci(vhci);

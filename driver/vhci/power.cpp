@@ -105,7 +105,7 @@ NTSTATUS
 
 extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
-	vdev_t *vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	TraceCall("%!vdev_type_t!: irql %!irql!, %!powermn!", 

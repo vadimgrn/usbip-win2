@@ -200,7 +200,7 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 	}
 
 	if (vdev->pdo && vdev->type != VDEV_ROOT) {
-		devobj_to_vdev(vdev->pdo)->fdo = nullptr;
+		to_vdev(vdev->pdo)->fdo = nullptr;
 	}
 
 	switch (vdev->type) {

@@ -11,7 +11,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 {
 	PAGED_CODE();
 
-	auto vdev = devobj_to_vdev(devobj);
+	auto vdev = to_vdev(devobj);
 	auto status = STATUS_INVALID_DEVICE_REQUEST;
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);

@@ -1148,7 +1148,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 
 	TraceCall("Enter irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
 
-	auto vhci = devobj_to_vhci_or_null(devobj);
+	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
 		Trace(TRACE_LEVEL_ERROR, "read for non-vhci is not allowed");
 		return  irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);

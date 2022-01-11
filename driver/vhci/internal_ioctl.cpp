@@ -441,7 +441,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 
 	TraceCall("Enter irql %!irql!, %s(%#08lX)", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
 
-	auto vpdo = devobj_to_vpdo_or_null(devobj);
+	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
 		Trace(TRACE_LEVEL_WARNING, "Internal ioctl only for vpdo is allowed");
 		return irp_done(Irp, STATUS_INVALID_DEVICE_REQUEST);
