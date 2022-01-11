@@ -186,8 +186,7 @@ PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)
 	}
 
 	if (auto vpdo = vhub_find_vpdo(vhub, port)) {
-		vhub_unplug_vpdo(vpdo);
-		return STATUS_SUCCESS;
+		return vhub_unplug_vpdo(vpdo);
 	}
 
 	Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", port);

@@ -166,7 +166,7 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE void vhub_unplug_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
@@ -174,12 +174,16 @@ PAGEABLE void vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 	static_assert(sizeof(vpdo->unplugged) == sizeof(CHAR));
 
 	if (InterlockedExchange8(reinterpret_cast<volatile CHAR*>(&vpdo->unplugged), true)) {
-		Trace(TRACE_LEVEL_INFORMATION, "Device was already unplugged, port %d", vpdo->port);
-	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "Unplugging device %p on port %d", vpdo, vpdo->port);
-		auto vhub = vhub_from_vpdo(vpdo);
-		IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
+		Trace(TRACE_LEVEL_INFORMATION, "Device is already unplugged, port %d", vpdo->port);
+		return STATUS_OPERATION_IN_PROGRESS;
 	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Unplugging device %p on port %d", vpdo, vpdo->port);
+
+	auto vhub = vhub_from_vpdo(vpdo);
+	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);
+
+	return STATUS_SUCCESS;
 }
 
 PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
