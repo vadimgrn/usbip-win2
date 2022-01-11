@@ -145,15 +145,7 @@ struct vhub_dev_t : vdev_t
 	enum { NUM_PORTS = 8 }; // see USB_SS_MAXPORTS
 	vpdo_dev_t *vpdo[NUM_PORTS];
 
-	// The number of IRPs sent from the bus to the underlying device object
-	LONG OutstandingIO; // Biased to 1
-
 	UNICODE_STRING DevIntfRootHub;
-
-	// On remove device plug & play request we must wait until all outstanding
-	// requests have been completed before we can actually delete the device
-	// object. This event is when the Outstanding IO count goes to zero
-	KEVENT RemoveEvent;
 };
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);

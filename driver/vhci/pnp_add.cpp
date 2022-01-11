@@ -91,13 +91,7 @@ PAGEABLE void init_dev_vhub(vdev_t *vdev)
 	PAGED_CODE();
 
 	auto vhub = static_cast<vhub_dev_t*>(vdev);
-
 	ExInitializeFastMutex(&vhub->Mutex);
-	vhub->OutstandingIO = 1;
-
-	// Initialize the remove event to Not-Signaled.  This event
-	// will be set when the OutstandingIO will become 0.
-	KeInitializeEvent(&vhub->RemoveEvent, SynchronizationEvent, FALSE);
 }
 
 PAGEABLE NTSTATUS add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
