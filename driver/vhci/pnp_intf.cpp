@@ -24,6 +24,14 @@ void InterfaceReference(__in PVOID /*Context*/) {}
 void InterfaceDereference(__in PVOID /*Context*/) {}
 
 /*
+ * If return zero, QueryBusTime() will be called again and again.
+ */
+inline auto get_current_frame_number(const vpdo_dev_t &vpdo)
+{
+	return vpdo.current_frame_number ? vpdo.current_frame_number : 100;
+}
+
+/*
  * @return true if device is operating at high speed
  */
 BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(__in PVOID Context)
@@ -146,13 +154,12 @@ NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
 
 /*
  * @return the current 32-bit USB frame number
- * If return zero, this function will be called again and again.
  */
 NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID BusContext, _Out_opt_ ULONG *CurrentUsbFrame)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
-	*CurrentUsbFrame = vpdo->current_frame_number ? vpdo->current_frame_number : 100;
+	*CurrentUsbFrame = get_current_frame_number(*vpdo);
 	TraceCall("CurrentUsbFrame -> %lu", *CurrentUsbFrame);
 
 	return STATUS_SUCCESS;
@@ -169,7 +176,7 @@ NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID BusContext, _Out_opt_ ULONG *
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
-	*HighSpeedFrameCounter = (vpdo->current_frame_number ? vpdo->current_frame_number : 100)  << 3;
+	*HighSpeedFrameCounter = get_current_frame_number(*vpdo) << 3;
 	TraceCall("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter);
 
 	return STATUS_SUCCESS;
