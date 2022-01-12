@@ -1,7 +1,7 @@
 # USB/IP for Windows
 
-- This project aims to support both a USB/IP server and a client on Windows platform.
-
+- Implements USB/IP client for Windows (vhci driver) which is fully compatible with Linux USB/IP server.
+- USB/IP server for Windows (stub driver) is updated from the original repository AS IS.
 
 ## Build
 
@@ -25,8 +25,8 @@
 ## Install
 
 ### Windows USB/IP server
-- Prepare a Linux machine as a USB/IP client or Windows usbip-win VHCI client (tested on Ubuntu 16.04 with kernel 5.13.0-22 - USB/IP kernel module crash was observed on some other versions)
-  - `# modprobe vhci-hcd`
+- Prepare a Linux machine as a USB/IP client or Windows usbip-win VHCI client
+  - `$ sudo modprobe -a usbip-core vhci-hcd`
 - Install USB/IP test certificate
   - Install `driver/usbip_test.pfx` (password: usbip)
   - Certificate should be installed into
@@ -62,11 +62,11 @@ usbip.exe list -l
   - `# usbip attach -r <usbip server ip> -b 1-59`
 
 ### Windows USB/IP client
-- Prepare a Linux machine as a USB/IP server or Windows usbip-win stub server - (tested on Ubuntu 16.04 (kernel 4.15.0-29), 18.04, 20.04)
-  - `# modprobe usbip-host`
+- Prepare a Linux machine as a USB/IP server or Windows usbip-win stub server
+  - `$ sudo modprobe -a usbip-core usbip-host`
   - You can use virtual [usbip-vstub](https://github.com/vadimgrn/usbip-vstub) as a stub server
 - Run usbipd on a USB/IP server (Linux)
-  - `# usbipd -4 -d`
+  - `$ sudo usbipd -D`
 - Install USB/IP test certificate
   - Install `driver/usbip_test.pfx` (password: usbip)
   - Certificate should be installed into
@@ -132,13 +132,6 @@ tracefmt.exe -nosummary -p %TMFS% -o usbip-vhci.txt usbip-vhci.etl
   - You can send real-time trace messages to WinDbg by modifying in \"*Advanced Log Session Options*\".
 - If your testing machine suffer from BSOD (Blue Screen of Death), you should get it via remote debugging.
   - `WinDbg` on virtual machines would be good to get logs
-
-#### How to get usbip forwarder log
-- usbip-win transmits usbip packets via a userland forwarder.
-  - forwarder log is the best to look into usbip packet internals.
-- edit `usbip_forward.c` to define `DEBUG_PDU` at the head of the file
-- compile `usbip.exe` or `usbipd.exe`
-- `debug_pdu.log` is created at the path where an executable runs.
 
 #### How to get linux kernel log
 - Sometimes Linux kernel log is required
