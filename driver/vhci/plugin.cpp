@@ -13,28 +13,28 @@
 namespace
 {
 
-PAGEABLE auto vhci_init_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
-	vpdo->current_intf_num = 0;
-	vpdo->current_intf_alt = 0;
+	vpdo.current_intf_num = 0;
+	vpdo.current_intf_alt = 0;
 
-	INITIALIZE_PNP_STATE(vpdo);
+	INITIALIZE_PNP_STATE(&vpdo);
 
 	// vpdo usually starts its life at D3
-	vpdo->DevicePowerState = PowerDeviceD3;
-	vpdo->SystemPowerState = PowerSystemWorking;
+	vpdo.DevicePowerState = PowerDeviceD3;
+	vpdo.SystemPowerState = PowerSystemWorking;
 
-	InitializeListHead(&vpdo->head_urbr);
-	InitializeListHead(&vpdo->head_urbr_pending);
-	InitializeListHead(&vpdo->head_urbr_sent);
-	KeInitializeSpinLock(&vpdo->lock_urbr);
+	InitializeListHead(&vpdo.head_urbr);
+	InitializeListHead(&vpdo.head_urbr_pending);
+	InitializeListHead(&vpdo.head_urbr_sent);
+	KeInitializeSpinLock(&vpdo.lock_urbr);
 
-	auto &Flags = vpdo->Self->Flags;
+	auto &Flags = vpdo.Self->Flags;
 	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
-	if (!vhub_attach_vpdo(vpdo)) {
+	if (!vhub_attach_vpdo(&vpdo)) {
 		Trace(TRACE_LEVEL_ERROR, "Can't acquire free port");
 		return STATUS_END_OF_FILE;
 	}
@@ -43,23 +43,44 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t *vpdo)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto setup_vpdo_with_descriptor(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &d)
+PAGEABLE auto init_vpdo(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
 	if (is_valid_dsc(&d)) {
-		NT_ASSERT(!is_valid_dsc(&vpdo->descriptor)); // first time initialization
-		RtlCopyMemory(&vpdo->descriptor, &d, sizeof(d));
+		NT_ASSERT(!is_valid_dsc(&vpdo.descriptor)); // first time initialization
+		RtlCopyMemory(&vpdo.descriptor, &d, sizeof(d));
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	vpdo->speed = get_usb_speed(d.bcdUSB);
+	vpdo.speed = get_usb_speed(d.bcdUSB);
 
-	vpdo->bDeviceClass = d.bDeviceClass;
-	vpdo->bDeviceSubClass = d.bDeviceSubClass;
-	vpdo->bDeviceProtocol = d.bDeviceProtocol;
+	vpdo.bDeviceClass = d.bDeviceClass;
+	vpdo.bDeviceSubClass = d.bDeviceSubClass;
+	vpdo.bDeviceProtocol = d.bDeviceProtocol;
+
+	return STATUS_SUCCESS;
+}
+
+PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
+{
+	PAGED_CODE();
+
+	auto d = dsc_find_next_intf(vpdo.actconfig, nullptr);
+	if (!d) {
+		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	vpdo.bDeviceClass = d->bInterfaceClass;
+	vpdo.bDeviceSubClass = d->bInterfaceSubClass;
+	vpdo.bDeviceProtocol = d->bInterfaceProtocol;
+
+	Trace(TRACE_LEVEL_INFORMATION, "Set Class(%#02x)/SubClass(%#02x)/Protocol(%#02x) from bInterfaceNumber %d, bAlternateSetting %d",
+					vpdo.bDeviceClass, vpdo.bDeviceSubClass, vpdo.bDeviceProtocol,
+					d->bInterfaceNumber, d->bAlternateSetting);
 
 	return STATUS_SUCCESS;
 }
@@ -70,37 +91,22 @@ PAGEABLE auto setup_vpdo_with_descriptor(vpdo_dev_t *vpdo, const USB_DEVICE_DESC
 * USB class, subclass and protocol numbers should be setup before importing.
 * Because windows vhci driver builds a device compatible id with those numbers.
 */
-PAGEABLE auto setup_vpdo_with_dsc_conf(vpdo_dev_t *vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
+PAGEABLE auto init_vpdo(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
-	NT_ASSERT(!vpdo->actconfig); // first time initialization
-	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(PagedPool, d.wTotalLength, USBIP_VHCI_POOL_TAG);
+	NT_ASSERT(!vpdo.actconfig); // first time initialization
+	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(PagedPool, d.wTotalLength, USBIP_VHCI_POOL_TAG);
 
-	if (vpdo->actconfig) {
-		RtlCopyMemory(vpdo->actconfig, &d, d.wTotalLength);
+	if (vpdo.actconfig) {
+		RtlCopyMemory(vpdo.actconfig, &d, d.wTotalLength);
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Cannot allocate configuration descriptor, wTotalLength %d", d.wTotalLength);
+		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes of memory", d.wTotalLength);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	if (vpdo->bDeviceClass || vpdo->bDeviceSubClass || vpdo->bDeviceProtocol) {
-		return STATUS_SUCCESS;
-	}
-
-	if (auto i = dsc_find_next_intf(vpdo->actconfig, nullptr)) {
-		vpdo->bDeviceClass = i->bInterfaceClass;
-		vpdo->bDeviceSubClass = i->bInterfaceSubClass;
-		vpdo->bDeviceProtocol = i->bInterfaceProtocol;
-		Trace(TRACE_LEVEL_VERBOSE, "Set Class(%#02x)/SubClass(%#02x)/Protocol(%#02x) from bInterfaceNumber %d, bAlternateSetting %d",
-					vpdo->bDeviceClass, vpdo->bDeviceSubClass, vpdo->bDeviceProtocol,
-					i->bInterfaceNumber, i->bAlternateSetting);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	return STATUS_SUCCESS;
+	return d.bNumInterfaces == 1 && !(vpdo.bDeviceClass || vpdo.bDeviceSubClass || vpdo.bDeviceProtocol) ?
+		set_class_subclass_proto(vpdo) : STATUS_SUCCESS;
 }
 
 } // namespace
@@ -132,17 +138,17 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	vpdo->devid = pluginfo->devid;
 	vpdo->parent = vhub_from_vhci(vhci);
 
-	if (auto err = setup_vpdo_with_descriptor(vpdo, pluginfo->dscr_dev)) {
+	if (auto err = init_vpdo(*vpdo, pluginfo->dscr_dev)) {
 		destroy_device(vpdo);
 		return err;
 	}
 	
-	if (auto err = setup_vpdo_with_dsc_conf(vpdo, pluginfo->dscr_conf)) {
+	if (auto err = init_vpdo(*vpdo, pluginfo->dscr_conf)) {
 		destroy_device(vpdo);
 		return err;
 	}
 
-	if (auto err = vhci_init_vpdo(vpdo)) {
+	if (auto err = vhci_init_vpdo(*vpdo)) {
 		destroy_device(vpdo);
 		return err;
 	}
