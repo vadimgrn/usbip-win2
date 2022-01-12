@@ -10,10 +10,6 @@
 DEFINE_GUID(GUID_SD_USBIP_VHCI,
 	0x9d3039dd, 0xcca5, 0x4b4d, 0xb3, 0x3d, 0xe2, 0xdd, 0xc8, 0xa8, 0xc5, 0x2f);
 
-const LPCWSTR devcodes[] = {
-	L"ROOT", L"CPDO", L"VHCI", L"HPDO", L"VHUB", L"VPDO"
-};
-
 namespace
 {
 
@@ -85,8 +81,8 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 
 	auto vdev = to_vdev(devobj);
 
-	vdev->DevicePnPState = NotStarted;
-	vdev->PreviousPnPState = NotStarted;
+	vdev->PnPState = pnp_state::NotStarted;
+	vdev->PreviousPnPState = pnp_state::NotStarted;
 
 	vdev->type = type;
 	vdev->Self = devobj;

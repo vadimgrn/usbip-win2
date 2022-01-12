@@ -25,7 +25,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto inlen = irpstack->Parameters.DeviceIoControl.InputBufferLength;
 	auto outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
 
-	if (vdev->DevicePnPState == Deleted) {
+	if (vdev->PnPState == pnp_state::Removed) {
 		status = STATUS_NO_SUCH_DEVICE;
 		goto END;
 	}

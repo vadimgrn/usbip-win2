@@ -228,14 +228,14 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceCall("%p", vdev);
 
-	if (vdev->DevicePnPState == Deleted) {
+	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: already removed", vdev->type);
 		return irp_done_success(irp);
 	}
 
 	auto devobj_lower = vdev->devobj_lower;
 
-	SET_NEW_PNP_STATE(vdev, Deleted);
+	set_state(*vdev, pnp_state::Removed);
 	destroy_device(vdev);
 
 	if (is_fdo(vdev->type)) {

@@ -7,22 +7,20 @@
 #include "usbdsc.h"
 
 struct urb_req;
-extern const LPCWSTR devcodes[];
 
 // These are the states a vpdo or vhub transition upon
 // receiving a specific PnP Irp. Refer to the PnP Device States
 // diagram in DDK documentation for better understanding.
-enum DEVICE_PNP_STATE 
+enum class pnp_state 
 {
-	NotStarted,		// Not started yet
-	Started,		// Device has received the START_DEVICE IRP
-	StopPending,		// Device has received the QUERY_STOP IRP
-	Stopped,		// Device has received the STOP_DEVICE IRP
-	RemovePending,		// Device has received the QUERY_REMOVE IRP
-	SurpriseRemovePending,	// Device has received the SURPRISE_REMOVE IRP
-	Deleted,		// Device has received the REMOVE_DEVICE IRP
-	UnKnown			// Unknown state
-} ;
+	NotStarted,
+	Started,		// START_DEVICE
+	StopPending,		// QUERY_STOP
+	Stopped,		// STOP_DEVICE
+	RemovePending,		// QUERY_REMOVE
+	SurpriseRemovePending,	// SURPRISE_REMOVE
+	Removed			// REMOVE_DEVICE
+};
 
 // Structure for reporting data to WMI
 struct USBIP_BUS_WMI_STD_DATA
@@ -49,8 +47,8 @@ struct vdev_t
 
 	// We track the state of the device with every PnP Irp
 	// that affects the device through these two variables.
-	DEVICE_PNP_STATE DevicePnPState;
-	DEVICE_PNP_STATE PreviousPnPState;
+	pnp_state PnPState;
+	pnp_state PreviousPnPState;
 
 	// Stores the current system power state
 	SYSTEM_POWER_STATE SystemPowerState;

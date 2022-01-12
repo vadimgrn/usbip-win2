@@ -43,12 +43,12 @@ PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pd
 	PDEVICE_OBJECT	devobj_cpdo;
 	ULONG	size;
 
-	if (vdev->child_pdo == nullptr || vdev->child_pdo->DevicePnPState == Deleted)
+	if (!vdev->child_pdo || vdev->child_pdo->PnPState == pnp_state::Removed)
 		child_exist = FALSE;
 
-	if (relations == nullptr) {
-		relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
-		if (relations == nullptr) {
+	if (!relations) {
+		relations = (DEVICE_RELATIONS*)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
+		if (!relations) {
 			Trace(TRACE_LEVEL_ERROR, "no relations will be reported: out of memory");
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}

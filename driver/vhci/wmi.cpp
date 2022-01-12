@@ -168,7 +168,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 
 	Trace(TRACE_LEVEL_INFORMATION, "%!sysctrl!", irpstack->MinorFunction);
 
-	if (vhci->DevicePnPState == Deleted) {
+	if (vhci->PnPState == pnp_state::Removed) {
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	}
 

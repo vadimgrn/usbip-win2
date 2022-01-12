@@ -29,7 +29,7 @@ PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceCall("%p", vdev);
 
-	SET_NEW_PNP_STATE(vdev, StopPending);
+	set_state(*vdev, pnp_state::StopPending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
@@ -38,10 +38,10 @@ PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceCall("%p", vdev);
 
-	if (vdev->DevicePnPState == StopPending) {
+	if (vdev->PnPState == pnp_state::StopPending) {
 		// We did receive a query-stop, so restore.
-		RESTORE_PREVIOUS_PNP_STATE(vdev);
-		NT_ASSERT(vdev->DevicePnPState == Started);
+		set_previous_pnp_state(*vdev);
+		NT_ASSERT(vdev->PnPState == pnp_state::Started);
 	}
 
 	return irp_pass_down_or_success(vdev, irp);
@@ -52,7 +52,7 @@ PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceCall("%p", vdev);
 
-	SET_NEW_PNP_STATE(vdev, Stopped);
+	set_state(*vdev, pnp_state::Stopped);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
@@ -65,7 +65,7 @@ PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
 	}
 
-	SET_NEW_PNP_STATE(vdev, RemovePending);
+	set_state(*vdev, pnp_state::RemovePending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
@@ -74,8 +74,8 @@ PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceCall("%p", vdev);
 
-	if (vdev->DevicePnPState == RemovePending) {
-		RESTORE_PREVIOUS_PNP_STATE(vdev);
+	if (vdev->PnPState == pnp_state::RemovePending) {
+		set_previous_pnp_state(*vdev);
 	}
 
 	return irp_pass_down_or_success(vdev, irp);
@@ -86,7 +86,7 @@ PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceCall("%p", vdev);
 
-	SET_NEW_PNP_STATE(vdev, SurpriseRemovePending);
+	set_state(*vdev, pnp_state::SurpriseRemovePending);
 	return irp_pass_down_or_success(vdev, irp);
 }
 
@@ -234,6 +234,14 @@ pnpmn_func_t* const pnpmn_functions[] =
 
 } // namespace
 
+
+PAGEABLE void set_state(vdev_t &vdev, pnp_state state)
+{
+	PAGED_CODE();
+	vdev.PreviousPnPState = vdev.PnPState;
+	vdev.PnPState = state;
+}
+
 extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 {
 	PAGED_CODE();
@@ -245,7 +253,7 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 
 	NTSTATUS status = STATUS_SUCCESS;
 
-	if (vdev->DevicePnPState == Deleted) { // the driver should not pass the IRP down to the next lower driver
+	if (vdev->PnPState == pnp_state::Removed) { // the driver should not pass the IRP down to the next lower driver
 		status = irp_done(irp, STATUS_NO_SUCH_DEVICE);
 	} else if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
 		status = pnpmn_functions[irpstack->MinorFunction](vdev, irp);

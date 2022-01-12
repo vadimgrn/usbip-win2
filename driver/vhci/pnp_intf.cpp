@@ -351,6 +351,8 @@ NTSTATUS GetLocationString(
 	WCHAR buf[32];
 	size_t remaining = 0;
 
+	const LPCWSTR devcodes[] { L"ROOT", L"CPDO", L"VHCI", L"HPDO", L"VHUB", L"VPDO" };
+
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
 		st = RtlStringCchPrintfExW(buf, ARRAYSIZE(buf), nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL,

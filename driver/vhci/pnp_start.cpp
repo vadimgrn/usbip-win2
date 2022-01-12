@@ -121,7 +121,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 
 	if (NT_SUCCESS(status)) {
 		vdev->DevicePowerState = PowerDeviceD0;
-		SET_NEW_PNP_STATE(vdev, Started);
+		set_state(*vdev, pnp_state::Started);
 
 		POWER_STATE ps;
 		ps.DeviceState = PowerDeviceD0;

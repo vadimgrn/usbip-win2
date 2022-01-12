@@ -17,13 +17,10 @@
 	L"&PID_" VHUB_PID \
 	L"&REV_" VHUB_REV
 
-#define INITIALIZE_PNP_STATE(_Data_)    \
-        (_Data_)->DevicePnPState =  NotStarted;\
-        (_Data_)->PreviousPnPState = NotStarted;
 
-#define SET_NEW_PNP_STATE(vdev, _state_) \
-        do { (vdev)->PreviousPnPState = (vdev)->DevicePnPState;\
-        (vdev)->DevicePnPState = (_state_); } while (0)
+PAGEABLE void set_state(vdev_t &vdev, pnp_state state);
 
-#define RESTORE_PREVIOUS_PNP_STATE(vdev)   \
-        do { (vdev)->DevicePnPState = (vdev)->PreviousPnPState; } while (0)
+inline void set_previous_pnp_state(vdev_t &vdev)
+{
+	vdev.PnPState = vdev.PreviousPnPState;
+}

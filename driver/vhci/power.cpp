@@ -30,7 +30,7 @@ NTSTATUS
 	powerState = irpstack->Parameters.Power.State;
 
 	// If the device is not stated yet, just pass it down.
-	if (vhci->DevicePnPState == NotStarted) {
+	if (vhci->PnPState == pnp_state::NotStarted) {
 		return irp_pass_down(vhci->devobj_lower, irp);
 	}
 
@@ -111,7 +111,7 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	TraceCall("%!vdev_type_t!: irql %!irql!, %!powermn!", 
 			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
-	if (vdev->DevicePnPState == Deleted) {
+	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
 		PoStartNextPowerIrp(irp);
 		return irp_done(irp, STATUS_NO_SUCH_DEVICE);

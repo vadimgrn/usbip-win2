@@ -1156,7 +1156,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
 
-	if (vhci->DevicePnPState != Deleted) {
+	if (vhci->PnPState != pnp_state::Removed) {
 		auto irpstack = IoGetCurrentIrpStackLocation(irp);
 		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
 		status = vpdo && !vpdo->unplugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
