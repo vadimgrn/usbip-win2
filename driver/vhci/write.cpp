@@ -104,12 +104,10 @@ PAGEABLE NTSTATUS urb_function_generic(vpdo_dev_t*, URB *urb, const usbip_header
 	}
 
 	auto func = urb->UrbHeader.Function;
-
-	bool bulk = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER || 
-		    func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
+	bool log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
 
 	auto buf = copy_to_transfer_buffer(urb, hdr + 1);
-	if (buf && !bulk) { // bulk can have sensitive data
+	if (buf && log) {
 		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
 
