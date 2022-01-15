@@ -16,36 +16,31 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, void *buffer, ULONG *poutlen)
+PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto pdrkey_name = (USB_HCD_DRIVERKEY_NAME*)buffer;
-	ULONG drvkey_buflen = 0;
-
-	auto drvkey = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &drvkey_buflen);
-	if (!drvkey) {
-		Trace(TRACE_LEVEL_WARNING, "failed to get vhci driver key");
+	ULONG prop_sz = 0;
+	auto prop = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &prop_sz);
+	if (!prop) {
+		Trace(TRACE_LEVEL_ERROR, "Failed to get DevicePropertyDriverKeyName");
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	auto outlen_res = (ULONG)(sizeof(*pdrkey_name) + drvkey_buflen - sizeof(WCHAR));
-	if (*poutlen < sizeof(*pdrkey_name)) {
-		*poutlen = outlen_res;
-		ExFreePoolWithTag(drvkey, USBIP_VHCI_POOL_TAG);
-		return STATUS_INSUFFICIENT_RESOURCES;
+	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
+
+	if (*poutlen < sizeof(r)) {
+		*poutlen = r_sz;
+		ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
+		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	pdrkey_name->ActualLength = outlen_res;
-	if (*poutlen >= outlen_res) {
-		RtlCopyMemory(pdrkey_name->DriverKeyName, drvkey, drvkey_buflen);
-		*poutlen = outlen_res;
-	}
-	else
-		RtlCopyMemory(pdrkey_name->DriverKeyName, drvkey, *poutlen - sizeof(USB_HCD_DRIVERKEY_NAME) + sizeof(WCHAR));
+	*poutlen = min(*poutlen, r_sz);
 
-	ExFreePoolWithTag(drvkey, USBIP_VHCI_POOL_TAG);
+	r.ActualLength = prop_sz;
+	RtlCopyMemory(r.DriverKeyName, prop, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName));
 
+	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
 	return STATUS_SUCCESS;
 }
 
@@ -96,7 +91,7 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG, 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack, ULONG ioctl_code, PVOID buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack, ULONG ioctl_code, void  *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
@@ -121,7 +116,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t * vhci, PIO_STACK_LOCATION irpstack
 						*poutlen/sizeof(ioctl_usbip_vhci_imported_dev));
 		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:
-		status = get_hcd_driverkey_name(vhci, buffer, poutlen);
+		status = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
 		status = vhub_get_roothub_name(to_vhub_or_null(vhci->child_pdo->fdo->Self), buffer, inlen, poutlen);

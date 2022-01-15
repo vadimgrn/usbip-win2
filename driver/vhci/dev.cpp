@@ -25,30 +25,33 @@ const ULONG ext_sizes_per_devtype[] = {
 } // namespace
 
 
-LPWSTR get_device_prop(PDEVICE_OBJECT pdo, DEVICE_REGISTRY_PROPERTY prop, PULONG plen)
+LPWSTR get_device_prop(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, ULONG *plen)
 {
 	ULONG buflen = 0;
 
-	NTSTATUS status = IoGetDeviceProperty(pdo, prop, 0, nullptr, &buflen);
+	auto status = IoGetDeviceProperty(pdo, prop, 0, nullptr, &buflen);
 	if (status != STATUS_BUFFER_TOO_SMALL) {
-		Trace(TRACE_LEVEL_ERROR, "failed to get device property size: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "IoGetDeviceProperty %!STATUS!", status);
 		return nullptr;
+	}
+
+	if (plen) {
+		*plen = buflen;
 	}
 
 	auto value = (LPWSTR)ExAllocatePoolWithTag(PagedPool, buflen, USBIP_VHCI_POOL_TAG);
 	if (!value) {
-		Trace(TRACE_LEVEL_ERROR, "failed to get device property: out of memory");
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes of memory", buflen);
 		return nullptr;
 	}
 
 	status = IoGetDeviceProperty(pdo, prop, buflen, value, &buflen);
 	if (NT_ERROR(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to get device property: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "IoGetDeviceProperty %!STATUS!", status);
 		ExFreePoolWithTag(value, USBIP_VHCI_POOL_TAG);
 		return nullptr;
 	}
-	if (plen != nullptr)
-		*plen = buflen;
+
 	return value;
 }
 

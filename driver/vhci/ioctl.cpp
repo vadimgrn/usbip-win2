@@ -1,4 +1,3 @@
-#include "vhci.h"
 #include "dbgcommon.h"
 #include "trace.h"
 #include "ioctl.tmh"
