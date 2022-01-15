@@ -1,15 +1,13 @@
 #include "ioctl_vhci.h"
-#include "dbgcommon.h"
 #include "trace.h"
 #include "ioctl_vhci.tmh"
 
+#include "dbgcommon.h"
 #include "vhci.h"
 #include "plugin.h"
-#include "pnp.h"
 #include "vhub.h"
 #include "ioctl_usrreq.h"
 
-#include <usbdi.h>
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
@@ -38,56 +36,60 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	*poutlen = min(*poutlen, r_sz);
 
 	r.ActualLength = prop_sz;
-	RtlCopyMemory(r.DriverKeyName, prop, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName));
+	RtlStringCbCopyW(r.DriverKeyName, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
 
 	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
+
+	TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
 	return STATUS_SUCCESS;
 }
 
-/* IOCTL_USB_GET_ROOT_HUB_NAME requires a device interface symlink name with the prefix(\??\) stripped */
-PAGEABLE SIZE_T get_name_prefix_size(PWCHAR name)
+/* 
+ * The leading "\xxx\ " text is not included in the retrieved string.
+ */
+PAGEABLE ULONG get_name_prefix_cch(const UNICODE_STRING &s)
 {
 	PAGED_CODE();
 
-	SIZE_T	i;
-	for (i = 1; name[i]; i++) {
-		if (name[i] == L'\\') {
+	auto &str = s.Buffer;
+
+	for (ULONG i = 1; *str == L'\\' && (i + 1)*sizeof(*str) <= s.Length; ++i) {
+		if (str[i] == L'\\') {
 			return i + 1;
 		}
 	}
+
 	return 0;
 }
 
 } // namespace
 
 
-PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t * vhub, PVOID buffer, ULONG, PULONG poutlen)
+PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto roothub_name = (USB_ROOT_HUB_NAME*)buffer;
-	auto prefix_len = get_name_prefix_size(vhub->DevIntfRootHub.Buffer);
+	auto &str = vhub->DevIntfRootHub;
 
-	if (!prefix_len) {
-		Trace(TRACE_LEVEL_ERROR, "inavlid root hub format: %S", vhub->DevIntfRootHub.Buffer);
-		return STATUS_INVALID_PARAMETER;
+	auto prefix_cch = get_name_prefix_cch(str);
+	if (!prefix_cch) {
+		Trace(TRACE_LEVEL_WARNING, "Prefix expected: DevIntfRootHub '%!USTR!'", &str);
 	}
 
-	auto roothub_namelen = sizeof(USB_ROOT_HUB_NAME) + vhub->DevIntfRootHub.Length - prefix_len * sizeof(WCHAR);
+	ULONG str_sz = str.Length - prefix_cch*sizeof(*str.Buffer);
+	ULONG r_sz = sizeof(r) - sizeof(*r.RootHubName) + str_sz;
 
-	if (*poutlen < sizeof(USB_ROOT_HUB_NAME)) {
-		*poutlen = (ULONG)roothub_namelen;
+	if (*poutlen < sizeof(r)) {
+		*poutlen = r_sz;
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	roothub_name->ActualLength = (ULONG)roothub_namelen;
-	RtlStringCchCopyW(roothub_name->RootHubName, (*poutlen - sizeof(USB_ROOT_HUB_NAME) + sizeof(WCHAR)) / sizeof(WCHAR),
-			vhub->DevIntfRootHub.Buffer + prefix_len);
+	*poutlen = min(*poutlen, r_sz);
 
-	if (*poutlen > roothub_namelen) {
-		*poutlen = (ULONG)roothub_namelen;
-	}
-
+	r.ActualLength = r_sz;
+	RtlStringCbCopyW(r.RootHubName, *poutlen - offsetof(USB_ROOT_HUB_NAME, RootHubName), str.Buffer + prefix_cch);
+	
+	TraceCall("ActualLength %lu, RootHubName '%S'", r.ActualLength, r.RootHubName);
 	return STATUS_SUCCESS;
 }
 
@@ -119,13 +121,13 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack,
 		status = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		status = vhub_get_roothub_name(to_vhub_or_null(vhci->child_pdo->fdo->Self), buffer, inlen, poutlen);
+		status = vhub_get_roothub_name(to_vhub_or_null(vhci->child_pdo->fdo->Self), *static_cast<USB_ROOT_HUB_NAME*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
 	return status;
