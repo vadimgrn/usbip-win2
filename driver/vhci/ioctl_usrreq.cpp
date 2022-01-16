@@ -141,6 +141,47 @@ PAGEABLE auto get_bandwidth_information(vhub_dev_t *vhub, USB_BANDWIDTH_INFO &r,
 	return STATUS_SUCCESS;
 }
 
+PAGEABLE auto get_bus_statistics(vhub_dev_t *vhub, USB_BUS_STATISTICS_0 &r, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	*poutlen = sizeof(r);
+	if (inlen != sizeof(r)) {
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	RtlZeroMemory(&r, sizeof(r));
+
+	for (auto d: vhub->vpdo) {
+		if (d) {
+			++r.DeviceCount;
+		}
+	}
+
+/*
+	r.CurrentSystemTime;
+	r.CurrentUsbFrame;
+	r.BulkBytes;
+	r.IsoBytes;
+	r.InterruptBytes;
+	r.ControlDataBytes;
+	r.PciInterruptCount;
+	r.HardResetCount;
+	r.WorkerSignalCount;
+	r.CommonBufferBytes;
+	r.WorkerIdleTimeMs;
+*/
+	r.RootHubEnabled = true;
+	r.RootHubDevicePowerState = vhub->DevicePowerState != PowerDeviceUnspecified ?
+					static_cast<UCHAR>(vhub->DevicePowerState) - 1 : 0;
+
+	r.Unused = 1;
+//	r.NameIndex;
+	
+	TraceCall("DeviceCount %lu", r.DeviceCount);
+	return STATUS_SUCCESS;
+}
+
 } // namespace
 
 
@@ -182,6 +223,9 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, void *buffer, ULONG 
 		break;
 	case USBUSER_GET_BANDWIDTH_INFORMATION:
 		status = get_bandwidth_information(vhub_from_vhci(vhci), *reinterpret_cast<USB_BANDWIDTH_INFO*>(hdr + 1), inlen, poutlen);
+		break;
+	case USBUSER_GET_BUS_STATISTICS_0:
+		status = get_bus_statistics(vhub_from_vhci(vhci), *reinterpret_cast<USB_BUS_STATISTICS_0*>(hdr + 1), inlen, poutlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", hdr->UsbUserRequest);
