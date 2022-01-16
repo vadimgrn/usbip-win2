@@ -121,7 +121,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack,
 		status = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		status = vhub_get_roothub_name(to_vhub_or_null(vhci->child_pdo->fdo->Self), *static_cast<USB_ROOT_HUB_NAME*>(buffer), poutlen);
+		status = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
 		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);

@@ -2,6 +2,7 @@
 #include "trace.h"
 #include "ioctl_usrreq.tmh"
 
+#include "dev.h"
 #include "ioctl_vhci.h"
 
 #include <usbdi.h>
@@ -105,6 +106,20 @@ PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, USB_UNICODE_NAME &r, U
 	return get_hcd_driverkey_name(vhci, name, poutlen);
 }
 
+PAGEABLE auto get_roothub_symbolic_name(vhub_dev_t *vhub, USB_UNICODE_NAME &r, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto &name = reinterpret_cast<USB_ROOT_HUB_NAME&>(r);
+
+	static_assert(sizeof(r) == sizeof(name));
+	static_assert(sizeof(r.Length) == sizeof(name.ActualLength));
+	static_assert(sizeof(r.String) == sizeof(name.RootHubName));
+
+	TraceCall("outlen %lu", *poutlen);
+	return vhub_get_roothub_name(vhub, name, poutlen);
+}
+
 } // namespace
 
 
@@ -137,6 +152,9 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, void *buffer, ULONG 
 		break;
 	case USBUSER_GET_CONTROLLER_DRIVER_KEY:
 		status = get_controller_driver_key(vhci, *reinterpret_cast<USB_UNICODE_NAME*>(hdr + 1), poutlen);
+		break;
+	case USBUSER_GET_ROOTHUB_SYMBOLIC_NAME:
+		status = get_roothub_symbolic_name(vhub_from_vhci(vhci), *reinterpret_cast<USB_UNICODE_NAME*>(hdr + 1), poutlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", hdr->UsbUserRequest);
