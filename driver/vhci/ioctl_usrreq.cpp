@@ -120,9 +120,33 @@ PAGEABLE auto get_roothub_symbolic_name(vhub_dev_t *vhub, USB_UNICODE_NAME &r, U
 	return vhub_get_roothub_name(vhub, name, poutlen);
 }
 
+PAGEABLE auto get_bandwidth_information(vhub_dev_t *vhub, USB_BANDWIDTH_INFO &r, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	*poutlen = sizeof(r);
+	if (inlen != sizeof(r)) {
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	RtlZeroMemory(&r, sizeof(r));
+
+	for (auto d: vhub->vpdo) {
+		if (d) {
+			++r.DeviceCount;
+		}
+	}
+
+	TraceCall("DeviceCount %lu", r.DeviceCount);
+	return STATUS_SUCCESS;
+}
+
 } // namespace
 
 
+/*
+ * https://docs.microsoft.com/en-us/windows/win32/api/usbuser/ni-usbuser-ioctl_usb_user_request
+ */
 PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
@@ -155,6 +179,9 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, void *buffer, ULONG 
 		break;
 	case USBUSER_GET_ROOTHUB_SYMBOLIC_NAME:
 		status = get_roothub_symbolic_name(vhub_from_vhci(vhci), *reinterpret_cast<USB_UNICODE_NAME*>(hdr + 1), poutlen);
+		break;
+	case USBUSER_GET_BANDWIDTH_INFORMATION:
+		status = get_bandwidth_information(vhub_from_vhci(vhci), *reinterpret_cast<USB_BANDWIDTH_INFO*>(hdr + 1), inlen, poutlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", hdr->UsbUserRequest);
