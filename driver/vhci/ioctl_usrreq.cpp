@@ -2,6 +2,8 @@
 #include "trace.h"
 #include "ioctl_usrreq.tmh"
 
+#include "ioctl_vhci.h"
+
 #include <usbdi.h>
 #include <usbuser.h>
 
@@ -89,9 +91,24 @@ PAGEABLE get_usb_driver_version(USB_DRIVER_VERSION_PARAMETERS &r, ULONG inlen, U
 	return STATUS_SUCCESS;
 }
 
+PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, USB_UNICODE_NAME &r, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto &name = reinterpret_cast<USB_HCD_DRIVERKEY_NAME&>(r);
+
+	static_assert(sizeof(r) == sizeof(name));
+	static_assert(sizeof(r.Length) == sizeof(name.ActualLength));
+	static_assert(sizeof(r.String) == sizeof(name.DriverKeyName));
+
+	TraceCall("outlen %lu", *poutlen);
+	return get_hcd_driverkey_name(vhci, name, poutlen);
+}
+
 } // namespace
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, void *buffer, ULONG inlen, ULONG *poutlen)
+
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
@@ -100,7 +117,7 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, void *buffer, ULONG inlen
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "%!usbuser!", hdr->UsbUserRequest);
+	TraceCall("%!usbuser!", hdr->UsbUserRequest);
 
 	buffer = hdr + 1;
 	inlen -= sizeof(*hdr);
@@ -118,8 +135,11 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, void *buffer, ULONG inlen
 	case USBUSER_GET_USB_DRIVER_VERSION:
 		status = get_usb_driver_version(*reinterpret_cast<USB_DRIVER_VERSION_PARAMETERS*>(hdr + 1), inlen, poutlen);
 		break;
+	case USBUSER_GET_CONTROLLER_DRIVER_KEY:
+		status = get_controller_driver_key(vhci, *reinterpret_cast<USB_UNICODE_NAME*>(hdr + 1), poutlen);
+		break;
 	default:
-		Trace(TRACE_LEVEL_WARNING, "unhandled %!usbuser!", hdr->UsbUserRequest);
+		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", hdr->UsbUserRequest);
 		hdr->UsbUserStatusCode = UsbUserNotSupported;
 	}
 

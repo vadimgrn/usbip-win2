@@ -14,36 +14,6 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG *poutlen)
-{
-	PAGED_CODE();
-
-	ULONG prop_sz = 0;
-	auto prop = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &prop_sz);
-	if (!prop) {
-		Trace(TRACE_LEVEL_ERROR, "Failed to get DevicePropertyDriverKeyName");
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
-
-	if (*poutlen < sizeof(r)) {
-		*poutlen = r_sz;
-		ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	*poutlen = min(*poutlen, r_sz);
-
-	r.ActualLength = prop_sz;
-	RtlStringCbCopyW(r.DriverKeyName, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
-
-	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
-
-	TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
-	return STATUS_SUCCESS;
-}
-
 /* 
  * The leading "\xxx\ " text is not included in the retrieved string.
  */
@@ -90,6 +60,36 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, 
 	RtlStringCbCopyW(r.RootHubName, *poutlen - offsetof(USB_ROOT_HUB_NAME, RootHubName), str.Buffer + prefix_cch);
 	
 	TraceCall("ActualLength %lu, RootHubName '%S'", r.ActualLength, r.RootHubName);
+	return STATUS_SUCCESS;
+}
+
+PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	ULONG prop_sz = 0;
+	auto prop = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &prop_sz);
+	if (!prop) {
+		Trace(TRACE_LEVEL_ERROR, "Failed to get DevicePropertyDriverKeyName");
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
+
+	if (*poutlen < sizeof(r)) {
+		*poutlen = r_sz;
+		ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	*poutlen = min(*poutlen, r_sz);
+
+	r.ActualLength = prop_sz;
+	RtlStringCbCopyW(r.DriverKeyName, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
+
+	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
+
+	TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
 	return STATUS_SUCCESS;
 }
 
