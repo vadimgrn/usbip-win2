@@ -69,6 +69,26 @@ PAGEABLE NTSTATUS get_controller_info(USB_CONTROLLER_INFO_0 &r, ULONG inlen, ULO
 	return STATUS_SUCCESS;
 }
 
+PAGEABLE get_usb_driver_version(USB_DRIVER_VERSION_PARAMETERS &r, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	*poutlen = sizeof(r);
+	if (inlen != sizeof(r)) {
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	r.DriverTrackingCode = 0x04; // FIXME: A tracking code that identifies the revision of the USB stack
+	r.USBDI_Version = USBDI_VERSION;
+	r.USBUSER_Version = USBUSER_VERSION;
+	r.CheckedPortDriver = false;
+	r.CheckedMiniportDriver = false;
+	r.USB_Version = 0; // BCD usb version 0x0110 (1.1) 0x0200 (2.0)
+
+	TraceCall("USBDI_Version %#04lx, USB_Version %04lx", r.USBDI_Version, r.USB_Version);
+	return STATUS_SUCCESS;
+}
+
 } // namespace
 
 PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, void *buffer, ULONG inlen, ULONG *poutlen)
@@ -94,6 +114,9 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, void *buffer, ULONG inlen
 		break;
 	case USBUSER_GET_CONTROLLER_INFO_0:
 		status = get_controller_info(*reinterpret_cast<USB_CONTROLLER_INFO_0*>(hdr + 1), inlen, poutlen);
+		break;
+	case USBUSER_GET_USB_DRIVER_VERSION:
+		status = get_usb_driver_version(*reinterpret_cast<USB_DRIVER_VERSION_PARAMETERS*>(hdr + 1), inlen, poutlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "unhandled %!usbuser!", hdr->UsbUserRequest);
