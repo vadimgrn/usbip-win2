@@ -8,74 +8,70 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_power_info(PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_power_info(USB_POWER_INFO &r, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto pinfo = static_cast<USB_POWER_INFO*>(buffer);
-
-	if (inlen < sizeof(*pinfo)) {
-		return STATUS_BUFFER_TOO_SMALL;
+	*poutlen = sizeof(r);
+	if (inlen != sizeof(r)) {
+		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	pinfo->HcDeviceWake = WdmUsbPowerDeviceUnspecified;
-	pinfo->HcSystemWake = WdmUsbPowerNotMapped;
-	pinfo->RhDeviceWake = WdmUsbPowerDeviceD2;
-	pinfo->RhSystemWake = WdmUsbPowerSystemWorking;
-	pinfo->LastSystemSleepState = WdmUsbPowerNotMapped;
+	r.HcDeviceWake = WdmUsbPowerDeviceUnspecified;
+	r.HcSystemWake = WdmUsbPowerNotMapped;
+	r.RhDeviceWake = WdmUsbPowerDeviceD2;
+	r.RhSystemWake = WdmUsbPowerSystemWorking;
+	r.LastSystemSleepState = WdmUsbPowerNotMapped;
 
-	switch (pinfo->SystemState) {
+	switch (r.SystemState) {
 	case WdmUsbPowerSystemWorking:
-		pinfo->HcDevicePowerState = WdmUsbPowerDeviceD0;
-		pinfo->RhDevicePowerState = WdmUsbPowerNotMapped;
+		r.HcDevicePowerState = WdmUsbPowerDeviceD0;
+		r.RhDevicePowerState = WdmUsbPowerNotMapped;
 		break;
 	case WdmUsbPowerSystemSleeping1:
 	case WdmUsbPowerSystemSleeping2:
 	case WdmUsbPowerSystemSleeping3:
-		pinfo->HcDevicePowerState = WdmUsbPowerDeviceUnspecified;
-		pinfo->RhDevicePowerState = WdmUsbPowerDeviceD3;
+		r.HcDevicePowerState = WdmUsbPowerDeviceUnspecified;
+		r.RhDevicePowerState = WdmUsbPowerDeviceD3;
 		break;
 	case WdmUsbPowerSystemHibernate:
-		pinfo->HcDevicePowerState = WdmUsbPowerDeviceD3;
-		pinfo->RhDevicePowerState = WdmUsbPowerDeviceD3;
+		r.HcDevicePowerState = WdmUsbPowerDeviceD3;
+		r.RhDevicePowerState = WdmUsbPowerDeviceD3;
 		break;
 	case WdmUsbPowerSystemShutdown:
-		pinfo->HcDevicePowerState = WdmUsbPowerNotMapped;
-		pinfo->RhDevicePowerState = WdmUsbPowerNotMapped;
+		r.HcDevicePowerState = WdmUsbPowerNotMapped;
+		r.RhDevicePowerState = WdmUsbPowerNotMapped;
 		break;
 	}
 
-	pinfo->CanWakeup = FALSE;
-	pinfo->IsPowered = FALSE;
+	r.CanWakeup = FALSE;
+	r.IsPowered = FALSE;
 
-	*poutlen = sizeof(*pinfo);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_controller_info(PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS get_controller_info(USB_CONTROLLER_INFO_0 &r, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto pinfo = static_cast<USB_CONTROLLER_INFO_0*>(buffer);
-
-	if (inlen < sizeof(*pinfo)) {
-		return STATUS_BUFFER_TOO_SMALL;
+	*poutlen = sizeof(r);
+	if (inlen != sizeof(r)) {
+		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	pinfo->PciVendorId = 0;
-	pinfo->PciDeviceId = 0;
-	pinfo->PciRevision = 0;
-	pinfo->NumberOfRootPorts = 1;
-	pinfo->ControllerFlavor = EHCI_Generic;
-	pinfo->HcFeatureFlags = 0;
+	r.PciVendorId = 0x1D6B;
+	r.PciDeviceId = 0x03;
+	r.PciRevision = 0x513; // bcdDevice
+	r.NumberOfRootPorts = 1;
+	r.ControllerFlavor = USB_HcGeneric;
+	r.HcFeatureFlags = 0;
 
-	*poutlen = sizeof(*pinfo);
 	return STATUS_SUCCESS;
 }
 
 } // namespace
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, PVOID buffer, ULONG inlen, PULONG poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
@@ -94,10 +90,10 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t*, PVOID buffer, ULONG inlen
 
 	switch (hdr->UsbUserRequest) {
 	case USBUSER_GET_POWER_STATE_MAP:
-		status = get_power_info(buffer, inlen, poutlen);
+		status = get_power_info(*reinterpret_cast<USB_POWER_INFO*>(buffer), inlen, poutlen);
 		break;
 	case USBUSER_GET_CONTROLLER_INFO_0:
-		status = get_controller_info(hdr + 1, inlen, poutlen);
+		status = get_controller_info(*reinterpret_cast<USB_CONTROLLER_INFO_0*>(hdr + 1), inlen, poutlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "unhandled %!usbuser!", hdr->UsbUserRequest);
