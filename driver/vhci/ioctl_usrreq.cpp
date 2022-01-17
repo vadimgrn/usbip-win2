@@ -5,15 +5,14 @@
 #include "dev.h"
 #include "ioctl_vhci.h"
 
-#include <usbdi.h>
-#include <usbuser.h>
-
 namespace
 {
 
-PAGEABLE NTSTATUS get_power_info(USB_POWER_INFO &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
+
+	auto &r = *static_cast<USB_POWER_INFO*>(request);
 
 	*poutlen = sizeof(r);
 	if (inlen != sizeof(r)) {
@@ -53,9 +52,11 @@ PAGEABLE NTSTATUS get_power_info(USB_POWER_INFO &r, ULONG inlen, ULONG *poutlen)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_controller_info(USB_CONTROLLER_INFO_0 &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_controller_info(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
+
+	auto &r = *static_cast<USB_CONTROLLER_INFO_0*>(request);
 
 	*poutlen = sizeof(r);
 	if (inlen != sizeof(r)) {
@@ -72,9 +73,11 @@ PAGEABLE NTSTATUS get_controller_info(USB_CONTROLLER_INFO_0 &r, ULONG inlen, ULO
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE get_usb_driver_version(USB_DRIVER_VERSION_PARAMETERS &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
+
+	auto &r = *static_cast<USB_DRIVER_VERSION_PARAMETERS*>(request);
 
 	*poutlen = sizeof(r);
 	if (inlen != sizeof(r)) {
@@ -92,37 +95,53 @@ PAGEABLE get_usb_driver_version(USB_DRIVER_VERSION_PARAMETERS &r, ULONG inlen, U
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, USB_UNICODE_NAME &r, ULONG *poutlen)
+PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, ULONG, ULONG *poutlen)
 {
 	PAGED_CODE();
 
+	auto &r = *static_cast<USB_UNICODE_NAME*>(request);
 	auto &name = reinterpret_cast<USB_HCD_DRIVERKEY_NAME&>(r);
 
 	static_assert(sizeof(r) == sizeof(name));
 	static_assert(sizeof(r.Length) == sizeof(name.ActualLength));
 	static_assert(sizeof(r.String) == sizeof(name.DriverKeyName));
 
-	TraceCall("outlen %lu", *poutlen);
 	return get_hcd_driverkey_name(vhci, name, poutlen);
 }
 
-PAGEABLE auto get_roothub_symbolic_name(vhub_dev_t *vhub, USB_UNICODE_NAME &r, ULONG *poutlen)
+PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, ULONG, ULONG *poutlen)
 {
 	PAGED_CODE();
 
+	auto &r = *static_cast<USB_UNICODE_NAME*>(request);
 	auto &name = reinterpret_cast<USB_ROOT_HUB_NAME&>(r);
 
 	static_assert(sizeof(r) == sizeof(name));
 	static_assert(sizeof(r.Length) == sizeof(name.ActualLength));
 	static_assert(sizeof(r.String) == sizeof(name.RootHubName));
 
-	TraceCall("outlen %lu", *poutlen);
+	auto vhub = vhub_from_vhci(vhci);
 	return vhub_get_roothub_name(vhub, name, poutlen);
 }
 
-PAGEABLE auto get_bandwidth_information(vhub_dev_t *vhub, USB_BANDWIDTH_INFO &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto get_device_count(const vhub_dev_t *vhub)
+{
+	int cnt = 0;
+
+	for (auto d: vhub->vpdo) {
+		if (d) {
+			++cnt;
+		}
+	}
+
+	return cnt;
+}
+
+PAGEABLE auto get_bandwidth_information(vhci_dev_t *vhci, void *request, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
+
+	auto &r = *static_cast<USB_BANDWIDTH_INFO*>(request);
 
 	*poutlen = sizeof(r);
 	if (inlen != sizeof(r)) {
@@ -131,19 +150,24 @@ PAGEABLE auto get_bandwidth_information(vhub_dev_t *vhub, USB_BANDWIDTH_INFO &r,
 
 	RtlZeroMemory(&r, sizeof(r));
 
-	for (auto d: vhub->vpdo) {
-		if (d) {
-			++r.DeviceCount;
-		}
-	}
+	auto vhub = vhub_from_vhci(vhci);
+	r.DeviceCount = get_device_count(vhub);
 
-	TraceCall("DeviceCount %lu", r.DeviceCount);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_bus_statistics(vhub_dev_t *vhub, USB_BUS_STATISTICS_0 &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto GetCurrentSystemTime()
+{
+	LARGE_INTEGER CurrentTime;
+	KeQuerySystemTimePrecise(&CurrentTime);
+	return CurrentTime;
+}
+
+PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
+
+	auto &r = *static_cast<USB_BUS_STATISTICS_0*>(request);
 
 	*poutlen = sizeof(r);
 	if (inlen != sizeof(r)) {
@@ -152,14 +176,12 @@ PAGEABLE auto get_bus_statistics(vhub_dev_t *vhub, USB_BUS_STATISTICS_0 &r, ULON
 
 	RtlZeroMemory(&r, sizeof(r));
 
-	for (auto d: vhub->vpdo) {
-		if (d) {
-			++r.DeviceCount;
-		}
-	}
+	auto vhub = vhub_from_vhci(vhci);
+	r.DeviceCount = get_device_count(vhub);
+
+	r.CurrentSystemTime = GetCurrentSystemTime();
 
 /*
-	r.CurrentSystemTime;
 	r.CurrentUsbFrame;
 	r.BulkBytes;
 	r.IsoBytes;
@@ -172,74 +194,95 @@ PAGEABLE auto get_bus_statistics(vhub_dev_t *vhub, USB_BUS_STATISTICS_0 &r, ULON
 	r.WorkerIdleTimeMs;
 */
 	r.RootHubEnabled = true;
+
 	r.RootHubDevicePowerState = vhub->DevicePowerState != PowerDeviceUnspecified ?
 					static_cast<UCHAR>(vhub->DevicePowerState) - 1 : 0;
 
-	r.Unused = 1;
+//	r.Unused;
 //	r.NameIndex;
 	
-	TraceCall("DeviceCount %lu", r.DeviceCount);
 	return STATUS_SUCCESS;
 }
+
+PAGEABLE auto get_usb2_hw_version(vhci_dev_t*, void *data, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto &r = *static_cast<USB_USB2HW_VERSION_PARAMETERS*>(data);
+	*poutlen = sizeof(r);
+
+	if (inlen == sizeof(r)) {
+		r.Usb2HwRevision = 0; // USB2HW_UNKNOWN
+		return STATUS_SUCCESS;
+	}
+
+	return STATUS_INVALID_BUFFER_SIZE;
+}
+
+PAGEABLE auto usb_refresh_hct_reg(vhci_dev_t*, void *data, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto &r = *static_cast<USBUSER_REFRESH_HCT_REG*>(data);
+	*poutlen = sizeof(r);
+
+	return inlen == sizeof(r) ? STATUS_NOT_SUPPORTED : STATUS_INVALID_BUFFER_SIZE;
+}
+
+using request_t = NTSTATUS(vhci_dev_t*, void *buffer, ULONG inlen, ULONG *poutlen);
+
+/*
+ * The following APIS are enabled always
+ */
+request_t* const requests[] =
+{
+	nullptr,
+	get_controller_info,
+	get_controller_driver_key,
+	nullptr, // USBUSER_PASS_THRU
+	get_power_state_map,
+	get_bandwidth_information,
+	get_bus_statistics_0,
+	get_roothub_symbolic_name,
+	get_usb_driver_version,
+	get_usb2_hw_version,
+	usb_refresh_hct_reg
+};
 
 } // namespace
 
 
-/*
- * https://docs.microsoft.com/en-us/windows/win32/api/usbuser/ni-usbuser-ioctl_usb_user_request
- */
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, USBUSER_REQUEST_HEADER *hdr, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto hdr = static_cast<USBUSER_REQUEST_HEADER*>(buffer);
 	if (inlen < sizeof(*hdr)) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	TraceCall("%!usbuser!", hdr->UsbUserRequest);
-
-	buffer = hdr + 1;
 	inlen -= sizeof(*hdr);
 	*poutlen -= sizeof(*hdr);
 
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
+	auto req = hdr->UsbUserRequest;
 
-	switch (hdr->UsbUserRequest) {
-	case USBUSER_GET_POWER_STATE_MAP:
-		status = get_power_info(*reinterpret_cast<USB_POWER_INFO*>(buffer), inlen, poutlen);
-		break;
-	case USBUSER_GET_CONTROLLER_INFO_0:
-		status = get_controller_info(*reinterpret_cast<USB_CONTROLLER_INFO_0*>(hdr + 1), inlen, poutlen);
-		break;
-	case USBUSER_GET_USB_DRIVER_VERSION:
-		status = get_usb_driver_version(*reinterpret_cast<USB_DRIVER_VERSION_PARAMETERS*>(hdr + 1), inlen, poutlen);
-		break;
-	case USBUSER_GET_CONTROLLER_DRIVER_KEY:
-		status = get_controller_driver_key(vhci, *reinterpret_cast<USB_UNICODE_NAME*>(hdr + 1), poutlen);
-		break;
-	case USBUSER_GET_ROOTHUB_SYMBOLIC_NAME:
-		status = get_roothub_symbolic_name(vhub_from_vhci(vhci), *reinterpret_cast<USB_UNICODE_NAME*>(hdr + 1), poutlen);
-		break;
-	case USBUSER_GET_BANDWIDTH_INFORMATION:
-		status = get_bandwidth_information(vhub_from_vhci(vhci), *reinterpret_cast<USB_BANDWIDTH_INFO*>(hdr + 1), inlen, poutlen);
-		break;
-	case USBUSER_GET_BUS_STATISTICS_0:
-		status = get_bus_statistics(vhub_from_vhci(vhci), *reinterpret_cast<USB_BUS_STATISTICS_0*>(hdr + 1), inlen, poutlen);
-		break;
-	default:
-		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", hdr->UsbUserRequest);
-		hdr->UsbUserStatusCode = UsbUserNotSupported;
+	if (auto f = req < ARRAYSIZE(requests) ? requests[req] : nullptr) {
+		status = f(vhci, hdr + 1, inlen, poutlen);
+	} else {
+		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", req);
+		hdr->UsbUserStatusCode = req ? UsbUserNotSupported : UsbUserInvalidRequestCode;
 	}
+
+	*poutlen += sizeof(*hdr);
 
 	if (NT_SUCCESS(status)) {
-		*poutlen += sizeof(*hdr);
-		hdr->UsbUserStatusCode = UsbUserSuccess;
 		hdr->ActualBufferLength = *poutlen;
+		hdr->UsbUserStatusCode = UsbUserSuccess;
 	} else {
-		hdr->UsbUserStatusCode = UsbUserMiniportError; // TODO
+		hdr->UsbUserStatusCode = UsbUserMiniportError;
 
 	}
 
+	TraceCall("%!usbuser! -> %!USB_USER_ERROR_CODE!, %!STATUS!", hdr->UsbUserRequest, hdr->UsbUserStatusCode, status);
 	return status;
 }

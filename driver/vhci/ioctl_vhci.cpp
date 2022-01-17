@@ -93,7 +93,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack, ULONG ioctl_code, void  *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
@@ -124,7 +124,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack,
 		status = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
-		status = vhci_ioctl_user_request(vhci, buffer, inlen, poutlen);
+		status = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), inlen, poutlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
