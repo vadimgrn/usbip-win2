@@ -23,12 +23,11 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip_vhci.h"
-#include "usbip_forward.h"
 #include "dbgcode.h"
 
 #include "usbip_dscr.h"
 
-#define ATTACHER	"attacher.exe"
+#define ATTACHER "attacher2.exe"
 
 static const char usbip_attach_usage_string[] =
 	"usbip attach <args>\n"
