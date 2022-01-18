@@ -127,26 +127,6 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t*, USB_HUB_CAPABILITIES_EX &p)
-{
-	PAGED_CODE();
-
-	auto &f = p.CapabilityFlags;
-	f.ul = 0;
-
-//	f.HubIsHighSpeedCapable = false;
-//	f.HubIsHighSpeed = false;
-	
-	f.HubIsMultiTtCapable = true;
-	f.HubIsMultiTt = true;
-	
-	f.HubIsRoot = true;
-	//f.HubIsArmedWakeOnConnect = true; // the hub is armed to wake when a device is connected to the hub
-//	f.HubIsBusPowered = false;
-
-	return STATUS_SUCCESS;
-}
-
 PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES *p, ULONG *poutlen)
 {
 	PAGED_CODE();

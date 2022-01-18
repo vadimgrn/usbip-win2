@@ -13,7 +13,6 @@ PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &pdes
 PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_30_HUB_DESCRIPTOR &pdesc);
 
 PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &pinfo);
-PAGEABLE NTSTATUS vhub_get_capabilities_ex(vhub_dev_t *vhub, USB_HUB_CAPABILITIES_EX &pinfo);
 PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES *pinfo, ULONG *poutlen);
 
 PAGEABLE NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo);
