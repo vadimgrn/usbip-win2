@@ -151,26 +151,26 @@ void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t 
 	snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
 }
 
-void usbip_names_get_class(char *buff, size_t size, uint8_t class, uint8_t subclass, uint8_t protocol)
+void usbip_names_get_class(char *buff, size_t size, uint8_t class_, uint8_t subclass, uint8_t protocol)
 {
 	const char *c, *s, *p;
 
-	if (class == 0 && subclass == 0 && protocol == 0) {
-		snprintf(buff, size, "(Defined at Interface level) (%02x/%02x/%02x)", class, subclass, protocol);
+	if (class_ == 0 && subclass == 0 && protocol == 0) {
+		snprintf(buff, size, "(Defined at Interface level) (%02x/%02x/%02x)", class_, subclass, protocol);
 		return;
 	}
 
-	p = names_protocol(class, subclass, protocol);
+	p = names_protocol(class_, subclass, protocol);
 	if (!p)
 		p = "unknown protocol";
 
-	s = names_subclass(class, subclass);
+	s = names_subclass(class_, subclass);
 	if (!s)
 		s = "unknown subclass";
 
-	c = names_class(class);
+	c = names_class(class_);
 	if (!c)
 		c = "unknown class";
 
-	snprintf(buff, size, "%s / %s / %s (%02x/%02x/%02x)", c, s, p, class, subclass, protocol);
+	snprintf(buff, size, "%s / %s / %s (%02x/%02x/%02x)", c, s, p, class_, subclass, protocol);
 }
