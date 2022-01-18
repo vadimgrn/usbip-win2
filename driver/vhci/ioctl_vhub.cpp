@@ -89,18 +89,16 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto r = static_cast<USB_DESCRIPTOR_REQUEST*>(buffer);
-
-	if (inlen < sizeof(*r)) {
-		*poutlen = sizeof(*r);
+	if (inlen < sizeof(r)) {
+		*poutlen = sizeof(r);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (auto vpdo = vhub_find_vpdo(vhub, r->ConnectionIndex)) {
+	if (auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex)) {
 		auto st = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
 		return st;
 	}
@@ -165,30 +163,27 @@ PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG *pou
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto r = (USB_PORT_CONNECTOR_PROPERTIES*)buffer;
-	if (inlen >= sizeof(*r)) {
+	if (inlen >= sizeof(r)) {
 		return vhub_get_port_connector_properties(vhub, r, poutlen);
 	}
 
-	*poutlen = sizeof(*r);
+	*poutlen = sizeof(r);
 	return STATUS_BUFFER_TOO_SMALL;
 }
 
-PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_DRIVERKEY_NAME &r, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	auto pdrvkey_name = (USB_NODE_CONNECTION_DRIVERKEY_NAME*)buffer;
-
-	if (inlen < sizeof(*pdrvkey_name)) {
+	if (inlen < sizeof(r)) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto vpdo = vhub_find_vpdo(vhub, pdrvkey_name->ConnectionIndex);
+	auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex);
 	if (!vpdo) {
 		return STATUS_NO_SUCH_DEVICE;
 	}
@@ -208,12 +203,12 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, void *buffer, ULONG 
 			status = STATUS_INSUFFICIENT_RESOURCES;
 			*poutlen = outlen_res;
 		} else {
-			pdrvkey_name->ActualLength = outlen_res;
+			r.ActualLength = outlen_res;
 			if (*poutlen >= outlen_res) {
-				RtlCopyMemory(pdrvkey_name->DriverKeyName, driverkey, driverkeylen);
+				RtlCopyMemory(r.DriverKeyName, driverkey, driverkeylen);
 				*poutlen = outlen_res;
 			} else {
-				RtlCopyMemory(pdrvkey_name->DriverKeyName, driverkey, *poutlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
+				RtlCopyMemory(r.DriverKeyName, driverkey, *poutlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
 			}
 
 			status = STATUS_SUCCESS;
@@ -268,7 +263,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, 
 		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descriptor_from_nodeconn(vhub, irp, buffer, inlen, poutlen);
+		status = get_descriptor_from_nodeconn(vhub, irp, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_HUB_INFORMATION_EX:
 		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), poutlen);
@@ -280,10 +275,10 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, 
 		status = get_hub_capabilities_ex(*static_cast<USB_HUB_CAPABILITIES_EX*>(buffer), poutlen);
 		break;
 	case IOCTL_USB_GET_PORT_CONNECTOR_PROPERTIES:
-		status = get_port_connector_properties(vhub, buffer, inlen, poutlen);
+		status = get_port_connector_properties(vhub, *static_cast<USB_PORT_CONNECTOR_PROPERTIES*>(buffer), inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_DRIVERKEY_NAME:
-		status = get_node_driverkey_name(vhub, buffer, inlen, poutlen);
+		status = get_node_driverkey_name(vhub, *static_cast<USB_NODE_CONNECTION_DRIVERKEY_NAME*>(buffer), inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_ATTRIBUTES:
 		status = get_node_connection_attributes(vhub, *static_cast<USB_NODE_CONNECTION_ATTRIBUTES*>(buffer), inlen, poutlen);

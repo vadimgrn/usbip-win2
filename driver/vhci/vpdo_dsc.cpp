@@ -95,12 +95,12 @@ PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, con
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST *r, ULONG *psize)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG *psize)
 {
 	PAGED_CODE();
 
-	auto setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&r->SetupPacket;
-	static_assert(sizeof(*setup) == sizeof(r->SetupPacket));
+	auto setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&r.SetupPacket;
+	static_assert(sizeof(*setup) == sizeof(r.SetupPacket));
 
 	void *dsc_data = nullptr;
 	ULONG dsc_len = 0;
@@ -124,16 +124,16 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 		return req_fetch_dsc(vpdo, irp);
 	}
 
-	ULONG outlen = sizeof(*r) + dsc_len;
+	ULONG outlen = sizeof(r) + dsc_len;
 
-	if (*psize < sizeof(*r)) {
+	if (*psize < sizeof(r)) {
 		*psize = outlen;
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto ncopy = *psize < outlen ? *psize - sizeof(*r) : outlen;
+	auto ncopy = *psize < outlen ? *psize - sizeof(r) : outlen;
 	if (ncopy) {
-		RtlCopyMemory(r->Data, dsc_data, ncopy);
+		RtlCopyMemory(r.Data, dsc_data, ncopy);
 	}
 
 	if (ncopy == outlen) {

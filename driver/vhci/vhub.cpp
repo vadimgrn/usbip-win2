@@ -127,31 +127,31 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES *p, ULONG *poutlen)
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG *poutlen)
 {
 	PAGED_CODE();
 
-	if (!is_valid_port(p->ConnectionIndex)) {
+	if (!is_valid_port(r.ConnectionIndex)) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (*poutlen < sizeof(*p)) {
+	if (*poutlen < sizeof(r)) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	*poutlen = sizeof(*p);
+	*poutlen = sizeof(r);
 
-	p->ActualLength = sizeof(*p);
+	r.ActualLength = sizeof(r);
 
-	p->UsbPortProperties.ul = 0;
-	p->UsbPortProperties.PortIsUserConnectable = true;
-	p->UsbPortProperties.PortIsDebugCapable = true;
-//	p->UsbPortProperties.PortHasMultipleCompanions = FALSE;
-//	p->UsbPortProperties.PortConnectorIsTypeC = FALSE;
+	r.UsbPortProperties.ul = 0;
+	r.UsbPortProperties.PortIsUserConnectable = true;
+	r.UsbPortProperties.PortIsDebugCapable = true;
+//	r.UsbPortProperties.PortHasMultipleCompanions = FALSE;
+//	r.UsbPortProperties.PortConnectorIsTypeC = FALSE;
 
-	p->CompanionIndex = 0;
-	p->CompanionPortNumber = 0;
-	p->CompanionHubSymbolicLinkName[0] = L'\0';
+	r.CompanionIndex = 0;
+	r.CompanionPortNumber = 0;
+	r.CompanionHubSymbolicLinkName[0] = L'\0';
 
 	return STATUS_SUCCESS;
 }
