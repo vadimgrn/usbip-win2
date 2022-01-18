@@ -9,7 +9,7 @@
 namespace
 {
 
-PAGEABLE UCHAR to_dev_speed(usb_device_speed speed)
+PAGEABLE auto to_dev_speed(usb_device_speed speed)
 {
 	PAGED_CODE();
 
@@ -34,7 +34,7 @@ PAGEABLE void set_speed(USB_NODE_CONNECTION_INFORMATION_EX &ci, usb_device_speed
 	PAGED_CODE();
 
 	if (ex) {
-		ci.Speed = to_dev_speed(speed);
+		ci.Speed = static_cast<UCHAR>(to_dev_speed(speed));
 	} else {
 		auto &r = reinterpret_cast<USB_NODE_CONNECTION_INFORMATION&>(ci);
 		static_assert(sizeof(r) == sizeof(ci));
@@ -118,30 +118,31 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE 
 	return status;
 }
 
+/*
+ * vpdo is NULL if device is not plugged into the port.
+ */
 PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_INFORMATION_EX &ci, ULONG *poutlen, bool ex)
 {
 	PAGED_CODE();
 
-	NT_ASSERT(ci.ConnectionIndex);
-	TraceCall("%p: ConnectionIndex %lu", vpdo, ci.ConnectionIndex); // input parameter
+	TraceCall("ConnectionIndex %lu", ci.ConnectionIndex); // input parameter
 
 	RtlZeroMemory(&ci.DeviceDescriptor, sizeof(ci.DeviceDescriptor));
 	ci.CurrentConfigurationValue = vpdo && vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
 	set_speed(ci, vpdo ? vpdo->speed : USB_SPEED_UNKNOWN, ex);
 	ci.DeviceIsHub = FALSE;
-	ci.DeviceAddress = static_cast<USHORT>(ci.ConnectionIndex);
+	ci.DeviceAddress = vpdo ? static_cast<USHORT>(vpdo->port) : 0;
 	ci.NumberOfOpenPipes = 0;
 	ci.ConnectionStatus = vpdo ? DeviceConnected : NoDeviceConnected;
+	RtlIsZeroMemory(ci.PipeList, sizeof(*ci.PipeList));
 
 	if (!vpdo) {
 		*poutlen = sizeof(ci);
 		return STATUS_SUCCESS;
-	}
-
-	if (is_valid_dsc(&vpdo->descriptor)) {
+	} else if (is_valid_dsc(&vpdo->descriptor)) {
 		RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized");
+		Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized, ConnectionIndex %lu", ci.ConnectionIndex);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -150,7 +151,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 		ci.NumberOfOpenPipes = iface->bNumEndpoints;
 	}
 
-	ULONG outlen = sizeof(ci) + ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
+	ULONG outlen = sizeof(ci) - sizeof(*ci.PipeList) + ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
 	NTSTATUS status = STATUS_SUCCESS;
 
 	if (*poutlen < outlen) {
@@ -159,36 +160,6 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 		dsc_for_each_endpoint(vpdo->actconfig, iface, copy_ep, ci.PipeList);
 	}
 
-	*poutlen = outlen;
+	*poutlen = max(outlen, sizeof(ci));
 	return status;
-}
-
-PAGEABLE NTSTATUS vpdo_get_nodeconn_info_ex_v2(vpdo_dev_t*, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG *poutlen)
-{
-	PAGED_CODE();
-
-	if (*poutlen != sizeof(ci)) {
-		return STATUS_INVALID_BUFFER_SIZE;
-	}
-
-	if (ci.Length != sizeof(ci)) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	*poutlen = sizeof(ci);
-
-	ci.SupportedUsbProtocols.ul = 0;
-	ci.SupportedUsbProtocols.Usb110 = true;
-	ci.SupportedUsbProtocols.Usb200 = true;
-//	ci.SupportedUsbProtocols.Usb300 = true;
-
-	ci.Flags.ul = 0;
-/*
-	ci.Flags.DeviceIsOperatingAtSuperSpeedOrHigher = false;
-	ci.Flags.DeviceIsSuperSpeedCapableOrHigher = false;
-	ci.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher = false;
-	ci.Flags.DeviceIsSuperSpeedPlusCapableOrHigher = false;
-*/
-
-	return STATUS_SUCCESS;
 }

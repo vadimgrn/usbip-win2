@@ -40,36 +40,53 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 	static_assert(sizeof(USB_NODE_CONNECTION_INFORMATION) == sizeof(USB_NODE_CONNECTION_INFORMATION_EX));
 	auto &ci = *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX*>(buffer);
 
-	if (!(inlen >= sizeof(ci) && *poutlen >= sizeof(ci))) {
+	if (inlen < sizeof(ci) || *poutlen < sizeof(ci)) {
 		*poutlen = sizeof(ci);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex)) {
-		auto st = vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
-		return st;
-	}
+	NT_ASSERT(ci.ConnectionIndex);
+	auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex);
 
-	return STATUS_NO_SUCH_DEVICE;
+	return vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
 }
 
-PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG inlen, ULONG *poutlen)
 {
 	PAGED_CODE();
-
-	auto conninfo = (USB_NODE_CONNECTION_INFORMATION_EX_V2*)buffer;
-
-	if (inlen < sizeof(*conninfo) || *poutlen < sizeof(*conninfo)) {
-		*poutlen = sizeof(*conninfo);
-		return STATUS_BUFFER_TOO_SMALL;
+	
+	if (!(inlen == sizeof(ci) && *poutlen == sizeof(ci))) {
+		*poutlen = sizeof(ci);
+		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	if (auto vpdo = vhub_find_vpdo(vhub, conninfo->ConnectionIndex)) {
-		auto st = vpdo_get_nodeconn_info_ex_v2(vpdo, *conninfo, poutlen);
-		return st;
+	if (ci.Length != sizeof(ci)) {
+		return STATUS_INVALID_PARAMETER;
 	}
 
-	return STATUS_NO_SUCH_DEVICE;
+	NT_ASSERT(ci.ConnectionIndex);
+	TraceCall("ConnectionIndex %lu", ci.ConnectionIndex);
+
+	ci.SupportedUsbProtocols.ul = 0; // by the port
+	ci.SupportedUsbProtocols.Usb110 = true;
+	ci.SupportedUsbProtocols.Usb200 = true;
+	ci.SupportedUsbProtocols.Usb300 = false;
+
+	ci.Flags.ul = 0;
+
+	if (auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex)) {
+		switch (vpdo->speed) {
+		case USB_SPEED_SUPER_PLUS:
+			ci.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher = false;
+			ci.Flags.DeviceIsSuperSpeedPlusCapableOrHigher = true;
+			[[fallthrough]];
+		case USB_SPEED_SUPER:
+			ci.Flags.DeviceIsOperatingAtSuperSpeedOrHigher = false;
+			ci.Flags.DeviceIsSuperSpeedCapableOrHigher = true;
+		}
+	}
+
+	return STATUS_SUCCESS;
 }
 
 PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, void *buffer, ULONG inlen, ULONG *poutlen)
@@ -197,7 +214,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, 
 		status = get_nodeconn_info(vhub, buffer, inlen, poutlen, true);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2:
-		status = get_nodeconn_info_ex_v2(vhub, buffer, inlen, poutlen);
+		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, poutlen);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
 		status = get_descriptor_from_nodeconn(vhub, irp, buffer, inlen, poutlen);
