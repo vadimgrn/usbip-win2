@@ -63,6 +63,7 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 		return;
 	}
 
+	NT_ASSERT(is_valid_port(vpdo->port));
 	auto vhub = vhub_from_vpdo(vpdo);
 
 	ExAcquireFastMutex(&vhub->Mutex);
@@ -76,34 +77,43 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 	vpdo->port = 0;
 }
 
+/*
+ * See: <linux>/drivers/usb/usbip/vhci_hcd.c, hub_descriptor
+ */
 PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
-	d.bDescriptorLength = USB_DT_HUB_NONVAR_SIZE + 2;
-	d.bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE;
+	static_assert(vhub->NUM_PORTS <= USB_MAXCHILDREN);
+	constexpr auto width = vhub->NUM_PORTS/8 + 1;
+
+	d.bDescriptorLength = USB_DT_HUB_NONVAR_SIZE + 2*width;
+	d.bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE; // USB_DT_HUB
 	d.bNumberOfPorts = vhub->NUM_PORTS; 
-	d.wHubCharacteristics = 0;
-	d.bPowerOnToPowerGood = 1;
-	d.bHubControlCurrent = 1;
-	//d.bRemoveAndPowerMask = 0;
+	d.wHubCharacteristics = HUB_CHAR_INDV_PORT_LPSM | HUB_CHAR_COMMON_OCPM;
+	d.bPowerOnToPowerGood = 0;
+	d.bHubControlCurrent = 0;
+
+	RtlZeroMemory(d.bRemoveAndPowerMask, width);
+	RtlFillMemory(d.bRemoveAndPowerMask + width, width, UCHAR(-1));
 }
 
+/*
+* See: <linux>/drivers/usb/usbip/vhci_hcd.c, ss_hub_descriptor
+*/
 PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_30_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
-	static_assert(sizeof(d) == USB_DT_SS_HUB_SIZE);
-
-	d.bLength = sizeof(d);
-	d.bDescriptorType = USB_30_HUB_DESCRIPTOR_TYPE;
+	d.bLength = USB_DT_SS_HUB_SIZE;
+	d.bDescriptorType = USB_30_HUB_DESCRIPTOR_TYPE; // USB_DT_SS_HUB
 	d.bNumberOfPorts = vhub->NUM_PORTS; 
-	d.wHubCharacteristics = 0;
+	d.wHubCharacteristics = HUB_CHAR_INDV_PORT_LPSM | HUB_CHAR_COMMON_OCPM;
 	d.bPowerOnToPowerGood = 0;
 	d.bHubControlCurrent = 0;
-	d.bHubHdrDecLat = 0; // The hub packet header decode latency
+	d.bHubHdrDecLat = 0x04; // worst case: 0.4 micro sec
 	d.wHubDelay = 0; // The average delay, in nanoseconds, that is introduced by the hub
-	d.DeviceRemovable = USHORT(-1 << 1); // Indicates whether a removable device is attached to each port
+	d.DeviceRemovable = USHORT(-1); // Indicates whether a removable device is attached to each port
 }
 
 PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &p)
