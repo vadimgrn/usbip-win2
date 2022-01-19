@@ -27,7 +27,7 @@
 
 #include "usbip_dscr.h"
 
-#define ATTACHER "attacher2.exe"
+#define ATTACHER "attacher.exe"
 
 static const char usbip_attach_usage_string[] =
 	"usbip attach <args>\n"
@@ -187,14 +187,14 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 }
 
 static BOOL
-write_handle_value(HANDLE hInWrite, HANDLE handle)
+write_data(HANDLE hInWrite, const void *data, DWORD len)
 {
 	DWORD	nwritten;
 	BOOL	res;
 
-	res = WriteFile(hInWrite, &handle, sizeof(HANDLE), &nwritten, NULL);
-	if (!res || nwritten != sizeof(HANDLE)) {
-		dbg("failed to write handle value");
+	res = WriteFile(hInWrite, data, len, &nwritten, NULL);
+	if (!res || nwritten != len) {
+		dbg("failed to write handle value, len %d", len);
 		return FALSE;
 	}
 	return TRUE;
@@ -222,7 +222,7 @@ execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
 	STARTUPINFO	si;
 	PROCESS_INFORMATION	pi;
 	HANDLE	hRead, hWrite;
-	HANDLE	hdev_attacher, sockfd_attacher;
+	HANDLE	hdev_attacher;
 	BOOL	res;
 	int	ret = ERR_GENERAL;
 
@@ -243,19 +243,25 @@ execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
 		dbg("failed to create process: 0x%lx", err);
 		goto out;
 	}
+
 	res = DuplicateHandle(GetCurrentProcess(), hdev, pi.hProcess, &hdev_attacher, 0, FALSE, DUPLICATE_SAME_ACCESS);
 	if (!res) {
 		dbg("failed to dup hdev: 0x%lx", GetLastError());
 		goto out_proc;
 	}
-	res = DuplicateHandle(GetCurrentProcess(), (HANDLE)sockfd, pi.hProcess, &sockfd_attacher, 0, FALSE, DUPLICATE_SAME_ACCESS);
-	if (!res) {
-		dbg("failed to dup sockfd: 0x%lx", GetLastError());
+
+	WSAPROTOCOL_INFOW ProtocolInfo;
+	res = WSADuplicateSocketW(sockfd, pi.dwProcessId, &ProtocolInfo);
+	if (res) {
+		dbg("failed to dup sockfd: %#x", WSAGetLastError());
 		goto out_proc;
 	}
-	if (!write_handle_value(hWrite, hdev_attacher) || !write_handle_value(hWrite, sockfd_attacher))
-		goto out_proc;
-	ret = 0;
+
+	if (write_data(hWrite, &hdev_attacher, sizeof(hdev_attacher)) && 
+	    write_data(hWrite, &ProtocolInfo, sizeof(ProtocolInfo))) {
+		ret = 0;
+	}
+
 out_proc:
 	CloseHandle(pi.hProcess);
 	CloseHandle(pi.hThread);

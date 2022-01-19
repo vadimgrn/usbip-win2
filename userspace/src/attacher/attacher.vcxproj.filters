@@ -3,4 +3,7 @@
   <ItemGroup>
     <ClCompile Include="attacher.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="trace.h" />
+  </ItemGroup>
 </Project>
