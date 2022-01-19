@@ -109,6 +109,21 @@ PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, ULONG, 
 	return get_hcd_driverkey_name(vhci, name, poutlen);
 }
 
+PAGEABLE auto pass_thru(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
+{
+	PAGED_CODE();
+
+	auto &r = *static_cast<USB_PASS_THRU_PARAMETERS*>(request);
+
+	if (inlen != sizeof(r)) {
+		*poutlen = sizeof(r);
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	TraceCall("FunctionGUID %!GUID!, ParameterLength %lu", &r.FunctionGUID, r.ParameterLength);
+	return STATUS_NOT_SUPPORTED;
+}
+
 PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, ULONG, ULONG *poutlen)
 {
 	PAGED_CODE();
@@ -152,6 +167,8 @@ PAGEABLE auto get_bandwidth_information(vhci_dev_t *vhci, void *request, ULONG i
 
 	auto vhub = vhub_from_vhci(vhci);
 	r.DeviceCount = get_device_count(vhub);
+
+	r.TotalBusBandwidth = 0; // FIXME
 
 	return STATUS_SUCCESS;
 }
@@ -239,7 +256,7 @@ request_t* const requests[] =
 	nullptr,
 	get_controller_info,
 	get_controller_driver_key,
-	nullptr, // USBUSER_PASS_THRU
+	pass_thru,
 	get_power_state_map,
 	get_bandwidth_information,
 	get_bus_statistics_0,

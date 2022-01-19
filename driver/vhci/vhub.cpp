@@ -247,7 +247,7 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 		dev->port = static_cast<char>(vpdo->port);
 		NT_ASSERT(dev->port == vpdo->port);
 
-		dev->status = usbip_device_status(2); // SDEV_ST_USED
+		dev->status = usbip_device_status(2); // FIXME: SDEV_ST_USED
 		dev->vendor = d.idVendor;
 		dev->product = d.idProduct;
 		dev->speed = vpdo->speed;
