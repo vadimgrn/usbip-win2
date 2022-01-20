@@ -6,8 +6,6 @@
 #include <exception>
 #include <atomic>
 #include <vector>
-#include <array>
-#include <string>
 
 #include <boost/asio.hpp>
 
@@ -45,7 +43,7 @@ void terminate(int exit_code = EXIT_FAILURE)
 	get_io_context().stop();
 }
 
-inline auto terminated()
+auto terminated()
 {
 	return get_io_context().stopped();
 }
@@ -64,25 +62,23 @@ class Forwarder : public std::enable_shared_from_this<Forwarder>
 public:
 	Forwarder(HANDLE hdev, SOCKET sockfd);
 
-	void run();
+	void async_start();
 
 private:
-	using header_buffer = std::array<char, sizeof(usbip_header)>;
-	using header_ptr = std::shared_ptr<header_buffer>;
-
-	using data_buffer = std::vector<char>;
-	using data_ptr = std::shared_ptr<data_buffer>;
+	using buffer_t = std::vector<char>;
+	using buffer_ptr = std::shared_ptr<buffer_t>;
 
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
 
-	void sched_dev_hdr_read(header_ptr hdr, data_ptr data);
+	void async_read_header(buffer_ptr buf);
+	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf);
 
-	void on_dev_hdr_read (const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data);
-	void on_dev_data_read(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data);
+	void async_read_body(buffer_ptr buf);
+	void on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf);
 
-	void sched_socket_write(header_ptr hdr, data_ptr data);
-	void on_socket_write(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data);
+	void async_write_pdu(buffer_ptr buf);
+	void on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf);
 };
 
 
@@ -92,94 +88,93 @@ Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd) :
 {
 }
 
-void Forwarder::run()
+void Forwarder::async_start()
 {
-	sched_dev_hdr_read(std::make_shared<header_buffer>(), std::make_shared<data_buffer>());
+	async_read_header(std::make_shared<buffer_t>());
 }
 
-void Forwarder::sched_dev_hdr_read(header_ptr hdr, data_ptr data)
+void Forwarder::async_read_header(buffer_ptr buf)
 {
 	if (terminated()) {
 		return;
 	}
 
-	auto f = [self = shared_from_this(), hdr, data = std::move(data)] (auto&&... args)
+	auto f = [self = shared_from_this(), buf] (auto&&... args)
 	{
-		self->on_dev_hdr_read(std::forward<decltype(args)>(args)..., std::move(hdr), std::move(data));
+		self->on_read_header(std::forward<decltype(args)>(args)..., std::move(buf));
 	};
 
-	async_read(m_dev, boost::asio::buffer(*hdr), f);
+	buf->resize(sizeof(usbip_header));
+	async_read(m_dev, boost::asio::buffer(*buf), f);
 }
 
-void Forwarder::on_dev_hdr_read(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data)
+void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
-		return;
-	} 
-	
-	assert(transferred == hdr->size());
+	} else {
+		assert(transferred == buf->size());
+		async_read_body(std::move(buf));
+	}
+}
 
+void Forwarder::async_read_body(buffer_ptr buf)
+{
 	if (terminated()) {
 		return;
 	}
 
-	auto head = reinterpret_cast<usbip_header*>(hdr->data());
+	auto hdr = reinterpret_cast<usbip_header*>(buf->data());
+	assert(buf->size() == sizeof(*hdr));
 
-	auto len = get_pdu_payload_size(head);
-	data->resize(len);
+	if (auto len = get_pdu_payload_size(hdr)) {
 
-	if (len) {
-		auto f = [self = shared_from_this(), hdr = std::move(hdr), data] (auto&&... args)
+		auto f = [self = shared_from_this(), buf] (auto&&... args)
 		{
-			self->on_dev_data_read(std::forward<decltype(args)>(args)..., std::move(hdr), std::move(data));
+			self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf));
 		};
 
-		async_read(m_dev, boost::asio::buffer(*data), f); // boost::asio::transfer_exactly(len), 
+		buf->resize(buf->size() + len);
+		async_read(m_dev, boost::asio::buffer(*buf), f); // boost::asio::transfer_exactly(len), 
 	} else {
-		sched_socket_write(std::move(hdr), std::move(data));
+		async_write_pdu(std::move(buf));
 	}
 }
 
-void Forwarder::on_dev_data_read(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data)
+void Forwarder::on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
-		assert(transferred == data->size());
-		sched_socket_write(std::move(hdr), std::move(data));
+		assert(transferred == buf->size());
+		async_write_pdu(std::move(buf));
 	}
 }
 
-void Forwarder::sched_socket_write(header_ptr hdr, data_ptr data)
+void Forwarder::async_write_pdu(buffer_ptr buf)
 {
 	if (terminated()) {
 		return;
 	}
 
-	auto f = [self = shared_from_this(), hdr, data] (auto&&... args)
+	auto f = [self = shared_from_this(), buf] (auto&&... args)
 	{
-		self->on_socket_write(std::forward<decltype(args)>(args)..., std::move(hdr), std::move(data));
+		self->on_write_pdu(std::forward<decltype(args)>(args)..., std::move(buf));
 	};
 
-	std::array<boost::asio::const_buffer, 2> buffers = {
-		boost::asio::buffer(*hdr),
-		boost::asio::buffer(*data)
-	};
-
-	async_write(m_dev, buffers, f);
+	async_write(m_dev, boost::asio::buffer(*buf), f);
 }
 
-void Forwarder::on_socket_write(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data)
+void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
-		assert(transferred == hdr->size() + data->size());
-		sched_dev_hdr_read(std::move(hdr), std::move(data));
+		assert(transferred == buf->size());
+		async_read_header(std::move(buf));
 	}
 }
 
@@ -224,7 +219,7 @@ void run(HANDLE hdev, SOCKET sockfd)
 	boost::asio::signal_set signals(ctx, SIGTERM, SIGINT);
 	signals.async_wait(signal_handler);
 
-	std::make_shared<Forwarder>(hdev, sockfd)->run();
+	std::make_shared<Forwarder>(hdev, sockfd)->async_start();
 
 	ctx.run();
 	assert(terminated());
