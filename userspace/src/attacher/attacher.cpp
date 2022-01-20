@@ -1,13 +1,13 @@
-#include <winsock2.h>
-#include <windows.h>
+#include "trace.h"
+#include "attacher.tmh"
 
 #include <cerrno>
 #include <cassert>
 #include <exception>
-#include <fstream>
 #include <atomic>
 #include <vector>
 #include <array>
+#include <string>
 
 #include <boost/asio.hpp>
 
@@ -22,16 +22,16 @@ using boost::asio::ip::tcp;
 	
 std::atomic<int> g_exit_code(EXIT_SUCCESS);
 
+struct WPPInit
+{
+	WPPInit() { WPP_INIT_TRACING(nullptr); }
+	~WPPInit() { WPP_CLEANUP(); }
+};
+
 auto &get_io_context()
 {
 	static boost::asio::io_context ctx(1);
 	return ctx;
-}
-
-auto &log()
-{
-	static std::ofstream f("attacher.log", std::ios::out | std::ios::trunc);
-	return f;
 }
 
 void terminate(int exit_code = EXIT_FAILURE)
@@ -39,7 +39,7 @@ void terminate(int exit_code = EXIT_FAILURE)
 	auto expected = EXIT_SUCCESS;
 
 	if (g_exit_code.compare_exchange_strong(expected, exit_code)) {
-		log() << __func__ << '(' << exit_code << ")\n";
+		Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", exit_code);
 	}
 
 	get_io_context().stop();
@@ -53,9 +53,9 @@ inline auto terminated()
 void signal_handler(const boost::system::error_code &ec, int signum)
 {
 	if (ec) {
-		log() << __func__ << '(' << signum << "): error #" << ec.value() << ' ' << ec.message() << std::endl;
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', signum %d", ec.value(), ec.message().c_str(), signum);
 	} else {
-		log() << __func__ << '(' << signum << ")\n";
+		Trace(TRACE_LEVEL_INFORMATION, "signum %d", signum);
 	}
 }
 
@@ -114,7 +114,7 @@ void Forwarder::sched_dev_hdr_read(header_ptr hdr, data_ptr data)
 void Forwarder::on_dev_hdr_read(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data)
 {
 	if (ec) {
-		log() << __func__ << ": error #" << ec.value() << ' ' << ec.message() << std::endl;
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 		return;
 	} 
@@ -145,7 +145,7 @@ void Forwarder::on_dev_hdr_read(const boost::system::error_code &ec, std::size_t
 void Forwarder::on_dev_data_read(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data)
 {
 	if (ec) {
-		log() << __func__ << ": error #" << ec.value() << ' ' << ec.message() << std::endl;
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
 		assert(transferred == data->size());
@@ -175,7 +175,7 @@ void Forwarder::sched_socket_write(header_ptr hdr, data_ptr data)
 void Forwarder::on_socket_write(const boost::system::error_code &ec, std::size_t transferred, header_ptr hdr, data_ptr data)
 {
 	if (ec) {
-		log() << __func__ << ": error #" << ec.value() << ' ' << ec.message() << std::endl;
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
 		assert(transferred == hdr->size() + data->size());
@@ -250,10 +250,12 @@ void setup_forwarder()
 
 int main()
 {
+	WPPInit wpp;
+
 	try {
 		setup_forwarder();
 	} catch (std::exception &e) {
-		log() << "Exception: " << e.what() << std::endl;
+		Trace(TRACE_LEVEL_ERROR, "Exception: %s", e.what());
 		g_exit_code = EXIT_FAILURE;
 	}
 

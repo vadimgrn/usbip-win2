@@ -21,20 +21,20 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{d89776ab-dc80-4ad8-862e-18c084bd3e60}</ProjectGuid>
     <RootNamespace>attacher</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
     <ProjectName>attacher</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>WindowsApplicationForDrivers10.0</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>WindowsApplicationForDrivers10.0</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -71,6 +71,10 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppEnabled>true</WppEnabled>
+      <WppAdditionalConfigurationFile>
+      </WppAdditionalConfigurationFile>
+      <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -90,6 +94,10 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppEnabled>true</WppEnabled>
+      <WppAdditionalConfigurationFile>
+      </WppAdditionalConfigurationFile>
+      <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

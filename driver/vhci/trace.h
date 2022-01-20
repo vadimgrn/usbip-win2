@@ -22,11 +22,11 @@
 #define WPP_FLAG_LEVEL_ENABLED(flag, level) \
 	(WPP_LEVEL_ENABLED(flag) && WPP_CONTROL(WPP_BIT_ ## flag).Level >= level)
 
-#define WPP_LEVEL_FLAGS_LOGGER(level, flag) \
+#define WPP_LEVEL_FLAGS_LOGGER(level, flags) \
 	WPP_LEVEL_LOGGER(flags)
 
-#define WPP_LEVEL_FLAGS_ENABLED(level, flag) \
-	(WPP_LEVEL_ENABLED(flag) && WPP_CONTROL(WPP_BIT_ ## flag).Level >= level)
+#define WPP_LEVEL_FLAGS_ENABLED(level, flags) \
+	(WPP_LEVEL_ENABLED(flags) && WPP_CONTROL(WPP_BIT_ ## flags).Level >= level)
 
 //           
 // WPP orders static parameters before dynamic parameters. To support the Trace function
