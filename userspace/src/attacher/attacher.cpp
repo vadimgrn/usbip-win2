@@ -6,12 +6,14 @@
 #include <exception>
 #include <atomic>
 #include <vector>
+#include <thread>
 
 #include <boost/asio.hpp>
 
+#include "usbip_proto.h"
 #include "usbip_common.h"
-#include "pdu.h"
 #include "usbip_vhci_api.h"
+#include "pdu.h"
 
 namespace
 {
@@ -48,6 +50,63 @@ auto terminated()
 	return get_io_context().stopped();
 }
 
+auto& get_thread_pool()
+{
+	static std::thread v[2]; // read and write simultaneously
+	return v;
+}
+
+auto exec(const std::function<void()> &func, const char *name)
+{
+	try {
+		func();
+		return false;
+	} catch (std::exception &e) {
+		Trace(TRACE_LEVEL_ERROR, "Exception(%s): %s", name, e.what());
+	}
+
+	return true;
+}
+
+void io_context_run(boost::asio::io_context &ioc)
+{
+	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+
+	auto run = [&ioc] { ioc.run(); };
+
+	while (!ioc.stopped()) {
+		if (exec(run, "io_context::run")) {
+			terminate();
+		}
+	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Leave");
+}
+
+void start_threads(boost::asio::io_context &ioc)
+{
+	for (auto &t : get_thread_pool()) {
+		t = std::thread(io_context_run, std::ref(ioc));
+	}
+}
+
+void stop_threads(boost::asio::io_context *ioc)
+{
+	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+
+	assert(ioc);
+	ioc->stop();
+
+	for (auto &t : get_thread_pool()) {
+		if (t.joinable()) {
+			auto join = [&t] { t.join(); };
+			exec(join, "thread::join");
+		}
+	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Leave");
+}
+
 void signal_handler(const boost::system::error_code &ec, int signum)
 {
 	if (ec) {
@@ -70,6 +129,8 @@ private:
 
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
+
+	static auto &get_hdr(buffer_ptr buf) { return *reinterpret_cast<usbip_header*>(buf->data()); }
 
 	void async_read_header(buffer_ptr buf, bool remote);
 	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
@@ -106,9 +167,10 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 	};
 
 	buf->resize(sizeof(usbip_header));
+	auto hdr = boost::asio::buffer(*buf);
 	
-	remote ? async_read(m_sock, boost::asio::buffer(*buf), f) : 
-		 async_read(m_dev,  boost::asio::buffer(*buf), f);
+	remote ? async_read(m_sock, std::move(hdr), std::move(f)) : 
+		 async_read(m_dev,  std::move(hdr), std::move(f));
 }
 
 void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
@@ -118,6 +180,7 @@ void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t 
 		terminate();
 	} else {
 		assert(transferred == buf->size());
+		Trace(TRACE_LEVEL_VERBOSE, "Remote %!bool!, transferred %Iu", remote, transferred);
 		async_read_body(std::move(buf), remote);
 	}
 }
@@ -128,21 +191,25 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 		return;
 	}
 
-	auto hdr = reinterpret_cast<usbip_header*>(buf->data());
-	assert(buf->size() == sizeof(*hdr));
+	auto &hdr = get_hdr(buf);
+	assert(buf->size() == sizeof(hdr));
 
-	if (auto len = get_pdu_payload_size(hdr)) {
+	if (remote) {
+		byteswap_header(hdr, swap_dir::net2host);
+	}
+
+	if (auto len = get_payload_size(hdr)) {
 
 		auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 		{
 			self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf), remote);
 		};
 
-		buf->resize(sizeof(*hdr) + len);
-		auto body = buf->data() + sizeof(*hdr);
+		buf->resize(sizeof(hdr) + len);
+		auto body = boost::asio::buffer(buf->data() + sizeof(hdr), len);
 
-		remote ? async_read(m_sock, boost::asio::buffer(body, len), f) :
-			 async_read(m_dev,  boost::asio::buffer(body, len), f);
+		remote ? async_read(m_sock, std::move(body), std::move(f)) : 
+			 async_read(m_dev,  std::move(body), std::move(f));
 	} else {
 		async_write_pdu(std::move(buf), !remote);
 	}
@@ -153,10 +220,16 @@ void Forwarder::on_read_body(const boost::system::error_code &ec, std::size_t tr
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
-	} else {
-		assert(transferred == buf->size() - sizeof(usbip_header));
-		async_write_pdu(std::move(buf), !remote);
+		return;
 	}
+
+	auto &hdr = get_hdr(buf);
+	assert(transferred == buf->size() - sizeof(hdr));
+
+	Trace(TRACE_LEVEL_VERBOSE, "Remote %!bool!, transferred %Iu", remote, transferred);
+
+	byteswap_payload(hdr);
+	async_write_pdu(std::move(buf), !remote);
 }
 
 void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
@@ -165,13 +238,19 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 		return;
 	}
 
+	if (remote) {
+		byteswap_header(get_hdr(buf), swap_dir::host2net);
+	}
+
 	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 	{
 		self->on_write_pdu(std::forward<decltype(args)>(args)..., std::move(buf), remote);
 	};
 
-	remote ? async_write(m_sock, boost::asio::buffer(*buf), f) :
-		 async_write(m_dev,  boost::asio::buffer(*buf), f);
+	auto data = boost::asio::buffer(*buf);
+
+	remote ? async_write(m_sock, std::move(data), std::move(f)) :
+		 async_write(m_dev,  std::move(data), std::move(f));
 }
 
 void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
@@ -181,6 +260,7 @@ void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t tr
 		terminate();
 	} else {
 		assert(transferred == buf->size());
+		Trace(TRACE_LEVEL_VERBOSE, "Remote %!bool!, transferred %Iu", remote, transferred);
 		async_read_header(std::move(buf), !remote);
 	}
 }
@@ -220,6 +300,13 @@ auto read_data(HANDLE &hdev, SOCKET &sockfd, int &AddressFamily)
 	return hdev != INVALID_HANDLE_VALUE && sockfd != INVALID_SOCKET;
 }
 
+auto start_thread_pool(boost::asio::io_context &ioc)
+{
+	std::unique_ptr<boost::asio::io_context, decltype(stop_threads)&> ptr(&ioc, stop_threads);
+	start_threads(ioc);
+	return ptr;
+}
+
 void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
 {
 	auto &ioc = get_io_context();
@@ -229,8 +316,12 @@ void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
 
 	std::make_shared<Forwarder>(hdev, sockfd, AddressFamily)->async_start();
 
+	auto stop = start_thread_pool(ioc);
+
 	ioc.run();
 	assert(terminated());
+
+	stop.reset();
 }
 
 void setup_forwarder()
@@ -245,7 +336,10 @@ void setup_forwarder()
 
 	if (hdev != INVALID_HANDLE_VALUE) {
 		DWORD unused{};
-		DeviceIoControl(hdev, IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr);
+		auto ok = DeviceIoControl(hdev, IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr);
+		if (!ok) {
+			Trace(TRACE_LEVEL_ERROR, "VHCI_SHUTDOWN_HARDWARE error %#lu", GetLastError());
+		}
 	}
 }
 
@@ -263,5 +357,6 @@ int main()
 		g_exit_code = EXIT_FAILURE;
 	}
 
+	Trace(TRACE_LEVEL_INFORMATION, "Exiting %d", g_exit_code);
 	return g_exit_code;
 }

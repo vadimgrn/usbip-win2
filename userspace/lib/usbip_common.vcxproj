@@ -96,6 +96,7 @@
   <ItemGroup>
     <ClCompile Include="dbgcode.c" />
     <ClCompile Include="names.c" />
+    <ClCompile Include="pdu.cpp" />
     <ClCompile Include="usbip_common.c" />
     <ClCompile Include="getopt.c" />
     <ClCompile Include="getopt_long.c" />
@@ -114,6 +115,7 @@
     <ClInclude Include="list.h" />
     <ClInclude Include="mssign32.h" />
     <ClInclude Include="names.h" />
+    <ClInclude Include="pdu.h" />
     <ClInclude Include="usbip_common.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="usbip_forward.h" />

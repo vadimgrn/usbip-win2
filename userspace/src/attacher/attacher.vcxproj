@@ -11,9 +11,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\lib\pdu.cpp" />
     <ClCompile Include="attacher.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\lib\pdu.h" />
     <ClInclude Include="trace.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

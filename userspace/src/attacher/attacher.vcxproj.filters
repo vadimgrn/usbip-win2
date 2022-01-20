@@ -2,8 +2,10 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="attacher.cpp" />
+    <ClCompile Include="..\..\lib\pdu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="trace.h" />
+    <ClInclude Include="..\..\lib\pdu.h" />
   </ItemGroup>
 </Project>
