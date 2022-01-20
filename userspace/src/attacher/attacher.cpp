@@ -71,14 +71,14 @@ private:
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
 
-	void async_read_header(buffer_ptr buf);
-	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf);
+	void async_read_header(buffer_ptr buf, bool remote);
+	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
-	void async_read_body(buffer_ptr buf);
-	void on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf);
+	void async_read_body(buffer_ptr buf, bool remote);
+	void on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
-	void async_write_pdu(buffer_ptr buf);
-	void on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf);
+	void async_write_pdu(buffer_ptr buf, bool remote);
+	void on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 };
 
 
@@ -90,36 +90,39 @@ Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily) :
 
 void Forwarder::async_start()
 {
-	async_read_header(std::make_shared<buffer_t>());
+	async_read_header(std::make_shared<buffer_t>(), false);
+	async_read_header(std::make_shared<buffer_t>(), true);
 }
 
-void Forwarder::async_read_header(buffer_ptr buf)
+void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 {
 	if (terminated()) {
 		return;
 	}
 
-	auto f = [self = shared_from_this(), buf] (auto&&... args)
+	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 	{
-		self->on_read_header(std::forward<decltype(args)>(args)..., std::move(buf));
+		self->on_read_header(std::forward<decltype(args)>(args)..., std::move(buf), remote);
 	};
 
 	buf->resize(sizeof(usbip_header));
-	async_read(m_dev, boost::asio::buffer(*buf), f);
+	
+	remote ? async_read(m_sock, boost::asio::buffer(*buf), f) : 
+		 async_read(m_dev,  boost::asio::buffer(*buf), f);
 }
 
-void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf)
+void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
 		assert(transferred == buf->size());
-		async_read_body(std::move(buf));
+		async_read_body(std::move(buf), remote);
 	}
 }
 
-void Forwarder::async_read_body(buffer_ptr buf)
+void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 {
 	if (terminated()) {
 		return;
@@ -130,51 +133,55 @@ void Forwarder::async_read_body(buffer_ptr buf)
 
 	if (auto len = get_pdu_payload_size(hdr)) {
 
-		auto f = [self = shared_from_this(), buf] (auto&&... args)
+		auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 		{
-			self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf));
+			self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf), remote);
 		};
 
-		buf->resize(buf->size() + len);
-		async_read(m_dev, boost::asio::buffer(*buf), f); // boost::asio::transfer_exactly(len), 
+		buf->resize(sizeof(*hdr) + len);
+		auto body = buf->data() + sizeof(*hdr);
+
+		remote ? async_read(m_sock, boost::asio::buffer(body, len), f) :
+			 async_read(m_dev,  boost::asio::buffer(body, len), f);
 	} else {
-		async_write_pdu(std::move(buf));
+		async_write_pdu(std::move(buf), !remote);
 	}
 }
 
-void Forwarder::on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf)
+void Forwarder::on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
-		assert(transferred == buf->size());
-		async_write_pdu(std::move(buf));
+		assert(transferred == buf->size() - sizeof(usbip_header));
+		async_write_pdu(std::move(buf), !remote);
 	}
 }
 
-void Forwarder::async_write_pdu(buffer_ptr buf)
+void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 {
 	if (terminated()) {
 		return;
 	}
 
-	auto f = [self = shared_from_this(), buf] (auto&&... args)
+	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 	{
-		self->on_write_pdu(std::forward<decltype(args)>(args)..., std::move(buf));
+		self->on_write_pdu(std::forward<decltype(args)>(args)..., std::move(buf), remote);
 	};
 
-	async_write(m_dev, boost::asio::buffer(*buf), f);
+	remote ? async_write(m_sock, boost::asio::buffer(*buf), f) :
+		 async_write(m_dev,  boost::asio::buffer(*buf), f);
 }
 
-void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf)
+void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu", ec.value(), ec.message().c_str(), transferred);
 		terminate();
 	} else {
 		assert(transferred == buf->size());
-		async_read_header(std::move(buf));
+		async_read_header(std::move(buf), !remote);
 	}
 }
 
