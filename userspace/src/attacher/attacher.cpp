@@ -60,7 +60,7 @@ void signal_handler(const boost::system::error_code &ec, int signum)
 class Forwarder : public std::enable_shared_from_this<Forwarder>
 {
 public:
-	Forwarder(HANDLE hdev, SOCKET sockfd);
+	Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily);
 
 	void async_start();
 
@@ -82,9 +82,9 @@ private:
 };
 
 
-Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd) :
+Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily) :
 	m_dev(get_io_context(), hdev),
-	m_sock(get_io_context(), tcp::v4(), sockfd)
+	m_sock(get_io_context(), AddressFamily == AF_INET6 ? tcp::v6() : tcp::v4(), sockfd)
 {
 }
 
@@ -194,7 +194,7 @@ auto read(HANDLE hStdin, void *buf, DWORD len)
 	return true;
 }
 
-auto read_data(HANDLE &hdev, SOCKET &sockfd)
+auto read_data(HANDLE &hdev, SOCKET &sockfd, int &AddressFamily)
 {
 	auto hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	assert(hStdin != INVALID_HANDLE_VALUE);
@@ -205,6 +205,7 @@ auto read_data(HANDLE &hdev, SOCKET &sockfd)
 	CloseHandle(hStdin);
 
 	if (ok) {
+		AddressFamily = ProtocolInfo.iAddressFamily;
 		sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &ProtocolInfo, 0, WSA_FLAG_OVERLAPPED);
 		assert(sockfd != INVALID_SOCKET);
 	}
@@ -212,16 +213,16 @@ auto read_data(HANDLE &hdev, SOCKET &sockfd)
 	return hdev != INVALID_HANDLE_VALUE && sockfd != INVALID_SOCKET;
 }
 
-void run(HANDLE hdev, SOCKET sockfd)
+void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
 {
-	auto &ctx = get_io_context();
+	auto &ioc = get_io_context();
 
-	boost::asio::signal_set signals(ctx, SIGTERM, SIGINT);
+	boost::asio::signal_set signals(ioc, SIGTERM, SIGINT);
 	signals.async_wait(signal_handler);
 
-	std::make_shared<Forwarder>(hdev, sockfd)->async_start();
+	std::make_shared<Forwarder>(hdev, sockfd, AddressFamily)->async_start();
 
-	ctx.run();
+	ioc.run();
 	assert(terminated());
 }
 
@@ -229,9 +230,10 @@ void setup_forwarder()
 {
 	HANDLE hdev = INVALID_HANDLE_VALUE;
 	SOCKET sockfd = INVALID_SOCKET;
+	int AddressFamily = AF_UNSPEC;
 
-	if (read_data(hdev, sockfd)) {
-		run(hdev, sockfd);
+	if (read_data(hdev, sockfd, AddressFamily)) {
+		run(hdev, sockfd, AddressFamily);
 	}
 
 	if (hdev != INVALID_HANDLE_VALUE) {
