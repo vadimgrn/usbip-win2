@@ -69,9 +69,9 @@ auto try_catch(const std::function<void()> &func, const char *name) noexcept
 	return true;
 }
 
-void io_context_run(boost::asio::io_context &ioc)
+void io_context_run(boost::asio::io_context &ioc, const char *caller)
 {
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+	Trace(TRACE_LEVEL_INFORMATION, "%s enter", caller);
 
 	auto run = [&ioc] { ioc.run(); };
 
@@ -81,7 +81,7 @@ void io_context_run(boost::asio::io_context &ioc)
 		}
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Leave");
+	Trace(TRACE_LEVEL_INFORMATION, "%s leave", caller);
 }
 
 constexpr auto get_submit_dir(const usbip_header &hdr) noexcept
@@ -199,9 +199,7 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 		submit_dir = push_submit_dir(hdr);
 	}
 
-	trace(hdr, __func__, remote);
-
-	auto payload = get_payload_size(hdr, submit_dir);
+	auto payload = 0; // get_payload_size(hdr, submit_dir);
 	if (!payload) {
 		async_write_pdu(std::move(buf), !remote);
 		return;
@@ -328,7 +326,7 @@ void stop_thread(std::thread *tr)
 
 auto launch_thread()
 {
-	static std::thread tr(io_context_run, std::ref(io_context()));
+	static std::thread tr(io_context_run, std::ref(io_context()), "thread");
 	return std::unique_ptr<std::thread, decltype(stop_thread)&>(&tr, stop_thread);
 }
 
@@ -342,7 +340,7 @@ void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
 	std::make_shared<Forwarder>(hdev, sockfd, AddressFamily)->async_start();
 
 	if (auto stop = launch_thread()) {
-		io_context_run(ioc); // blocks thread
+		io_context_run(ioc, "main"); // blocks thread
 		assert(terminated());
 	}
 }
