@@ -13,10 +13,15 @@
   <ItemGroup>
     <ClCompile Include="..\..\lib\pdu.cpp" />
     <ClCompile Include="attacher.cpp" />
+    <ClCompile Include="debug.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\lib\pdu.h" />
+    <ClInclude Include="debug.h" />
     <ClInclude Include="trace.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom_wpp.ini" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -74,8 +79,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppEnabled>true</WppEnabled>
-      <WppAdditionalConfigurationFile>
-      </WppAdditionalConfigurationFile>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
@@ -97,8 +101,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppEnabled>true</WppEnabled>
-      <WppAdditionalConfigurationFile>
-      </WppAdditionalConfigurationFile>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>

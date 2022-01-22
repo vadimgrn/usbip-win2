@@ -17,7 +17,7 @@ enum usbip_request_type {
 	USBIP_RET_UNLINK
 };
 
-enum { USBIP_DIR_OUT, USBIP_DIR_IN };
+enum usbip_dir { USBIP_DIR_OUT, USBIP_DIR_IN }; // transfer direction like USB_DIR_IN, USB_DIR_OUT
 enum { USBIP_MAX_ISO_PACKETS = 1024 };
 
 /*
@@ -65,7 +65,7 @@ struct usbip_header_basic {
 	 * this value is ((busnum << 16) | devnum) */
 	UINT32	devid;
 
-	UINT32	direction; /* direction of the transfer, USBIP_DIR_OUT/IN */
+	UINT32	direction; /* direction of the transfer, enum usbip_dir */
 	UINT32	ep;     /* endpoint number */
 };
 

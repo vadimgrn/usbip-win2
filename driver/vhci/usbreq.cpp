@@ -69,13 +69,13 @@ void cancel_urbr(DEVICE_OBJECT*, IRP *irp)
 
 struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 {
-	struct urb_req *result = nullptr;
+	urb_req *result{};
 
 	KIRQL oldirql;
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
-	for (LIST_ENTRY *le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
-		struct urb_req *urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
+	for (auto le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
+		auto urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
 		if (urbr->seqnum == seqnum) {
 			RemoveEntryListInit(&urbr->list_all);
 			RemoveEntryListInit(&urbr->list_state);
@@ -96,7 +96,7 @@ struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 
 	struct urb_req *urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, struct urb_req, list_state);
 
-	urbr->seqnum = ++vpdo->seqnum;
+	urbr->seqnum = next_seqnum(*vpdo);
 	RemoveEntryListInit(&urbr->list_state);
 
 	return urbr;
@@ -212,7 +212,7 @@ NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
 	read_irp = vpdo->pending_read_irp;
 	vpdo->urbr_sent_partial = urbr;
 
-	urbr->seqnum = ++vpdo->seqnum;
+	urbr->seqnum = next_seqnum(*vpdo);
 
 	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 

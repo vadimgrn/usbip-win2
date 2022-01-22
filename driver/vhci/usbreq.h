@@ -18,8 +18,11 @@ struct urb_req
 	LIST_ENTRY list_state;
 };
 
-#define RemoveEntryListInit(le) \
-do { RemoveEntryList(le); InitializeListHead(le); } while (0)
+inline void RemoveEntryListInit(LIST_ENTRY *le) noexcept
+{
+	RemoveEntryList(le); 
+	InitializeListHead(le);
+}
 
 NTSTATUS submit_urbr(vpdo_dev_t *vpdo, urb_req *urbr);
 
@@ -28,5 +31,5 @@ void free_urbr(urb_req *urbr);
 
 bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle);
 
-urb_req *find_sent_urbr(vpdo_dev_t * vpdo, unsigned long seqnum);
-urb_req *find_pending_urbr(vpdo_dev_t * vpdo);
+urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum);
+urb_req *find_pending_urbr(vpdo_dev_t *vpdo);

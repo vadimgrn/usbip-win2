@@ -3,9 +3,14 @@
   <ItemGroup>
     <ClCompile Include="attacher.cpp" />
     <ClCompile Include="..\..\lib\pdu.cpp" />
+    <ClCompile Include="debug.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="trace.h" />
     <ClInclude Include="..\..\lib\pdu.h" />
+    <ClInclude Include="debug.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom_wpp.ini" />
   </ItemGroup>
 </Project>

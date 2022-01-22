@@ -117,21 +117,21 @@ struct vpdo_dev_t : vdev_t
 	UNICODE_STRING usb_dev_interface;
 
 	// a pending irp when no urb is requested
-	PIRP	pending_read_irp;
+	IRP *pending_read_irp;
 	// a partially transferred urb_req
 	urb_req	*urbr_sent_partial;
 	// a partially transferred length of urbr_sent_partial
-	ULONG	len_sent_partial;
+	ULONG len_sent_partial;
 	// all urb_req's. This list will be used for clear or cancellation.
-	LIST_ENTRY	head_urbr;
+	LIST_ENTRY head_urbr;
 	// pending urb_req's which are not transferred yet
-	LIST_ENTRY	head_urbr_pending;
+	LIST_ENTRY head_urbr_pending;
 	// urb_req's which had been sent and have waited for response
-	LIST_ENTRY	head_urbr_sent;
-	KSPIN_LOCK	lock_urbr;
-	PFILE_OBJECT	fo;
-	unsigned int	devid;
-	unsigned long	seqnum;
+	LIST_ENTRY head_urbr_sent;
+	KSPIN_LOCK lock_urbr;
+	FILE_OBJECT *fo;
+	UINT32 devid;
+	unsigned long seqnum; // the most significant bit is reserved and must be zero
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -176,3 +176,21 @@ vhci_dev_t *to_vhci_or_null(DEVICE_OBJECT *devobj);
 hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
+
+/*
+ * See: attacher.cpp 
+ */
+inline auto next_seqnum(vpdo_dev_t &vpdo)
+{
+	static_assert(sizeof(usbip_header_basic::seqnum) <= sizeof(vpdo.seqnum));
+	static_assert(sizeof(usbip_header_basic::seqnum) == sizeof(UINT32));
+
+	auto &val = vpdo.seqnum;
+
+	if (++val & 0x8000'0000) { // the most significant bit is set
+		val = 1;
+	}
+
+	NT_ASSERT(val);
+	return val;
+}
