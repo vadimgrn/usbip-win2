@@ -12,7 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\lib\pdu.cpp" />
-    <ClCompile Include="attacher.cpp" />
+    <ClCompile Include="usbip_xfer.cpp" />
     <ClCompile Include="debug.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -27,9 +27,9 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{d89776ab-dc80-4ad8-862e-18c084bd3e60}</ProjectGuid>
-    <RootNamespace>attacher</RootNamespace>
+    <RootNamespace>usbip_xfer</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
-    <ProjectName>attacher</ProjectName>
+    <ProjectName>usbip_xfer</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

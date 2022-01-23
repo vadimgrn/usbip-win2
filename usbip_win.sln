@@ -15,7 +15,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_stub", "driver\stub\u
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libdrv", "driver\lib\libdrv.vcxproj", "{27AB4325-4980-4634-9818-AE6BD61DE532}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "attacher", "userspace\src\attacher\attacher.vcxproj", "{D89776AB-DC80-4AD8-862E-18C084BD3E60}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_xfer", "userspace\src\usbip_xfer\usbip_xfer.vcxproj", "{D89776AB-DC80-4AD8-862E-18C084BD3E60}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
