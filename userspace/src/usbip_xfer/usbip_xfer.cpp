@@ -1,6 +1,6 @@
+#include "usbip_xfer.h"
 #include "trace.h"
 #include "usbip_xfer.tmh"
-#include "debug.h"
 
 #include <cerrno>
 #include <cassert>
@@ -10,15 +10,16 @@
 
 #include <boost/asio.hpp>
 
-#include "pdu.h"
+#include "usbip_proto.h"
 #include "usbip_common.h"
 #include "usbip_vhci_api.h"
+#include "pdu.h"
 
 namespace
 {
 
 using boost::asio::ip::tcp;
-	
+
 int g_exit_code = EXIT_SUCCESS;
 
 struct WPPInit
@@ -84,32 +85,35 @@ void io_context_run(boost::asio::io_context &ioc, const char *caller)
 	Trace(TRACE_LEVEL_INFORMATION, "%s leave", caller);
 }
 
-constexpr auto get_submit_dir(const usbip_header &hdr) noexcept
-{
-	return static_cast<usbip_dir>(hdr.base.seqnum >> 31);
-}
-
-constexpr auto pop_submit_dir(usbip_header &hdr) noexcept
-{
-	auto dir = get_submit_dir(hdr);
-	hdr.base.seqnum &= 0x7FFF'FFFF;
-	return dir;
-}
-
 /*
  * usbip_header_ret_submit always has zeros in usbip_header_basic's devid, direction, ep.
  * The most significant bit of seqnum is used to store transfer direction from a submit command.
- * 
+ * @param hdr request to the server
  * See: <linux>/Documentation/usb/usbip_protocol.rst, usbip_header_basic. 
  */
-auto push_submit_dir(usbip_header &hdr) noexcept
+inline void stash_submit_dir(usbip_header &hdr) noexcept
 {
 	auto &b = hdr.base;
-	
+	assert(b.command == USBIP_CMD_SUBMIT || b.command == USBIP_CMD_UNLINK);
+
 	assert(!(b.seqnum & 0x8000'0000)); // vhci driver must never set the most significant bit of seqnum
 	b.seqnum |= b.direction << 31;
-	
-	return get_submit_dir(hdr);
+}
+
+static_assert(sizeof(usbip_header_basic::seqnum) == sizeof(UINT32));
+
+/*
+* @param hdr response from the server
+*/
+void restore_submit_dir(usbip_header &hdr) noexcept
+{
+	auto &b = hdr.base;
+	assert(b.command == USBIP_RET_SUBMIT || b.command == USBIP_RET_UNLINK);
+
+	assert(!b.direction);
+	b.direction = b.seqnum >> 31; // vhci driver is relied on it
+
+	b.seqnum &= 0x7FFF'FFFF; // clear the most significant bit
 }
 
 
@@ -123,6 +127,7 @@ public:
 private:
 	using buffer_t = std::vector<char>;
 	using buffer_ptr = std::shared_ptr<buffer_t>;
+	int m_client = -1; // whoami
 
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
@@ -133,7 +138,7 @@ private:
 	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
 	void async_read_body(buffer_ptr buf, bool remote);
-	void on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote, usbip_dir submit_dir);
+	void on_read_body(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
 	void async_write_pdu(buffer_ptr buf, bool remote);
 	void on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
@@ -156,6 +161,11 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 {
 	if (terminated()) {
 		return;
+	}
+
+	if (m_client < 0) {
+		m_client = !remote;
+		Trace(TRACE_LEVEL_INFORMATION, "I'm a %s", m_client ? "Client" : "Server");
 	}
 
 	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
@@ -190,26 +200,26 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 	auto &hdr = get_hdr(buf);
 	assert(buf->size() == sizeof(hdr));
 
-	usbip_dir submit_dir{};
-
 	if (remote) {
 		byteswap_header(hdr, swap_dir::net2host);
-		submit_dir = pop_submit_dir(hdr);
-	} else {
-		submit_dir = push_submit_dir(hdr);
+		if (m_client) {
+			restore_submit_dir(hdr);
+		}
+	} else if (m_client) {
+		stash_submit_dir(hdr);
 	}
 
-	auto payload = 0; // get_payload_size(hdr, submit_dir);
+	auto payload = get_payload_size(hdr);
 	if (!payload) {
 		async_write_pdu(std::move(buf), !remote);
 		return;
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Remote %d, %!usbip_dir!, payload %Iu", remote, submit_dir, payload);
+//	Trace(TRACE_LEVEL_VERBOSE, "Remote %d, payload %Iu", remote, payload);
 
-	auto f = [self = shared_from_this(), buf, remote, submit_dir] (auto&&... args)
+	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 	{
-		self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf), remote, submit_dir);
+		self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf), remote);
 	};
 
 	buf->resize(sizeof(hdr) + payload);
@@ -220,7 +230,7 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 }
 
 void Forwarder::on_read_body(
-	const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote, usbip_dir submit_dir)
+	const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
@@ -228,12 +238,12 @@ void Forwarder::on_read_body(
 		return;
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Remote %d, %!usbip_dir!, transferred %Iu", remote, submit_dir, transferred);
+	Trace(TRACE_LEVEL_VERBOSE, "Remote %d, transferred %Iu", remote, transferred);
 
 	auto &hdr = get_hdr(buf);
 	assert(transferred == buf->size() - sizeof(hdr));
 
-	byteswap_payload(hdr, submit_dir);
+	byteswap_payload(hdr);
 	async_write_pdu(std::move(buf), !remote);
 }
 
@@ -244,7 +254,13 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 	}
 
 	auto &hdr = get_hdr(buf);
-	trace(hdr, __func__, remote);
+
+	{
+		auto &b = hdr.base;
+		Trace(TRACE_LEVEL_VERBOSE, "Remote %d <- Hdr{%!usbip_request_type!, seqnum %#x, devid %#x, %s[%u]}",
+						remote, b.command, b.seqnum, b.devid,
+						b.direction == USBIP_DIR_OUT ? "out" : "in", b.ep);
+	}
 
 	if (remote) {
 		byteswap_header(hdr, swap_dir::host2net);
@@ -255,7 +271,7 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 		self->on_write_pdu(std::forward<decltype(args)>(args)..., buf, remote);
 	};
 
-	Trace(TRACE_LEVEL_VERBOSE, "Buffer size %Iu", buf->size());
+//	Trace(TRACE_LEVEL_VERBOSE, "Buffer size %Iu", buf->size());
 
 	remote ? async_write(m_sock, boost::asio::buffer(*buf), std::move(f)) :
 		 async_write(m_dev,  boost::asio::buffer(*buf), std::move(f));
@@ -289,32 +305,35 @@ auto read(HANDLE hStdin, void *buf, DWORD len)
 	return true;
 }
 
-auto read_data(HANDLE &hdev, SOCKET &sockfd, int &AddressFamily)
+auto read_args(HANDLE &hdev, SOCKET &sockfd, int &AddressFamily)
 {
 	auto hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	assert(hStdin != INVALID_HANDLE_VALUE);
 
-	WSAPROTOCOL_INFOW ProtocolInfo{};
-	auto ok = read(hStdin, &hdev, sizeof(hdev)) && read(hStdin, &ProtocolInfo, sizeof(ProtocolInfo));
+	usbip_xfer_args args{};
+	auto ok = read(hStdin, &args, sizeof(args));
 
 	CloseHandle(hStdin);
 
 	if (ok) {
-		AddressFamily = ProtocolInfo.iAddressFamily;
-		sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &ProtocolInfo, 0, WSA_FLAG_OVERLAPPED);
+		hdev = args.hdev;
+		assert(hdev != INVALID_HANDLE_VALUE);
+		
+		AddressFamily = args.info.iAddressFamily;
+
+		sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &args.info, 0, WSA_FLAG_OVERLAPPED);
 		assert(sockfd != INVALID_SOCKET);
 	}
 
 	return hdev != INVALID_HANDLE_VALUE && sockfd != INVALID_SOCKET;
 }
 
-void stop_thread(std::thread *tr)
+void join(std::thread *tr)
 {
 	assert(tr);
+	assert(terminated());
 
 	Trace(TRACE_LEVEL_INFORMATION, "Enter");
-
-	io_context().stop();
 
 	if (tr->joinable()) {
 		auto join = [tr] { tr->join(); };
@@ -327,7 +346,7 @@ void stop_thread(std::thread *tr)
 auto launch_thread()
 {
 	static std::thread tr(io_context_run, std::ref(io_context()), "thread");
-	return std::unique_ptr<std::thread, decltype(stop_thread)&>(&tr, stop_thread);
+	return std::unique_ptr<std::thread, decltype(join)&>(&tr, join);
 }
 
 void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
@@ -339,21 +358,22 @@ void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
 
 	std::make_shared<Forwarder>(hdev, sockfd, AddressFamily)->async_start();
 
-	if (auto stop = launch_thread()) {
+	if (auto join = launch_thread()) {
 		io_context_run(ioc, "main"); // blocks thread
 		assert(terminated());
+		join.reset();
 	}
 }
 
-void shutdown_device(HANDLE hdev)
+void shutdown_hardware(HANDLE hdev)
 {
 	assert(hdev != INVALID_HANDLE_VALUE);
 	DWORD unused{};
 
 	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
-		Trace(TRACE_LEVEL_INFORMATION, "VHCI_SHUTDOWN_HARDWARE");
+		Trace(TRACE_LEVEL_INFORMATION, "OK");
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "VHCI_SHUTDOWN_HARDWARE error %#lu", GetLastError());
+		Trace(TRACE_LEVEL_ERROR, "Error %#lu", GetLastError());
 	}
 }
 
@@ -363,8 +383,8 @@ void setup_forwarder()
 	SOCKET sockfd = INVALID_SOCKET;
 	int AddressFamily = AF_UNSPEC;
 
-	if (read_data(hdev, sockfd, AddressFamily)) {
-		std::unique_ptr<void, decltype(shutdown_device)&> ptr(hdev, shutdown_device);
+	if (read_args(hdev, sockfd, AddressFamily)) {
+		std::unique_ptr<void, decltype(shutdown_hardware)&> ptr(hdev, shutdown_hardware);
 		run(hdev, sockfd, AddressFamily);
 	}
 }

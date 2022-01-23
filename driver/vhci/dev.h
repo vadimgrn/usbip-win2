@@ -130,8 +130,12 @@ struct vpdo_dev_t : vdev_t
 	LIST_ENTRY head_urbr_sent;
 	KSPIN_LOCK lock_urbr;
 	FILE_OBJECT *fo;
-	UINT32 devid;
+	
+	unsigned int devid;
+	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
+
 	unsigned long seqnum; // the most significant bit is reserved and must be zero
+	static_assert(sizeof(seqnum) >= sizeof(usbip_header_basic::seqnum));
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -178,11 +182,10 @@ vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
 /*
- * See: attacher.cpp 
+ * See: attacher_xfer.cpp 
  */
 inline auto next_seqnum(vpdo_dev_t &vpdo)
 {
-	static_assert(sizeof(usbip_header_basic::seqnum) <= sizeof(vpdo.seqnum));
 	static_assert(sizeof(usbip_header_basic::seqnum) == sizeof(UINT32));
 
 	auto &val = vpdo.seqnum;

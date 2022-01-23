@@ -3,12 +3,11 @@
   <ItemGroup>
     <ClCompile Include="usbip_xfer.cpp" />
     <ClCompile Include="..\..\lib\pdu.cpp" />
-    <ClCompile Include="debug.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="trace.h" />
     <ClInclude Include="..\..\lib\pdu.h" />
-    <ClInclude Include="debug.h" />
+    <ClInclude Include="usbip_xfer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />

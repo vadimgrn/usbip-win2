@@ -24,10 +24,9 @@
 #include "usbip_network.h"
 #include "usbip_vhci.h"
 #include "dbgcode.h"
-
 #include "usbip_dscr.h"
 
-#define ATTACHER "attacher.exe"
+#include "usbip_xfer/usbip_xfer.h"
 
 static const char usbip_attach_usage_string[] =
 	"usbip attach <args>\n"
@@ -222,7 +221,6 @@ execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
 	STARTUPINFO	si;
 	PROCESS_INFORMATION	pi;
 	HANDLE	hRead, hWrite;
-	HANDLE	hdev_attacher;
 	BOOL	res;
 	int	ret = ERR_GENERAL;
 
@@ -235,7 +233,7 @@ execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
 	si.dwFlags = STARTF_USESTDHANDLES;
 	ZeroMemory(&pi, sizeof(pi));
 
-	res = CreateProcess(ATTACHER, ATTACHER, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+	res = CreateProcess(usbip_xfer_binary(), NULL, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
 	if (!res) {
 		DWORD	err = GetLastError();
 		if (err == ERROR_FILE_NOT_FOUND)
@@ -244,21 +242,21 @@ execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
 		goto out;
 	}
 
-	res = DuplicateHandle(GetCurrentProcess(), hdev, pi.hProcess, &hdev_attacher, 0, FALSE, DUPLICATE_SAME_ACCESS);
+	struct usbip_xfer_args args = {INVALID_HANDLE_VALUE};
+
+	res = DuplicateHandle(GetCurrentProcess(), hdev, pi.hProcess, &args.hdev, 0, FALSE, DUPLICATE_SAME_ACCESS);
 	if (!res) {
 		dbg("failed to dup hdev: 0x%lx", GetLastError());
 		goto out_proc;
 	}
 
-	WSAPROTOCOL_INFOW ProtocolInfo;
-	res = WSADuplicateSocketW(sockfd, pi.dwProcessId, &ProtocolInfo);
+	res = WSADuplicateSocketW(sockfd, pi.dwProcessId, &args.info);
 	if (res) {
 		dbg("failed to dup sockfd: %#x", WSAGetLastError());
 		goto out_proc;
 	}
 
-	if (write_data(hWrite, &hdev_attacher, sizeof(hdev_attacher)) && 
-	    write_data(hWrite, &ProtocolInfo, sizeof(ProtocolInfo))) {
+	if (write_data(hWrite, &args, sizeof(args))) {
 		ret = 0;
 	}
 
@@ -318,10 +316,10 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 	else {
 		switch (ret) {
 		case ERR_NOTEXIST:
-			err(ATTACHER " not found");
+			err("%s not found", usbip_xfer_binary());
 			break;
 		default:
-			err("failed to running " ATTACHER);
+			err("failed to running %s", usbip_xfer_binary());
 			break;
 		}
 		ret = 4;
@@ -337,7 +335,7 @@ check_attacher(void)
 {
 	DWORD	bintype;
 
-	if (!GetBinaryType(ATTACHER, &bintype))
+	if (!GetBinaryType(usbip_xfer_binary(), &bintype))
 		return FALSE;
 	return TRUE;
 }
@@ -394,7 +392,7 @@ int usbip_attach(int argc, char *argv[])
 	}
 
 	if (!check_attacher()) {
-		err(ATTACHER " not found");
+		err("%s not found", usbip_xfer_binary());
 		return 126;
 	}
 	return attach_device(host, busid, serial, terse);

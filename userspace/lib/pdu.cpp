@@ -1,4 +1,5 @@
 #include "pdu.h"
+#include "usbip_proto.h"
 
 #include <cassert>
 #include <stdlib.h>
@@ -89,42 +90,37 @@ void byteswap_header(usbip_header &hdr, swap_dir dir) noexcept
 	}
 }
 
-void byteswap_payload(usbip_header &hdr, usbip_dir submit_dir) noexcept
+void byteswap_payload(usbip_header &hdr) noexcept
 {
 	usbip_iso_packet_descriptor *isoc{};
 
-	if (auto cnt = get_isoc_descr(isoc, hdr, submit_dir)) {
+	if (auto cnt = get_isoc_descr(isoc, hdr)) {
 		byteswap(isoc, cnt);
 	}
 }
 
 /*
- * usbip_header_ret_submit/unlink always has zeros in usbip_header_basic's devid, direction, ep.
+ * Server's responses always have zeroes in usbip_header_basic's devid, direction, ep.
  * See: <linux>/Documentation/usb/usbip_protocol.rst, usbip_header_basic.
  */
-int get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr, usbip_dir submit_dir) noexcept
+int get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr) noexcept
 {
-	auto dir = static_cast<usbip_dir>(hdr.base.direction);
+	auto dir_out = hdr.base.direction == USBIP_DIR_OUT;
 
 	auto buf_end = reinterpret_cast<char*>(&hdr + 1);
 	int cnt = 0;
 
 	switch (hdr.base.command) {
 	case USBIP_CMD_SUBMIT:
-		assert(submit_dir == dir);
-		buf_end += hdr.base.direction == USBIP_DIR_OUT ? hdr.u.cmd_submit.transfer_buffer_length : 0;
+		buf_end += dir_out ? hdr.u.cmd_submit.transfer_buffer_length : 0;
 		cnt = hdr.u.cmd_submit.number_of_packets;
 		break;
 	case USBIP_RET_SUBMIT:
-		assert(!dir);
-		buf_end += submit_dir == USBIP_DIR_IN ? hdr.u.ret_submit.actual_length : 0;
+		buf_end += dir_out ? 0 : hdr.u.ret_submit.actual_length; // harmless if direction was not corrected
 		cnt = hdr.u.ret_submit.number_of_packets;
 		break;
 	case USBIP_CMD_UNLINK:
-		assert(submit_dir == dir);
-		break;
 	case USBIP_RET_UNLINK:
-		assert(!dir);
 		break;
 	default:
 		assert(!"Invalid command, wrong endianness?");
@@ -134,13 +130,19 @@ int get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr, usbip_
 	return cnt;
 }
 
-size_t get_payload_size(const usbip_header &hdr, usbip_dir submit_dir) noexcept
+size_t get_payload_size(const usbip_header &hdr) noexcept
 {
 	usbip_iso_packet_descriptor *isoc{};
-	auto cnt = get_isoc_descr(isoc, const_cast<usbip_header&>(hdr), submit_dir);
+	auto cnt = get_isoc_descr(isoc, const_cast<usbip_header&>(hdr));
 
 	auto buf = reinterpret_cast<const char*>(&hdr + 1);
 	assert((char*)isoc >= buf);
 
 	return reinterpret_cast<char*>(isoc + cnt) - buf;
+}
+
+
+size_t get_total_size(const usbip_header &hdr) noexcept
+{
+	return sizeof(hdr) + get_payload_size(hdr);
 }
