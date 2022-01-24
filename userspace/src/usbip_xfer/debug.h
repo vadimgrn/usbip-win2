@@ -1,0 +1,9 @@
+#pragma once
+
+struct usbip_header;
+
+enum { DBG_USBIP_HDR_BUFSZ = 255 };
+const char *print(char *buf, size_t len, const usbip_header &hdr) noexcept;
+
+enum { USB_SETUP_PKT_STR_BUFBZ = 128 };
+const char *print_usb_setup(char *buf, size_t len, const void *packet) noexcept;

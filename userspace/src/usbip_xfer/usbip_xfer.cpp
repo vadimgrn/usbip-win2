@@ -121,6 +121,7 @@ class Forwarder : public std::enable_shared_from_this<Forwarder>
 {
 public:
 	Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily);
+	~Forwarder() { shutdown_hardware(); }
 
 	void async_start();
 
@@ -131,9 +132,13 @@ private:
 
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
+	//boost::asio::io_context::strand m_strand{io_context()};
 
 	static auto &get_hdr(buffer_ptr buf) { return *reinterpret_cast<usbip_header*>(buf->data()); }
+	static constexpr auto target(bool remote) noexcept { return remote ? "server" : "driver"; }
 
+	void shutdown_hardware();
+		
 	void async_read_header(buffer_ptr buf, bool remote);
 	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
@@ -151,6 +156,18 @@ Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily) :
 {
 }
 
+void Forwarder::shutdown_hardware()
+{
+//	assert(m_dev.is_open());
+	DWORD unused{};
+
+	if (DeviceIoControl(m_dev.native_handle(), IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
+		Trace(TRACE_LEVEL_INFORMATION, "OK");
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Error %#lu", GetLastError());
+	}
+}
+
 void Forwarder::async_start()
 {
 	async_read_header(std::make_shared<buffer_t>(), false);
@@ -165,7 +182,7 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 
 	if (m_client < 0) {
 		m_client = !remote;
-		Trace(TRACE_LEVEL_INFORMATION, "I'm a %s", m_client ? "Client" : "Server");
+		Trace(TRACE_LEVEL_INFORMATION, "%s!", m_client ? "Client" : "Server");
 	}
 
 	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
@@ -175,17 +192,17 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 
 	buf->resize(sizeof(usbip_header));
 	
-	remote ? async_read(m_sock, boost::asio::buffer(*buf), std::move(f)) : 
+	remote ? async_read(m_sock, boost::asio::buffer(*buf), std::move(f)) : // m_strand.wrap(f)
 		 async_read(m_dev,  boost::asio::buffer(*buf), std::move(f));
 }
 
 void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
+		Trace(TRACE_LEVEL_ERROR, "%s: error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
 		terminate();
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Remote %d, transferred %Iu", remote, transferred);
+		Trace(TRACE_LEVEL_VERBOSE, "%s -> %Iu", target(remote), transferred);
 		assert(transferred == buf->size());
 		async_read_body(std::move(buf), remote);
 	}
@@ -215,8 +232,6 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 		return;
 	}
 
-//	Trace(TRACE_LEVEL_VERBOSE, "Remote %d, payload %Iu", remote, payload);
-
 	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
 	{
 		self->on_read_body(std::forward<decltype(args)>(args)..., std::move(buf), remote);
@@ -233,12 +248,12 @@ void Forwarder::on_read_body(
 	const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu ", ec.value(), ec.message().c_str(), transferred);
+		Trace(TRACE_LEVEL_ERROR, "%s: error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
 		terminate();
 		return;
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Remote %d, transferred %Iu", remote, transferred);
+	Trace(TRACE_LEVEL_VERBOSE, "%s -> %Iu", target(remote), transferred);
 
 	auto &hdr = get_hdr(buf);
 	assert(transferred == buf->size() - sizeof(hdr));
@@ -257,8 +272,8 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 
 	{
 		auto &b = hdr.base;
-		Trace(TRACE_LEVEL_VERBOSE, "Remote %d <- Hdr{%!usbip_request_type!, seqnum %#x, devid %#x, %s[%u]}",
-						remote, b.command, b.seqnum, b.devid,
+		Trace(TRACE_LEVEL_VERBOSE, "%s <- Hdr{%!usbip_request_type!, seqnum %#x, devid %#x, %s[%u]}",
+						target(remote), b.command, b.seqnum, b.devid,
 						b.direction == USBIP_DIR_OUT ? "out" : "in", b.ep);
 	}
 
@@ -271,8 +286,6 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 		self->on_write_pdu(std::forward<decltype(args)>(args)..., buf, remote);
 	};
 
-//	Trace(TRACE_LEVEL_VERBOSE, "Buffer size %Iu", buf->size());
-
 	remote ? async_write(m_sock, boost::asio::buffer(*buf), std::move(f)) :
 		 async_write(m_dev,  boost::asio::buffer(*buf), std::move(f));
 }
@@ -280,10 +293,10 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s', transferred %Iu", ec.value(), ec.message().c_str(), transferred);
+		Trace(TRACE_LEVEL_ERROR, "%s: error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
 		terminate();
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Remote %d, transferred %Iu", remote, transferred);
+		Trace(TRACE_LEVEL_VERBOSE, "%s <- %Iu", target(remote), transferred);
 		assert(transferred == buf->size());
 		async_read_header(std::move(buf), !remote);
 	}
@@ -365,18 +378,6 @@ void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
 	}
 }
 
-void shutdown_hardware(HANDLE hdev)
-{
-	assert(hdev != INVALID_HANDLE_VALUE);
-	DWORD unused{};
-
-	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
-		Trace(TRACE_LEVEL_INFORMATION, "OK");
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Error %#lu", GetLastError());
-	}
-}
-
 void setup_forwarder()
 {
 	HANDLE hdev = INVALID_HANDLE_VALUE;
@@ -384,7 +385,6 @@ void setup_forwarder()
 	int AddressFamily = AF_UNSPEC;
 
 	if (read_args(hdev, sockfd, AddressFamily)) {
-		std::unique_ptr<void, decltype(shutdown_hardware)&> ptr(hdev, shutdown_hardware);
 		run(hdev, sockfd, AddressFamily);
 	}
 }
