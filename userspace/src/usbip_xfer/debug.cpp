@@ -77,6 +77,8 @@ void print(char *buf, size_t len, const usbip_header_cmd_submit &r) noexcept
 			r.interval);
 
 	if (snprintf_ok(ret, len)) {
+		buf += ret;
+		len -= ret;
 		print_usb_setup(buf, len, r.setup);
 	}
 }

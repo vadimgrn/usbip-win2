@@ -6,7 +6,7 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
-constexpr const char *bmrequest_dir_str(BM_REQUEST_TYPE r)
+constexpr auto bmrequest_dir_str(BM_REQUEST_TYPE r)
 {
 	return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
 }
@@ -234,7 +234,7 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 
 static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cmd_submit *cmd)
 {
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
+	auto st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
 			"cmd_submit: flags %#x, length %d, start_frame %d, isoc[%d], interval %d, ",
 			cmd->transfer_flags, 
 			cmd->transfer_buffer_length, 
@@ -263,10 +263,10 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
 		return "usbip_header{null}";
 	}
 
-	const char *result = buf;
-	const struct usbip_header_basic *base = &hdr->base;
+	auto result = buf;
+	auto base = &hdr->base;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
+	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
 					base->seqnum, 
 					base->devid,			
 					base->direction == USBIP_DIR_OUT ? "out" : "in",
@@ -317,9 +317,9 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 
 const char* usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
 {
-	const char *dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
+	auto dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
 
-	NTSTATUS st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
+	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
 					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
 					TransferFlags & USBD_START_ISO_TRANSFER_ASAP ? "|ISO_ASAP" : "",
 					TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");

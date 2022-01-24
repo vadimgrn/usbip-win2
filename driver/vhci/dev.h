@@ -134,8 +134,7 @@ struct vpdo_dev_t : vdev_t
 	unsigned int devid;
 	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
-	unsigned long seqnum; // the most significant bit is reserved and must be zero
-	static_assert(sizeof(seqnum) >= sizeof(usbip_header_basic::seqnum));
+	seqnum_t seqnum;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -181,19 +180,8 @@ hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
-/*
- * See: attacher_xfer.cpp 
- */
 inline auto next_seqnum(vpdo_dev_t &vpdo)
 {
-	static_assert(sizeof(usbip_header_basic::seqnum) == sizeof(UINT32));
-
 	auto &val = vpdo.seqnum;
-
-	if (++val & 0x8000'0000) { // the most significant bit is set
-		val = 1;
-	}
-
-	NT_ASSERT(val);
-	return val;
+	return ++val ? val : ++val; // skip zero in case of overflow
 }

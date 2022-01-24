@@ -32,6 +32,8 @@ enum usb_device_speed {
 	USB_SPEED_SUPER_PLUS			/* usb 3.1 */
 };
 
+typedef UINT32 seqnum_t;
+
 #include <PSHPACK1.H>
 
 /*
@@ -58,7 +60,7 @@ struct usbip_header_basic {
 
 	/* sequencial number which identifies requests.
 	* incremented per connections */
-	UINT32	seqnum;
+	seqnum_t seqnum;
 
 	/* devid is used to specify a remote USB device uniquely instead
 	 * of busnum and devnum in Linux. In the case of Linux stub_driver,
@@ -111,7 +113,7 @@ struct usbip_header_ret_submit {
 * An additional header for a CMD_UNLINK packet.
 */
 struct usbip_header_cmd_unlink {
-	UINT32	seqnum; /* URB's seqnum which will be unlinked */
+	seqnum_t seqnum; /* URB's seqnum which will be unlinked */
 };
 
 /*
