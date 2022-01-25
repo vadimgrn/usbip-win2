@@ -233,7 +233,10 @@ execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
 	si.dwFlags = STARTF_USESTDHANDLES;
 	ZeroMemory(&pi, sizeof(pi));
 
-	res = CreateProcess(usbip_xfer_binary(), NULL, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+	char CommandLine[MAX_PATH];
+	strcpy_s(CommandLine, sizeof(CommandLine), usbip_xfer_binary());
+
+	res = CreateProcess(usbip_xfer_binary(), CommandLine, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
 	if (!res) {
 		DWORD	err = GetLastError();
 		if (err == ERROR_FILE_NOT_FOUND)
