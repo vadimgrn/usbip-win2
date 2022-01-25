@@ -1020,23 +1020,23 @@ PAGEABLE NTSTATUS cmd_unlink(IRP *irp, urb_req *urbr)
 }
 
 /*
-* Code must be in nonpaged section if it acquires spinlock.
-*/
+ * Code must be in nonpaged section if it acquires spinlock.
+ * FIXME: irpstack->FileObject->FsContext is NULL sometimes, must be fixed.
+ */
 void on_pending_irp_read_cancelled(DEVICE_OBJECT*, IRP *irp_read)
 {
-	TraceUrb("Pending irp read cancelled %p", irp_read);
+	TraceUrb("%p", irp_read);
 
 	IoReleaseCancelSpinLock(irp_read->CancelIrql);
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp_read);
-	auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
 
-	KIRQL irql;
-	KeAcquireSpinLock(&vpdo->lock_urbr, &irql); // FIMXE: IRQL_NOT_LESS_OR_EQUAL
-	if (vpdo->pending_read_irp == irp_read) {
-		vpdo->pending_read_irp = nullptr;
+	if (auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext)) { // FIXME: temporary workaround
+		KIRQL irql;
+		KeAcquireSpinLock(&vpdo->lock_urbr, &irql);
+		InterlockedCompareExchangePointer(reinterpret_cast<PVOID*>(&vpdo->pending_read_irp), nullptr, irp_read);
+		KeReleaseSpinLock(&vpdo->lock_urbr, irql);
 	}
-	KeReleaseSpinLock(&vpdo->lock_urbr, irql);
 
 	irp_done(irp_read, STATUS_CANCELLED);
 }
