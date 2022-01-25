@@ -1,3 +1,6 @@
+/*
+* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 #pragma once
 
 struct usbip_header;

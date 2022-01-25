@@ -1,3 +1,6 @@
+/*
+* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 #include "pdu.h"
 #include "usbip_proto.h"
 

@@ -1,15 +1,29 @@
+/*
+* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 #include "usbip_xfer.h"
 #include "trace.h"
 #include "usbip_xfer.tmh"
 
-#include <cerrno>
-#include <cassert>
+#include <type_traits>
 #include <exception>
 #include <vector>
+#include <map>
 #include <thread>
-#include <unordered_map>
 
-#include <boost/asio.hpp>
+#include <cerrno>
+#include <cassert>
+
+#include <boost/asio/read.hpp>
+#include <boost/asio/write.hpp>
+#include <boost/asio/strand.hpp>
+#include <boost/asio/signal_set.hpp>
+#include <boost/asio/windows/stream_handle.hpp>
+#include <boost/asio/windows/object_handle.hpp>
+#include <boost/asio/dispatch.hpp>
+#include <boost/asio/post.hpp>
+#include <boost/asio/bind_executor.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 #include "usbip_proto.h"
 #include "usbip_common.h"
@@ -32,9 +46,32 @@ struct WPPInit
 
 WPPInit wpp;
 
+/*
+ * ASIO splits large transfers into chunks, its default_max_transfer_size_t is 65536.
+ * Implementation of vhci driver's write operation requires that full PDU must be in the buffer.
+ * It calculates PDU size from the usbip_header and compares it with write's buffer size.
+ *
+ * See: usbip_vhci/write.cpp, consume_write_irp_buffer.
+ * See: boost/asio/completion_condition.hpp, default_max_transfer_size_t
+ */
+struct transfer_usbip_t
+{
+	template <typename Error>
+	auto operator() (const Error &err, std::size_t) noexcept
+	{
+		static_assert(std::is_same_v<INT32, decltype(usbip_header_cmd_submit::transfer_buffer_length)>);
+		return !!err ? std::size_t() : INT32_MAX;
+	}
+};
+
+inline auto transfer_max() noexcept
+{
+	return transfer_usbip_t();
+}
+
 auto &io_context()
 {
-	static boost::asio::io_context ctx(2); // for simultaneous read and write
+	static boost::asio::io_context ctx(2); // for simultaneous read/write from a device handle and a socket
 	return ctx;
 }
 
@@ -94,7 +131,7 @@ class Forwarder : public std::enable_shared_from_this<Forwarder>
 {
 public:
 	Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily);
-	~Forwarder() { shutdown_hardware(); }
+	~Forwarder();
 
 	void async_start();
 
@@ -104,22 +141,22 @@ private:
 
 	int m_client = -1; // whoami
 
-	using seqnums_type = std::unordered_map<seqnum_t, seqnum_t>;
-	seqnums_type m_client_dir_in; // seqnum of cmd_submit -> seqnum of cmd_unlink, USBIP_DIR_IN client requests with data
+	using seqnums_type = std::map<seqnum_t, seqnum_t>;
+	seqnums_type m_client_req_in; // seqnum of cmd_submit -> seqnum of cmd_unlink, DIR_IN client requests with payload
 
 	boost::asio::io_context::strand m_strand{io_context()};
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
 
+	auto &ioctx() noexcept { return m_strand.context(); }
 	static auto &get_hdr(buffer_ptr buf) noexcept { return *reinterpret_cast<usbip_header*>(buf->data()); }
 	static constexpr auto target(bool remote) noexcept { return remote ? "server" : "driver"; }
 
 	void shutdown_hardware() noexcept;
 
-	void save_client_request_dir(const usbip_header &req);
+	void save_client_req_in(const usbip_header &req);
 	void add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum);
-	void restore_server_response_dir(buffer_ptr resp);
-	seqnums_type::iterator find_unlink_seqnum(seqnum_t seqnum);
+	void restore_server_resp_in(buffer_ptr resp);
 
 	void async_read_header(buffer_ptr buf, bool remote);
 	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
@@ -133,20 +170,30 @@ private:
 
 
 Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily) :
-	m_dev(m_strand.context(), hdev),
-	m_sock(m_strand.context(), AddressFamily == AF_INET6 ? tcp::v6() : tcp::v4(), sockfd)
+	m_dev(ioctx(), hdev),
+	m_sock(ioctx(), AddressFamily == AF_INET6 ? tcp::v6() : tcp::v4(), sockfd)
 {
+}
+
+Forwarder::~Forwarder() 
+{ 
+	if (m_dev.is_open()) {
+		shutdown_hardware(); 
+	}
+
+	if (auto n = m_client_req_in.size()) {
+		Trace(TRACE_LEVEL_WARNING, "Seqnums remaining: %Iu", n);
+	}
 }
 
 void Forwarder::shutdown_hardware() noexcept
 {
-//	assert(m_dev.is_open());
 	DWORD unused{};
 
 	if (DeviceIoControl(m_dev.native_handle(), IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
 		Trace(TRACE_LEVEL_INFORMATION, "OK");
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Error %#lu", GetLastError());
+		Trace(TRACE_LEVEL_ERROR, "Error %#x", GetLastError());
 	}
 }
 
@@ -156,9 +203,9 @@ void Forwarder::async_start()
 	async_read_header(std::make_shared<buffer_t>(), true);
 }
 
-auto get_client_request_seqnums(const usbip_header &req) noexcept
+auto get_client_req_seqnums(const usbip_header &req) noexcept
 {
-	std::pair<seqnum_t, seqnum_t> res{};
+	std::pair<seqnum_t, seqnum_t> res;
 
 	switch (req.base.command)
 	{
@@ -170,7 +217,7 @@ auto get_client_request_seqnums(const usbip_header &req) noexcept
 		break;
 	case USBIP_CMD_UNLINK:
 		res.first = req.base.seqnum;
-		res.second = req.u.cmd_unlink.seqnum; // unknown if it is USBIP_DIR_IN, can't search m_client_dir_in here
+		res.second = req.u.cmd_unlink.seqnum; // unknown if it is a USBIP_DIR_IN, will be checked later
 		assert(res.first);
 		assert(res.second);
 		break;
@@ -182,9 +229,9 @@ auto get_client_request_seqnums(const usbip_header &req) noexcept
 	return res;
 }
 
-void Forwarder::save_client_request_dir(const usbip_header &req)
+void Forwarder::save_client_req_in(const usbip_header &req)
 {
-	auto [seqnum, unlink_seqnum] = get_client_request_seqnums(req);
+	auto [seqnum, unlink_seqnum] = get_client_req_seqnums(req);
 	if (!seqnum) {
 		return;
 	}
@@ -199,37 +246,21 @@ void Forwarder::save_client_request_dir(const usbip_header &req)
 
 void Forwarder::add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum)
 {
-	if (!unlink_seqnum) {
-		auto [i, was_inserted] = m_client_dir_in.emplace(seqnum, 0);
+	if (!unlink_seqnum) { // CMD_SUBMIT
+		auto [i, was_inserted] = m_client_req_in.emplace(seqnum, 0);
 		assert(was_inserted);
-		Trace(TRACE_LEVEL_VERBOSE, "Added seqnum %u, unlink_seqnum %u", seqnum, unlink_seqnum);
+		Trace(TRACE_LEVEL_VERBOSE, "Added seqnum %u, unlink_seqnum %u, total %Iu", 
+					seqnum, unlink_seqnum, m_client_req_in.size());
 		return;
 	}
 
-	auto i = m_client_dir_in.find(unlink_seqnum);
+	auto i = m_client_req_in.find(unlink_seqnum); // CMD_UNLINK
 
-	if (i != m_client_dir_in.end()) {
+	if (i != m_client_req_in.end()) {
 		assert(!i->second);
 		i->second = seqnum;
 		Trace(TRACE_LEVEL_VERBOSE, "Updated seqnum %u, unlink_seqnum %u", i->first, i->second);
-	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Skip seqnum %u, unlink_seqnum %u is not USBIP_DIR_IN request with data", 
-						seqnum, unlink_seqnum);
 	}
-}
-
-auto Forwarder::find_unlink_seqnum(seqnum_t seqnum) -> seqnums_type::iterator
-{
-	auto res = m_client_dir_in.end();
-
-	for (auto i = m_client_dir_in.begin(); i != m_client_dir_in.end(); ++i) {
-		if (i->second == seqnum) {
-			res = i;
-			break;
-		}
-	}
-
-	return res;
 }
 
 /*
@@ -239,45 +270,31 @@ auto Forwarder::find_unlink_seqnum(seqnum_t seqnum) -> seqnums_type::iterator
  * If USBIP_RET_UNLINK status is zero, USBIP_RET_SUBMIT response was already sent.
  * See: <linux>/Documentation/usb/usbip_protocol.rst
  */
-void Forwarder::restore_server_response_dir(buffer_ptr resp)
+void Forwarder::restore_server_resp_in(buffer_ptr resp)
 {
-	enum { ECONNRESET_LNX = 104 }; // <linux>/include/uapi/asm-generic/errno.h
-
 	auto &hdr = get_hdr(resp);
 	assert(!hdr.base.direction); // always zero for server responses
 
 	auto seqnum = hdr.base.seqnum;
 
-	switch (auto cmd = hdr.base.command)
-	{
-	case USBIP_RET_SUBMIT: {
-		auto i = m_client_dir_in.find(seqnum);
-		if (i != m_client_dir_in.end()) {
-			Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: remove seqnum %u, unlink_seqnum %u", 
-						cmd, i->first, i->second);
-
+	switch (auto cmd = hdr.base.command) {
+	case USBIP_RET_SUBMIT:
+		if (m_client_req_in.erase(seqnum)) {
 			hdr.base.direction = USBIP_DIR_IN;
-			m_client_dir_in.erase(i);
+			Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: removed seqnum %u, total %Iu", 
+							cmd, seqnum, m_client_req_in.size());
 		}
-	} 
 		break;
-	case USBIP_RET_UNLINK: {
-		auto i = find_unlink_seqnum(seqnum);
-		switch (hdr.u.ret_unlink.status) 
-		{
-		case 0: // too late, RET_SUBMIT was already received
-			assert(i == m_client_dir_in.end());
-			break;
-		case -ECONNRESET_LNX: // unlinked, RET_SUBMIT won't be issued
-			if (i != m_client_dir_in.end()) {
-				Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: remove seqnum %u, unlink_seqnum %u",
-							cmd, i->first, i->second);
+	case USBIP_RET_UNLINK:
+		for (auto i = m_client_req_in.begin(); i != m_client_req_in.end(); ++i) {
+			if (i->second == seqnum) {
+				Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: removed seqnum %u, unlink_seqnum %u, total %Iu", 
+							cmd, i->first, i->second, m_client_req_in.size());
 
-				m_client_dir_in.erase(i);
+				m_client_req_in.erase(i);
+				break;
 			}
-			break;
 		}
-	}
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "%!usbip_request_type!: response expected", cmd);
@@ -290,7 +307,7 @@ void Forwarder::restore_server_response_dir(buffer_ptr resp)
 		self->async_read_body(std::move(buf), true); // now get_payload_size will return correct result for DIR_IN
 	};
 
-	boost::asio::post(std::move(f));
+	post(bind_executor(ioctx(), std::move(f)));
 }
 
 void Forwarder::async_read_header(buffer_ptr buf, bool remote)
@@ -312,7 +329,7 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 	buf->resize(sizeof(usbip_header));
 	
 	remote ? async_read(m_sock, boost::asio::buffer(*buf), std::move(f)) :
-		 async_read(m_dev,  boost::asio::buffer(*buf), std::move(f));
+		 async_read(m_dev,  boost::asio::buffer(*buf), transfer_max(), std::move(f));
 }
 
 void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
@@ -330,7 +347,7 @@ void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t 
 
 	if (!remote) { // reading from the driver's device handle
 		if (m_client) {
-			save_client_request_dir(hdr);
+			save_client_req_in(hdr);
 		}
 		async_read_body(std::move(buf), remote);
 		return;
@@ -345,7 +362,7 @@ void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t 
 
 	auto f = [self = shared_from_this(), buf = std::move(buf)] 
 	{ 
-		self->restore_server_response_dir(std::move(buf)); 
+		self->restore_server_resp_in(std::move(buf)); 
 	};
 
 	dispatch(bind_executor(m_strand, std::move(f)));
@@ -375,7 +392,7 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 	auto body = boost::asio::buffer(buf->data() + sizeof(hdr), payload);
 
 	remote ? async_read(m_sock, std::move(body), std::move(f)) : 
-		 async_read(m_dev,  std::move(body), std::move(f));
+		 async_read(m_dev,  std::move(body), transfer_max(), std::move(f));
 }
 
 void Forwarder::on_read_body(
@@ -419,7 +436,7 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 	};
 
 	remote ? async_write(m_sock, boost::asio::buffer(*buf), std::move(f)) :
-		 async_write(m_dev,  boost::asio::buffer(*buf), std::move(f));
+		 async_write(m_dev,  boost::asio::buffer(*buf), transfer_max(), std::move(f));
 }
 
 void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
@@ -431,45 +448,6 @@ void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t tr
 		assert(transferred == buf->size());
 		async_read_header(std::move(buf), !remote);
 	}
-}
-
-auto read(HANDLE hStdin, void *buf, DWORD len)
-{
-	for (DWORD offset = 0; offset < len; ) {
-
-		DWORD nread{};
-
-		if (ReadFile(hStdin, static_cast<char*>(buf) + offset, len - offset, &nread, nullptr) && nread) {
-			offset += nread;
-		} else {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-auto read_args(HANDLE &hdev, SOCKET &sockfd, int &AddressFamily)
-{
-	auto hStdin = GetStdHandle(STD_INPUT_HANDLE);
-	assert(hStdin != INVALID_HANDLE_VALUE);
-
-	usbip_xfer_args args{};
-	auto ok = read(hStdin, &args, sizeof(args));
-
-	CloseHandle(hStdin);
-
-	if (ok) {
-		hdev = args.hdev;
-		assert(hdev != INVALID_HANDLE_VALUE);
-		
-		AddressFamily = args.info.iAddressFamily;
-
-		sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &args.info, 0, WSA_FLAG_OVERLAPPED);
-		assert(sockfd != INVALID_SOCKET);
-	}
-
-	return hdev != INVALID_HANDLE_VALUE && sockfd != INVALID_SOCKET;
 }
 
 void join(std::thread *tr)
@@ -487,36 +465,74 @@ void join(std::thread *tr)
 	Trace(TRACE_LEVEL_INFORMATION, "Leave");
 }
 
-auto launch_thread()
+auto launch_thread(boost::asio::io_context &ioc)
 {
-	static std::thread tr(io_context_run, std::ref(io_context()), "thread");
+	static std::thread tr(io_context_run, std::ref(ioc), "thread");
 	return std::unique_ptr<std::thread, decltype(join)&>(&tr, join);
 }
 
-void run(HANDLE hdev, SOCKET sockfd, int AddressFamily)
+DWORD read(HANDLE hStdin, void *dst, DWORD len)
+{
+	for (auto buf = static_cast<char*>(dst); len; ) {
+
+		DWORD cnt = 0;
+
+		if (ReadFile(hStdin, buf, len, &cnt, nullptr)) {
+			buf += cnt;
+			len -= cnt;
+		} else {
+			return GetLastError();
+		}
+	}
+
+	return len ? ERROR_READ_FAULT : ERROR_SUCCESS;
+}
+
+void async_start(boost::asio::io_context &ioc)
+{
+	boost::asio::windows::object_handle handle(ioc, GetStdHandle(STD_INPUT_HANDLE));
+
+	boost::system::error_code ec;
+	handle.wait(ec);
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "STD_INPUT_HANDLE wait error #%d '%s'", ec.value(), ec.message().c_str());
+		terminate();
+		return;
+	}
+
+	usbip_xfer_args args{};
+
+	if (auto err = read(handle.native_handle(), &args, sizeof(args))) {
+		Trace(TRACE_LEVEL_ERROR, "ReadFile(STD_INPUT_HANDLE) error %#x", err);
+		terminate();
+		return;
+	}
+
+	handle.close();
+	auto sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &args.info, 0, WSA_FLAG_OVERLAPPED);
+
+	if (args.hdev == INVALID_HANDLE_VALUE || sockfd == INVALID_SOCKET) {
+		Trace(TRACE_LEVEL_ERROR, "Invalid handle(s): hdev(%p), sockfd(%x)", args.hdev, sockfd);
+		terminate();
+		return;
+	}
+
+	std::make_shared<Forwarder>(args.hdev, sockfd, args.info.iAddressFamily)->async_start();
+}
+
+auto run()
 {
 	auto &ioc = io_context();
 
 	boost::asio::signal_set signals(ioc, SIGTERM, SIGINT);
 	signals.async_wait(signal_handler);
 
-	std::make_shared<Forwarder>(hdev, sockfd, AddressFamily)->async_start();
+	async_start(ioc);
 
-	if (auto join = launch_thread()) {
+	if (auto join = launch_thread(ioc)) {
 		io_context_run(ioc, "main"); // blocks thread
 		assert(terminated());
 		join.reset();
-	}
-}
-
-void setup_forwarder()
-{
-	HANDLE hdev = INVALID_HANDLE_VALUE;
-	SOCKET sockfd = INVALID_SOCKET;
-	int AddressFamily = AF_UNSPEC;
-
-	if (read_args(hdev, sockfd, AddressFamily)) {
-		run(hdev, sockfd, AddressFamily);
 	}
 }
 
@@ -526,7 +542,7 @@ void setup_forwarder()
 int main()
 {
 	try {
-		setup_forwarder();
+		run();
 	} catch (std::exception &e) {
 		Trace(TRACE_LEVEL_ERROR, "Exception: %s", e.what());
 		g_exit_code = EXIT_FAILURE;

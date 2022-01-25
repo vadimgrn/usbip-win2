@@ -1,10 +1,11 @@
+/*
+* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 #include "debug.h"
 #include "usbip_proto.h"
-//#include "usbip_vhci_api.h"
 
 #include <cassert>
 #include <cstdio>
-
 
 #include <ntdef.h>
 #include <usb.h>

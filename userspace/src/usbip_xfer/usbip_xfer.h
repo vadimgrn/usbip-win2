@@ -1,3 +1,6 @@
+/*
+* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 #pragma once
 
 #include <WinSock2.h>
