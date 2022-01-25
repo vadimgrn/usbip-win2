@@ -26,6 +26,7 @@
 #include "dbgcode.h"
 #include "usbip_dscr.h"
 
+#include "launch_xfer.h"
 #include "usbip_xfer/usbip_xfer.h"
 
 static const char usbip_attach_usage_string[] =
@@ -185,93 +186,6 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 	return rc;
 }
 
-static BOOL
-write_data(HANDLE hInWrite, const void *data, DWORD len)
-{
-	DWORD	nwritten;
-	BOOL	res;
-
-	res = WriteFile(hInWrite, data, len, &nwritten, NULL);
-	if (!res || nwritten != len) {
-		dbg("failed to write handle value, len %d", len);
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static BOOL
-create_pipe(HANDLE *phRead, HANDLE *phWrite)
-{
-	SECURITY_ATTRIBUTES	saAttr;
-
-	saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-	saAttr.bInheritHandle = TRUE;
-	saAttr.lpSecurityDescriptor = NULL;
-
-	if (!CreatePipe(phRead, phWrite, &saAttr, 0)) {
-		dbg("failed to create stdin pipe: 0x%lx", GetLastError());
-		return FALSE;
-	}
-	return TRUE;
-}
-
-static int
-execute_attacher(HANDLE hdev, SOCKET sockfd, int rhport)
-{
-	STARTUPINFO	si;
-	PROCESS_INFORMATION	pi;
-	HANDLE	hRead, hWrite;
-	BOOL	res;
-	int	ret = ERR_GENERAL;
-
-	if (!create_pipe(&hRead, &hWrite))
-		return ERR_GENERAL;
-
-	ZeroMemory(&si, sizeof(si));
-	si.cb = sizeof(si);
-	si.hStdInput = hRead;
-	si.dwFlags = STARTF_USESTDHANDLES;
-	ZeroMemory(&pi, sizeof(pi));
-
-	char CommandLine[MAX_PATH];
-	strcpy_s(CommandLine, sizeof(CommandLine), usbip_xfer_binary());
-
-	res = CreateProcess(usbip_xfer_binary(), CommandLine, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
-	if (!res) {
-		DWORD	err = GetLastError();
-		if (err == ERROR_FILE_NOT_FOUND)
-			ret = ERR_NOTEXIST;
-		dbg("failed to create process: 0x%lx", err);
-		goto out;
-	}
-
-	struct usbip_xfer_args args = {INVALID_HANDLE_VALUE};
-
-	res = DuplicateHandle(GetCurrentProcess(), hdev, pi.hProcess, &args.hdev, 0, FALSE, DUPLICATE_SAME_ACCESS);
-	if (!res) {
-		dbg("failed to dup hdev: 0x%lx", GetLastError());
-		goto out_proc;
-	}
-
-	res = WSADuplicateSocketW(sockfd, pi.dwProcessId, &args.info);
-	if (res) {
-		dbg("failed to dup sockfd: %#x", WSAGetLastError());
-		goto out_proc;
-	}
-
-	if (write_data(hWrite, &args, sizeof(args))) {
-		ret = 0;
-	}
-
-out_proc:
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-out:
-	CloseHandle(hRead);
-	CloseHandle(hWrite);
-	return ret;
-}
-
 static int
 attach_device(const char *host, const char *busid, const char *serial, BOOL terse)
 {
@@ -307,7 +221,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		return 3;
 	}
 
-	ret = execute_attacher(hdev, sockfd, rhport);
+	ret = launch_xfer(hdev, sockfd);
 	if (ret == 0) {
 		if (terse) {
 			printf("%d\n", rhport);

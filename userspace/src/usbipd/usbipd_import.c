@@ -3,57 +3,25 @@
 #include "usbip_network.h"
 #include "usbipd_stub.h"
 #include "usbip_setupdi.h"
-#include "usbip_forward.h"
-
-typedef struct {
-	HANDLE	hdev;
-	SOCKET	sockfd;
-} forwarder_ctx_t;
-
-static VOID CALLBACK
-forwarder_stub(PTP_CALLBACK_INSTANCE inst, PVOID ctx, PTP_WORK work)
-{
-	forwarder_ctx_t	*pctx = (forwarder_ctx_t *)ctx;
-
-	dbg("stub forwarding started");
-
-	usbip_forward((HANDLE)pctx->sockfd, pctx->hdev, TRUE);
-
-	closesocket(pctx->sockfd);
-	CloseHandle(pctx->hdev);
-	free(pctx);
-
-	CloseThreadpoolWork(work);
-
-	dbg("stub forwarding stopped");
-}
+#include "launch_xfer.h"
 
 static int
 export_device(devno_t devno, SOCKET sockfd)
 {
-	PTP_WORK	work;
-	forwarder_ctx_t	*pctx;
-
-	pctx = (forwarder_ctx_t *)malloc(sizeof(forwarder_ctx_t));
-	if (pctx == NULL) {
-		dbg("out of memory");
-		return ERR_GENERAL;
-	}
-	pctx->hdev = open_stub_dev(devno);
-	if (pctx->hdev == INVALID_HANDLE_VALUE) {
+	HANDLE hdev = open_stub_dev(devno);
+	if (hdev == INVALID_HANDLE_VALUE) {
 		dbg("cannot open devno: %hhu", devno);
 		return ERR_NOTEXIST;
 	}
-	pctx->sockfd = sockfd;
 
-	work = CreateThreadpoolWork(forwarder_stub, pctx, NULL);
-	if (work == NULL) {
-		dbg("failed to create thread pool work: error: %lx", GetLastError());
-		CloseHandle(pctx->hdev);
-		free(pctx);
+	int err = launch_xfer(hdev, sockfd);
+	CloseHandle(hdev);
+
+	if (err) {
+		dbg("failed to lauch xfer process: error: %lx", GetLastError());
 		return ERR_GENERAL;
 	}
-	SubmitThreadpoolWork(work);
+
 	return 0;
 }
 
