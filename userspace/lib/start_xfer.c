@@ -16,7 +16,7 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "launch_xfer.h"
+#include "start_xfer.h"
 #include "usbip_xfer/usbip_xfer.h"
 #include "usbip_network.h"
 
@@ -48,7 +48,7 @@ static BOOL create_pipe(HANDLE *phRead, HANDLE *phWrite)
 	return TRUE;
 }
 
-int launch_xfer(HANDLE hdev, SOCKET sockfd)
+int start_xfer(HANDLE hdev, SOCKET sockfd)
 {
 	STARTUPINFO	si;
 	PROCESS_INFORMATION	pi;

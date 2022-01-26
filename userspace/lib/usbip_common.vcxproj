@@ -107,7 +107,7 @@
     <ClCompile Include="usbip_util.c" />
     <ClCompile Include="usbip_windows.c" />
     <ClCompile Include="usbip_network.c" />
-    <ClCompile Include="launch_xfer.c" />
+    <ClCompile Include="start_xfer.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\config.h" />
@@ -123,7 +123,7 @@
     <ClInclude Include="usbip_util.h" />
     <ClInclude Include="usbip_windows.h" />
     <ClInclude Include="usbip_network.h" />
-    <ClInclude Include="launch_xfer.h" />
+    <ClInclude Include="start_xfer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

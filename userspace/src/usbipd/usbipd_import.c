@@ -3,7 +3,7 @@
 #include "usbip_network.h"
 #include "usbipd_stub.h"
 #include "usbip_setupdi.h"
-#include "launch_xfer.h"
+#include "start_xfer.h"
 
 static int
 export_device(devno_t devno, SOCKET sockfd)
@@ -14,7 +14,7 @@ export_device(devno_t devno, SOCKET sockfd)
 		return ERR_NOTEXIST;
 	}
 
-	int err = launch_xfer(hdev, sockfd);
+	int err = start_xfer(hdev, sockfd);
 	CloseHandle(hdev);
 
 	if (err) {

@@ -26,7 +26,7 @@
 #include "dbgcode.h"
 #include "usbip_dscr.h"
 
-#include "launch_xfer.h"
+#include "start_xfer.h"
 #include "usbip_xfer/usbip_xfer.h"
 
 static const char usbip_attach_usage_string[] =
@@ -221,7 +221,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		return 3;
 	}
 
-	ret = launch_xfer(hdev, sockfd);
+	ret = start_xfer(hdev, sockfd);
 	if (ret == 0) {
 		if (terse) {
 			printf("%d\n", rhport);
