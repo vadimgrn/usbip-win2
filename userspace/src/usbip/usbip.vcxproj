@@ -103,6 +103,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\config.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />
     <ClInclude Include="usbip_dscr.h" />
     <ClInclude Include="usbip_vhci.h" />

@@ -68,12 +68,12 @@ BEGIN
         BLOCK "040004b0"
         BEGIN
             VALUE "CompanyName", "usbip-win"
-            VALUE "FileDescription", "usbip-win xfer"
+            VALUE "FileDescription", "usbip_xfer for usbip-win"
             VALUE "FileVersion", "0.7.5.0"
             VALUE "InternalName", "usbip_xfer.exe"
             VALUE "LegalCopyright", "Copyright (C) 2022 usbip-win project"
             VALUE "OriginalFilename", "usbip_xfer.exe"
-            VALUE "ProductName", "usbip-win xfer"
+            VALUE "ProductName", "usbip-win"
             VALUE "ProductVersion", "0.7.5.0"
         END
     END

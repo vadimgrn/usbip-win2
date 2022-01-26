@@ -97,6 +97,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\config.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="usbipd.h" />
     <ClInclude Include="usbipd_stub.h" />
   </ItemGroup>
