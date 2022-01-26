@@ -10,8 +10,12 @@
     <ClInclude Include="..\..\lib\pdu.h" />
     <ClInclude Include="usbip_xfer.h" />
     <ClInclude Include="debug.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="usbip_xfer.rc" />
   </ItemGroup>
 </Project>

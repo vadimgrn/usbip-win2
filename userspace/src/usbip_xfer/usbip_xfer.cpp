@@ -24,6 +24,7 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/deadline_timer.hpp>
 
 #include "usbip_proto.h"
 #include "usbip_common.h"
@@ -54,28 +55,32 @@ WPPInit wpp;
  * See: usbip_vhci/write.cpp, consume_write_irp_buffer.
  * See: boost/asio/completion_condition.hpp, default_max_transfer_size_t
  */
-struct transfer_usbip_t
-{
-	template <typename Error>
-	auto operator() (const Error &err, std::size_t) noexcept
-	{
-		static_assert(std::is_same_v<INT32, decltype(usbip_header_cmd_submit::transfer_buffer_length)>);
-		return !!err ? std::size_t() : INT32_MAX;
-	}
-};
-
 inline auto transfer_max() noexcept
 {
-	return transfer_usbip_t();
+	auto f = [] (const auto &err, auto) noexcept 
+	{ 
+		static_assert(std::is_same_v<INT32, decltype(usbip_header_cmd_submit::transfer_buffer_length)>);
+		return !!err ? std::size_t() : INT32_MAX;
+	};
+
+	return f;
+}
+
+enum { TOTAL_THREADS = 2 }; // for simultaneous read/write from a device handle and a socket
+
+auto& get_threads()
+{
+	static std::thread v[TOTAL_THREADS - 1]; // main thread is used as well
+	return v;
 }
 
 auto &io_context()
 {
-	static boost::asio::io_context ctx(2); // for simultaneous read/write from a device handle and a socket
+	static boost::asio::io_context ctx(TOTAL_THREADS);
 	return ctx;
 }
 
-void terminate(int exit_code = EXIT_FAILURE)
+void stop(int exit_code = EXIT_FAILURE)
 {
 	Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", exit_code);
 
@@ -83,7 +88,7 @@ void terminate(int exit_code = EXIT_FAILURE)
 	io_context().stop();
 }
 
-inline auto terminated()
+inline auto stopped()
 {
 	return io_context().stopped();
 }
@@ -96,7 +101,7 @@ void signal_handler(const boost::system::error_code &ec, int signum)
 		Trace(TRACE_LEVEL_INFORMATION, "signum %d", signum);
 	}
 
-	terminate(EXIT_SUCCESS);
+	stop(EXIT_SUCCESS);
 }
 
 auto try_catch(const std::function<void()> &func, const char *name) noexcept
@@ -119,7 +124,7 @@ void io_context_run(boost::asio::io_context &ioc, const char *caller)
 
 	while (!ioc.stopped()) {
 		if (try_catch(run, "io_context::run")) {
-			terminate();
+			stop();
 		}
 	}
 
@@ -144,20 +149,30 @@ private:
 	using seqnums_type = std::map<seqnum_t, seqnum_t>;
 	seqnums_type m_client_req_in; // seqnum of cmd_submit -> seqnum of cmd_unlink, DIR_IN client requests with payload
 
+	std::unique_ptr<boost::asio::deadline_timer> m_timer;
 	boost::asio::io_context::strand m_strand{io_context()};
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
 
-	auto &ioctx() noexcept { return m_strand.context(); }
 	static auto &get_hdr(buffer_ptr buf) noexcept { return *reinterpret_cast<usbip_header*>(buf->data()); }
-	static constexpr auto target(bool remote) noexcept { return remote ? "server" : "driver"; }
 
-	void shutdown_hardware() noexcept;
+	auto &ioctx() noexcept { return m_strand.context(); }
+	auto target(bool remote) noexcept;
+
+	void stop();
+
+	void close_all() noexcept;
+	void close_socket() noexcept;
+	void close_device() noexcept;
 
 	void save_client_req_in(const usbip_header &req);
 	void add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum);
 	void restore_server_resp_in(buffer_ptr resp);
 
+	bool start_timer();
+	bool cancel_timer();
+	void on_timer(const boost::system::error_code &ec);
+		
 	void async_read_header(buffer_ptr buf, bool remote);
 	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
@@ -177,23 +192,78 @@ Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily) :
 
 Forwarder::~Forwarder() 
 { 
-	if (m_dev.is_open()) {
-		shutdown_hardware(); 
-	}
+	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+
+	close_all();
 
 	if (auto n = m_client_req_in.size()) {
 		Trace(TRACE_LEVEL_WARNING, "Seqnums remaining: %Iu", n);
 	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Leave");
 }
 
-void Forwarder::shutdown_hardware() noexcept
+void Forwarder::stop()
 {
-	DWORD unused{};
+	::stop();
+	close_all();
+}
 
-	if (DeviceIoControl(m_dev.native_handle(), IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
-		Trace(TRACE_LEVEL_INFORMATION, "OK");
+void Forwarder::close_all() noexcept
+{
+	close_socket();
+	close_device();
+}
+
+void Forwarder::close_device() noexcept
+{
+	if (!m_dev.is_open()) {
+		return;
+	}
+
+	DWORD unused{};
+	if (!DeviceIoControl(m_dev.native_handle(), IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
+		Trace(TRACE_LEVEL_ERROR, "VHCI_SHUTDOWN_HARDWARE error %#x", GetLastError());
+	}
+
+	boost::system::error_code ec;
+	m_dev.close(ec);
+
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Error %#x", GetLastError());
+		Trace(TRACE_LEVEL_INFORMATION, "Closed");
+	}
+}
+
+void Forwarder::close_socket() noexcept
+{
+	if (!m_sock.is_open()) {
+		return;
+	}
+
+	boost::system::error_code ec;
+
+	m_sock.shutdown(tcp::socket::shutdown_both, ec);
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "Socket shutdown error #%d '%s'", ec.value(), ec.message().c_str());
+	}
+
+	m_sock.close(ec);
+
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "Socket close error #%d '%s'", ec.value(), ec.message().c_str());
+	} else {
+		Trace(TRACE_LEVEL_INFORMATION, "Closed");
+	}
+}
+
+auto Forwarder::target(bool remote) noexcept 
+{ 
+	if (m_client) {
+		return remote ? "server" : "vhci"; 
+	} else {
+		return remote ? "client" : "stub"; 
 	}
 }
 
@@ -223,7 +293,7 @@ auto get_client_req_seqnums(const usbip_header &req) noexcept
 		break;
 	default:
 		Trace(TRACE_LEVEL_CRITICAL, "%!usbip_request_type!: request expected", req.base.command);
-		terminate();
+		stop();
 	}
 
 	return res;
@@ -273,7 +343,9 @@ void Forwarder::add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum)
 void Forwarder::restore_server_resp_in(buffer_ptr resp)
 {
 	auto &hdr = get_hdr(resp);
-	assert(!hdr.base.direction); // always zero for server responses
+
+	static_assert(!USBIP_DIR_OUT);
+	assert(hdr.base.direction == USBIP_DIR_OUT); // always zero for server responses
 
 	auto seqnum = hdr.base.seqnum;
 
@@ -298,7 +370,7 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "%!usbip_request_type!: response expected", cmd);
-		terminate();
+		stop();
 		return;
 	}
 
@@ -310,15 +382,89 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 	post(bind_executor(ioctx(), std::move(f)));
 }
 
+bool Forwarder::start_timer()
+{
+	assert(!m_timer);
+	m_timer = std::make_unique<boost::asio::deadline_timer>(ioctx());
+
+	auto timeout = boost::posix_time::seconds(30);
+
+	boost::system::error_code ec;
+	m_timer->expires_from_now(timeout, ec);
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
+		m_timer.reset();
+		stop();
+		return false;
+	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Timeout %d sec.", timeout.total_seconds());
+
+	auto f = [self = shared_from_this()] (auto&&... args)
+	{
+		self->on_timer(std::forward<decltype(args)>(args)...);
+	};
+
+	m_timer->async_wait(std::move(f));
+	return true;
+}
+
+bool Forwarder::cancel_timer()
+{
+	assert(m_timer);
+
+	boost::system::error_code ec;
+	m_timer->cancel(ec);
+
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
+		stop();
+	} else {
+		Trace(TRACE_LEVEL_INFORMATION, "Cancelled");
+	}
+
+	return static_cast<bool>(!ec);
+}
+
+void Forwarder::on_timer(const boost::system::error_code &ec)
+{
+	assert(m_timer);
+	m_timer.reset();
+
+	if (ec == boost::asio::error::operation_aborted) {
+		Trace(TRACE_LEVEL_ERROR, "Aborted");
+		return;
+	}
+	
+	if (ec) {
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
+		stop();
+		return;
+	}
+
+	boost::system::error_code err;
+	m_dev.cancel(err);
+
+	if (err) {
+		Trace(TRACE_LEVEL_ERROR, "Cancel error #%d '%s'", err.value(), err.message().c_str());
+		stop();
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Cancel expired read");
+	}
+}
+
 void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 {
-	if (terminated()) {
+	if (stopped()) {
 		return;
 	}
 
 	if (m_client < 0) { // once
 		m_client = !remote;
 		Trace(TRACE_LEVEL_INFORMATION, "%s!", m_client ? "Client" : "Server");
+		if (m_client && !start_timer()) {
+			return;
+		}
 	}
 
 	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
@@ -329,14 +475,18 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 	buf->resize(sizeof(usbip_header));
 	
 	remote ? async_read(m_sock, boost::asio::buffer(*buf), std::move(f)) :
-		 async_read(m_dev,  boost::asio::buffer(*buf), transfer_max(), std::move(f));
+		 async_read(m_dev,  boost::asio::buffer(*buf), std::move(f));
 }
 
 void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
+	if (m_timer && !cancel_timer()) {
+		return;
+	}
+
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "%s <- error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
-		terminate();
+		stop();
 		return;
 	}
 
@@ -370,7 +520,7 @@ void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t 
 
 void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 {
-	if (terminated()) {
+	if (stopped()) {
 		return;
 	}
 
@@ -400,7 +550,7 @@ void Forwarder::on_read_body(
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "%s <- error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
-		terminate();
+		stop();
 		return;
 	}
 
@@ -415,7 +565,7 @@ void Forwarder::on_read_body(
 
 void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 {
-	if (terminated()) {
+	if (stopped()) {
 		return;
 	}
 
@@ -439,36 +589,15 @@ void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)
 		 async_write(m_dev,  boost::asio::buffer(*buf), transfer_max(), std::move(f));
 }
 
-void Forwarder::on_write_pdu(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
+void Forwarder::on_write_pdu(const boost::system::error_code &ec, [[maybe_unused]] std::size_t transferred, buffer_ptr buf, bool remote)
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "%s <- error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
-		terminate();
+		stop();
 	} else {
 		assert(transferred == buf->size());
 		async_read_header(std::move(buf), !remote);
 	}
-}
-
-void join(std::thread *tr)
-{
-	assert(tr);
-	assert(terminated());
-
-	Trace(TRACE_LEVEL_INFORMATION, "Enter");
-
-	if (tr->joinable()) {
-		auto join = [tr] { tr->join(); };
-		try_catch(join, "thread::join");
-	}
-
-	Trace(TRACE_LEVEL_INFORMATION, "Leave");
-}
-
-auto launch_thread(boost::asio::io_context &ioc)
-{
-	static std::thread tr(io_context_run, std::ref(ioc), "thread");
-	return std::unique_ptr<std::thread, decltype(join)&>(&tr, join);
 }
 
 DWORD read(HANDLE hStdin, void *dst, DWORD len)
@@ -477,47 +606,80 @@ DWORD read(HANDLE hStdin, void *dst, DWORD len)
 
 		DWORD cnt = 0;
 
-		if (ReadFile(hStdin, buf, len, &cnt, nullptr)) {
+		if (!ReadFile(hStdin, buf, len, &cnt, nullptr)) {
+			return GetLastError();
+		} else if (cnt) {
 			buf += cnt;
 			len -= cnt;
-		} else {
-			return GetLastError();
+		} else { // EOF
+			break;
 		}
 	}
 
 	return len ? ERROR_READ_FAULT : ERROR_SUCCESS;
 }
 
-void async_start(boost::asio::io_context &ioc)
+void on_stdin_ready(const boost::system::error_code &ec, boost::asio::windows::object_handle &handle)
 {
-	boost::asio::windows::object_handle handle(ioc, GetStdHandle(STD_INPUT_HANDLE));
-
-	boost::system::error_code ec;
-	handle.wait(ec);
 	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "STD_INPUT_HANDLE wait error #%d '%s'", ec.value(), ec.message().c_str());
-		terminate();
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
+		stop();
 		return;
 	}
 
-	usbip_xfer_args args{};
+	usbip_xfer_args args;
 
 	if (auto err = read(handle.native_handle(), &args, sizeof(args))) {
 		Trace(TRACE_LEVEL_ERROR, "ReadFile(STD_INPUT_HANDLE) error %#x", err);
-		terminate();
+		stop();
 		return;
 	}
 
-	handle.close();
 	auto sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &args.info, 0, WSA_FLAG_OVERLAPPED);
 
 	if (args.hdev == INVALID_HANDLE_VALUE || sockfd == INVALID_SOCKET) {
 		Trace(TRACE_LEVEL_ERROR, "Invalid handle(s): hdev(%p), sockfd(%x)", args.hdev, sockfd);
-		terminate();
+		stop();
 		return;
 	}
 
 	std::make_shared<Forwarder>(args.hdev, sockfd, args.info.iAddressFamily)->async_start();
+}
+
+void async_start(boost::asio::io_context &ioc)
+{
+	auto hStdin = GetStdHandle(STD_INPUT_HANDLE);
+	auto handle = std::make_shared<boost::asio::windows::object_handle>(ioc, hStdin);
+
+	auto f = [handle] (auto&&... args)
+	{
+		on_stdin_ready(std::forward<decltype(args)>(args)..., *handle);
+	};
+
+	handle->async_wait(std::move(f));
+}
+
+void start_threads(boost::asio::io_context &ioc)
+{
+	for (auto &tr : get_threads()) {
+		tr = std::thread(io_context_run, std::ref(ioc), "thread");
+	}
+}
+
+void join_threads(boost::asio::io_context *ioc)
+{
+	Trace(TRACE_LEVEL_INFORMATION, "Enter");
+
+	assert(ioc->stopped());
+
+	for (auto &tr : get_threads()) {
+		if (tr.joinable()) {
+			auto join = [&tr] { tr.join(); };
+			try_catch(join, "thread::join");
+		}
+	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "Leave");
 }
 
 auto run()
@@ -528,12 +690,18 @@ auto run()
 	signals.async_wait(signal_handler);
 
 	async_start(ioc);
+	
+	if (auto join = std::unique_ptr<boost::asio::io_context, decltype(join_threads)&>(&ioc, join_threads)) {
 
-	if (auto join = launch_thread(ioc)) {
+		start_threads(ioc);
+
 		io_context_run(ioc, "main"); // blocks thread
-		assert(terminated());
+		assert(stopped());
+
 		join.reset();
 	}
+
+	return g_exit_code;
 }
 
 } // namespace
@@ -541,13 +709,14 @@ auto run()
 
 int main()
 {
+	int exit_code = EXIT_FAILURE;
+
 	try {
-		run();
+		exit_code = run();
 	} catch (std::exception &e) {
 		Trace(TRACE_LEVEL_ERROR, "Exception: %s", e.what());
-		g_exit_code = EXIT_FAILURE;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", g_exit_code);
-	return g_exit_code;
+	Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", exit_code);
+	return exit_code;
 }

@@ -18,11 +18,15 @@
   <ItemGroup>
     <ClInclude Include="..\..\lib\pdu.h" />
     <ClInclude Include="debug.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="trace.h" />
     <ClInclude Include="usbip_xfer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="usbip_xfer.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
