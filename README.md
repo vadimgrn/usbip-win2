@@ -13,8 +13,16 @@
 - The latest Microsoft Visual Studio Community 2019
 - Windows 11 SDK (10.1.22000.194)
 - Windows Driver Kit (10.1.22000.1)
+- vcpkg
 
 ### Build Process
+- Install vcpkg, https://vcpkg.io/en/getting-started.html
+  - git clone https://github.com/Microsoft/vcpkg.git
+  - .\vcpkg\bootstrap-vcpkg.bat
+- Install Boost C++ libraries
+  - vcpkg install boost:x64-windows
+- Integrate vcpkg with Visual Studio
+  - vcpkg integrate install
 - Open `usbip_win.sln`
 - Set certificate driver signing for `usbip_stub` and `usbip_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
