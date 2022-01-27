@@ -15,14 +15,17 @@
 - Windows Driver Kit (10.1.22000.1)
 - vcpkg
 
-### Build Process
-- Install vcpkg, https://vcpkg.io/en/getting-started.html
+### Install Boost C++
+- Install vcpkg
+  - See https://vcpkg.io/en/getting-started.html
   - git clone https://github.com/Microsoft/vcpkg.git
   - .\vcpkg\bootstrap-vcpkg.bat
-- Install Boost C++ libraries
-  - vcpkg install boost:x64-windows
 - Integrate vcpkg with Visual Studio
   - vcpkg integrate install
+- Install Boost C++ libraries
+  - vcpkg install boost:x64-windows
+
+### Build Process
 - Open `usbip_win.sln`
 - Set certificate driver signing for `usbip_stub` and `usbip_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`

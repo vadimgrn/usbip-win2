@@ -161,9 +161,9 @@ private:
 
 	void stop();
 
-	void close_all() noexcept;
 	void close_socket() noexcept;
 	void close_device() noexcept;
+	void close() noexcept;
 
 	void save_client_req_in(const usbip_header &req);
 	void add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum);
@@ -194,7 +194,7 @@ Forwarder::~Forwarder()
 { 
 	Trace(TRACE_LEVEL_INFORMATION, "Enter");
 
-	close_all();
+	close();
 
 	if (auto n = m_client_req_in.size()) {
 		Trace(TRACE_LEVEL_WARNING, "Seqnums remaining: %Iu", n);
@@ -206,10 +206,10 @@ Forwarder::~Forwarder()
 void Forwarder::stop()
 {
 	::stop();
-	close_all();
+	close();
 }
 
-void Forwarder::close_all() noexcept
+void Forwarder::close() noexcept
 {
 	close_socket();
 	close_device();
@@ -232,7 +232,7 @@ void Forwarder::close_device() noexcept
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
 	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "Closed");
+		Trace(TRACE_LEVEL_INFORMATION, "OK");
 	}
 }
 
@@ -254,7 +254,7 @@ void Forwarder::close_socket() noexcept
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Socket close error #%d '%s'", ec.value(), ec.message().c_str());
 	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "Closed");
+		Trace(TRACE_LEVEL_INFORMATION, "OK");
 	}
 }
 
@@ -382,6 +382,9 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 	post(bind_executor(ioctx(), std::move(f)));
 }
 
+/*
+ * Client's first read from vhci device can last forever (the issue of the driver).
+ */
 bool Forwarder::start_timer()
 {
 	assert(!m_timer);
@@ -415,15 +418,15 @@ bool Forwarder::cancel_timer()
 
 	boost::system::error_code ec;
 	m_timer->cancel(ec);
-
-	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
-		stop();
-	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "Cancelled");
+	if (!ec) {
+		Trace(TRACE_LEVEL_INFORMATION, "OK");
+		return true;
 	}
 
-	return static_cast<bool>(!ec);
+	Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
+
+	stop();
+	return false;
 }
 
 void Forwarder::on_timer(const boost::system::error_code &ec)
@@ -666,7 +669,7 @@ void start_threads(boost::asio::io_context &ioc)
 	}
 }
 
-void join_threads(boost::asio::io_context *ioc)
+void join_threads([[maybe_unused]] boost::asio::io_context *ioc)
 {
 	Trace(TRACE_LEVEL_INFORMATION, "Enter");
 
