@@ -8,8 +8,14 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_common", "userspace\lib\usbip_common.vcxproj", "{2C173853-88C0-4334-85BF-0B46CFD5A007}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip", "userspace\src\usbip\usbip.vcxproj", "{36CEE68D-D6CF-4413-978C-794488F44555}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D89776AB-DC80-4AD8-862E-18C084BD3E60} = {D89776AB-DC80-4AD8-862E-18C084BD3E60}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbipd", "userspace\src\usbipd\usbipd.vcxproj", "{0C5C92AA-37F0-4521-86EA-76F32B43E7B4}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D89776AB-DC80-4AD8-862E-18C084BD3E60} = {D89776AB-DC80-4AD8-862E-18C084BD3E60}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_stub", "driver\stub\usbip_stub.vcxproj", "{08230AFF-8015-437B-9DF1-AF8D0112DF59}"
 EndProject
