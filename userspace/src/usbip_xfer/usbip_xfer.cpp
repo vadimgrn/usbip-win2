@@ -55,9 +55,9 @@ WPPInit wpp;
  * See: usbip_vhci/write.cpp, consume_write_irp_buffer.
  * See: boost/asio/completion_condition.hpp, default_max_transfer_size_t
  */
-inline auto transfer_max() noexcept
+inline auto transfer_max()
 {
-	auto f = [] (const auto &err, auto) noexcept 
+	auto f = [] (const auto &err, auto)
 	{ 
 		static_assert(std::is_same_v<INT32, decltype(usbip_header_cmd_submit::transfer_buffer_length)>);
 		return !!err ? std::size_t() : INT32_MAX;
@@ -149,16 +149,16 @@ private:
 	using seqnums_type = std::map<seqnum_t, seqnum_t>;
 	seqnums_type m_client_req_in; // seqnum of cmd_submit -> seqnum of cmd_unlink, DIR_IN client requests with payload
 
-	std::unique_ptr<boost::asio::deadline_timer> m_timer;
 	boost::asio::io_context::strand m_strand{io_context()};
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
+	boost::asio::deadline_timer m_timer{ioctx()};
+	bool m_timer_active{};
 
 	static auto &get_hdr(buffer_ptr buf) noexcept { return *reinterpret_cast<usbip_header*>(buf->data()); }
 
-	auto &ioctx() noexcept { return m_strand.context(); }
+	boost::asio::io_context& ioctx() noexcept { return m_strand.context(); }
 	auto target(bool remote) noexcept;
-
 	void stop();
 
 	void close_socket() noexcept;
@@ -170,7 +170,7 @@ private:
 	void restore_server_resp_in(buffer_ptr resp);
 
 	bool start_timer();
-	bool cancel_timer();
+	bool cancel_timer(bool stop_on_error = true);
 	void on_timer(const boost::system::error_code &ec);
 		
 	void async_read_header(buffer_ptr buf, bool remote);
@@ -205,12 +205,18 @@ Forwarder::~Forwarder()
 
 void Forwarder::stop()
 {
-	::stop();
-	close();
+	::stop(EXIT_FAILURE);
+
+	auto f = [self = shared_from_this()] { self->close(); };
+	dispatch(bind_executor(m_strand, std::move(f)));
 }
 
 void Forwarder::close() noexcept
 {
+	if (m_timer_active) {
+		cancel_timer(false);
+	}
+	
 	close_socket();
 	close_device();
 }
@@ -384,19 +390,17 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 
 /*
  * Client's first read from vhci device can last forever (the issue of the driver).
+ * Must be called once.
  */
 bool Forwarder::start_timer()
 {
-	assert(!m_timer);
-	m_timer = std::make_unique<boost::asio::deadline_timer>(ioctx());
-
-	auto timeout = boost::posix_time::seconds(30);
+	assert(!m_timer_active);
+	auto timeout = boost::posix_time::seconds(10); // arbitrary, data must be ready without delay
 
 	boost::system::error_code ec;
-	m_timer->expires_from_now(timeout, ec);
+	m_timer.expires_from_now(timeout, ec);
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
-		m_timer.reset();
 		stop();
 		return false;
 	}
@@ -408,16 +412,21 @@ bool Forwarder::start_timer()
 		self->on_timer(std::forward<decltype(args)>(args)...);
 	};
 
-	m_timer->async_wait(std::move(f));
+	m_timer_active = true;
+	m_timer.async_wait(std::move(f));
+
 	return true;
 }
 
-bool Forwarder::cancel_timer()
+/*
+ * There can be race condition between this function and on_timer().
+ * They can call stop() concurrently, but stop() execution is synchronized via strand.
+ */
+bool Forwarder::cancel_timer(bool stop_on_error)
 {
-	assert(m_timer);
-
 	boost::system::error_code ec;
-	m_timer->cancel(ec);
+	m_timer.cancel(ec);
+
 	if (!ec) {
 		Trace(TRACE_LEVEL_INFORMATION, "OK");
 		return true;
@@ -425,14 +434,17 @@ bool Forwarder::cancel_timer()
 
 	Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
 
-	stop();
+	if (stop_on_error) {
+		stop();
+	}
+
 	return false;
 }
 
 void Forwarder::on_timer(const boost::system::error_code &ec)
 {
-	assert(m_timer);
-	m_timer.reset();
+	assert(m_timer_active);
+	m_timer_active = false;
 
 	if (ec == boost::asio::error::operation_aborted) {
 		Trace(TRACE_LEVEL_ERROR, "Aborted");
@@ -483,7 +495,7 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 
 void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
-	if (m_timer && !cancel_timer()) {
+	if (m_timer_active && !cancel_timer()) {
 		return;
 	}
 
