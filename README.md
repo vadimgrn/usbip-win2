@@ -16,8 +16,7 @@
 - vcpkg
 
 ### Install Boost C++
-- Install vcpkg
-  - See https://vcpkg.io/en/getting-started.html
+- Install vcpkg, https://vcpkg.io/en/getting-started.html
   - git clone https://github.com/Microsoft/vcpkg.git
   - .\vcpkg\bootstrap-vcpkg.bat
 - Integrate vcpkg with Visual Studio
@@ -35,19 +34,62 @@
 
 ## Install
 
-### Windows USB/IP server
-- Prepare a Linux machine as a USB/IP client or Windows usbip-win VHCI client
-  - `$ sudo modprobe -a usbip-core vhci-hcd`
-- Install USB/IP test certificate
-  - Install `driver/usbip_test.pfx` (password: usbip)
+### USB/IP test certificate
+  - Right click on `driver/usbip_test.pfx`, select "Install PFX" (password: usbip)
   - Certificate should be installed into
     1. "Trusted Root Certification Authority" in "Local Computer" (not current user) *and*
     2. "Trusted Publishers" in "Local Computer" (not current user)
-- Enable test signing
-  - `> bcdedit.exe /set TESTSIGNING ON`
+  - Enable test signing
+    - `> bcdedit.exe /set TESTSIGNING ON`
+    - reboot the system to apply
+
+### Windows USB/IP client
+- Copy VHCI driver files into a folder in target machine
+  - Copy `usbip.exe`, `usbip_xfer.exe`, `usbip_vhci.sys`, `usbip_vhci.inf`, `usbip_root.inf`, `usbip_vhci.cat` into a folder in target machine;
+  - You can find all files in output folder after build or on [release](https://github.com/vadimgrn/usbip-win/releases) page.
+- Install USB/IP VHCI driver
+  - Run PowerShell or CMD as an Administrator
+  - `PS> usbip.exe install`
+- Run USB/IP server on Linux machine (or try to use Windows USB/IP server)
+  - `$ sudo modprobe -a usbip-core usbip-host`
+  - `$ sudo usbipd -D`
+- List available USB devices on Linux USB/IP server
+```
+$ usbip list -l
+ - busid 3-2 (1005:b113)
+   Apacer Technology, Inc. : Handy Steno/AH123 / Handy Steno 2.0/HT203 (1005:b113)
+
+ - busid 3-3.2 (07ca:513b)
+   AVerMedia Technologies, Inc. : unknown product (07ca:513b)
+```
+- Export desired USB device(s) using its busid on Linux USB/IP server
+  - `$ sudo usbip bind -b 3-2`
+- Query exported USB devices on Windows using USB/IP client
+  - `PS> usbip.exe list -r <usbip server ip>`
+```
+Exportable USB devices
+======================
+ - 192.168.1.9
+        3-2: unknown vendor : unknown product (1005:b113)
+           : /sys/devices/pci0000:00/0000:00:14.0/usb3/3-2
+           : (Defined at Interface level) (00/00/00)
+```
+- Attach desired remote USB device using its busid
+  - `PS> usbip.exe attach -r <usbip server ip> -b 3-2`
+- New USB device should appear on Windows, use it as usual
+- Detach the remote USB device using its usb port, pass -1 to detach all remote devices
+  - `PS> usbip.exe detach -p -1`
+- Uninstall the driver
+  - `PS> usbip.exe uninstall`
+- Disable test signing
+  - `> bcdedit.exe /set TESTSIGNING OFF`
   - reboot the system to apply
-- Copy `usbip.exe`, `usbipd.exe`, `usb.ids`, `usbip_stub.sys`, `usbip_stub.inx` into a folder in target machine
-  - You can find `usbip.exe`, `usbipd.exe`, `usbip_stub.sys` in the output folder after build or on [release](https://github.com/vadimgrn/usbip-win/releases) page.
+
+### Windows USB/IP server
+- Prepare a Linux machine as a USB/IP client or Windows usbip-win VHCI client
+  - `$ sudo modprobe -a usbip-core vhci-hcd`
+- Copy `usbip.exe`, `usbipd.exe`, `usbip_xfer.exe`, `usb.ids`, `usbip_stub.sys`, `usbip_stub.inx` into a folder in target machine
+  - You can find there files in the output folder after build or on [release](https://github.com/vadimgrn/usbip-win/releases) page.
   - `userspace/usb.ids`
   - `driver/stub/usbip_stub.inx`
 - Find USB Device ID
@@ -67,53 +109,14 @@ usbip.exe list -l
     - `usbip_stub.inx` and `usbip_stub.sys` files should be in the same folder as `usbip.exe`
   - `> usbip.exe bind -b 1-59`
 - Run `usbipd.exe`
-  - `> usbipd.exe -d -4`
+  - `> usbipd.exe`
   - TCP port `3240` should be allowed by firewall
 - Attach USB/IP device on Linux machine
   - `# usbip attach -r <usbip server ip> -b 1-59`
 
-### Windows USB/IP client
-- Prepare a Linux machine as a USB/IP server or Windows usbip-win stub server
-  - `$ sudo modprobe -a usbip-core usbip-host`
-  - You can use virtual [usbip-vstub](https://github.com/vadimgrn/usbip-vstub) as a stub server
-- Run usbipd on a USB/IP server (Linux)
-  - `$ sudo usbipd -D`
-- Install USB/IP test certificate
-  - Install `driver/usbip_test.pfx` (password: usbip)
-  - Certificate should be installed into
-    1. "Trusted Root Certification Authority" in "Local Computer" (not current user) *and*
-    2. "Trusted Publishers" in "Local Computer" (not current user)
-- Enable test signing
-  - `> bcdedit.exe /set TESTSIGNING ON`
-  - reboot the system to apply
-- Copy VHCI driver files into a folder in target machine
-  - Copy `usbip.exe`, `usbip_vhci.sys`, `usbip_vhci.inf`, `usbip_root.inf`, `usbip_vhci.cat` into a folder in target machine;
-  - You can find all files in output folder after build or on [release](https://github.com/vadimgrn/usbip-win/releases) page.
-- Install USB/IP VHCI driver
-  - You can install using `usbip.exe` or manually
-  - Using `usbip.exe` install command
-    - Run PowerShell or CMD as an Administrator
-    - `PS> usbip.exe install`
-  - Manual Installation
-    - Run PowerShell or CMD as an Administrator
-    - `PS> pnputil /add-driver usbip_vhci.inf`
-    - Start Device manager
-    - Choose "Add Legacy Hardware" from the "Action" menu.
-    - Select "Install the hardware that I manually select from the list".
-    - Click "Next".
-    - Click "Have Disk", click "Browse", choose the copied folder, and click "OK".
-    - Click on the "USB/IP VHCI Root", and then click "Next".
-    - Click Finish at "Completing the Add/Remove Hardware Wizard".
-- Attach a remote USB device
-  - `PS> usbip.exe attach -r <usbip server ip> -b 2-2`
-- Uninstall driver
-  - `PS> usbip.exe uninstall`
-- Disable test signing
-  - `> bcdedit.exe /set TESTSIGNING OFF`
-  - reboot the system to apply
-
 ### Reporting Bugs
-- `usbip-win` is not yet ready for production use. We could find the problems with detailed logs.
+- `usbip-win` is not yet ready for production use. It can cause BSOD or hang Windows Explorer, etc.
+- We could find the problems with detailed logs
 
 #### How to get Windows kernel log for drivers
 - WPP Software Tracing is used
@@ -141,6 +144,7 @@ tracefmt.exe -nosummary -p %TMFS% -o usbip-vhci.txt usbip-vhci.etl
   - Choose \"*PDB (Debug Information) File*\" radio button and specify PDB file
     - `usbip_stub.pdb` for stub driver
     - `usbip_vhci.pdb` for vhci driver
+    - `usbip_xfer.pdb` for usbip_xfer utility
   - You can send real-time trace messages to WinDbg by modifying in \"*Advanced Log Session Options*\".
 - If your testing machine suffer from BSOD (Blue Screen of Death), you should get it via remote debugging.
   - `WinDbg` on virtual machines would be good to get logs
