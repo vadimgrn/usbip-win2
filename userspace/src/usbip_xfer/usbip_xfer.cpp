@@ -28,7 +28,6 @@
 
 #include "usbip_proto.h"
 #include "usbip_common.h"
-#include "usbip_vhci_api.h"
 #include "pdu.h"
 #include "debug.h"
 
@@ -216,11 +215,6 @@ void Forwarder::close_device() noexcept
 {
 	if (!m_dev.is_open()) {
 		return;
-	}
-
-	DWORD unused{};
-	if (!DeviceIoControl(m_dev.native_handle(), IOCTL_USBIP_VHCI_SHUTDOWN_HARDWARE, nullptr, 0, nullptr, 0, &unused, nullptr)) {
-		Trace(TRACE_LEVEL_ERROR, "VHCI_SHUTDOWN_HARDWARE error %#x", GetLastError());
 	}
 
 	boost::system::error_code ec;
