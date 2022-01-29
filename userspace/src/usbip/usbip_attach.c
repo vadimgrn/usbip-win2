@@ -42,7 +42,7 @@ void usbip_attach_usage(void)
 }
 
 static int
-import_device(SOCKET sockfd, pvhci_pluginfo_t pluginfo, HANDLE *phdev)
+import_device(SOCKET sockfd, struct vhci_pluginfo_t *pluginfo, HANDLE *phdev)
 {
 	HANDLE	hdev;
 	int	rc;
@@ -69,7 +69,7 @@ import_device(SOCKET sockfd, pvhci_pluginfo_t pluginfo, HANDLE *phdev)
 	return pluginfo->port;
 }
 
-static pvhci_pluginfo_t
+static struct vhci_pluginfo_t*
 build_pluginfo(SOCKET sockfd, unsigned devid)
 {
 	USHORT wTotalLength = 0;
@@ -79,7 +79,7 @@ build_pluginfo(SOCKET sockfd, unsigned devid)
 		return NULL;
 	}
 
-	vhci_pluginfo_t *pluginfo = NULL;
+	struct vhci_pluginfo_t *pluginfo = NULL;
 	unsigned long pluginfo_size = sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf);
 
 	pluginfo = malloc(pluginfo_size);
@@ -109,33 +109,26 @@ build_pluginfo(SOCKET sockfd, unsigned devid)
 static int
 query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char *serial)
 {
-	struct op_import_request request;
-	struct op_import_reply   reply;
-	pvhci_pluginfo_t	pluginfo;
-	uint16_t code = OP_REP_IMPORT;
-	unsigned	devid;
-	int	status;
-	int	rc;
-
-	memset(&request, 0, sizeof(request));
-	memset(&reply, 0, sizeof(reply));
-
 	/* send a request */
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
+	int rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
 	if (rc < 0) {
 		dbg("failed to send common header: %s", dbg_errcode(rc));
 		return ERR_NETWORK;
 	}
 
-	strncpy_s(request.busid, USBIP_BUS_ID_SIZE, busid, sizeof(request.busid));
+	struct op_import_request request = {0};
+	strcpy_s(request.busid, sizeof(request.busid), busid);
 
 	PACK_OP_IMPORT_REQUEST(0, &request);
 
-	rc = usbip_net_send(sockfd, (void *)&request, sizeof(request));
+	rc = usbip_net_send(sockfd, &request, sizeof(request));
 	if (rc < 0) {
 		dbg("failed to send import request: %s", dbg_errcode(rc));
 		return ERR_NETWORK;
 	}
+
+	uint16_t code = OP_REP_IMPORT;
+	int status = 0;
 
 	/* recieve a reply */
 	rc = usbip_net_recv_op_common(sockfd, &code, &status);
@@ -156,7 +149,9 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 		return rc;
 	}
 
-	rc = usbip_net_recv(sockfd, (void *)&reply, sizeof(reply));
+	struct op_import_reply reply = {0};
+
+	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("failed to recv import reply: %s", dbg_errcode(rc));
 		return ERR_NETWORK;
@@ -165,20 +160,23 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 	PACK_OP_IMPORT_REPLY(0, &reply);
 
 	/* check the reply */
-	if (strncmp(reply.udev.busid, busid, sizeof(reply.udev.busid)) != 0) {
+	if (strncmp(reply.udev.busid, busid, sizeof(reply.udev.busid))) {
 		dbg("recv different busid: %s", reply.udev.busid);
 		return ERR_PROTOCOL;
 	}
 
-	devid = reply.udev.busnum << 16 | reply.udev.devnum;
-	pluginfo = build_pluginfo(sockfd, devid);
-	if (pluginfo == NULL)
-		return ERR_GENERAL;
+	unsigned int devid = reply.udev.busnum << 16 | reply.udev.devnum;
 
-	if (serial != NULL)
-		mbstowcs_s(NULL, pluginfo->wserial, MAX_VHCI_SERIAL_ID, serial, _TRUNCATE);
-	else
+	struct vhci_pluginfo_t *pluginfo = build_pluginfo(sockfd, devid);
+	if (!pluginfo) {
+		return ERR_GENERAL;
+	}
+
+	if (serial) {
+		mbstowcs_s(NULL, pluginfo->wserial, sizeof(pluginfo->wserial)/sizeof(*pluginfo->wserial), serial, _TRUNCATE);
+	} else {
 		pluginfo->wserial[0] = L'\0';
+	}
 
 	/* import a device */
 	rc = import_device(sockfd, pluginfo, phdev);
@@ -222,15 +220,14 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 	}
 
 	ret = start_xfer(hdev, sockfd, true);
-	if (ret == 0) {
+	if (!ret) {
 		if (terse) {
 			printf("%d\n", rhport);
 		}
 		else {
 			printf("succesfully attached to port %d\n", rhport);
 		}
-	}
-	else {
+	} else {
 		switch (ret) {
 		case ERR_NOTEXIST:
 			err("%s not found", usbip_xfer_binary());
@@ -241,20 +238,17 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		}
 		ret = 4;
 	}
+
 	usbip_vhci_driver_close(hdev);
 	closesocket(sockfd);
 
 	return ret;
 }
 
-static BOOL
-check_attacher(void)
+static bool check_attacher()
 {
-	DWORD	bintype;
-
-	if (!GetBinaryType(usbip_xfer_binary(), &bintype))
-		return FALSE;
-	return TRUE;
+	DWORD bintype;
+	return GetBinaryType(usbip_xfer_binary(), &bintype);
 }
 
 int usbip_attach(int argc, char *argv[])
@@ -266,12 +260,13 @@ int usbip_attach(int argc, char *argv[])
 		{ "terse", required_argument, NULL, 't' },
 		{ NULL, 0, NULL, 0 }
 	};
+
 	char	*host = NULL;
 	char	*busid = NULL;
 	char	*serial = NULL;
 	BOOL	terse = FALSE;
 
-	for (;;) {
+	while (true) {
 		int	opt = getopt_long(argc, argv, "r:b:s:t", opts, NULL);
 
 		if (opt == -1)
@@ -297,12 +292,13 @@ int usbip_attach(int argc, char *argv[])
 		}
 	}
 
-	if (host == NULL) {
+	if (!host) {
 		err("empty remote host");
 		usbip_attach_usage();
 		return 1;
 	}
-	if (busid == NULL) {
+	
+	if (!busid) {
 		err("empty busid");
 		usbip_attach_usage();
 		return 1;
@@ -312,5 +308,6 @@ int usbip_attach(int argc, char *argv[])
 		err("%s not found", usbip_xfer_binary());
 		return 126;
 	}
+
 	return attach_device(host, busid, serial, terse);
 }

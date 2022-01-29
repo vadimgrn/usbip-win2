@@ -144,15 +144,16 @@ usbip_vhci_get_imported_devs(HANDLE hdev, pioctl_usbip_vhci_imported_dev_t *pide
 }
 
 int
-usbip_vhci_attach_device(HANDLE hdev, pvhci_pluginfo_t pluginfo)
+usbip_vhci_attach_device(HANDLE hdev, struct vhci_pluginfo_t *pluginfo)
 {
-	unsigned long	unused;
+	unsigned long unused;
 
 	if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE,
-		pluginfo, pluginfo->size, pluginfo, sizeof(vhci_pluginfo_t), &unused, NULL)) {
-		DWORD	err = GetLastError();
-		if (err == ERROR_HANDLE_EOF)
+		pluginfo, pluginfo->size, pluginfo, sizeof(*pluginfo), &unused, NULL)) {
+		DWORD err = GetLastError();
+		if (err == ERROR_HANDLE_EOF) {
 			return ERR_PORTFULL;
+		}
 		dbg("usbip_vhci_attach_device: DeviceIoControl failed: err: 0x%lx", GetLastError());
 		return ERR_GENERAL;
 	}

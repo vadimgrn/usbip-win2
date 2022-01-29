@@ -66,7 +66,7 @@ DEFINE_GUID(USBIP_NOTIFY_DEVICE_ARRIVAL_EVENT,
 
 enum { MAX_VHCI_SERIAL_ID = 127 };
 
-typedef struct _vhci_pluginfo
+struct vhci_pluginfo_t
 {
 	/* vhci_pluginfo_t structure size */
 	unsigned long	size;
@@ -76,7 +76,7 @@ typedef struct _vhci_pluginfo
 	USB_DEVICE_DESCRIPTOR dscr_dev;
 	/* variable length. It's a full-length configuration descriptor */
 	USB_CONFIGURATION_DESCRIPTOR dscr_conf;
-} vhci_pluginfo_t, *pvhci_pluginfo_t;
+};
 
 /* usbip-win assumes max port is 127 */
 typedef struct _ioctl_usbip_vhci_get_ports_status
