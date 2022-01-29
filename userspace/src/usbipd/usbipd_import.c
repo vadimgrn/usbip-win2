@@ -14,7 +14,7 @@ export_device(devno_t devno, SOCKET sockfd)
 		return ERR_NOTEXIST;
 	}
 
-	int err = start_xfer(hdev, sockfd);
+	int err = start_xfer(hdev, sockfd, false);
 	CloseHandle(hdev);
 
 	if (err) {

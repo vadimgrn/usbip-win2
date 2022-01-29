@@ -24,7 +24,6 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/deadline_timer.hpp>
 
 #include "usbip_proto.h"
 #include "usbip_common.h"
@@ -57,7 +56,7 @@ WPPInit wpp;
  */
 inline auto transfer_max()
 {
-	auto f = [] (const auto &err, auto)
+	auto f = [] (const auto &err, auto) noexcept
 	{ 
 		static_assert(std::is_same_v<INT32, decltype(usbip_header_cmd_submit::transfer_buffer_length)>);
 		return !!err ? std::size_t() : INT32_MAX;
@@ -135,7 +134,7 @@ void io_context_run(boost::asio::io_context &ioc, const char *caller)
 class Forwarder : public std::enable_shared_from_this<Forwarder>
 {
 public:
-	Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily);
+	Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily, bool client);
 	~Forwarder();
 
 	void async_start();
@@ -144,7 +143,7 @@ private:
 	using buffer_t = std::vector<char>;
 	using buffer_ptr = std::shared_ptr<buffer_t>;
 
-	int m_client = -1; // whoami
+	bool m_client{};
 
 	using seqnums_type = std::map<seqnum_t, seqnum_t>;
 	seqnums_type m_client_req_in; // seqnum of cmd_submit -> seqnum of cmd_unlink, DIR_IN client requests with payload
@@ -152,12 +151,10 @@ private:
 	boost::asio::io_context::strand m_strand{io_context()};
 	boost::asio::windows::stream_handle m_dev;
 	tcp::socket m_sock;
-	boost::asio::deadline_timer m_timer{ioctx()};
-	bool m_timer_active{};
 
 	static auto &get_hdr(buffer_ptr buf) noexcept { return *reinterpret_cast<usbip_header*>(buf->data()); }
 
-	boost::asio::io_context& ioctx() noexcept { return m_strand.context(); }
+	auto& ioctx() noexcept { return m_strand.context(); }
 	auto target(bool remote) noexcept;
 	void stop();
 
@@ -169,10 +166,6 @@ private:
 	void add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum);
 	void restore_server_resp_in(buffer_ptr resp);
 
-	bool start_timer();
-	bool cancel_timer(bool stop_on_error = true);
-	void on_timer(const boost::system::error_code &ec);
-		
 	void async_read_header(buffer_ptr buf, bool remote);
 	void on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote);
 
@@ -184,7 +177,8 @@ private:
 };
 
 
-Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily) :
+Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily, bool client) :
+	m_client(client),
 	m_dev(ioctx(), hdev),
 	m_sock(ioctx(), AddressFamily == AF_INET6 ? tcp::v6() : tcp::v4(), sockfd)
 {
@@ -213,10 +207,6 @@ void Forwarder::stop()
 
 void Forwarder::close() noexcept
 {
-	if (m_timer_active) {
-		cancel_timer(false);
-	}
-	
 	close_socket();
 	close_device();
 }
@@ -252,13 +242,13 @@ void Forwarder::close_socket() noexcept
 
 	m_sock.shutdown(tcp::socket::shutdown_both, ec);
 	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Socket shutdown error #%d '%s'", ec.value(), ec.message().c_str());
+		Trace(TRACE_LEVEL_ERROR, "Shutdown error #%d '%s'", ec.value(), ec.message().c_str());
 	}
 
 	m_sock.close(ec);
 
 	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Socket close error #%d '%s'", ec.value(), ec.message().c_str());
+		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
 	} else {
 		Trace(TRACE_LEVEL_INFORMATION, "OK");
 	}
@@ -388,98 +378,10 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 	post(bind_executor(ioctx(), std::move(f)));
 }
 
-/*
- * Client's first read from vhci device can last forever (the issue of the driver).
- * Must be called once.
- */
-bool Forwarder::start_timer()
-{
-	assert(!m_timer_active);
-	auto timeout = boost::posix_time::seconds(10); // arbitrary, data must be ready without delay
-
-	boost::system::error_code ec;
-	m_timer.expires_from_now(timeout, ec);
-	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
-		stop();
-		return false;
-	}
-
-	Trace(TRACE_LEVEL_INFORMATION, "Timeout %d sec.", timeout.total_seconds());
-
-	auto f = [self = shared_from_this()] (auto&&... args)
-	{
-		self->on_timer(std::forward<decltype(args)>(args)...);
-	};
-
-	m_timer_active = true;
-	m_timer.async_wait(std::move(f));
-
-	return true;
-}
-
-/*
- * There can be race condition between this function and on_timer().
- * They can call stop() concurrently, but stop() execution is synchronized via strand.
- */
-bool Forwarder::cancel_timer(bool stop_on_error)
-{
-	boost::system::error_code ec;
-	m_timer.cancel(ec);
-
-	if (!ec) {
-		Trace(TRACE_LEVEL_INFORMATION, "OK");
-		return true;
-	}
-
-	Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
-
-	if (stop_on_error) {
-		stop();
-	}
-
-	return false;
-}
-
-void Forwarder::on_timer(const boost::system::error_code &ec)
-{
-	assert(m_timer_active);
-	m_timer_active = false;
-
-	if (ec == boost::asio::error::operation_aborted) {
-		Trace(TRACE_LEVEL_ERROR, "Aborted");
-		return;
-	}
-	
-	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
-		stop();
-		return;
-	}
-
-	boost::system::error_code err;
-	m_dev.cancel(err);
-
-	if (err) {
-		Trace(TRACE_LEVEL_ERROR, "Cancel error #%d '%s'", err.value(), err.message().c_str());
-		stop();
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Cancel expired read");
-	}
-}
-
 void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 {
 	if (stopped()) {
 		return;
-	}
-
-	if (m_client < 0) { // once
-		m_client = !remote;
-		Trace(TRACE_LEVEL_INFORMATION, "%s!", m_client ? "Client" : "Server");
-		if (m_client && !start_timer()) {
-			return;
-		}
 	}
 
 	auto f = [self = shared_from_this(), buf, remote] (auto&&... args)
@@ -495,10 +397,6 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 
 void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
-	if (m_timer_active && !cancel_timer()) {
-		return;
-	}
-
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "%s <- error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
 		stop();
@@ -658,10 +556,10 @@ void on_stdin_ready(const boost::system::error_code &ec, boost::asio::windows::o
 		return;
 	}
 
-	std::make_shared<Forwarder>(args.hdev, sockfd, args.info.iAddressFamily)->async_start();
+	std::make_shared<Forwarder>(args.hdev, sockfd, args.info.iAddressFamily, args.client)->async_start();
 }
 
-void async_start(boost::asio::io_context &ioc)
+void async_wait_stdin(boost::asio::io_context &ioc)
 {
 	auto hStdin = GetStdHandle(STD_INPUT_HANDLE);
 	auto handle = std::make_shared<boost::asio::windows::object_handle>(ioc, hStdin);
@@ -704,7 +602,7 @@ auto run()
 	boost::asio::signal_set signals(ioc, SIGTERM, SIGINT);
 	signals.async_wait(signal_handler);
 
-	async_start(ioc);
+	async_wait_stdin(ioc);
 	
 	if (auto join = std::unique_ptr<boost::asio::io_context, decltype(join_threads)&>(&ioc, join_threads)) {
 

@@ -221,7 +221,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		return 3;
 	}
 
-	ret = start_xfer(hdev, sockfd);
+	ret = start_xfer(hdev, sockfd, true);
 	if (ret == 0) {
 		if (terse) {
 			printf("%d\n", rhport);

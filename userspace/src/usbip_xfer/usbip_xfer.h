@@ -18,8 +18,9 @@ struct usbip_xfer_args
 {
 	HANDLE hdev;
 	WSAPROTOCOL_INFOW info;
+	bool client; // false -> server
 };
 
 #ifdef __cplusplus
-  }
+}
 #endif
