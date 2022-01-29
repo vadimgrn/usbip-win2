@@ -24,6 +24,7 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/bind_executor.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/use_future.hpp>
 
 #include "usbip_proto.h"
 #include "usbip_common.h"
@@ -263,12 +264,6 @@ auto Forwarder::target(bool remote) noexcept
 	}
 }
 
-void Forwarder::async_start()
-{
-	async_read_header(std::make_shared<buffer_t>(), false);
-	async_read_header(std::make_shared<buffer_t>(), true);
-}
-
 auto get_client_req_seqnums(const usbip_header &req) noexcept
 {
 	std::pair<seqnum_t, seqnum_t> res;
@@ -376,6 +371,38 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 	};
 
 	post(bind_executor(ioctx(), std::move(f)));
+}
+
+/*
+ * Client first read from vhci device can last forever (the issue of the driver).
+ * The future is used for simplicity to avoid usage of deadline_timer.
+ */ 
+void Forwarder::async_start()
+{
+	if (!m_client) {
+		for (auto remote: {false, true}) {
+			async_read_header(std::make_shared<buffer_t>(), remote);
+		}
+		return;
+	}
+
+	const std::chrono::seconds vhci_read_timeout(10); // can't gracefully terminate the process during this period
+
+	auto buf = std::make_shared<buffer_t>(sizeof(usbip_header));
+	auto fut = async_read(m_dev, boost::asio::buffer(*buf), boost::asio::use_future);
+
+	switch (fut.wait_for(vhci_read_timeout)) {
+	case std::future_status::ready:
+		on_read_header(boost::system::error_code(), fut.get(), std::move(buf), false);
+		async_read_header(std::make_shared<buffer_t>(), true);
+		break;
+	case std::future_status::timeout:
+		Trace(TRACE_LEVEL_ERROR, "%s -> read timeout %d sec.", target(false), vhci_read_timeout.count());
+		break;
+	case std::future_status::deferred:
+		assert(!"future_status::deferred");
+		break;
+	}
 }
 
 void Forwarder::async_read_header(buffer_ptr buf, bool remote)
