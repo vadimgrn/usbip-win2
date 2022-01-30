@@ -10,6 +10,7 @@
 #include <vector>
 #include <map>
 #include <thread>
+#include <atomic>
 
 #include <cerrno>
 #include <cassert>
@@ -36,7 +37,7 @@ namespace
 
 using boost::asio::ip::tcp;
 
-int g_exit_code = EXIT_SUCCESS;
+std::atomic<int> g_exit_code(EXIT_SUCCESS);
 
 struct WPPInit
 {
@@ -57,7 +58,7 @@ WPPInit wpp;
 inline auto transfer_max()
 {
 	auto f = [] (const auto &err, auto) noexcept
-	{ 
+	{
 		static_assert(std::is_same_v<INT32, decltype(usbip_header_cmd_submit::transfer_buffer_length)>);
 		return !!err ? std::size_t() : INT32_MAX;
 	};
@@ -81,10 +82,19 @@ auto &io_context()
 
 void stop(int exit_code = EXIT_FAILURE)
 {
-	Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", exit_code);
+	int expected = EXIT_SUCCESS;
 
-	*(volatile int*)&g_exit_code = exit_code;
-	io_context().stop();
+	if (g_exit_code.compare_exchange_strong(expected, exit_code)) {
+		Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", exit_code);
+	} else if (expected != exit_code) {
+		Trace(TRACE_LEVEL_INFORMATION, "Exit code %d ignored, %d was set earlear", exit_code, expected);
+	}
+
+	auto &ioc = io_context();
+
+	if (!ioc.stopped()) {
+		ioc.stop();
+	}
 }
 
 inline auto stopped()
@@ -184,8 +194,8 @@ Forwarder::Forwarder(HANDLE hdev, SOCKET sockfd, int AddressFamily, bool client)
 {
 }
 
-Forwarder::~Forwarder() 
-{ 
+Forwarder::~Forwarder()
+{
 	Trace(TRACE_LEVEL_INFORMATION, "Enter");
 
 	close();
@@ -249,12 +259,12 @@ void Forwarder::close_socket() noexcept
 	}
 }
 
-auto Forwarder::target(bool remote) noexcept 
-{ 
+auto Forwarder::target(bool remote) noexcept
+{
 	if (m_client) {
-		return remote ? "server" : "vhci"; 
+		return remote ? "server" : "vhci";
 	} else {
-		return remote ? "client" : "stub"; 
+		return remote ? "client" : "stub";
 	}
 }
 
@@ -291,9 +301,9 @@ void Forwarder::save_client_req_in(const usbip_header &req)
 		return;
 	}
 
-	auto f = [self = shared_from_this(), seqnum, unlink_seqnum] 
-	{ 
-		self->add_seqnums(seqnum, unlink_seqnum); 
+	auto f = [self = shared_from_this(), seqnum, unlink_seqnum]
+	{
+		self->add_seqnums(seqnum, unlink_seqnum);
 	};
 
 	dispatch(bind_executor(m_strand, std::move(f)));
@@ -304,7 +314,7 @@ void Forwarder::add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum)
 	if (!unlink_seqnum) { // CMD_SUBMIT
 		auto [i, was_inserted] = m_client_req_in.emplace(seqnum, 0);
 		assert(was_inserted);
-		Trace(TRACE_LEVEL_VERBOSE, "Added seqnum %u, unlink_seqnum %u, total %Iu", 
+		Trace(TRACE_LEVEL_VERBOSE, "Added seqnum %u, unlink_seqnum %u, total %Iu",
 					seqnum, unlink_seqnum, m_client_req_in.size());
 		return;
 	}
@@ -321,7 +331,7 @@ void Forwarder::add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum)
 /*
  * usbip_header_ret_submit always has zeros in usbip_header_basic's devid, direction, ep.
  * After a successful USBIP_RET_UNLINK (status = -ECONNRESET), the unlinked URB submission
- * would not have a corresponding USBIP_RET_SUBMIT. 
+ * would not have a corresponding USBIP_RET_SUBMIT.
  * If USBIP_RET_UNLINK status is zero, USBIP_RET_SUBMIT response was already sent.
  * See: <linux>/Documentation/usb/usbip_protocol.rst
  */
@@ -338,14 +348,14 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 	case USBIP_RET_SUBMIT:
 		if (m_client_req_in.erase(seqnum)) {
 			hdr.base.direction = USBIP_DIR_IN;
-			Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: removed seqnum %u, total %Iu", 
+			Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: removed seqnum %u, total %Iu",
 							cmd, seqnum, m_client_req_in.size());
 		}
 		break;
 	case USBIP_RET_UNLINK:
 		for (auto i = m_client_req_in.begin(); i != m_client_req_in.end(); ++i) {
 			if (i->second == seqnum) {
-				Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: removed seqnum %u, unlink_seqnum %u, total %Iu", 
+				Trace(TRACE_LEVEL_VERBOSE, "%!usbip_request_type!: removed seqnum %u, unlink_seqnum %u, total %Iu",
 							cmd, i->first, i->second, m_client_req_in.size());
 
 				m_client_req_in.erase(i);
@@ -359,8 +369,8 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 		return;
 	}
 
-	auto f = [self = shared_from_this(), buf = std::move(resp)] 
-	{ 
+	auto f = [self = shared_from_this(), buf = std::move(resp)]
+	{
 		self->async_read_body(std::move(buf), true); // now get_payload_size will return correct result for DIR_IN
 	};
 
@@ -370,7 +380,7 @@ void Forwarder::restore_server_resp_in(buffer_ptr resp)
 /*
  * Client first read from vhci device can last forever (the issue of the driver).
  * The future is used for simplicity to avoid usage of deadline_timer.
- */ 
+ */
 void Forwarder::async_start()
 {
 	if (!m_client) {
@@ -381,13 +391,20 @@ void Forwarder::async_start()
 	}
 
 	const std::chrono::seconds vhci_read_timeout(10); // can't gracefully terminate the process during this period
+	size_t transferred = 0;
 
 	auto buf = std::make_shared<buffer_t>(sizeof(usbip_header));
 	auto fut = async_read(m_dev, boost::asio::buffer(*buf), boost::asio::use_future);
 
 	switch (fut.wait_for(vhci_read_timeout)) {
 	case std::future_status::ready:
-		on_read_header(boost::system::error_code(), fut.get(), std::move(buf), false);
+		try {
+			transferred = fut.get();
+		} catch (std::exception &e) {
+			Trace(TRACE_LEVEL_ERROR, "%s -> %s", target(false), e.what());
+			break;
+		}
+		on_read_header(boost::system::error_code(), transferred, std::move(buf), false);
 		async_read_header(std::make_shared<buffer_t>(), true);
 		break;
 	case std::future_status::timeout:
@@ -411,7 +428,7 @@ void Forwarder::async_read_header(buffer_ptr buf, bool remote)
 	};
 
 	buf->resize(sizeof(usbip_header));
-	
+
 	remote ? async_read(m_sock, boost::asio::buffer(*buf), std::move(f)) :
 		 async_read(m_dev,  boost::asio::buffer(*buf), std::move(f));
 }
@@ -444,9 +461,9 @@ void Forwarder::on_read_header(const boost::system::error_code &ec, std::size_t 
 		return;
 	}
 
-	auto f = [self = shared_from_this(), buf = std::move(buf)] 
-	{ 
-		self->restore_server_resp_in(std::move(buf)); 
+	auto f = [self = shared_from_this(), buf = std::move(buf)]
+	{
+		self->restore_server_resp_in(std::move(buf));
 	};
 
 	dispatch(bind_executor(m_strand, std::move(f)));
@@ -475,7 +492,7 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 	buf->resize(sizeof(hdr) + payload);
 	auto body = boost::asio::buffer(buf->data() + sizeof(hdr), payload);
 
-	remote ? async_read(m_sock, std::move(body), std::move(f)) : 
+	remote ? async_read(m_sock, std::move(body), std::move(f)) :
 		 async_read(m_dev,  std::move(body), transfer_max(), std::move(f));
 }
 
@@ -557,7 +574,7 @@ void on_stdin_ready(const boost::system::error_code &ec, boost::asio::windows::o
 {
 	if (ec) {
 		Trace(TRACE_LEVEL_ERROR, "Error #%d '%s'", ec.value(), ec.message().c_str());
-		stop();
+		g_exit_code = EXIT_FAILURE;
 		return;
 	}
 
@@ -565,7 +582,7 @@ void on_stdin_ready(const boost::system::error_code &ec, boost::asio::windows::o
 
 	if (auto err = read(handle.native_handle(), &args, sizeof(args))) {
 		Trace(TRACE_LEVEL_ERROR, "ReadFile(STD_INPUT_HANDLE) error %#x", err);
-		stop();
+		g_exit_code = EXIT_FAILURE;
 		return;
 	}
 
@@ -573,7 +590,7 @@ void on_stdin_ready(const boost::system::error_code &ec, boost::asio::windows::o
 
 	if (args.hdev == INVALID_HANDLE_VALUE || sockfd == INVALID_SOCKET) {
 		Trace(TRACE_LEVEL_ERROR, "Invalid handle(s): hdev(%p), sockfd(%x)", args.hdev, sockfd);
-		stop();
+		g_exit_code = EXIT_FAILURE;
 		return;
 	}
 
@@ -616,7 +633,7 @@ void join_threads([[maybe_unused]] boost::asio::io_context *ioc)
 	Trace(TRACE_LEVEL_INFORMATION, "Leave");
 }
 
-auto run()
+void run()
 {
 	auto &ioc = io_context();
 
@@ -624,7 +641,7 @@ auto run()
 	signals.async_wait(signal_handler);
 
 	async_wait_stdin(ioc);
-	
+
 	if (auto join = std::unique_ptr<boost::asio::io_context, decltype(join_threads)&>(&ioc, join_threads)) {
 
 		start_threads(ioc);
@@ -634,8 +651,6 @@ auto run()
 
 		join.reset();
 	}
-
-	return g_exit_code;
 }
 
 } // namespace
@@ -643,14 +658,14 @@ auto run()
 
 int main()
 {
-	int exit_code = EXIT_FAILURE;
-
 	try {
-		exit_code = run();
+		run();
 	} catch (std::exception &e) {
 		Trace(TRACE_LEVEL_ERROR, "Exception: %s", e.what());
+		g_exit_code = EXIT_FAILURE;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", exit_code);
-	return exit_code;
+	auto ret = g_exit_code.load();
+	Trace(TRACE_LEVEL_INFORMATION, "Exit code %d", ret);
+	return ret;
 }
