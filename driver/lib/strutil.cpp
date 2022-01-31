@@ -1,11 +1,9 @@
 #include "strutil.h"
-
-#include <ntddk.h>
 #include <ntstrsafe.h>
 
 const ULONG libdrv_pooltag = 'dbil';
 
-LPWSTR libdrv_strdupW(LPCWSTR str)
+LPWSTR libdrv_strdupW(POOL_TYPE PoolType, LPCWSTR str)
 {
 	size_t len = 0;
 	NTSTATUS st = RtlStringCchLengthW(str, NTSTRSAFE_MAX_CCH, &len);
@@ -15,7 +13,7 @@ LPWSTR libdrv_strdupW(LPCWSTR str)
 
 	size_t sz = ++len*sizeof(*str);
 
-	auto s = (LPWSTR)ExAllocatePoolWithTag(PagedPool, sz, libdrv_pooltag);
+	auto s = (LPWSTR)ExAllocatePoolWithTag(PoolType, sz, libdrv_pooltag);
 	if (s) {
 		RtlCopyMemory(s, str, sz);
 	}

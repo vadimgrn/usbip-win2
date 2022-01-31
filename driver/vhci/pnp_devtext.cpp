@@ -20,14 +20,18 @@ const LPCWSTR vdev_locinfos[] = {
 } // namespace
 
 
+/*
+ * If a bus driver returns information in response to this IRP, 
+ * it allocates a NULL-terminated Unicode string from paged memory. 
+ */
 PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	DEVICE_TEXT_TYPE type = irpstack->Parameters.QueryDeviceText.DeviceTextType;
-	LPCWSTR str = (PWSTR)irp->IoStatus.Information;
+	auto type = irpstack->Parameters.QueryDeviceText.DeviceTextType;
+	auto str = (LPCWSTR)irp->IoStatus.Information;
 
 	if (str) {
 		Trace(TRACE_LEVEL_WARNING, "%!DEVICE_TEXT_TYPE!, LCID %#lx -> pre-filled '%!WSTR!', %!STATUS!",
@@ -38,10 +42,10 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 
 	switch (type) {
 	case DeviceTextDescription:
-		str = libdrv_strdupW(vdev_descs[vdev->type]);
+		str = libdrv_strdupW(PagedPool, vdev_descs[vdev->type]);
 		break;
 	case DeviceTextLocationInformation:
-		str = libdrv_strdupW(vdev_locinfos[vdev->type]);
+		str = libdrv_strdupW(PagedPool, vdev_locinfos[vdev->type]);
 		break;
 	}
 

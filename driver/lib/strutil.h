@@ -4,9 +4,9 @@
 extern "C" {
 #endif
 
-#include <ntdef.h>
+#include <wdm.h>
 
-LPWSTR libdrv_strdupW(LPCWSTR str);
+LPWSTR libdrv_strdupW(POOL_TYPE PoolType, LPCWSTR str);
 void libdrv_free(void *data);
 
 #ifdef __cplusplus

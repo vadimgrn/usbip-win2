@@ -158,7 +158,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	pluginfo->port = static_cast<char>(vpdo->port);
 	NT_ASSERT(pluginfo->port == vpdo->port);
 
-	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(pluginfo->wserial) : nullptr;
+	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(NonPagedPool, pluginfo->wserial) : nullptr;
 
 	if (InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr)) {
 		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
