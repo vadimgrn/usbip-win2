@@ -12,15 +12,19 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
 
-	ULONG dummy;
 	UNICODE_STRING hwid{};
 
-	if (auto s = GetDevicePropertyString(devobj, DevicePropertyHardwareID, dummy)) {
+	NTSTATUS err{};
+	ULONG dummy;
+
+	if (auto s = GetDevicePropertyString(devobj, DevicePropertyHardwareID, err, dummy)) {
 		RtlInitUnicodeString(&hwid, s);
 		ExFreePool(s);
 	} else {
-		return false;
+		return err;
 	}
+
+	TraceCall("%!USTR!", &hwid);
 
 	const wchar_t* v[] = { HWID_ROOT, HWID_VHCI, HWID_VHUB };
 
@@ -28,11 +32,11 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 		UNICODE_STRING s{};
 		RtlInitUnicodeString(&s, i);
 		if (RtlEqualUnicodeString(&s, &hwid, TRUE)) {
-			return true;
+			return STATUS_SUCCESS;
 		}
 	}
 
-	return false;
+	return STATUS_INVALID_PARAMETER;
 }
 
 PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
@@ -150,9 +154,9 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PD
 {
 	PAGED_CODE();
 
-	if (!is_valid_vdev_hwid(pdo)) {
-		Trace(TRACE_LEVEL_ERROR, "Invalid hwid");
-		return STATUS_INVALID_PARAMETER;
+	if (auto err = is_valid_vdev_hwid(pdo)) {
+		Trace(TRACE_LEVEL_ERROR, "Invalid hwid, %!STATUS!", err);
+		return err;
 	}
 
 	auto type = VDEV_ROOT;

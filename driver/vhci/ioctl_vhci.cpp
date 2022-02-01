@@ -67,14 +67,15 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 {
 	PAGED_CODE();
 
+	NTSTATUS st{};
 	ULONG prop_sz = 0;
-	auto prop = GetDevicePropertyString(vhci->child_pdo->Self, DevicePropertyDriverKeyName, prop_sz);
+
+	auto prop = GetDevicePropertyString(vhci->child_pdo->Self, DevicePropertyDriverKeyName, st, prop_sz);
 	if (!prop) {
-		return STATUS_UNSUCCESSFUL;
+		return st;
 	}
 
 	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
-	NTSTATUS st = STATUS_SUCCESS;
 
 	if (*poutlen >= sizeof(r)) {
 		*poutlen = min(*poutlen, r_sz);

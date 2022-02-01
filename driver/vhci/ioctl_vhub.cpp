@@ -188,14 +188,15 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
+	NTSTATUS status{};
 	ULONG driverkeylen = 0;
-	auto driverkey = GetDevicePropertyString(vpdo->Self, DevicePropertyDriverKeyName, driverkeylen);
+
+	auto driverkey = GetDevicePropertyString(vpdo->Self, DevicePropertyDriverKeyName, status, driverkeylen);
 	if (!driverkey) {
-		return STATUS_UNSUCCESSFUL;
+		return status;
 	}
 
 	ULONG outlen_res = sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + driverkeylen - sizeof(WCHAR);
-	NTSTATUS status = STATUS_SUCCESS;
 
 	if (*poutlen >= sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
 		r.ActualLength = outlen_res;

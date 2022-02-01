@@ -14,7 +14,8 @@ DEFINE_GUID(GUID_SD_USBIP_VHCI,
 namespace
 {
 
-const ULONG ext_sizes_per_devtype[] = {
+const ULONG ext_sizes_per_devtype[VDEV_SIZE] = 
+{
 	sizeof(root_dev_t),
 	sizeof(cpdo_dev_t),
 	sizeof(vhci_dev_t),
@@ -29,36 +30,43 @@ const ULONG ext_sizes_per_devtype[] = {
 /*
  * Use ExFreePool to free result because libdrv_strdupW uses different tag for memory allocation.
  */
-LPWSTR GetDevicePropertyString(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, ULONG &ResultLength)
+LPWSTR GetDevicePropertyString(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
-	wchar_t data[0xFF];
+	wchar_t data[128];
 	ResultLength = sizeof(data);
 
-	auto free = [data] (auto ptr) 
+	auto free = [data = data] (auto ptr) 
 	{ 
-		NT_ASSERT(ptr);
+		static_assert(sizeof(data) == sizeof(ptr));
 		if (ptr != data) {
 			ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
 		}
 	};
 
 	for (auto buf = data; buf; ) {
-
-		switch (auto st = IoGetDeviceProperty(pdo, prop, ResultLength, buf, &ResultLength)) {
+		
+		error = IoGetDeviceProperty(pdo, prop, ResultLength, buf, &ResultLength);
+		
+		switch (error) {
 		case STATUS_SUCCESS:
-			return buf == data ? libdrv_strdupW(PagedPool, buf) : buf;
+			if (buf == data) {
+				buf = libdrv_strdupW(PagedPool, data);
+			}
+			if (buf) {
+				return buf;
+			}
+			break;
 		case STATUS_BUFFER_TOO_SMALL:
 			free(buf);
 			buf = (wchar_t*)ExAllocatePoolWithTag(PagedPool, ResultLength, USBIP_VHCI_POOL_TAG);
 			break;
 		default:
-			Trace(TRACE_LEVEL_ERROR, "%!DEVICE_REGISTRY_PROPERTY! -> %!STATUS!", prop, st);
 			free(buf);
 			return nullptr;
 		}
 	}
 
-	Trace(TRACE_LEVEL_ERROR, "%!DEVICE_REGISTRY_PROPERTY! -> insufficient resources", prop);
+	error = USBD_STATUS_INSUFFICIENT_RESOURCES;
 	return nullptr;
 }
 

@@ -22,7 +22,6 @@
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="pnp_add.cpp" />
     <ClCompile Include="pnp_cap.cpp" />
-    <ClCompile Include="pnp_devtext.cpp" />
     <ClCompile Include="pnp_id.cpp" />
     <ClCompile Include="pnp_intf.cpp" />
     <ClCompile Include="pnp_relations.cpp" />
@@ -58,7 +57,6 @@
     <ClInclude Include="trace.h" />
     <ClInclude Include="usbreq.h" />
     <ClInclude Include="pnp_cap.h" />
-    <ClInclude Include="pnp_devtext.h" />
     <ClInclude Include="pnp_id.h" />
     <ClInclude Include="pnp_intf.h" />
     <ClInclude Include="pnp_relations.h" />
