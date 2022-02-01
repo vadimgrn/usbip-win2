@@ -188,35 +188,29 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
-	NTSTATUS status = STATUS_SUCCESS;
-
 	ULONG driverkeylen = 0;
-	auto driverkey = get_device_prop(vpdo->Self, DevicePropertyDriverKeyName, &driverkeylen);
-
+	auto driverkey = GetDevicePropertyString(vpdo->Self, DevicePropertyDriverKeyName, driverkeylen);
 	if (!driverkey) {
-		Trace(TRACE_LEVEL_WARNING, "failed to get vpdo driver key");
-		status = STATUS_UNSUCCESSFUL;
-	} else {
-		ULONG outlen_res = sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + driverkeylen - sizeof(WCHAR);
-
-		if (*poutlen < sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
-			status = STATUS_INSUFFICIENT_RESOURCES;
-			*poutlen = outlen_res;
-		} else {
-			r.ActualLength = outlen_res;
-			if (*poutlen >= outlen_res) {
-				RtlCopyMemory(r.DriverKeyName, driverkey, driverkeylen);
-				*poutlen = outlen_res;
-			} else {
-				RtlCopyMemory(r.DriverKeyName, driverkey, *poutlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
-			}
-
-			status = STATUS_SUCCESS;
-		}
-
-		ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
+		return STATUS_UNSUCCESSFUL;
 	}
 
+	ULONG outlen_res = sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + driverkeylen - sizeof(WCHAR);
+	NTSTATUS status = STATUS_SUCCESS;
+
+	if (*poutlen >= sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
+		r.ActualLength = outlen_res;
+		if (*poutlen >= outlen_res) {
+			RtlCopyMemory(r.DriverKeyName, driverkey, driverkeylen);
+			*poutlen = outlen_res;
+		} else {
+			RtlCopyMemory(r.DriverKeyName, driverkey, *poutlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
+		}
+	} else {
+		status = STATUS_INSUFFICIENT_RESOURCES;
+		*poutlen = outlen_res;
+	}
+
+	ExFreePool(driverkey);
 	return status;
 }
 

@@ -68,29 +68,26 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	PAGED_CODE();
 
 	ULONG prop_sz = 0;
-	auto prop = get_device_prop(vhci->child_pdo->Self, DevicePropertyDriverKeyName, &prop_sz);
+	auto prop = GetDevicePropertyString(vhci->child_pdo->Self, DevicePropertyDriverKeyName, prop_sz);
 	if (!prop) {
-		Trace(TRACE_LEVEL_ERROR, "Failed to get DevicePropertyDriverKeyName");
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
+	NTSTATUS st = STATUS_SUCCESS;
 
-	if (*poutlen < sizeof(r)) {
+	if (*poutlen >= sizeof(r)) {
+		*poutlen = min(*poutlen, r_sz);
+		r.ActualLength = prop_sz;
+		RtlStringCbCopyW(r.DriverKeyName, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
+		TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
+	} else {
 		*poutlen = r_sz;
-		ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
-		return STATUS_BUFFER_TOO_SMALL;
+		st = STATUS_BUFFER_TOO_SMALL;
 	}
 
-	*poutlen = min(*poutlen, r_sz);
-
-	r.ActualLength = prop_sz;
-	RtlStringCbCopyW(r.DriverKeyName, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
-
-	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
-
-	TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
-	return STATUS_SUCCESS;
+	ExFreePool(prop);
+	return st;
 }
 
 PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG *poutlen)

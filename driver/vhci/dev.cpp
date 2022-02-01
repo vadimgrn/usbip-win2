@@ -3,6 +3,7 @@
 #include "dev.tmh"
 #include "pageable.h"
 #include "vhci.h"
+#include "strutil.h"
 
 #include <wdmsec.h>
 #include <initguid.h> // required for GUID definitions
@@ -25,34 +26,40 @@ const ULONG ext_sizes_per_devtype[] = {
 } // namespace
 
 
-LPWSTR get_device_prop(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, ULONG *plen)
+/*
+ * Use ExFreePool to free result because libdrv_strdupW uses different tag for memory allocation.
+ */
+LPWSTR GetDevicePropertyString(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, ULONG &ResultLength)
 {
-	ULONG buflen = 0;
+	wchar_t data[0xFF];
+	ResultLength = sizeof(data);
 
-	auto status = IoGetDeviceProperty(pdo, prop, 0, nullptr, &buflen);
-	if (status != STATUS_BUFFER_TOO_SMALL) {
-		Trace(TRACE_LEVEL_ERROR, "IoGetDeviceProperty %!STATUS!", status);
-		return nullptr;
+	auto free = [data] (auto ptr) 
+	{ 
+		NT_ASSERT(ptr);
+		if (ptr != data) {
+			ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
+		}
+	};
+
+	for (auto buf = data; buf; ) {
+
+		switch (auto st = IoGetDeviceProperty(pdo, prop, ResultLength, buf, &ResultLength)) {
+		case STATUS_SUCCESS:
+			return buf == data ? libdrv_strdupW(PagedPool, buf) : buf;
+		case STATUS_BUFFER_TOO_SMALL:
+			free(buf);
+			buf = (wchar_t*)ExAllocatePoolWithTag(PagedPool, ResultLength, USBIP_VHCI_POOL_TAG);
+			break;
+		default:
+			Trace(TRACE_LEVEL_ERROR, "%!DEVICE_REGISTRY_PROPERTY! -> %!STATUS!", prop, st);
+			free(buf);
+			return nullptr;
+		}
 	}
 
-	if (plen) {
-		*plen = buflen;
-	}
-
-	auto value = (LPWSTR)ExAllocatePoolWithTag(PagedPool, buflen, USBIP_VHCI_POOL_TAG);
-	if (!value) {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes of memory", buflen);
-		return nullptr;
-	}
-
-	status = IoGetDeviceProperty(pdo, prop, buflen, value, &buflen);
-	if (NT_ERROR(status)) {
-		Trace(TRACE_LEVEL_ERROR, "IoGetDeviceProperty %!STATUS!", status);
-		ExFreePoolWithTag(value, USBIP_VHCI_POOL_TAG);
-		return nullptr;
-	}
-
-	return value;
+	Trace(TRACE_LEVEL_ERROR, "%!DEVICE_REGISTRY_PROPERTY! -> insufficient resources", prop);
+	return nullptr;
 }
 
 PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)

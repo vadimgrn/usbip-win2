@@ -8,40 +8,39 @@
 namespace
 {
 
-PAGEABLE BOOLEAN is_valid_vdev_hwid(PDEVICE_OBJECT devobj)
+PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
 
-	LPWSTR	hwid;
-	UNICODE_STRING	ustr_hwid_devprop, ustr_hwid;
-	BOOLEAN	res;
+	ULONG dummy;
+	UNICODE_STRING hwid{};
 
-	hwid = get_device_prop(devobj, DevicePropertyHardwareID, nullptr);
-	if (hwid == nullptr)
-		return FALSE;
+	if (auto s = GetDevicePropertyString(devobj, DevicePropertyHardwareID, dummy)) {
+		RtlInitUnicodeString(&hwid, s);
+		ExFreePool(s);
+	} else {
+		return false;
+	}
 
-	RtlInitUnicodeString(&ustr_hwid_devprop, hwid);
+	const wchar_t* v[] = { HWID_ROOT, HWID_VHCI, HWID_VHUB };
 
-	RtlInitUnicodeString(&ustr_hwid, HWID_ROOT);
-	res = RtlEqualUnicodeString(&ustr_hwid, &ustr_hwid_devprop, TRUE);
-	if (!res) {
-		RtlInitUnicodeString(&ustr_hwid, HWID_VHCI);
-		res = RtlEqualUnicodeString(&ustr_hwid, &ustr_hwid_devprop, TRUE);
-		if (!res) {
-			RtlInitUnicodeString(&ustr_hwid, HWID_VHUB);
-			res = RtlEqualUnicodeString(&ustr_hwid, &ustr_hwid_devprop, TRUE);
+	for (auto i: v) {
+		UNICODE_STRING s{};
+		RtlInitUnicodeString(&s, i);
+		if (RtlEqualUnicodeString(&s, &hwid, TRUE)) {
+			return true;
 		}
 	}
-	ExFreePoolWithTag(hwid, USBIP_VHCI_POOL_TAG);
-	return res;
+
+	return false;
 }
 
 PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	PAGED_CODE();
 
-	for (DEVICE_OBJECT *devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
-		vdev_t *vdev = to_vdev(devobj);
+	for (auto devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
+		auto vdev = to_vdev(devobj);
 		if (vdev->type == type) {
 			return vdev;
 		}
@@ -56,7 +55,7 @@ PAGEABLE vdev_t *create_child_pdo(vdev_t * vdev, vdev_type_t type)
 
 	Trace(TRACE_LEVEL_INFORMATION, "creating child %!vdev_type_t!", type);
 
-	DEVICE_OBJECT *devobj = vdev_create(vdev->Self->DriverObject, type);
+	auto devobj = vdev_create(vdev->Self->DriverObject, type);
 	if (!devobj) {
 		return nullptr;
 	}
