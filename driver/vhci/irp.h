@@ -3,8 +3,8 @@
 #include "pageable.h"
 #include <wdm.h>
 
-PAGEABLE NTSTATUS irp_pass_down(PDEVICE_OBJECT devobj, PIRP irp);
-PAGEABLE NTSTATUS irp_send_synchronously(PDEVICE_OBJECT devobj, PIRP irp);
+PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp);
+PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);
 
 NTSTATUS irp_done(IRP *irp, NTSTATUS status);
 
