@@ -3,7 +3,6 @@
 #include "dev.tmh"
 #include "pageable.h"
 #include "vhci.h"
-#include "strutil.h"
 
 #include <wdmsec.h>
 #include <initguid.h> // required for GUID definitions
@@ -27,41 +26,24 @@ const ULONG ext_sizes_per_devtype[VDEV_SIZE] =
 } // namespace
 
 
-/*
- * Use ExFreePool to free result because libdrv_strdupW uses different tag for memory allocation.
- */
-LPWSTR GetDevicePropertyString(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
+void *GetDeviceProperty(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
-	wchar_t data[128];
-	ResultLength = sizeof(data);
+	ResultLength = 256;
+	auto alloc = [] (ULONG len) noexcept { return ExAllocatePoolWithTag(PagedPool, len, USBIP_VHCI_POOL_TAG); };
 
-	auto free = [data = data] (auto ptr) 
-	{ 
-		static_assert(sizeof(data) == sizeof(ptr));
-		if (ptr != data) {
-			ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
-		}
-	};
-
-	for (auto buf = data; buf; ) {
+	for (auto buf = alloc(ResultLength); buf; ) {
 		
 		error = IoGetDeviceProperty(pdo, prop, ResultLength, buf, &ResultLength);
 		
 		switch (error) {
 		case STATUS_SUCCESS:
-			if (buf == data) {
-				buf = libdrv_strdupW(PagedPool, data);
-			}
-			if (buf) {
-				return buf;
-			}
-			break;
+			return buf;
 		case STATUS_BUFFER_TOO_SMALL:
-			free(buf);
-			buf = (wchar_t*)ExAllocatePoolWithTag(PagedPool, ResultLength, USBIP_VHCI_POOL_TAG);
+			ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
+			buf = alloc(ResultLength);
 			break;
 		default:
-			free(buf);
+			ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
 			return nullptr;
 		}
 	}

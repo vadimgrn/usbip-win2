@@ -70,7 +70,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	NTSTATUS st{};
 	ULONG prop_sz = 0;
 
-	auto prop = GetDevicePropertyString(vhci->child_pdo->Self, DevicePropertyDriverKeyName, st, prop_sz);
+	auto prop = (PWSTR)GetDeviceProperty(vhci->child_pdo->Self, DevicePropertyDriverKeyName, st, prop_sz);
 	if (!prop) {
 		return st;
 	}
@@ -87,7 +87,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 		st = STATUS_BUFFER_TOO_SMALL;
 	}
 
-	ExFreePool(prop);
+	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
 	return st;
 }
 

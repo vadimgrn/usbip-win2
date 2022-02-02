@@ -191,7 +191,7 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 	NTSTATUS status{};
 	ULONG driverkeylen = 0;
 
-	auto driverkey = GetDevicePropertyString(vpdo->Self, DevicePropertyDriverKeyName, status, driverkeylen);
+	auto driverkey = (PWSTR)GetDeviceProperty(vpdo->Self, DevicePropertyDriverKeyName, status, driverkeylen);
 	if (!driverkey) {
 		return status;
 	}
@@ -211,7 +211,7 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 		*poutlen = outlen_res;
 	}
 
-	ExFreePool(driverkey);
+	ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
 	return status;
 }
 

@@ -252,7 +252,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 	NTSTATUS err;
 	ULONG dummy;
 
-	if (auto str = GetDevicePropertyString(vdev->Self, prop, err, dummy)) {
+	if (auto str = GetDeviceProperty(vdev->Self, prop, err, dummy)) {
 		Information = reinterpret_cast<ULONG_PTR>(str);
 		Status = STATUS_SUCCESS;
 	} else if (vdev->type == VDEV_VPDO && prop == DevicePropertyDeviceDescription) {

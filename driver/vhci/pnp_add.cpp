@@ -17,9 +17,9 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 	NTSTATUS err{};
 	ULONG dummy;
 
-	if (auto s = GetDevicePropertyString(devobj, DevicePropertyHardwareID, err, dummy)) {
+	if (auto s = (PWSTR)GetDeviceProperty(devobj, DevicePropertyHardwareID, err, dummy)) {
 		RtlInitUnicodeString(&hwid, s);
-		ExFreePool(s);
+		ExFreePoolWithTag(s, USBIP_VHCI_POOL_TAG);
 	} else {
 		return err;
 	}

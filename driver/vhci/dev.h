@@ -151,7 +151,7 @@ struct vhub_dev_t : vdev_t
 
 extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
 
-LPWSTR GetDevicePropertyString(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength);
+void *GetDeviceProperty(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength);
 
 constexpr auto is_fdo(vdev_type_t type)
 {
