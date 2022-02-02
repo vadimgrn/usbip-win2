@@ -67,7 +67,7 @@ void cancel_urbr(DEVICE_OBJECT*, IRP *irp)
 
 } // namespace
 
-struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
+urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 {
 	urb_req *result{};
 
@@ -75,7 +75,7 @@ struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
 
 	for (auto le = vpdo->head_urbr_sent.Flink; le != &vpdo->head_urbr_sent; le = le->Flink) {
-		auto urbr = CONTAINING_RECORD(le, struct urb_req, list_state);
+		auto urbr = CONTAINING_RECORD(le, urb_req, list_state);
 		if (urbr->seqnum == seqnum) {
 			RemoveEntryListInit(&urbr->list_all);
 			RemoveEntryListInit(&urbr->list_state);
@@ -88,13 +88,13 @@ struct urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum)
 	return result;
 }
 
-struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
+urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 {
 	if (IsListEmpty(&vpdo->head_urbr_pending)) {
 		return nullptr;
 	}
 
-	struct urb_req *urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, struct urb_req, list_state);
+	auto urbr = CONTAINING_RECORD(vpdo->head_urbr_pending.Flink, urb_req, list_state);
 
 	urbr->seqnum = next_seqnum(*vpdo);
 	RemoveEntryListInit(&urbr->list_state);
@@ -102,7 +102,7 @@ struct urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 	return urbr;
 }
 
-struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seqnum_unlink)
+urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seqnum_unlink)
 {
 	auto urbr = (urb_req*)ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
@@ -128,10 +128,10 @@ struct urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seqnum_unl
 	return urbr;
 }
 
-void free_urbr(struct urb_req *urbr)
+void free_urbr(urb_req *urbr)
 {
 	NT_ASSERT(IsListEmpty(&urbr->list_all));
-	NT_ASSERT(IsListEmpty(&urbr->list_state)); // FAIL
+	NT_ASSERT(IsListEmpty(&urbr->list_state)); // FIXME: SYSTEM_SERVICE_EXCEPTION
 
 	ExFreeToNPagedLookasideList(&g_lookaside, urbr);
 }
@@ -169,7 +169,7 @@ bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle)
 	return hPipe == handle;
 }
 
-NTSTATUS submit_urbr(vpdo_dev_t *vpdo, struct urb_req *urbr)
+NTSTATUS submit_urbr(vpdo_dev_t *vpdo, urb_req *urbr)
 {
 	KIRQL	oldirql;
 	KIRQL	oldirql_cancel;
