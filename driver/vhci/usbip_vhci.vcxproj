@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="dev.cpp" />
     <ClCompile Include="devconf.cpp" />
