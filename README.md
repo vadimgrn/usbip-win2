@@ -1,13 +1,40 @@
-# USB/IP for Windows
+# USB/IP Client for Windows
 
-- Implements USB/IP client for Windows (vhci driver) which is fully compatible with Linux USB/IP server.
-- USB/IP server for Windows (stub driver) is updated from the original repository AS IS.
+- This is USB/IP Client for Windows which is fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
+- There is no "official" USB/IP client for Windows so far
+
+## Status
+- Client (VHCI driver)
+  - **Is fully implemented**
+  - Fully compatible with Linux usbip server (at least for kernels 4.19 - 5.13)
+  - **Is not ready for production use**, can cause BSOD or hang in the kernel. This usually happens during disconnection of a device or uninstallation of the driver.
+  - There is no installer
+  - The driver is not signed
+  - Works on Windows 11/10 x64, x86 build is not supported
+- UDE client driver from the parent repo is removed. VHCI driver is superseded it.
+- Server (stub driver) is not the goal of this project. It is updated from original repo AS IS.
+
+## Devices that work (list is incomplete)
+  - USB 2.0/3.X flash drives
+  - Webcams
+    - AVerMedia PW513
+    - Builtin cam of Dell Alienware 17R3
+    - Guillemot Deluxe Optical Glass
+  - Headsets
+    - Microsoft LifeChat LX-6000
+    - Sennheiser ADAPT 160T USB-C II
+  - Audio devices
+    - C-Media Electronics CM102-A+/102S+ Audio Controller
+    - UGREEN External Stereo Sound Adapter (ALC4040)
+  - Peripherals
+    - Microsoft Wired Keyboard 600 (model 1576)
+    - Primax Electronics 0Y357C PMX-MMOCZUL [Dell Laser Mouse]
 
 ## Build
 
 ### Notes
-- Build is tested on Windows 11 x64 and the projects are configured for Win10 target by default.
-- x86 platform is no longer supported.
+- Build is tested on Windows 11 x64 and the projects are configured for Win10 target by default
+- x86 platform is not supported
 
 ### Build Tools
 - The latest Microsoft Visual Studio Community 2019
@@ -16,7 +43,7 @@
 - vcpkg
 
 ### Install Boost C++
-- Install vcpkg, https://vcpkg.io/en/getting-started.html
+- Install [vcpkg](https://vcpkg.io/en/getting-started.html)
   - git clone https://github.com/Microsoft/vcpkg.git
   - .\vcpkg\bootstrap-vcpkg.bat
 - Integrate vcpkg with Visual Studio
@@ -24,48 +51,54 @@
 - Install Boost C++ libraries
   - vcpkg install boost:x64-windows
 
-### Build Process
+### Build Visual Studio solution
 - Open `usbip_win.sln`
 - Set certificate driver signing for `usbip_stub` and `usbip_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Browse to `driver/usbip_test.pfx` (password: usbip)
-- Build solution or desired project
-- All output files are created under {Debug,Release}/x64 folder.
+- Build the solution
+- All output files are created under x64/{Debug,Release} folders.
 
-## Install
+## Setup usbip server on Ubuntu Linux
+- Install required packages
+```
+apt install linux-tools-generic linux-cloud-tools-generic
+modprobe -a usbip-core usbip-host
+usbipd -D
+```
+- List available USB devices
+  - `usbip list -l`
+```
+ - busid 3-2 (1005:b113)
+   Apacer Technology, Inc. : Handy Steno/AH123 / Handy Steno 2.0/HT203 (1005:b113)
+ - busid 3-3.2 (07ca:513b)
+   AVerMedia Technologies, Inc. : unknown product (07ca:513b)
+```
+- Bind desired USB device
+  - `usbip bind -b 3-2`
+- Your device 3-2 now can be used by usbip client
 
-### USB/IP test certificate
+## Setup usbip client on Windows
+
+### Install USB/IP test certificate
   - Right click on `driver/usbip_test.pfx`, select "Install PFX" (password: usbip)
   - Certificate should be installed into
     1. "Trusted Root Certification Authority" in "Local Computer" (not current user) *and*
     2. "Trusted Publishers" in "Local Computer" (not current user)
   - Enable test signing
-    - `> bcdedit.exe /set TESTSIGNING ON`
-    - reboot the system to apply
+    - `bcdedit.exe /set TESTSIGNING ON`
+    - Reboot the system to apply
 
-### Windows USB/IP client
-- Copy VHCI driver files into a folder in target machine
-  - Copy `usbip.exe`, `usbip_xfer.exe`, `usbip_vhci.sys`, `usbip_vhci.inf`, `usbip_root.inf`, `usbip_vhci.cat` into a folder in target machine;
-  - You can find all files in output folder after build or on [release](https://github.com/vadimgrn/usbip-win/releases) page.
-- Install USB/IP VHCI driver
+### Install USB/IP client
+- Download and unpack [release](https://github.com/vadimgrn/usbip-win/releases)
+- Install drivers
   - Run PowerShell or CMD as an Administrator
-  - `PS> usbip.exe install`
-- Run USB/IP server on Linux machine (or try to use Windows USB/IP server)
-  - `$ sudo modprobe -a usbip-core usbip-host`
-  - `$ sudo usbipd -D`
-- List available USB devices on Linux USB/IP server
-```
-$ usbip list -l
- - busid 3-2 (1005:b113)
-   Apacer Technology, Inc. : Handy Steno/AH123 / Handy Steno 2.0/HT203 (1005:b113)
+  - Go to the folder with usbip binaries and run
+  - `usbip.exe install`
 
- - busid 3-3.2 (07ca:513b)
-   AVerMedia Technologies, Inc. : unknown product (07ca:513b)
-```
-- Export desired USB device(s) using its busid on Linux USB/IP server
-  - `$ sudo usbip bind -b 3-2`
-- Query exported USB devices on Windows using USB/IP client
-  - `PS> usbip.exe list -r <usbip server ip>`
+### Use usbip.exe to attach remote device(s)
+- Query available USB devices on the server
+  - `usbip.exe list -r <usbip server ip>`
 ```
 Exportable USB devices
 ======================
@@ -75,63 +108,36 @@ Exportable USB devices
            : (Defined at Interface level) (00/00/00)
 ```
 - Attach desired remote USB device using its busid
-  - `PS> usbip.exe attach -r <usbip server ip> -b 3-2`
-- New USB device should appear on Windows, use it as usual
+  - `usbip.exe attach -r <usbip server ip> -b 3-2`
+```
+successfully attached to port 1
+```
+- New USB device should appear in the system, use it as usual
 - Detach the remote USB device using its usb port, pass -1 to detach all remote devices
-  - `PS> usbip.exe detach -p -1`
-- Uninstall the driver
-  - `PS> usbip.exe uninstall`
+  - `usbip.exe detach -p 1`
+```
+port 1 is successfully detached
+```
+### Uninstallation of USB/IP client
+- Uninstall drivers
+  - `usbip.exe uninstall`
 - Disable test signing
   - `> bcdedit.exe /set TESTSIGNING OFF`
-  - reboot the system to apply
+  - Reboot the system to apply
 
-### Windows USB/IP server
-- Prepare a Linux machine as a USB/IP client or Windows usbip-win VHCI client
-  - `$ sudo modprobe -a usbip-core vhci-hcd`
-- Copy `usbip.exe`, `usbipd.exe`, `usbip_xfer.exe`, `usb.ids`, `usbip_stub.sys`, `usbip_stub.inx` into a folder in target machine
-  - You can find there files in the output folder after build or on [release](https://github.com/vadimgrn/usbip-win/releases) page.
-  - `userspace/usb.ids`
-  - `driver/stub/usbip_stub.inx`
-- Find USB Device ID
-  - You can get id from usbip listing
-    - `> usbip.exe list -l`
-  - Bus id is always 1. So output from `usbip.exe` listing is shown as:
-```
-usbip.exe list -l
- - busid 1-59 (045e:00cb)
-   Microsoft Corp. : Basic Optical Mouse v2.0 (045e:00cb)
- - busid 1-30 (80ee:0021)
-   VirtualBox : USB Tablet (80ee:0021)
-```
-- Bind USB device to usbip stub
-  - The next command replaces the existing function driver with usbip stub driver
-    - This should be executed using administrator privilege
-    - `usbip_stub.inx` and `usbip_stub.sys` files should be in the same folder as `usbip.exe`
-  - `> usbip.exe bind -b 1-59`
-- Run `usbipd.exe`
-  - `> usbipd.exe`
-  - TCP port `3240` should be allowed by firewall
-- Attach USB/IP device on Linux machine
-  - `# usbip attach -r <usbip server ip> -b 1-59`
-
-### Reporting Bugs
-- `usbip-win` is not yet ready for production use. It can cause BSOD or hang Windows Explorer, etc.
-- We could find the problems with detailed logs
-
-#### How to get Windows kernel log for drivers
+## Obtaining usbip logs on Windows
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
 - Use these tracing GUIDs
   - `8b56380d-5174-4b15-b6f4-4c47008801a4` for vhci driver
-  - `682e9961-054c-482b-a86d-d94f6cd5f555` for stub driver
   - `8b56380d-5174-4b15-b6f4-4c47008801a4` for usbip_xfer utility
 - Example of a log session for vhci driver using command-line tools
   - Start a new log session
     - `tracelog.exe -start usbip-vhci -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f usbip-vhci.etl -flag 0xF -level 5`
   - Stop the log session
     - `tracelog.exe -stop usbip-vhci`
-  - Format binary event trace log `usbip-vhci.etl` as text
+  - Produce readable text from binary event trace log `usbip-vhci.etl`
 ```
 set TMFS=%TEMP%\tmfs
 set TRACE_FORMAT_PREFIX=%%4!s! [%%9!2u!]%%3!04x! %%!LEVEL! %%!FUNC!:
@@ -142,15 +148,19 @@ tracefmt.exe -nosummary -p %TMFS% -o usbip-vhci.txt usbip-vhci.etl
   - Open the menu item "File/Create New Log Session"
   - \"*Provider Control GUID Setup*\" dialog window appears
   - Choose \"*PDB (Debug Information) File*\" radio button and specify PDB file
-    - `usbip_stub.pdb` for stub driver
     - `usbip_vhci.pdb` for vhci driver
     - `usbip_xfer.pdb` for usbip_xfer utility
-  - You can send real-time trace messages to WinDbg by modifying in \"*Advanced Log Session Options*\".
-- If your testing machine suffer from BSOD (Blue Screen of Death), you should get it via remote debugging.
-  - `WinDbg` on virtual machines would be good to get logs
 
-#### How to get linux kernel log
-- Sometimes Linux kernel log is required
+## Obtaining usbip log on Linux
 ```
-# dmesg --follow | tee kernel_log.txt
+killall usbipd
+modprobe -r usbip-host usbip-vudc vhci-hcd usbip-core
+modprobe usbip-core usbip_debug_flag=0xFFFFFFFF
+modprobe -a usbip-host usbip-vudc vhci-hcd
+usbipd -D
+dmesg --follow | tee ~/usbip.log
 ```
+## Plans for near future
+  - Use Cancel-Safe IRP Queues. Issues with IRP cancellation are the major cause of BSODs.
+  - Get rid of usbip_xfer.exe userspace app and handle TCP/IP data exchange inside the driver
+  - Use vectored I/O (MDL) to avoid copying of buffers
