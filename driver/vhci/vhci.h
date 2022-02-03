@@ -3,7 +3,7 @@
 #include <ntdef.h>
 #include <wdm.h>
 
-const auto USBIP_VHCI_POOL_TAG = (ULONG)'VhcI';
+const ULONG USBIP_VHCI_POOL_TAG = 'ICHV';
 
 struct GLOBALS
 {

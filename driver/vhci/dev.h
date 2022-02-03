@@ -67,13 +67,9 @@ struct vdev_t
 	DEVICE_OBJECT *devobj_lower;
 };
 
-struct root_dev_t : vdev_t
-{
-};
-
-struct cpdo_dev_t : vdev_t
-{
-};
+struct root_dev_t : vdev_t {};
+struct cpdo_dev_t : vdev_t {};
+struct hpdo_dev_t : vdev_t {};
 
 struct vhci_dev_t : vdev_t
 {
@@ -82,10 +78,6 @@ struct vhci_dev_t : vdev_t
 
 	WMILIB_CONTEXT	WmiLibInfo;
 	USBIP_BUS_WMI_STD_DATA	StdUSBIPBusData;
-};
-
-struct hpdo_dev_t : vdev_t
-{
 };
 
 // The device extension for the vpdo.
@@ -158,14 +150,11 @@ constexpr auto is_fdo(vdev_type_t type)
 	return type == VDEV_ROOT || type == VDEV_VHCI || type == VDEV_VHUB;
 }
 
-inline auto vhub_from_vhci(vhci_dev_t *vhci)
-{	
-	auto child_pdo = vhci->child_pdo;
-	return child_pdo ? reinterpret_cast<vhub_dev_t*>(child_pdo->fdo) : nullptr;
-}
+vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci);
 
 inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
+	NT_ASSERT(vpdo);
 	return reinterpret_cast<vhub_dev_t*>(vpdo->parent);
 }
 

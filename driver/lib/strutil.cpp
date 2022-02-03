@@ -1,7 +1,7 @@
 #include "strutil.h"
 #include <ntstrsafe.h>
 
-const ULONG libdrv_pooltag = 'dbil';
+const ULONG libdrv_pooltag = 'vrdl';
 
 LPWSTR libdrv_strdupW(POOL_TYPE PoolType, LPCWSTR str)
 {

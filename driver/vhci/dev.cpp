@@ -26,14 +26,14 @@ const ULONG ext_sizes_per_devtype[VDEV_SIZE] =
 } // namespace
 
 
-void *GetDeviceProperty(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
+void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
 	ResultLength = 256;
-	auto alloc = [] (ULONG len) noexcept { return ExAllocatePoolWithTag(PagedPool, len, USBIP_VHCI_POOL_TAG); };
+	auto alloc = [] (auto len) noexcept { return ExAllocatePoolWithTag(PagedPool, len, USBIP_VHCI_POOL_TAG); };
 
 	for (auto buf = alloc(ResultLength); buf; ) {
 		
-		error = IoGetDeviceProperty(pdo, prop, ResultLength, buf, &ResultLength);
+		error = IoGetDeviceProperty(obj, prop, ResultLength, buf, &ResultLength);
 		
 		switch (error) {
 		case STATUS_SUCCESS:
@@ -95,37 +95,39 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 	return devobj;
 }
 
+vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
+{	
+	NT_ASSERT(vhci);
+	auto child_pdo = vhci->child_pdo;
+	return child_pdo ? reinterpret_cast<vhub_dev_t*>(child_pdo->fdo) : nullptr;
+}
+
 cpdo_dev_t *to_cpdo_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
-	NT_ASSERT(vdev);
 	return vdev->type == VDEV_CPDO ? static_cast<cpdo_dev_t*>(vdev) : nullptr;
 }
 
 vhci_dev_t *to_vhci_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
-	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VHCI ? static_cast<vhci_dev_t*>(vdev) : nullptr;
 }
 
 hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
-	NT_ASSERT(vdev);
 	return vdev->type == VDEV_HPDO ? static_cast<hpdo_dev_t*>(vdev) : nullptr;
 }
 
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
-	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VHUB ? static_cast<vhub_dev_t*>(vdev) : nullptr;
 }
 
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
-	NT_ASSERT(vdev);
 	return vdev->type == VDEV_VPDO ? static_cast<vpdo_dev_t*>(vdev) : nullptr;
 }
