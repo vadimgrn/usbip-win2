@@ -114,16 +114,16 @@
   <PropertyGroup />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
     <Inf2CatVerbose>true</Inf2CatVerbose>
     <EnableInf2cat>false</EnableInf2cat>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <OutDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)$(ConfigurationName)\$(Platform)\$(ProjectName)\</IntDir>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
     <Inf2CatUseLocalTime>true</Inf2CatUseLocalTime>
     <Inf2CatVerbose>true</Inf2CatVerbose>
     <EnableInf2cat>false</EnableInf2cat>
