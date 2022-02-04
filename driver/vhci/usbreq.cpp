@@ -12,7 +12,7 @@
 namespace
 {
 
-void submit_urbr_unlink(vpdo_dev_t *vpdo, unsigned long seq_num_unlink)
+void submit_urbr_unlink(vpdo_dev_t *vpdo, seqnum_t seq_num_unlink)
 {
 	auto urbr_unlink = create_urbr(vpdo, nullptr, seq_num_unlink);
 	if (!urbr_unlink) {
@@ -102,7 +102,7 @@ urb_req *find_pending_urbr(vpdo_dev_t *vpdo)
 	return urbr;
 }
 
-urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, unsigned long seqnum_unlink)
+urb_req *create_urbr(vpdo_dev_t *vpdo, IRP *irp, seqnum_t seqnum_unlink)
 {
 	auto urbr = (urb_req*)ExAllocateFromNPagedLookasideList(&g_lookaside);
 	if (!urbr) {
