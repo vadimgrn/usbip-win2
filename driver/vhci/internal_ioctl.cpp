@@ -36,8 +36,8 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	KIRQL oldirql;
-	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+	KLOCK_QUEUE_HANDLE hlock;
+	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 
 	for (auto le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr; ) { // remove all URBRs of the aborted pipe
 
@@ -50,26 +50,26 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 
 		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seqnum %lu", urbr_local->seqnum);
 
-		if (urbr_local->irp) {
-			PIRP irp = urbr_local->irp;
+		if (auto irp = urbr_local->irp) {
 
-			KIRQL oldirql_cancel;
-			IoAcquireCancelSpinLock(&oldirql_cancel);
+			KIRQL irql;
+			IoAcquireCancelSpinLock(&irql);
 			bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-			IoReleaseCancelSpinLock(oldirql_cancel);
+			IoReleaseCancelSpinLock(irql);
 
 			if (valid_irp) {
 				irp->IoStatus.Information = 0;
 				irp_done(irp, STATUS_CANCELLED);
 			}
 		}
+
 		RemoveEntryListInit(&urbr_local->list_state);
 		RemoveEntryListInit(&urbr_local->list_all);
+
 		free_urbr(urbr_local);
 	}
 
-	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
-
+	KeReleaseInStackQueuedSpinLock(&hlock);
 	return STATUS_SUCCESS;
 }
 

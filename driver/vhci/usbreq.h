@@ -31,5 +31,5 @@ void free_urbr(urb_req *urbr);
 
 bool is_port_urbr(IRP *irp, USBD_PIPE_HANDLE handle);
 
-urb_req *find_sent_urbr(vpdo_dev_t *vpdo, unsigned long seqnum);
+urb_req *find_sent_urbr(vpdo_dev_t *vpdo, seqnum_t seqnum);
 urb_req *find_pending_urbr(vpdo_dev_t *vpdo);

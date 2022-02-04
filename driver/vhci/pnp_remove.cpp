@@ -17,27 +17,29 @@ namespace
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-void complete_pending_read_irp(vpdo_dev_t * vpdo)
+void complete_pending_read_irp(vpdo_dev_t *vpdo)
 {
-	KIRQL oldirql;
-
-	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+	KLOCK_QUEUE_HANDLE hlock;
+	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 	auto irp = vpdo->pending_read_irp;
 	vpdo->pending_read_irp = nullptr;
-	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+	KeReleaseInStackQueuedSpinLock(&hlock);
 
-	if (irp) {
-		Trace(TRACE_LEVEL_VERBOSE, "Complete pending read irp %p", irp);
+	if (!irp) {
+		return;
+	}
 
-		// We got pending_read_irp before submit_urbr
-		BOOLEAN valid_irp;
-		IoAcquireCancelSpinLock(&oldirql);
-		valid_irp = IoSetCancelRoutine(irp, nullptr) != nullptr;
-		IoReleaseCancelSpinLock(oldirql);
-		if (valid_irp) {
-			irp->IoStatus.Information = 0;
-			irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
-		}
+	Trace(TRACE_LEVEL_VERBOSE, "Complete pending read irp %p", irp);
+	// We got pending_read_irp before submit_urbr
+
+	KIRQL irql;
+	IoAcquireCancelSpinLock(&irql);
+	bool valid_irp = IoSetCancelRoutine(irp, nullptr);
+	IoReleaseCancelSpinLock(irql);
+
+	if (valid_irp) {
+		irp->IoStatus.Information = 0;
+		irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
 	}
 }
 
@@ -46,9 +48,8 @@ void complete_pending_read_irp(vpdo_dev_t * vpdo)
 */
 void complete_pending_irp(vpdo_dev_t *vpdo)
 {
-	KIRQL oldirql;
-
-	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+	KLOCK_QUEUE_HANDLE hlock;
+	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 
 	while (!IsListEmpty(&vpdo->head_urbr)) {
 
@@ -57,23 +58,26 @@ void complete_pending_irp(vpdo_dev_t *vpdo)
 
 		RemoveEntryListInit(&urbr->list_all);
 		RemoveEntryListInit(&urbr->list_state);
-		/* FIMXE event */
-		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+
+		KeReleaseInStackQueuedSpinLock(&hlock);
 
 		auto irp = urbr->irp;
 		free_urbr(urbr);
+
 		if (irp) {
 			// urbr irps have cancel routine
-			IoAcquireCancelSpinLock(&oldirql);
+			KIRQL irql;
+			IoAcquireCancelSpinLock(&irql);
 			bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-			IoReleaseCancelSpinLock(oldirql);
+			IoReleaseCancelSpinLock(irql);
+
 			if (valid_irp) {
 				irp->IoStatus.Information = 0;
 				irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
 			}
 		}
 
-		KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+		KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 	}
 
 	vpdo->urbr_sent_partial = nullptr; // sure?
@@ -82,7 +86,7 @@ void complete_pending_irp(vpdo_dev_t *vpdo)
 	InitializeListHead(&vpdo->head_urbr_sent);
 	InitializeListHead(&vpdo->head_urbr_pending);
 
-	KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+	KeReleaseInStackQueuedSpinLock(&hlock);
 }
 
 PAGEABLE void destroy_vhci(vhci_dev_t *vhci)

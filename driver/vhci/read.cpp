@@ -1032,10 +1032,10 @@ void on_pending_irp_read_cancelled(DEVICE_OBJECT*, IRP *irp_read)
 	auto irpstack = IoGetCurrentIrpStackLocation(irp_read);
 
 	if (auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext)) { // FIXME: temporary workaround
-		KIRQL irql;
-		KeAcquireSpinLock(&vpdo->lock_urbr, &irql);
+		KLOCK_QUEUE_HANDLE hlock;
+		KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 		InterlockedCompareExchangePointer(reinterpret_cast<PVOID*>(&vpdo->pending_read_irp), nullptr, irp_read);
-		KeReleaseSpinLock(&vpdo->lock_urbr, irql);
+		KeReleaseInStackQueuedSpinLock(&hlock);
 	}
 
 	irp_done(irp_read, STATUS_CANCELLED);
@@ -1046,63 +1046,65 @@ void on_pending_irp_read_cancelled(DEVICE_OBJECT*, IRP *irp_read)
 */
 NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	NTSTATUS status = STATUS_SUCCESS;
-	urb_req *urbr = nullptr;
-	KIRQL oldirql;
-
-	KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+	KLOCK_QUEUE_HANDLE hlock;
+	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 
 	if (vpdo->pending_read_irp) {
-		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+		KeReleaseInStackQueuedSpinLock(&hlock);
 		return STATUS_INVALID_DEVICE_REQUEST;
 	}
+
+	urb_req *urbr = nullptr;
+	NTSTATUS status = STATUS_SUCCESS;
 
 	if (vpdo->urbr_sent_partial) {
 		NT_ASSERT(vpdo->len_sent_partial);
 		urbr = vpdo->urbr_sent_partial;
 
-		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+		KeReleaseInStackQueuedSpinLock(&hlock);
 		status = store_urbr_partial(read_irp, urbr);
-		KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+		KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 
 		vpdo->len_sent_partial = 0;
 	} else {
 		NT_ASSERT(!vpdo->len_sent_partial);
-
 		urbr = find_pending_urbr(vpdo);
+
 		if (!urbr) {
 			vpdo->pending_read_irp = read_irp;
 
-			KIRQL oldirql_cancel;
-			IoAcquireCancelSpinLock(&oldirql_cancel);
+			KIRQL irql;
+			IoAcquireCancelSpinLock(&irql);
 			IoSetCancelRoutine(read_irp, on_pending_irp_read_cancelled);
-			IoReleaseCancelSpinLock(oldirql_cancel);
-			KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+			IoReleaseCancelSpinLock(irql);
+
+			KeReleaseInStackQueuedSpinLock(&hlock);
 			IoMarkIrpPending(read_irp);
 
 			return STATUS_PENDING;
 		}
 
 		vpdo->urbr_sent_partial = urbr;
-		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
 
+		KeReleaseInStackQueuedSpinLock(&hlock);
 		status = store_urbr(read_irp, urbr);
-
-		KeAcquireSpinLock(&vpdo->lock_urbr, &oldirql);
+		KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 	}
 
 	if (status != STATUS_SUCCESS) {
 		RemoveEntryListInit(&urbr->list_all);
-		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+		KeReleaseInStackQueuedSpinLock(&hlock);
 
-		IRP *irp = urbr->irp;
-		free_urbr(urbr); // FAIL
+		auto irp = urbr->irp;
+		free_urbr(urbr); // FIXME: FAIL
 
 		if (irp) {
 			// urbr irp has cancel routine, if the IoSetCancelRoutine returns nullptr that means IRP was cancelled
-			IoAcquireCancelSpinLock(&oldirql);
+			KIRQL irql;
+			IoAcquireCancelSpinLock(&irql);
 			bool valid = IoSetCancelRoutine(irp, nullptr);
-			IoReleaseCancelSpinLock(oldirql);
+			IoReleaseCancelSpinLock(irql);
+
 			if (valid) {
 				TRANSFERRED(irp) = 0;
 				irp_done(irp, STATUS_INVALID_PARAMETER);
@@ -1113,7 +1115,8 @@ NTSTATUS process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 			InsertTailList(&vpdo->head_urbr_sent, &urbr->list_state);
 			vpdo->urbr_sent_partial = nullptr;
 		}
-		KeReleaseSpinLock(&vpdo->lock_urbr, oldirql);
+
+		KeReleaseInStackQueuedSpinLock(&hlock);
 	}
 
 	return status;
