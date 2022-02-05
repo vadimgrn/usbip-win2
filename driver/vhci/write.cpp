@@ -6,7 +6,6 @@
 #include "usbip_proto.h"
 #include "vpdo.h"
 #include "vpdo_dsc.h"
-#include "usbreq.h"
 #include "usbd_helper.h"
 #include "irp.h"
 #include "pdu.h"
@@ -587,37 +586,34 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 	return hdr;
 }
 
-/*
-* Code must be in nonpaged section if it acquires spinlock.
-*/
-void complete_irp(IRP *irp, NTSTATUS status)
+/* 
+ * it seems windows client usb driver will think IoCompleteRequest is running at DISPATCH_LEVEL
+ * so without this it will change IRQL sometimes, and introduce to a dead of my userspace program.
+ */
+void complete(vpdo_dev_t*, IRP *irp, NTSTATUS)
 {
-	KIRQL oldirql;
-
-	IoAcquireCancelSpinLock(&oldirql);
-	bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-	IoReleaseCancelSpinLock(oldirql);
-
-	if (!valid_irp) {
+	NT_ASSERT(irp);
+/*
+	if (!IoCsqRemoveNextIrp(&vpdo->urb_irps_queue, irp)) {
 		return;
 	}
 
+	TraceCall("%p -> %!STATUS!", irp, status);
 	irp->IoStatus.Status = status;
 
-	/* it seems windows client usb driver will think
-	* IoCompleteRequest is running at DISPATCH_LEVEL
-	* so without this it will change IRQL sometimes,
-	* and introduce to a dead of my userspace program
-	*/
-	KeRaiseIrql(DISPATCH_LEVEL, &oldirql);
+	KIRQL irql;
+	KeRaiseIrql(DISPATCH_LEVEL, &irql); // FIXME: really?
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
-	KeLowerIrql(oldirql);
+	KeLowerIrql(irql);
+*/
 }
 
 PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	PAGED_CODE();
-
+	UNREFERENCED_PARAMETER(vpdo);
+	UNREFERENCED_PARAMETER(write_irp);
+	/*
 	auto hdr = consume_write_irp_buffer(write_irp);
 	if (!hdr) {
 		return STATUS_INVALID_PARAMETER;
@@ -652,10 +648,12 @@ PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 
 	free_urbr(urbr);
 	if (irp) {
-		complete_irp(irp, status);
+		complete(vpdo, irp, status);
 	}
 
 	return STATUS_SUCCESS;
+*/
+	return STATUS_NOT_IMPLEMENTED;
 }
 
 } // namespace

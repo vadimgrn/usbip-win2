@@ -38,7 +38,6 @@
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="power.cpp" />
     <ClCompile Include="proto.cpp" />
-    <ClCompile Include="usbreq.cpp" />
     <ClCompile Include="wmi.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -56,7 +55,6 @@
     <ClInclude Include="plugin.h" />
     <ClInclude Include="pnp.h" />
     <ClInclude Include="trace.h" />
-    <ClInclude Include="usbreq.h" />
     <ClInclude Include="pnp_cap.h" />
     <ClInclude Include="pnp_id.h" />
     <ClInclude Include="pnp_intf.h" />

@@ -4,7 +4,6 @@
 
 #include "vhci.h"
 #include "dev.h"
-#include "usbreq.h"
 #include "usbip_proto.h"
 #include "irp.h"
 #include "usbdsc.h"
@@ -14,10 +13,10 @@
 namespace
 {
 
-PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
+PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t*, IRP *irp)
 {
 	PAGED_CODE();
-
+/*
 	NTSTATUS status = STATUS_INSUFFICIENT_RESOURCES;
 	auto urbr = create_urbr(vpdo, irp, 0);
 
@@ -32,8 +31,9 @@ PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
 		free_urbr(urbr);
 		status = STATUS_UNSUCCESSFUL;
 	}
+	*/
 
-	return irp_done(irp, status);
+	return irp_done(irp, STATUS_NOT_IMPLEMENTED);
 }
 
 PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)

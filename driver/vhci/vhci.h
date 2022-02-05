@@ -11,4 +11,3 @@ struct GLOBALS
 };
 
 extern GLOBALS Globals;
-extern NPAGED_LOOKASIDE_LIST g_lookaside;

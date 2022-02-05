@@ -2,8 +2,8 @@
 #include "trace.h"
 #include "proto.tmh"
 
-#include "usbreq.h"
 #include "usbd_helper.h"
+#include "devconf.h"
 
 namespace
 {

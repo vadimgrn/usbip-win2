@@ -2,7 +2,6 @@
 #include "trace.h"
 #include "vhci.tmh"
 
-#include "usbreq.h"
 #include "pnp.h"
 #include "irp.h"
 #include "vhub.h"
@@ -11,7 +10,6 @@
 #include <usbdi.h>
 
 GLOBALS Globals;
-NPAGED_LOOKASIDE_LIST g_lookaside;
 
 namespace
 {
@@ -92,8 +90,6 @@ PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 	TraceCall("Unloading");
 
 	// NT_ASSERT(!drvobj->DeviceObject);
-
-	ExDeleteNPagedLookasideList(&g_lookaside);
 
 	NT_ASSERT(Globals.RegistryPath.Buffer);
 	ExFreePoolWithTag(Globals.RegistryPath.Buffer, USBIP_VHCI_POOL_TAG);
@@ -223,8 +219,6 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 		WPP_CLEANUP(drvobj);
 		return err;
 	}
-
-	ExInitializeNPagedLookasideList(&g_lookaside, nullptr, nullptr, 0, sizeof(struct urb_req), 'USBV', 0);
 
 	drvobj->MajorFunction[IRP_MJ_CREATE] = vhci_create;
 	drvobj->MajorFunction[IRP_MJ_CLEANUP] = vhci_cleanup;

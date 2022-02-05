@@ -1,4 +1,8 @@
 #include "irp.h"
+#include "trace.h"
+#include "irp.tmh"
+
+#include "dev.h"
 
 namespace
 {
@@ -55,4 +59,15 @@ NTSTATUS irp_done(IRP *irp, NTSTATUS status)
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
+}
+
+void complete_canceled_irp(IRP *irp)
+{
+	Trace(TRACE_LEVEL_INFORMATION, "seqnum %u, irp %p", get_seqnum(irp), irp);
+
+	auto &r = irp->IoStatus;
+	r.Status = STATUS_CANCELLED;
+	r.Information = 0;
+
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }

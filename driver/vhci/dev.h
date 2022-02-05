@@ -6,8 +6,6 @@
 #include "devconf.h"
 #include "usbdsc.h"
 
-struct urb_req;
-
 // These are the states a vpdo or vhub transition upon
 // receiving a specific PnP Irp. Refer to the PnP Device States
 // diagram in DDK documentation for better understanding.
@@ -108,26 +106,25 @@ struct vpdo_dev_t : vdev_t
 	ULONG current_frame_number;
 
 	UNICODE_STRING usb_dev_interface;
-
-	// a pending irp when no urb is requested
-	IRP *pending_read_irp;
-	// a partially transferred urb_req
-	urb_req	*urbr_sent_partial;
-	// a partially transferred length of urbr_sent_partial
-	ULONG len_sent_partial;
-	// all urb_req's. This list will be used for clear or cancellation.
-	LIST_ENTRY head_urbr;
-	// pending urb_req's which are not transferred yet
-	LIST_ENTRY head_urbr_pending;
-	// urb_req's which had been sent and have waited for response
-	LIST_ENTRY head_urbr_sent;
-	KSPIN_LOCK lock_urbr;
 	FILE_OBJECT *fo;
 	
 	unsigned int devid;
 	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
 	seqnum_t seqnum;
+
+	IO_CSQ read_irp_queue; // waiting for urb irp from vhci_internal_ioctl
+	IRP *read_irp;
+
+	volatile IRP *current_urb_rx_irp; // not cancelable until read irp for payload is handled
+
+	KSPIN_LOCK urb_irps_lock; // common lock to avoid race conditions between vhci_read and vhci_internal_ioctl
+
+	IO_CSQ urb_rx_irps_queue; // waiting for read irp from vhci_read
+	LIST_ENTRY urb_rx_irps;
+
+	IO_CSQ urb_tx_irps_queue; // waiting for write irp from vhci_write
+	LIST_ENTRY urb_tx_irps;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -170,8 +167,42 @@ hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
-inline auto next_seqnum(vpdo_dev_t &vpdo)
+seqnum_t next_seqnum(vpdo_dev_t &vpdo);
+
+inline auto set_vpdo(IRP *irp, vpdo_dev_t *vpdo)
 {
-	auto &val = vpdo.seqnum;
-	return ++val ? val : ++val; // skip zero in case of overflow
+	irp->Tail.Overlay.DriverContext[0] = vpdo;
+}
+
+inline auto get_vpdo(IRP *irp)
+{
+	auto vpdo = static_cast<vpdo_dev_t*>(irp->Tail.Overlay.DriverContext[0]);
+	NT_ASSERT(vpdo);
+	return vpdo;
+}
+
+/*
+* IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
+* Drivers that use these routines to queue IRPs must leave that member unused.
+*/
+inline auto set_seqnums(IRP *irp, seqnum_t seqnum, seqnum_t seqnum_unlink)
+{
+	auto val = (uintptr_t(seqnum_unlink) << 32) | seqnum;
+
+	static_assert(sizeof(val) == sizeof(UINT64));
+	static_assert(sizeof(seqnum) == sizeof(UINT32));
+
+	irp->Tail.Overlay.DriverContext[1] = reinterpret_cast<void*>(val);
+}
+
+inline auto get_seqnum(IRP *irp)
+{
+	seqnum_t seqnum = reinterpret_cast<uintptr_t>(irp->Tail.Overlay.DriverContext[1]) & 0xFFFF'FFFF;
+	NT_ASSERT(seqnum);
+	return seqnum;
+}
+
+inline seqnum_t get_seqnum_unlink(IRP *irp)
+{
+	return reinterpret_cast<uintptr_t>(irp->Tail.Overlay.DriverContext[1]) >> 32;
 }

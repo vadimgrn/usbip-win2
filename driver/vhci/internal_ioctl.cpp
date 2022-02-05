@@ -2,40 +2,25 @@
 #include "trace.h"
 #include "internal_ioctl.tmh"
 
-#include "usbreq.h"
 #include "irp.h"
+#include "dev.h"
 
 namespace
 {
 
 const auto STATUS_SUBMIT_URBR_IRP = NTSTATUS(-1);
 
-auto submit_urbr_irp(vpdo_dev_t *vpdo, IRP *irp)
-{
-	auto urbr = create_urbr(vpdo, irp, 0);
-	if (!urbr) {
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	auto status = submit_urbr(vpdo, urbr);
-	if (NT_ERROR(status)) {
-		free_urbr(urbr);
-	}
-
-	return status;
-}
-
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
+NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t*, USBD_PIPE_HANDLE hPipe)
 {
 	TraceUrb("PipeHandle %#Ix", (uintptr_t)hPipe);
 
 	if (!hPipe) {
 		return STATUS_INVALID_PARAMETER;
 	}
-
+/*
 	KLOCK_QUEUE_HANDLE hlock;
 	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
 
@@ -50,17 +35,11 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 
 		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seqnum %lu", urbr_local->seqnum);
 
-		if (auto irp = urbr_local->irp) {
-
-			KIRQL irql;
-			IoAcquireCancelSpinLock(&irql);
-			bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-			IoReleaseCancelSpinLock(irql);
-
-			if (valid_irp) {
-				irp->IoStatus.Information = 0;
-				irp_done(irp, STATUS_CANCELLED);
+		if (auto &rip = urbr_local->irp) {
+			if (IoCsqRemoveNextIrp(&vpdo->csq, rip)) {
+				complete_canceled_irp(rip);
 			}
+			rip = nullptr;
 		}
 
 		RemoveEntryListInit(&urbr_local->list_state);
@@ -70,6 +49,7 @@ NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
 	}
 
 	KeReleaseInStackQueuedSpinLock(&hlock);
+*/
 	return STATUS_SUCCESS;
 }
 
@@ -409,7 +389,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 	if (auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
 		auto uirp = reinterpret_cast<uintptr_t>(irp);
 		auto st = pfunc(vpdo, urb, static_cast<UINT32>(uirp));
-		return st == STATUS_SUBMIT_URBR_IRP ? submit_urbr_irp(vpdo, irp) : st;
+		return st; // == STATUS_SUBMIT_URBR_IRP ? submit_urbr_irp(vpdo, irp) : st;
 	}
 
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
@@ -430,6 +410,17 @@ NTSTATUS usb_get_port_status(ULONG *status)
 	*status = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
 	TraceUrb("-> PORT_ENABLED|PORT_CONNECTED"); 
 	return STATUS_SUCCESS;
+}
+
+auto pop_read_irp(IRP* &read_irp, vpdo_dev_t *vpdo, IRP *urb_irp)
+{
+	read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr);
+	if (!read_irp) {
+		IoCsqInsertIrp(&vpdo->urb_rx_irps_queue, urb_irp, nullptr);
+		return STATUS_PENDING;
+	}
+
+	return STATUS_INVALID_PARAMETER;
 }
 
 } // namespace
@@ -453,6 +444,12 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 		return irp_done(Irp, st);
 	}
 
+	IRP *read_irp{};
+	if (auto err = pop_read_irp(read_irp, vpdo, Irp)) {
+		TraceCall("Leave %!STATUS!", err);
+		return err;
+	}
+
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
 	switch (ioctl_code) {
@@ -463,7 +460,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 		status = usb_get_port_status(static_cast<ULONG*>(irpStack->Parameters.Others.Argument1));
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		status = submit_urbr_irp(vpdo, Irp);
+		//status = submit_urbr_irp(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
 		status = setup_topology_address(vpdo, *static_cast<USB_TOPOLOGY_ADDRESS*>(irpStack->Parameters.Others.Argument1));
