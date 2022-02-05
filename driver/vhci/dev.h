@@ -109,19 +109,20 @@ struct vpdo_dev_t : vdev_t
 
 	UNICODE_STRING usb_dev_interface;
 
-	// a pending irp when no urb is requested
-	IRP *pending_read_irp;
-	// a partially transferred urb_req
-	urb_req	*urbr_sent_partial;
-	// a partially transferred length of urbr_sent_partial
-	ULONG len_sent_partial;
-	// all urb_req's. This list will be used for clear or cancellation.
-	LIST_ENTRY head_urbr;
-	// pending urb_req's which are not transferred yet
-	LIST_ENTRY head_urbr_pending;
-	// urb_req's which had been sent and have waited for response
-	LIST_ENTRY head_urbr_sent;
+	LIST_ENTRY pending_irps;
+	KSPIN_LOCK pending_irps_lock;
+	IO_CSQ csq;
+
+	IRP *pending_read_irp; // a pending irp when no urb is requested
+	
+	urb_req	*urbr_sent_partial; // a partially transferred urb_req
+	ULONG len_sent_partial; // a partially transferred length of urbr_sent_partial
+
+	LIST_ENTRY head_urbr; // all urb_req's. This list will be used for clear or cancellation.
+	LIST_ENTRY head_urbr_pending; // pending urb_req's which are not transferred yet
+	LIST_ENTRY head_urbr_sent; // urb_req's which had been sent and have waited for response
 	KSPIN_LOCK lock_urbr;
+
 	FILE_OBJECT *fo;
 	
 	unsigned int devid;
@@ -174,4 +175,9 @@ inline auto next_seqnum(vpdo_dev_t &vpdo)
 {
 	auto &val = vpdo.seqnum;
 	return ++val ? val : ++val; // skip zero in case of overflow
+}
+
+inline auto to_vpdo(IO_CSQ *ptr) noexcept
+{
+	return CONTAINING_RECORD(ptr, vpdo_dev_t, csq);
 }

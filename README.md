@@ -1,7 +1,9 @@
+![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")
+
 # USB/IP Client for Windows
 
 - This is USB/IP Client for Windows which is fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- There is no "official" USB/IP client for Windows so far
+- There is no official USB/IP client for Windows so far
 
 ## Status
 - Client (VHCI driver)
@@ -33,7 +35,7 @@
 ## Build
 
 ### Notes
-- Build is tested on Windows 11 x64 and the projects are configured for Win10 target by default
+- Build is tested on Windows 11 x64, projects are configured for Win10 target by default
 - x86 platform is not supported
 
 ### Build Tools
@@ -76,6 +78,9 @@ usbipd -D
 ```
 - Bind desired USB device
   - `usbip bind -b 3-2`
+```
+usbip: info: bind device on busid 3-2: complete
+```
 - Your device 3-2 now can be used by usbip client
 
 ## Setup usbip client on Windows
@@ -141,7 +146,7 @@ port 1 is successfully detached
 ```
 set TMFS=%TEMP%\tmfs
 set TRACE_FORMAT_PREFIX=%%4!s! [%%9!2u!]%%3!04x! %%!LEVEL! %%!FUNC!:
-tracepdb.exe -f D:\usbip-win\Debug\x64 -p %TMFS%
+tracepdb.exe -f D:\usbip-win\x64\Debug -p %TMFS%
 tracefmt.exe -nosummary -p %TMFS% -o usbip-vhci.txt usbip-vhci.etl
 ```
 - How to use `TraceView.exe` GUI app

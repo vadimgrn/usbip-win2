@@ -13,6 +13,70 @@
 namespace
 {
 
+PAGEABLE void CsqInsertIrp(_In_ IO_CSQ *Csq, _In_ IRP *Irp)
+{
+	TraceCall("%p", Irp);
+	auto vpdo = to_vpdo(Csq);
+	InsertTailList(&vpdo->pending_irps, &Irp->Tail.Overlay.ListEntry);
+}
+
+PAGEABLE void CsqRemoveIrp(_In_ IO_CSQ* /*Csq*/, _In_ IRP *Irp)
+{
+	TraceCall("%p", Irp);
+	auto le = &Irp->Tail.Overlay.ListEntry;
+	RemoveEntryList(le);
+	InitializeListHead(le);
+}
+
+PAGEABLE PIRP CsqPeekNextIrp(_In_ IO_CSQ *Csq, _In_ IRP *Irp, _In_ PVOID PeekContext)
+{
+	IRP *result{};
+
+	auto &vpdo = *to_vpdo(Csq);
+	auto head = &vpdo.pending_irps;
+
+	for (auto next = Irp ? Irp->Tail.Overlay.ListEntry.Flink : head->Flink; next != head; next = next->Flink) 
+	{
+		auto irp = CONTAINING_RECORD(next, IRP, Tail.Overlay.ListEntry);
+		auto irpstack = IoGetCurrentIrpStackLocation(irp);
+
+		if (!PeekContext || static_cast<FILE_OBJECT*>(PeekContext) == irpstack->FileObject) {
+			result = irp;
+			break;
+		}
+	}
+
+	TraceCall("%p", result);
+	return result;
+}
+
+_IRQL_raises_(DISPATCH_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Acquires_lock_(CONTAINING_RECORD(Csq,vpdo_dev_t, csq)->QueueLock)
+PAGEABLE void CsqAcquireLock(_In_ IO_CSQ *Csq, _Out_ PKIRQL Irql)
+{
+	auto &vpdo = *to_vpdo(Csq);
+	KeAcquireSpinLock(&vpdo.pending_irps_lock, Irql);
+}
+
+_IRQL_requires_(DISPATCH_LEVEL)
+_Releases_lock_(CONTAINING_RECORD(Csq,vpdo_dev_t, csq)->QueueLock)
+PAGEABLE void CsqReleaseLock(_In_ IO_CSQ *Csq, _In_ KIRQL Irql)
+{
+	auto &vpdo = *to_vpdo(Csq);
+	KeReleaseSpinLock(&vpdo.pending_irps_lock, Irql);
+}
+
+PAGEABLE void CsqCompleteCanceledIrp(_In_ IO_CSQ*, _In_ IRP *Irp)
+{
+	TraceCall("%p", Irp);
+
+	Irp->IoStatus.Status = STATUS_CANCELLED;
+	Irp->IoStatus.Information = 0;
+
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+}
+
 PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
@@ -27,6 +91,21 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
 	vpdo.DevicePowerState = PowerDeviceD3;
 	vpdo.SystemPowerState = PowerSystemWorking;
 
+	InitializeListHead(&vpdo.pending_irps);
+	KeInitializeSpinLock(&vpdo.pending_irps_lock);
+
+	if (auto err = IoCsqInitialize(&vpdo.csq,
+				CsqInsertIrp,
+				CsqRemoveIrp,
+				CsqPeekNextIrp,
+				CsqAcquireLock,
+				CsqReleaseLock,
+				CsqCompleteCanceledIrp)) 
+	{
+		Trace(TRACE_LEVEL_ERROR, "IoCsqInitialize %!STATUS!", err);
+		return err;
+	}
+
 	InitializeListHead(&vpdo.head_urbr);
 	InitializeListHead(&vpdo.head_urbr_pending);
 	InitializeListHead(&vpdo.head_urbr_sent);
@@ -36,7 +115,7 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
 	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
 	if (!vhub_attach_vpdo(&vpdo)) {
-		Trace(TRACE_LEVEL_ERROR, "Can't acquire free port");
+		Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");
 		return STATUS_END_OF_FILE;
 	}
 
