@@ -11,20 +11,18 @@ namespace
 
 const auto STATUS_HANDLE_IRP = NTSTATUS(-1);
 
-NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *irp)
+NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *urb_irp)
 {
-	set_vpdo(irp, vpdo);
+	set_vpdo(urb_irp, vpdo);
 
 	auto seqnum = next_seqnum(*vpdo);
-	set_seqnums(irp, seqnum, 0);
+	set_seqnums(urb_irp, seqnum, 0);
 
 	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
-		if (auto err = do_read(vpdo, read_irp, irp)) {
-			return err;
-		}
+		return do_read(read_irp, urb_irp, true);
 	}
 
-	IoCsqInsertIrp(&vpdo->urb_rx_irps_queue, irp, nullptr);
+	IoCsqInsertIrp(&vpdo->urb_rx_irps_queue, urb_irp, nullptr);
 	return STATUS_PENDING;
 }
 
@@ -370,9 +368,9 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 
 	auto func = urb->UrbHeader.Function;
 
-	if (auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
+	if (auto handler = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
 		auto uirp = reinterpret_cast<uintptr_t>(irp);
-		auto st = pfunc(vpdo, urb, static_cast<UINT32>(uirp));
+		auto st = handler(vpdo, urb, static_cast<UINT32>(uirp));
 		return st == STATUS_HANDLE_IRP ? handle_irp(vpdo, irp) : st;
 	}
 

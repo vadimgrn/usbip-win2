@@ -88,8 +88,6 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 			complete_canceled_irp(irp);
 		}
 	}
-
-	InterlockedExchangePointer((PVOID*)&vpdo->current_urb_rx_irp, nullptr);
 }
 
 PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)

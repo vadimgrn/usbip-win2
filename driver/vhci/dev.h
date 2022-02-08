@@ -116,8 +116,6 @@ struct vpdo_dev_t : vdev_t
 	IO_CSQ read_irp_queue; // waiting for urb irp from vhci_internal_ioctl
 	IRP *read_irp;
 
-	volatile IRP *current_urb_rx_irp; // not cancelable until read irp for payload is handled
-
 	KSPIN_LOCK urb_irps_lock; // common lock to avoid race conditions between vhci_read and vhci_internal_ioctl
 
 	IO_CSQ urb_rx_irps_queue; // waiting for read irp from vhci_read
@@ -179,6 +177,11 @@ inline auto get_vpdo(IRP *irp)
 	auto vpdo = static_cast<vpdo_dev_t*>(irp->Tail.Overlay.DriverContext[0]);
 	NT_ASSERT(vpdo);
 	return vpdo;
+}
+
+inline auto get_devid(IRP *irp)
+{
+	return get_vpdo(irp)->devid;
 }
 
 /*

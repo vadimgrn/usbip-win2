@@ -61,6 +61,7 @@ PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp)
 
 NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 {
+	NT_ASSERT(status != STATUS_PENDING);
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
