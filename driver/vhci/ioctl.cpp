@@ -14,7 +14,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		TraceCall("%!vdev_type_t! -> NO_SUCH_DEVICE", vdev->type);
-		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
+		return CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
@@ -44,7 +44,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	irp->IoStatus.Information = outlen;
 
 	if (status != STATUS_PENDING) {
-		irp_done(irp, status);
+		CompleteRequest(irp, status);
 	}
 
 	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);

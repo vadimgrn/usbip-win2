@@ -321,5 +321,5 @@ PAGEABLE NTSTATUS pnp_query_id(vdev_t *vdev, IRP *irp)
 	}
 
 	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(result);
-	return irp_done(irp, status);
+	return CompleteRequest(irp, status);
 }

@@ -170,7 +170,7 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: already removed", vdev->type);
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	}
 
 	auto devobj_lower = vdev->devobj_lower;
@@ -182,6 +182,6 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 		irp->IoStatus.Status = STATUS_SUCCESS;
 		return irp_pass_down(devobj_lower, irp);
 	} else {
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	}
 }

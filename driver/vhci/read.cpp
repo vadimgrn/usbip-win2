@@ -1081,7 +1081,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
 		Trace(TRACE_LEVEL_ERROR, "read for non-vhci is not allowed");
-		return  irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
+		return  CompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
@@ -1092,10 +1092,10 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 		status = vpdo && !vpdo->unplugged ? process_read_irp(vpdo, irp) : STATUS_INVALID_DEVICE_REQUEST;
 	}
 
-	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp)); // before irp_done()
+	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp)); // before CompleteRequest()
 
 	if (status != STATUS_PENDING) {
-		irp_done(irp, status);
+		CompleteRequest(irp, status);
 	}
 
 	TraceCall("Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));

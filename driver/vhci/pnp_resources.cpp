@@ -45,7 +45,7 @@ PAGEABLE NTSTATUS pnp_query_resource_requirements(vdev_t * vdev, PIRP irp)
 
 	if (!is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resource_requirements();
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	} else {
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}
@@ -57,7 +57,7 @@ PAGEABLE NTSTATUS pnp_query_resources(vdev_t * vdev, PIRP irp)
 
 	if (!is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resources();
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	} else {
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}
@@ -69,8 +69,8 @@ PAGEABLE NTSTATUS pnp_filter_resource_requirements(vdev_t * vdev, PIRP irp)
 
 	if (is_fdo(vdev->type)) {
 		irp->IoStatus.Information = (ULONG_PTR)get_query_empty_resource_requirements();
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	} else {
-		return irp_done(irp, STATUS_NOT_SUPPORTED);
+		return CompleteRequest(irp, STATUS_NOT_SUPPORTED);
 	}
 }

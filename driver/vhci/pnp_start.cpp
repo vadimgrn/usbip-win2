@@ -101,7 +101,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 	if (is_fdo(vdev->type)) {
 		auto status = irp_send_synchronously(vdev->devobj_lower, irp);
 		if (NT_ERROR(status)) {
-			return irp_done(irp, status);
+			return CompleteRequest(irp, status);
 		}
 	}
 
@@ -130,5 +130,5 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! started", vdev->type);
 	}
 
-	return irp_done(irp, status);
+	return CompleteRequest(irp, status);
 }

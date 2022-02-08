@@ -33,7 +33,7 @@ PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t*, IRP *irp)
 	}
 	*/
 
-	return irp_done(irp, STATUS_NOT_IMPLEMENTED);
+	return CompleteRequest(irp, STATUS_NOT_IMPLEMENTED);
 }
 
 PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)

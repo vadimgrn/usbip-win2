@@ -97,7 +97,7 @@ NTSTATUS
 		irp->IoStatus.Status = status;
 	}
 
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 } // namespace
@@ -114,7 +114,7 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
 		PoStartNextPowerIrp(irp);
-		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
+		return CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	NTSTATUS st = vdev->type == VDEV_VHCI ?

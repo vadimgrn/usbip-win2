@@ -278,5 +278,5 @@ PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t * vdev, PIRP irp)
 		irp->IoStatus.Information = (ULONG_PTR)dev_relations;
 	}
 
-	return irp_done(irp, status);
+	return CompleteRequest(irp, status);
 }

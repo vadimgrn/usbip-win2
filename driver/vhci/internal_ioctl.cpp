@@ -15,42 +15,8 @@ const auto STATUS_SUBMIT_URBR_IRP = NTSTATUS(-1);
 */
 NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t*, USBD_PIPE_HANDLE hPipe)
 {
-	TraceUrb("PipeHandle %#Ix", (uintptr_t)hPipe);
-
-	if (!hPipe) {
-		return STATUS_INVALID_PARAMETER;
-	}
-/*
-	KLOCK_QUEUE_HANDLE hlock;
-	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
-
-	for (auto le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr; ) { // remove all URBRs of the aborted pipe
-
-		auto urbr_local = CONTAINING_RECORD(le, struct urb_req, list_all);
-		le = le->Flink;
-
-		if (!is_port_urbr(urbr_local->irp, hPipe)) {
-			continue;
-		}
-
-		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seqnum %lu", urbr_local->seqnum);
-
-		if (auto &rip = urbr_local->irp) {
-			if (IoCsqRemoveNextIrp(&vpdo->csq, rip)) {
-				complete_canceled_irp(rip);
-			}
-			rip = nullptr;
-		}
-
-		RemoveEntryListInit(&urbr_local->list_state);
-		RemoveEntryListInit(&urbr_local->list_all);
-
-		free_urbr(urbr_local);
-	}
-
-	KeReleaseInStackQueuedSpinLock(&hlock);
-*/
-	return STATUS_SUCCESS;
+	TraceUrb("PipeHandle %#Ix, NOT IMPEMENTED", (uintptr_t)hPipe);
+	return hPipe ? STATUS_NOT_IMPLEMENTED : STATUS_INVALID_PARAMETER;
 }
 
 NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -412,18 +378,8 @@ NTSTATUS usb_get_port_status(ULONG *status)
 	return STATUS_SUCCESS;
 }
 
-auto pop_read_irp(IRP* &read_irp, vpdo_dev_t *vpdo, IRP *urb_irp)
-{
-	read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr);
-	if (!read_irp) {
-		IoCsqInsertIrp(&vpdo->urb_rx_irps_queue, urb_irp, nullptr);
-		return STATUS_PENDING;
-	}
-
-	return STATUS_INVALID_PARAMETER;
-}
-
 } // namespace
+
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Irp)
 {
@@ -435,19 +391,13 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
 		Trace(TRACE_LEVEL_WARNING, "Internal ioctl only for vpdo is allowed");
-		return irp_done(Irp, STATUS_INVALID_DEVICE_REQUEST);
+		return CompleteRequest(Irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	if (vpdo->unplugged) {
 		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
 		Trace(TRACE_LEVEL_VERBOSE, "%!STATUS!", st);
-		return irp_done(Irp, st);
-	}
-
-	IRP *read_irp{};
-	if (auto err = pop_read_irp(read_irp, vpdo, Irp)) {
-		TraceCall("Leave %!STATUS!", err);
-		return err;
+		return CompleteRequest(Irp, st);
 	}
 
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
@@ -471,7 +421,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 
 	if (status != STATUS_PENDING) {
 		Irp->IoStatus.Information = 0;
-		irp_done(Irp, status);
+		CompleteRequest(Irp, status);
 	}
 
 	TraceCall("Leave %!STATUS!", status);

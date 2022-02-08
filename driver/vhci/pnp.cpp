@@ -31,7 +31,7 @@ const LPCWSTR vdev_desc[VDEV_SIZE] =
 
 PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 {
-	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : irp_done_success(irp);
+	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
 }
 
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
@@ -114,28 +114,28 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(bi);
 
 	auto st = bi ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
-	return irp_done(irp, st);
+	return CompleteRequest(irp, st);
 }
 
 PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 /*
@@ -152,17 +152,17 @@ PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	}
 
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
@@ -171,7 +171,7 @@ PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 	TraceCall("%p", vdev);
 
 	irp->IoStatus.Information = 0;
-	return irp_done_success(irp);
+	return CompleteRequest(irp);
 }
 
 /*
@@ -185,14 +185,14 @@ PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done(irp, STATUS_UNSUCCESSFUL);
+	return CompleteRequest(irp, STATUS_UNSUCCESSFUL);
 }
 
 PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 /*
@@ -203,7 +203,7 @@ PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 	TraceCall("%p", vdev);
-	return irp_done_success(irp);
+	return CompleteRequest(irp);
 }
 
 PAGEABLE void copy_str(LPCWSTR s, IO_STATUS_BLOCK &blk)
@@ -246,7 +246,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: %!DEVICE_TEXT_TYPE!", vdev->type, type);
-		return irp_done(irp, STATUS_INVALID_PARAMETER);
+		return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
 	}
 
 	NTSTATUS err;
@@ -270,7 +270,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 		"%!vdev_type_t!: %!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!", 
 		vdev->type, r.DeviceTextType, r.LocaleId, reinterpret_cast<wchar_t*>(Information), Status);
 
-	return irp_done_iostatus(irp);
+	return CompleteRequestIoStatus(irp);
 }
 
 using pnpmn_func_t = NTSTATUS(vdev_t*, IRP*);
@@ -331,12 +331,12 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 	NTSTATUS status = STATUS_SUCCESS;
 
 	if (vdev->PnPState == pnp_state::Removed) { // the driver should not pass the IRP down to the next lower driver
-		status = irp_done(irp, STATUS_NO_SUCH_DEVICE);
+		status = CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
 	} else if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
 		status = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
 	} else {
 		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
-		status = irp_done_iostatus(irp);
+		status = CompleteRequestIoStatus(irp);
 	}
 
 	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
