@@ -169,7 +169,7 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
 seqnum_t next_seqnum(vpdo_dev_t &vpdo);
 
-inline auto set_vpdo(IRP *irp, vpdo_dev_t *vpdo)
+inline void set_vpdo(IRP *irp, vpdo_dev_t *vpdo)
 {
 	irp->Tail.Overlay.DriverContext[0] = vpdo;
 }
@@ -185,7 +185,7 @@ inline auto get_vpdo(IRP *irp)
 * IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
 * Drivers that use these routines to queue IRPs must leave that member unused.
 */
-inline auto set_seqnums(IRP *irp, seqnum_t seqnum, seqnum_t seqnum_unlink)
+inline void set_seqnums(IRP *irp, seqnum_t seqnum, seqnum_t seqnum_unlink)
 {
 	auto val = (uintptr_t(seqnum_unlink) << 32) | seqnum;
 

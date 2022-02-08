@@ -162,12 +162,12 @@ PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 
 	return IoCsqInitialize(&vpdo.read_irp_queue,
-		InsertIrp_read,
-		RemoveIrp_read,
-		PeekNextIrp_read,
-		AcquireLock_read,
-		ReleaseLock_read,
-		CompleteCanceledIrp);
+				InsertIrp_read,
+				RemoveIrp_read,
+				PeekNextIrp_read,
+				AcquireLock_read,
+				ReleaseLock_read,
+				CompleteCanceledIrp);
 }
 
 PAGEABLE auto init_urb_rx_irps_queue(vpdo_dev_t &vpdo)

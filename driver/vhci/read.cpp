@@ -941,52 +941,6 @@ NTSTATUS usb_submit_urb(IRP *irp)
 	return STATUS_INVALID_PARAMETER;
 }
 
-PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp)
-{
-	PAGED_CODE();
-	
-	auto urb_irp = read_irp;
-
-	auto urb = (URB*)URB_FROM_IRP(urb_irp);
-	if (!urb) {
-		Trace(TRACE_LEVEL_VERBOSE, "Null URB");
-		return STATUS_INVALID_DEVICE_REQUEST;
-	}
-
-	Trace(TRACE_LEVEL_VERBOSE, "Transfer data");
-
-	NTSTATUS st = STATUS_INVALID_PARAMETER;
-
-	switch (urb->UrbHeader.Function) {
-	case URB_FUNCTION_ISOCH_TRANSFER:
-		st = urb_isoch_transfer_partial(read_irp, urb);
-		break;
-	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
-	case URB_FUNCTION_CONTROL_TRANSFER:
-	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-		//
-	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:	// _URB_CONTROL_DESCRIPTOR_REQUEST
-	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:	// _URB_CONTROL_DESCRIPTOR_REQUEST
-	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:	// _URB_CONTROL_DESCRIPTOR_REQUEST
-							//
-	case URB_FUNCTION_CLASS_DEVICE:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-	case URB_FUNCTION_CLASS_INTERFACE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-	case URB_FUNCTION_CLASS_ENDPOINT:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-	case URB_FUNCTION_CLASS_OTHER:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-							//
-	case URB_FUNCTION_VENDOR_DEVICE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-	case URB_FUNCTION_VENDOR_INTERFACE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-	case URB_FUNCTION_VENDOR_ENDPOINT:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-	case URB_FUNCTION_VENDOR_OTHER:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
-		st = transfer_partial(read_irp, urb);
-		break;
-	default:
-		Trace(TRACE_LEVEL_ERROR, "%s: unexpected partial transfer", urb_function_str(urb->UrbHeader.Function));
-	}
-
-	return st;
-}
-
 PAGEABLE void debug(IRP *read_irp, IRP *irp)
 {
 	auto hdr = (usbip_header*)get_irp_buffer(read_irp);
@@ -1042,6 +996,67 @@ PAGEABLE NTSTATUS cmd_unlink(IRP *irp)
 
 	TRANSFERRED(irp) += sizeof(*hdr);
 	return STATUS_SUCCESS;
+}
+
+/*
+* PAGED_CODE() fails.
+*/
+NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *urb_irp)
+{
+//	TraceCall("irp %04x: Transfer header", static_cast<UINT32>(uirp));
+
+	auto err = urbr->irp ? cmd_submit(read_irp, urbr) : cmd_unlink(read_irp, urbr);
+	if (!err) {
+		debug(read_irp, urbr->irp);
+	}
+
+	return err;
+}
+
+PAGEABLE NTSTATUS store_urbr_partial(IRP *read_irp)
+{
+	PAGED_CODE();
+
+	auto urb_irp = read_irp;
+
+	auto urb = (URB*)URB_FROM_IRP(urb_irp);
+	if (!urb) {
+		Trace(TRACE_LEVEL_VERBOSE, "Null URB");
+		return STATUS_INVALID_DEVICE_REQUEST;
+	}
+
+	Trace(TRACE_LEVEL_VERBOSE, "Transfer data");
+
+	NTSTATUS st = STATUS_INVALID_PARAMETER;
+
+	switch (urb->UrbHeader.Function) {
+	case URB_FUNCTION_ISOCH_TRANSFER:
+		st = urb_isoch_transfer_partial(read_irp, urb);
+		break;
+	case URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER:
+	case URB_FUNCTION_CONTROL_TRANSFER:
+	case URB_FUNCTION_CONTROL_TRANSFER_EX:
+		//
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:	// _URB_CONTROL_DESCRIPTOR_REQUEST
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:	// _URB_CONTROL_DESCRIPTOR_REQUEST
+	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:	// _URB_CONTROL_DESCRIPTOR_REQUEST
+							//
+	case URB_FUNCTION_CLASS_DEVICE:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+	case URB_FUNCTION_CLASS_INTERFACE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+	case URB_FUNCTION_CLASS_ENDPOINT:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+	case URB_FUNCTION_CLASS_OTHER:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+							//
+	case URB_FUNCTION_VENDOR_DEVICE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+	case URB_FUNCTION_VENDOR_INTERFACE:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+	case URB_FUNCTION_VENDOR_ENDPOINT:		// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+	case URB_FUNCTION_VENDOR_OTHER:			// _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+		st = transfer_partial(read_irp, urb);
+		break;
+	default:
+		Trace(TRACE_LEVEL_ERROR, "%s: unexpected partial transfer", urb_function_str(urb->UrbHeader.Function));
+	}
+
+	return st;
 }
 
 auto pop_urb_irp(IRP* &urb_irp, vpdo_dev_t *vpdo, IRP *read_irp)

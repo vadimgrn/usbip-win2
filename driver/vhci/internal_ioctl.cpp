@@ -4,11 +4,29 @@
 
 #include "irp.h"
 #include "dev.h"
+#include "read.h"
 
 namespace
 {
 
-const auto STATUS_SUBMIT_URBR_IRP = NTSTATUS(-1);
+const auto STATUS_HANDLE_IRP = NTSTATUS(-1);
+
+NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *irp)
+{
+	set_vpdo(irp, vpdo);
+
+	auto seqnum = next_seqnum(*vpdo);
+	set_seqnums(irp, seqnum, 0);
+
+	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
+		if (auto err = do_read(vpdo, read_irp, irp)) {
+			return err;
+		}
+	}
+
+	IoCsqInsertIrp(&vpdo->urb_rx_irps_queue, irp, nullptr);
+	return STATUS_PENDING;
+}
 
 /*
 * Code must be in nonpaged section if it acquires spinlock.
@@ -26,7 +44,7 @@ NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
 			irp, urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS urb_control_vendor_class_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -38,7 +56,7 @@ NTSTATUS urb_control_vendor_class_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 		irp, urb_function_str(r.Hdr.Function), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags), 
 		r.TransferBufferLength, brequest_str(r.Request), r.Request, r.Value, r.Index);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS urb_control_descriptor_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -49,7 +67,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 		irp, urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
 		r.Index, r.DescriptorType, r.LanguageId);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS urb_control_feature_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -59,7 +77,7 @@ NTSTATUS urb_control_feature_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx", 
 		irp, urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS urb_select_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -67,7 +85,7 @@ NTSTATUS urb_select_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
 	TraceUrb("irp %04x -> %s", irp, select_configuration_str(buf, sizeof(buf), &urb->UrbSelectConfiguration));
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS urb_select_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -75,7 +93,7 @@ NTSTATUS urb_select_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf[SELECT_INTERFACE_STR_BUFSZ];
 	TraceUrb("irp %04x -> %s", irp, select_interface_str(buf, sizeof(buf), &urb->UrbSelectInterface));
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 /*
@@ -101,7 +119,7 @@ NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 		st = vhci_ioctl_abort_pipe(vpdo, r.PipeHandle);
 		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
-		st = STATUS_SUBMIT_URBR_IRP;
+		st = STATUS_HANDLE_IRP;
 		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
@@ -152,7 +170,7 @@ NTSTATUS urb_control_transfer_any(vpdo_dev_t*, URB *urb, UINT32 irp)
 		urb->UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
 		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -168,7 +186,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 		r.TransferBufferLength,
 		func);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -187,7 +205,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 		r.ErrorCount,
 		func);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS usb_function_deprecated(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -203,7 +221,7 @@ NTSTATUS get_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbControlGetConfigurationRequest;
 	TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1)", irp, r.TransferBufferLength);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS get_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -211,7 +229,7 @@ NTSTATUS get_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbControlGetInterfaceRequest;
 	TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1), Interface %hu", irp, r.TransferBufferLength, r.Interface);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_HANDLE_IRP;
 }
 
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -355,7 +373,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 	if (auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
 		auto uirp = reinterpret_cast<uintptr_t>(irp);
 		auto st = pfunc(vpdo, urb, static_cast<UINT32>(uirp));
-		return st; // == STATUS_SUBMIT_URBR_IRP ? submit_urbr_irp(vpdo, irp) : st;
+		return st == STATUS_HANDLE_IRP ? handle_irp(vpdo, irp) : st;
 	}
 
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
@@ -410,7 +428,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 		status = usb_get_port_status(static_cast<ULONG*>(irpStack->Parameters.Others.Argument1));
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		//status = submit_urbr_irp(vpdo, Irp);
+		status = handle_irp(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
 		status = setup_topology_address(vpdo, *static_cast<USB_TOPOLOGY_ADDRESS*>(irpStack->Parameters.Others.Argument1));
