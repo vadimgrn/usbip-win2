@@ -525,7 +525,6 @@ PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 PAGEABLE NTSTATUS ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
 {
 	PAGED_CODE();
-	NT_ASSERT(irp);
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
@@ -590,14 +589,8 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
  * it seems windows client usb driver will think IoCompleteRequest is running at DISPATCH_LEVEL
  * so without this it will change IRQL sometimes, and introduce to a dead of my userspace program.
  */
-void complete(vpdo_dev_t*, IRP *irp, NTSTATUS)
+void complete_urb_irp(IRP *irp, NTSTATUS status)
 {
-	NT_ASSERT(irp);
-/*
-	if (!IoCsqRemoveNextIrp(&vpdo->urb_irps_queue, irp)) {
-		return;
-	}
-
 	TraceCall("%p -> %!STATUS!", irp, status);
 	irp->IoStatus.Status = status;
 
@@ -605,55 +598,46 @@ void complete(vpdo_dev_t*, IRP *irp, NTSTATUS)
 	KeRaiseIrql(DISPATCH_LEVEL, &irql); // FIXME: really?
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	KeLowerIrql(irql);
-*/
 }
 
-PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
+PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	PAGED_CODE();
-	UNREFERENCED_PARAMETER(vpdo);
-	UNREFERENCED_PARAMETER(write_irp);
-	/*
+
 	auto hdr = consume_write_irp_buffer(write_irp);
 	if (!hdr) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto urbr = find_sent_urbr(vpdo, hdr->base.seqnum);
+	auto seqnum = static_cast<uintptr_t>(hdr->base.seqnum);
+	auto urb_irp = IoCsqRemoveNextIrp(&vpdo->urb_tx_irps_queue, reinterpret_cast<void*>(seqnum));
 
-	if (urbr) {
-		auto uirp = reinterpret_cast<uintptr_t>(urbr->irp);
+	if (urb_irp) {
+		NT_ASSERT(get_vpdo(urb_irp) == vpdo);
+		auto uirp = reinterpret_cast<uintptr_t>(urb_irp);
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s", 
 				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "urb_req not found (cancelled?), seqnum %u", hdr->base.seqnum);
+		Trace(TRACE_LEVEL_VERBOSE, "Pending irp not found (cancelled?), seqnum %Iu", seqnum);
 		return STATUS_SUCCESS;
 	}
 
-	auto irp = urbr->irp;
 	auto status = STATUS_INVALID_PARAMETER;
 
 	switch (hdr->base.command) {
 	case USBIP_RET_SUBMIT:
-		status = ret_submit(urbr->vpdo, irp, hdr);
+		status = ret_submit(vpdo, urb_irp, hdr);
 		break;
 	case USBIP_RET_UNLINK:
-		NT_ASSERT(!irp);
 		status = ret_unlink(hdr);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 	}
 
-	free_urbr(urbr);
-	if (irp) {
-		complete(vpdo, irp, status);
-	}
-
+	complete_urb_irp(urb_irp, status);
 	return STATUS_SUCCESS;
-*/
-	return STATUS_NOT_IMPLEMENTED;
 }
 
 } // namespace
@@ -683,7 +667,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
 		
 		if (vpdo && !vpdo->unplugged) {
-			status = do_write_irp(vpdo, irp);
+			status = process_write_irp(vpdo, irp);
 		} else {
 			Trace(TRACE_LEVEL_VERBOSE, "Null or unplugged");
 			status = STATUS_INVALID_DEVICE_REQUEST;
