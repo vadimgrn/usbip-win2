@@ -11,6 +11,7 @@
 #include "pdu.h"
 #include "usbdsc.h"
 #include "urbtransfer.h"
+#include "csq.h"
 
 namespace
 {
@@ -609,17 +610,15 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto seqnum = static_cast<uintptr_t>(hdr->base.seqnum);
-	auto urb_irp = IoCsqRemoveNextIrp(&vpdo->urb_tx_irps_queue, reinterpret_cast<void*>(seqnum));
+	auto urb_irp = IoCsqRemoveNextIrp(&vpdo->urb_tx_irps_queue, as_pointer(hdr->base.seqnum));
 
 	if (urb_irp) {
-		NT_ASSERT(get_vpdo(urb_irp) == vpdo);
 		auto uirp = reinterpret_cast<uintptr_t>(urb_irp);
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s", 
 				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Pending irp not found (cancelled?), seqnum %Iu", seqnum);
+		Trace(TRACE_LEVEL_VERBOSE, "Pending URB irp not found (cancelled?), seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
@@ -662,15 +661,9 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
 
 	if (vhci->PnPState != pnp_state::Removed) {
-
 		auto irpstack = IoGetCurrentIrpStackLocation(irp);
-		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
-		
-		if (vpdo && !vpdo->unplugged) {
-			status = process_write_irp(vpdo, irp);
-		} else {
-			Trace(TRACE_LEVEL_VERBOSE, "Null or unplugged");
-			status = STATUS_INVALID_DEVICE_REQUEST;
+		if (auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext)) {
+			status = vpdo->unplugged ? STATUS_DEVICE_NOT_CONNECTED : process_write_irp(vpdo, irp);
 		}
 	}
 

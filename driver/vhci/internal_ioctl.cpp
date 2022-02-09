@@ -1,29 +1,61 @@
-#include "dbgcommon.h"
+#include "internal_ioctl.h"
 #include "trace.h"
 #include "internal_ioctl.tmh"
 
+#include "dbgcommon.h"
 #include "irp.h"
 #include "dev.h"
 #include "read.h"
+#include "csq.h"
 
 namespace
 {
 
 const auto STATUS_HANDLE_IRP = NTSTATUS(-1);
 
+void handle_read(NTSTATUS &status, vpdo_dev_t *vpdo, IRP *read_irp, IRP *next_irp, bool complete)
+{
+	if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
+		if (complete) {
+			complete_internal_ioctl(next_irp, err);
+		} else {
+			status = err;
+		}
+	}
+}
+
 NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *urb_irp)
 {
-	set_vpdo(urb_irp, vpdo);
+	auto status = STATUS_PENDING;
 
-	auto seqnum = next_seqnum(*vpdo);
-	set_seqnums(urb_irp, seqnum, 0);
+	{
+		ULONG flags = CSQ_INSERT_TAIL;
 
-	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
-		return do_read(read_irp, urb_irp, true);
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->urb_rx_irps_queue, urb_irp, nullptr, &flags);
+		NT_ASSERT(!err);
+
+		if (!(flags & CSQ_READ_PENDING)) {
+			return status;
+		}
 	}
 
-	IoCsqInsertIrp(&vpdo->urb_rx_irps_queue, urb_irp, nullptr);
-	return STATUS_PENDING;
+	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
+
+		auto ctx = as_pointer(vpdo->seqnum_payload);
+
+		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->urb_rx_irps_queue, ctx)) {
+			handle_read(status, vpdo, read_irp, next_irp, next_irp != urb_irp);
+		} else if (ctx) { // urb irp with payload has cancelled, but header was already read
+			auto err = abort_read_payload(vpdo, read_irp);
+			CompleteRequest(read_irp, err);
+		} else { // urb irp has cancelled
+			ULONG flags = 0;
+			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, &flags);
+			NT_ASSERT(!err);
+		}
+	}
+
+	return status;
 }
 
 /*
@@ -397,6 +429,12 @@ NTSTATUS usb_get_port_status(ULONG *status)
 } // namespace
 
 
+NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
+{
+	irp->IoStatus.Information = 0;
+	return CompleteRequest(irp, status);
+}
+
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Irp)
 {
 	auto irpStack = IoGetCurrentIrpStackLocation(Irp);
@@ -436,8 +474,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 	}
 
 	if (status != STATUS_PENDING) {
-		Irp->IoStatus.Information = 0;
-		CompleteRequest(Irp, status);
+		complete_internal_ioctl(Irp, status);
 	}
 
 	TraceCall("Leave %!STATUS!", status);

@@ -5,7 +5,9 @@
 
 #include "usbip_proto.h"
 
-NTSTATUS set_cmd_submit_usbip_header(
-	usbip_header* h, IRP *irp, USBD_PIPE_HANDLE pipe, ULONG TransferFlags, ULONG TransferBufferLength);
+struct vpdo_dev_t;
 
-void set_cmd_unlink_usbip_header(usbip_header *hdr, IRP *irp);
+NTSTATUS set_cmd_submit_usbip_header(
+	vpdo_dev_t *vpdo, usbip_header* h, USBD_PIPE_HANDLE pipe, ULONG TransferFlags, ULONG TransferBufferLength);
+
+void set_cmd_unlink_usbip_header(vpdo_dev_t *vpdo, usbip_header *hdr, seqnum_t seqnum_unlink);

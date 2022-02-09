@@ -55,7 +55,6 @@ struct vdev_t
 	// Stores current device power state
 	DEVICE_POWER_STATE DevicePowerState;
 
-
 	// root and vhci have cpdo and hpdo each
 	vdev_t *child_pdo;
 	vdev_t *parent;
@@ -112,17 +111,19 @@ struct vpdo_dev_t : vdev_t
 	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
 	seqnum_t seqnum;
+	seqnum_t seqnum_payload; // urb irp which is wating for read irp for payload transfer
 
 	IO_CSQ read_irp_queue; // waiting for urb irp from vhci_internal_ioctl
 	IRP *read_irp;
 
-	KSPIN_LOCK urb_irps_lock; // common lock to avoid race conditions between vhci_read and vhci_internal_ioctl
+	KSPIN_LOCK irps_queue_shared_lock; // avoid race conditions between vhci_read and vhci_internal_ioctl
 
 	IO_CSQ urb_rx_irps_queue; // waiting for read irp from vhci_read
 	LIST_ENTRY urb_rx_irps;
 
 	IO_CSQ urb_tx_irps_queue; // waiting for write irp from vhci_write
 	LIST_ENTRY urb_tx_irps;
+	KSPIN_LOCK urb_tx_irps_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -165,47 +166,40 @@ hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
-seqnum_t next_seqnum(vpdo_dev_t &vpdo);
+seqnum_t next_seqnum(vpdo_dev_t *vpdo);
 
-inline void set_vpdo(IRP *irp, vpdo_dev_t *vpdo)
+inline auto as_seqnum(const void *p)
 {
-	irp->Tail.Overlay.DriverContext[0] = vpdo;
+	return static_cast<seqnum_t>(reinterpret_cast<uintptr_t>(p));
 }
 
-inline auto get_vpdo(IRP *irp)
+inline auto as_pointer(seqnum_t seqnum)
 {
-	auto vpdo = static_cast<vpdo_dev_t*>(irp->Tail.Overlay.DriverContext[0]);
-	NT_ASSERT(vpdo);
-	return vpdo;
-}
-
-inline auto get_devid(IRP *irp)
-{
-	return get_vpdo(irp)->devid;
+	return reinterpret_cast<void*>(uintptr_t(seqnum));
 }
 
 /*
 * IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
 * Drivers that use these routines to queue IRPs must leave that member unused.
 */
-inline void set_seqnums(IRP *irp, seqnum_t seqnum, seqnum_t seqnum_unlink)
+inline void set_seqnum(IRP *irp, seqnum_t seqnum)
 {
-	auto val = (uintptr_t(seqnum_unlink) << 32) | seqnum;
-
-	static_assert(sizeof(val) == sizeof(UINT64));
-	static_assert(sizeof(seqnum) == sizeof(UINT32));
-
-	irp->Tail.Overlay.DriverContext[1] = reinterpret_cast<void*>(val);
+	NT_ASSERT(seqnum);
+	irp->Tail.Overlay.DriverContext[0] = as_pointer(seqnum);
 }
 
 inline auto get_seqnum(IRP *irp)
 {
-	seqnum_t seqnum = reinterpret_cast<uintptr_t>(irp->Tail.Overlay.DriverContext[1]) & 0xFFFF'FFFF;
-	NT_ASSERT(seqnum);
-	return seqnum;
+	return as_seqnum(irp->Tail.Overlay.DriverContext[0]);
 }
 
-inline seqnum_t get_seqnum_unlink(IRP *irp)
+inline void set_seqnum_unlink(IRP *irp, seqnum_t seqnum_unlink)
 {
-	return reinterpret_cast<uintptr_t>(irp->Tail.Overlay.DriverContext[1]) >> 32;
+	NT_ASSERT(seqnum_unlink);
+	irp->Tail.Overlay.DriverContext[1] = as_pointer(seqnum_unlink);
+}
+
+inline auto get_seqnum_unlink(IRP *irp)
+{
+	return as_seqnum(irp->Tail.Overlay.DriverContext[1]);
 }

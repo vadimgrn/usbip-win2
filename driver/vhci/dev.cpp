@@ -132,8 +132,8 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)
 	return vdev->type == VDEV_VPDO ? static_cast<vpdo_dev_t*>(vdev) : nullptr;
 }
 
-seqnum_t next_seqnum(vpdo_dev_t &vpdo)
+seqnum_t next_seqnum(vpdo_dev_t *vpdo)
 {
-	auto &val = vpdo.seqnum;
+	auto &val = vpdo->seqnum;
 	return ++val ? val : ++val; // skip zero in case of overflow
 }
