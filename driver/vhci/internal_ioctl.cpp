@@ -24,40 +24,6 @@ void handle_read(NTSTATUS &status, vpdo_dev_t *vpdo, IRP *read_irp, IRP *next_ir
 	}
 }
 
-NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *urb_irp)
-{
-	auto status = STATUS_PENDING;
-
-	{
-		ULONG flags = CSQ_INSERT_TAIL;
-
-		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->urb_rx_irps_queue, urb_irp, nullptr, &flags);
-		NT_ASSERT(!err);
-
-		if (!(flags & CSQ_READ_PENDING)) {
-			return status;
-		}
-	}
-
-	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
-
-		auto ctx = as_pointer(vpdo->seqnum_payload);
-
-		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->urb_rx_irps_queue, ctx)) {
-			handle_read(status, vpdo, read_irp, next_irp, next_irp != urb_irp);
-		} else if (ctx) { // urb irp with payload has cancelled, but header was already read
-			auto err = abort_read_payload(vpdo, read_irp);
-			CompleteRequest(read_irp, err);
-		} else { // urb irp has cancelled
-			ULONG flags = 0;
-			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, &flags);
-			NT_ASSERT(!err);
-		}
-	}
-
-	return status;
-}
-
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
@@ -433,6 +399,40 @@ NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
 	irp->IoStatus.Information = 0;
 	return CompleteRequest(irp, status);
+}
+
+NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *urb_irp)
+{
+	auto status = STATUS_PENDING;
+
+	{
+		ULONG flags = CSQ_INSERT_TAIL;
+
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->urb_rx_irps_queue, urb_irp, nullptr, &flags);
+		NT_ASSERT(!err);
+
+		if (!(flags & CSQ_READ_PENDING)) {
+			return status;
+		}
+	}
+
+	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
+
+		auto ctx = as_pointer(vpdo->seqnum_payload);
+
+		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->urb_rx_irps_queue, ctx)) {
+			handle_read(status, vpdo, read_irp, next_irp, next_irp != urb_irp);
+		} else if (ctx) { // urb irp with payload has cancelled, but header was already read
+			auto err = abort_read_payload(vpdo, read_irp);
+			CompleteRequest(read_irp, err);
+		} else { // urb irp has cancelled
+			ULONG flags = 0;
+			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, &flags);
+			NT_ASSERT(!err);
+		}
+	}
+
+	return status;
 }
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Irp)
