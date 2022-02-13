@@ -1020,15 +1020,14 @@ PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *irp)
 auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 {
 	auto ctx = as_pointer(vpdo->seqnum_payload);
-	ULONG flags = CSQ_FAIL_IF_URB_PENDING;
 
 	do {
 		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irp_queue, ctx)) {
 			return do_read(vpdo, read_irp, irp, true);
-		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read(sent)
+		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read
 			return abort_read_payload(vpdo, read_irp);
 		}
-	} while (IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, &flags));
+	} while (IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, InsertTailIfRxEmpty()));
 
 	return STATUS_PENDING;
 }
@@ -1060,8 +1059,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 
 	if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
-		ULONG flags = CSQ_INSERT_HEAD;
-		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irp_queue, irp, nullptr, &flags);
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irp_queue, irp, nullptr, InsertHead());
 		NT_ASSERT(!err);
 	} else {
 		IoCsqInsertIrp(&vpdo->tx_irp_queue, irp, nullptr);

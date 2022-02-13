@@ -406,14 +406,8 @@ NTSTATUS submit_to_server(vpdo_dev_t *vpdo, IRP *irp)
 	auto status = STATUS_PENDING;
 
 	{
-		ULONG flags = CSQ_INSERT_TAIL;
-
-		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irp_queue, irp, nullptr, &flags);
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irp_queue, irp, nullptr, InsertTail());
 		NT_ASSERT(!err);
-
-		if (!(flags & CSQ_READ_PENDING)) {
-			return status;
-		}
 	}
 
 	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_queue, nullptr)) {
@@ -426,8 +420,7 @@ NTSTATUS submit_to_server(vpdo_dev_t *vpdo, IRP *irp)
 			auto err = abort_read_payload(vpdo, read_irp);
 			CompleteRequest(read_irp, err);
 		} else { // irp has cancelled
-			ULONG flags = 0;
-			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, &flags);
+			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, InsertTail());
 			NT_ASSERT(!err);
 		}
 	}

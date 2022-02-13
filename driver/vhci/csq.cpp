@@ -18,59 +18,56 @@ inline auto to_vpdo_read(IO_CSQ *csq)
 	return CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue);
 }
 
-inline auto to_vpdo_urb_rx(IO_CSQ *csq)
+inline auto to_vpdo_rx(IO_CSQ *csq)
 {
 	return CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue);
 }
 
-inline auto to_vpdo_urb_tx(IO_CSQ *csq)
+inline auto to_vpdo_tx(IO_CSQ *csq)
 {
 	return CONTAINING_RECORD(csq, vpdo_dev_t, tx_irp_queue);
 }
 
 auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 {
+	NTSTATUS err{};
 	auto vpdo = to_vpdo_read(csq);
+	NT_ASSERT(InsertContext != InsertHead());
 
-	NT_ASSERT(InsertContext);
-	auto flags = *static_cast<ULONG*>(InsertContext);
-
-	if ((flags & CSQ_FAIL_IF_URB_PENDING) && !IsListEmpty(&vpdo->rx_irp_head)) {
-		TraceCSQ("%p -> rejected, urb rx irp queue is not empty", irp);
-		return STATUS_UNSUCCESSFUL;
+	KIRQL irql;
+	KeAcquireSpinLock(&vpdo->rx_irp_lock, &irql);
+	
+	if (InsertContext == InsertTailIfRxEmpty() && !IsListEmpty(&vpdo->rx_irp_head)) { // if has pending irps
+		err = STATUS_UNSUCCESSFUL;
+	} else {
+		NT_ASSERT(!vpdo->read_irp);
+		vpdo->read_irp = irp;
 	}
 
-	NT_ASSERT(!vpdo->read_irp);
-	vpdo->read_irp = irp;
+	KeReleaseSpinLock(&vpdo->rx_irp_lock, irql);
 
-	TraceCSQ("%p", irp);
-	return STATUS_SUCCESS;
+	TraceCSQ("%p -> %!STATUS!", irp, err);
+	return err;
 }
 
-auto InsertIrp_urb_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
+auto InsertIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 {
-	auto vpdo = to_vpdo_urb_rx(csq);
-	auto head = &vpdo->rx_irp_head;
-
-	NT_ASSERT(InsertContext);
-	auto &flags = *static_cast<ULONG*>(InsertContext);
-
-	bool tail = flags & CSQ_INSERT_TAIL;
-	flags = vpdo->read_irp ? CSQ_READ_PENDING : 0; // OUT
+	auto vpdo = to_vpdo_rx(csq);
+	bool tail = InsertContext == InsertTail();
 
 	auto func = tail ? InsertTailList : InsertHeadList;
-	func(head, list_entry(irp));
+	func(&vpdo->rx_irp_head, list_entry(irp));
 
 	TraceCSQ("%s %p", tail ? "tail" : "head", irp);
 	return STATUS_SUCCESS;
 }
 
-void InsertIrp_urb_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
+void InsertIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	NT_ASSERT(get_seqnum(irp));
 	TraceCSQ("%p", irp);
 
-	auto vpdo = to_vpdo_urb_tx(csq);
+	auto vpdo = to_vpdo_tx(csq);
 	InsertTailList(&vpdo->tx_irp_head, list_entry(irp));
 }
 
@@ -83,7 +80,7 @@ void RemoveIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 	vpdo->read_irp = nullptr;
 }
 
-void RemoveIrp_urb(_In_ IO_CSQ*, _In_ IRP *irp)
+void RemoveIrp(_In_ IO_CSQ*, _In_ IRP *irp)
 {
 	TraceCSQ("%p", irp);
 	auto entry = list_entry(irp);
@@ -120,66 +117,66 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 	return result;
 }
 
-auto PeekNextIrp_urb_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
+auto PeekNextIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
 {
-	auto vpdo = to_vpdo_urb_rx(csq);
+	auto vpdo = to_vpdo_rx(csq);
 	return PeekNextIrp(&vpdo->rx_irp_head, irp, context);
 }
 
-auto PeekNextIrp_urb_tx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
+auto PeekNextIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
 {
-	auto vpdo = to_vpdo_urb_tx(csq);
+	auto vpdo = to_vpdo_tx(csq);
 	return PeekNextIrp(&vpdo->tx_irp_head, irp, context);
 }
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue)->irp_queue_shared_lock)
+_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue)->read_irp_lock)
 void AcquireLock_read(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql) 
 {
 	auto vpdo = to_vpdo_read(csq);
-	KeAcquireSpinLock(&vpdo->irp_queue_shared_lock, Irql);
+	KeAcquireSpinLock(&vpdo->read_irp_lock, Irql);
 }
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue)->irp_queue_shared_lock)
-void AcquireLock_urb_rx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
+_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue)->rx_irp_lock)
+void AcquireLock_rx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 {
-	auto vpdo = to_vpdo_urb_rx(csq);
-	KeAcquireSpinLock(&vpdo->irp_queue_shared_lock, Irql);
+	auto vpdo = to_vpdo_rx(csq);
+	KeAcquireSpinLock(&vpdo->rx_irp_lock, Irql);
 }
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, tx_irp_queue)->tx_irp_lock)
-void AcquireLock_urb_tx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
+void AcquireLock_tx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 {
-	auto vpdo = to_vpdo_urb_tx(csq);
+	auto vpdo = to_vpdo_tx(csq);
 	KeAcquireSpinLock(&vpdo->tx_irp_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue)->irp_queue_shared_lock)
+_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue)->read_irp_lock)
 void ReleaseLock_read(_In_ IO_CSQ *csq, _In_ KIRQL Irql) 
 {
 	auto vpdo = to_vpdo_read(csq);
-	KeReleaseSpinLock(&vpdo->irp_queue_shared_lock, Irql);
+	KeReleaseSpinLock(&vpdo->read_irp_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue)->irp_queue_shared_lock)
-void ReleaseLock_urb_rx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
+_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue)->rx_irp_lock)
+void ReleaseLock_rx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 {
-	auto vpdo = to_vpdo_urb_rx(csq);
-	KeReleaseSpinLock(&vpdo->irp_queue_shared_lock, Irql);
+	auto vpdo = to_vpdo_rx(csq);
+	KeReleaseSpinLock(&vpdo->rx_irp_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
 _Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, tx_irp_queue)->tx_irp_lock)
-void ReleaseLock_urb_tx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
+void ReleaseLock_tx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 {
-	auto vpdo = to_vpdo_urb_tx(csq);
+	auto vpdo = to_vpdo_tx(csq);
 	KeReleaseSpinLock(&vpdo->tx_irp_lock, Irql);
 }
 
@@ -192,6 +189,8 @@ PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
+	KeInitializeSpinLock(&vpdo.read_irp_lock);
+
 	return IoCsqInitializeEx(&vpdo.read_irp_queue,
 				InsertIrp_read,
 				RemoveIrp_read,
@@ -201,33 +200,35 @@ PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 				CompleteCanceledIrp);
 }
 
-PAGEABLE auto init_urb_rx_irps_queue(vpdo_dev_t &vpdo)
+PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
 	InitializeListHead(&vpdo.rx_irp_head);
+	KeInitializeSpinLock(&vpdo.rx_irp_lock);
 
 	return IoCsqInitializeEx(&vpdo.rx_irp_queue,
-				InsertIrp_urb_rx,
-				RemoveIrp_urb,
-				PeekNextIrp_urb_rx,
-				AcquireLock_urb_rx,
-				ReleaseLock_urb_rx,
+				InsertIrp_rx,
+				RemoveIrp,
+				PeekNextIrp_rx,
+				AcquireLock_rx,
+				ReleaseLock_rx,
 				CompleteCanceledIrp);
 }
 
-PAGEABLE auto init_urb_tx_irps_queue(vpdo_dev_t &vpdo)
+PAGEABLE auto init_tx_irps_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
 	InitializeListHead(&vpdo.tx_irp_head);
+	KeInitializeSpinLock(&vpdo.tx_irp_lock);
 
 	return IoCsqInitialize(&vpdo.tx_irp_queue,
-				InsertIrp_urb_tx,
-				RemoveIrp_urb,
-				PeekNextIrp_urb_tx,
-				AcquireLock_urb_tx,
-				ReleaseLock_urb_tx,
+				InsertIrp_tx,
+				RemoveIrp,
+				PeekNextIrp_tx,
+				AcquireLock_tx,
+				ReleaseLock_tx,
 				CompleteCanceledIrp);
 }
 
@@ -239,7 +240,7 @@ PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 
 	using func = NTSTATUS(vpdo_dev_t&);
-	func* v[] { init_read_irp_queue, init_urb_rx_irps_queue, init_urb_tx_irps_queue };
+	func* v[] { init_read_irp_queue, init_rx_irps_queue, init_tx_irps_queue };
 
 	for (auto f: v) {
 		if (auto err = f(vpdo)) {
@@ -247,6 +248,5 @@ PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo)
 		}
 	}
 
-	KeInitializeSpinLock(&vpdo.irp_queue_shared_lock);
 	return STATUS_SUCCESS;
 }

@@ -114,12 +114,12 @@ struct vpdo_dev_t : vdev_t
 	seqnum_t seqnum_payload; // *ioctl irp which is wating for read irp for payload transfer
 
 	IO_CSQ read_irp_queue; // waiting for irp from *ioctl
-	IRP *read_irp;
-
-	KSPIN_LOCK irp_queue_shared_lock; // avoid race conditions between vhci_read and *ioctl
+	IRP *read_irp; // can be only one
+	KSPIN_LOCK read_irp_lock;
 
 	IO_CSQ rx_irp_queue; // waiting for read irp from vhci_read
 	LIST_ENTRY rx_irp_head;
+	KSPIN_LOCK rx_irp_lock;
 
 	IO_CSQ tx_irp_queue; // waiting for write irp from vhci_write
 	LIST_ENTRY tx_irp_head;
