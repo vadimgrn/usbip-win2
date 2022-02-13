@@ -111,19 +111,19 @@ struct vpdo_dev_t : vdev_t
 	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
 	seqnum_t seqnum;
-	seqnum_t seqnum_payload; // urb irp which is wating for read irp for payload transfer
+	seqnum_t seqnum_payload; // *ioctl irp which is wating for read irp for payload transfer
 
-	IO_CSQ read_irp_queue; // waiting for urb irp from vhci_internal_ioctl
+	IO_CSQ read_irp_queue; // waiting for irp from *ioctl
 	IRP *read_irp;
 
-	KSPIN_LOCK irps_queue_shared_lock; // avoid race conditions between vhci_read and vhci_internal_ioctl
+	KSPIN_LOCK irp_queue_shared_lock; // avoid race conditions between vhci_read and *ioctl
 
-	IO_CSQ urb_rx_irps_queue; // waiting for read irp from vhci_read
-	LIST_ENTRY urb_rx_irps;
+	IO_CSQ rx_irp_queue; // waiting for read irp from vhci_read
+	LIST_ENTRY rx_irp_head;
 
-	IO_CSQ urb_tx_irps_queue; // waiting for write irp from vhci_write
-	LIST_ENTRY urb_tx_irps;
-	KSPIN_LOCK urb_tx_irps_lock;
+	IO_CSQ tx_irp_queue; // waiting for write irp from vhci_write
+	LIST_ENTRY tx_irp_head;
+	KSPIN_LOCK tx_irp_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.

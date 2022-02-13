@@ -241,18 +241,18 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t *vpdo, IRP *irp)
 /*
 * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> req_fetch_dsc -> submit_urbr -> vhci_read
 */
-PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp)
+PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 {
 	PAGED_CODE();
 
-	auto hdr = get_usbip_header(irp);
+	auto hdr = get_usbip_header(read_irp);
 	if (!hdr) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto &r = *(const USB_DESCRIPTOR_REQUEST*)get_irp_buffer(urb_irp);
+	auto &r = *(const USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 
-	auto irpstack = IoGetCurrentIrpStackLocation(urb_irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // length of r.Data[]
 
 	const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
@@ -272,7 +272,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t *vpdo, IRP *irp
 	char buf[USB_SETUP_PKT_STR_BUFBZ];
 	TraceUrb("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
 
-	TRANSFERRED(irp) = sizeof(*hdr);
+	TRANSFERRED(read_irp) = sizeof(*hdr);
 	return STATUS_SUCCESS;
 }
 
@@ -898,9 +898,9 @@ urb_function_t* const urb_functions[] =
 /*
 * PAGED_CODE() fails.
 */
-NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp)
+NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 {
-	auto urb = (URB*)URB_FROM_IRP(urb_irp);
+	auto urb = (URB*)URB_FROM_IRP(irp);
 	if (!urb) {
 		Trace(TRACE_LEVEL_VERBOSE, "Null URB");
 		return STATUS_INVALID_DEVICE_REQUEST;
@@ -910,21 +910,21 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp)
 
 	auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
 	if (pfunc) {
-		return pfunc(vpdo, irp, urb);
+		return pfunc(vpdo, read_irp, urb);
 	}
 
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
 	return STATUS_INVALID_PARAMETER;
 }
 
-void debug(const usbip_header &hdr, IRP *read_irp, IRP *urb_irp)
+void debug(const usbip_header &hdr, IRP *read_irp, IRP *irp)
 {
 	auto pdu_sz = get_pdu_size(&hdr);
 
 	[[maybe_unused]] auto transferred = TRANSFERRED(read_irp);
 	NT_ASSERT(transferred == sizeof(hdr) || (transferred > sizeof(hdr) && transferred == pdu_sz));
 
-	auto uirp = reinterpret_cast<uintptr_t>(urb_irp);
+	auto uirp = reinterpret_cast<uintptr_t>(irp);
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
 	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
@@ -934,22 +934,22 @@ void debug(const usbip_header &hdr, IRP *read_irp, IRP *urb_irp)
 /*
 * PAGED_CODE() fails.
 */
-NTSTATUS cmd_submit(vpdo_dev_t *vpdo, IRP *read_irp, IRP *urb_irp)
+NTSTATUS cmd_submit(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 {
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
 
-	auto irpstack = IoGetCurrentIrpStackLocation(urb_irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = usb_submit_urb(vpdo, read_irp, urb_irp);
+		st = usb_submit_urb(vpdo, read_irp, irp);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		st = usb_reset_port(vpdo, read_irp);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		st = get_descriptor_from_node_connection(vpdo, read_irp, urb_irp);
+		st = get_descriptor_from_node_connection(vpdo, read_irp, irp);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
@@ -973,11 +973,11 @@ PAGEABLE NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *urb_irp)
+PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *irp)
 {
 	PAGED_CODE();
 
-	auto urb = (URB*)URB_FROM_IRP(urb_irp);
+	auto urb = (URB*)URB_FROM_IRP(irp);
 	if (!urb) {
 		Trace(TRACE_LEVEL_VERBOSE, "Null URB");
 		return STATUS_INVALID_DEVICE_REQUEST;
@@ -1023,8 +1023,8 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 	ULONG flags = CSQ_FAIL_IF_URB_PENDING;
 
 	do {
-		if (auto urb_irp = IoCsqRemoveNextIrp(&vpdo->urb_rx_irps_queue, ctx)) {
-			return do_read(vpdo, read_irp, urb_irp, true);
+		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irp_queue, ctx)) {
+			return do_read(vpdo, read_irp, irp, true);
 		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read(sent)
 			return abort_read_payload(vpdo, read_irp);
 		}
@@ -1045,26 +1045,26 @@ auto complete_read(IRP *irp, NTSTATUS status)
 	return status;
 }
 
-void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *urb_irp)
+void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 {
 	if (vpdo->seqnum_payload) { // payload has read
 		vpdo->seqnum_payload = 0;
-		IoCsqInsertIrp(&vpdo->urb_tx_irps_queue, urb_irp, nullptr);
+		IoCsqInsertIrp(&vpdo->tx_irp_queue, irp, nullptr);
 		return;
 	}
 	
 	NT_ASSERT(hdr); // header has read
 
 	auto seqnum = hdr->base.seqnum;
-	set_seqnum(urb_irp, seqnum);
+	set_seqnum(irp, seqnum);
 
 	if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
 		ULONG flags = CSQ_INSERT_HEAD;
-		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->urb_rx_irps_queue, urb_irp, nullptr, &flags);
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irp_queue, irp, nullptr, &flags);
 		NT_ASSERT(!err);
 	} else {
-		IoCsqInsertIrp(&vpdo->urb_tx_irps_queue, urb_irp, nullptr);
+		IoCsqInsertIrp(&vpdo->tx_irp_queue, irp, nullptr);
 	}
 }
 
@@ -1090,23 +1090,23 @@ NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
  * It must not be called concurrently for the same vpdo_dev_t.
  * PAGED_CODE() fails.
  */
-NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *urb_irp, bool from_read)
+NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 {	
 	bool read_hdr = !vpdo->seqnum_payload;
 
-	auto err = read_hdr ? cmd_submit(vpdo, read_irp, urb_irp) : // FIXME: cmd_unlink(vpdo, read_irp, urb_irp)
-				read_payload(read_irp, urb_irp);
+	auto err = read_hdr ? cmd_submit(vpdo, read_irp, irp) : // FIXME: cmd_unlink(vpdo, read_irp, irp)
+				read_payload(read_irp, irp);
 
 	if (!err) {
 		auto hdr = read_hdr ? get_usbip_header(read_irp, true) : nullptr;
 		if (read_hdr) {
 			NT_ASSERT(hdr);
-			debug(*hdr, read_irp, urb_irp);
+			debug(*hdr, read_irp, irp);
 		}
-		post_read(vpdo, hdr, urb_irp);
+		post_read(vpdo, hdr, irp);
 	} else {
 		if (from_read) {
-			complete_internal_ioctl(urb_irp, err);
+			complete_internal_ioctl(irp, err);
 		}
 		if (!read_hdr) {
 			err = abort_read_payload(vpdo, read_irp);

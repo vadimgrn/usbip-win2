@@ -81,7 +81,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	IO_CSQ* v[] { &vpdo->read_irp_queue, &vpdo->urb_rx_irps_queue, &vpdo->urb_tx_irps_queue };
+	IO_CSQ* v[] { &vpdo->read_irp_queue, &vpdo->rx_irp_queue, &vpdo->tx_irp_queue };
 
 	for (auto csq: v) {
 		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {

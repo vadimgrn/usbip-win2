@@ -4,5 +4,5 @@
 
 struct vpdo_dev_t;
 
-NTSTATUS handle_irp(vpdo_dev_t *vpdo, IRP *urb_irp);
+NTSTATUS submit_to_server(vpdo_dev_t *vpdo, IRP *irp);
 NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status);
