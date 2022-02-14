@@ -34,18 +34,23 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 
 	NTSTATUS err{};
 	auto vpdo = to_vpdo_read(csq);
+	bool check_rx = InsertContext == InsertTailIfRxEmpty();
 
-	KIRQL irql;
-	KeAcquireSpinLock(&vpdo->rx_irps_lock, &irql);
+	KIRQL irql{};
+	if (check_rx) {
+		KeAcquireSpinLock(&vpdo->rx_irps_lock, &irql);
+	}
 
-	if (InsertContext == InsertTailIfRxEmpty() && !IsListEmpty(&vpdo->rx_irps)) {
+	if (check_rx && !IsListEmpty(&vpdo->rx_irps)) {
 		err = STATUS_UNSUCCESSFUL;
 	} else {
 		auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
 		NT_ASSERT(!old_ptr);
 	}
 
-	KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
+	if (check_rx) {
+		KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
+	}
 
 	TraceCSQ("%p -> %!STATUS!", irp, err);
 	return err;

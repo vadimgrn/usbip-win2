@@ -1034,7 +1034,7 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 
 auto complete_read(IRP *irp, NTSTATUS status)
 {
-	TraceCall("%!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+	TraceCall("%!STATUS!, transferred %Iu, irp %p", status, TRANSFERRED(irp), irp);
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp)); // before CompleteRequest()
 
 	if (status != STATUS_PENDING) {

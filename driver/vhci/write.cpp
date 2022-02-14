@@ -590,10 +590,10 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
  * it seems windows client usb driver will think IoCompleteRequest is running at DISPATCH_LEVEL
  * so without this it will change IRQL sometimes, and introduce to a dead of my userspace program.
  */
-void complete_irp(IRP *irp, NTSTATUS status)
+void complete_request(IRP *irp, NTSTATUS status)
 {
-	TraceCall("%p -> %!STATUS!", irp, status);
 	irp->IoStatus.Status = status;
+	TraceCall("%!STATUS!, Information %Iu, irp %p", status, irp->IoStatus.Information, irp);
 
 	KIRQL irql;
 	KeRaiseIrql(DISPATCH_LEVEL, &irql); // FIXME: really?
@@ -618,7 +618,7 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s", 
 				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Pending irp not found (cancelled?), seqnum %u", hdr->base.seqnum);
+		Trace(TRACE_LEVEL_VERBOSE, "Pending irp was cancelled, seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
@@ -635,7 +635,7 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 	}
 
-	complete_irp(irp, status);
+	complete_request(irp, status);
 	return STATUS_SUCCESS;
 }
 
