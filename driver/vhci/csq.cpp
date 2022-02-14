@@ -30,18 +30,19 @@ inline auto to_vpdo_tx(IO_CSQ *csq)
 
 auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 {
+	NT_ASSERT(InsertContext != InsertHead());
+
 	NTSTATUS err{};
 	auto vpdo = to_vpdo_read(csq);
-	NT_ASSERT(InsertContext != InsertHead());
 
 	KIRQL irql;
 	KeAcquireSpinLock(&vpdo->rx_irps_lock, &irql);
-	
-	if (InsertContext == InsertTailIfRxEmpty() && !IsListEmpty(&vpdo->rx_irps)) { // if has pending irps
+
+	if (InsertContext == InsertTailIfRxEmpty() && !IsListEmpty(&vpdo->rx_irps)) {
 		err = STATUS_UNSUCCESSFUL;
 	} else {
-		NT_ASSERT(!vpdo->read_irp);
-		vpdo->read_irp = irp;
+		auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
+		NT_ASSERT(!old_ptr);
 	}
 
 	KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
@@ -76,8 +77,8 @@ void RemoveIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 	TraceCSQ("%p", irp);
 	auto vpdo = to_vpdo_read(csq);
 
-	NT_ASSERT(vpdo->read_irp == irp);
-	vpdo->read_irp = nullptr;
+	auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), nullptr);
+	NT_ASSERT(old_ptr == irp);
 }
 
 void RemoveIrp(_In_ IO_CSQ*, _In_ IRP *irp)
@@ -94,8 +95,10 @@ auto PeekNextIrp_read(_In_ IO_CSQ *csq, [[maybe_unused]] _In_ IRP *irp, [[maybe_
 	NT_ASSERT(!context);
 
 	auto vpdo = to_vpdo_read(csq);
-	TraceCSQ("%p", vpdo->read_irp);
-	return vpdo->read_irp;
+	auto ptr = *reinterpret_cast<IRP* volatile *>(&vpdo->read_irp); // dereference pointer to volatile pointer
+
+	TraceCSQ("%p", ptr);
+	return ptr;
 }
 
 auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
@@ -129,14 +132,9 @@ auto PeekNextIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
 	return PeekNextIrp(&vpdo->tx_irps, irp, context);
 }
 
-_IRQL_raises_(DISPATCH_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_csq)->read_irp_lock)
-void AcquireLock_read(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql) 
-{
-	auto vpdo = to_vpdo_read(csq);
-	KeAcquireSpinLock(&vpdo->read_irp_lock, Irql);
-}
+// atomic operations are used
+void AcquireLock_read(_In_ IO_CSQ*, _Out_ PKIRQL) {}
+void ReleaseLock_read(_In_ IO_CSQ*, _In_ KIRQL) {}
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -154,14 +152,6 @@ void AcquireLock_tx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 {
 	auto vpdo = to_vpdo_tx(csq);
 	KeAcquireSpinLock(&vpdo->tx_irps_lock, Irql);
-}
-
-_IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_csq)->read_irp_lock)
-void ReleaseLock_read(_In_ IO_CSQ *csq, _In_ KIRQL Irql) 
-{
-	auto vpdo = to_vpdo_read(csq);
-	KeReleaseSpinLock(&vpdo->read_irp_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
@@ -188,8 +178,6 @@ void CompleteCanceledIrp(_In_ IO_CSQ*, _In_ IRP *irp)
 PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
-
-	KeInitializeSpinLock(&vpdo.read_irp_lock);
 
 	return IoCsqInitializeEx(&vpdo.read_irp_csq,
 				InsertIrp_read,

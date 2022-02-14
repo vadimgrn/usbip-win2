@@ -115,7 +115,6 @@ struct vpdo_dev_t : vdev_t
 
 	IO_CSQ read_irp_csq; // waiting for irp from *ioctl
 	IRP *read_irp; // from vhci_read, can be only one
-	KSPIN_LOCK read_irp_lock;
 
 	IO_CSQ rx_irps_csq; // waiting for irp from vhci_read
 	LIST_ENTRY rx_irps; // from *ioctl
