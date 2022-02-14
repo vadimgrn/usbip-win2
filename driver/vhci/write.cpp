@@ -610,7 +610,7 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irp_queue, as_pointer(hdr->base.seqnum));
+	auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, as_pointer(hdr->base.seqnum));
 
 	if (irp) {
 		auto uirp = reinterpret_cast<uintptr_t>(irp);

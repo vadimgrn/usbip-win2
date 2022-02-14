@@ -1022,12 +1022,12 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 	auto ctx = as_pointer(vpdo->seqnum_payload);
 
 	do {
-		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irp_queue, ctx)) {
+		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
 			return do_read(vpdo, read_irp, irp, true);
 		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read
 			return abort_read_payload(vpdo, read_irp);
 		}
-	} while (IoCsqInsertIrpEx(&vpdo->read_irp_queue, read_irp, nullptr, InsertTailIfRxEmpty()));
+	} while (IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTailIfRxEmpty()));
 
 	return STATUS_PENDING;
 }
@@ -1048,7 +1048,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 {
 	if (vpdo->seqnum_payload) { // payload has read
 		vpdo->seqnum_payload = 0;
-		IoCsqInsertIrp(&vpdo->tx_irp_queue, irp, nullptr);
+		IoCsqInsertIrp(&vpdo->tx_irps_csq, irp, nullptr);
 		return;
 	}
 	
@@ -1059,10 +1059,10 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 
 	if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
-		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irp_queue, irp, nullptr, InsertHead());
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertHead());
 		NT_ASSERT(!err);
 	} else {
-		IoCsqInsertIrp(&vpdo->tx_irp_queue, irp, nullptr);
+		IoCsqInsertIrp(&vpdo->tx_irps_csq, irp, nullptr);
 	}
 }
 

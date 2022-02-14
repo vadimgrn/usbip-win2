@@ -15,17 +15,17 @@ inline auto list_entry(IRP *irp)
 
 inline auto to_vpdo_read(IO_CSQ *csq)
 {
-	return CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue);
+	return CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_csq);
 }
 
 inline auto to_vpdo_rx(IO_CSQ *csq)
 {
-	return CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue);
+	return CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq);
 }
 
 inline auto to_vpdo_tx(IO_CSQ *csq)
 {
-	return CONTAINING_RECORD(csq, vpdo_dev_t, tx_irp_queue);
+	return CONTAINING_RECORD(csq, vpdo_dev_t, tx_irps_csq);
 }
 
 auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
@@ -35,16 +35,16 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	NT_ASSERT(InsertContext != InsertHead());
 
 	KIRQL irql;
-	KeAcquireSpinLock(&vpdo->rx_irp_lock, &irql);
+	KeAcquireSpinLock(&vpdo->rx_irps_lock, &irql);
 	
-	if (InsertContext == InsertTailIfRxEmpty() && !IsListEmpty(&vpdo->rx_irp_head)) { // if has pending irps
+	if (InsertContext == InsertTailIfRxEmpty() && !IsListEmpty(&vpdo->rx_irps)) { // if has pending irps
 		err = STATUS_UNSUCCESSFUL;
 	} else {
 		NT_ASSERT(!vpdo->read_irp);
 		vpdo->read_irp = irp;
 	}
 
-	KeReleaseSpinLock(&vpdo->rx_irp_lock, irql);
+	KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
 
 	TraceCSQ("%p -> %!STATUS!", irp, err);
 	return err;
@@ -56,7 +56,7 @@ auto InsertIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	bool tail = InsertContext == InsertTail();
 
 	auto func = tail ? InsertTailList : InsertHeadList;
-	func(&vpdo->rx_irp_head, list_entry(irp));
+	func(&vpdo->rx_irps, list_entry(irp));
 
 	TraceCSQ("%s %p", tail ? "tail" : "head", irp);
 	return STATUS_SUCCESS;
@@ -68,7 +68,7 @@ void InsertIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 	TraceCSQ("%p", irp);
 
 	auto vpdo = to_vpdo_tx(csq);
-	InsertTailList(&vpdo->tx_irp_head, list_entry(irp));
+	InsertTailList(&vpdo->tx_irps, list_entry(irp));
 }
 
 void RemoveIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
@@ -120,18 +120,18 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 auto PeekNextIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
 {
 	auto vpdo = to_vpdo_rx(csq);
-	return PeekNextIrp(&vpdo->rx_irp_head, irp, context);
+	return PeekNextIrp(&vpdo->rx_irps, irp, context);
 }
 
 auto PeekNextIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID context)
 {
 	auto vpdo = to_vpdo_tx(csq);
-	return PeekNextIrp(&vpdo->tx_irp_head, irp, context);
+	return PeekNextIrp(&vpdo->tx_irps, irp, context);
 }
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue)->read_irp_lock)
+_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_csq)->read_irp_lock)
 void AcquireLock_read(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql) 
 {
 	auto vpdo = to_vpdo_read(csq);
@@ -140,24 +140,24 @@ void AcquireLock_read(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue)->rx_irp_lock)
+_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq)->rx_irps_lock)
 void AcquireLock_rx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 {
 	auto vpdo = to_vpdo_rx(csq);
-	KeAcquireSpinLock(&vpdo->rx_irp_lock, Irql);
+	KeAcquireSpinLock(&vpdo->rx_irps_lock, Irql);
 }
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, tx_irp_queue)->tx_irp_lock)
+_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, tx_irps_csq)->tx_irps_lock)
 void AcquireLock_tx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 {
 	auto vpdo = to_vpdo_tx(csq);
-	KeAcquireSpinLock(&vpdo->tx_irp_lock, Irql);
+	KeAcquireSpinLock(&vpdo->tx_irps_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_queue)->read_irp_lock)
+_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_csq)->read_irp_lock)
 void ReleaseLock_read(_In_ IO_CSQ *csq, _In_ KIRQL Irql) 
 {
 	auto vpdo = to_vpdo_read(csq);
@@ -165,19 +165,19 @@ void ReleaseLock_read(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irp_queue)->rx_irp_lock)
+_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq)->rx_irps_lock)
 void ReleaseLock_rx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 {
 	auto vpdo = to_vpdo_rx(csq);
-	KeReleaseSpinLock(&vpdo->rx_irp_lock, Irql);
+	KeReleaseSpinLock(&vpdo->rx_irps_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, tx_irp_queue)->tx_irp_lock)
+_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, tx_irps_csq)->tx_irps_lock)
 void ReleaseLock_tx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 {
 	auto vpdo = to_vpdo_tx(csq);
-	KeReleaseSpinLock(&vpdo->tx_irp_lock, Irql);
+	KeReleaseSpinLock(&vpdo->tx_irps_lock, Irql);
 }
 
 void CompleteCanceledIrp(_In_ IO_CSQ*, _In_ IRP *irp)
@@ -191,7 +191,7 @@ PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 
 	KeInitializeSpinLock(&vpdo.read_irp_lock);
 
-	return IoCsqInitializeEx(&vpdo.read_irp_queue,
+	return IoCsqInitializeEx(&vpdo.read_irp_csq,
 				InsertIrp_read,
 				RemoveIrp_read,
 				PeekNextIrp_read,
@@ -204,10 +204,10 @@ PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
-	InitializeListHead(&vpdo.rx_irp_head);
-	KeInitializeSpinLock(&vpdo.rx_irp_lock);
+	InitializeListHead(&vpdo.rx_irps);
+	KeInitializeSpinLock(&vpdo.rx_irps_lock);
 
-	return IoCsqInitializeEx(&vpdo.rx_irp_queue,
+	return IoCsqInitializeEx(&vpdo.rx_irps_csq,
 				InsertIrp_rx,
 				RemoveIrp,
 				PeekNextIrp_rx,
@@ -220,10 +220,10 @@ PAGEABLE auto init_tx_irps_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
-	InitializeListHead(&vpdo.tx_irp_head);
-	KeInitializeSpinLock(&vpdo.tx_irp_lock);
+	InitializeListHead(&vpdo.tx_irps);
+	KeInitializeSpinLock(&vpdo.tx_irps_lock);
 
-	return IoCsqInitialize(&vpdo.tx_irp_queue,
+	return IoCsqInitialize(&vpdo.tx_irps_csq,
 				InsertIrp_tx,
 				RemoveIrp,
 				PeekNextIrp_tx,
