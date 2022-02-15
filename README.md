@@ -137,17 +137,26 @@ port 1 is successfully detached
 - Use these tracing GUIDs
   - `8b56380d-5174-4b15-b6f4-4c47008801a4` for vhci driver
   - `8b56380d-5174-4b15-b6f4-4c47008801a4` for usbip_xfer utility
-- Example of a log session for vhci driver using command-line tools
-  - Start a new log session
-    - `tracelog.exe -start usbip-vhci -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f usbip-vhci.etl -flag 0x1F -level 5`
-  - Stop the log session
-    - `tracelog.exe -stop usbip-vhci`
-  - Get readable text from binary event trace log `usbip-vhci.etl`
+- Start real-time log session for vhci driver
 ```
+@echo off
+set NAME=usbip-vhci
 set TMFS=%TEMP%\tmfs
-set TRACE_FORMAT_PREFIX=%%4!s! [%%9!2u!]%%3!04x! %%!LEVEL! %%!FUNC!:
+set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!: 
+tracelog.exe -stop %NAME%
+tracelog.exe -start %NAME% -rt -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x1F -level 5
 tracepdb.exe -f D:\usbip-win2\x64\Debug -p %TMFS%
-tracefmt.exe -nosummary -p %TMFS% -o usbip-vhci.txt usbip-vhci.etl
+start /MAX tracefmt.exe -nosummary -p %TMFS% -displayonly -rt %NAME%
+```
+- Stop the log session and get plain text log
+```
+@echo off
+set NAME=usbip-vhci
+set TMFS=%TEMP%\tmfs
+set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!: 
+tracelog.exe -stop %NAME%
+tracefmt.exe -nosummary -p %TMFS% -o %NAME%.txt %NAME%.etl
+rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
 ```
 
 ## Debugging BSOD
@@ -178,6 +187,5 @@ usbipd -D
 dmesg --follow | tee ~/usbip.log
 ```
 ## Plans for near future
-  - Use Cancel-Safe IRP Queues. Issues with IRP cancellation are the major cause of BSODs.
   - Get rid of usbip_xfer.exe userspace app and handle TCP/IP data exchange inside the driver
   - Use vectored I/O (MDL) to avoid copying of buffers
