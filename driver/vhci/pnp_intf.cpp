@@ -434,5 +434,5 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 	}
 
 	TraceCall("%!GUID! -> %!STATUS!", qi.InterfaceType, status);
-	return irp_done(irp, status);
+	return CompleteRequest(irp, status);
 }

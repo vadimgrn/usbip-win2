@@ -232,7 +232,7 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 	return "IOCTL_?";
 }
 
-static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cmd_submit *cmd)
+static void print_cmd_submit(char *buf, size_t len, const usbip_header_cmd_submit *cmd)
 {
 	auto st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
 			"cmd_submit: flags %#x, length %d, start_frame %d, isoc[%d], interval %d, ",
@@ -247,7 +247,7 @@ static void print_cmd_submit(char *buf, size_t len, const struct usbip_header_cm
 	}
 }
 
-static void print_ret_submit(char *buf, size_t len, const struct usbip_header_ret_submit *cmd)
+static void print_ret_submit(char *buf, size_t len, const usbip_header_ret_submit *cmd)
 {
 	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, start_frame %d, isoc[%d], error_count %d", 
 					cmd->status,
@@ -257,7 +257,7 @@ static void print_ret_submit(char *buf, size_t len, const struct usbip_header_re
 					cmd->error_count);
 }
 
-const char *dbg_usbip_hdr(char *buf, size_t len, const struct usbip_header *hdr)
+const char *dbg_usbip_hdr(char *buf, size_t len, const usbip_header *hdr)
 {
 	if (!hdr) {
 		return "usbip_header{null}";

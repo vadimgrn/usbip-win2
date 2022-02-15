@@ -8,7 +8,7 @@
 ## Status
 - Client (VHCI driver)
   - **Is fully implemented**
-  - Fully compatible with Linux usbip server (at least for kernels 4.19 - 5.13)
+  - Fully compatible with Linux USBIP server (at least for kernels 4.19 - 5.13)
   - **Is not ready for production use**, can cause BSOD or hang in the kernel. This usually happens during disconnection of a device or uninstallation of the driver.
   - There is no installer
   - The driver is not signed
@@ -61,7 +61,7 @@
 - Build the solution
 - All output files are created under x64/{Debug,Release} folders.
 
-## Setup usbip server on Ubuntu Linux
+## Setup USBIP server on Ubuntu Linux
 - Install required packages
 ```
 apt install linux-tools-generic linux-cloud-tools-generic
@@ -83,7 +83,7 @@ usbip: info: bind device on busid 3-2: complete
 ```
 - Your device 3-2 now can be used by usbip client
 
-## Setup usbip client on Windows
+## Setup USBIP client on Windows
 
 ### Install USB/IP test certificate
   - Right click on `driver/usbip_test.pfx`, select "Install PFX" (password: usbip)
@@ -95,10 +95,10 @@ usbip: info: bind device on busid 3-2: complete
     - Reboot the system to apply
 
 ### Install USB/IP client
-- Download and unpack [release](https://github.com/vadimgrn/usbip-win/releases)
+- Download and unpack [release](https://github.com/vadimgrn/usbip-win2/releases)
 - Install drivers
   - Run PowerShell or CMD as an Administrator
-  - Go to the folder with usbip binaries and run
+  - Go to the folder with USBIP binaries and run
   - `usbip.exe install`
 
 ### Use usbip.exe to attach remote device(s)
@@ -130,7 +130,7 @@ port 1 is successfully detached
   - `> bcdedit.exe /set TESTSIGNING OFF`
   - Reboot the system to apply
 
-## Obtaining usbip logs on Windows
+## Obtaining USBIP logs on Windows
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
@@ -139,24 +139,36 @@ port 1 is successfully detached
   - `8b56380d-5174-4b15-b6f4-4c47008801a4` for usbip_xfer utility
 - Example of a log session for vhci driver using command-line tools
   - Start a new log session
-    - `tracelog.exe -start usbip-vhci -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f usbip-vhci.etl -flag 0xF -level 5`
+    - `tracelog.exe -start usbip-vhci -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f usbip-vhci.etl -flag 0x1F -level 5`
   - Stop the log session
     - `tracelog.exe -stop usbip-vhci`
-  - Produce readable text from binary event trace log `usbip-vhci.etl`
+  - Get readable text from binary event trace log `usbip-vhci.etl`
 ```
 set TMFS=%TEMP%\tmfs
 set TRACE_FORMAT_PREFIX=%%4!s! [%%9!2u!]%%3!04x! %%!LEVEL! %%!FUNC!:
-tracepdb.exe -f D:\usbip-win\x64\Debug -p %TMFS%
+tracepdb.exe -f D:\usbip-win2\x64\Debug -p %TMFS%
 tracefmt.exe -nosummary -p %TMFS% -o usbip-vhci.txt usbip-vhci.etl
 ```
-- How to use `TraceView.exe` GUI app
-  - Open the menu item "File/Create New Log Session"
-  - \"*Provider Control GUID Setup*\" dialog window appears
-  - Choose \"*PDB (Debug Information) File*\" radio button and specify PDB file
-    - `usbip_vhci.pdb` for vhci driver
-    - `usbip_xfer.pdb` for usbip_xfer utility
 
-## Obtaining usbip log on Linux
+## Debugging BSOD
+- Enable kernel memory dump
+  - Open "System Properties" dialog bog
+  - Select "Advanced" tab 
+  - Click on "Settings" in "Startup and Recovery"
+  - "System failure", "Write debugging information", pick "Kernel Memory Dump"
+  - Check "Overwrite any existing file"
+- Start WPP tracing session for vhci driver as described in the previous topic
+- When BSOD has occured
+  - Reboot PC if automatic reboot is not set
+  - Run Windows debugger WinDbg.exe as Administrator
+  - Press Ctrl+D to open chash dump
+  - Run following commands and copy the output 
+```
+!analyze -v
+!wmitrace.logdump usbip-vhci
+``` 
+
+## Obtaining USBIP log on Linux
 ```
 killall usbipd
 modprobe -r usbip-host usbip-vudc vhci-hcd usbip-core

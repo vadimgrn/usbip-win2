@@ -1,5 +1,7 @@
 #pragma once
 
-#include "usbreq.h"
+#include <wdm.h>
 
-NTSTATUS store_urbr(IRP *irp, urb_req *urbr);
+struct vpdo_dev_t;
+NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *urb_irp, bool from_read);
+NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *irp);

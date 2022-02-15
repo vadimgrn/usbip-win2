@@ -6,12 +6,12 @@
 #include "usbip_proto.h"
 #include "vpdo.h"
 #include "vpdo_dsc.h"
-#include "usbreq.h"
 #include "usbd_helper.h"
 #include "irp.h"
 #include "pdu.h"
 #include "usbdsc.h"
 #include "urbtransfer.h"
+#include "csq.h"
 
 namespace
 {
@@ -526,7 +526,6 @@ PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 PAGEABLE NTSTATUS ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
 {
 	PAGED_CODE();
-	NT_ASSERT(irp);
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
@@ -587,34 +586,22 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 	return hdr;
 }
 
-/*
-* Code must be in nonpaged section if it acquires spinlock.
-*/
-void complete_irp(IRP *irp, NTSTATUS status)
+/* 
+ * it seems windows client usb driver will think IoCompleteRequest is running at DISPATCH_LEVEL
+ * so without this it will change IRQL sometimes, and introduce to a dead of my userspace program.
+ */
+void complete_request(IRP *irp, NTSTATUS status)
 {
-	KIRQL oldirql;
-
-	IoAcquireCancelSpinLock(&oldirql);
-	bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-	IoReleaseCancelSpinLock(oldirql);
-
-	if (!valid_irp) {
-		return;
-	}
-
 	irp->IoStatus.Status = status;
+	TraceCall("%!STATUS!, Information %Iu, irp %p", status, irp->IoStatus.Information, irp);
 
-	/* it seems windows client usb driver will think
-	* IoCompleteRequest is running at DISPATCH_LEVEL
-	* so without this it will change IRQL sometimes,
-	* and introduce to a dead of my userspace program
-	*/
-	KeRaiseIrql(DISPATCH_LEVEL, &oldirql);
+	KIRQL irql;
+	KeRaiseIrql(DISPATCH_LEVEL, &irql); // FIXME: really?
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
-	KeLowerIrql(oldirql);
+	KeLowerIrql(irql);
 }
 
-PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
+PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	PAGED_CODE();
 
@@ -623,38 +610,32 @@ PAGEABLE NTSTATUS do_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto urbr = find_sent_urbr(vpdo, hdr->base.seqnum);
+	auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, as_pointer(hdr->base.seqnum));
 
-	if (urbr) {
-		auto uirp = reinterpret_cast<uintptr_t>(urbr->irp);
+	if (irp) {
+		auto uirp = reinterpret_cast<uintptr_t>(irp);
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s", 
 				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "urb_req not found (cancelled?), seqnum %u", hdr->base.seqnum);
+		Trace(TRACE_LEVEL_VERBOSE, "Pending irp was cancelled, seqnum %u", hdr->base.seqnum);
 		return STATUS_SUCCESS;
 	}
 
-	auto irp = urbr->irp;
 	auto status = STATUS_INVALID_PARAMETER;
 
 	switch (hdr->base.command) {
 	case USBIP_RET_SUBMIT:
-		status = ret_submit(urbr->vpdo, irp, hdr);
+		status = ret_submit(vpdo, irp, hdr);
 		break;
 	case USBIP_RET_UNLINK:
-		NT_ASSERT(!irp);
 		status = ret_unlink(hdr);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
 	}
 
-	free_urbr(urbr);
-	if (irp) {
-		complete_irp(irp, status);
-	}
-
+	complete_request(irp, status);
 	return STATUS_SUCCESS;
 }
 
@@ -674,26 +655,20 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
 		Trace(TRACE_LEVEL_WARNING, "write for non-vhci is not allowed");
-		return irp_done(irp, STATUS_INVALID_DEVICE_REQUEST);
+		return CompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	NTSTATUS status = STATUS_NO_SUCH_DEVICE;
 
 	if (vhci->PnPState != pnp_state::Removed) {
-
 		auto irpstack = IoGetCurrentIrpStackLocation(irp);
-		auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext);
-		
-		if (vpdo && !vpdo->unplugged) {
-			status = do_write_irp(vpdo, irp);
-		} else {
-			Trace(TRACE_LEVEL_VERBOSE, "Null or unplugged");
-			status = STATUS_INVALID_DEVICE_REQUEST;
+		if (auto vpdo = static_cast<vpdo_dev_t*>(irpstack->FileObject->FsContext)) {
+			status = vpdo->unplugged ? STATUS_DEVICE_NOT_CONNECTED : process_write_irp(vpdo, irp);
 		}
 	}
 
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
 	TraceCall("Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
 
-	return irp_done(irp, status);
+	return CompleteRequest(irp, status);
 }

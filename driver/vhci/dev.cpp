@@ -29,7 +29,7 @@ const ULONG ext_sizes_per_devtype[VDEV_SIZE] =
 void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
 	ResultLength = 256;
-	auto alloc = [] (auto len) noexcept { return ExAllocatePoolWithTag(PagedPool, len, USBIP_VHCI_POOL_TAG); };
+	auto alloc = [] (auto len) { return ExAllocatePoolWithTag(PagedPool, len, USBIP_VHCI_POOL_TAG); };
 
 	for (auto buf = alloc(ResultLength); buf; ) {
 		
@@ -130,4 +130,10 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
 	return vdev->type == VDEV_VPDO ? static_cast<vpdo_dev_t*>(vdev) : nullptr;
+}
+
+seqnum_t next_seqnum(vpdo_dev_t *vpdo)
+{
+	auto &val = vpdo->seqnum;
+	return ++val ? val : ++val; // skip zero in case of overflow
 }

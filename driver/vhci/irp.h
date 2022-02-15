@@ -6,14 +6,11 @@
 PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp);
 PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);
 
-NTSTATUS irp_done(IRP *irp, NTSTATUS status);
+NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status = STATUS_SUCCESS);
 
-inline auto irp_done_success(IRP *irp)
+inline auto CompleteRequestIoStatus(IRP *irp)
 {
-	return irp_done(irp, STATUS_SUCCESS);
+	return CompleteRequest(irp, irp->IoStatus.Status);
 }
 
-inline auto irp_done_iostatus(IRP *irp)
-{
-	return irp_done(irp, irp->IoStatus.Status);
-}
+void complete_canceled_irp(IRP *irp);

@@ -1,76 +1,25 @@
-#include "dbgcommon.h"
+#include "internal_ioctl.h"
 #include "trace.h"
 #include "internal_ioctl.tmh"
 
-#include "usbreq.h"
+#include "dbgcommon.h"
 #include "irp.h"
+#include "dev.h"
+#include "read.h"
+#include "csq.h"
 
 namespace
 {
 
-const auto STATUS_SUBMIT_URBR_IRP = NTSTATUS(-1);
-
-auto submit_urbr_irp(vpdo_dev_t *vpdo, IRP *irp)
-{
-	auto urbr = create_urbr(vpdo, irp, 0);
-	if (!urbr) {
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	auto status = submit_urbr(vpdo, urbr);
-	if (NT_ERROR(status)) {
-		free_urbr(urbr);
-	}
-
-	return status;
-}
+const auto STATUS_SUBMIT_TO_SERVER = NTSTATUS(-1);
 
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE hPipe)
+NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t*, USBD_PIPE_HANDLE hPipe)
 {
-	TraceUrb("PipeHandle %#Ix", (uintptr_t)hPipe);
-
-	if (!hPipe) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	KLOCK_QUEUE_HANDLE hlock;
-	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
-
-	for (auto le = vpdo->head_urbr.Flink; le != &vpdo->head_urbr; ) { // remove all URBRs of the aborted pipe
-
-		auto urbr_local = CONTAINING_RECORD(le, struct urb_req, list_all);
-		le = le->Flink;
-
-		if (!is_port_urbr(urbr_local->irp, hPipe)) {
-			continue;
-		}
-
-		Trace(TRACE_LEVEL_VERBOSE, "Aborted urbr removed, seqnum %lu", urbr_local->seqnum);
-
-		if (auto irp = urbr_local->irp) {
-
-			KIRQL irql;
-			IoAcquireCancelSpinLock(&irql);
-			bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-			IoReleaseCancelSpinLock(irql);
-
-			if (valid_irp) {
-				irp->IoStatus.Information = 0;
-				irp_done(irp, STATUS_CANCELLED);
-			}
-		}
-
-		RemoveEntryListInit(&urbr_local->list_state);
-		RemoveEntryListInit(&urbr_local->list_all);
-
-		free_urbr(urbr_local);
-	}
-
-	KeReleaseInStackQueuedSpinLock(&hlock);
-	return STATUS_SUCCESS;
+	TraceUrb("PipeHandle %#Ix, NOT IMPEMENTED", (uintptr_t)hPipe);
+	return hPipe ? STATUS_NOT_IMPLEMENTED : STATUS_INVALID_PARAMETER;
 }
 
 NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -80,7 +29,7 @@ NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
 			irp, urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS urb_control_vendor_class_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -92,7 +41,7 @@ NTSTATUS urb_control_vendor_class_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 		irp, urb_function_str(r.Hdr.Function), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags), 
 		r.TransferBufferLength, brequest_str(r.Request), r.Request, r.Value, r.Index);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS urb_control_descriptor_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -103,7 +52,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 		irp, urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
 		r.Index, r.DescriptorType, r.LanguageId);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS urb_control_feature_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -113,7 +62,7 @@ NTSTATUS urb_control_feature_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx", 
 		irp, urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS urb_select_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -121,7 +70,7 @@ NTSTATUS urb_select_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
 	TraceUrb("irp %04x -> %s", irp, select_configuration_str(buf, sizeof(buf), &urb->UrbSelectConfiguration));
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS urb_select_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -129,7 +78,7 @@ NTSTATUS urb_select_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf[SELECT_INTERFACE_STR_BUFSZ];
 	TraceUrb("irp %04x -> %s", irp, select_interface_str(buf, sizeof(buf), &urb->UrbSelectInterface));
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 /*
@@ -155,7 +104,7 @@ NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 		st = vhci_ioctl_abort_pipe(vpdo, r.PipeHandle);
 		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
-		st = STATUS_SUBMIT_URBR_IRP;
+		st = STATUS_SUBMIT_TO_SERVER;
 		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
@@ -206,7 +155,7 @@ NTSTATUS urb_control_transfer_any(vpdo_dev_t*, URB *urb, UINT32 irp)
 		urb->UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
 		usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -222,7 +171,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 		r.TransferBufferLength,
 		func);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -241,7 +190,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 		r.ErrorCount,
 		func);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS usb_function_deprecated(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -257,7 +206,7 @@ NTSTATUS get_configuration(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbControlGetConfigurationRequest;
 	TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1)", irp, r.TransferBufferLength);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS get_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -265,7 +214,7 @@ NTSTATUS get_interface(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbControlGetInterfaceRequest;
 	TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1), Interface %hu", irp, r.TransferBufferLength, r.Interface);
 
-	return STATUS_SUBMIT_URBR_IRP;
+	return STATUS_SUBMIT_TO_SERVER;
 }
 
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -406,10 +355,10 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 
 	auto func = urb->UrbHeader.Function;
 
-	if (auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
+	if (auto handler = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
 		auto uirp = reinterpret_cast<uintptr_t>(irp);
-		auto st = pfunc(vpdo, urb, static_cast<UINT32>(uirp));
-		return st == STATUS_SUBMIT_URBR_IRP ? submit_urbr_irp(vpdo, irp) : st;
+		auto st = handler(vpdo, urb, static_cast<UINT32>(uirp));
+		return st == STATUS_SUBMIT_TO_SERVER ? submit_to_server(vpdo, irp) : st;
 	}
 
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
@@ -432,7 +381,52 @@ NTSTATUS usb_get_port_status(ULONG *status)
 	return STATUS_SUCCESS;
 }
 
+void handle_read(NTSTATUS &status, vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool complete)
+{
+	if (auto err = do_read(vpdo, read_irp, irp, false)) {
+		if (complete) {
+			complete_internal_ioctl(irp, err);
+		} else {
+			status = err;
+		}
+	}
+}
+
 } // namespace
+
+
+NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
+{
+	irp->IoStatus.Information = 0;
+	return CompleteRequest(irp, status);
+}
+
+NTSTATUS submit_to_server(vpdo_dev_t *vpdo, IRP *irp)
+{
+	auto status = STATUS_PENDING;
+
+	{
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertTail());
+		NT_ASSERT(!err);
+	}
+
+	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_csq, nullptr)) {
+
+		auto ctx = as_pointer(vpdo->seqnum_payload);
+
+		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
+			handle_read(status, vpdo, read_irp, next_irp, next_irp != irp);
+		} else if (ctx) { // irp with payload has cancelled, but header was already read
+			auto err = abort_read_payload(vpdo, read_irp);
+			CompleteRequest(read_irp, err);
+		} else { // irp has cancelled
+			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTail());
+			NT_ASSERT(!err);
+		}
+	}
+
+	return status;
+}
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Irp)
 {
@@ -444,13 +438,13 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
 		Trace(TRACE_LEVEL_WARNING, "Internal ioctl only for vpdo is allowed");
-		return irp_done(Irp, STATUS_INVALID_DEVICE_REQUEST);
+		return CompleteRequest(Irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	if (vpdo->unplugged) {
 		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
 		Trace(TRACE_LEVEL_VERBOSE, "%!STATUS!", st);
-		return irp_done(Irp, st);
+		return CompleteRequest(Irp, st);
 	}
 
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
@@ -463,7 +457,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 		status = usb_get_port_status(static_cast<ULONG*>(irpStack->Parameters.Others.Argument1));
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		status = submit_urbr_irp(vpdo, Irp);
+		status = submit_to_server(vpdo, Irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
 		status = setup_topology_address(vpdo, *static_cast<USB_TOPOLOGY_ADDRESS*>(irpStack->Parameters.Others.Argument1));
@@ -473,8 +467,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 	}
 
 	if (status != STATUS_PENDING) {
-		Irp->IoStatus.Information = 0;
-		irp_done(Irp, status);
+		complete_internal_ioctl(Irp, status);
 	}
 
 	TraceCall("Leave %!STATUS!", status);

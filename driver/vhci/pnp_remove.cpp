@@ -8,86 +8,10 @@
 #include "wmi.h"
 #include "vhub.h"
 #include "usbip_vhci_api.h"
-#include "usbreq.h"
 #include "strutil.h"
 
 namespace
 {
-
-/*
-* Code must be in nonpaged section if it acquires spinlock.
-*/
-void complete_pending_read_irp(vpdo_dev_t *vpdo)
-{
-	KLOCK_QUEUE_HANDLE hlock;
-	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
-	auto irp = vpdo->pending_read_irp;
-	vpdo->pending_read_irp = nullptr;
-	KeReleaseInStackQueuedSpinLock(&hlock);
-
-	if (!irp) {
-		return;
-	}
-
-	Trace(TRACE_LEVEL_VERBOSE, "Complete pending read irp %p", irp);
-	// We got pending_read_irp before submit_urbr
-
-	KIRQL irql;
-	IoAcquireCancelSpinLock(&irql);
-	bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-	IoReleaseCancelSpinLock(irql);
-
-	if (valid_irp) {
-		irp->IoStatus.Information = 0;
-		irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
-	}
-}
-
-/*
-* Code must be in nonpaged section if it acquires spinlock.
-*/
-void complete_pending_irp(vpdo_dev_t *vpdo)
-{
-	KLOCK_QUEUE_HANDLE hlock;
-	KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
-
-	while (!IsListEmpty(&vpdo->head_urbr)) {
-
-		auto urbr = CONTAINING_RECORD(vpdo->head_urbr.Flink, struct urb_req, list_all);
-		Trace(TRACE_LEVEL_VERBOSE, "Complete pending urbr, seqnum %lu", urbr->seqnum);
-
-		RemoveEntryListInit(&urbr->list_all);
-		RemoveEntryListInit(&urbr->list_state);
-
-		KeReleaseInStackQueuedSpinLock(&hlock);
-
-		auto irp = urbr->irp;
-		free_urbr(urbr);
-
-		if (irp) {
-			// urbr irps have cancel routine
-			KIRQL irql;
-			IoAcquireCancelSpinLock(&irql);
-			bool valid_irp = IoSetCancelRoutine(irp, nullptr);
-			IoReleaseCancelSpinLock(irql);
-
-			if (valid_irp) {
-				irp->IoStatus.Information = 0;
-				irp_done(irp, STATUS_DEVICE_NOT_CONNECTED);
-			}
-		}
-
-		KeAcquireInStackQueuedSpinLock(&vpdo->lock_urbr, &hlock);
-	}
-
-	vpdo->urbr_sent_partial = nullptr; // sure?
-	vpdo->len_sent_partial = 0;
-
-	InitializeListHead(&vpdo->head_urbr_sent);
-	InitializeListHead(&vpdo->head_urbr_pending);
-
-	KeReleaseInStackQueuedSpinLock(&hlock);
-}
 
 PAGEABLE void destroy_vhci(vhci_dev_t *vhci)
 {
@@ -153,15 +77,25 @@ PAGEABLE void free_usb_dev_interface(UNICODE_STRING *iface)
 	iface->MaximumLength = 0;
 }
 
-PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
+	IO_CSQ* v[] { &vpdo->read_irp_csq, &vpdo->rx_irps_csq, &vpdo->tx_irps_csq };
+
+	for (auto csq: v) {
+		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
+			complete_canceled_irp(irp);
+		}
+	}
+}
+
+PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
+{
+	PAGED_CODE();
 	TraceCall("%p, port %d", vpdo, vpdo->port);
 
-	complete_pending_read_irp(vpdo);
-	complete_pending_irp(vpdo);
-
+	cancel_pending_irps(vpdo);
 	vhub_detach_vpdo(vpdo);
 
 	free_usb_dev_interface(&vpdo->usb_dev_interface);
@@ -177,9 +111,9 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
 		vpdo->actconfig = nullptr;
 	}
 
-	if (vpdo->fo) { // FIXME
-		vpdo->fo->FsContext = nullptr;
-		vpdo->fo = nullptr;
+	if (auto &fo = vpdo->fo) { // FIXME
+		fo->FsContext = nullptr;
+		fo = nullptr;
 	}
 }
 
@@ -234,7 +168,7 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: already removed", vdev->type);
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	}
 
 	auto devobj_lower = vdev->devobj_lower;
@@ -246,6 +180,6 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 		irp->IoStatus.Status = STATUS_SUCCESS;
 		return irp_pass_down(devobj_lower, irp);
 	} else {
-		return irp_done_success(irp);
+		return CompleteRequest(irp);
 	}
 }

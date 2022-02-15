@@ -213,5 +213,5 @@ PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp)
 				pnp_query_cap_vpdo((vpdo_dev_t*)vdev, irpstack) :
 				pnp_query_cap(irpstack);
 
-	return irp_done(irp, status);
+	return CompleteRequest(irp, status);
 }

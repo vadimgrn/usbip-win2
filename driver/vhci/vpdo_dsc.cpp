@@ -4,37 +4,15 @@
 
 #include "vhci.h"
 #include "dev.h"
-#include "usbreq.h"
 #include "usbip_proto.h"
 #include "irp.h"
 #include "usbdsc.h"
+#include "internal_ioctl.h"
 
 #include <ntstrsafe.h>
 
 namespace
 {
-
-PAGEABLE NTSTATUS req_fetch_dsc(vpdo_dev_t *vpdo, IRP *irp)
-{
-	PAGED_CODE();
-
-	NTSTATUS status = STATUS_INSUFFICIENT_RESOURCES;
-	auto urbr = create_urbr(vpdo, irp, 0);
-
-	if (urbr) {
-		status = submit_urbr(vpdo, urbr);
-		if (NT_SUCCESS(status)) {
-			return STATUS_PENDING;
-		}
-
-		Trace(TRACE_LEVEL_ERROR, "Failed to submit fetch descriptor URB");
-
-		free_urbr(urbr);
-		status = STATUS_UNSUCCESSFUL;
-	}
-
-	return irp_done(irp, status);
-}
 
 PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 {
@@ -121,7 +99,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 	}
 
 	if (!dsc_data) {
-		return req_fetch_dsc(vpdo, irp);
+		return submit_to_server(vpdo, irp);
 	}
 
 	ULONG outlen = sizeof(r) + dsc_len;

@@ -2,7 +2,6 @@
 #include "trace.h"
 #include "vhci.tmh"
 
-#include "usbreq.h"
 #include "pnp.h"
 #include "irp.h"
 #include "vhub.h"
@@ -11,7 +10,6 @@
 #include <usbdi.h>
 
 GLOBALS Globals;
-NPAGED_LOOKASIDE_LIST g_lookaside;
 
 namespace
 {
@@ -38,13 +36,13 @@ PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
+		return CompleteRequest(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
-	return irp_done_success(Irp);
+	return CompleteRequest(Irp);
 }
 
 PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
@@ -55,7 +53,7 @@ PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return irp_done(irp, STATUS_NO_SUCH_DEVICE);
+		return CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
@@ -65,7 +63,7 @@ PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	}
 
 	irp->IoStatus.Information = 0;
-	return irp_done_success(irp);
+	return CompleteRequest(irp);
 }
 
 PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
@@ -76,13 +74,13 @@ PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return irp_done(Irp, STATUS_NO_SUCH_DEVICE);
+		return CompleteRequest(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
 	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
 
 	Irp->IoStatus.Information = 0;
-	return irp_done_success(Irp);
+	return CompleteRequest(Irp);
 }
 
 PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
@@ -92,8 +90,6 @@ PAGEABLE void vhci_driverUnload(__in DRIVER_OBJECT *drvobj)
 	TraceCall("Unloading");
 
 	// NT_ASSERT(!drvobj->DeviceObject);
-
-	ExDeleteNPagedLookasideList(&g_lookaside);
 
 	NT_ASSERT(Globals.RegistryPath.Buffer);
 	ExFreePoolWithTag(Globals.RegistryPath.Buffer, USBIP_VHCI_POOL_TAG);
@@ -223,8 +219,6 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 		WPP_CLEANUP(drvobj);
 		return err;
 	}
-
-	ExInitializeNPagedLookasideList(&g_lookaside, nullptr, nullptr, 0, sizeof(struct urb_req), 'USBV', 0);
 
 	drvobj->MajorFunction[IRP_MJ_CREATE] = vhci_create;
 	drvobj->MajorFunction[IRP_MJ_CLEANUP] = vhci_cleanup;

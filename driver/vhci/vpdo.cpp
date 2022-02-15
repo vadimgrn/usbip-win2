@@ -3,7 +3,6 @@
 #include "vpdo.tmh"
 
 #include "vhci.h"
-#include "usbreq.h"
 #include "usbdsc.h"
 
 namespace

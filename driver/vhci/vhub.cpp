@@ -159,11 +159,12 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 PAGEABLE NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
-
 	NT_ASSERT(vpdo);
-	static_assert(sizeof(vpdo->unplugged) == sizeof(CHAR));
 
-	if (InterlockedExchange8(reinterpret_cast<volatile CHAR*>(&vpdo->unplugged), true)) {
+	static_assert(sizeof(vpdo->unplugged) == sizeof(CHAR));
+	auto &ch = reinterpret_cast<volatile CHAR&>(vpdo->unplugged);
+
+	if (InterlockedExchange8(&ch, true)) {
 		Trace(TRACE_LEVEL_INFORMATION, "Device is already unplugged, port %d", vpdo->port);
 		return STATUS_OPERATION_IN_PROGRESS;
 	}
