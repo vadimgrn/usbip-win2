@@ -37,7 +37,7 @@ inline void swap_ret_unlink(usbip_header_ret_unlink &r)
 } // namespace
 
 
-void swap_usbip_header(struct usbip_header *hdr)
+void swap_usbip_header(usbip_header *hdr)
 {
 	hdr->base.seqnum = RtlUlongByteSwap(hdr->base.seqnum);
 	hdr->base.devid = RtlUlongByteSwap(hdr->base.devid);
@@ -62,10 +62,10 @@ void swap_usbip_header(struct usbip_header *hdr)
 	hdr->base.command = RtlUlongByteSwap(hdr->base.command);
 }
 
-void swap_usbip_ds(struct usbip_header *hdr)
+void swap_usbip_ds(usbip_header *hdr)
 {
 	auto cnt = hdr->u.ret_submit.number_of_packets;
-	auto d = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + hdr->u.ret_submit.actual_length);
+	auto d = (usbip_iso_packet_descriptor*)((char*)(hdr + 1) + hdr->u.ret_submit.actual_length);
 	
 	for (int i = 0; i < cnt; ++i, ++d) {
 		d->offset = RtlUlongByteSwap(d->offset);
@@ -75,7 +75,7 @@ void swap_usbip_ds(struct usbip_header *hdr)
 	}
 }
 
-size_t get_pdu_payload_size(const struct usbip_header *hdr)
+size_t get_pdu_payload_size(const usbip_header *hdr)
 {
 	NT_ASSERT(hdr);
 
@@ -85,11 +85,11 @@ size_t get_pdu_payload_size(const struct usbip_header *hdr)
 	switch (hdr->base.command) {
 	case USBIP_CMD_SUBMIT:
 		len += dir_out ? hdr->u.cmd_submit.transfer_buffer_length : 0;
-		len += hdr->u.cmd_submit.number_of_packets*sizeof(struct usbip_iso_packet_descriptor);
+		len += hdr->u.cmd_submit.number_of_packets*sizeof(usbip_iso_packet_descriptor);
 		break;
 	case USBIP_RET_SUBMIT:
 		len += dir_out ? 0 : hdr->u.ret_submit.actual_length;
-		len += hdr->u.ret_submit.number_of_packets*sizeof(struct usbip_iso_packet_descriptor);
+		len += hdr->u.ret_submit.number_of_packets*sizeof(usbip_iso_packet_descriptor);
 		break;
 	case USBIP_CMD_UNLINK:
 	case USBIP_RET_UNLINK:
@@ -99,7 +99,7 @@ size_t get_pdu_payload_size(const struct usbip_header *hdr)
 	return len;
 }
 
-size_t get_pdu_size(const struct usbip_header *hdr)
+size_t get_pdu_size(const usbip_header *hdr)
 {
 	return sizeof(*hdr) + get_pdu_payload_size(hdr);
 }

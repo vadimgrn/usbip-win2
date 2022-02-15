@@ -174,6 +174,7 @@ private:
 
 	void save_client_req_in(const usbip_header &req);
 	void add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum);
+	void remove_seqnum(seqnum_t seqnum);
 	void restore_server_resp_in(buffer_ptr resp);
 
 	void async_read_header(buffer_ptr buf, bool remote);
@@ -326,6 +327,13 @@ void Forwarder::add_seqnums(seqnum_t seqnum, seqnum_t unlink_seqnum)
 		i->second = seqnum;
 		Trace(TRACE_LEVEL_VERBOSE, "Updated seqnum %u, unlink_seqnum %u", i->first, i->second);
 	}
+}
+
+void Forwarder::remove_seqnum(seqnum_t seqnum)
+{
+	[[maybe_unused]] auto cnt = m_client_req_in.erase(seqnum);
+	assert(cnt);
+	Trace(TRACE_LEVEL_VERBOSE, "Removed seqnum %u/%Iu, total %Iu", seqnum, cnt, m_client_req_in.size());
 }
 
 /*
@@ -496,22 +504,41 @@ void Forwarder::async_read_body(buffer_ptr buf, bool remote)
 		 async_read(m_dev,  std::move(body), transfer_max(), std::move(f));
 }
 
+/*
+ * See driver/vhci/read.cpp, abort_read_payload. 
+ */
 void Forwarder::on_read_body(
 	const boost::system::error_code &ec, std::size_t transferred, buffer_ptr buf, bool remote)
 {
-	if (ec) {
-		Trace(TRACE_LEVEL_ERROR, "%s <- error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
+	auto &hdr = get_hdr(buf);
+
+	if (!ec) {
+		Trace(TRACE_LEVEL_VERBOSE, "%s -> %Iu", target(remote), transferred);
+		assert(transferred == buf->size() - sizeof(hdr));
+		byteswap_payload(hdr);
+		async_write_pdu(std::move(buf), !remote);
+		return;
+	}
+
+	Trace(TRACE_LEVEL_ERROR, "%s <- error #%d '%s'", target(remote), ec.value(), ec.message().c_str());
+
+	bool read_payload_cancelled = ec.value() == ERROR_REQUEST_ABORTED && m_client && !remote;
+	if (!read_payload_cancelled) {
 		stop();
 		return;
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "%s -> %Iu", target(remote), transferred);
+	assert(!transferred); // vhci driver has cancelled read payload
 
-	auto &hdr = get_hdr(buf);
-	assert(transferred == buf->size() - sizeof(hdr));
+	auto [seqnum, unlink_seqnum] = get_client_req_seqnums(hdr);
+	assert(!unlink_seqnum); // cmd_unlink has no payload
 
-	byteswap_payload(hdr);
-	async_write_pdu(std::move(buf), !remote);
+	if (seqnum && !stopped()) { // DIR_IN
+		auto f = [self = shared_from_this(), seqnum] { self->remove_seqnum(seqnum); };
+		dispatch(bind_executor(m_strand, std::move(f)));
+	}
+
+	async_read_header(std::move(buf), remote);
 }
 
 void Forwarder::async_write_pdu(buffer_ptr buf, bool remote)

@@ -650,11 +650,11 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceCall("Enter irql %!irql!, write buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
+	TraceCall("Enter irql %!irql!, write buffer %lu, irp %p", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp);
 
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
-		Trace(TRACE_LEVEL_WARNING, "write for non-vhci is not allowed");
+		Trace(TRACE_LEVEL_WARNING, "Write for non-vhci is not allowed");
 		return CompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
@@ -668,7 +668,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	}
 
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
-	TraceCall("Leave %!STATUS!, transferred %Iu", status, TRANSFERRED(irp));
+	TraceCall("Leave %!STATUS!, transferred %Iu, irp %p", status, TRANSFERRED(irp), irp);
 
 	return CompleteRequest(irp, status);
 }

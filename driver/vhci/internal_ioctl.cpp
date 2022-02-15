@@ -433,7 +433,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 	auto irpStack = IoGetCurrentIrpStackLocation(Irp);
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceCall("Enter irql %!irql!, %s(%#08lX)", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code);
+	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %p", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
 
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -470,6 +470,6 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 		complete_internal_ioctl(Irp, status);
 	}
 
-	TraceCall("Leave %!STATUS!", status);
+	TraceCall("Leave %!STATUS!, irp  %p", status, Irp);
 	return status;
 }

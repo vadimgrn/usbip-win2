@@ -1127,7 +1127,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceCall("irql %!irql!, read buffer %lu", KeGetCurrentIrql(), get_irp_buffer_size(irp));
+	TraceCall("irql %!irql!, read buffer %lu, irp %p", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp);
 
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
