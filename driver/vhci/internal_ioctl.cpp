@@ -381,17 +381,6 @@ NTSTATUS usb_get_port_status(ULONG *status)
 	return STATUS_SUCCESS;
 }
 
-void handle_read(NTSTATUS &status, vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool complete)
-{
-	if (auto err = do_read(vpdo, read_irp, irp, false)) {
-		if (complete) {
-			complete_internal_ioctl(irp, err);
-		} else {
-			status = err;
-		}
-	}
-}
-
 } // namespace
 
 
@@ -415,7 +404,13 @@ NTSTATUS submit_to_server(vpdo_dev_t *vpdo, IRP *irp)
 		auto ctx = as_pointer(vpdo->seqnum_payload);
 
 		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
-			handle_read(status, vpdo, read_irp, next_irp, next_irp != irp);
+			if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
+				if (next_irp != irp) {
+					complete_internal_ioctl(next_irp, err);
+				} else {
+					status = err;
+				}
+			}
 		} else if (ctx) { // irp with payload has cancelled, but header was already read
 			auto err = abort_read_payload(vpdo, read_irp);
 			CompleteRequest(read_irp, err);
