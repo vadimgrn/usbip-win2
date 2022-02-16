@@ -386,6 +386,7 @@ NTSTATUS usb_get_port_status(ULONG *status)
 
 NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
+	TraceCall("%p %!STATUS!", irp, status);
 	irp->IoStatus.Information = 0;
 	return CompleteRequest(irp, status);
 }

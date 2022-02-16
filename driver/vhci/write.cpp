@@ -586,19 +586,11 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 	return hdr;
 }
 
-/* 
- * it seems windows client usb driver will think IoCompleteRequest is running at DISPATCH_LEVEL
- * so without this it will change IRQL sometimes, and introduce to a dead of my userspace program.
- */
 void complete_request(IRP *irp, NTSTATUS status)
 {
 	irp->IoStatus.Status = status;
-	TraceCall("%!STATUS!, Information %Iu, irp %p", status, irp->IoStatus.Information, irp);
-
-	KIRQL irql;
-	KeRaiseIrql(DISPATCH_LEVEL, &irql); // FIXME: really?
+	TraceCall("%p %!STATUS!, Information %Iu", irp, status, irp->IoStatus.Information);
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
-	KeLowerIrql(irql);
 }
 
 PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
