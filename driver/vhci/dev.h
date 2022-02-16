@@ -81,7 +81,7 @@ struct vhci_dev_t : vdev_t
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
-	int port; // unique port number of the device on the bus, [1, vhub_dev_t::NUM_PORTS]
+	int port; // unique port number of the device on hub, [1, vhub_dev_t::NUM_PORTS]
 	volatile bool unplugged; // see IOCTL_USBIP_VHCI_UNPLUG_HARDWARE
 
 	USB_DEVICE_DESCRIPTOR descriptor;

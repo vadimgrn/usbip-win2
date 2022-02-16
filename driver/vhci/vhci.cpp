@@ -19,12 +19,15 @@ PAGEABLE void cleanup_vpdo(IRP *irp)
 	PAGED_CODE();
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	auto &FsContext = irpstack->FileObject->FsContext;
+	auto fo = irpstack->FileObject;
 
-	if (auto vpdo = static_cast<vpdo_dev_t*>(FsContext)) {
-		vpdo->fo = nullptr;
-		FsContext = nullptr;
-		vhub_unplug_vpdo(vpdo);
+	if (auto vpdo = (vpdo_dev_t*)InterlockedExchangePointer(&fo->FsContext, nullptr)) {
+		auto ptr = (FILE_OBJECT*)InterlockedCompareExchangePointer((PVOID*)&vpdo->fo, nullptr, fo);
+		if (ptr == fo) {
+			vhub_unplug_vpdo(vpdo);
+		} else {
+			Trace(TRACE_LEVEL_WARNING, "FsContext(%p)->fo(%p) != FileObject(%p)", vpdo, ptr, fo);
+		}
 	}
 }
 

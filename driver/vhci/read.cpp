@@ -1071,6 +1071,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 
 /*
  * @return special error code to abort payload read
+ * See: userspace\src\usbip_xfer\usbip_xfer.cpp, on_read_body.
  */
 NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
 {

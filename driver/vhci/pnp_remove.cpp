@@ -111,9 +111,11 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
 		vpdo->actconfig = nullptr;
 	}
 
-	if (auto &fo = vpdo->fo) { // FIXME
-		fo->FsContext = nullptr;
-		fo = nullptr;
+	if (auto fo = (FILE_OBJECT*)InterlockedExchangePointer((PVOID*)&vpdo->fo, nullptr)) {
+		auto ptr = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, nullptr, vpdo);
+		if (ptr != vpdo) {
+			Trace(TRACE_LEVEL_WARNING, "FsContext(%p) != this(%p)", ptr, vpdo);
+		}
 	}
 }
 
