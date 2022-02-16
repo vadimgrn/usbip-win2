@@ -16,10 +16,10 @@ const auto STATUS_SUBMIT_TO_SERVER = NTSTATUS(-1);
 /*
 * Code must be in nonpaged section if it acquires spinlock.
 */
-NTSTATUS vhci_ioctl_abort_pipe(vpdo_dev_t*, USBD_PIPE_HANDLE hPipe)
+NTSTATUS abort_pipe(vpdo_dev_t*, USBD_PIPE_HANDLE PipeHandle)
 {
-	TraceUrb("PipeHandle %#Ix, NOT IMPEMENTED", (uintptr_t)hPipe);
-	return hPipe ? STATUS_NOT_IMPLEMENTED : STATUS_INVALID_PARAMETER;
+	TraceUrb("PipeHandle %#Ix, NOT IMPEMENTED", (uintptr_t)PipeHandle);
+	return PipeHandle ? STATUS_NOT_IMPLEMENTED : STATUS_INVALID_PARAMETER;
 }
 
 NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -101,7 +101,7 @@ NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 
 	switch (urb->UrbHeader.Function) {
 	case URB_FUNCTION_ABORT_PIPE:
-		st = vhci_ioctl_abort_pipe(vpdo, r.PipeHandle);
+		st = abort_pipe(vpdo, r.PipeHandle);
 		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 		st = STATUS_SUBMIT_TO_SERVER;
