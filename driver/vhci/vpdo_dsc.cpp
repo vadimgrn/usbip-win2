@@ -99,7 +99,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 	}
 
 	if (!dsc_data) {
-		return submit_to_server(vpdo, irp);
+		return send_to_server(vpdo, irp);
 	}
 
 	ULONG outlen = sizeof(r) + dsc_len;
