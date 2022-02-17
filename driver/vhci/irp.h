@@ -13,4 +13,5 @@ inline auto CompleteRequestIoStatus(IRP *irp)
 	return CompleteRequest(irp, irp->IoStatus.Status);
 }
 
-void complete_canceled_irp(IRP *irp);
+struct vpdo_dev_t;
+void complete_canceled_irp(vpdo_dev_t *vpdo, IRP *irp);

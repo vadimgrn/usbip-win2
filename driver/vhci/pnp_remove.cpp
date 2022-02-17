@@ -85,7 +85,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 
 	for (auto csq: v) {
 		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
-			complete_canceled_irp(irp);
+			complete_canceled_irp(vpdo, irp);
 		}
 	}
 }

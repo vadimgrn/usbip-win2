@@ -175,9 +175,22 @@ void ReleaseLock_tx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 	KeReleaseSpinLock(&vpdo->tx_irps_lock, Irql);
 }
 
-void CompleteCanceledIrp(_In_ IO_CSQ*, _In_ IRP *irp)
+void CompleteCanceledIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	complete_canceled_irp(irp);
+	auto vpdo = to_vpdo_read(csq);
+	complete_canceled_irp(vpdo, irp);
+}
+
+void CompleteCanceledIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp)
+{
+	auto vpdo = to_vpdo_rx(csq);
+	complete_canceled_irp(vpdo, irp);
+}
+
+void CompleteCanceledIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
+{
+	auto vpdo = to_vpdo_tx(csq);
+	complete_canceled_irp(vpdo, irp);
 }
 
 PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
@@ -190,7 +203,7 @@ PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 				PeekNextIrp_read,
 				AcquireLock_read,
 				ReleaseLock_read,
-				CompleteCanceledIrp);
+				CompleteCanceledIrp_read);
 }
 
 PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
@@ -206,7 +219,7 @@ PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
 				PeekNextIrp_rx,
 				AcquireLock_rx,
 				ReleaseLock_rx,
-				CompleteCanceledIrp);
+				CompleteCanceledIrp_rx);
 }
 
 PAGEABLE auto init_tx_irps_queue(vpdo_dev_t &vpdo)
@@ -222,7 +235,7 @@ PAGEABLE auto init_tx_irps_queue(vpdo_dev_t &vpdo)
 				PeekNextIrp_tx,
 				AcquireLock_tx,
 				ReleaseLock_tx,
-				CompleteCanceledIrp);
+				CompleteCanceledIrp_tx);
 }
 
 } // namespace
