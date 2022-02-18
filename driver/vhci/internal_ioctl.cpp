@@ -391,39 +391,6 @@ NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 	return CompleteRequest(irp, status);
 }
 
-NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
-{
-	auto status = STATUS_PENDING;
-
-	{
-		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertTail());
-		NT_ASSERT(!err);
-	}
-
-	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_csq, nullptr)) {
-
-		auto ctx = as_pointer(vpdo->seqnum_payload);
-
-		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
-			if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
-				if (next_irp != irp) {
-					complete_internal_ioctl(next_irp, err);
-				} else {
-					status = err;
-				}
-			}
-		} else if (ctx) { // irp with payload has cancelled, but header was already read
-			auto err = abort_read_payload(vpdo, read_irp);
-			CompleteRequest(read_irp, err);
-		} else { // irp has cancelled
-			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTail());
-			NT_ASSERT(!err);
-		}
-	}
-
-	return status;
-}
-
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Irp)
 {
 	auto irpStack = IoGetCurrentIrpStackLocation(Irp);

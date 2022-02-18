@@ -1017,19 +1017,19 @@ PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *irp)
 	return st;
 }
 
-auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
+/*
+ * @return special error code to abort payload read
+ * See: userspace\src\usbip_xfer\usbip_xfer.cpp, on_read_body.
+ */
+NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	auto ctx = as_pointer(vpdo->seqnum_payload);
+	TraceCall("seqnum %u, irp %p", vpdo->seqnum_payload, read_irp);
 
-	do {
-		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
-			return do_read(vpdo, read_irp, irp, true);
-		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read
-			return abort_read_payload(vpdo, read_irp);
-		}
-	} while (IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTailIfRxEmpty()));
+	NT_ASSERT(vpdo->seqnum_payload);
+	vpdo->seqnum_payload = 0;
 
-	return STATUS_PENDING;
+	TRANSFERRED(read_irp) = 0;
+	return STATUS_REQUEST_ABORTED; // read irp must be completed with this status
 }
 
 auto complete_read(IRP *irp, NTSTATUS status)
@@ -1066,24 +1066,6 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 	}
 }
 
-} // namespace
-
-
-/*
- * @return special error code to abort payload read
- * See: userspace\src\usbip_xfer\usbip_xfer.cpp, on_read_body.
- */
-NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
-{
-	TraceCall("seqnum %u, irp %p", vpdo->seqnum_payload, read_irp);
-
-	NT_ASSERT(vpdo->seqnum_payload);
-	vpdo->seqnum_payload = 0;
-
-	TRANSFERRED(read_irp) = 0;
-	return STATUS_REQUEST_ABORTED; // read irp must be completed with this status
-}
-
 /*
  * This function can be called from thread that executes ioctl or thread that executes vhci_read.
  * It must not be called concurrently for the same vpdo_dev_t.
@@ -1118,6 +1100,57 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 
 	NT_ASSERT(err != STATUS_PENDING);
 	return err;
+}
+
+auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
+{
+	auto ctx = as_pointer(vpdo->seqnum_payload);
+
+	do {
+		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
+			return do_read(vpdo, read_irp, irp, true);
+		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read
+			return abort_read_payload(vpdo, read_irp);
+		}
+	} while (IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTailIfRxEmpty()));
+
+	return STATUS_PENDING;
+}
+
+} // namespace
+
+
+NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
+{
+	auto status = STATUS_PENDING;
+
+	{
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertTail());
+		NT_ASSERT(!err);
+	}
+
+	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_csq, nullptr)) {
+
+		auto ctx = as_pointer(vpdo->seqnum_payload);
+
+		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
+			if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
+				if (next_irp != irp) {
+					complete_internal_ioctl(next_irp, err);
+				} else {
+					status = err;
+				}
+			}
+		} else if (ctx) { // irp with payload has cancelled, but header was already read
+			auto err = abort_read_payload(vpdo, read_irp);
+			CompleteRequest(read_irp, err);
+		} else { // irp has cancelled
+			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTail());
+			NT_ASSERT(!err);
+		}
+	}
+
+	return status;
 }
 
 /*
