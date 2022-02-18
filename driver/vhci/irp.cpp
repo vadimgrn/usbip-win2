@@ -77,14 +77,3 @@ void complete_canceled_irp(vpdo_dev_t*, IRP *irp)
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
-
-void irp_canceled(vpdo_dev_t *vpdo, IRP *irp)
-{
-	NT_ASSERT(get_seqnum(irp));
-	TraceCall("seqnum %u, irp %p", get_seqnum(irp), irp);
-
-	KLOCK_QUEUE_HANDLE qh;
-	KeAcquireInStackQueuedSpinLock(&vpdo->unlink_lock, &qh);
-	InsertTailList(&vpdo->rx_unlink, list_entry(irp));
-	KeReleaseInStackQueuedSpinLock(&qh);
-}

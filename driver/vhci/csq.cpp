@@ -108,7 +108,7 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 
 	for (auto entry = irp ? list_entry(irp)->Flink : head->Flink; entry != head; entry = entry->Flink) 
 	{
-		auto entry_irp = CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
+		auto entry_irp = get_irp(entry);
 
 		if (!seqnum || seqnum == get_seqnum(entry_irp)) {
 			result = entry_irp;
@@ -179,13 +179,13 @@ void CompleteCanceledIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 void CompleteCanceledIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	auto vpdo = to_vpdo_rx(csq);
-	complete_canceled_irp(vpdo, irp);
+	complete_canceled_irp(vpdo, irp); // was not sent to server
 }
 
 void CompleteCanceledIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	auto vpdo = to_vpdo_tx(csq);
-	irp_canceled(vpdo, irp);
+	enqueue_canceled_irp(vpdo, irp);
 }
 
 PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)

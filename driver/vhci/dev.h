@@ -124,9 +124,9 @@ struct vpdo_dev_t : vdev_t
 	LIST_ENTRY tx_irps; // from *ioctl
 	KSPIN_LOCK tx_irps_lock;
 
-	LIST_ENTRY rx_unlink; // waiting for irp from vhci_read
-	LIST_ENTRY tx_unlink; // waiting for irp from vhci_write
-	KSPIN_LOCK unlink_lock;
+	LIST_ENTRY rx_canceled_irps; // waiting for irp from vhci_read
+	LIST_ENTRY tx_canceled_irps; // waiting for irp from vhci_write
+	KSPIN_LOCK canceled_irps_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -206,3 +206,6 @@ inline auto get_seqnum_unlink(IRP *irp)
 {
 	return as_seqnum(irp->Tail.Overlay.DriverContext[1]);
 }
+
+void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp);
+IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, LIST_ENTRY *head);

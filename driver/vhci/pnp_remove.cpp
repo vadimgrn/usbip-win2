@@ -81,10 +81,23 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	IO_CSQ* v[] { &vpdo->read_irp_csq, &vpdo->rx_irps_csq, &vpdo->tx_irps_csq };
+	IO_CSQ* v[] { &vpdo->read_irp_csq, &vpdo->tx_irps_csq, &vpdo->rx_irps_csq };
 
 	for (auto csq: v) {
 		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
+			complete_canceled_irp(vpdo, irp);
+		}
+	}
+}
+
+PAGEABLE void complete_canceled_irps(vpdo_dev_t *vpdo)
+{
+	PAGED_CODE();
+
+	LIST_ENTRY* v[] { &vpdo->tx_canceled_irps, &vpdo->rx_canceled_irps };
+
+	for (auto head: v) {
+		while (auto irp = dequeue_canceled_irp(vpdo, head)) {
 			complete_canceled_irp(vpdo, irp);
 		}
 	}
@@ -96,6 +109,8 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
 	TraceCall("%p, port %d", vpdo, vpdo->port);
 
 	cancel_pending_irps(vpdo);
+	complete_canceled_irps(vpdo);
+
 	vhub_detach_vpdo(vpdo);
 
 	free_usb_dev_interface(&vpdo->usb_dev_interface);

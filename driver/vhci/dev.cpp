@@ -3,6 +3,7 @@
 #include "dev.tmh"
 #include "pageable.h"
 #include "vhci.h"
+#include "irp.h"
 
 #include <wdmsec.h>
 #include <initguid.h> // required for GUID definitions
@@ -136,4 +137,32 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo)
 {
 	auto &val = vpdo->seqnum;
 	return ++val ? val : ++val; // skip zero in case of overflow
+}
+
+void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp)
+{
+	NT_ASSERT(get_seqnum(irp));
+	TraceCall("seqnum %u, irp %p", get_seqnum(irp), irp);
+
+	KLOCK_QUEUE_HANDLE qh;
+	KeAcquireInStackQueuedSpinLock(&vpdo->canceled_irps_lock, &qh);
+	InsertTailList(&vpdo->rx_canceled_irps, list_entry(irp));
+	KeReleaseInStackQueuedSpinLock(&qh);
+}
+
+IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, LIST_ENTRY *head)
+{
+	IRP *irp{};
+
+	KLOCK_QUEUE_HANDLE qh;
+	KeAcquireInStackQueuedSpinLock(&vpdo->canceled_irps_lock, &qh);		
+	auto entry = RemoveHeadList(head);
+	KeReleaseInStackQueuedSpinLock(&qh);
+
+	if (entry != head) {
+		InitializeListHead(entry);
+		irp = get_irp(entry);
+	}
+
+	return irp;
 }
