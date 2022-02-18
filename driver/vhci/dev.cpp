@@ -4,6 +4,7 @@
 #include "pageable.h"
 #include "vhci.h"
 #include "irp.h"
+#include "read.h"
 
 #include <wdmsec.h>
 #include <initguid.h> // required for GUID definitions
@@ -139,30 +140,43 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo)
 	return ++val ? val : ++val; // skip zero in case of overflow
 }
 
-void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp)
+void enqueue_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue)
 {
 	NT_ASSERT(get_seqnum(irp));
-	TraceCall("seqnum %u, irp %p", get_seqnum(irp), irp);
+	
+	bool rx = queue == cancel_queue::rx;
+	auto head = rx ? &vpdo->rx_canceled_irps : &vpdo->tx_canceled_irps;
+
+	TraceCall("seqnum %u, irp %p -> %s", get_seqnum(irp), irp, rx ? "RX" : "TX");
 
 	KLOCK_QUEUE_HANDLE qh;
 	KeAcquireInStackQueuedSpinLock(&vpdo->canceled_irps_lock, &qh);
-	InsertTailList(&vpdo->rx_canceled_irps, list_entry(irp));
+	InsertTailList(head, list_entry(irp));
 	KeReleaseInStackQueuedSpinLock(&qh);
 }
 
-IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, LIST_ENTRY *head)
+IRP *dequeue_irp_seqnum(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink)
 {
 	IRP *irp{};
+	bool rx = queue == cancel_queue::rx;
+	auto head = rx ? &vpdo->rx_canceled_irps : &vpdo->tx_canceled_irps;
+	auto func = unlink ? get_seqnum_unlink : get_seqnum;
 
 	KLOCK_QUEUE_HANDLE qh;
 	KeAcquireInStackQueuedSpinLock(&vpdo->canceled_irps_lock, &qh);		
-	auto entry = RemoveHeadList(head);
-	KeReleaseInStackQueuedSpinLock(&qh);
 
-	if (entry != head) {
-		InitializeListHead(entry);
-		irp = get_irp(entry);
+	for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
+
+		auto entry_irp = get_irp(entry);
+		
+		if (!seqnum || seqnum == func(entry_irp)) {
+			RemoveEntryList(entry);
+			InitializeListHead(entry);
+			irp = entry_irp;
+			break;
+		}
 	}
 
+	KeReleaseInStackQueuedSpinLock(&qh);
 	return irp;
 }

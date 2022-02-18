@@ -94,10 +94,10 @@ PAGEABLE void complete_canceled_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	LIST_ENTRY* v[] { &vpdo->tx_canceled_irps, &vpdo->rx_canceled_irps };
+	constexpr int v[] { (int)cancel_queue::tx, (int)cancel_queue::rx };
 
-	for (auto head: v) {
-		while (auto irp = dequeue_canceled_irp(vpdo, head)) {
+	for (auto i: v) {
+		while (auto irp = dequeue_irp(vpdo, static_cast<cancel_queue>(i))) {
 			complete_canceled_irp(vpdo, irp);
 		}
 	}

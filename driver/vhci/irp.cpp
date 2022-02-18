@@ -71,9 +71,8 @@ void complete_canceled_irp(vpdo_dev_t*, IRP *irp)
 {
 	TraceCall("irp %p", irp);
 
-	auto &r = irp->IoStatus;
-	r.Status = STATUS_CANCELLED;
-	r.Information = 0;
+	irp->IoStatus.Status = STATUS_CANCELLED;
+	irp->IoStatus.Information = 0;
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }

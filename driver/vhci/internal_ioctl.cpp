@@ -391,36 +391,36 @@ NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 	return CompleteRequest(irp, status);
 }
 
-extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Irp)
+extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
-	auto irpStack = IoGetCurrentIrpStackLocation(Irp);
+	auto irpStack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %p", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, Irp);
+	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %p", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, irp);
 
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
 		Trace(TRACE_LEVEL_WARNING, "Internal ioctl only for vpdo is allowed");
-		return CompleteRequest(Irp, STATUS_INVALID_DEVICE_REQUEST);
+		return CompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
 	}
 
 	if (vpdo->unplugged) {
 		NTSTATUS st = STATUS_DEVICE_NOT_CONNECTED;
 		Trace(TRACE_LEVEL_VERBOSE, "%!STATUS!", st);
-		return CompleteRequest(Irp, st);
+		return CompleteRequest(irp, st);
 	}
 
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = usb_submit_urb(vpdo, Irp);
+		status = usb_submit_urb(vpdo, irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
 		status = usb_get_port_status(static_cast<ULONG*>(irpStack->Parameters.Others.Argument1));
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		status = send_to_server(vpdo, Irp);
+		status = send_to_server(vpdo, irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
 		status = setup_topology_address(vpdo, *static_cast<USB_TOPOLOGY_ADDRESS*>(irpStack->Parameters.Others.Argument1));
@@ -430,9 +430,9 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *Ir
 	}
 
 	if (status != STATUS_PENDING) {
-		complete_internal_ioctl(Irp, status);
+		complete_internal_ioctl(irp, status);
 	}
 
-	TraceCall("Leave %!STATUS!, irp  %p", status, Irp);
+	TraceCall("Leave %!STATUS!, irp  %p", status, irp);
 	return status;
 }

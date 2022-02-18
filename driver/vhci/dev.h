@@ -207,5 +207,12 @@ inline auto get_seqnum_unlink(IRP *irp)
 	return as_seqnum(irp->Tail.Overlay.DriverContext[1]);
 }
 
-void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp);
-IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, LIST_ENTRY *head);
+enum class cancel_queue { rx, tx };
+void enqueue_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue);
+
+IRP *dequeue_irp_seqnum(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink);
+
+inline auto dequeue_irp(vpdo_dev_t *vpdo, cancel_queue queue)
+{
+	return dequeue_irp_seqnum(vpdo, queue, 0, false);
+}

@@ -523,14 +523,15 @@ PAGEABLE NTSTATUS usb_reset_port(const usbip_header *hdr)
 	return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
+PAGEABLE void ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
 {
 	PAGED_CODE();
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	NTSTATUS st = STATUS_INVALID_PARAMETER;
+	auto &st = irp->IoStatus.Status;
+	st = STATUS_INVALID_PARAMETER;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
@@ -546,22 +547,8 @@ PAGEABLE NTSTATUS ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr
 		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
-	return st;
-}
-
-/*
- * status: This is similar to the status of USBIP_RET_SUBMIT (share the same memory offset).
- * When UNLINK is successful, status is -ECONNRESET;
- * when USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
- * 
- * See: <kernel>/Documentation/usb/usbip_protocol.rst
- */
-PAGEABLE NTSTATUS ret_unlink(const usbip_header *hdr)
-{
-	PAGED_CODE();
-	
-	TraceUrb("%s", dbg_usbd_status(to_windows_status(hdr->u.ret_unlink.status)));
-	return STATUS_SUCCESS; // it's OK if can't unlink (too late, etc.)
+	TraceCall("%p %!STATUS!, Information %Iu", irp, st, irp->IoStatus.Information);
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
 PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
@@ -586,13 +573,37 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 	return hdr;
 }
 
-void complete_request(IRP *irp, NTSTATUS status)
+PAGEABLE auto dequeue_tx_irp(usbip_request_type &cmd, vpdo_dev_t *vpdo, seqnum_t seqnum)
 {
-	irp->IoStatus.Status = status;
-	TraceCall("%p %!STATUS!, Information %Iu", irp, status, irp->IoStatus.Information);
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	PAGED_CODE();
+	NT_ASSERT(seqnum);
+
+	IRP *irp{};
+	bool unlink{};
+
+	switch (cmd) {
+	case USBIP_RET_SUBMIT:
+		irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, as_pointer(seqnum));
+		if (irp) {
+			break;
+		}
+		cmd = USBIP_RET_UNLINK;
+		unlink = true;
+		[[fallthrough]]; // response on canceled irp?
+	case USBIP_RET_UNLINK:
+		irp = dequeue_irp_seqnum(vpdo, cancel_queue::tx, seqnum, unlink);
+		break;
+	}
+
+	return irp;
 }
 
+/*
+ * USBIP_RET_UNLINK
+ * 1) if UNLINK is successful, status is -ECONNRESET
+ * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
+ * See: <kernel>/Documentation/usb/usbip_protocol.rst
+ */
 PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 {
 	PAGED_CODE();
@@ -602,32 +613,42 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, as_pointer(hdr->base.seqnum));
+	auto seqnum = hdr->base.seqnum;
+	if (!seqnum) {
+		Trace(TRACE_LEVEL_ERROR, "seqnum is zero");
+		return STATUS_INVALID_PARAMETER;
+	}
 
-	if (irp) {
+	auto cmd = static_cast<usbip_request_type>(hdr->base.command);
+
+	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
+		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	auto irp_cmd = cmd; // from what queue it was dequeued
+	auto irp = dequeue_tx_irp(irp_cmd, vpdo, seqnum);
+
+	{
 		auto uirp = reinterpret_cast<uintptr_t>(irp);
 		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s", 
+		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
 				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
-	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Pending irp was cancelled, seqnum %u", hdr->base.seqnum);
-		return STATUS_SUCCESS;
 	}
 
-	auto status = STATUS_INVALID_PARAMETER;
-
-	switch (hdr->base.command) {
-	case USBIP_RET_SUBMIT:
-		status = ret_submit(vpdo, irp, hdr);
-		break;
-	case USBIP_RET_UNLINK:
-		status = ret_unlink(hdr);
-		break;
-	default:
-		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", hdr->base.command);
+	if (!irp) {
+		bool too_late = cmd == USBIP_RET_UNLINK && !hdr->u.ret_unlink.status; // USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT
+		Trace(too_late ? TRACE_LEVEL_VERBOSE : TRACE_LEVEL_ERROR, 
+			"irp not found for seqnum %u%s", seqnum, too_late ? " (RET_SUBMIT must be already received)" : "");
+		return too_late ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	}
+	
+	if (irp_cmd == USBIP_RET_SUBMIT) {
+		ret_submit(vpdo, irp, hdr);
+	} else { // FIXME: call ret_submit() for canceled CMD_SUBMIT if RET_SUBMIT?
+		complete_canceled_irp(vpdo, irp);
 	}
 
-	complete_request(irp, status);
 	return STATUS_SUCCESS;
 }
 

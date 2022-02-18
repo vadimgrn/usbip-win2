@@ -958,7 +958,7 @@ NTSTATUS cmd_submit(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 	return st;
 }
 
-PAGEABLE NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
+PAGEABLE NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp, seqnum_t seqnum_unlink)
 {
 	PAGED_CODE();
 
@@ -967,7 +967,7 @@ PAGEABLE NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	set_cmd_unlink_usbip_header(vpdo, hdr, 0); // FIXME: pass seqnum_unlink
+	set_cmd_unlink_usbip_header(vpdo, hdr, seqnum_unlink);
 
 	TRANSFERRED(irp) += sizeof(*hdr);
 	return STATUS_SUCCESS;
@@ -1057,7 +1057,9 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 	auto seqnum = hdr->base.seqnum;
 	set_seqnum(irp, seqnum);
 
-	if (get_pdu_payload_size(hdr)) {
+	if (get_seqnum_unlink(irp)) {
+		enqueue_irp(vpdo, irp, cancel_queue::tx);
+	} else if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
 		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertHead());
 		NT_ASSERT(!err);
@@ -1075,8 +1077,12 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 {	
 	bool read_hdr = !vpdo->seqnum_payload;
 
-	auto err = read_hdr ? cmd_submit(vpdo, read_irp, irp) : // FIXME: cmd_unlink(vpdo, read_irp, irp)
-				read_payload(read_irp, irp);
+	auto seqnum_unlink = get_seqnum_unlink(irp);
+	NT_ASSERT(!seqnum_unlink || read_hdr);
+
+	auto err = seqnum_unlink ? cmd_unlink(vpdo, read_irp, seqnum_unlink) :
+		   read_hdr ? cmd_submit(vpdo, read_irp, irp) : 
+		   read_payload(read_irp, irp);
 
 	if (!err) {
 		auto hdr = read_hdr ? get_usbip_header(read_irp, true) : nullptr;
@@ -1124,38 +1130,50 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
 {
 	auto status = STATUS_PENDING;
 
-	{
+	bool canceled = get_seqnum_unlink(irp);
+	auto ctx = as_pointer(vpdo->seqnum_payload);
+
+	if (canceled) {
+		enqueue_irp(vpdo, irp, cancel_queue::rx);
+		if (ctx) { // can't interrupt reading of payload
+			return status;
+		}
+	} else {
 		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertTail());
 		NT_ASSERT(!err);
 	}
 
-	if (auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_csq, nullptr)) {
+	auto read_irp = IoCsqRemoveNextIrp(&vpdo->read_irp_csq, nullptr);
+	if (!read_irp) {
+		return status;
+	}
 
-		auto ctx = as_pointer(vpdo->seqnum_payload);
-
-		if (auto next_irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
-			if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
-				if (next_irp != irp) {
-					complete_internal_ioctl(next_irp, err);
-				} else {
-					status = err;
-				}
+	if (auto next_irp = canceled ? dequeue_irp(vpdo, cancel_queue::rx) : 
+					IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)
+	) {
+		if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
+			if (next_irp == irp) {
+				status = err;
+			} else if (canceled) {
+				complete_canceled_irp(vpdo, next_irp);
+			} else {
+				complete_internal_ioctl(next_irp, err);
 			}
-		} else if (ctx) { // irp with payload has cancelled, but header was already read
-			auto err = abort_read_payload(vpdo, read_irp);
-			CompleteRequest(read_irp, err);
-		} else { // irp has cancelled
-			[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTail());
-			NT_ASSERT(!err);
 		}
+	} else if (ctx) { // irp with payload has cancelled, but header was already read
+		auto err = abort_read_payload(vpdo, read_irp);
+		CompleteRequest(read_irp, err);
+	} else { // irp has cancelled
+		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTail());
+		NT_ASSERT(!err);
 	}
 
 	return status;
 }
 
 /*
-* ReadFile -> IRP_MJ_READ -> vhci_read
-*/
+ * ReadFile -> IRP_MJ_READ -> vhci_read
+ */
 extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();
