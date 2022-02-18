@@ -8,11 +8,6 @@
 namespace
 {
 
-inline auto list_entry(IRP *irp)
-{
-	return &irp->Tail.Overlay.ListEntry;
-}
-
 inline auto to_vpdo_read(IO_CSQ *csq)
 {
 	return CONTAINING_RECORD(csq, vpdo_dev_t, read_irp_csq);
@@ -190,7 +185,7 @@ void CompleteCanceledIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 void CompleteCanceledIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	auto vpdo = to_vpdo_tx(csq);
-	complete_canceled_irp(vpdo, irp);
+	irp_canceled(vpdo, irp);
 }
 
 PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)

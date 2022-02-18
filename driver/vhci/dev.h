@@ -123,6 +123,10 @@ struct vpdo_dev_t : vdev_t
 	IO_CSQ tx_irps_csq; // waiting for irp from vhci_write
 	LIST_ENTRY tx_irps; // from *ioctl
 	KSPIN_LOCK tx_irps_lock;
+
+	LIST_ENTRY rx_unlink; // waiting for irp from vhci_read
+	LIST_ENTRY tx_unlink; // waiting for irp from vhci_write
+	KSPIN_LOCK unlink_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.

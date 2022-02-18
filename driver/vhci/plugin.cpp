@@ -34,6 +34,10 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
 		return err;
 	}
 
+	InitializeListHead(&vpdo.rx_unlink);
+	InitializeListHead(&vpdo.tx_unlink);
+	KeInitializeSpinLock(&vpdo.unlink_lock);
+
 	auto &Flags = vpdo.Self->Flags;
 	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
 
