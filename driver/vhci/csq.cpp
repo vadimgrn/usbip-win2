@@ -104,18 +104,34 @@ auto PeekNextIrp_read(_In_ IO_CSQ *csq, [[maybe_unused]] _In_ IRP *irp, [[maybe_
 
 auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 {
-	auto seqnum = as_seqnum(context);
+	auto ctx = as_peek_context(context);
 	IRP *result{};
 
 	for (auto entry = irp ? list_entry(irp)->Flink : head->Flink; entry != head; entry = entry->Flink) {
+
 		auto entry_irp = get_irp(entry);
-		if (!seqnum || seqnum == get_seqnum(entry_irp)) {
+		bool found = false;
+		
+		if (!ctx) {
+			found = true;
+		} else if (ctx->use_seqnum) {
+			NT_ASSERT(ctx->u.seqnum);
+			found = ctx->u.seqnum == get_seqnum(entry_irp);
+		} else {
+			NT_ASSERT(ctx->u.handle);
+			found = ctx->u.handle == get_pipe_handle(entry_irp);
+		}
+
+		if (found) {
 			result = entry_irp;
 			break;
 		}
 	}
 
-	TraceCSQ("seqnum %u -> %p", seqnum, result);
+	TraceCSQ("%p, seqnum %u, PipeHandle %p", result, 
+		ctx && ctx->use_seqnum ? ctx->u.seqnum : 0, 
+		ctx && !ctx->use_seqnum ? ctx->u.handle : USBD_PIPE_HANDLE());
+
 	return result;
 }
 

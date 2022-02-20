@@ -207,6 +207,17 @@ inline auto get_seqnum_unlink(IRP *irp)
 	return as_seqnum(irp->Tail.Overlay.DriverContext[1]);
 }
 
+inline void set_pipe_handle(IRP *irp, USBD_PIPE_HANDLE PipeHandle)
+{
+	NT_ASSERT(PipeHandle != EP0);
+	irp->Tail.Overlay.DriverContext[2] = PipeHandle;
+}
+
+inline auto get_pipe_handle(IRP *irp)
+{
+	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
+}
+
 enum class cancel_queue { rx, tx };
 void enqueue_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue);
 

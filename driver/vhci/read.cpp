@@ -290,7 +290,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t *vpdo, IRP *rea
 * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
 <linux>/drivers/usb/core/message.c, usb_clear_halt
 */
-PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb)
 {
 	PAGED_CODE();
 
@@ -317,7 +317,7 @@ PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t *vpdo, IRP *irp, UR
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB *urb, bool dir_in, UCHAR recipient)
+PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb, bool dir_in, UCHAR recipient)
 {
 	PAGED_CODE();
 
@@ -352,7 +352,7 @@ PAGEABLE NTSTATUS urb_control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, IRP *irp, URB *urb, UCHAR recipient)
+PAGEABLE NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb, UCHAR recipient)
 {
 	PAGED_CODE();
 
@@ -379,7 +379,7 @@ PAGEABLE NTSTATUS urb_control_get_status_request(vpdo_dev_t *vpdo, IRP *irp, URB
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, IRP *irp, URB *urb, UCHAR type, UCHAR recipient)
+PAGEABLE NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb, UCHAR type, UCHAR recipient)
 {
 	PAGED_CODE();
 
@@ -415,47 +415,47 @@ PAGEABLE NTSTATUS urb_control_vendor_class_request(vpdo_dev_t *vpdo, IRP *irp, U
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vendor_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS vendor_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS vendor_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS vendor_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS vendor_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS vendor_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS vendor_other(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS vendor_other(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
 }
 
-PAGEABLE NTSTATUS class_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS class_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS class_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS class_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS class_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS class_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS class_other(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS class_other(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
+	return urb_control_vendor_class_request(vpdo, irp, urb_irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
-PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb)
 {
 	PAGED_CODE();
 
@@ -483,7 +483,7 @@ PAGEABLE NTSTATUS urb_select_configuration(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb)
 {
 	PAGED_CODE();
 
@@ -514,7 +514,7 @@ PAGEABLE NTSTATUS urb_select_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 * PAGED_CODE() fails.
 * The USB bus driver processes this URB at DISPATCH_LEVEL.
 */
-NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
 	auto &r = urb->UrbBulkOrInterruptTransfer;
 	auto type = get_endpoint_type(r.PipeHandle);
@@ -534,6 +534,7 @@ NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 		return err;
 	}
 
+	set_pipe_handle(urb_irp, r.PipeHandle);
 	TRANSFERRED(irp) = sizeof(*hdr);
 
 	if (r.TransferBufferLength && is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
@@ -547,7 +548,7 @@ NTSTATUS urb_bulk_or_interrupt_transfer(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 * PAGED_CODE() fails.
 * USBD_START_ISO_TRANSFER_ASAP is appended because _URB_GET_CURRENT_FRAME_NUMBER is not implemented.
 */
-NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
 	auto &r = urb->UrbIsochronousTransfer;
 	auto type = get_endpoint_type(r.PipeHandle);
@@ -569,6 +570,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 		return err;
 	}
 
+	set_pipe_handle(urb_irp, r.PipeHandle);
 	hdr->u.cmd_submit.start_frame = r.StartFrame;
 	hdr->u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
@@ -582,7 +584,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS urb_control_transfer_any(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS urb_control_transfer_any(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
 	PAGED_CODE();
 
@@ -599,6 +601,7 @@ PAGEABLE NTSTATUS urb_control_transfer_any(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 		return err;
 	}
 
+	set_pipe_handle(urb_irp, r.PipeHandle);
 	bool dir_out = is_transfer_direction_out(hdr); // TransferFlags can have wrong direction
 
 	if (dir_out != is_transfer_dir_out(&r)) {
@@ -621,7 +624,7 @@ PAGEABLE NTSTATUS urb_control_transfer_any(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 /*
 * vhci_internal_ioctl.c handles such functions itself.
 */
-PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t*, [[maybe_unused]] IRP *irp, URB *urb)
+PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t*, [[maybe_unused]] IRP *irp, IRP*, URB *urb)
 {
 	PAGED_CODE();
 
@@ -632,37 +635,37 @@ PAGEABLE NTSTATUS urb_function_unexpected(vpdo_dev_t*, [[maybe_unused]] IRP *irp
 	return STATUS_INTERNAL_ERROR;
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
+	return urb_control_descriptor_request(vpdo, irp, urb_irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
+	return urb_control_descriptor_request(vpdo, irp, urb_irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
+	return urb_control_descriptor_request(vpdo, irp, urb_irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
+	return urb_control_descriptor_request(vpdo, irp, urb_irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
+	return urb_control_descriptor_request(vpdo, irp, urb_irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
+	return urb_control_descriptor_request(vpdo, irp, urb_irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, IRP *irp, URB *urb, UCHAR bRequest, UCHAR recipient)
+PAGEABLE NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb, UCHAR bRequest, UCHAR recipient)
 {
 	PAGED_CODE();
 
@@ -689,47 +692,47 @@ PAGEABLE NTSTATUS urb_control_feature_request(vpdo_dev_t *vpdo, IRP *irp, URB *u
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS set_feature_to_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_feature_to_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS set_feature_to_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_feature_to_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS set_feature_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_feature_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS set_feature_to_other(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS set_feature_to_other(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
 }
 
-PAGEABLE NTSTATUS clear_feature_to_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS clear_feature_to_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS clear_feature_to_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS clear_feature_to_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS clear_feature_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS clear_feature_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS clear_feature_to_other(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS clear_feature_to_other(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
+	return urb_control_feature_request(vpdo, irp, urb_irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
 }
 
-PAGEABLE NTSTATUS get_configuration(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_configuration(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb)
 {
 	PAGED_CODE();
 
@@ -755,7 +758,7 @@ PAGEABLE NTSTATUS get_configuration(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_interface(vpdo_dev_t *vpdo, IRP *irp, IRP*, URB *urb)
 {
 	PAGED_CODE();
 
@@ -782,27 +785,27 @@ PAGEABLE NTSTATUS get_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_status_from_device(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_status_from_device(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_get_status_request(vpdo, irp, urb,  USB_RECIP_DEVICE);
+	return urb_control_get_status_request(vpdo, irp, urb_irp, urb,  USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS get_status_from_interface(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_status_from_interface(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_get_status_request(vpdo, irp, urb, USB_RECIP_INTERFACE);
+	return urb_control_get_status_request(vpdo, irp, urb_irp, urb, USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS get_status_from_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_status_from_endpoint(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_get_status_request(vpdo, irp, urb, USB_RECIP_ENDPOINT);
+	return urb_control_get_status_request(vpdo, irp, urb_irp, urb, USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS get_status_from_other(vpdo_dev_t *vpdo, IRP *irp, URB *urb)
+PAGEABLE NTSTATUS get_status_from_other(vpdo_dev_t *vpdo, IRP *irp, IRP *urb_irp, URB *urb)
 {
-	return urb_control_get_status_request(vpdo, irp, urb, USB_RECIP_OTHER);
+	return urb_control_get_status_request(vpdo, irp, urb_irp, urb, USB_RECIP_OTHER);
 }
 
-using urb_function_t = NTSTATUS(vpdo_dev_t *vpdo, IRP*, URB*);
+using urb_function_t = NTSTATUS(vpdo_dev_t *vpdo, IRP*, IRP*, URB*);
 
 urb_function_t* const urb_functions[] =
 {
@@ -910,7 +913,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 
 	auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
 	if (pfunc) {
-		return pfunc(vpdo, read_irp, urb);
+		return pfunc(vpdo, read_irp, irp, urb);
 	}
 
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
@@ -1110,12 +1113,12 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 
 auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	auto ctx = as_pointer(vpdo->seqnum_payload);
+	auto ctx = make_peek_context(vpdo->seqnum_payload);
 
 	do {
-		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)) {
+		if (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)) {
 			return do_read(vpdo, read_irp, irp, true);
-		} else if (ctx) { // urb irp with payload has cancelled, but usbip header was already read
+		} else if (vpdo->seqnum_payload) { // urb irp with payload has cancelled, but usbip header was already read
 			return abort_read_payload(vpdo, read_irp);
 		}
 	} while (IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTailIfRxEmpty()));
@@ -1129,13 +1132,11 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
 {
 	auto status = STATUS_PENDING;
-
 	bool canceled = get_seqnum_unlink(irp);
-	auto ctx = as_pointer(vpdo->seqnum_payload);
 
 	if (canceled) {
 		enqueue_irp(vpdo, irp, cancel_queue::rx);
-		if (ctx) { // can't interrupt reading of payload
+		if (vpdo->seqnum_payload) { // can't interrupt reading of payload
 			return status;
 		}
 	} else {
@@ -1148,8 +1149,10 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
 		return status;
 	}
 
+	auto ctx = make_peek_context(vpdo->seqnum_payload);
+
 	if (auto next_irp = canceled ? dequeue_irp(vpdo, cancel_queue::rx) : 
-					IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, ctx)
+					IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)
 	) {
 		if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
 			if (next_irp == irp) {
@@ -1160,7 +1163,7 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
 				complete_internal_ioctl(next_irp, err);
 			}
 		}
-	} else if (ctx) { // irp with payload has cancelled, but header was already read
+	} else if (vpdo->seqnum_payload) { // irp with payload has cancelled, but header was already read
 		auto err = abort_read_payload(vpdo, read_irp);
 		CompleteRequest(read_irp, err);
 	} else { // irp has cancelled

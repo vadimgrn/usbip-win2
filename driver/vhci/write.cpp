@@ -576,14 +576,16 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 PAGEABLE auto dequeue_tx_irp(usbip_request_type &cmd, vpdo_dev_t *vpdo, seqnum_t seqnum)
 {
 	PAGED_CODE();
+
 	NT_ASSERT(seqnum);
+	auto ctx = make_peek_context(seqnum);
 
 	IRP *irp{};
 	bool unlink{};
 
 	switch (cmd) {
 	case USBIP_RET_SUBMIT:
-		irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, as_pointer(seqnum));
+		irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, &ctx);
 		if (irp) {
 			break;
 		}
