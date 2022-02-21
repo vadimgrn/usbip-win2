@@ -40,7 +40,7 @@ NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbControlGetStatusRequest;
 
 	TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
-			irp, urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
+		irp, urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 
 	return STATUS_SEND_TO_SERVER;
 }
@@ -406,8 +406,6 @@ NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
-	clear_context(irp);
-
 	auto irpStack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 

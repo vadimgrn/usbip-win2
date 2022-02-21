@@ -207,7 +207,6 @@ inline auto get_seqnum_unlink(IRP *irp)
 
 inline void set_pipe_handle(IRP *irp, USBD_PIPE_HANDLE PipeHandle)
 {
-	NT_ASSERT(PipeHandle);
 	irp->Tail.Overlay.DriverContext[2] = PipeHandle;
 }
 
@@ -219,11 +218,11 @@ inline auto get_pipe_handle(IRP *irp)
 void clear_context(IRP *irp);
 
 enum class cancel_queue { rx, tx };
-void enqueue_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue);
+void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue);
 
-IRP *dequeue_irp_seqnum(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink);
+IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink);
 
-inline auto dequeue_irp(vpdo_dev_t *vpdo, cancel_queue queue)
+inline auto dequeue_canceled_irp(vpdo_dev_t *vpdo, cancel_queue queue)
 {
-	return dequeue_irp_seqnum(vpdo, queue, 0, false);
+	return dequeue_canceled_irp(vpdo, queue, 0, false);
 }

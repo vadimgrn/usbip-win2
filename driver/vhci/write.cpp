@@ -498,10 +498,8 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_head
 	auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 
-	auto uirp = reinterpret_cast<uintptr_t>(irp);
-
 	TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
-			static_cast<UINT32>(uirp), r->ConnectionIndex, data_sz, actual_length, 
+			irp4log(irp), r->ConnectionIndex, data_sz, actual_length, 
 			WppBinary(r->Data, (USHORT)actual_length));
 
 	auto err = to_windows_status(hdr->u.ret_submit.status);
@@ -593,7 +591,7 @@ PAGEABLE auto dequeue_tx_irp(usbip_request_type &cmd, vpdo_dev_t *vpdo, seqnum_t
 		unlink = true;
 		[[fallthrough]]; // response on canceled irp?
 	case USBIP_RET_UNLINK:
-		irp = dequeue_irp_seqnum(vpdo, cancel_queue::tx, seqnum, unlink);
+		irp = dequeue_canceled_irp(vpdo, cancel_queue::tx, seqnum, unlink);
 		break;
 	}
 
@@ -632,10 +630,9 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 	auto irp = dequeue_tx_irp(irp_cmd, vpdo, seqnum);
 
 	{
-		auto uirp = reinterpret_cast<uintptr_t>(irp);
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-				static_cast<UINT32>(uirp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
+				irp4log(irp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	}
 
 	if (!irp) {

@@ -140,14 +140,14 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo)
 	return ++val ? val : ++val; // skip zero in case of overflow
 }
 
-void enqueue_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue)
+void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue)
 {
-	NT_ASSERT(get_seqnum(irp));
-	
+	NT_ASSERT(get_seqnum_unlink(irp));
+
 	bool rx = queue == cancel_queue::rx;
 	auto head = rx ? &vpdo->rx_canceled_irps : &vpdo->tx_canceled_irps;
 
-	TraceCall("seqnum %u, irp %p -> %s", get_seqnum(irp), irp, rx ? "RX" : "TX");
+	TraceCall("seqnum %u, irp %04x -> %s", get_seqnum(irp), irp4log(irp), rx ? "rx" : "tx");
 
 	KLOCK_QUEUE_HANDLE qh;
 	KeAcquireInStackQueuedSpinLock(&vpdo->canceled_irps_lock, &qh);
@@ -155,7 +155,7 @@ void enqueue_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue)
 	KeReleaseInStackQueuedSpinLock(&qh);
 }
 
-IRP *dequeue_irp_seqnum(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink)
+IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink)
 {
 	IRP *irp{};
 	bool rx = queue == cancel_queue::rx;
@@ -178,6 +178,8 @@ IRP *dequeue_irp_seqnum(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, b
 	}
 
 	KeReleaseInStackQueuedSpinLock(&qh);
+
+	TraceCall("%s(seqnum %u, unlink %d) -> irp %04x", rx ? "rx" : "tx", seqnum, unlink, irp4log(irp));
 	return irp;
 }
 
