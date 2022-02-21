@@ -104,7 +104,7 @@ auto PeekNextIrp_read(_In_ IO_CSQ *csq, [[maybe_unused]] _In_ IRP *irp, [[maybe_
 
 auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 {
-	auto ctx = as_peek_context(context);
+	auto ctx = static_cast<peek_context*>(context);
 	IRP *result{};
 
 	for (auto entry = irp ? list_entry(irp)->Flink : head->Flink; entry != head; entry = entry->Flink) {
@@ -115,8 +115,7 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 		if (!ctx) {
 			found = true;
 		} else if (ctx->use_seqnum) {
-			NT_ASSERT(ctx->u.seqnum);
-			found = ctx->u.seqnum == get_seqnum(entry_irp);
+			found = !ctx->u.seqnum || ctx->u.seqnum == get_seqnum(entry_irp);
 		} else {
 			NT_ASSERT(ctx->u.handle);
 			found = ctx->u.handle == get_pipe_handle(entry_irp);
@@ -187,24 +186,23 @@ void ReleaseLock_tx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 
 void CompleteCanceledIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
+	TraceCSQ("%p", irp);
 	auto vpdo = to_vpdo_read(csq);
 	complete_canceled_irp(vpdo, irp);
 }
 
 void CompleteCanceledIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
+	TraceCSQ("%p", irp);
 	auto vpdo = to_vpdo_rx(csq);
 	complete_canceled_irp(vpdo, irp); // was not sent to server
 }
 
 void CompleteCanceledIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	auto seqnum = get_seqnum(irp);
-	set_seqnum_unlink(irp, seqnum);
-	set_seqnum(irp, 0);
-
+	TraceCSQ("%p", irp);
 	auto vpdo = to_vpdo_tx(csq);
-	send_to_server(vpdo, irp);
+	send_cmd_unlink(vpdo, irp);
 }
 
 PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)

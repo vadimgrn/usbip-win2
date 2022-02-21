@@ -642,6 +642,7 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		bool too_late = cmd == USBIP_RET_UNLINK && !hdr->u.ret_unlink.status; // USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT
 		Trace(too_late ? TRACE_LEVEL_VERBOSE : TRACE_LEVEL_ERROR, 
 			"irp not found for seqnum %u%s", seqnum, too_late ? " (RET_SUBMIT must be already received)" : "");
+
 		return too_late ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 	}
 	

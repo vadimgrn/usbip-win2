@@ -180,3 +180,10 @@ IRP *dequeue_irp_seqnum(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, b
 	KeReleaseInStackQueuedSpinLock(&qh);
 	return irp;
 }
+
+void clear_context(IRP *irp)
+{
+	set_seqnum(irp, 0);
+	set_seqnum_unlink(irp, 0);
+	set_pipe_handle(irp, USBD_PIPE_HANDLE());
+}

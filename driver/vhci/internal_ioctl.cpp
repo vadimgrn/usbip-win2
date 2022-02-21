@@ -13,13 +13,26 @@ namespace
 
 const auto STATUS_SEND_TO_SERVER = NTSTATUS(-1);
 
-/*
-* Code must be in nonpaged section if it acquires spinlock.
-*/
-NTSTATUS abort_pipe(vpdo_dev_t*, USBD_PIPE_HANDLE PipeHandle)
+NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 {
-	TraceUrb("PipeHandle %#Ix, NOT IMPEMENTED", (uintptr_t)PipeHandle);
-	return PipeHandle ? STATUS_NOT_IMPLEMENTED : STATUS_INVALID_PARAMETER;
+	TraceUrb("PipeHandle %#Ix", (uintptr_t)PipeHandle);
+
+	if (!PipeHandle) {
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	auto ctx = make_peek_context(PipeHandle);
+
+	while (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)) {
+		complete_canceled_irp(vpdo, irp);
+	}
+
+	while (auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, &ctx)) {
+		send_cmd_unlink(vpdo, irp);
+	}
+
+	TraceUrb("Done");
+	return STATUS_SUCCESS;
 }
 
 NTSTATUS urb_control_get_status_request(vpdo_dev_t*, URB *urb, UINT32 irp)
@@ -393,6 +406,8 @@ NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
+	clear_context(irp);
+
 	auto irpStack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 

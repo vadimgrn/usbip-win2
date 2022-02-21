@@ -935,8 +935,8 @@ void debug(const usbip_header &hdr, IRP *read_irp, IRP *irp)
 }
 
 /*
-* PAGED_CODE() fails.
-*/
+ * PAGED_CODE() fails.
+ */
 NTSTATUS cmd_submit(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 {
 	NTSTATUS st = STATUS_INVALID_PARAMETER;
@@ -961,10 +961,11 @@ NTSTATUS cmd_submit(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 	return st;
 }
 
-PAGEABLE NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp, seqnum_t seqnum_unlink)
+/*
+ * PAGED_CODE() fails.
+ */
+NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp, seqnum_t seqnum_unlink)
 {
-	PAGED_CODE();
-
 	auto hdr = get_usbip_header(irp);
 	if (!hdr) {
 		return STATUS_INVALID_PARAMETER;
@@ -1120,6 +1121,8 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 			return do_read(vpdo, read_irp, irp, true);
 		} else if (vpdo->seqnum_payload) { // urb irp with payload has cancelled, but usbip header was already read
 			return abort_read_payload(vpdo, read_irp);
+		} else if (auto canceled_irp = dequeue_irp(vpdo, cancel_queue::rx)) {
+			return do_read(vpdo, read_irp, canceled_irp, true);
 		}
 	} while (IoCsqInsertIrpEx(&vpdo->read_irp_csq, read_irp, nullptr, InsertTailIfRxEmpty()));
 
@@ -1129,10 +1132,25 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 } // namespace
 
 
+void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
+{
+	auto seqnum = get_seqnum(irp);
+	NT_ASSERT(seqnum);
+
+	TraceCall("irp %p, seqnum %u", irp, seqnum);
+
+	set_seqnum_unlink(irp, seqnum);
+	set_seqnum(irp, 0);
+
+	send_to_server(vpdo, irp);
+}
+
 NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp)
 {
 	auto status = STATUS_PENDING;
 	bool canceled = get_seqnum_unlink(irp);
+
+	TraceCall("%p%s", irp, canceled ? ", canceled" : "");
 
 	if (canceled) {
 		enqueue_irp(vpdo, irp, cancel_queue::rx);

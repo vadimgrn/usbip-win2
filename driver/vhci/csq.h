@@ -24,11 +24,6 @@ struct peek_context
 	} u;
 };
 
-inline auto as_peek_context(void *ctx)
-{
-	return static_cast<peek_context*>(ctx);
-}
-
 constexpr auto make_peek_context(seqnum_t seqnum)
 {
 	return peek_context{true, {seqnum}};
@@ -36,6 +31,7 @@ constexpr auto make_peek_context(seqnum_t seqnum)
 
 inline auto make_peek_context(USBD_PIPE_HANDLE handle)
 {
+	NT_ASSERT(handle);
 	peek_context ctx{false};
 	ctx.u.handle = handle;
 	return ctx;
