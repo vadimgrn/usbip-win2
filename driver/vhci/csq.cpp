@@ -34,21 +34,21 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 
 	KIRQL irql{};
 	if (check_rx) {
-		KeAcquireSpinLock(&vpdo->rx_irps_lock, &irql);
+		KeAcquireSpinLock(&vpdo->rx_lock, &irql);
 	}
-
-	if (check_rx && !IsListEmpty(&vpdo->rx_irps)) {
-		err = STATUS_UNSUCCESSFUL;
-	} else {
+		
+	if (!check_rx || (IsListEmpty(&vpdo->rx_irps) && IsListEmpty(&vpdo->rx_canceled_irps))) {
 		auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
 		NT_ASSERT(!old_ptr);
+	} else {
+		err = STATUS_UNSUCCESSFUL;
 	}
 
 	if (check_rx) {
-		KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
+		KeReleaseSpinLock(&vpdo->rx_lock, irql);
 	}
 
-	TraceCSQ("%04x -> %!STATUS!", irp4log(irp), err);
+	TraceCSQ("%04x %!STATUS!", irp4log(irp), err);
 	return err;
 }
 
@@ -60,7 +60,7 @@ auto InsertIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	auto func = tail ? InsertTailList : InsertHeadList;
 	func(&vpdo->rx_irps, list_entry(irp));
 
-	TraceCSQ("%s %04x", tail ? "tail" : "head", irp4log(irp));
+	TraceCSQ("%04x -> %s ", irp4log(irp), tail ? "tail" : "head");
 	return STATUS_SUCCESS;
 }
 
@@ -129,10 +129,12 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 
 	if (!ctx) {
 		TraceCSQ("%04x", irp4log(result));
-	} else if (ctx->use_seqnum) {
+	} else if (!ctx->use_seqnum) {
+		TraceCSQ("PipeHandle %#Ix -> %04x, seqnum %u", ph4log(ctx->u.handle), irp4log(result), get_seqnum(irp));
+	} else if (ctx->u.seqnum) {
 		TraceCSQ("seqnum %u -> %04x", ctx->u.seqnum, irp4log(result));
 	} else {
-		TraceCSQ("PipeHandle %#Ix -> %04x", ph4log(ctx->u.handle), irp4log(result));
+		TraceCSQ("%04x, seqnum %u", irp4log(result), get_seqnum(irp));
 	}
 
 	return result;
@@ -156,11 +158,11 @@ void ReleaseLock_read(_In_ IO_CSQ*, _In_ KIRQL) {}
 
 _IRQL_raises_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq)->rx_irps_lock)
+_Acquires_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq)->rx_lock)
 void AcquireLock_rx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 {
 	auto vpdo = to_vpdo_rx(csq);
-	KeAcquireSpinLock(&vpdo->rx_irps_lock, Irql);
+	KeAcquireSpinLock(&vpdo->rx_lock, Irql);
 }
 
 _IRQL_raises_(DISPATCH_LEVEL)
@@ -173,11 +175,11 @@ void AcquireLock_tx(_In_ IO_CSQ *csq, _Out_ PKIRQL Irql)
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
-_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq)->rx_irps_lock)
+_Releases_lock_(CONTAINING_RECORD(csq, vpdo_dev_t, rx_irps_csq)->rx_lock)
 void ReleaseLock_rx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 {
 	auto vpdo = to_vpdo_rx(csq);
-	KeReleaseSpinLock(&vpdo->rx_irps_lock, Irql);
+	KeReleaseSpinLock(&vpdo->rx_lock, Irql);
 }
 
 _IRQL_requires_(DISPATCH_LEVEL)
@@ -225,7 +227,7 @@ PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 
 	InitializeListHead(&vpdo.rx_irps);
-	KeInitializeSpinLock(&vpdo.rx_irps_lock);
+	KeInitializeSpinLock(&vpdo.rx_lock);
 
 	return IoCsqInitializeEx(&vpdo.rx_irps_csq,
 				InsertIrp_rx,

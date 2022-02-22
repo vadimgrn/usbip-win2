@@ -118,15 +118,15 @@ struct vpdo_dev_t : vdev_t
 
 	IO_CSQ rx_irps_csq; // waiting for irp from vhci_read
 	LIST_ENTRY rx_irps; // from *ioctl
-	KSPIN_LOCK rx_irps_lock;
+	LIST_ENTRY rx_canceled_irps; // waiting for irp from vhci_read
+	KSPIN_LOCK rx_lock; // protects both lists
 
 	IO_CSQ tx_irps_csq; // waiting for irp from vhci_write
 	LIST_ENTRY tx_irps; // from *ioctl
 	KSPIN_LOCK tx_irps_lock;
 
-	LIST_ENTRY rx_canceled_irps; // waiting for irp from vhci_read
 	LIST_ENTRY tx_canceled_irps; // waiting for irp from vhci_write
-	KSPIN_LOCK canceled_irps_lock;
+	KSPIN_LOCK tx_canceled_irps_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -215,6 +215,8 @@ inline auto get_pipe_handle(IRP *irp)
 	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
 }
 
+void clear_context(IRP *irp);
+
 /*
  * Use format "%#Ix"
  * @see make_pipe_handle 
@@ -224,14 +226,8 @@ inline auto ph4log(USBD_PIPE_HANDLE handle)
 	return reinterpret_cast<uintptr_t>(handle);
 }
 
-void clear_context(IRP *irp);
+void enqueue_rx_canceled_irp(vpdo_dev_t *vpdo, IRP *irp);
+void enqueue_tx_canceled_irp(vpdo_dev_t *vpdo, IRP *irp);
 
-enum class cancel_queue { rx, tx };
-void enqueue_canceled_irp(vpdo_dev_t *vpdo, IRP *irp, cancel_queue queue);
-
-IRP *dequeue_canceled_irp(vpdo_dev_t *vpdo, cancel_queue queue, seqnum_t seqnum, bool unlink);
-
-inline auto dequeue_canceled_irp(vpdo_dev_t *vpdo, cancel_queue queue)
-{
-	return dequeue_canceled_irp(vpdo, queue, 0, false);
-}
+IRP *dequeue_rx_canceled_irp(vpdo_dev_t *vpdo);
+IRP *dequeue_tx_canceled_irp(vpdo_dev_t *vpdo, seqnum_t seqnum = 0, bool unlink = false);
