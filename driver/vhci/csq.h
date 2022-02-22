@@ -13,7 +13,7 @@ constexpr void *InsertTail() { return nullptr; }
 constexpr void *InsertHead() { return InsertTail; }
 
 // for read irp only
-constexpr void *InsertTailIfRxEmpty() { return init_queues; }
+constexpr void *InsertIfRxEmpty() { return InsertHead; }
 
 struct peek_context
 {

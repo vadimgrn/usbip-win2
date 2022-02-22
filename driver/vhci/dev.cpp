@@ -171,14 +171,13 @@ IRP *dequeue_rx_canceled_irp(vpdo_dev_t *vpdo)
 
 	KIRQL irql;
 	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
-
 	auto entry = RemoveHeadList(head);
+	KeReleaseSpinLock(&vpdo->rx_lock, irql);		
+
 	if (entry != head) {
 		InitializeListHead(entry);
 		irp = get_irp(entry);
 	}
-
-	KeReleaseSpinLock(&vpdo->rx_lock, irql);		
 
 	TraceCall("%04x", irp4log(irp));
 	return irp;
@@ -211,9 +210,13 @@ IRP *dequeue_tx_canceled_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
 	return irp;
 }
 
-void clear_context(IRP *irp)
+void clear_context(IRP *irp, bool unlink)
 {
 	set_seqnum(irp, 0);
-	set_seqnum_unlink(irp, 0);
+
+	if (!unlink) {
+		set_seqnum_unlink(irp, 0);
+	}
+
 	set_pipe_handle(irp, USBD_PIPE_HANDLE());
 }

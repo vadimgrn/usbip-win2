@@ -23,12 +23,12 @@ NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 
 	auto ctx = make_peek_context(PipeHandle);
 
-	while (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)) {
-		complete_canceled_irp(vpdo, irp);
-	}
-
 	while (auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, &ctx)) {
 		send_cmd_unlink(vpdo, irp);
+	}
+
+	while (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)) {
+		complete_canceled_irp(vpdo, irp);
 	}
 
 	TraceUrb("Done");

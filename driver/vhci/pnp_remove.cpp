@@ -80,6 +80,7 @@ PAGEABLE void free_usb_dev_interface(UNICODE_STRING *iface)
 PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
+	TraceCall("%p", vpdo);
 
 	IO_CSQ* v[] { &vpdo->read_irp_csq, &vpdo->tx_irps_csq, &vpdo->rx_irps_csq };
 
@@ -93,6 +94,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 PAGEABLE void complete_canceled_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
+	TraceCall("%p", vpdo);
 
 	while (auto irp = dequeue_tx_canceled_irp(vpdo)) {
 		complete_canceled_irp(vpdo, irp);

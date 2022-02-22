@@ -215,7 +215,7 @@ inline auto get_pipe_handle(IRP *irp)
 	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
 }
 
-void clear_context(IRP *irp);
+void clear_context(IRP *irp, bool unlink);
 
 /*
  * Use format "%#Ix"

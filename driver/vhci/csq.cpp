@@ -26,11 +26,9 @@ inline auto to_vpdo_tx(IO_CSQ *csq)
 
 auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 {
-	NT_ASSERT(InsertContext != InsertHead());
-
 	NTSTATUS err{};
 	auto vpdo = to_vpdo_read(csq);
-	bool check_rx = InsertContext == InsertTailIfRxEmpty();
+	bool check_rx = InsertContext == InsertIfRxEmpty();
 
 	KIRQL irql{};
 	if (check_rx) {
@@ -130,11 +128,11 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 	if (!ctx) {
 		TraceCSQ("%04x", irp4log(result));
 	} else if (!ctx->use_seqnum) {
-		TraceCSQ("PipeHandle %#Ix -> %04x, seqnum %u", ph4log(ctx->u.handle), irp4log(result), get_seqnum(irp));
+		TraceCSQ("PipeHandle %#Ix -> %04x", ph4log(ctx->u.handle), irp4log(result));
 	} else if (ctx->u.seqnum) {
 		TraceCSQ("seqnum %u -> %04x", ctx->u.seqnum, irp4log(result));
 	} else {
-		TraceCSQ("%04x, seqnum %u", irp4log(result), get_seqnum(irp));
+		TraceCSQ("%04x", irp4log(result));
 	}
 
 	return result;
