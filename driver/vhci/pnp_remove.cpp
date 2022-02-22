@@ -91,16 +91,16 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 	}
 }
 
-PAGEABLE void complete_canceled_irps(vpdo_dev_t *vpdo)
+PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 	TraceCall("%p", vpdo);
 
-	while (auto irp = dequeue_tx_canceled_irp(vpdo)) {
+	while (auto irp = dequeue_tx_unlink_irp(vpdo)) {
 		complete_canceled_irp(vpdo, irp);
 	}
 
-	while (auto irp = dequeue_rx_canceled_irp(vpdo)) {
+	while (auto irp = dequeue_rx_unlink_irp(vpdo)) {
 		complete_canceled_irp(vpdo, irp);
 	}
 }
@@ -111,7 +111,7 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
 	TraceCall("%p, port %d", vpdo, vpdo->port);
 
 	cancel_pending_irps(vpdo);
-	complete_canceled_irps(vpdo);
+	complete_unlinked_irps(vpdo);
 
 	vhub_detach_vpdo(vpdo);
 

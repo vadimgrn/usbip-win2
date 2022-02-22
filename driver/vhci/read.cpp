@@ -1060,7 +1060,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 	set_seqnum(irp, seqnum);
 
 	if (get_seqnum_unlink(irp)) {
-		enqueue_tx_canceled_irp(vpdo, irp);
+		enqueue_tx_unlink_irp(vpdo, irp);
 	} else if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
 		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertHead());
@@ -1113,7 +1113,7 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 auto dequeue_rx_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_payload)
 {
 	if (!seqnum_payload) { // can't interrupt reading of payload
-		if (auto irp = dequeue_rx_canceled_irp(vpdo)) {
+		if (auto irp = dequeue_rx_unlink_irp(vpdo)) {
 			return irp;
 		}
 	}
@@ -1154,13 +1154,13 @@ void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 
 NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp, bool unlink)
 {
+	TraceCall("irp %04x", irp4log(irp));
+
 	clear_context(irp, unlink);
+	NT_ASSERT(unlink == (bool)get_seqnum_unlink(irp));
 
-	bool canceled = get_seqnum_unlink(irp);
-	TraceCall("irp %04x%s", irp4log(irp), canceled ? "(canceled)" : " ");
-
-	if (canceled) {
-		enqueue_rx_canceled_irp(vpdo, irp);
+	if (unlink) {
+		enqueue_rx_unlink_irp(vpdo, irp);
 	} else {
 		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, nullptr);
 		NT_ASSERT(!err);
@@ -1177,7 +1177,7 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp, bool unlink)
 			if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
 				if (next_irp == irp) {
 					status = err;
-				} else if (canceled) {
+				} else if (unlink) {
 					complete_canceled_irp(vpdo, next_irp);
 				} else {
 					complete_internal_ioctl(next_irp, err);

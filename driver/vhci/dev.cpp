@@ -140,18 +140,18 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo)
 	return ++val ? val : ++val; // skip zero in case of overflow
 }
 
-void enqueue_rx_canceled_irp(vpdo_dev_t *vpdo, IRP *irp)
+void enqueue_rx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp)
 {
 	NT_ASSERT(get_seqnum_unlink(irp));
 	TraceCall("irp %04x, unlink seqnum %u", irp4log(irp), get_seqnum_unlink(irp));
 
 	KIRQL irql;
 	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
-	InsertTailList(&vpdo->rx_canceled_irps, list_entry(irp));
+	InsertTailList(&vpdo->rx_unlink_irps, list_entry(irp));
 	KeReleaseSpinLock(&vpdo->rx_lock, irql);
 }
 
-void enqueue_tx_canceled_irp(vpdo_dev_t *vpdo, IRP *irp)
+void enqueue_tx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp)
 {
 	NT_ASSERT(get_seqnum(irp));
 	NT_ASSERT(get_seqnum_unlink(irp));
@@ -159,15 +159,15 @@ void enqueue_tx_canceled_irp(vpdo_dev_t *vpdo, IRP *irp)
 	TraceCall("irp %04x, seqnum %u, unlink seqnum %u", irp4log(irp), get_seqnum(irp), get_seqnum_unlink(irp));
 
 	KLOCK_QUEUE_HANDLE qh;
-	KeAcquireInStackQueuedSpinLock(&vpdo->tx_canceled_irps_lock, &qh);
-	InsertTailList(&vpdo->tx_canceled_irps, list_entry(irp));
+	KeAcquireInStackQueuedSpinLock(&vpdo->tx_unlink_irps_lock, &qh);
+	InsertTailList(&vpdo->tx_unlink_irps, list_entry(irp));
 	KeReleaseInStackQueuedSpinLock(&qh);
 }
 
-IRP *dequeue_rx_canceled_irp(vpdo_dev_t *vpdo)
+IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo)
 {
 	IRP *irp{};
-	auto head = &vpdo->rx_canceled_irps;
+	auto head = &vpdo->rx_unlink_irps;
 
 	KIRQL irql;
 	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
@@ -183,14 +183,14 @@ IRP *dequeue_rx_canceled_irp(vpdo_dev_t *vpdo)
 	return irp;
 }
 
-IRP *dequeue_tx_canceled_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
+IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
 {
 	IRP *irp{};
-	auto head = &vpdo->tx_canceled_irps;
+	auto head = &vpdo->tx_unlink_irps;
 	auto func = unlink ? get_seqnum_unlink : get_seqnum;
 
 	KLOCK_QUEUE_HANDLE qh;
-	KeAcquireInStackQueuedSpinLock(&vpdo->tx_canceled_irps_lock, &qh);		
+	KeAcquireInStackQueuedSpinLock(&vpdo->tx_unlink_irps_lock, &qh);		
 
 	for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
 
@@ -210,11 +210,11 @@ IRP *dequeue_tx_canceled_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
 	return irp;
 }
 
-void clear_context(IRP *irp, bool unlink)
+void clear_context(IRP *irp, bool skip_unlink)
 {
 	set_seqnum(irp, 0);
 
-	if (!unlink) {
+	if (!skip_unlink) {
 		set_seqnum_unlink(irp, 0);
 	}
 

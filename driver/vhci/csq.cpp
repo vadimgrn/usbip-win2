@@ -35,7 +35,7 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 		KeAcquireSpinLock(&vpdo->rx_lock, &irql);
 	}
 		
-	if (!check_rx || (IsListEmpty(&vpdo->rx_irps) && IsListEmpty(&vpdo->rx_canceled_irps))) {
+	if (!check_rx || (IsListEmpty(&vpdo->rx_irps) && IsListEmpty(&vpdo->rx_unlink_irps))) {
 		auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
 		NT_ASSERT(!old_ptr);
 	} else {

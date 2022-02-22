@@ -591,7 +591,7 @@ PAGEABLE auto dequeue_tx_irp(usbip_request_type &cmd, vpdo_dev_t *vpdo, seqnum_t
 		unlink = true;
 		[[fallthrough]]; // response on canceled irp?
 	case USBIP_RET_UNLINK:
-		irp = dequeue_tx_canceled_irp(vpdo, seqnum, unlink);
+		irp = dequeue_tx_unlink_irp(vpdo, seqnum, unlink);
 		break;
 	}
 
