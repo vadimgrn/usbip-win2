@@ -15,7 +15,7 @@ const auto STATUS_SEND_TO_SERVER = NTSTATUS(-1);
 
 NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 {
-	TraceUrb("PipeHandle %#Ix", (uintptr_t)PipeHandle);
+	TraceUrb("PipeHandle %#Ix", ph4log(PipeHandle));
 
 	if (!PipeHandle) {
 		return STATUS_INVALID_PARAMETER;
@@ -129,7 +129,7 @@ NTSTATUS urb_pipe_request(vpdo_dev_t *vpdo, URB *urb, UINT32 irp)
 	TraceUrb("irp %04x -> %s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d) -> %!STATUS!",
 		irp,
 		urb_function_str(r.Hdr.Function), 
-		(uintptr_t)r.PipeHandle, 
+		ph4log(r.PipeHandle), 
 		get_endpoint_address(r.PipeHandle), 
 		get_endpoint_type(r.PipeHandle),
 		get_endpoint_interval(r.PipeHandle),
@@ -162,7 +162,7 @@ NTSTATUS urb_control_transfer_any(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu, Timeout %lu, %s",
-		irp, (uintptr_t)r.PipeHandle,
+		irp, ph4log(r.PipeHandle),
 		usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
 		r.TransferBufferLength,
 		urb->UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
@@ -179,7 +179,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu%s",
-		irp, (uintptr_t)r.PipeHandle,
+		irp, ph4log(r.PipeHandle),
 		usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
 		r.TransferBufferLength,
 		func);
@@ -195,7 +195,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
-		irp, (uintptr_t)r.PipeHandle,	
+		irp, ph4log(r.PipeHandle),	
 		usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
 		r.TransferBufferLength, 
 		r.StartFrame, 
@@ -248,7 +248,7 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbGetIsochPipeTransferPathDelays;
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, MaximumSendPathDelayInMilliSeconds %lu, MaximumCompletionPathDelayInMilliSeconds %lu",
-		irp, (uintptr_t)r.PipeHandle, 
+		irp, ph4log(r.PipeHandle), 
 		r.MaximumSendPathDelayInMilliSeconds, 
 		r.MaximumCompletionPathDelayInMilliSeconds);
 
@@ -260,7 +260,7 @@ NTSTATUS open_static_streams(vpdo_dev_t*, URB *urb, UINT32 irp)
 	auto &r = urb->UrbOpenStaticStreams;
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",
-		irp, (uintptr_t)r.PipeHandle, r.NumberOfStreams, r.StreamInfoVersion, r.StreamInfoSize);
+		irp, ph4log(r.PipeHandle), r.NumberOfStreams, r.StreamInfoVersion, r.StreamInfoSize);
 
 	return STATUS_NOT_SUPPORTED;
 }
@@ -399,7 +399,7 @@ NTSTATUS usb_get_port_status(ULONG *status)
 
 NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
-	TraceCall("%p %!STATUS!", irp, status);
+	TraceCall("irp %04x %!STATUS!", irp4log(irp), status);
 	irp->IoStatus.Information = 0;
 	return CompleteRequest(irp, status);
 }
@@ -409,7 +409,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpStack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %p", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, irp);
+	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %04x", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, irp4log(irp));
 
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -446,6 +446,6 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		complete_internal_ioctl(irp, status);
 	}
 
-	TraceCall("Leave %!STATUS!, irp  %p", status, irp);
+	TraceCall("Leave %!STATUS!, irp %04x", status, irp4log(irp));
 	return status;
 }

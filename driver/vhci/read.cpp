@@ -1025,7 +1025,7 @@ PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *irp)
  */
 NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	TraceCall("seqnum %u, irp %p", vpdo->seqnum_payload, read_irp);
+	TraceCall("seqnum %u, irp %04x", vpdo->seqnum_payload, irp4log(read_irp));
 
 	NT_ASSERT(vpdo->seqnum_payload);
 	vpdo->seqnum_payload = 0;
@@ -1036,7 +1036,7 @@ NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
 
 auto complete_read(IRP *irp, NTSTATUS status)
 {
-	TraceCall("%p %!STATUS!, transferred %Iu", irp, status, TRANSFERRED(irp));
+	TraceCall("%04x %!STATUS!, transferred %Iu", irp4log(irp), status, TRANSFERRED(irp));
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp)); // before CompleteRequest()
 
 	if (status != STATUS_PENDING) {
@@ -1135,7 +1135,7 @@ void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 	auto seqnum = get_seqnum(irp);
 	NT_ASSERT(seqnum);
 
-	TraceCall("irp %p, seqnum %u", irp, seqnum);
+	TraceCall("irp %04x, seqnum %u", irp4log(irp), seqnum);
 
 	set_seqnum_unlink(irp, seqnum);
 	set_seqnum(irp, 0);
@@ -1152,7 +1152,7 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp, bool clear_ctx)
 	auto status = STATUS_PENDING;
 	bool canceled = get_seqnum_unlink(irp);
 
-	TraceCall("%p%s", irp, canceled ? ", canceled" : "");
+	TraceCall("irp %04x%s", irp4log(irp), canceled ? ", canceled" : " ");
 
 	if (canceled) {
 		enqueue_canceled_irp(vpdo, irp, cancel_queue::rx);
@@ -1202,7 +1202,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceCall("irql %!irql!, read buffer %lu, irp %p", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp);
+	TraceCall("irql %!irql!, read buffer %lu, irp %04x", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp4log(irp));
 
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {

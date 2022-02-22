@@ -545,7 +545,7 @@ PAGEABLE void ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
 		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
-	TraceCall("%p %!STATUS!, Information %Iu", irp, st, irp->IoStatus.Information);
+	TraceCall("%04x %!STATUS!, Information %Iu", irp4log(irp), st, irp->IoStatus.Information);
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
@@ -663,7 +663,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceCall("Enter irql %!irql!, write buffer %lu, irp %p", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp);
+	TraceCall("Enter irql %!irql!, write buffer %lu, irp %04x", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp4log(irp));
 
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -681,7 +681,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	}
 
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
-	TraceCall("Leave %!STATUS!, transferred %Iu, irp %p", status, TRANSFERRED(irp), irp);
+	TraceCall("Leave %!STATUS!, transferred %Iu, irp %04x", status, TRANSFERRED(irp), irp4log(irp));
 
 	return CompleteRequest(irp, status);
 }

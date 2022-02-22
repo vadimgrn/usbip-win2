@@ -74,4 +74,3 @@ static_assert(get_endpoint_type(EP0) == UsbdPipeTypeControl);
 static_assert(!get_endpoint_number(EP0));
 static_assert(!get_endpoint_interval(EP0));
 */
-

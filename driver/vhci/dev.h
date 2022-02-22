@@ -215,6 +215,15 @@ inline auto get_pipe_handle(IRP *irp)
 	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
 }
 
+/*
+ * Use format "%#Ix"
+ * @see make_pipe_handle 
+ */ 
+inline auto ph4log(USBD_PIPE_HANDLE handle)
+{
+	return reinterpret_cast<uintptr_t>(handle);
+}
+
 void clear_context(IRP *irp);
 
 enum class cancel_queue { rx, tx };

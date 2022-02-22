@@ -48,7 +48,7 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 		KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
 	}
 
-	TraceCSQ("%p -> %!STATUS!", irp, err);
+	TraceCSQ("%04x -> %!STATUS!", irp4log(irp), err);
 	return err;
 }
 
@@ -127,9 +127,13 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 		}
 	}
 
-	TraceCSQ("%04x, seqnum %u, PipeHandle %p", irp4log(result), 
-		ctx && ctx->use_seqnum ? ctx->u.seqnum : 0, 
-		ctx && !ctx->use_seqnum ? ctx->u.handle : USBD_PIPE_HANDLE());
+	if (!ctx) {
+		TraceCSQ("%04x", irp4log(result));
+	} else if (ctx->use_seqnum) {
+		TraceCSQ("seqnum %u -> %04x", ctx->u.seqnum, irp4log(result));
+	} else {
+		TraceCSQ("PipeHandle %#Ix -> %04x", ph4log(ctx->u.handle), irp4log(result));
+	}
 
 	return result;
 }
