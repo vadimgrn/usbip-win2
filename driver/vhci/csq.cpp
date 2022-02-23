@@ -1,8 +1,8 @@
 #include "csq.h"
-#include "dev.h"
 #include "trace.h"
 #include "csq.tmh"
 
+#include "dev.h"
 #include "irp.h"
 #include "read.h"
 
@@ -55,7 +55,7 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 		KeReleaseSpinLock(&vpdo->rx_lock, irql);
 	}
 
-	TraceCSQ("%04x %!STATUS!", ptr4log(irp), err);
+	TraceCSQ("%04x%s", ptr4log(irp), err ? " not inserted, rx irp is available" : " ");
 	return err;
 }
 

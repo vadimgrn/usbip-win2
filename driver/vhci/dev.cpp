@@ -164,33 +164,10 @@ void enqueue_tx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp)
 	KeReleaseInStackQueuedSpinLock(&qh);
 }
 
-IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo)
+auto dequeue(LIST_ENTRY *head, seqnum_t seqnum, bool unlink)
 {
-	IRP *irp{};
-	auto head = &vpdo->rx_unlink_irps;
-
-	KIRQL irql;
-	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
-	auto entry = RemoveHeadList(head);
-	KeReleaseSpinLock(&vpdo->rx_lock, irql);		
-
-	if (entry != head) {
-		InitializeListHead(entry);
-		irp = get_irp(entry);
-	}
-
-	TraceCSQ("%04x", ptr4log(irp));
-	return irp;
-}
-
-IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
-{
-	IRP *irp{};
-	auto head = &vpdo->tx_unlink_irps;
 	auto func = unlink ? get_seqnum_unlink : get_seqnum;
-
-	KLOCK_QUEUE_HANDLE qh;
-	KeAcquireInStackQueuedSpinLock(&vpdo->tx_unlink_irps_lock, &qh);		
+	IRP *irp{};
 
 	for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
 
@@ -204,6 +181,25 @@ IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
 		}
 	}
 
+	return irp;
+}
+
+IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink)
+{
+	KIRQL irql;
+	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
+	auto irp = dequeue(&vpdo->rx_unlink_irps, seqnum_unlink, true);
+	KeReleaseSpinLock(&vpdo->rx_lock, irql);		
+
+	TraceCSQ("unlink seqnum %u -> irp %04x", seqnum_unlink, ptr4log(irp));
+	return irp;
+}
+
+IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
+{
+	KLOCK_QUEUE_HANDLE qh;
+	KeAcquireInStackQueuedSpinLock(&vpdo->tx_unlink_irps_lock, &qh);		
+	auto irp = dequeue(&vpdo->tx_unlink_irps, seqnum, unlink);
 	KeReleaseInStackQueuedSpinLock(&qh);
 
 	TraceCSQ("%sseqnum %u -> irp %04x", unlink ? "unlink " : " ", seqnum, ptr4log(irp));
