@@ -360,17 +360,18 @@ urb_function_t* const urb_functions[] =
 
 NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 {
+	auto uirp = irp4log(irp);
+
 	auto urb = (URB*)URB_FROM_IRP(irp);
 	if (!urb) {
-		Trace(TRACE_LEVEL_WARNING, "Null urb");
+		Trace(TRACE_LEVEL_WARNING, "URB_FROM_IRP(%04x) -> NULL", uirp);
 		return STATUS_INVALID_PARAMETER;
 	}
 
 	auto func = urb->UrbHeader.Function;
 
 	if (auto handler = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
-		auto uirp = reinterpret_cast<uintptr_t>(irp);
-		auto st = handler(vpdo, urb, static_cast<UINT32>(uirp));
+		auto st = handler(vpdo, urb, uirp);
 		return st == STATUS_SEND_TO_SERVER ? send_to_server(vpdo, irp) : st;
 	}
 
@@ -409,7 +410,8 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpStack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %04x", KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, irp4log(irp));
+	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %04x", 
+			KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, irp4log(irp));
 
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {

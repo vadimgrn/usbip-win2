@@ -1110,6 +1110,9 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 	return err;
 }
 
+/*
+ * @see csq.cpp, rx_unlink_unavail.
+ */
 auto dequeue_rx_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_payload)
 {
 	if (!seqnum_payload) { // can't interrupt reading of payload

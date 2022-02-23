@@ -24,6 +24,15 @@ inline auto to_vpdo_tx(IO_CSQ *csq)
 	return CONTAINING_RECORD(csq, vpdo_dev_t, tx_irps_csq);
 }
 
+/*
+ * @see read.cpp, dequeue_rx_irp.
+ */
+inline auto rx_unlink_unavail(vpdo_dev_t *vpdo)
+{
+	return  vpdo->seqnum_payload || // can't interrupt reading of payload
+		IsListEmpty(&vpdo->rx_unlink_irps);
+}
+
 auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 {
 	NTSTATUS err{};
@@ -34,12 +43,12 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	if (check_rx) {
 		KeAcquireSpinLock(&vpdo->rx_lock, &irql);
 	}
-		
-	if (!check_rx || (IsListEmpty(&vpdo->rx_irps) && IsListEmpty(&vpdo->rx_unlink_irps))) {
+
+	if (check_rx && !(IsListEmpty(&vpdo->rx_irps) && rx_unlink_unavail(vpdo))) {
+		err = STATUS_UNSUCCESSFUL;
+	} else {
 		auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
 		NT_ASSERT(!old_ptr);
-	} else {
-		err = STATUS_UNSUCCESSFUL;
 	}
 
 	if (check_rx) {
