@@ -146,7 +146,7 @@ set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
 tracelog.exe -start %NAME% -rt -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x1F -level 5
 tracepdb.exe -f D:\usbip-win2\x64\Debug -p %TMFS%
-start /MAX tracefmt.exe -nosummary -p %TMFS% -displayonly -rt %NAME%
+rem start /MAX tracefmt.exe -nosummary -p %TMFS% -displayonly -rt %NAME%
 ```
 - Stop the log session and get plain text log
 ```

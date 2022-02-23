@@ -26,9 +26,3 @@ inline auto get_irp(LIST_ENTRY *entry)
 {
 	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
 }
-
-inline auto irp4log(IRP *irp) // use format "%04x"
-{
-	auto n = reinterpret_cast<uintptr_t>(irp);
-	return static_cast<UINT32>(n);
-}

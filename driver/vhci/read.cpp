@@ -929,7 +929,7 @@ void debug(const usbip_header &hdr, IRP *read_irp, IRP *irp)
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
 	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-			irp4log(irp), pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+			ptr4log(irp), pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 }
 
 /*
@@ -1025,7 +1025,7 @@ PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *irp)
  */
 NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
 {
-	TraceCall("seqnum %u, irp %04x", vpdo->seqnum_payload, irp4log(read_irp));
+	TraceCall("seqnum %u, irp %04x", vpdo->seqnum_payload, ptr4log(read_irp));
 
 	NT_ASSERT(vpdo->seqnum_payload);
 	vpdo->seqnum_payload = 0;
@@ -1036,7 +1036,7 @@ NTSTATUS abort_read_payload(vpdo_dev_t *vpdo, IRP *read_irp)
 
 auto complete_read(IRP *irp, NTSTATUS status)
 {
-	TraceCall("%04x %!STATUS!, transferred %Iu", irp4log(irp), status, TRANSFERRED(irp));
+	TraceCall("%04x %!STATUS!, transferred %Iu", ptr4log(irp), status, TRANSFERRED(irp));
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp)); // before CompleteRequest()
 
 	if (status != STATUS_PENDING) {
@@ -1149,7 +1149,7 @@ void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 	auto seqnum = get_seqnum(irp);
 	NT_ASSERT(seqnum);
 
-	TraceCall("irp %04x, unlink seqnum %u", irp4log(irp), seqnum);
+	TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
 
 	set_seqnum_unlink(irp, seqnum);
 	send_to_server(vpdo, irp, true);
@@ -1157,7 +1157,7 @@ void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 
 NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp, bool unlink)
 {
-	TraceCall("irp %04x", irp4log(irp));
+	TraceCall("irp %04x", ptr4log(irp));
 
 	clear_context(irp, unlink);
 	NT_ASSERT(unlink == (bool)get_seqnum_unlink(irp));
@@ -1206,7 +1206,7 @@ extern "C" PAGEABLE NTSTATUS vhci_read(__in DEVICE_OBJECT *devobj, __in IRP *irp
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceCall("irql %!irql!, read buffer %lu, irp %04x", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp4log(irp));
+	TraceCall("irql %!irql!, read buffer %lu, irp %04x", KeGetCurrentIrql(), get_irp_buffer_size(irp), ptr4log(irp));
 
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {

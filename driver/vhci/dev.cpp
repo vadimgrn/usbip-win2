@@ -143,7 +143,7 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo)
 void enqueue_rx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp)
 {
 	NT_ASSERT(get_seqnum_unlink(irp));
-	TraceCall("irp %04x, unlink seqnum %u", irp4log(irp), get_seqnum_unlink(irp));
+	TraceCSQ("irp %04x, unlink seqnum %u", ptr4log(irp), get_seqnum_unlink(irp));
 
 	KIRQL irql;
 	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
@@ -156,7 +156,7 @@ void enqueue_tx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp)
 	NT_ASSERT(get_seqnum(irp));
 	NT_ASSERT(get_seqnum_unlink(irp));
 
-	TraceCall("irp %04x, seqnum %u, unlink seqnum %u", irp4log(irp), get_seqnum(irp), get_seqnum_unlink(irp));
+	TraceCSQ("irp %04x, seqnum %u, unlink seqnum %u", ptr4log(irp), get_seqnum(irp), get_seqnum_unlink(irp));
 
 	KLOCK_QUEUE_HANDLE qh;
 	KeAcquireInStackQueuedSpinLock(&vpdo->tx_unlink_irps_lock, &qh);
@@ -179,7 +179,7 @@ IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo)
 		irp = get_irp(entry);
 	}
 
-	TraceCall("%04x", irp4log(irp));
+	TraceCSQ("%04x", ptr4log(irp));
 	return irp;
 }
 
@@ -206,7 +206,7 @@ IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
 
 	KeReleaseInStackQueuedSpinLock(&qh);
 
-	TraceCall("%sseqnum %u -> irp %04x", unlink ? "unlink " : " ", seqnum, irp4log(irp));
+	TraceCSQ("%sseqnum %u -> irp %04x", unlink ? "unlink " : " ", seqnum, ptr4log(irp));
 	return irp;
 }
 

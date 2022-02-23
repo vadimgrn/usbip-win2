@@ -499,7 +499,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_head
 	RtlCopyMemory(r->Data, hdr + 1, actual_length);
 
 	TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
-			irp4log(irp), r->ConnectionIndex, data_sz, actual_length, 
+			ptr4log(irp), r->ConnectionIndex, data_sz, actual_length, 
 			WppBinary(r->Data, (USHORT)actual_length));
 
 	auto err = to_windows_status(hdr->u.ret_submit.status);
@@ -545,7 +545,7 @@ PAGEABLE void ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header *hdr)
 		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
-	TraceCall("%04x %!STATUS!, Information %Iu", irp4log(irp), st, irp->IoStatus.Information);
+	TraceCall("%04x %!STATUS!, Information %Iu", ptr4log(irp), st, irp->IoStatus.Information);
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
@@ -632,7 +632,7 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-				irp4log(irp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
+				ptr4log(irp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	}
 
 	if (!irp) {
@@ -663,7 +663,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	PAGED_CODE();
 	NT_ASSERT(!TRANSFERRED(irp));
 
-	TraceCall("Enter irql %!irql!, write buffer %lu, irp %04x", KeGetCurrentIrql(), get_irp_buffer_size(irp), irp4log(irp));
+	TraceCall("Enter irql %!irql!, write buffer %lu, irp %04x", KeGetCurrentIrql(), get_irp_buffer_size(irp), ptr4log(irp));
 
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) {
@@ -681,7 +681,7 @@ extern "C" PAGEABLE NTSTATUS vhci_write(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	}
 
 	NT_ASSERT(TRANSFERRED(irp) <= get_irp_buffer_size(irp));
-	TraceCall("Leave %!STATUS!, transferred %Iu, irp %04x", status, TRANSFERRED(irp), irp4log(irp));
+	TraceCall("Leave %!STATUS!, transferred %Iu, irp %04x", status, TRANSFERRED(irp), ptr4log(irp));
 
 	return CompleteRequest(irp, status);
 }

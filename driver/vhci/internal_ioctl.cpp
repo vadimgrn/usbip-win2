@@ -31,7 +31,6 @@ NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 		complete_canceled_irp(vpdo, irp);
 	}
 
-	TraceUrb("Done");
 	return STATUS_SUCCESS;
 }
 
@@ -174,7 +173,7 @@ NTSTATUS urb_control_transfer_any(vpdo_dev_t*, URB *urb, UINT32 irp)
 NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t*, URB *urb, UINT32 irp)
 {
 	auto &r = urb->UrbBulkOrInterruptTransfer;
-	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
+	const char *func = urb->UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : " ";
 
 	char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
@@ -360,7 +359,7 @@ urb_function_t* const urb_functions[] =
 
 NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *irp)
 {
-	auto uirp = irp4log(irp);
+	auto uirp = ptr4log(irp);
 
 	auto urb = (URB*)URB_FROM_IRP(irp);
 	if (!urb) {
@@ -400,7 +399,7 @@ NTSTATUS usb_get_port_status(ULONG *status)
 
 NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
-	TraceCall("irp %04x %!STATUS!", irp4log(irp), status);
+	TraceCall("irp %04x %!STATUS!", ptr4log(irp), status);
 	irp->IoStatus.Information = 0;
 	return CompleteRequest(irp, status);
 }
@@ -411,7 +410,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto ioctl_code = irpStack->Parameters.DeviceIoControl.IoControlCode;
 
 	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %04x", 
-			KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, irp4log(irp));
+			KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
 
 	auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -444,10 +443,11 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
-	if (status != STATUS_PENDING) {
+	if (status == STATUS_PENDING) {
+		TraceCall("Leave %!STATUS!, irp %04x", status, ptr4log(irp));
+	} else {
 		complete_internal_ioctl(irp, status);
 	}
 
-	TraceCall("Leave %!STATUS!, irp %04x", status, irp4log(irp));
 	return status;
 }

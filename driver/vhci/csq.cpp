@@ -55,7 +55,7 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 		KeReleaseSpinLock(&vpdo->rx_lock, irql);
 	}
 
-	TraceCSQ("%04x %!STATUS!", irp4log(irp), err);
+	TraceCSQ("%04x %!STATUS!", ptr4log(irp), err);
 	return err;
 }
 
@@ -67,14 +67,14 @@ auto InsertIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	auto func = tail ? InsertTailList : InsertHeadList;
 	func(&vpdo->rx_irps, list_entry(irp));
 
-	TraceCSQ("%04x -> %s ", irp4log(irp), tail ? "tail" : "head");
+	TraceCSQ("%04x -> %s ", ptr4log(irp), tail ? "tail" : "head");
 	return STATUS_SUCCESS;
 }
 
 void InsertIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	NT_ASSERT(get_seqnum(irp));
-	TraceCSQ("%04x", irp4log(irp));
+	TraceCSQ("%04x", ptr4log(irp));
 
 	auto vpdo = to_vpdo_tx(csq);
 	InsertTailList(&vpdo->tx_irps, list_entry(irp));
@@ -82,7 +82,7 @@ void InsertIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 
 void RemoveIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	TraceCSQ("%04x", irp4log(irp));
+	TraceCSQ("%04x", ptr4log(irp));
 	auto vpdo = to_vpdo_read(csq);
 
 	auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), nullptr);
@@ -91,7 +91,7 @@ void RemoveIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 
 void RemoveIrp(_In_ IO_CSQ*, _In_ IRP *irp)
 {
-	TraceCSQ("%04x", irp4log(irp));
+	TraceCSQ("%04x", ptr4log(irp));
 	auto entry = list_entry(irp);
 	RemoveEntryList(entry);
 	InitializeListHead(entry);
@@ -105,7 +105,7 @@ auto PeekNextIrp_read(_In_ IO_CSQ *csq, [[maybe_unused]] _In_ IRP *irp, [[maybe_
 	auto vpdo = to_vpdo_read(csq);
 	auto ptr = *reinterpret_cast<IRP* volatile *>(&vpdo->read_irp); // dereference pointer to volatile pointer
 
-	TraceCSQ("%04x", irp4log(ptr));
+	TraceCSQ("%04x", ptr4log(ptr));
 	return ptr;
 }
 
@@ -135,13 +135,13 @@ auto PeekNextIrp(_In_ LIST_ENTRY *head, _In_ IRP *irp, _In_ PVOID context)
 	}
 
 	if (!ctx) {
-		TraceCSQ("%04x", irp4log(result));
+		TraceCSQ("%04x", ptr4log(result));
 	} else if (!ctx->use_seqnum) {
-		TraceCSQ("PipeHandle %#Ix -> %04x", ph4log(ctx->u.handle), irp4log(result));
+		TraceCSQ("PipeHandle %#Ix -> %04x", ph4log(ctx->u.handle), ptr4log(result));
 	} else if (ctx->u.seqnum) {
-		TraceCSQ("seqnum %u -> %04x", ctx->u.seqnum, irp4log(result));
+		TraceCSQ("seqnum %u -> %04x", ctx->u.seqnum, ptr4log(result));
 	} else {
-		TraceCSQ("%04x", irp4log(result));
+		TraceCSQ("%04x", ptr4log(result));
 	}
 
 	return result;
@@ -211,7 +211,7 @@ void CompleteCanceledIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 
 void CompleteCanceledIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	TraceCSQ("%04x", irp4log(irp));
+	TraceCSQ("%04x", ptr4log(irp));
 	auto vpdo = to_vpdo_tx(csq);
 	send_cmd_unlink(vpdo, irp);
 }

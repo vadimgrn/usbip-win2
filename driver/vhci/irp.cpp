@@ -69,7 +69,7 @@ NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 
 void complete_canceled_irp(vpdo_dev_t*, IRP *irp)
 {
-	TraceCall("%04x", irp4log(irp));
+	TraceCall("%04x", ptr4log(irp));
 
 	irp->IoStatus.Status = STATUS_CANCELLED;
 	irp->IoStatus.Information = 0;

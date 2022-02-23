@@ -217,6 +217,12 @@ inline auto get_pipe_handle(IRP *irp)
 
 void clear_context(IRP *irp, bool skip_unlink);
 
+inline auto ptr4log(const void *ptr) // use format "%04x"
+{
+	auto n = reinterpret_cast<uintptr_t>(ptr);
+	return static_cast<UINT32>(n);
+}
+
 /*
  * Use format "%#Ix"
  * @see make_pipe_handle 
