@@ -1060,7 +1060,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 	set_seqnum(irp, seqnum);
 
 	if (get_seqnum_unlink(irp)) {
-		enqueue_tx_unlink_irp(vpdo, irp);
+		//enqueue_tx_unlink_irp(vpdo, irp);
 	} else if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
 		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertHead());
@@ -1144,6 +1144,22 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 } // namespace
 
 
+/*
+ * There is a race condition between RET_SUBMIT and CMD_UNLINK.
+ * Sequence of events:
+ * 1.Pending IRPs are waiting for RET_SUBMIT in tx_irps.
+ * 2.An upper driver cancels IRP.
+ * 3.IRP is removed from tx_irps, CsqCompleteCanceledIrp callback is called.
+ * 4.IRP is inserted into rx_unlink_irps (waiting for read IRP).
+ * 5.IRP is dequeued from rx_unlink_irps and appended into tx_unlink_irps atomically.
+ * 6.CMD_UNLINK is issued.
+ * 
+ * RET_SUBMIT can be received
+ * a)Before #3 - normal case, IRP will be dequeued from tx_irps.
+ * b)Between #3 and #4, IRP will not be found.
+ * c)Between #4 and #5, IRP will be dequeued from rx_unlink_irps.
+ * d)After #5, IRP will be dequeued from tx_unlink_irps.
+ */
 void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 {
 	auto seqnum = get_seqnum(irp);

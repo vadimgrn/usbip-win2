@@ -111,22 +111,20 @@ struct vpdo_dev_t : vdev_t
 	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
 	seqnum_t seqnum;
-	seqnum_t seqnum_payload; // *ioctl irp which is wating for read irp for payload transfer
+	seqnum_t seqnum_payload; // *ioctl irp which is waiting for read irp for payload transfer
 
 	IO_CSQ read_irp_csq; // waiting for irp from *ioctl
 	IRP *read_irp; // from vhci_read, can be only one
 
 	IO_CSQ rx_irps_csq; // waiting for irp from vhci_read
 	LIST_ENTRY rx_irps; // from *ioctl
-	LIST_ENTRY rx_unlink_irps;
-	KSPIN_LOCK rx_lock; // protects both lists
+	LIST_ENTRY rx_unlink_irps; // waiting for irp from vhci_read
+	LIST_ENTRY tx_unlink_irps; // waiting for irp from vhci_write
+	KSPIN_LOCK rx_lock;
 
 	IO_CSQ tx_irps_csq; // waiting for irp from vhci_write
 	LIST_ENTRY tx_irps; // from *ioctl
 	KSPIN_LOCK tx_irps_lock;
-
-	LIST_ENTRY tx_unlink_irps; // waiting for irp from vhci_write
-	KSPIN_LOCK tx_unlink_irps_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
@@ -171,52 +169,6 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
 seqnum_t next_seqnum(vpdo_dev_t *vpdo);
 
-inline auto as_seqnum(const void *p)
-{
-	return static_cast<seqnum_t>(reinterpret_cast<uintptr_t>(p));
-}
-
-inline auto as_pointer(seqnum_t seqnum)
-{
-	return reinterpret_cast<void*>(uintptr_t(seqnum));
-}
-
-/*
-* IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
-* Drivers that use these routines to queue IRPs must leave that member unused.
-*/
-inline void set_seqnum(IRP *irp, seqnum_t seqnum)
-{
-	irp->Tail.Overlay.DriverContext[0] = as_pointer(seqnum);
-}
-
-inline auto get_seqnum(IRP *irp)
-{
-	return as_seqnum(irp->Tail.Overlay.DriverContext[0]);
-}
-
-inline void set_seqnum_unlink(IRP *irp, seqnum_t seqnum_unlink)
-{
-	irp->Tail.Overlay.DriverContext[1] = as_pointer(seqnum_unlink);
-}
-
-inline auto get_seqnum_unlink(IRP *irp)
-{
-	return as_seqnum(irp->Tail.Overlay.DriverContext[1]);
-}
-
-inline void set_pipe_handle(IRP *irp, USBD_PIPE_HANDLE PipeHandle)
-{
-	irp->Tail.Overlay.DriverContext[2] = PipeHandle;
-}
-
-inline auto get_pipe_handle(IRP *irp)
-{
-	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
-}
-
-void clear_context(IRP *irp, bool skip_unlink);
-
 inline auto ptr4log(const void *ptr) // use format "%04x"
 {
 	auto n = reinterpret_cast<uintptr_t>(ptr);
@@ -231,9 +183,3 @@ inline auto ph4log(USBD_PIPE_HANDLE handle)
 {
 	return reinterpret_cast<uintptr_t>(handle);
 }
-
-void enqueue_rx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp);
-void enqueue_tx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp);
-
-IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink = 0);
-IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum = 0, bool unlink = false);

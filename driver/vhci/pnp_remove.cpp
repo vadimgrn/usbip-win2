@@ -9,6 +9,7 @@
 #include "vhub.h"
 #include "usbip_vhci_api.h"
 #include "strutil.h"
+#include "csq.h"
 
 namespace
 {

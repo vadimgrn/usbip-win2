@@ -279,3 +279,72 @@ PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo)
 
 	return STATUS_SUCCESS;
 }
+
+void enqueue_rx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp)
+{
+	NT_ASSERT(get_seqnum_unlink(irp));
+	TraceCSQ("irp %04x, unlink seqnum %u", ptr4log(irp), get_seqnum_unlink(irp));
+
+	KIRQL irql;
+	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
+	InsertTailList(&vpdo->rx_unlink_irps, list_entry(irp));
+	KeReleaseSpinLock(&vpdo->rx_lock, irql);
+}
+
+auto dequeue(LIST_ENTRY *head, seqnum_t seqnum, bool unlink)
+{
+	auto func = unlink ? get_seqnum_unlink : get_seqnum;
+	IRP *irp{};
+
+	for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
+
+		auto entry_irp = get_irp(entry);
+
+		if (!seqnum || seqnum == func(entry_irp)) {
+			RemoveEntryList(entry);
+			InitializeListHead(entry);
+			irp = entry_irp;
+			break;
+		}
+	}
+
+	return irp;
+}
+
+IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink)
+{
+	KIRQL irql;
+	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
+
+	auto irp = dequeue(&vpdo->rx_unlink_irps, seqnum_unlink, true);
+	if (irp) {
+		InsertTailList(&vpdo->tx_unlink_irps, list_entry(irp));
+	}
+
+	KeReleaseSpinLock(&vpdo->rx_lock, irql);		
+
+	TraceCSQ("unlink seqnum %u -> irp %04x", seqnum_unlink, ptr4log(irp));
+	return irp;
+}
+
+IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum, bool unlink)
+{
+	KIRQL irql;
+	KeAcquireSpinLock(&vpdo->rx_lock, &irql);
+	auto irp = dequeue(&vpdo->tx_unlink_irps, seqnum, unlink);
+	KeReleaseSpinLock(&vpdo->rx_lock, irql);
+
+	TraceCSQ("%sseqnum %u -> irp %04x", unlink ? "unlink " : " ", seqnum, ptr4log(irp));
+	return irp;
+}
+
+void clear_context(IRP *irp, bool skip_unlink)
+{
+	set_seqnum(irp, 0);
+
+	if (!skip_unlink) {
+		set_seqnum_unlink(irp, 0);
+	}
+
+	set_pipe_handle(irp, USBD_PIPE_HANDLE());
+}
