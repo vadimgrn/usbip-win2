@@ -37,10 +37,8 @@ inline auto make_peek_context(USBD_PIPE_HANDLE handle)
 	return ctx;
 }
 
-
 void enqueue_rx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp);
 IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink = 0);
-IRP *dequeue_tx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum = 0, bool unlink = false);
 
 inline auto as_seqnum(const void *p)
 {

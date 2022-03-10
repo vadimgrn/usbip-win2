@@ -118,9 +118,8 @@ struct vpdo_dev_t : vdev_t
 
 	IO_CSQ rx_irps_csq; // waiting for irp from vhci_read
 	LIST_ENTRY rx_irps; // from *ioctl
-	LIST_ENTRY rx_unlink_irps; // waiting for irp from vhci_read
-	LIST_ENTRY tx_unlink_irps; // waiting for irp from vhci_write
-	KSPIN_LOCK rx_lock;
+	LIST_ENTRY rx_irps_unlink; // from CompleteCanceledIrp_tx
+	KSPIN_LOCK rx_irps_lock;
 
 	IO_CSQ tx_irps_csq; // waiting for irp from vhci_write
 	LIST_ENTRY tx_irps; // from *ioctl

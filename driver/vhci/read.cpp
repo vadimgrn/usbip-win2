@@ -920,7 +920,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
 	return STATUS_INVALID_PARAMETER;
 }
 
-void debug(const usbip_header &hdr, IRP *read_irp, IRP *irp)
+void debug(const usbip_header &hdr, const IRP *read_irp, const IRP *irp)
 {
 	auto pdu_sz = get_pdu_size(&hdr);
 
@@ -964,15 +964,13 @@ NTSTATUS cmd_submit(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp)
  */
 NTSTATUS cmd_unlink(vpdo_dev_t *vpdo, IRP *irp, seqnum_t seqnum_unlink)
 {
-	auto hdr = get_usbip_header(irp);
-	if (!hdr) {
-		return STATUS_INVALID_PARAMETER;
+	if (auto hdr = get_usbip_header(irp)) {
+		set_cmd_unlink_usbip_header(vpdo, hdr, seqnum_unlink);
+		TRANSFERRED(irp) += sizeof(*hdr);
+		return STATUS_SUCCESS;
 	}
 
-	set_cmd_unlink_usbip_header(vpdo, hdr, seqnum_unlink);
-
-	TRANSFERRED(irp) += sizeof(*hdr);
-	return STATUS_SUCCESS;
+	return STATUS_INVALID_PARAMETER;
 }
 
 PAGEABLE NTSTATUS read_payload(IRP *read_irp, IRP *irp)
@@ -1046,9 +1044,10 @@ auto complete_read(IRP *irp, NTSTATUS status)
 	return status;
 }
 
-void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
+void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp, bool unlink)
 {
 	if (vpdo->seqnum_payload) { // payload has read
+		NT_ASSERT(!unlink);
 		vpdo->seqnum_payload = 0;
 		IoCsqInsertIrp(&vpdo->tx_irps_csq, irp, nullptr);
 		return;
@@ -1059,8 +1058,8 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp)
 	auto seqnum = hdr->base.seqnum;
 	set_seqnum(irp, seqnum);
 
-	if (get_seqnum_unlink(irp)) {
-		//enqueue_tx_unlink_irp(vpdo, irp);
+	if (unlink) {
+		// do not enqueue, cancelled irp will be completed
 	} else if (get_pdu_payload_size(hdr)) {
 		vpdo->seqnum_payload = seqnum; // this urb irp is waiting for payload read
 		[[maybe_unused]] auto err = IoCsqInsertIrpEx(&vpdo->rx_irps_csq, irp, nullptr, InsertHead());
@@ -1083,8 +1082,8 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 	NT_ASSERT(!seqnum_unlink || read_hdr);
 
 	auto err = seqnum_unlink ? cmd_unlink(vpdo, read_irp, seqnum_unlink) :
-		   read_hdr ? cmd_submit(vpdo, read_irp, irp) : 
-		   read_payload(read_irp, irp);
+			read_hdr ? cmd_submit(vpdo, read_irp, irp) : 
+				   read_payload(read_irp, irp);
 
 	if (!err) {
 		auto hdr = read_hdr ? get_usbip_header(read_irp, true) : nullptr;
@@ -1092,9 +1091,9 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 			NT_ASSERT(hdr);
 			debug(*hdr, read_irp, irp);
 		}
-		post_read(vpdo, hdr, irp);
+		post_read(vpdo, hdr, irp, seqnum_unlink);
 	} else {
-		if (from_read) {
+		if (from_read && !seqnum_unlink) {
 			complete_internal_ioctl(irp, err);
 		}
 		if (!read_hdr) {
@@ -1106,6 +1105,10 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 		complete_read(read_irp, err);
 	}
 
+	if (seqnum_unlink) {
+		complete_canceled_irp(vpdo, irp);
+	}
+
 	NT_ASSERT(err != STATUS_PENDING);
 	return err;
 }
@@ -1115,7 +1118,7 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
  */
 auto dequeue_rx_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_payload)
 {
-	if (!seqnum_payload) { // can't interrupt reading of payload
+	if (!seqnum_payload) { // do not interrupt reading of payload
 		if (auto irp = dequeue_rx_unlink_irp(vpdo)) {
 			return irp;
 		}
@@ -1150,15 +1153,20 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
  * 1.Pending IRPs are waiting for RET_SUBMIT in tx_irps.
  * 2.An upper driver cancels IRP.
  * 3.IRP is removed from tx_irps, CsqCompleteCanceledIrp callback is called.
- * 4.IRP is inserted into rx_unlink_irps (waiting for read IRP).
- * 5.IRP is dequeued from rx_unlink_irps and appended into tx_unlink_irps atomically.
+ * 4.IRP is inserted into rx_irps_unlink (waiting for read IRP).
+ * 5.IRP is dequeued from rx_irps_unlink and appended into tx_irps_unlink atomically.
  * 6.CMD_UNLINK is issued.
  * 
  * RET_SUBMIT can be received
  * a)Before #3 - normal case, IRP will be dequeued from tx_irps.
  * b)Between #3 and #4, IRP will not be found.
- * c)Between #4 and #5, IRP will be dequeued from rx_unlink_irps.
- * d)After #5, IRP will be dequeued from tx_unlink_irps.
+ * c)Between #4 and #5, IRP will be dequeued from rx_irps_unlink.
+ * d)After #5, IRP will be dequeued from tx_irps_unlink.
+ * 
+ * Case b) is unavoidable because CSQ library calls CsqCompleteCanceledIrp after releasing a lock.
+ * For that reason the cancellation logic is simplified and tx_irps_unlink is removed.
+ * IRP will be cancelled as soon as read thread will dequeue it from rx_irps_unlink and CMD_UNLINK will be issued.
+ * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
 void send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
 {

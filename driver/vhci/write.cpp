@@ -571,36 +571,25 @@ PAGEABLE const usbip_header *consume_write_irp_buffer(IRP *irp)
 	return hdr;
 }
 
-PAGEABLE auto dequeue_irp(usbip_request_type cmd, vpdo_dev_t *vpdo, seqnum_t seqnum)
+PAGEABLE auto dequeue_irp(vpdo_dev_t *vpdo, seqnum_t seqnum)
 {
 	PAGED_CODE();
 
 	NT_ASSERT(seqnum);
 	auto ctx = make_peek_context(seqnum);
 
-	IRP *irp{};
-	bool unlink{};
-
-	switch (cmd) {
-	case USBIP_RET_SUBMIT:
-		irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, &ctx);
-		if (irp) {
-			break;
-		}
-		unlink = true;
-		[[fallthrough]]; // response on canceled irp
-	case USBIP_RET_UNLINK:
-		irp = dequeue_tx_unlink_irp(vpdo, seqnum, unlink); // assume RET_SUBMIT is after cmd_unlink
-		if (!irp && unlink) { // RET_SUBMIT is before cmd_unlink
-			irp = dequeue_rx_unlink_irp(vpdo, seqnum);
-		}
-		break;
+	auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, &ctx);
+	if (!irp) { // irp is cancelled
+		irp = dequeue_rx_unlink_irp(vpdo, seqnum); // may be irp is still waiting for read irp to issue CMD_UNLINK
 	}
 
 	return irp;
 }
 
 /*
+ * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
+ * @see do_read
+ *
  * USBIP_RET_UNLINK
  * 1) if UNLINK is successful, status is -ECONNRESET
  * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
@@ -628,7 +617,7 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto irp = dequeue_irp(cmd, vpdo, seqnum);
+	auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, seqnum) : nullptr;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
@@ -636,20 +625,8 @@ PAGEABLE NTSTATUS process_write_irp(vpdo_dev_t *vpdo, IRP *write_irp)
 				ptr4log(irp), TRANSFERRED(write_irp), dbg_usbip_hdr(buf, sizeof(buf), hdr));
 	}
 
-	if (!irp) {
-		bool too_late = cmd == USBIP_RET_UNLINK && !hdr->u.ret_unlink.status;
-		if (too_late) {
-			Trace(TRACE_LEVEL_VERBOSE, "irp not found for seqnum %u (CMD_UNLINK is after RET_SUBMIT)", seqnum);
-		} else {
-			Trace(TRACE_LEVEL_ERROR, "irp not found for seqnum %u", seqnum);
-		}
-		return too_late ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
-	}
-	
-	if (cmd == USBIP_RET_SUBMIT) {
-		ret_submit(vpdo, irp, hdr); // FIXME: is it really OK for cancelled irp?
-	} else {
-		complete_canceled_irp(vpdo, irp);
+	if (irp) {
+		ret_submit(vpdo, irp, hdr);
 	}
 
 	return STATUS_SUCCESS;

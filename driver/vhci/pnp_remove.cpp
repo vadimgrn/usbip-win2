@@ -97,10 +97,6 @@ PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 	PAGED_CODE();
 	TraceCall("%p", vpdo);
 
-	while (auto irp = dequeue_tx_unlink_irp(vpdo)) {
-		complete_canceled_irp(vpdo, irp);
-	}
-
 	while (auto irp = dequeue_rx_unlink_irp(vpdo)) {
 		complete_canceled_irp(vpdo, irp);
 	}
