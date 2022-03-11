@@ -28,7 +28,7 @@ NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 	}
 
 	while (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)) {
-		complete_canceled_irp(vpdo, irp);
+		complete_canceled_irp(irp);
 	}
 
 	return STATUS_SUCCESS;

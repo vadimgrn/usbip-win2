@@ -170,7 +170,7 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
 - When BSOD has occured
   - Reboot PC if automatic reboot is not set
   - Run Windows debugger WinDbg.exe as Administrator
-  - Press Ctrl+D to open chash dump
+  - Press Ctrl+D to open crash dump
   - Run following commands and copy the output 
 ```
 !analyze -v

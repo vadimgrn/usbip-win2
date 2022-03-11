@@ -1074,7 +1074,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp, bool unlink)
  * It must not be called concurrently for the same vpdo_dev_t.
  * PAGED_CODE() fails.
  */
-NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
+NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, bool complete_read_irp, IRP *irp, bool complete_irp)
 {	
 	bool read_hdr = !vpdo->seqnum_payload;
 
@@ -1085,6 +1085,9 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 			read_hdr ? cmd_submit(vpdo, read_irp, irp) : 
 				   read_payload(read_irp, irp);
 
+	NT_ASSERT(err != STATUS_PENDING);
+	auto read_err = err;
+
 	if (!err) {
 		auto hdr = read_hdr ? get_usbip_header(read_irp, true) : nullptr;
 		if (read_hdr) {
@@ -1093,24 +1096,19 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, IRP *irp, bool from_read)
 		}
 		post_read(vpdo, hdr, irp, seqnum_unlink);
 	} else {
-		if (from_read && !seqnum_unlink) {
-			complete_internal_ioctl(irp, err);
+		if (complete_irp && !seqnum_unlink) {
+			complete_internal_ioctl(irp, err); // irp->IoStatus.Information is set to zero
 		}
 		if (!read_hdr) {
-			err = abort_read_payload(vpdo, read_irp);
+			read_err = abort_read_payload(vpdo, read_irp);
 		}
-	}
-
-	if (!from_read) {
-		complete_read(read_irp, err);
 	}
 
 	if (seqnum_unlink) {
-		complete_canceled_irp(vpdo, irp);
+		complete_canceled_irp(irp);
 	}
 
-	NT_ASSERT(err != STATUS_PENDING);
-	return err;
+	return complete_read_irp ? complete_read(read_irp, read_err) : err;
 }
 
 /*
@@ -1134,7 +1132,7 @@ auto process_read_irp(vpdo_dev_t *vpdo, IRP *read_irp)
 		auto seqnum_payload = vpdo->seqnum_payload;
 
 		if (auto irp = dequeue_rx_irp(vpdo, seqnum_payload)) {
-			return do_read(vpdo, read_irp, irp, true);
+			return do_read(vpdo, read_irp, false, irp, true);
 		} else if (seqnum_payload) { // urb irp with payload has cancelled, but usbip header was already read
 			return abort_read_payload(vpdo, read_irp);
 		}
@@ -1201,15 +1199,14 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp, bool unlink)
 
 		if (auto next_irp = dequeue_rx_irp(vpdo, seqnum_payload)) {
 
-			if (auto err = do_read(vpdo, read_irp, next_irp, false)) {
-				if (next_irp == irp) {
-					status = err;
-				} else if (unlink) {
-					complete_canceled_irp(vpdo, next_irp);
-				} else {
-					complete_internal_ioctl(next_irp, err);
+			bool complete_next_irp = next_irp != irp;
+
+			if (auto err = do_read(vpdo, read_irp, true, next_irp, complete_next_irp)) {
+				if (!complete_next_irp) {
+					status = err; // the caller will complete it
 				}
 			}
+
 		} else if (seqnum_payload) { // irp with payload has cancelled, but header was already read
 			auto err = abort_read_payload(vpdo, read_irp);
 			CompleteRequest(read_irp, err);

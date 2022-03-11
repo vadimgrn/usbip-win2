@@ -87,7 +87,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
 
 	for (auto csq: v) {
 		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
-			complete_canceled_irp(vpdo, irp);
+			complete_canceled_irp(irp);
 		}
 	}
 }
@@ -98,7 +98,7 @@ PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 	TraceCall("%p", vpdo);
 
 	while (auto irp = dequeue_rx_unlink_irp(vpdo)) {
-		complete_canceled_irp(vpdo, irp);
+		complete_canceled_irp(irp);
 	}
 }
 

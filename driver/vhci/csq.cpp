@@ -197,16 +197,9 @@ void ReleaseLock_tx(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 	KeReleaseSpinLock(&vpdo->tx_irps_lock, Irql);
 }
 
-void CompleteCanceledIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
+void CompleteCanceledIrp(_In_ IO_CSQ*, _In_ IRP *irp)
 {
-	auto vpdo = to_vpdo_read(csq);
-	complete_canceled_irp(vpdo, irp);
-}
-
-void CompleteCanceledIrp_rx(_In_ IO_CSQ *csq, _In_ IRP *irp)
-{
-	auto vpdo = to_vpdo_rx(csq);
-	complete_canceled_irp(vpdo, irp); // was not sent to server
+	complete_canceled_irp(irp); // was not sent to server
 }
 
 void CompleteCanceledIrp_tx(_In_ IO_CSQ *csq, _In_ IRP *irp)
@@ -226,7 +219,7 @@ PAGEABLE auto init_read_irp_queue(vpdo_dev_t &vpdo)
 				PeekNextIrp_read,
 				AcquireLock_read,
 				ReleaseLock_read,
-				CompleteCanceledIrp_read);
+				CompleteCanceledIrp);
 }
 
 PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
@@ -243,7 +236,7 @@ PAGEABLE auto init_rx_irps_queue(vpdo_dev_t &vpdo)
 				PeekNextIrp_rx,
 				AcquireLock_rx,
 				ReleaseLock_rx,
-				CompleteCanceledIrp_rx);
+				CompleteCanceledIrp);
 }
 
 PAGEABLE auto init_tx_irps_queue(vpdo_dev_t &vpdo)

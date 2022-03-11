@@ -67,7 +67,7 @@ NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 	return status;
 }
 
-void complete_canceled_irp(vpdo_dev_t*, IRP *irp)
+void complete_canceled_irp(IRP *irp)
 {
 	TraceCall("%04x", ptr4log(irp));
 
