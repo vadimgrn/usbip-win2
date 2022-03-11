@@ -47,7 +47,7 @@ auto InsertIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	if (check_rx && !(IsListEmpty(&vpdo->rx_irps) && rx_unlink_unavail(vpdo))) {
 		err = STATUS_UNSUCCESSFUL;
 	} else {
-		auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
+		[[maybe_unused]] auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), irp);
 		NT_ASSERT(!old_ptr);
 	}
 
@@ -85,7 +85,7 @@ void RemoveIrp_read(_In_ IO_CSQ *csq, _In_ IRP *irp)
 	TraceCSQ("%04x", ptr4log(irp));
 	auto vpdo = to_vpdo_read(csq);
 
-	auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), nullptr);
+	[[maybe_unused]] auto old_ptr = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo->read_irp), nullptr);
 	NT_ASSERT(old_ptr == irp);
 }
 
