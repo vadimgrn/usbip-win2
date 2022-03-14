@@ -1074,7 +1074,7 @@ void post_read(vpdo_dev_t *vpdo, const usbip_header *hdr, IRP *irp, bool unlink)
  * It must not be called concurrently for the same vpdo_dev_t.
  * PAGED_CODE() fails.
  */
-NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, bool complete_read_irp, IRP *irp, bool complete_irp)
+NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, bool complete_read_irp, IRP *irp, bool may_complete_irp)
 {	
 	bool read_hdr = !vpdo->seqnum_payload;
 
@@ -1096,7 +1096,7 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, bool complete_read_irp, IRP *i
 		}
 		post_read(vpdo, hdr, irp, seqnum_unlink);
 	} else {
-		if (complete_irp && !seqnum_unlink) {
+		if (may_complete_irp && !seqnum_unlink) {
 			complete_internal_ioctl(irp, err); // irp->IoStatus.Information is set to zero
 		}
 		if (!read_hdr) {
@@ -1108,7 +1108,11 @@ NTSTATUS do_read(vpdo_dev_t *vpdo, IRP *read_irp, bool complete_read_irp, IRP *i
 		complete_canceled_irp(irp);
 	}
 
-	return complete_read_irp ? complete_read(read_irp, read_err) : err;
+	if (complete_read_irp) {
+		complete_read(read_irp, read_err);
+	}
+
+	return complete_read_irp ? err : read_err;
 }
 
 /*
@@ -1199,11 +1203,11 @@ NTSTATUS send_to_server(vpdo_dev_t *vpdo, IRP *irp, bool unlink)
 
 		if (auto next_irp = dequeue_rx_irp(vpdo, seqnum_payload)) {
 
-			bool complete_next_irp = next_irp != irp;
+			bool skip_complete = next_irp == irp;
 
-			if (auto err = do_read(vpdo, read_irp, true, next_irp, complete_next_irp)) {
-				if (!complete_next_irp) {
-					status = err; // the caller will complete it
+			if (auto err = do_read(vpdo, read_irp, true, next_irp, !skip_complete)) {
+				if (skip_complete) {
+					status = err; // the caller will complete irp
 				}
 			}
 
