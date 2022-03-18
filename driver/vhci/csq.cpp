@@ -29,7 +29,7 @@ inline auto to_vpdo_tx(IO_CSQ *csq)
  */
 inline auto rx_unlink_unavail(vpdo_dev_t *vpdo)
 {
-	return  vpdo->seqnum_payload || // can't interrupt reading of payload
+	return  vpdo->seqnum_payload || // do not interrupt reading of payload
 		IsListEmpty(&vpdo->rx_irps_unlink);
 }
 

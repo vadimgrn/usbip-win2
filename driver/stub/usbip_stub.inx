@@ -38,11 +38,11 @@ CopyFiles=Drivers_Dir
 [usbip_stub_Device.NTamd64.HW]
 AddReg=usbip_stub_Device_AddReg
 
-[usbip_stub_Device_AddReg]                            
+[usbip_stub_Device_AddReg]
 HKR,,DeviceCharacteristics,0x10001,0x0100         ; Use same security checks on relative opens
 ;Using default permissions so comment out next lines
 ;HKR,,Security,,"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGWGX;;;WD)(A;;GRGWGX;;;RC)"      ; Allow generic-all access to all users
-;HKR,,Security,,"D:P(A;;GA;;;BA)(A;;GA;;;SY)"      ; Allow generic-all access to Built-in administrators and Local system 
+;HKR,,Security,,"D:P(A;;GA;;;BA)(A;;GA;;;SY)"      ; Allow generic-all access to Built-in administrators and Local system
 
 ;-------------- Service installation
 [usbip_stub_Device.NTamd64.Services]
@@ -52,7 +52,7 @@ AddService = usbip_stub,%SPSVCINST_ASSOCSERVICE%, usbip_stub_Service_Inst
 [usbip_stub_Service_Inst]
 DisplayName    = %ServiceDesc%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
-StartType      = 3               ; SERVICE_DEMAND_START 
+StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %12%\usbip_stub.sys
 LoadOrderGroup = Extended Base

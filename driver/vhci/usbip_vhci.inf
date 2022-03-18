@@ -56,10 +56,10 @@ LoadOrderGroup = Extended Base
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
-Provider = "usbip-win project"
-StdMfg = "usbip-win"
-DiskId1 = "usbip-win VHCI Disk"
-DeviceDesc = "usbip-win VHCI"
-vhub_DeviceDesc = "usbip-win VHUB"
-ServiceDesc = "usbip-win VHCI Service"
-DisplayClassName = "usbip-win"
+Provider = "usbip-win2 project"
+StdMfg = "usbip-win2"
+DiskId1 = "usbip-win2 VHCI Disk"
+DeviceDesc = "usbip-win2 VHCI"
+vhub_DeviceDesc = "usbip-win2 VHUB"
+ServiceDesc = "usbip-win2 VHCI Service"
+DisplayClassName = "usbip-win2"

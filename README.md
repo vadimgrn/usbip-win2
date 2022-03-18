@@ -43,6 +43,7 @@
 - Windows 11 SDK (10.1.22000.194)
 - Windows Driver Kit (10.1.22000.1)
 - vcpkg
+- InnoSetup
 
 ### Install Boost C++
 - Install [vcpkg](https://vcpkg.io/en/getting-started.html)
@@ -52,6 +53,10 @@
   - vcpkg integrate install
 - Install Boost C++ libraries
   - vcpkg install boost:x64-windows
+
+### Install InnoSetup
+- Install the latest release of [InnoSetup](https://jrsoftware.org/isdl.php#stable)
+- Append path to InnoSetup compiler ISCC.exe to PATH environment variable
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`
@@ -142,7 +147,7 @@ port 1 is successfully detached
 @echo off
 set NAME=usbip-vhci
 set TMFS=%TEMP%\tmfs
-set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!: 
+set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
 tracelog.exe -start %NAME% -rt -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x1F -level 5
 tracepdb.exe -f D:\usbip-win2\x64\Debug -p %TMFS%
@@ -153,7 +158,7 @@ rem start /MAX tracefmt.exe -nosummary -p %TMFS% -displayonly -rt %NAME%
 @echo off
 set NAME=usbip-vhci
 set TMFS=%TEMP%\tmfs
-set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!: 
+set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
 tracefmt.exe -nosummary -p %TMFS% -o %NAME%.txt %NAME%.etl
 rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
@@ -162,7 +167,7 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
 ## Debugging BSOD
 - Enable kernel memory dump
   - Open "System Properties" dialog bog
-  - Select "Advanced" tab 
+  - Select "Advanced" tab
   - Click on "Settings" in "Startup and Recovery"
   - "System failure", "Write debugging information", pick "Kernel Memory Dump"
   - Check "Overwrite any existing file"
@@ -171,11 +176,11 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
   - Reboot PC if automatic reboot is not set
   - Run Windows debugger WinDbg.exe as Administrator
   - Press Ctrl+D to open crash dump
-  - Run following commands and copy the output 
+  - Run following commands and copy the output
 ```
 !analyze -v
 !wmitrace.logdump usbip-vhci
-``` 
+```
 
 ## Obtaining USBIP log on Linux
 ```
