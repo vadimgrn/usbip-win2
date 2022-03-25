@@ -10,8 +10,7 @@
   - **Is fully implemented**
   - Fully compatible with Linux USBIP server (at least for kernels 4.19 - 5.13)
   - **Is not ready for production use**, can cause BSOD or hang in the kernel. This usually happens during disconnection of a device or uninstallation of the driver.
-  - There is no installer
-  - The driver is not signed
+  - The driver is not signed (Windows Test Signing Mode must be enabled)
   - Works on Windows 11/10 x64, x86 build is not supported
 - UDE client driver from the parent repo is removed. VHCI driver is superseded it.
 - Server (stub driver) is not the goal of this project. It is updated from original repo AS IS.
@@ -60,9 +59,9 @@
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`
-- Set certificate driver signing for `usbip_stub` and `usbip_vhci` projects
+- Set certificate driver signing for `package`, `usbip_stub`, `usbip_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
-  - Browse to `driver/usbip_test.pfx` (password: usbip)
+  - Enter `..\usbip_test.pfx` (password: usbip)
 - Build the solution
 - All output files are created under x64/{Debug,Release} folders.
 
@@ -88,23 +87,14 @@ usbip: info: bind device on busid 3-2: complete
 ```
 - Your device 3-2 now can be used by usbip client
 
-## Setup USBIP client on Windows
+## Setup USBIP on Windows
 
-### Install USB/IP test certificate
-  - Right click on `driver/usbip_test.pfx`, select "Install PFX" (password: usbip)
-  - Certificate should be installed into
-    1. "Trusted Root Certification Authority" in "Local Computer" (not current user) *and*
-    2. "Trusted Publishers" in "Local Computer" (not current user)
-  - Enable test signing
-    - `bcdedit.exe /set TESTSIGNING ON`
-    - Reboot the system to apply
+### Enable Windows Test Signing Mode
+- `bcdedit.exe /set testsigning on`
+- Reboot the system to apply
 
-### Install USB/IP client
-- Download and unpack [release](https://github.com/vadimgrn/usbip-win2/releases)
-- Install drivers
-  - Run PowerShell or CMD as an Administrator
-  - Go to the folder with USBIP binaries and run
-  - `usbip.exe install`
+### Install USB/IP app
+- Download and run an installer from [releases](https://github.com/vadimgrn/usbip-win2/releases)
 
 ### Use usbip.exe to attach remote device(s)
 - Query available USB devices on the server
@@ -128,11 +118,10 @@ successfully attached to port 1
 ```
 port 1 is successfully detached
 ```
-### Uninstallation of USB/IP client
-- Uninstall drivers
-  - `usbip.exe uninstall`
+### Uninstallation of USB/IP
+- Uninstall USB/IP app
 - Disable test signing
-  - `> bcdedit.exe /set TESTSIGNING OFF`
+    - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
 
 ## Obtaining USBIP logs on Windows
