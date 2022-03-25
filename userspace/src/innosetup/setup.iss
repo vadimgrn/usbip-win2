@@ -8,10 +8,8 @@
         #error Use option /DExePath=path-to-exe
 #endif
 
-#define BuildDir AddBackslash(ExtractFilePath(ExePath))
-
 #define TestCert "USBIP Test"
-#define ENV_PATH "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+#define BuildDir AddBackslash(ExtractFilePath(ExePath))
 
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
@@ -39,6 +37,10 @@ LicenseFile={#SolutionDir + "LICENSE"}
 AppId=b26d8e8f-5ed4-40e7-835f-03dfcc57cb45
 OutputBaseFilename={#ProductName}-{#VersionInfo}-setup
 OutputDir={#BuildDir}
+DisableWelcomePage=no
+
+[Messages]
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
 
 [Types]
 Name: "full"; Description: "Full"
@@ -48,9 +50,6 @@ Name: "server"; Description: "Server"
 [Components]
 Name: client; Description: "client"; Types: full client; Flags: fixed
 Name: server; Description: "server"; Types: full server; Flags: fixed
-
-[Tasks]
-Name: path; Description: "Append path to binaries to PATH environment variable for all users";
 
 [Files]
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
@@ -73,15 +72,12 @@ Source: {#SolutionDir + "driver\stub\usbip_stub.inx"}; DestDir: "{app}"; Compone
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Components: client; Flags: runhidden
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_root.inf /install"; WorkingDir: "{tmp}"; Components: client; Flags: runhidden
-
-; Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_stub.inx /install"; WorkingDir: "{tmp}"; Components: server; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Components: client; Flags: runhidden
 
 [UninstallRun]
 
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "RmClientDrivers"; Components: client; Flags: runhidden
-; Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_stub.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "RmServerDrivers"; Components: server; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Components: client; Flags: runhidden
 
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "RmCertRoot"; Flags: runhidden
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "RmCertTrustedPublisher"; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden
