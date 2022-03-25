@@ -92,18 +92,6 @@ static const struct command cmds[] = {
 		.usage = usbip_unbind_usage
 	},
 	{
-		.name  = "install",
-		.fn    = usbip_install,
-		.help  = "Install usbip vhci driver",
-		.usage = usbip_install_usage
-	},
-	{
-		.name = "uninstall",
-		.fn = usbip_uninstall,
-		.help = "Uninstall usbip vhci driver",
-		.usage = usbip_uninstall_usage
-	},
-	{
 		.name  = "port",
 		.fn    = usbip_port_show,
 		.help  = "Show imported USB devices",

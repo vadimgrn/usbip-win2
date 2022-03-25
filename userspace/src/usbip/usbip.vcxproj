@@ -93,7 +93,6 @@
     <ClCompile Include="usbip_bind.c" />
     <ClCompile Include="usbip_detach.c" />
     <ClCompile Include="usbip_dscr.c" />
-    <ClCompile Include="usbip_install.c" />
     <ClCompile Include="usbip_list.c" />
     <ClCompile Include="usbip_list_local.c" />
     <ClCompile Include="usbip_list_remote.c" />
