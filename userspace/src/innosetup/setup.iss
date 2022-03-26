@@ -100,6 +100,7 @@ const
 
 var
   PathIsModified: Boolean;  // Cache task selection from previous installs
+  Uninstalled : Boolean;
 
 // Import AddDirToPath() at setup time ('files:' prefix)
 function DLLAddDirToPath(DirName: string; PathType, AddType: DWORD): DWORD;
@@ -175,6 +176,7 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then
   begin
+    Uninstalled := true;
     // Remove app directory from path during uninstall if task was selected;
     // use variable because we can't use WizardIsTaskSelected() at uninstall
     if PathIsModified then
@@ -184,10 +186,12 @@ end;
 
 procedure DeinitializeUninstall();
 begin
-  // Unload and delete PathMgr.dll and remove app dir when uninstalling
-  UnloadDLL(ExpandConstant('{app}\PathMgr.dll'));
-  DeleteFile(ExpandConstant('{app}\PathMgr.dll'));
-  RemoveDir(ExpandConstant('{app}'));
+  if Uninstalled then // Unload and delete PathMgr.dll and remove app dir when uninstalling
+  begin
+    UnloadDLL(ExpandConstant('{app}\PathMgr.dll'));
+    DeleteFile(ExpandConstant('{app}\PathMgr.dll'));
+    RemoveDir(ExpandConstant('{app}'));
+  end;
 end;
 
 // end of PathMgr.dll
