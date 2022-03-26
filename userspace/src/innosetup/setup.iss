@@ -86,6 +86,7 @@ Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /inst
 [UninstallRun]
 
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Components: client; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_stub.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelServerDrivers"; Components: server; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden
@@ -100,6 +101,7 @@ const
 
 var
   PathIsModified: Boolean;  // Cache task selection from previous installs
+  ApplicationUninstalled: Boolean;  // Has application been uninstalled?
 
 // Import AddDirToPath() at setup time ('files:' prefix)
 function DLLAddDirToPath(DirName: string; PathType, AddType: DWORD): DWORD;
@@ -159,6 +161,7 @@ begin
   result := true;
   // Was task selected during a previous install?
   PathIsModified := GetPreviousData(MODIFY_PATH_TASK_NAME, '') = 'true';
+  ApplicationUninstalled := false;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -179,15 +182,22 @@ begin
     // use variable because we can't use WizardIsTaskSelected() at uninstall
     if PathIsModified then
       RemoveDirFromPath(ExpandConstant('{app}'));
+  end
+  else if CurUninstallStep = usPostUninstall then
+  begin
+    ApplicationUninstalled := true;
   end;
 end;
 
 procedure DeinitializeUninstall();
 begin
-  // Unload and delete PathMgr.dll and remove app dir when uninstalling
-  UnloadDLL(ExpandConstant('{app}\PathMgr.dll'));
-  DeleteFile(ExpandConstant('{app}\PathMgr.dll'));
-  RemoveDir(ExpandConstant('{app}'));
+  if ApplicationUninstalled then
+  begin
+    // Unload and delete PathMgr.dll and remove app dir when uninstalling
+    UnloadDLL(ExpandConstant('{app}\PathMgr.dll'));
+    DeleteFile(ExpandConstant('{app}\PathMgr.dll'));
+    RemoveDir(ExpandConstant('{app}'));
+  end;
 end;
 
 // end of PathMgr.dll
