@@ -13,7 +13,6 @@
 #endif
 
 #define TestCert "USBIP Test"
-#define HwidRoot "USBIPWIN\root"
 #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 
 ; information from .exe GetVersionInfo
@@ -64,7 +63,7 @@ Source: {#SolutionDir + "userspace\src\innosetup\PathMgr.dll"};  DestDir: "{app}
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
 Source: {#SolutionDir + "driver\usbip_test.pfx"}; DestDir: "{tmp}"
 
-Source: {#SolutionDir + "userspace\src\innosetup\devcon.exe"};  DestDir: "{app}"; Components: client
+Source: {#BuildDir + "devnode.exe"};  DestDir: "{app}"; Components: client
 Source: {#BuildDir + "package\usbip_root.inf"}; DestDir: "{tmp}"; Components: client
 Source: {#BuildDir + "package\usbip_vhci.inf"}; DestDir: "{tmp}"; Components: client
 Source: {#BuildDir + "package\usbip_vhci.sys"}; DestDir: "{tmp}"; Components: client
@@ -83,11 +82,11 @@ Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\u
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Components: client; Flags: runhidden
-Filename: {app}\devcon.exe; Parameters: "install {tmp}\usbip_root.inf {#HwidRoot}"; WorkingDir: "{tmp}"; Components: client; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\root"; WorkingDir: "{tmp}"; Components: client; Flags: runhidden
 
 [UninstallRun]
 
-Filename: {app}\devcon.exe; Parameters: "remove {#HwidRoot}"; RunOnceId: "DelClientRootDevice"; Components: client; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove ROOT\SYSTEM\0001"; RunOnceId: "DelClientRootDevice"; Components: client; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Components: client; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_stub.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelServerDrivers"; Components: server; Flags: runhidden
 
