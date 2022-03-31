@@ -150,7 +150,7 @@ auto get_file_name(WCHAR *buf, DWORD cnt, const wchar_t *path) noexcept
 {
         LPWSTR fname{};
 
-        auto n = GetFullPathName(path, cnt, buf, &fname);
+        [[maybe_unused]] auto n = GetFullPathName(path, cnt, buf, &fname);
         assert(n > 0 && n < cnt);
 
         return fname;

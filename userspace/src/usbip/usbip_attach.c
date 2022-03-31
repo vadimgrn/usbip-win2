@@ -223,8 +223,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 	if (!ret) {
 		if (terse) {
 			printf("%d\n", rhport);
-		}
-		else {
+		} else {
 			printf("succesfully attached to port %d\n", rhport);
 		}
 	} else {
@@ -233,7 +232,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 			err("%s not found", usbip_xfer_binary());
 			break;
 		default:
-			err("failed to running %s", usbip_xfer_binary());
+			err("failed to run %s", usbip_xfer_binary());
 			break;
 		}
 		ret = 4;
@@ -243,12 +242,6 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 	closesocket(sockfd);
 
 	return ret;
-}
-
-static bool check_attacher()
-{
-	DWORD bintype;
-	return GetBinaryType(usbip_xfer_binary(), &bintype);
 }
 
 int usbip_attach(int argc, char *argv[])
@@ -267,7 +260,7 @@ int usbip_attach(int argc, char *argv[])
 	BOOL	terse = FALSE;
 
 	while (true) {
-		int	opt = getopt_long(argc, argv, "r:b:s:t", opts, NULL);
+		int opt = getopt_long(argc, argv, "r:b:s:t", opts, NULL);
 
 		if (opt == -1)
 			break;
@@ -302,11 +295,6 @@ int usbip_attach(int argc, char *argv[])
 		err("empty busid");
 		usbip_attach_usage();
 		return 1;
-	}
-
-	if (!check_attacher()) {
-		err("%s not found", usbip_xfer_binary());
-		return 126;
 	}
 
 	return attach_device(host, busid, serial, terse);

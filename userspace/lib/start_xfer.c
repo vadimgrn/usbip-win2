@@ -20,6 +20,8 @@
 #include "usbip_xfer/usbip_xfer.h"
 #include "usbip_network.h"
 
+#include <assert.h>
+
 static BOOL write_data(HANDLE hInWrite, const void *data, DWORD len)
 {
 	DWORD nwritten = 0;
@@ -48,9 +50,25 @@ static BOOL create_pipe(HANDLE *phRead, HANDLE *phWrite)
 	return FALSE;
 }
 
+bool get_usbip_xfer_path(char *path, DWORD cch)
+{
+        DWORD n = GetModuleFileName(NULL, path, cch);
+        if (!(n > 0 && n < cch)) {
+                dbg("GetModuleFileName error %#0x", GetLastError());
+                return false;
+        }
+
+        LPSTR fname = NULL;
+        n = GetFullPathName(path, cch, path, &fname);
+        assert(n > 0 && n < cch);
+
+        strcpy_s(fname, cch - (fname - path), usbip_xfer_binary());
+        return true;
+}
+
 int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 {
-	int ret = ERR_GENERAL;
+        int ret = ERR_GENERAL;
 
 	HANDLE hRead;
 	HANDLE hWrite;
@@ -59,7 +77,9 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 	}
 
 	char CommandLine[MAX_PATH];
-	strcpy_s(CommandLine, sizeof(CommandLine), usbip_xfer_binary());
+        if (!get_usbip_xfer_path(CommandLine, ARRAYSIZE(CommandLine))) {
+                return ERR_GENERAL;
+        }
 
 	STARTUPINFO si = {
 		.cb = sizeof(si),
@@ -68,8 +88,7 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 	};
 
 	PROCESS_INFORMATION pi = {0};
-
-	BOOL res = CreateProcess(usbip_xfer_binary(), CommandLine, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+        BOOL res = CreateProcess(NULL, CommandLine, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
 	if (!res) {
 		DWORD err = GetLastError();
 		if (err == ERROR_FILE_NOT_FOUND) {
