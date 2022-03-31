@@ -8,6 +8,10 @@
         #error Use option /DSolutionDir=<path>
 #endif
 
+#ifndef Configuration
+        #error Use option /DConfiguration=<cfg>
+#endif
+
 #ifndef ExePath
         #error Use option /DExePath=path-to-exe
 #endif
@@ -39,7 +43,7 @@ ShowLanguageDialog=no
 AllowNoIcons=yes
 LicenseFile={#SolutionDir + "LICENSE"}
 AppId=b26d8e8f-5ed4-40e7-835f-03dfcc57cb45
-OutputBaseFilename={#ProductName}-{#VersionInfo}-setup
+OutputBaseFilename={#ProductName}-{#VersionInfo}-{#Configuration}
 OutputDir={#BuildDir}
 DisableWelcomePage=no
 

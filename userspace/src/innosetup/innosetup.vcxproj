@@ -39,19 +39,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <NMakeBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\usbip-win2-*-setup.exe</NMakeCleanCommandLine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <NMakeBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\usbip-win2-*-setup.exe</NMakeCleanCommandLine>
