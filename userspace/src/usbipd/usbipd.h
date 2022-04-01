@@ -5,5 +5,5 @@
 
 #include "usbip_common.h"
 
-extern int recv_request_import(SOCKET sockfd);
-extern int recv_request_devlist(SOCKET connfd);
+int recv_request_import(SOCKET sockfd);
+int recv_request_devlist(SOCKET connfd);

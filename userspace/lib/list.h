@@ -1,5 +1,4 @@
-#ifndef _LIST_H
-#define _LIST_H
+#pragma once
 
 /* Stripped down implementation of linked list taken
  * from the Linux Kernel.
@@ -119,5 +118,3 @@ static inline void list_del(struct list_head *entry)
 #define list_for_each_safe(pos, n, head) \
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, n = pos->next)
-
-#endif

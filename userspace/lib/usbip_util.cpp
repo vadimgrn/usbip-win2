@@ -9,15 +9,15 @@ utf8_to_wchar(const char *str)
 	wchar_t	*wstr;
 	int	size;
 
-	size = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
+	size = MultiByteToWideChar(CP_UTF8, 0, str, -1, nullptr, 0);
 	if (size <= 1)
-		return NULL;
+		return nullptr;
 
-	if ((wstr = (wchar_t *)calloc(size, sizeof(wchar_t))) == NULL)
-		return NULL;
+	if ((wstr = (wchar_t *)calloc(size, sizeof(wchar_t))) == nullptr)
+		return nullptr;
 	if (MultiByteToWideChar(CP_UTF8, 0, str, -1, wstr, size) != size) {
 		free(wstr);
-		return NULL;
+		return nullptr;
 	}
 	return wstr;
 }
@@ -26,7 +26,6 @@ int
 vasprintf(char **strp, const char *fmt, va_list ap)
 {
 	size_t	size;
-	char	*str;
 	int	ret;
 
 	int len = _vscprintf(fmt, ap);
@@ -34,7 +33,7 @@ vasprintf(char **strp, const char *fmt, va_list ap)
 		return -1;
 	}
 	size = (size_t)len + 1;
-	str = malloc(size);
+	auto str = (char*)malloc(size);
 	if (!str) {
 		return -1;
 	}
@@ -68,18 +67,18 @@ get_module_dir(void)
 		char	*path_mod;
 
 		path_mod = (char *)malloc(size);
-		if (path_mod == NULL)
-			return NULL;
-		if (GetModuleFileName(NULL, path_mod, size) == size) {
+		if (path_mod == nullptr)
+			return nullptr;
+		if (GetModuleFileName(nullptr, path_mod, size) == size) {
 			free(path_mod);
 			if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
-				return NULL;
+				return nullptr;
 			size += 1024;
 		}
 		else {
 			char	*last_sep;
 			last_sep = strrchr(path_mod, '\\');
-			if (last_sep != NULL)
+			if (last_sep != nullptr)
 				*last_sep = '\0';
 			return path_mod;
 		}

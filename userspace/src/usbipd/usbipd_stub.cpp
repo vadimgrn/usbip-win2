@@ -27,7 +27,7 @@ walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno
 	char	*id_inst;
 
 	id_inst = get_id_inst(dev_info, pdev_info_data);
-	if (id_inst == NULL)
+	if (id_inst == nullptr)
 		return 0;
 	if (strcmp(id_inst, pctx->id_inst) != 0) {
 		free(id_inst);
@@ -36,7 +36,7 @@ walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno
 	free(id_inst);
 
 	pdetail = get_intf_detail(dev_info, pdev_info_data, &GUID_DEVINTERFACE_STUB_USBIP);
-	if (pdetail == NULL) {
+	if (pdetail == nullptr) {
 		return 0;
 	}
 	pctx->devpath = _strdup(pdetail->DevicePath);
@@ -54,7 +54,7 @@ get_device_path(const char *id_inst)
 	rc = traverse_intfdevs(walker_devpath, &GUID_DEVINTERFACE_STUB_USBIP, &devpath_ctx);
 	if (rc != 1) {
 		dbg("traverse_intfdevs failed, returned: %d", rc);
-		return NULL;
+		return nullptr;
 	}
 
 	return devpath_ctx.devpath;
@@ -66,12 +66,12 @@ get_devinfo(const char *devpath, ioctl_usbip_stub_devinfo_t *devinfo)
 	HANDLE	hdev;
 	DWORD	len;
 
-	hdev = CreateFile(devpath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	hdev = CreateFile(devpath, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	if (hdev == INVALID_HANDLE_VALUE) {
 		dbg("get_devinfo: cannot open device: %s", devpath);
 		return FALSE;
 	}
-	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_GET_DEVINFO, NULL, 0, devinfo, sizeof(ioctl_usbip_stub_devinfo_t), &len, NULL)) {
+	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_GET_DEVINFO, nullptr, 0, devinfo, sizeof(ioctl_usbip_stub_devinfo_t), &len, NULL)) {
 		dbg("get_devinfo: DeviceIoControl failed: err: 0x%lx", GetLastError());
 		CloseHandle(hdev);
 		return FALSE;
@@ -114,7 +114,7 @@ get_devpath_from_devno(devno_t devno)
 	rc = traverse_usbdevs(walker_get_id_inst, TRUE, &ctx);
 	if (rc != 1) {
 		dbg("traverse_usbdevs failed. traverse_usbdevs returned %d.", rc);
-		return NULL;
+		return nullptr;
 	}
 
 	devpath = get_device_path(ctx.id_inst);
@@ -151,7 +151,7 @@ build_udev(devno_t devno, struct usbip_usb_device *pudev)
 	ioctl_usbip_stub_devinfo_t	Devinfo;
 
 	devpath = get_devpath_from_devno(devno);
-	if (devpath == NULL) {
+	if (devpath == nullptr) {
 		dbg("invalid devno: %hhu. devpath returned %s", devno, devpath);
 		return FALSE;
 	}
@@ -167,7 +167,7 @@ build_udev(devno_t devno, struct usbip_usb_device *pudev)
 		pudev->idVendor = Devinfo.vendor;
 		pudev->idProduct = Devinfo.product;
 		pudev->speed = Devinfo.speed;
-		pudev->bDeviceClass = Devinfo.class;
+		pudev->bDeviceClass = Devinfo.class_;
 		pudev->bDeviceSubClass = Devinfo.subclass;
 		pudev->bDeviceProtocol = Devinfo.protocol;
 	}
@@ -184,12 +184,12 @@ open_stub_dev(devno_t devno)
 	DWORD	len;
 
 	devpath = get_devpath_from_devno(devno);
-	if (devpath == NULL) {
+	if (devpath == nullptr) {
 		dbg("invalid devno: %hhu", devno);
 		return INVALID_HANDLE_VALUE;
 	}
 
-	hdev = CreateFile(devpath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	hdev = CreateFile(devpath, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	free(devpath);
 
 	if (hdev == INVALID_HANDLE_VALUE) {
@@ -197,7 +197,7 @@ open_stub_dev(devno_t devno)
 		return INVALID_HANDLE_VALUE;
 	}
 
-	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_EXPORT, NULL, 0, NULL, 0, &len, NULL)) {
+	if (!DeviceIoControl(hdev, IOCTL_USBIP_STUB_EXPORT, nullptr, 0, NULL, 0, &len, NULL)) {
 		dbg("DeviceIoControl failed: err: 0x%lx", GetLastError());
 		CloseHandle(hdev);
 		return INVALID_HANDLE_VALUE;

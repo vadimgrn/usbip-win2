@@ -40,12 +40,12 @@ create_usbdev_list(void)
 	usbdev_list_t	*usbdev_list;
 
 	usbdev_list = (usbdev_list_t *)malloc(sizeof(usbdev_list_t));
-	if (usbdev_list == NULL) {
+	if (usbdev_list == nullptr) {
 		dbg("create_usbdev_list: out of memory");
-		return NULL;
+		return nullptr;
 	}
 	usbdev_list->n_usbdevs = 0;
-	usbdev_list->usbdevs = NULL;
+	usbdev_list->usbdevs = nullptr;
 
 	return usbdev_list;
 }
@@ -65,7 +65,7 @@ add_usbdev(usbdev_list_t *usbdev_list, const char *id_hw, devno_t devno)
 		return;
 	}
 	usbdevs = (usbdev_t *)realloc(usbdev_list->usbdevs, sizeof(usbdev_t) * (usbdev_list->n_usbdevs + 1));
-	if (usbdevs == NULL) {
+	if (usbdevs == nullptr) {
 		dbg("out of memory");
 		return;
 	}
@@ -114,7 +114,7 @@ walker_list(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, v
 	char	*id_hw;
 
 	id_hw = get_id_hw(dev_info, pdev_info_data);
-	if (id_hw == NULL) {
+	if (id_hw == nullptr) {
 		dbg("failed to get hw id\n");
 		return 0;
 	}
@@ -131,8 +131,8 @@ usbip_list_usbdevs(void)
 	usbdev_list_t	*usbdev_list;
 
 	usbdev_list = create_usbdev_list();
-	if (usbdev_list == NULL)
-		return NULL;
+	if (usbdev_list == nullptr)
+		return nullptr;
 
 	traverse_usbdevs(walker_list, TRUE, usbdev_list);
 
@@ -142,9 +142,9 @@ usbip_list_usbdevs(void)
 void
 usbip_free_usbdev_list(usbdev_list_t *usbdev_list)
 {
-	if (usbdev_list == NULL)
+	if (usbdev_list == nullptr)
 		return;
-	if (usbdev_list->usbdevs != NULL)
+	if (usbdev_list->usbdevs != nullptr)
 		free(usbdev_list->usbdevs);
 	free(usbdev_list);
 }
@@ -155,7 +155,7 @@ int list_devices(BOOL parsable)
 	int	i;
 
 	usbdev_list = usbip_list_usbdevs();
-	if (usbdev_list == NULL) {
+	if (usbdev_list == nullptr) {
 		err("out of memory");
 		return 2;
 	}

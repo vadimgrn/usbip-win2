@@ -92,9 +92,9 @@ static int usbip_net_xmit(SOCKET sockfd, void *buff, size_t bufflen, int sending
 		int nbytes;
 
 		if (sending)
-			nbytes = send(sockfd, buff, (int)bufflen, 0);
+			nbytes = send(sockfd, (char*)buff, (int)bufflen, 0);
 		else
-			nbytes = recv(sockfd, buff, (int)bufflen, 0);
+			nbytes = recv(sockfd, (char*)buff, (int)bufflen, 0);
 
 		if (nbytes <= 0)
 			return -1;
@@ -194,10 +194,10 @@ int usbip_net_set_reuseaddr(SOCKET sockfd)
 
 int usbip_net_set_nodelay(SOCKET sockfd)
 {
-	const int val = 1;
+	int val = 1;
 	int ret;
 
-	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (void*)&val, sizeof(val));
+	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
 	if (ret < 0)
 		dbg("setsockopt: TCP_NODELAY");
 
@@ -234,7 +234,7 @@ int usbip_net_set_keepalive(SOCKET sockfd)
 		keepalive.keepalivetime = timeout * 1000 / 2;
 		keepalive.keepaliveinterval = timeout * 1000 / 10 / 2;
 
-		ret = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &keepalive, sizeof(keepalive), NULL, 0, &outlen, NULL, NULL);
+		ret = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &keepalive, sizeof(keepalive), nullptr, 0, &outlen, nullptr, nullptr);
 		if (ret != 0) {
 			dbg("failed to set KEEPALIVE via SIO_KEEPALIVE_VALS: 0x%lx", GetLastError());
 			return -1;
@@ -245,7 +245,7 @@ int usbip_net_set_keepalive(SOCKET sockfd)
 		DWORD	val = 1;
 		int	ret;
 
-		ret = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (void *)&val, sizeof(val));
+		ret = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
 		if (ret < 0) {
 			dbg("failed to set KEEPALIVE via setsockopt: 0x%lx", GetLastError());
 		}
@@ -255,10 +255,10 @@ int usbip_net_set_keepalive(SOCKET sockfd)
 
 int usbip_net_set_v6only(SOCKET sockfd)
 {
-	const int val = 1;
+	int val = 1;
 	int ret;
 
-	ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&val, sizeof(val));
+	ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&val, sizeof(val));
 	if (ret < 0)
 		dbg("setsockopt: IPV6_V6ONLY");
 

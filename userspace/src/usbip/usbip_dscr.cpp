@@ -21,9 +21,9 @@ static int fetch_descriptor(SOCKET sockfd, UINT8 dscr_type, unsigned int devid, 
 	USB_DEFAULT_PIPE_SETUP_PACKET *setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)uhdr.u.cmd_submit.setup; // get_submit_setup(&uhdr);
 	static_assert(sizeof(*setup) == sizeof(uhdr.u.cmd_submit.setup), "assert");
 
-	setup->bmRequestType.Dir = BMREQUEST_DEVICE_TO_HOST;
-	setup->bmRequestType.Type = BMREQUEST_STANDARD;
-	setup->bmRequestType.Recipient = BMREQUEST_TO_DEVICE;
+	setup->bmRequestType.s.Dir = BMREQUEST_DEVICE_TO_HOST;
+	setup->bmRequestType.s.Type = BMREQUEST_STANDARD;
+	setup->bmRequestType.s.Recipient = BMREQUEST_TO_DEVICE;
 
 	setup->bRequest = USB_REQUEST_GET_DESCRIPTOR;
 	setup->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(dscr_type, 0); // FIXME: index

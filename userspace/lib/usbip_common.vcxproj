@@ -94,20 +94,20 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="dbgcode.c" />
+    <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="names.c" />
     <ClCompile Include="pdu.cpp" />
-    <ClCompile Include="usbip_common.c" />
+    <ClCompile Include="usbip_common.cpp" />
     <ClCompile Include="getopt.c" />
     <ClCompile Include="getopt_long.c" />
-    <ClCompile Include="usbip_pki_cat.c" />
-    <ClCompile Include="usbip_pki_sign.c" />
-    <ClCompile Include="usbip_setupdi.c" />
-    <ClCompile Include="usbip_stub.c" />
-    <ClCompile Include="usbip_util.c" />
-    <ClCompile Include="usbip_windows.c" />
-    <ClCompile Include="usbip_network.c" />
-    <ClCompile Include="start_xfer.c" />
+    <ClCompile Include="usbip_pki_cat.cpp" />
+    <ClCompile Include="usbip_pki_sign.cpp" />
+    <ClCompile Include="usbip_setupdi.cpp" />
+    <ClCompile Include="usbip_stub.cpp" />
+    <ClCompile Include="usbip_util.cpp" />
+    <ClCompile Include="usbip_windows.cpp" />
+    <ClCompile Include="usbip_network.cpp" />
+    <ClCompile Include="start_xfer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\config.h" />

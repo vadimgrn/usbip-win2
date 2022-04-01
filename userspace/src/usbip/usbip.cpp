@@ -27,16 +27,19 @@
 #include "usbip_network.h"
 #include "usbip.h"
 
-static int usbip_help(int argc, char *argv[]);
-static int usbip_version(int argc, char *argv[]);
+namespace
+{
 
-static const char usbip_version_string[] = PACKAGE_STRING;
+int usbip_help(int argc, char *argv[]);
+int usbip_version(int argc, char *argv[]);
 
-static const char usbip_usage_string[] =
+const char usbip_version_string[] = PACKAGE_STRING;
+
+const char usbip_usage_string[] =
 	"usbip [--debug] [--tcp-port PORT] [version]\n"
 	"             [help] <command> <args>\n";
 
-static void usbip_usage(void)
+void usbip_usage()
 {
 	printf("usage: %s", usbip_usage_string);
 }
@@ -48,66 +51,26 @@ struct command {
 	void (*usage)(void);
 };
 
-static const struct command cmds[] = {
-	{
-		.name  = "help",
-		.fn    = usbip_help,
-		.help  = NULL,
-		.usage = NULL
-	},
-	{
-		.name  = "version",
-		.fn    = usbip_version,
-		.help  = NULL,
-		.usage = NULL
-	},
-	{
-		.name  = "attach",
-		.fn    = usbip_attach,
-		.help  = "Attach a remote USB device",
-		.usage = usbip_attach_usage
-	},
-	{
-		.name  = "detach",
-		.fn    = usbip_detach,
-		.help  = "Detach a remote USB device",
-		.usage = usbip_detach_usage
-	},
-	{
-		.name  = "list",
-		.fn    = usbip_list,
-		.help  = "List exportable or local USB devices",
-		.usage = usbip_list_usage
-	},
-	{
-		.name  = "bind",
-		.fn    = usbip_bind,
-		.help  = "Bind device to usbip stub driver",
-		.usage = usbip_bind_usage
-	},
-	{
-		.name  = "unbind",
-		.fn    = usbip_unbind,
-		.help  = "Unbind device from usbip stub driver",
-		.usage = usbip_unbind_usage
-	},
-	{
-		.name  = "port",
-		.fn    = usbip_port_show,
-		.help  = "Show imported USB devices",
-		.usage = usbip_port_usage
-	},
-	{ NULL, NULL, NULL, NULL }
+const struct command cmds[] = {
+	{ "help", usbip_help},
+	{ "version", usbip_version},
+	{ "attach", usbip_attach, "Attach a remote USB device",	usbip_attach_usage },
+	{ "detach", usbip_detach, "Detach a remote USB device", usbip_detach_usage },
+	{ "list", usbip_list, "List exportable or local USB devices", usbip_list_usage },
+	{ "bind", usbip_bind, "Bind device to usbip stub driver", usbip_bind_usage },
+	{ "unbind", usbip_unbind, "Unbind device from usbip stub driver", usbip_unbind_usage },
+	{ "port", usbip_port_show, "Show imported USB devices", usbip_port_usage },
+	{}
 };
 
-static int usbip_help(int argc, char *argv[])
+int usbip_help(int argc, char *argv[])
 {
 	const struct command *cmd;
 
 	if (argc > 1) {
 		int	i;
 
-		for (i = 0; cmds[i].name != NULL; i++)
+		for (i = 0; cmds[i].name != nullptr; i++)
 			if (strcmp(cmds[i].name, argv[1]) == 0) {
 				if (cmds[i].usage)
 					cmds[i].usage();
@@ -121,43 +84,46 @@ static int usbip_help(int argc, char *argv[])
 
 	usbip_usage();
 	printf("\n");
-	for (cmd = cmds; cmd->name != NULL; cmd++)
-		if (cmd->help != NULL)
+	for (cmd = cmds; cmd->name != nullptr; cmd++)
+		if (cmd->help != nullptr)
 			printf("  %-10s %s\n", cmd->name, cmd->help);
 	printf("\n");
 	return 0;
 }
 
-static int usbip_version(int argc, char *argv[])
+int usbip_version(int argc, char *argv[])
 {
 	printf("usbip (%s)\n", usbip_version_string);
 	return 0;
 }
 
-static int run_command(const struct command *cmd, int argc, char *argv[])
+int run_command(const struct command *cmd, int argc, char *argv[])
 {
 	dbg("running command: %s", cmd->name);
 	return cmd->fn(argc, argv);
 }
 
+} // namespace
+
+
 int main(int argc, char *argv[])
 {
-	static const struct option opts[] = {
-		{ "debug",    no_argument,       NULL, 'd' },
-		{ "tcp-port", required_argument, NULL, 't' },
-		{ NULL,       0,                 NULL,  0 }
+	const option opts[] = {
+		{ "debug",    no_argument,       nullptr, 'd' },
+		{ "tcp-port", required_argument, nullptr, 't' },
+		{}
 	};
 
-	char	*cmd;
-	int	opt;
-	int	rc = 1;
+	char *cmd{};
+	int opt{};
+	int rc = 1;
 
 	usbip_progname = "usbip";
 	usbip_use_stderr = 1;
 
 	opterr = 0;
-	for (;;) {
-		opt = getopt_long(argc, argv, "+dt:", opts, NULL);
+	while (true) {
+		opt = getopt_long(argc, argv, "+dt:", opts, nullptr);
 
 		if (opt == -1)
 			break;
@@ -171,7 +137,7 @@ int main(int argc, char *argv[])
 			break;
 		case '?':
 			err("invalid option: %c", opt);
-			/* fall through */
+			[[fallthrough]];
 		default:
 			usbip_usage();
 			return 1;
@@ -185,9 +151,7 @@ int main(int argc, char *argv[])
 
 	cmd = argv[optind];
 	if (cmd) {
-		int	i;
-
-		for (i = 0; cmds[i].name != NULL; i++)
+		for (int i = 0; cmds[i].name; i++)
 			if (!strcmp(cmds[i].name, cmd)) {
 				argc -= optind;
 				argv += optind;
@@ -196,10 +160,9 @@ int main(int argc, char *argv[])
 				goto out;
 			}
 		err("invalid command: %s", cmd);
-	}
-	else {
+	} else {
 		/* empty command */
-		usbip_help(0, NULL);
+		usbip_help(0, nullptr);
 	}
 
 out:

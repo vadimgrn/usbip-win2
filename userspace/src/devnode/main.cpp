@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include <windows.h>
 #include <strsafe.h>
 #include <setupapi.h>

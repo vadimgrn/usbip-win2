@@ -22,7 +22,7 @@ get_n_addrinfos(struct addrinfo *ainfos)
 	struct addrinfo	*ainfo;
 	int		count = 0;
 
-	for (ainfo = ainfos; ainfo != NULL;  ainfo = ainfo->ai_next) {
+	for (ainfo = ainfos; ainfo != nullptr;  ainfo = ainfo->ai_next) {
 		count++;
 	}
 	return count;
@@ -72,11 +72,11 @@ build_sockfds(struct addrinfo *ainfos)
 
 	n_infos = get_n_addrinfos(ainfos);
 	if (n_infos == 0)
-		return NULL;
+		return nullptr;
 	sockfds = (SOCKET *)malloc(sizeof(SOCKET) * (n_infos + 1));
-	if (sockfds == NULL)
-		return NULL;
-	for (ainfo = ainfos; ainfo != NULL; ainfo = ainfo->ai_next) {
+	if (sockfds == nullptr)
+		return nullptr;
+	for (ainfo = ainfos; ainfo != nullptr; ainfo = ainfo->ai_next) {
 		SOCKET sockfd;
 
 		sockfd = build_sockfd(ainfo);
@@ -87,7 +87,7 @@ build_sockfds(struct addrinfo *ainfos)
 	}
 	if (idx == 0) {
 		free(sockfds);
-		return NULL;
+		return nullptr;
 
 	}
 	sockfds[idx] = INVALID_SOCKET;
@@ -106,10 +106,10 @@ get_listen_sockfds(int family)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	rc = getaddrinfo(NULL, usbip_port_string, &hints, &ainfos);
+	rc = getaddrinfo(nullptr, usbip_port_string, &hints, &ainfos);
 	if (rc != 0) {
 		dbg("failed to get a network address %s: %s", usbip_port_string, gai_strerror(rc));
-		return NULL;
+		return nullptr;
 	}
 
 	sockfds = build_sockfds(ainfos);

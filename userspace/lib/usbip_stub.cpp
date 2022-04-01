@@ -19,7 +19,7 @@ is_service_usbip_stub(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data)
 	BOOL	res;
 
 	svcname = get_dev_property(dev_info, dev_info_data, SPDRP_SERVICE);
-	if (svcname == NULL)
+	if (svcname == nullptr)
 		return FALSE;
 	res = _stricmp(svcname, STUB_DRIVER_SVCNAME) == 0 ? TRUE: FALSE;
 	free(svcname);
@@ -33,7 +33,7 @@ copy_file(const char *fname, const char *path_drvpkg)
 	char	*path_mod;
 
 	path_mod = get_module_dir();
-	if (path_mod == NULL) {
+	if (path_mod == nullptr) {
 		return;
 	}
 	asprintf(&path_src, "%s\\%s", path_mod, fname);
@@ -71,7 +71,7 @@ copy_stub_inf(const char *id_hw, const char *path_drvpkg)
 	errno_t	err;
 
 	path_mod = get_module_dir();
-	if (path_mod == NULL)
+	if (path_mod == nullptr)
 		return;
 	asprintf(&path_inx, "%s\\usbip_stub.inx", path_mod);
 	free(path_mod);
@@ -128,7 +128,7 @@ get_temp_drvpkg_path(char path_drvpkg[])
 		return FALSE;
 	if (GetTempFileName(tempdir, "stub", 0, path_drvpkg) > 0) {
 		DeleteFile(path_drvpkg);
-		if (CreateDirectory(path_drvpkg, NULL))
+		if (CreateDirectory(path_drvpkg, nullptr))
 			return TRUE;
 	}
 	else
@@ -146,7 +146,7 @@ apply_stub_fdo(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 	int	ret;
 
 	id_hw = get_id_hw(dev_info, pdev_info_data);
-	if (id_hw == NULL)
+	if (id_hw == nullptr)
 		return ERR_GENERAL;
 	if (!get_temp_drvpkg_path(path_drvpkg)) {
 		free(id_hw);
@@ -175,7 +175,7 @@ apply_stub_fdo(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 
 	/* update driver */
 	asprintf(&path_inf, "%s\\usbip_stub.inf", path_drvpkg);
-	if (!UpdateDriverForPlugAndPlayDevicesA(NULL, id_hw, path_inf, INSTALLFLAG_NONINTERACTIVE | INSTALLFLAG_FORCE, &reboot_required)) {
+	if (!UpdateDriverForPlugAndPlayDevicesA(nullptr, id_hw, path_inf, INSTALLFLAG_NONINTERACTIVE | INSTALLFLAG_FORCE, &reboot_required)) {
 		DWORD	err = GetLastError();
 		dbg("failed to update driver %s ; %s ; errorcode: 0x%lx", path_inf, id_hw, err);
 		free(path_inf);
@@ -200,7 +200,7 @@ rollback_driver(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 {
 	BOOL	needReboot;
 
-	if (!DiRollbackDriver(dev_info, pdev_info_data, NULL, ROLLBACK_FLAG_NO_UI, &needReboot)) {
+	if (!DiRollbackDriver(dev_info, pdev_info_data, nullptr, ROLLBACK_FLAG_NO_UI, &needReboot)) {
 		dbg("failed to rollback driver: %lx", GetLastError());
 		return FALSE;
 	}

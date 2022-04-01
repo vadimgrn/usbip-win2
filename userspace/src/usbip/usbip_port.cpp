@@ -103,14 +103,15 @@ list_imported_devices(int port)
 int
 usbip_port_show(int argc, char *argv[])
 {
-	static const struct option opts[] = {
-		{ "port", required_argument, NULL, 'p' },
-		{ NULL, 0, NULL, 0 }
+	const option opts[] = {
+		{ "port", required_argument, nullptr, 'p' },
+		{}
 	};
-	int	port = -1;
+
+	int port = -1;
 
 	for (;;) {
-		int	opt = getopt_long(argc, argv, "p:", opts, NULL);
+		int opt = getopt_long(argc, argv, "p:", opts, nullptr);
 
 		if (opt == -1)
 			break;

@@ -48,9 +48,9 @@ calc_hash(LPCSTR fpath, PBYTE pbHash)
 {
 	HANDLE	hFile;
 	DWORD	cbHash = SHA1_HASH_LENGTH;
-	LPWSTR wszFilePath = NULL;
+	LPWSTR wszFilePath = nullptr;
 
-	hFile = CreateFile(fpath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	hFile = CreateFile(fpath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile == INVALID_HANDLE_VALUE) {
 		dbg("calc_hash: path not found: %s", fpath);
 		return FALSE;
@@ -120,16 +120,16 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 	sSIPData.Digest.cbData = SHA1_HASH_LENGTH;
 	sSIPData.Digest.pbData = pbHash;
 
-	pCatMember = CryptCATPutMemberInfo(hCat, NULL, wstrHash, (GUID*)(isPEType ? &pe_guid : &inf_guid), 0x200, sizeof(sSIPData), (BYTE*)&sSIPData);
-	if (pCatMember == NULL) {
+	pCatMember = CryptCATPutMemberInfo(hCat, nullptr, wstrHash, (GUID*)(isPEType ? &pe_guid : &inf_guid), 0x200, sizeof(sSIPData), (BYTE*)&sSIPData);
+	if (pCatMember == nullptr) {
 		dbg("failed to add cat entry: %s", fname);
 		return FALSE;
 	}
 
 	wfname = utf8_to_wchar(fname);
 	// Add the "File" and "OSAttr" attributes to the newly created member
-	if (CryptCATPutAttrInfo(hCat, pCatMember, L"File", ATTR_FLAGS, 2 * ((DWORD)wcslen(wfname) + 1), (BYTE*)wfname) == NULL ||
-		CryptCATPutAttrInfo(hCat, pCatMember, L"OSAttr", ATTR_FLAGS, 2 * ((DWORD)wcslen(wszOSAttr) + 1), (BYTE*)wszOSAttr) == NULL) {
+	if (CryptCATPutAttrInfo(hCat, pCatMember, L"File", ATTR_FLAGS, 2 * ((DWORD)wcslen(wfname) + 1), (BYTE*)wfname) == nullptr ||
+		CryptCATPutAttrInfo(hCat, pCatMember, L"OSAttr", ATTR_FLAGS, 2 * ((DWORD)wcslen(wszOSAttr) + 1), (BYTE*)wszOSAttr) == nullptr) {
 		free(wfname);
 		dbg("unable to create attributes: %s", fname);
 		return FALSE;
@@ -148,7 +148,7 @@ build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 	BOOL		res = FALSE;
 	LPCWSTR		wOS = L"7_X86,7_X64,8_X86,8_X64,8_ARM,10_X86,10_X64,10_ARM";
 
-	if (!CryptAcquireContextW(&hProv, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
+	if (!CryptAcquireContextW(&hProv, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) {
 		dbg("unable to acquire crypt context for cat creation");
 		return FALSE;
 	}
@@ -166,7 +166,7 @@ build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 
 	whwid = utf8_to_wchar(hwid);
 	if (CryptCATPutCatAttrInfo(hCat, L"HWID1", CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
-		2 * ((DWORD)wcslen(whwid) + 1), (BYTE*)whwid) == NULL) {
+		2 * ((DWORD)wcslen(whwid) + 1), (BYTE*)whwid) == nullptr) {
 		dbg("failed to set HWID1 cat attribute");
 		free(whwid);
 		goto out;
@@ -174,7 +174,7 @@ build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 	free(whwid);
 
 	if (CryptCATPutCatAttrInfo(hCat, L"OS", CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
-		2 * ((DWORD)wcslen(wOS) + 1), (BYTE*)wOS) == NULL) {
+		2 * ((DWORD)wcslen(wOS) + 1), (BYTE*)wOS) == nullptr) {
 		dbg("failed to set OS cat attribute");
 		goto out;
 	}

@@ -88,12 +88,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="usbipd.c" />
-    <ClCompile Include="usbipd_accept.c" />
-    <ClCompile Include="usbipd_import.c" />
-    <ClCompile Include="usbipd_list.c" />
-    <ClCompile Include="usbipd_sock.c" />
-    <ClCompile Include="usbipd_stub.c" />
+    <ClCompile Include="usbipd.cpp" />
+    <ClCompile Include="usbipd_accept.cpp" />
+    <ClCompile Include="usbipd_import.cpp" />
+    <ClCompile Include="usbipd_list.cpp" />
+    <ClCompile Include="usbipd_sock.cpp" />
+    <ClCompile Include="usbipd_stub.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\config.h" />

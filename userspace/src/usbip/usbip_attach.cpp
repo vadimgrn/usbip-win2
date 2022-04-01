@@ -74,18 +74,18 @@ build_pluginfo(SOCKET sockfd, unsigned devid)
 {
 	USHORT wTotalLength = 0;
 
-	if (fetch_conf_descriptor(sockfd, devid, NULL, &wTotalLength) < 0) {
+	if (fetch_conf_descriptor(sockfd, devid, nullptr, &wTotalLength) < 0) {
 		dbg("failed to get configuration descriptor size");
-		return NULL;
+		return nullptr;
 	}
 
-	struct vhci_pluginfo_t *pluginfo = NULL;
+	vhci_pluginfo_t *pluginfo = nullptr;
 	unsigned long pluginfo_size = sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf);
 
-	pluginfo = malloc(pluginfo_size);
+	pluginfo = (vhci_pluginfo_t*)malloc(pluginfo_size);
 	if (!pluginfo) {
 		dbg("out of memory or invalid vhci pluginfo size");
-		return NULL;
+		return nullptr;
 	}
 	
 	pluginfo->size = pluginfo_size;
@@ -94,13 +94,13 @@ build_pluginfo(SOCKET sockfd, unsigned devid)
 	if (fetch_device_descriptor(sockfd, devid, &pluginfo->dscr_dev) < 0) {
 		dbg("failed to fetch device descriptor");
 		free(pluginfo);
-		return NULL;
+		return nullptr;
 	}
 
 	if (fetch_conf_descriptor(sockfd, devid, &pluginfo->dscr_conf, &wTotalLength) < 0) {
 		dbg("failed to fetch configuration descriptor");
 		free(pluginfo);
-		return NULL;
+		return nullptr;
 	}
 
 	return pluginfo;
@@ -173,7 +173,7 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 	}
 
 	if (serial) {
-		mbstowcs_s(NULL, pluginfo->wserial, sizeof(pluginfo->wserial)/sizeof(*pluginfo->wserial), serial, _TRUNCATE);
+		mbstowcs_s(nullptr, pluginfo->wserial, sizeof(pluginfo->wserial)/sizeof(*pluginfo->wserial), serial, _TRUNCATE);
 	} else {
 		pluginfo->wserial[0] = L'\0';
 	}
@@ -247,20 +247,20 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 int usbip_attach(int argc, char *argv[])
 {
 	static const struct option opts[] = {
-		{ "remote", required_argument, NULL, 'r' },
-		{ "busid", required_argument, NULL, 'b' },
-		{ "serial", optional_argument, NULL, 's' },
-		{ "terse", required_argument, NULL, 't' },
-		{ NULL, 0, NULL, 0 }
+		{ "remote", required_argument, nullptr, 'r' },
+		{ "busid", required_argument, nullptr, 'b' },
+		{ "serial", optional_argument, nullptr, 's' },
+		{ "terse", required_argument, nullptr, 't' },
+		{ nullptr, 0, NULL, 0 }
 	};
 
-	char	*host = NULL;
-	char	*busid = NULL;
-	char	*serial = NULL;
+	char	*host = nullptr;
+	char	*busid = nullptr;
+	char	*serial = nullptr;
 	BOOL	terse = FALSE;
 
 	while (true) {
-		int opt = getopt_long(argc, argv, "r:b:s:t", opts, NULL);
+		int opt = getopt_long(argc, argv, "r:b:s:t", opts, nullptr);
 
 		if (opt == -1)
 			break;

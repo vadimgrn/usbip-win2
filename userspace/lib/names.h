@@ -29,19 +29,24 @@
 
 /*****************************************************************************/
 
-#ifndef _NAMES_H
-#define _NAMES_H
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdint.h>
 
 /* used by usbip_common.c */
-extern const char *names_vendor(uint16_t vendorid);
-extern const char *names_product(uint16_t vendorid, uint16_t productid);
-extern const char *names_class(uint8_t classid);
-extern const char *names_subclass(uint8_t classid, uint8_t subclassid);
-extern const char *names_protocol(uint8_t classid, uint8_t subclassid, uint8_t protocolid);
+const char *names_vendor(uint16_t vendorid);
+const char *names_product(uint16_t vendorid, uint16_t productid);
+const char *names_class(uint8_t classid);
+const char *names_subclass(uint8_t classid, uint8_t subclassid);
+const char *names_protocol(uint8_t classid, uint8_t subclassid, uint8_t protocolid);
 
-extern int  names_init(const char *path);
-extern void names_free(void);
+int  names_init(const char *path);
+void names_free(void);
 
-#endif /* _NAMES_H */
+#ifdef __cplusplus
+}
+#endif

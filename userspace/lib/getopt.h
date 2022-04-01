@@ -36,8 +36,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _GETOPT_H_
-#define _GETOPT_H_
+#pragma once
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 //#include <sys/cdefs.h>
 
@@ -78,5 +81,7 @@ extern   int optopt;
 extern   int optreset;
 extern   char *suboptarg;               /* getsubopt(3) external variable */
 #endif
- 
-#endif /* !_GETOPT_H_ */
+
+#ifdef __cplusplus
+}
+#endif

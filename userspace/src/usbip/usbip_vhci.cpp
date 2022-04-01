@@ -18,16 +18,16 @@ walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno
 	PSP_DEVICE_INTERFACE_DETAIL_DATA	pdev_interface_detail;
 
 	id_hw = get_id_hw(dev_info, pdev_info_data);
-	if (id_hw == NULL || (_stricmp(id_hw, "usbipwin\\vhci") != 0 && _stricmp(id_hw, "root\\vhci_ude") != 0)) {
+	if (id_hw == nullptr || (_stricmp(id_hw, "usbipwin\\vhci") != 0 && _stricmp(id_hw, "root\\vhci_ude") != 0)) {
 		dbg("invalid hw id: %s", id_hw ? id_hw : "");
-		if (id_hw != NULL)
+		if (id_hw != nullptr)
 			free(id_hw);
 		return 0;
 	}
 	free(id_hw);
 
 	pdev_interface_detail = get_intf_detail(dev_info, pdev_info_data, (LPCGUID)&GUID_DEVINTERFACE_VHCI_USBIP);
-	if (pdev_interface_detail == NULL) {
+	if (pdev_interface_detail == nullptr) {
 		return 0;
 	}
 
@@ -42,7 +42,7 @@ get_vhci_devpath(void)
 	char	*devpath;
 
 	if (traverse_intfdevs(walker_devpath, &GUID_DEVINTERFACE_VHCI_USBIP, &devpath) != 1) {
-		return NULL;
+		return nullptr;
 	}
 
 	return devpath;
@@ -55,11 +55,11 @@ usbip_vhci_driver_open(void)
 	char	*devpath;
 
 	devpath = get_vhci_devpath();
-	if (devpath == NULL) {
+	if (devpath == nullptr) {
 		return INVALID_HANDLE_VALUE;
 	}
 	dbg("device path: %s", devpath);
-	hdev = CreateFile(devpath, GENERIC_READ|GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	hdev = CreateFile(devpath, GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	free(devpath);
 	return hdev;
 }
@@ -76,7 +76,7 @@ usbip_vhci_get_ports_status(HANDLE hdev, ioctl_usbip_vhci_get_ports_status *st)
 	unsigned long	len;
 
 	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_PORTS_STATUS,
-		NULL, 0, st, sizeof(ioctl_usbip_vhci_get_ports_status), &len, NULL)) {
+		nullptr, 0, st, sizeof(ioctl_usbip_vhci_get_ports_status), &len, NULL)) {
 		if (len == sizeof(ioctl_usbip_vhci_get_ports_status))
 			return 0;
 	}
@@ -125,13 +125,13 @@ usbip_vhci_get_imported_devs(HANDLE hdev, pioctl_usbip_vhci_imported_dev_t *pide
 
 	len_out = sizeof(ioctl_usbip_vhci_imported_dev) * (n_max_ports + 1);
 	idevs = (ioctl_usbip_vhci_imported_dev *)malloc(len_out);
-	if (idevs == NULL) {
+	if (idevs == nullptr) {
 		dbg("out of memory");
 		return ERR_GENERAL;
 	}
 
 	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES,
-		NULL, 0, idevs, len_out, &len_returned, NULL)) {
+		nullptr, 0, idevs, len_out, &len_returned, NULL)) {
 		*pidevs = idevs;
 		return 0;
 	}
@@ -149,7 +149,7 @@ usbip_vhci_attach_device(HANDLE hdev, struct vhci_pluginfo_t *pluginfo)
 	unsigned long unused;
 
 	if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE,
-		pluginfo, pluginfo->size, pluginfo, sizeof(*pluginfo), &unused, NULL)) {
+		pluginfo, pluginfo->size, pluginfo, sizeof(*pluginfo), &unused, nullptr)) {
 		DWORD err = GetLastError();
 		if (err == ERROR_HANDLE_EOF) {
 			return ERR_PORTFULL;
@@ -170,7 +170,7 @@ usbip_vhci_detach_device(HANDLE hdev, int port)
 
 	unplug.addr = (char)port;
 	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE,
-		&unplug, sizeof(unplug), NULL, 0, &unused, NULL))
+		&unplug, sizeof(unplug), nullptr, 0, &unused, NULL))
 		return 0;
 
 	err = GetLastError();

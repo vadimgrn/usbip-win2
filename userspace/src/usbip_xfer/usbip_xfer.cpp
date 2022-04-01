@@ -1,6 +1,6 @@
 /*
-* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
-*/
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
 #include "usbip_xfer.h"
 #include "trace.h"
 #include "usbip_xfer.tmh"

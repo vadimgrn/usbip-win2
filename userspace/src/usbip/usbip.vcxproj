@@ -88,17 +88,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="usbip.c" />
-    <ClCompile Include="usbip_attach.c" />
-    <ClCompile Include="usbip_bind.c" />
-    <ClCompile Include="usbip_detach.c" />
-    <ClCompile Include="usbip_dscr.c" />
-    <ClCompile Include="usbip_list.c" />
-    <ClCompile Include="usbip_list_local.c" />
-    <ClCompile Include="usbip_list_remote.c" />
-    <ClCompile Include="usbip_port.c" />
-    <ClCompile Include="usbip_unbind.c" />
-    <ClCompile Include="usbip_vhci.c" />
+    <ClCompile Include="usbip.cpp" />
+    <ClCompile Include="usbip_attach.cpp" />
+    <ClCompile Include="usbip_bind.cpp" />
+    <ClCompile Include="usbip_detach.cpp" />
+    <ClCompile Include="usbip_dscr.cpp" />
+    <ClCompile Include="usbip_list.cpp" />
+    <ClCompile Include="usbip_list_local.cpp" />
+    <ClCompile Include="usbip_list_remote.cpp" />
+    <ClCompile Include="usbip_port.cpp" />
+    <ClCompile Include="usbip_unbind.cpp" />
+    <ClCompile Include="usbip_vhci.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\config.h" />

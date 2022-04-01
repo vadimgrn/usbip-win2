@@ -29,7 +29,7 @@ static const struct speed_string speed_strings[] = {
 	{ USB_SPEED_WIRELESS, "53.3-480", "Wireless" },
 	{ USB_SPEED_SUPER, "5000", "Super Speed(5000Mbps)" },
 	{ USB_SPEED_SUPER_PLUS, "10000", "Super Speed Plus(10 Gbit/s)" },
-	{ 0, NULL, NULL }
+	{ 0, nullptr, nullptr }
 };
 
 struct portst_string {
@@ -45,13 +45,13 @@ static struct portst_string portst_strings[] = {
 	{ VDEV_ST_NOTASSIGNED,	"Port Initializing"},
 	{ VDEV_ST_USED,		"Port in Use"},
 	{ VDEV_ST_ERROR,	"Port Error"},
-	{ 0, NULL}
+	{ 0, nullptr}
 };
 
 const char *usbip_status_string(int32_t status)
 {
 	int i;
-	for (i=0; portst_strings[i].desc != NULL; i++)
+	for (i=0; portst_strings[i].desc != nullptr; i++)
 		if (portst_strings[i].num == status)
 			return portst_strings[i].desc;
 
@@ -61,7 +61,7 @@ const char *usbip_status_string(int32_t status)
 const char *usbip_speed_string(int num)
 {
 	int i;
-	for (i=0; speed_strings[i].speed != NULL; i++)
+	for (i=0; speed_strings[i].speed != nullptr; i++)
 		if (speed_strings[i].num == num)
 			return speed_strings[i].desc;
 

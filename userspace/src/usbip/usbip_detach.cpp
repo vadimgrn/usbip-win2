@@ -75,12 +75,12 @@ static int detach_port(const char *portstr)
 int usbip_detach(int argc, char *argv[])
 {
 	static const struct option opts[] = {
-		{ "port", required_argument, NULL, 'p' },
-		{ NULL, 0, NULL, 0 }
+		{ "port", required_argument, nullptr, 'p' },
+		{ nullptr, 0, NULL, 0 }
 	};
 
 	for (;;) {
-		int	opt = getopt_long(argc, argv, "p:", opts, NULL);
+		int	opt = getopt_long(argc, argv, "p:", opts, nullptr);
 
 		if (opt == -1)
 			break;

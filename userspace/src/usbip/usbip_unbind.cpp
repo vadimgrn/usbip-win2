@@ -26,7 +26,7 @@ static const char usbip_unbind_usage_string[] =
 	"usbip unbind <args>\n"
 	"    -b, --busid=<busid>    Unbind usbip stub from device on <busid>\n";
 
-void usbip_unbind_usage(void)
+void usbip_unbind_usage()
 {
 	printf("usage: %s", usbip_unbind_usage_string);
 }
@@ -82,15 +82,13 @@ static int unbind_device(char *busid)
 
 int usbip_unbind(int argc, char *argv[])
 {
-	static const struct option opts[] = {
-		{ "busid", required_argument, NULL, 'b' },
-		{ NULL,    0,                 NULL,  0  }
+	const option opts[] = {
+		{ "busid", required_argument, nullptr, 'b' },
+		{}
 	};
 
-	int opt;
-
 	for (;;) {
-		opt = getopt_long(argc, argv, "b:", opts, NULL);
+		auto opt = getopt_long(argc, argv, "b:", opts, nullptr);
 
 		if (opt == -1)
 			break;

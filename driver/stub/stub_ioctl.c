@@ -73,7 +73,7 @@ process_get_devinfo(usbip_stub_dev_t *devstub, IRP *irp)
 			devinfo->vendor = desc.idVendor;
 			devinfo->product = desc.idProduct;
 			devinfo->speed = get_speed_from_bcdUSB(desc.bcdUSB);
-			devinfo->class = desc.bDeviceClass;
+			devinfo->class_ = desc.bDeviceClass;
 			devinfo->subclass = desc.bDeviceSubClass;
 			devinfo->protocol = desc.bDeviceProtocol;
 			irp->IoStatus.Information = sizeof(ioctl_usbip_stub_devinfo_t);

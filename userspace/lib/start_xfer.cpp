@@ -25,7 +25,7 @@
 static BOOL write_data(HANDLE hInWrite, const void *data, DWORD len)
 {
 	DWORD nwritten = 0;
-	BOOL res = WriteFile(hInWrite, data, len, &nwritten, NULL);
+	BOOL res = WriteFile(hInWrite, data, len, &nwritten, nullptr);
 
 	if (res && nwritten == len) {
 		return TRUE;
@@ -37,10 +37,7 @@ static BOOL write_data(HANDLE hInWrite, const void *data, DWORD len)
 
 static BOOL create_pipe(HANDLE *phRead, HANDLE *phWrite)
 {
-	SECURITY_ATTRIBUTES saAttr = {
-		.nLength = sizeof(saAttr),
-		.bInheritHandle = TRUE
-	};
+	SECURITY_ATTRIBUTES saAttr{sizeof(saAttr), nullptr, TRUE};
 
 	if (CreatePipe(phRead, phWrite, &saAttr, 0)) {
 		return TRUE;
@@ -50,15 +47,15 @@ static BOOL create_pipe(HANDLE *phRead, HANDLE *phWrite)
 	return FALSE;
 }
 
-bool get_usbip_xfer_path(char *path, DWORD cch)
+static bool get_usbip_xfer_path(char *path, DWORD cch)
 {
-        DWORD n = GetModuleFileName(NULL, path, cch);
+        DWORD n = GetModuleFileName(nullptr, path, cch);
         if (!(n > 0 && n < cch)) {
                 dbg("GetModuleFileName error %#0x", GetLastError());
                 return false;
         }
 
-        LPSTR fname = NULL;
+        LPSTR fname = nullptr;
         n = GetFullPathName(path, cch, path, &fname);
         assert(n > 0 && n < cch);
 
@@ -70,7 +67,10 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 {
         int ret = ERR_GENERAL;
 
-	HANDLE hRead;
+        usbip_xfer_args args{ INVALID_HANDLE_VALUE };
+        args.client = client;
+
+        HANDLE hRead;
 	HANDLE hWrite;
 	if (!create_pipe(&hRead, &hWrite)) {
 		return ERR_GENERAL;
@@ -81,14 +81,12 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
                 return ERR_GENERAL;
         }
 
-	STARTUPINFO si = {
-		.cb = sizeof(si),
-		.hStdInput = hRead,
-		.dwFlags = STARTF_USESTDHANDLES
-	};
+	STARTUPINFO si{sizeof(si)};
+	si.hStdInput = hRead,
+	si.dwFlags = STARTF_USESTDHANDLES;
 
-	PROCESS_INFORMATION pi = {0};
-        BOOL res = CreateProcess(NULL, CommandLine, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi);
+	PROCESS_INFORMATION pi{};
+        BOOL res = CreateProcess(nullptr, CommandLine, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi);
 	if (!res) {
 		DWORD err = GetLastError();
 		if (err == ERROR_FILE_NOT_FOUND) {
@@ -97,11 +95,6 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 		dbg("failed to create process: 0x%lx", err);
 		goto out;
 	}
-
-	struct usbip_xfer_args args = {
-		.hdev = INVALID_HANDLE_VALUE,
-		.client = client
-	};
 
 	res = DuplicateHandle(GetCurrentProcess(), hdev, pi.hProcess, &args.hdev, 0, FALSE, DUPLICATE_SAME_ACCESS);
 	if (!res) {

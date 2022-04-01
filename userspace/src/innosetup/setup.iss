@@ -1,4 +1,4 @@
-; (C) 2022 Vadym Hrynchyshyn
+; Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
 #if Ver < EncodeVer(6,2,0,0)
         #error This script requires Inno Setup 6.2 or later

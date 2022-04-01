@@ -22,18 +22,15 @@
 #include "usbip_setupdi.h"
 #include "usbip_stub.h"
 
-static const char usbip_bind_usage_string[] =
+namespace
+{
+
+const char usbip_bind_usage_string[] =
 	"usbip bind <args>\n"
 	"    -b, --busid=<busid>    Bind usbip stub to device "
 	"on <busid>\n";
 
-void usbip_bind_usage(void)
-{
-	printf("usage: %s", usbip_bind_usage_string);
-}
-
-static int
-walker_bind(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
+int walker_bind(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
 {
 	devno_t	*pdevno = (devno_t *)ctx;
 
@@ -51,8 +48,7 @@ walker_bind(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, v
 	return 0;
 }
 
-static int
-bind_device(const char *busid)
+int bind_device(const char *busid)
 {
 	unsigned char	devno;
 	int	rc;
@@ -81,17 +77,25 @@ bind_device(const char *busid)
 	return 0;
 }
 
+} // namespace
+
+
+void usbip_bind_usage()
+{
+        printf("usage: %s", usbip_bind_usage_string);
+}
+
 int usbip_bind(int argc, char *argv[])
 {
-	static const struct option opts[] = {
-		{ "busid", required_argument, NULL, 'b' },
-		{ NULL,    0,                 NULL,  0  }
+	const option opts[] = {
+		{ "busid", required_argument, nullptr, 'b' },
+		{}
 	};
 
 	int opt;
 
 	for (;;) {
-		opt = getopt_long(argc, argv, "b:", opts, NULL);
+		opt = getopt_long(argc, argv, "b:", opts, nullptr);
 
 		if (opt == -1)
 			break;

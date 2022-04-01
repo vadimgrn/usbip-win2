@@ -101,7 +101,7 @@ do_standalone_mode(void)
 	info("starting " PROGNAME " (%s)", usbip_version_string);
 
 	sockfds = get_listen_sockfds(family);
-	if (sockfds == NULL) {
+	if (sockfds == nullptr) {
 		err("failed to open a listening socket");
 		cleanup_socket();
 		return 2;
@@ -115,7 +115,7 @@ do_standalone_mode(void)
 		timeout.tv_sec = MAIN_LOOP_TIMEOUT;
 		timeout.tv_usec = 0;
 		fds.fd_count = n_sockfds;
-		rc = select(n_sockfds, &fds, NULL, NULL, &timeout);
+		rc = select(n_sockfds, &fds, nullptr, NULL, &timeout);
 		if (rc == SOCKET_ERROR) {
 			dbg("failed to select: err: %d", WSAGetLastError());
 			err("operation halted by socket error");
@@ -137,22 +137,22 @@ static BOOL
 parse_args(int argc, char *argv[])
 {
 	const struct option longopts[] = {
-	{ "ipv4",     no_argument,       NULL, '4' },
-	{ "ipv6",     no_argument,       NULL, '6' },
-	{ "debug",    no_argument,       NULL, 'd' },
-	{ "device",   no_argument,       NULL, 'e' },
-	{ "pid",      optional_argument, NULL, 'P' },
-	{ "tcp-port", required_argument, NULL, 't' },
-	{ "help",     no_argument,       NULL, 'h' },
-	{ "version",  no_argument,       NULL, 'v' },
-	{ NULL,	      0,                 NULL,  0 }
+	{ "ipv4",     no_argument,       nullptr, '4' },
+	{ "ipv6",     no_argument,       nullptr, '6' },
+	{ "debug",    no_argument,       nullptr, 'd' },
+	{ "device",   no_argument,       nullptr, 'e' },
+	{ "pid",      optional_argument, nullptr, 'P' },
+	{ "tcp-port", required_argument, nullptr, 't' },
+	{ "help",     no_argument,       nullptr, 'h' },
+	{ "version",  no_argument,       nullptr, 'v' },
+	{ nullptr,	      0,                 NULL,  0 }
 	};
 	BOOL	ipv4 = FALSE, ipv6 = FALSE;
 
 	for (;;) {
 		int	opt;
 
-		opt = getopt_long(argc, argv, "46Ddt:hv", longopts, NULL);
+		opt = getopt_long(argc, argv, "46Ddt:hv", longopts, nullptr);
 
 		if (opt == -1)
 			break;

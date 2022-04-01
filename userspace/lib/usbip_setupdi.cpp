@@ -9,10 +9,9 @@
 char *
 get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop)
 {
-	char	*value;
 	DWORD	length;
 
-	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, NULL, NULL, 0, &length)) {
+	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, nullptr, 0, &length)) {
 		DWORD	err = GetLastError();
 		switch (err) {
 		case ERROR_INVALID_DATA:
@@ -21,22 +20,22 @@ get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop)
 			break;
 		default:
 			dbg("failed to get device property: err: %x", err);
-			return NULL;
+			return nullptr;
 		}
 	}
 	else {
 		dbg("unexpected case");
-		return NULL;
+		return nullptr;
 	}
-	value = malloc(length);
-	if (value == NULL) {
+	auto value = (char*)malloc(length);
+	if (value == nullptr) {
 		dbg("out of memory");
-		return NULL;
+		return nullptr;
 	}
-	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, NULL, (PBYTE)value, length, &length)) {
+	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, (PBYTE)value, length, &length)) {
 		dbg("failed to get device property: err: %x", GetLastError());
 		free(value);
-		return NULL;
+		return nullptr;
 	}
 	return value;
 }
@@ -59,26 +58,26 @@ get_id_inst(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 	char	*id_inst;
 	DWORD	length;
 
-	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, NULL, 0, &length)) {
+	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, nullptr, 0, &length)) {
 		DWORD	err = GetLastError();
 		if (err != ERROR_INSUFFICIENT_BUFFER) {
 			dbg("get_id_inst: failed to get instance id: err: 0x%lx", err);
-			return NULL;
+			return nullptr;
 		}
 	}
 	else {
 		dbg("get_id_inst: unexpected case");
-		return NULL;
+		return nullptr;
 	}
 	id_inst = (char *)malloc(length);
-	if (id_inst == NULL) {
+	if (id_inst == nullptr) {
 		dbg("get_id_inst: out of memory");
-		return NULL;
+		return nullptr;
 	}
-	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, id_inst, length, NULL)) {
+	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, id_inst, length, nullptr)) {
 		dbg("failed to get instance id");
 		free(id_inst);
-		return NULL;
+		return nullptr;
 	}
 	return id_inst;
 }
@@ -96,31 +95,31 @@ get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, LPCGUID pgui
 		DWORD	err = GetLastError();
 		if (err != ERROR_NO_MORE_ITEMS)
 			dbg("SetupDiEnumDeviceInterfaces failed: err: 0x%lx", err);
-		return NULL;
+		return nullptr;
 	}
-	SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, NULL, 0, &len, NULL);
+	SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, nullptr, 0, &len, nullptr);
 	err = GetLastError();
 	if (err != ERROR_INSUFFICIENT_BUFFER) {
 		dbg("SetupDiGetDeviceInterfaceDetail failed: err: 0x%lx", err);
-		return NULL;
+		return nullptr;
 	}
 
 	// Allocate the required memory and set the cbSize.
 	pdev_interface_detail = (PSP_DEVICE_INTERFACE_DETAIL_DATA)malloc(len);
-	if (pdev_interface_detail == NULL) {
+	if (pdev_interface_detail == nullptr) {
 		dbg("can't malloc %lu size memory", len);
-		return NULL;
+		return nullptr;
 	}
 
 	pdev_interface_detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
 
 	// Try to get device details.
 	if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data,
-		pdev_interface_detail, len, &len, NULL)) {
+		pdev_interface_detail, len, &len, nullptr)) {
 		// Errors.
 		dbg("SetupDiGetDeviceInterfaceDetail failed: err: 0x%lx", GetLastError());
 		free(pdev_interface_detail);
-		return NULL;
+		return nullptr;
 	}
 
 	return pdev_interface_detail;
@@ -218,7 +217,7 @@ traverse_dev_info(HDEVINFO dev_info, walkfunc_t walker, void *ctx)
 			break;
 		}
 		id_inst = get_id_inst(dev_info, &dev_info_data);
-		if (id_inst == NULL)
+		if (id_inst == nullptr)
 			continue;
 		devno = get_devno_from_inst_id(devno_map, id_inst);
 		free(id_inst);
@@ -241,7 +240,7 @@ traverse_usbdevs(walkfunc_t walker, BOOL present_only, void *ctx)
 
 	if (present_only)
 		flags |= DIGCF_PRESENT;
-	dev_info = SetupDiGetClassDevs(NULL, "USB", NULL, flags);
+	dev_info = SetupDiGetClassDevs(nullptr, "USB", nullptr, flags);
 	if (dev_info == INVALID_HANDLE_VALUE) {
 		dbg("SetupDiGetClassDevs failed: 0x%lx", GetLastError());
 		return ERR_GENERAL;
@@ -255,7 +254,7 @@ traverse_intfdevs(walkfunc_t walker, LPCGUID pguid, void *ctx)
 {
 	HDEVINFO	dev_info;
 
-	dev_info = SetupDiGetClassDevs(pguid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+	dev_info = SetupDiGetClassDevs(pguid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
 	if (dev_info == INVALID_HANDLE_VALUE) {
 		dbg("SetupDiGetClassDevs failed: 0x%lx", GetLastError());
 		return ERR_GENERAL;
@@ -273,7 +272,7 @@ is_valid_usb_dev(const char *id_hw)
 	 * - USB\VID_0000&PID_0000 (Is it needed?)
 	 * Hardware ids of multi-interface device are not valid such as USB\VID_0000&PID_0000&MI_00.
 	 */
-	if (id_hw == NULL)
+	if (id_hw == nullptr)
 		return FALSE;
 	if (strncmp(id_hw, "USB\\", 4) != 0)
 		return FALSE;

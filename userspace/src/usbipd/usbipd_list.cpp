@@ -43,7 +43,7 @@ walker_edev_list(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t dev
 	edev_list_ctx_t	*pctx = (edev_list_ctx_t *)ctx;
 
 	edev = (edev_t *)malloc(sizeof(edev_t));
-	if (edev == NULL) {
+	if (edev == nullptr) {
 		dbg("out of memory");
 		return 0;
 	}

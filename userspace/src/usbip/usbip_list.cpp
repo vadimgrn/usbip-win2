@@ -42,10 +42,10 @@ void usbip_list_usage(void)
 int usbip_list(int argc, char *argv[])
 {
 	static const struct option opts[] = {
-		{ "parsable", no_argument, NULL, 'p' },
-		{ "remote", required_argument, NULL, 'r' },
-		{ "local", no_argument, NULL, 'l' },
-		{ NULL, 0, NULL, 0 }
+		{ "parsable", no_argument, nullptr, 'p' },
+		{ "remote", required_argument, nullptr, 'r' },
+		{ "local", no_argument, nullptr, 'l' },
+		{ nullptr, 0, NULL, 0 }
 	};
 	BOOL parsable = FALSE;
 	int opt;
@@ -55,7 +55,7 @@ int usbip_list(int argc, char *argv[])
 		dbg("failed to open usb id database");
 
 	for (;;) {
-		opt = getopt_long(argc, argv, "pr:l", opts, NULL);
+		opt = getopt_long(argc, argv, "pr:l", opts, nullptr);
 
 		if (opt == -1)
 			break;

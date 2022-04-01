@@ -7,13 +7,13 @@ static BOOL
 load_mssign32_lib(HMODULE	*phMod, SignerSignEx_t *pfSignerSignEx, SignerFreeSignerContext_t *pfSignerFreeSignerContext)
 {
 	*phMod = LoadLibrary("MSSign32.dll");
-	if (*phMod == NULL) {
+	if (*phMod == nullptr) {
 		dbg("cannot load mssign32.dll");
 		return FALSE;
 	}
 	*pfSignerSignEx = (SignerSignEx_t)GetProcAddress(*phMod, "SignerSignEx");
 	*pfSignerFreeSignerContext = (SignerFreeSignerContext_t)GetProcAddress(*phMod, "SignerFreeSignerContext");
-	if (*pfSignerSignEx == NULL || *pfSignerFreeSignerContext == NULL) {
+	if (*pfSignerSignEx == nullptr || *pfSignerFreeSignerContext == nullptr) {
 		dbg("cannot get functions from mssign32.dll");
 		FreeLibrary(*phMod);
 		return FALSE;
@@ -27,13 +27,13 @@ load_cert_context(LPCSTR subject, HCERTSTORE *phCertStore)
 	PCCERT_CONTEXT	pCertContext;
 	WCHAR	*wSubject;
 
-	*phCertStore = CertOpenStore(CERT_STORE_PROV_SYSTEM, 0, (HCRYPTPROV)NULL, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"Root");
-	if (*phCertStore == NULL) {
+	*phCertStore = CertOpenStore(CERT_STORE_PROV_SYSTEM, 0, (HCRYPTPROV)nullptr, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"Root");
+	if (*phCertStore == nullptr) {
 		dbg("load_cert_context: failed to open certificate store: %lx", GetLastError());
-		return NULL;
+		return nullptr;
 	}
 	wSubject = utf8_to_wchar(subject);
-	pCertContext = CertFindCertificateInStore(*phCertStore, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_SUBJECT_STR, wSubject, NULL);
+	pCertContext = CertFindCertificateInStore(*phCertStore, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_SUBJECT_STR, wSubject, nullptr);
 	free(wSubject);
 
 	return pCertContext;
@@ -56,7 +56,7 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	DWORD	dwIndex;
 	WCHAR	*wfpath;
 	PCCERT_CONTEXT		pCertContext;
-	PSIGNER_CONTEXT		pSignerContext = NULL;
+	PSIGNER_CONTEXT		pSignerContext = nullptr;
 	SignerSignEx_t			funcSignerSignEx;
 	SignerFreeSignerContext_t	funcSignerFreeSignerContext;
 	HRESULT	hres;
@@ -67,7 +67,7 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 		return ERR_GENERAL;
 
 	pCertContext = load_cert_context(subject, &hCertStore);
-	if (pCertContext == NULL) {
+	if (pCertContext == nullptr) {
 		dbg("cannot load certificate: subject: %s", subject);
 		FreeLibrary(hMod);
 		return ERR_NOTEXIST;
@@ -78,7 +78,7 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	wfpath = utf8_to_wchar(fpath);
 
 	signerFileInfo.pwszFileName = wfpath;
-	signerFileInfo.hFile = NULL;
+	signerFileInfo.hFile = nullptr;
 
 	// Prepare SIGNER_SUBJECT_INFO struct
 	signerSubjectInfo.cbSize = sizeof(SIGNER_SUBJECT_INFO);
@@ -91,13 +91,13 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	signerCertStoreInfo.cbSize = sizeof(SIGNER_CERT_STORE_INFO);
 	signerCertStoreInfo.pSigningCert = pCertContext;
 	signerCertStoreInfo.dwCertPolicy = SIGNER_CERT_POLICY_CHAIN;
-	signerCertStoreInfo.hCertStore = NULL;
+	signerCertStoreInfo.hCertStore = nullptr;
 
 	// Prepare SIGNER_CERT struct
 	signerCert.cbSize = sizeof(SIGNER_CERT);
 	signerCert.dwCertChoice = SIGNER_CERT_STORE;
 	signerCert.pCertStoreInfo = &signerCertStoreInfo;
-	signerCert.hwnd = NULL;
+	signerCert.hwnd = nullptr;
 
 	// Prepare the additional Authenticode OIDs
 	oidSpOpusInfoBlob.cbData = sizeof(pbOidSpOpusInfo);
@@ -117,12 +117,12 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	signerSignatureInfo.cbSize = sizeof(SIGNER_SIGNATURE_INFO);
 	signerSignatureInfo.algidHash = CALG_SHA_256;
 	signerSignatureInfo.dwAttrChoice = SIGNER_NO_ATTR;
-	signerSignatureInfo.pAttrAuthcode = NULL;
+	signerSignatureInfo.pAttrAuthcode = nullptr;
 	signerSignatureInfo.psAuthenticated = &cryptAttributesArray;
-	signerSignatureInfo.psUnauthenticated = NULL;
+	signerSignatureInfo.psUnauthenticated = nullptr;
 
 	// Sign file with cert
-	hres = funcSignerSignEx(0, &signerSubjectInfo, &signerCert, &signerSignatureInfo, NULL, NULL, NULL, NULL, &pSignerContext);
+	hres = funcSignerSignEx(0, &signerSubjectInfo, &signerCert, &signerSignatureInfo, nullptr, nullptr, nullptr, nullptr, &pSignerContext);
 	if (hres != S_OK) {
 		dbg("SignerSignEx failed. hResult #%X", hres);
 		goto out;
@@ -146,7 +146,7 @@ has_certificate(LPCSTR subject)
 	HCERTSTORE		hCertStore;
 
 	pCertContext = load_cert_context(subject, &hCertStore);
-	if (pCertContext == NULL)
+	if (pCertContext == nullptr)
 		return FALSE;
 	CertFreeCertificateContext(pCertContext);
 	CertCloseStore(hCertStore, 0);
