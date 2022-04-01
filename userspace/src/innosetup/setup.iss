@@ -17,17 +17,18 @@
 #endif
 
 #define TestCert "USBIP Test"
+#define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
 #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
-#define VersionInfo GetVersionNumbersString(ExePath)
+#define AppVersion GetVersionNumbersString(ExePath)
 #define Copyright GetFileCopyright(ExePath)
 #define Company GetFileCompany(ExePath)
 
 [Setup]
 AppName={#ProductName}
-AppVersion={#VersionInfo}
+AppVersion={#AppVersion}
 AppCopyright={#Copyright}
 AppPublisher={#Company}
 AppPublisherURL=https://github.com/vadimgrn/usbip-win2
@@ -38,12 +39,12 @@ Compression=lzma2/ultra
 SolidCompression=yes
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
-VersionInfoVersion={#VersionInfo}
+VersionInfoVersion={#AppVersion}
 ShowLanguageDialog=no
 AllowNoIcons=yes
 LicenseFile={#SolutionDir + "LICENSE"}
-AppId=b26d8e8f-5ed4-40e7-835f-03dfcc57cb45
-OutputBaseFilename={#ProductName}-{#VersionInfo}-{#Configuration}
+AppId={{#AppGUID}
+OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
 DisableWelcomePage=no
 
@@ -63,9 +64,10 @@ Name: server; Description: "server"; Types: full server; Flags: fixed
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
 Source: {#BuildDir + "usbip_xfer.exe"}; DestDir: "{app}"
 Source: {#SolutionDir + "userspace\usb.ids"}; DestDir: "{app}"
-Source: {#SolutionDir + "userspace\src\innosetup\PathMgr.dll"};  DestDir: "{app}"; Flags: uninsneveruninstall
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
 Source: {#SolutionDir + "driver\usbip_test.pfx"}; DestDir: "{tmp}"
+Source: {#SolutionDir + "userspace\src\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall
+Source: {#SolutionDir + "userspace\src\innosetup\UninsIS.dll"}; Flags: dontcopy
 
 Source: {#BuildDir + "devnode.exe"};  DestDir: "{app}"; Components: client
 Source: {#BuildDir + "package\usbip_root.inf"}; DestDir: "{tmp}"; Components: client
@@ -97,11 +99,17 @@ Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_s
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden
 
-; Inno Setup Third-Party Files, PathMgr.dll
-; https://github.com/Bill-Stewart/PathMgr
-; [Code] section is copied as is from EditPath.iss
-
 [Code]
+
+procedure InitializeWizard();
+begin
+  WizardForm.LicenseAcceptedRadio.Checked := True;
+end;
+
+// Inno Setup Third-Party Files, PathMgr.dll
+// https://github.com/Bill-Stewart/PathMgr
+// Code is copied as is from [Code] section of EditPath.iss
+
 const
   MODIFY_PATH_TASK_NAME = 'modifypath';  // Specify name of task
 
@@ -208,7 +216,80 @@ end;
 
 // end of PathMgr.dll
 
-procedure InitializeWizard();
+
+// UninsIS.dll
+// https://github.com/Bill-Stewart/UninsIS
+// Code is copied as is from [Code] section of UninsIS.iss
+
+// Import IsISPackageInstalled() function from UninsIS.dll at setup time
+function DLLIsISPackageInstalled(AppId: string; Is64BitInstallMode,
+  IsAdminInstallMode: DWORD): DWORD;
+  external 'IsISPackageInstalled@files:UninsIS.dll stdcall setuponly';
+
+// Import CompareISPackageVersion() function from UninsIS.dll at setup time
+function DLLCompareISPackageVersion(AppId, InstallingVersion: string;
+  Is64BitInstallMode, IsAdminInstallMode: DWORD): LongInt;
+  external 'CompareISPackageVersion@files:UninsIS.dll stdcall setuponly';
+
+// Import UninstallISPackage() function from UninsIS.dll at setup time
+function DLLUninstallISPackage(AppId: string; Is64BitInstallMode,
+  IsAdminInstallMode: DWORD): DWORD;
+  external 'UninstallISPackage@files:UninsIS.dll stdcall setuponly';
+
+// Wrapper for UninsIS.dll IsISPackageInstalled() function
+// Returns true if package is detected as installed, or false otherwise
+function IsISPackageInstalled(): Boolean;
 begin
-  WizardForm.LicenseAcceptedRadio.Checked := True;
+  result := DLLIsISPackageInstalled('{#AppGUID}',  // AppId
+    DWORD(Is64BitInstallMode()),                   // Is64BitInstallMode
+    DWORD(IsAdminInstallMode())) = 1;              // IsAdminInstallMode
+  if result then
+    Log('UninsIS.dll - Package detected as installed')
+  else
+    Log('UninsIS.dll - Package not detected as installed');
+end;
+
+// Wrapper for UninsIS.dll CompareISPackageVersion() function
+// Returns:
+// < 0 if version we are installing is < installed version
+// 0   if version we are installing is = installed version
+// > 0 if version we are installing is > installed version
+function CompareISPackageVersion(): LongInt;
+begin
+  result := DLLCompareISPackageVersion('{#AppGUID}',  // AppId
+    '{#AppVersion}',                                  // InstallingVersion
+    DWORD(Is64BitInstallMode()),                      // Is64BitInstallMode
+    DWORD(IsAdminInstallMode()));                     // IsAdminInstallMode
+  if result < 0 then
+    Log('UninsIS.dll - This version {#AppVersion} older than installed version')
+  else if result = 0 then
+    Log('UninsIS.dll - This version {#AppVersion} same as installed version')
+  else
+    Log('UninsIS.dll - This version {#AppVersion} newer than installed version');
+end;
+
+// Wrapper for UninsIS.dll UninstallISPackage() function
+// Returns 0 for success, non-zero for failure
+function UninstallISPackage(): DWORD;
+begin
+  result := DLLUninstallISPackage('{#AppGUID}',  // AppId
+    DWORD(Is64BitInstallMode()),                 // Is64BitInstallMode
+    DWORD(IsAdminInstallMode()));                // IsAdminInstallMode
+  if result = 0 then
+    Log('UninsIS.dll - Installed package uninstall completed successfully')
+  else
+    Log('UninsIS.dll - installed package uninstall did not complete successfully');
+end;
+
+
+function PrepareToInstall(var NeedsRestart: Boolean): string;
+begin
+  result := '';
+  // If package installed, uninstall it automatically if the version we are
+  // installing does not match the installed version; If you want to
+  // automatically uninstall only...
+  // ...when downgrading: change <> to <
+  // ...when upgrading:   change <> to >
+  if IsISPackageInstalled() and (CompareISPackageVersion() <> 0) then
+    UninstallISPackage();
 end;
