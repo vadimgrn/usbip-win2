@@ -180,6 +180,3 @@ modprobe -a usbip-host usbip-vudc vhci-hcd
 usbipd -D
 dmesg --follow | tee ~/usbip.log
 ```
-## Plans for near future
-  - Get rid of usbip_xfer.exe userspace app and handle TCP/IP data exchange inside the driver
-  - Use vectored I/O (MDL) to avoid copying of buffers
