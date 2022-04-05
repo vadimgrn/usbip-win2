@@ -11,3 +11,6 @@ struct GLOBALS
 };
 
 extern GLOBALS Globals;
+
+struct _WSK_PROVIDER_NPI;
+_WSK_PROVIDER_NPI *GetProviderNPI();
