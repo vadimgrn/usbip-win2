@@ -77,12 +77,13 @@ struct vhci_pluginfo_t
 	USB_CONFIGURATION_DESCRIPTOR dscr_conf;
 };
 
-/* usbip-win assumes max port is 127 */
+enum { VHCI_PORTS_MAX = 127 };
+
 struct ioctl_usbip_vhci_get_ports_status
 {
 	/* maximum number of ports */
 	unsigned char n_max_ports;
-	unsigned char port_status[127];
+	unsigned char port_status[VHCI_PORTS_MAX];
 };
 
 struct ioctl_usbip_vhci_unplug

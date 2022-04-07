@@ -26,7 +26,7 @@ static const char usbip_detach_usage_string[] =
 	"    -p, --port=<port>    "
 	" port the device is on\n";
 
-void usbip_detach_usage(void)
+void usbip_detach_usage()
 {
 	printf("usage: %s", usbip_detach_usage_string);
 }

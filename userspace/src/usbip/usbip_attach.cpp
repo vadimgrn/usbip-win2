@@ -36,7 +36,7 @@ static const char usbip_attach_usage_string[] =
 	"    -s, --serial=<USB serial>  (Optional) USB serial to be overwritten\n"
 	"    -t, --terse            show port number as a result\n";
 
-void usbip_attach_usage(void)
+void usbip_attach_usage()
 {
 	printf("usage: %s", usbip_attach_usage_string);
 }

@@ -1,181 +1,145 @@
+#include <cassert>
+#include <cstdlib>
+
+#include <string>
+#include <vector>
+
 #include <initguid.h>
 
 #include "usbip_common.h"
 #include "usbip_windows.h"
-
-#include <stdlib.h>
 
 #include "usbip_setupdi.h"
 #include "usbip_vhci_api.h"
 
 #include "dbgcode.h"
 
-static int
-walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
+namespace
 {
-	char	**pdevpath = (char **)ctx;
-	char	*id_hw;
-	PSP_DEVICE_INTERFACE_DETAIL_DATA	pdev_interface_detail;
 
-	id_hw = get_id_hw(dev_info, pdev_info_data);
-	if (id_hw == nullptr || (_stricmp(id_hw, "usbipwin\\vhci") != 0 && _stricmp(id_hw, "root\\vhci_ude") != 0)) {
-		dbg("invalid hw id: %s", id_hw ? id_hw : "");
-		if (id_hw != nullptr)
-			free(id_hw);
-		return 0;
-	}
-	free(id_hw);
-
-	pdev_interface_detail = get_intf_detail(dev_info, pdev_info_data, (LPCGUID)&GUID_DEVINTERFACE_VHCI_USBIP);
-	if (pdev_interface_detail == nullptr) {
-		return 0;
-	}
-
-	*pdevpath = _strdup(pdev_interface_detail->DevicePath);
-	free(pdev_interface_detail);
-	return 1;
-}
-
-static char *
-get_vhci_devpath(void)
+int walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
 {
-	char	*devpath;
+        auto id_hw = get_id_hw(dev_info, pdev_info_data);
+        if (!id_hw || (_stricmp(id_hw, "usbipwin\\vhci") && _stricmp(id_hw, "root\\vhci_ude"))) {
+                dbg("invalid hw id: %s", id_hw ? id_hw : "");
+                free(id_hw);
+                return 0;
+        }
+        free(id_hw);
 
-	if (traverse_intfdevs(walker_devpath, &GUID_DEVINTERFACE_VHCI_USBIP, &devpath) != 1) {
-		return nullptr;
-	}
-
-	return devpath;
-}
-
-HANDLE
-usbip_vhci_driver_open(void)
-{
-	HANDLE	hdev;
-	char	*devpath;
-
-	devpath = get_vhci_devpath();
-	if (devpath == nullptr) {
-		return INVALID_HANDLE_VALUE;
-	}
-	dbg("device path: %s", devpath);
-	hdev = CreateFile(devpath, GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
-	free(devpath);
-	return hdev;
-}
-
-void
-usbip_vhci_driver_close(HANDLE hdev)
-{
-	CloseHandle(hdev);
-}
-
-static int
-usbip_vhci_get_ports_status(HANDLE hdev, ioctl_usbip_vhci_get_ports_status *st)
-{
-	unsigned long len = 0;
-
-	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_PORTS_STATUS, nullptr, 0, st, sizeof(*st), &len, nullptr)) {
-                if (len == sizeof(*st)) {
-                        return 0;
-                }
-	}
-
-	return ERR_GENERAL;
-}
-
-int
-usbip_vhci_get_free_port(HANDLE hdev)
-{
-        ioctl_usbip_vhci_get_ports_status status{};
-
-        if (usbip_vhci_get_ports_status(hdev, &status)) {
-                return -1;
+        auto pdev_interface_detail = get_intf_detail(dev_info, pdev_info_data, &GUID_DEVINTERFACE_VHCI_USBIP);
+        if (!pdev_interface_detail) {
+                return 0;
         }
 
-        for (int i = 0; i < status.n_max_ports; ++i) {
-                if (!status.port_status[i]) {
-                        return i;
+        static_cast<std::string*>(ctx)->assign(pdev_interface_detail->DevicePath);
+        free(pdev_interface_detail);
+        return 1;
+}
+
+auto get_vhci_devpath()
+{
+        std::string path;
+        traverse_intfdevs(walker_devpath, &GUID_DEVINTERFACE_VHCI_USBIP, &path);
+        return path;
+}
+
+int usbip_vhci_get_ports_status(HANDLE hdev, ioctl_usbip_vhci_get_ports_status &st)
+{
+        DWORD len = 0;
+
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_PORTS_STATUS, nullptr, 0, &st, sizeof(st), &len, nullptr)) {
+                if (len == sizeof(st)) {
+                        return 0;
                 }
-	}
+        }
 
-        return -1;
+        return ERR_GENERAL;
 }
 
-static int get_n_max_ports(HANDLE hdev)
+int get_n_max_ports(HANDLE hdev)
 {
-        ioctl_usbip_vhci_get_ports_status status{};
-	auto err = usbip_vhci_get_ports_status(hdev, &status);
-	return err < 0 ? err : status.n_max_ports;
+        ioctl_usbip_vhci_get_ports_status status;
+        auto err = usbip_vhci_get_ports_status(hdev, status);
+        return err < 0 ? err : status.n_max_ports;
 }
 
-int usbip_vhci_get_imported_devs(HANDLE hdev, ioctl_usbip_vhci_imported_dev* &pidevs)
+} // namespace
+
+
+HANDLE usbip_vhci_driver_open()
 {
-	auto n_max_ports = get_n_max_ports(hdev);
-	if (n_max_ports < 0) {
-		dbg("failed to get the number of used ports: %s", dbg_errcode(n_max_ports));
-		return ERR_GENERAL;
-	}
-
-        unsigned long len_out = sizeof(ioctl_usbip_vhci_imported_dev) * (n_max_ports + 1);
-	auto idevs = (ioctl_usbip_vhci_imported_dev*)malloc(len_out);
-	if (!idevs) {
-		dbg("out of memory");
-		return ERR_GENERAL;
-	}
-
-        unsigned long len_returned = 0;
+        auto devpath = get_vhci_devpath();
+        if (devpath.empty()) {
+                return INVALID_HANDLE_VALUE;
+        }
         
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, idevs, len_out, &len_returned, nullptr)) {
-		pidevs = idevs;
-		return 0;
-	} else {
-		dbg("failed to get imported devices: 0x%lx", GetLastError());
-	}
+        dbg("device path: %s", devpath.c_str());
+        return CreateFile(devpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+}
 
-	free(idevs);
-	return ERR_GENERAL;
+void usbip_vhci_driver_close(HANDLE hdev)
+{
+        [[maybe_unused]] auto ok = CloseHandle(hdev);
+        assert(ok);
+}
+
+std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE hdev)
+{
+        std::vector<ioctl_usbip_vhci_imported_dev> idevs;
+
+        auto n_max_ports = get_n_max_ports(hdev);
+        if (n_max_ports < 0) {
+                dbg("failed to get the number of used ports: %s", dbg_errcode(n_max_ports));
+                return idevs;
+        }
+
+        idevs.resize(n_max_ports + 1);
+        auto idevs_bytes = DWORD(idevs.size()*sizeof(idevs[0]));
+
+        if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, idevs.data(), idevs_bytes, nullptr, nullptr)) {
+                dbg("failed to get imported devices: 0x%lx", GetLastError());
+                idevs.clear();
+        }
+
+        return idevs;
 }
 
 int
-usbip_vhci_attach_device(HANDLE hdev, struct vhci_pluginfo_t *pluginfo)
+usbip_vhci_attach_device(HANDLE hdev, struct vhci_pluginfo_t* pluginfo)
 {
-	unsigned long unused;
+        if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE,
+                pluginfo, pluginfo->size, pluginfo, sizeof(*pluginfo), nullptr , nullptr)) {
+                DWORD err = GetLastError();
+                if (err == ERROR_HANDLE_EOF) {
+                        return ERR_PORTFULL;
+                }
+                dbg("usbip_vhci_attach_device: DeviceIoControl failed: err: 0x%lx", GetLastError());
+                return ERR_GENERAL;
+        }
 
-	if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE,
-		pluginfo, pluginfo->size, pluginfo, sizeof(*pluginfo), &unused, nullptr)) {
-		DWORD err = GetLastError();
-		if (err == ERROR_HANDLE_EOF) {
-			return ERR_PORTFULL;
-		}
-		dbg("usbip_vhci_attach_device: DeviceIoControl failed: err: 0x%lx", GetLastError());
-		return ERR_GENERAL;
-	}
-
-	return 0;
+        return 0;
 }
 
 int
 usbip_vhci_detach_device(HANDLE hdev, int port)
 {
-	ioctl_usbip_vhci_unplug  unplug;
-	unsigned long	unused;
-	DWORD	err;
+        ioctl_usbip_vhci_unplug  unplug;
+        DWORD	err;
 
-	unplug.addr = (char)port;
-	if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE,
-		&unplug, sizeof(unplug), nullptr, 0, &unused, nullptr))
-		return 0;
+        unplug.addr = (char)port;
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE, &unplug, sizeof(unplug), nullptr, 0, nullptr, nullptr))
+                return 0;
 
-	err = GetLastError();
-	dbg("unplug error: 0x%lx", err);
+        err = GetLastError();
+        dbg("unplug error: 0x%lx", err);
 
-	switch (err) {
-	case ERROR_FILE_NOT_FOUND:
-		return ERR_NOTEXIST;
-	case ERROR_INVALID_PARAMETER:
-		return ERR_INVARG;
-	default:
-		return ERR_GENERAL;
-	}
+        switch (err) {
+        case ERROR_FILE_NOT_FOUND:
+                return ERR_NOTEXIST;
+        case ERROR_INVALID_PARAMETER:
+                return ERR_INVARG;
+        default:
+                return ERR_GENERAL;
+        }
 }

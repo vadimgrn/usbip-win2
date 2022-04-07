@@ -242,22 +242,23 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 			break;
 		}
 
-		auto &d = vpdo->descriptor;
-		NT_ASSERT(is_valid_dsc(&d));
-
 		dev->port = static_cast<char>(vpdo->port);
 		NT_ASSERT(dev->port == vpdo->port);
 
 		dev->status = usbip_device_status(2); // FIXME: SDEV_ST_USED
-		dev->vendor = d.idVendor;
-		dev->product = d.idProduct;
-		dev->speed = vpdo->speed;
 
+                auto& d = vpdo->descriptor;
+                NT_ASSERT(is_valid_dsc(&d));
+
+                dev->vendor = d.idVendor;
+		dev->product = d.idProduct;
+		
+                dev->speed = vpdo->speed;
 		++dev;
 	}
 
 	ExReleaseFastMutex(&vhub->Mutex);
 
-	dev->port = -1; // end of mark
+	dev->port = 0; // end of mark
 	return STATUS_SUCCESS;
 }

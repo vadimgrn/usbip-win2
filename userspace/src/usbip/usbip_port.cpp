@@ -16,102 +16,100 @@
 #include "usbip_windows.h"
 #include "usbip_common.h"
 #include "usbip_vhci.h"
-#include <stdlib.h>
 
-static const char usbip_port_usage_string[] =
-	"usbip port <args>\n"
-	"    -p, --port=<port>      list only given port(for port checking)\n";
-
-void
-usbip_port_usage(void)
+namespace
 {
-	printf("usage: %s", usbip_port_usage_string);
+
+int usbip_vhci_imported_device_dump(ioctl_usbip_vhci_imported_dev* idev)
+{
+        if (idev->status == VDEV_ST_NULL || idev->status == VDEV_ST_NOTASSIGNED) {
+                return 0;
+        }
+
+        printf("Port %02d: <%s> at %s\n", idev->port, usbip_status_string(idev->status), usbip_speed_string(idev->speed));
+
+        char product_name[128];
+        usbip_names_get_product(product_name, sizeof(product_name), idev->vendor, idev->product);
+
+        printf("       %s\n", product_name);
+
+        printf("       ?-? -> unknown host, remote port and remote busid\n");
+        printf("           -> remote bus/dev ???/???\n");
+
+        return 0;
 }
 
-static int
-usbip_vhci_imported_device_dump(ioctl_usbip_vhci_imported_dev *idev)
+int list_imported_devices(int port)
 {
-	char	product_name[128];
+        auto hdev = usbip_vhci_driver_open();
+        if (hdev == INVALID_HANDLE_VALUE) {
+                err("failed to open vhci driver");
+                return 3;
+        }
 
-	if (idev->status == VDEV_ST_NULL || idev->status == VDEV_ST_NOTASSIGNED)
-		return 0;
+        auto idevs = usbip_vhci_get_imported_devs(hdev);
+        if (idevs.empty()) {
+                usbip_vhci_driver_close(hdev);
+                err("failed to get attach information");
+                return 2;
+        }
 
-	printf("Port %02d: <%s> at %s\n", idev->port, usbip_status_string(idev->status), usbip_speed_string(idev->speed));
+        printf("Imported USB devices\n");
+        printf("====================\n");
 
-	usbip_names_get_product(product_name, sizeof(product_name), idev->vendor, idev->product);
+        if (usbip_names_init()) {
+                dbg("failed to open usb id database");
+        }
 
-	printf("       %s\n", product_name);
+        bool found{};
 
-	printf("       ?-? -> unknown host, remote port and remote busid\n");
-	printf("           -> remote bus/dev ???/???\n");
+        for (auto& d : idevs) {
+                if (!d.port) {
+                        break;
+                }
+                if (port > 0) {
+                        if (port != d.port) {
+                                continue;
+                        }
+                        found = true;
+                }
+                usbip_vhci_imported_device_dump(&d);
+        }
 
-	return 0;
+        usbip_vhci_driver_close(hdev);
+        usbip_names_free();
+
+        if (port > 0 && !found) {
+                /* port check failed */
+                return 2;
+        }
+
+        return 0;
 }
 
-static int
-list_imported_devices(int port)
+} // namespace
+
+
+void usbip_port_usage()
 {
-	HANDLE hdev;
-        ioctl_usbip_vhci_imported_dev *idevs{};
-	BOOL	found = FALSE;
-	int	res;
-	int	i;
+        const char msg[] =
+"usage: usbip port <args>\n"
+"    -p, --port=<port>      list only given port(for port checking)\n";
 
-	hdev = usbip_vhci_driver_open();
-	if (hdev == INVALID_HANDLE_VALUE) {
-		err("failed to open vhci driver");
-		return 3;
-	}
-
-	res = usbip_vhci_get_imported_devs(hdev, idevs);
-	if (res < 0) {
-		usbip_vhci_driver_close(hdev);
-		err("failed to get attach information");
-		return 2;
-	}
-
-	printf("Imported USB devices\n");
-	printf("====================\n");
-
-	if (usbip_names_init()) {
-		dbg("failed to open usb id database");
-	}
-
-	for (i = 0; i < 127; i++) {
-		if (idevs[i].port < 0)
-			break;
-		if (port >= 0) {
-			if (port != idevs[i].port)
-				continue;
-			found = TRUE;
-		}
-		usbip_vhci_imported_device_dump(&idevs[i]);
-	}
-
-	free(idevs);
-
-	usbip_vhci_driver_close(hdev);
-	usbip_names_free();
-
-	if (port >= 0 && !found) {
-		/* port check failed */
-		return 2;
-	}
-	return 0;
+        printf(msg);
 }
 
-int
-usbip_port_show(int argc, char *argv[])
+int usbip_port_show(int argc, char *argv[])
 {
 	const option opts[] = {
 		{ "port", required_argument, nullptr, 'p' },
 		{}
 	};
 
-	int port = -1;
+	int port = 0;
 
-	for (;;) {
-		int opt = getopt_long(argc, argv, "p:", opts, nullptr);
+	while (true) {
+		auto opt = getopt_long(argc, argv, "p:", opts, nullptr);
 
 		if (opt == -1)
 			break;
@@ -130,5 +128,6 @@ usbip_port_show(int argc, char *argv[])
 			return 1;
 		}
 	}
+
 	return list_imported_devices(port);
 }
