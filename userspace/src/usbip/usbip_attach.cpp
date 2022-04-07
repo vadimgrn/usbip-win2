@@ -251,7 +251,7 @@ int usbip_attach(int argc, char *argv[])
 		{ "busid", required_argument, nullptr, 'b' },
 		{ "serial", optional_argument, nullptr, 's' },
 		{ "terse", required_argument, nullptr, 't' },
-		{ nullptr, 0, NULL, 0 }
+		{ nullptr, 0, nullptr, 0 }
 	};
 
 	char	*host = nullptr;

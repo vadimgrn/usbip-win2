@@ -45,7 +45,7 @@ int usbip_list(int argc, char *argv[])
 		{ "parsable", no_argument, nullptr, 'p' },
 		{ "remote", required_argument, nullptr, 'r' },
 		{ "local", no_argument, nullptr, 'l' },
-		{ nullptr, 0, NULL, 0 }
+		{ nullptr, 0, nullptr, 0 }
 	};
 	BOOL parsable = FALSE;
 	int opt;

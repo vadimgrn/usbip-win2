@@ -29,7 +29,7 @@ usbip_port_usage(void)
 }
 
 static int
-usbip_vhci_imported_device_dump(pioctl_usbip_vhci_imported_dev_t idev)
+usbip_vhci_imported_device_dump(ioctl_usbip_vhci_imported_dev *idev)
 {
 	char	product_name[128];
 
@@ -52,7 +52,7 @@ static int
 list_imported_devices(int port)
 {
 	HANDLE hdev;
-	ioctl_usbip_vhci_imported_dev	*idevs;
+        ioctl_usbip_vhci_imported_dev *idevs{};
 	BOOL	found = FALSE;
 	int	res;
 	int	i;
@@ -63,7 +63,7 @@ list_imported_devices(int port)
 		return 3;
 	}
 
-	res = usbip_vhci_get_imported_devs(hdev, &idevs);
+	res = usbip_vhci_get_imported_devs(hdev, idevs);
 	if (res < 0) {
 		usbip_vhci_driver_close(hdev);
 		err("failed to get attach information");

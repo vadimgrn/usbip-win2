@@ -78,26 +78,27 @@ struct vhci_pluginfo_t
 };
 
 /* usbip-win assumes max port is 127 */
-typedef struct _ioctl_usbip_vhci_get_ports_status
+struct ioctl_usbip_vhci_get_ports_status
 {
 	/* maximum number of ports */
 	unsigned char n_max_ports;
 	unsigned char port_status[127];
-} ioctl_usbip_vhci_get_ports_status;
+};
 
-typedef struct _ioctl_usbip_vhci_unplug
+struct ioctl_usbip_vhci_unplug
 {
 	signed char addr;
 	char unused[3];
-} ioctl_usbip_vhci_unplug, *pvhci_unpluginfo_t;
+};
 
-typedef struct usbip_imported_device {
-	char port;
-	enum usbip_device_status status;
-	unsigned short vendor;
-	unsigned short product;
-	enum usb_device_speed speed; 
-} ioctl_usbip_vhci_imported_dev, *pioctl_usbip_vhci_imported_dev_t;
+struct ioctl_usbip_vhci_imported_dev 
+{
+        char port;
+        enum usbip_device_status status;
+        unsigned short vendor;
+        unsigned short product;
+        enum usb_device_speed speed;
+};
 
 #ifdef __cplusplus
 }

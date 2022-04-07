@@ -76,7 +76,7 @@ int usbip_detach(int argc, char *argv[])
 {
 	static const struct option opts[] = {
 		{ "port", required_argument, nullptr, 'p' },
-		{ nullptr, 0, NULL, 0 }
+		{ nullptr, 0, nullptr, 0 }
 	};
 
 	for (;;) {
