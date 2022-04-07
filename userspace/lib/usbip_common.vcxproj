@@ -59,6 +59,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -83,6 +84,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -112,6 +114,7 @@
   <ItemGroup>
     <ClInclude Include="..\config.h" />
     <ClInclude Include="dbgcode.h" />
+    <ClInclude Include="generic_handle.h" />
     <ClInclude Include="list.h" />
     <ClInclude Include="mssign32.h" />
     <ClInclude Include="names.h" />
@@ -124,6 +127,8 @@
     <ClInclude Include="usbip_windows.h" />
     <ClInclude Include="usbip_network.h" />
     <ClInclude Include="start_xfer.h" />
+    <ClInclude Include="win_handle.h" />
+    <ClInclude Include="win_socket.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

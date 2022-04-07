@@ -1,18 +1,12 @@
 #include <cassert>
-#include <cstdlib>
-
 #include <string>
-#include <vector>
 
 #include <initguid.h>
 
 #include "usbip_common.h"
-#include "usbip_windows.h"
-
 #include "usbip_setupdi.h"
-#include "usbip_vhci_api.h"
-
 #include "dbgcode.h"
+#include "usbip_vhci.h"
 
 namespace
 {
@@ -67,21 +61,21 @@ int get_n_max_ports(HANDLE hdev)
 } // namespace
 
 
-HANDLE usbip_vhci_driver_open()
+usbip::Handle usbip_vhci_driver_open()
 {
+        usbip::Handle h;
+
         auto devpath = get_vhci_devpath();
         if (devpath.empty()) {
-                return INVALID_HANDLE_VALUE;
+                return h;
         }
         
         dbg("device path: %s", devpath.c_str());
-        return CreateFile(devpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
-}
+        
+        auto fh = CreateFile(devpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+        h.reset(fh);
 
-void usbip_vhci_driver_close(HANDLE hdev)
-{
-        [[maybe_unused]] auto ok = CloseHandle(hdev);
-        assert(ok);
+        return h;
 }
 
 std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE hdev)

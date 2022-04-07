@@ -41,31 +41,25 @@ void usbip_attach_usage()
 	printf("usage: %s", usbip_attach_usage_string);
 }
 
-static int
-import_device(SOCKET sockfd, struct vhci_pluginfo_t *pluginfo, HANDLE *phdev)
+static int import_device(SOCKET sockfd, vhci_pluginfo_t *pluginfo, usbip::Handle &handle)
 {
-	HANDLE	hdev;
-	int	rc;
-
-	hdev = usbip_vhci_driver_open();
-	if (hdev == INVALID_HANDLE_VALUE) {
+	auto hdev = usbip_vhci_driver_open();
+	if (!hdev) {
 		dbg("failed to open vhci driver");
 		return ERR_DRIVER;
 	}
 
-	rc = usbip_vhci_attach_device(hdev, pluginfo);
+	auto rc = usbip_vhci_attach_device(hdev.get(), pluginfo);
 	if (rc < 0) {
 		if (rc == ERR_PORTFULL) {
 			dbg("no free port");
-		}
-		else {
+		} else {
 			dbg("failed to attach device: %d", rc);
 		}
-		usbip_vhci_driver_close(hdev);
 		return rc;
 	}
 
-	*phdev = hdev;
+        handle = std::move(hdev);
 	return pluginfo->port;
 }
 
@@ -106,8 +100,7 @@ build_pluginfo(SOCKET sockfd, unsigned devid)
 	return pluginfo;
 }
 
-static int
-query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char *serial)
+static int query_import_device(SOCKET sockfd, const char *busid, usbip::Handle &hdev, const char *serial)
 {
 	/* send a request */
 	int rc = usbip_net_send_op_common(sockfd, OP_REQ_IMPORT, 0);
@@ -116,7 +109,7 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 		return ERR_NETWORK;
 	}
 
-	struct op_import_request request = {0};
+	op_import_request request{};
 	strcpy_s(request.busid, sizeof(request.busid), busid);
 
 	PACK_OP_IMPORT_REQUEST(0, &request);
@@ -149,7 +142,7 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 		return rc;
 	}
 
-	struct op_import_reply reply = {0};
+	op_import_reply reply{};
 
 	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
 	if (rc < 0) {
@@ -179,7 +172,7 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 	}
 
 	/* import a device */
-	rc = import_device(sockfd, pluginfo, phdev);
+	rc = import_device(sockfd, pluginfo, hdev);
 	free(pluginfo);
 	return rc;
 }
@@ -187,17 +180,14 @@ query_import_device(SOCKET sockfd, const char *busid, HANDLE *phdev, const char 
 static int
 attach_device(const char *host, const char *busid, const char *serial, BOOL terse)
 {
-	SOCKET	sockfd;
-	int	rhport, ret;
-	HANDLE	hdev = INVALID_HANDLE_VALUE;
-
-	sockfd = usbip_net_tcp_connect(host, usbip_port_string);
+	auto sockfd = usbip_net_tcp_connect(host, usbip_port_string);
 	if (sockfd == INVALID_SOCKET) {
 		err("failed to connect a remote host: %s", host);
 		return 2;
 	}
 
-	rhport = query_import_device(sockfd, busid, &hdev, serial);
+        usbip::Handle hdev;
+        auto rhport = query_import_device(sockfd, busid, hdev, serial);
 	if (rhport < 0) {
 		switch (rhport) {
 		case ERR_DRIVER:
@@ -219,7 +209,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		return 3;
 	}
 
-	ret = start_xfer(hdev, sockfd, true);
+	auto ret = start_xfer(hdev.get(), sockfd, true);
 	if (!ret) {
 		if (terse) {
 			printf("%d\n", rhport);
@@ -238,9 +228,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		ret = 4;
 	}
 
-	usbip_vhci_driver_close(hdev);
 	closesocket(sockfd);
-
 	return ret;
 }
 

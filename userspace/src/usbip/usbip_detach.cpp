@@ -31,34 +31,36 @@ void usbip_detach_usage()
 	printf("usage: %s", usbip_detach_usage_string);
 }
 
-static int detach_port(const char *portstr)
+static int detach_port(const char* portstr)
 {
-	HANDLE	hdev;
-	int	port;
-	int	ret;
+        int port{};
 
-	if (*portstr == '*' && portstr[1] == '\0')
-		port = -1;
-	else if (sscanf_s(portstr, "%d", &port) != 1) {
+        if (*portstr == '*' && portstr[1] == '\0') {
+                port = -1;
+        } else if (sscanf_s(portstr, "%d", &port) != 1) {
 		err("invalid port: %s", portstr);
 		return 1;
 	}
-	hdev = usbip_vhci_driver_open();
-	if (hdev == INVALID_HANDLE_VALUE) {
+	
+        auto hdev = usbip_vhci_driver_open();
+	if (!hdev) {
 		err("vhci driver is not loaded");
 		return 2;
 	}
 
-	ret = usbip_vhci_detach_device(hdev, port);
-	usbip_vhci_driver_close(hdev);
-	if (ret == 0) {
-		if (port < 0)
-			printf("all ports are detached\n");
-		else
-			printf("port %d is succesfully detached\n", port);
+	auto ret = usbip_vhci_detach_device(hdev.get(), port);
+	hdev.reset();
+
+	if (!ret) {
+                if (port < 0) {
+                        printf("all ports are detached\n");
+                } else {
+                        printf("port %d is succesfully detached\n", port);
+                }
 		return 0;
 	}
-	switch (ret) {
+
+        switch (ret) {
 	case ERR_INVARG:
 		err("invalid port: %d", port);
 		break;
@@ -69,7 +71,8 @@ static int detach_port(const char *portstr)
 		err("failed to detach");
 		break;
 	}
-	return 3;
+	
+        return 3;
 }
 
 int usbip_detach(int argc, char *argv[])

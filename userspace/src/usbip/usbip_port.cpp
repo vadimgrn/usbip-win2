@@ -42,14 +42,13 @@ int usbip_vhci_imported_device_dump(ioctl_usbip_vhci_imported_dev* idev)
 int list_imported_devices(int port)
 {
         auto hdev = usbip_vhci_driver_open();
-        if (hdev == INVALID_HANDLE_VALUE) {
+        if (!hdev) {
                 err("failed to open vhci driver");
                 return 3;
         }
 
-        auto idevs = usbip_vhci_get_imported_devs(hdev);
+        auto idevs = usbip_vhci_get_imported_devs(hdev.get());
         if (idevs.empty()) {
-                usbip_vhci_driver_close(hdev);
                 err("failed to get attach information");
                 return 2;
         }
@@ -76,7 +75,6 @@ int list_imported_devices(int port)
                 usbip_vhci_imported_device_dump(&d);
         }
 
-        usbip_vhci_driver_close(hdev);
         usbip_names_free();
 
         if (port > 0 && !found) {
