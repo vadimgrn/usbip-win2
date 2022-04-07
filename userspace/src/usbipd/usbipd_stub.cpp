@@ -3,7 +3,7 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#define INITGUID
+#include <initguid.h>
 
 #include "usbip_windows.h"
 

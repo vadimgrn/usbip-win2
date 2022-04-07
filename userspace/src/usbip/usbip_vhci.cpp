@@ -1,4 +1,4 @@
-#define INITGUID
+#include <initguid.h>
 
 #include "usbip_common.h"
 #include "usbip_windows.h"

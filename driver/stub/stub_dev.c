@@ -6,7 +6,7 @@
 #include "stub_dbg.h"
 #include "stub_reg.h"
 
-#define INITGUID
+#include <initguid.h>
 #include "usbip_stub_api.h"
 
 enum { NAMEBUF_LEN = 128 };
