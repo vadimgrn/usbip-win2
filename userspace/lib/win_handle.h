@@ -10,10 +10,10 @@
 namespace usbip
 {
 
-using Handle = GenericHandle<HANDLE, INVALID_HANDLE_VALUE>;
+using Handle = generic_handle<HANDLE, INVALID_HANDLE_VALUE>;
 
 template<>
-inline void close_handle(Handle::Type h) noexcept
+inline void close_handle(Handle::type h) noexcept
 {
         [[maybe_unused]] auto ok = CloseHandle(h);
         assert(ok);
@@ -30,9 +30,14 @@ struct std::hash<usbip::Handle>
 {
         auto operator() (const usbip::Handle &h) const noexcept
         {
-                std::hash<usbip::Handle::Type> f;
+                std::hash<usbip::Handle::type> f;
                 return f(h.get());
         }
 };
+
+inline void swap(usbip::Handle &a, usbip::Handle &b) noexcept
+{
+        a.swap(b);
+}
 
 } // namespace std

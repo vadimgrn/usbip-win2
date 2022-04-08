@@ -41,7 +41,7 @@ void usbip_attach_usage()
 	printf("usage: %s", usbip_attach_usage_string);
 }
 
-static int import_device(SOCKET sockfd, vhci_pluginfo_t *pluginfo, usbip::Handle &handle)
+static int import_device(vhci_pluginfo_t *pluginfo, usbip::Handle &handle)
 {
 	auto hdev = usbip_vhci_driver_open();
 	if (!hdev) {
@@ -172,7 +172,7 @@ static int query_import_device(SOCKET sockfd, const char *busid, usbip::Handle &
 	}
 
 	/* import a device */
-	rc = import_device(sockfd, pluginfo, hdev);
+	rc = import_device(pluginfo, hdev);
 	free(pluginfo);
 	return rc;
 }
@@ -180,14 +180,14 @@ static int query_import_device(SOCKET sockfd, const char *busid, usbip::Handle &
 static int
 attach_device(const char *host, const char *busid, const char *serial, BOOL terse)
 {
-	auto sockfd = usbip_net_tcp_connect(host, usbip_port_string);
-	if (sockfd == INVALID_SOCKET) {
+	auto sock = usbip_net_tcp_connect(host, usbip_port_string);
+	if (!sock) {
 		err("failed to connect a remote host: %s", host);
 		return 2;
 	}
 
         usbip::Handle hdev;
-        auto rhport = query_import_device(sockfd, busid, hdev, serial);
+        auto rhport = query_import_device(sock.get(), busid, hdev, serial);
 	if (rhport < 0) {
 		switch (rhport) {
 		case ERR_DRIVER:
@@ -209,7 +209,7 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		return 3;
 	}
 
-	auto ret = start_xfer(hdev.get(), sockfd, true);
+	auto ret = start_xfer(hdev.get(), sock.get(), true);
 	if (!ret) {
 		if (terse) {
 			printf("%d\n", rhport);
@@ -228,7 +228,6 @@ attach_device(const char *host, const char *busid, const char *serial, BOOL ters
 		ret = 4;
 	}
 
-	closesocket(sockfd);
 	return ret;
 }
 

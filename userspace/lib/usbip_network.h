@@ -12,8 +12,9 @@
 #include <windows.h>
 
 #include "usbip_common.h"
+#include "win_socket.h"
 
-#include <stdint.h>
+#include <cstdint>
 
 extern int usbip_port;
 extern char *usbip_port_string;
@@ -175,4 +176,5 @@ int usbip_net_set_reuseaddr(SOCKET sockfd);
 int usbip_net_set_nodelay(SOCKET sockfd);
 int usbip_net_set_keepalive(SOCKET sockfd);
 int usbip_net_set_v6only(SOCKET sockfd);
-SOCKET usbip_net_tcp_connect(const char *hostname, const char *port);
+
+usbip::Socket usbip_net_tcp_connect(const char *hostname, const char *port);

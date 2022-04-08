@@ -268,10 +268,10 @@ int usbip_net_set_v6only(SOCKET sockfd)
 /*
  * IPv6 Ready
  */
-SOCKET usbip_net_tcp_connect(const char *hostname, const char *port)
+usbip::Socket usbip_net_tcp_connect(const char *hostname, const char *port)
 {
-	struct addrinfo hints, *res, *rp;
-	SOCKET sockfd = INVALID_SOCKET;
+        usbip::Socket sock;
+        struct addrinfo hints, *res, *rp;
 	int ret;
 
 	memset(&hints, 0, sizeof(hints));
@@ -283,30 +283,33 @@ SOCKET usbip_net_tcp_connect(const char *hostname, const char *port)
 	if (ret < 0) {
 		dbg("getaddrinfo: %s port %s: %s", hostname, port,
 		    gai_strerror(ret));
-		return INVALID_SOCKET;
+		return sock;
 	}
 
 	/* try the addresses */
 	for (rp = res; rp; rp = rp->ai_next) {
-		sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (sockfd == INVALID_SOCKET)
-			continue;
+
+                sock.reset(socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol));
+                if (!sock) {
+                        continue;
+                }
 
 		/* should set TCP_NODELAY for usbip */
-		usbip_net_set_nodelay(sockfd);
+		usbip_net_set_nodelay(sock.get());
 		/* TODO: write code for heartbeat */
-		usbip_net_set_keepalive(sockfd);
+		usbip_net_set_keepalive(sock.get());
 
-		if (connect(sockfd, rp->ai_addr, (int)rp->ai_addrlen) == 0)
+		if (connect(sock.get(), rp->ai_addr, (int)rp->ai_addrlen) == 0)
 			break;
 
-		closesocket(sockfd);
+		sock.close();
 	}
 
 	freeaddrinfo(res);
 
-	if (!rp)
-		return INVALID_SOCKET;
+        if (!rp) {
+                sock.close();
+        }
 
-	return sockfd;
+	return sock;
 }

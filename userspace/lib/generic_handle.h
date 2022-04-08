@@ -11,39 +11,39 @@ void close_handle(T) noexcept;
 
 
 template<typename T, auto NullValue>
-class GenericHandle
+class generic_handle
 {
 public:
-        using Type = T;
-        static constexpr auto Null = NullValue;
+        using type = T;
+        static constexpr auto null = NullValue;
 
-        explicit GenericHandle(Type h = Null) noexcept : m_handle(h) {}
-        ~GenericHandle() { close(); }
+        explicit generic_handle(type h = null) noexcept : m_handle(h) {}
+        ~generic_handle() { close(); }
 
-        GenericHandle(const GenericHandle&) = delete;
-        GenericHandle& operator=(const GenericHandle&) = delete;
+        generic_handle(const generic_handle&) = delete;
+        generic_handle& operator=(const generic_handle&) = delete;
 
-        GenericHandle(GenericHandle&& h) noexcept : m_handle(h.release()) {}
+        generic_handle(generic_handle&& h) noexcept : m_handle(h.release()) {}
 
-        GenericHandle& operator=(GenericHandle&& h) noexcept
+        generic_handle& operator=(generic_handle&& h) noexcept
         {
                 reset(h.release());
                 return *this;
         }
 
-        explicit operator bool() const noexcept { return m_handle != Null; }
-        bool operator !() const noexcept { return m_handle == Null; }
+        explicit operator bool() const noexcept { return m_handle != null; }
+        bool operator !() const noexcept { return m_handle == null; }
 
         auto get() const noexcept { return m_handle; }
 
         auto release() noexcept
         {
                 auto h = m_handle;
-                m_handle = Null;
+                m_handle = null;
                 return h;
         }
 
-        void reset(Type h = Null) noexcept
+        void reset(type h = null) noexcept
         {
                 if (m_handle == h) {
                         return;
@@ -58,7 +58,7 @@ public:
 
         void close() noexcept { reset(); }
 
-        void swap(GenericHandle& h) noexcept
+        void swap(generic_handle& h) noexcept
         {
                 auto tmp = h.m_handle;
                 h.m_handle = m_handle;
@@ -66,7 +66,7 @@ public:
         }
 
 private:
-        Type m_handle = Null;
+        type m_handle = null;
 };
 
 } // namespace usbip
