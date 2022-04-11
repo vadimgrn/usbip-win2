@@ -18,15 +18,12 @@
 
 #include "usbip_windows.h"
 #include "getopt.h"
-#include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip_vhci.h"
 #include "dbgcode.h"
 #include "usbip_dscr.h"
 #include "start_xfer.h"
 #include "usbip_xfer/usbip_xfer.h"
-
-#include <cstdlib>
 
 namespace
 {
@@ -61,40 +58,36 @@ int import_device(vhci_pluginfo_t *pluginfo, usbip::Handle &handle)
         return pluginfo->port;
 }
 
-vhci_pluginfo_t *build_pluginfo(SOCKET sockfd, unsigned devid)
+std::vector<char> build_pluginfo(SOCKET sockfd, unsigned int devid)
 {
-        USHORT wTotalLength = 0;
+        std::vector<char> v;
 
+        USHORT wTotalLength = 0;
         if (fetch_conf_descriptor(sockfd, devid, nullptr, &wTotalLength) < 0) {
                 dbg("failed to get configuration descriptor size");
-                return nullptr;
+                return v;
         }
 
-        vhci_pluginfo_t* pluginfo = nullptr;
-        unsigned long pluginfo_size = sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf);
+        vhci_pluginfo_t *pi{};
+        v.resize(sizeof(*pi) - sizeof(pi->dscr_conf) + wTotalLength);
+        pi = reinterpret_cast<vhci_pluginfo_t*>(v.data());
 
-        pluginfo = (vhci_pluginfo_t*)malloc(pluginfo_size);
-        if (!pluginfo) {
-                dbg("out of memory or invalid vhci pluginfo size");
-                return nullptr;
-        }
+        pi->size = static_cast<unsigned long>(v.size());
+        pi->devid = devid;
 
-        pluginfo->size = pluginfo_size;
-        pluginfo->devid = devid;
-
-        if (fetch_device_descriptor(sockfd, devid, &pluginfo->dscr_dev) < 0) {
+        if (fetch_device_descriptor(sockfd, devid, &pi->dscr_dev) < 0) {
                 dbg("failed to fetch device descriptor");
-                free(pluginfo);
-                return nullptr;
+                v.clear();
+                return v;
         }
 
-        if (fetch_conf_descriptor(sockfd, devid, &pluginfo->dscr_conf, &wTotalLength) < 0) {
+        if (fetch_conf_descriptor(sockfd, devid, &pi->dscr_conf, &wTotalLength) < 0) {
                 dbg("failed to fetch configuration descriptor");
-                free(pluginfo);
-                return nullptr;
+                v.clear();
+                return v;
         }
 
-        return pluginfo;
+        return v;
 }
 
 int query_import_device(SOCKET sockfd, const char* busid, usbip::Handle& hdev, const char* serial)
@@ -157,22 +150,19 @@ int query_import_device(SOCKET sockfd, const char* busid, usbip::Handle& hdev, c
 
         unsigned int devid = reply.udev.busnum << 16 | reply.udev.devnum;
 
-        struct vhci_pluginfo_t* pluginfo = build_pluginfo(sockfd, devid);
-        if (!pluginfo) {
+        auto pluginfo = build_pluginfo(sockfd, devid);
+        if (pluginfo.empty()) {
                 return ERR_GENERAL;
         }
+        auto pi = reinterpret_cast<vhci_pluginfo_t*>(pluginfo.data());
 
         if (serial) {
-                mbstowcs_s(nullptr, pluginfo->wserial, sizeof(pluginfo->wserial) / sizeof(*pluginfo->wserial), serial, _TRUNCATE);
-        }
-        else {
-                pluginfo->wserial[0] = L'\0';
+                mbstowcs_s(nullptr, pi->wserial, ARRAYSIZE(pi->wserial), serial, _TRUNCATE);
+        } else {
+                pi->wserial[0] = L'\0';
         }
 
-        /* import a device */
-        rc = import_device(pluginfo, hdev);
-        free(pluginfo);
-        return rc;
+        return import_device(pi, hdev);
 }
 
 int attach_device(const char *host, const char *busid, const char *serial, bool terse)
