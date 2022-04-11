@@ -17,17 +17,16 @@
  */
 
 #include "usbip_windows.h"
-
-#include <stdlib.h>
-
+#include "getopt.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip_vhci.h"
 #include "dbgcode.h"
 #include "usbip_dscr.h"
-
 #include "start_xfer.h"
 #include "usbip_xfer/usbip_xfer.h"
+
+#include <cstdlib>
 
 static const char usbip_attach_usage_string[] =
 	"usbip attach <args>\n"

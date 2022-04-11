@@ -19,13 +19,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
-
 #include "usbip_windows.h"
-
+#include "getopt.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip.h"
+
+#include <cstdlib>
 
 namespace
 {

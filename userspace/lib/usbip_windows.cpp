@@ -6,10 +6,9 @@
 #include <winsock2.h>
 
 #include "usbip_windows.h"
-
 #include "usbip_common.h"
 
-int init_socket(void)
+int init_socket()
 {
 	WSADATA	wsaData;
 	int	err;
@@ -28,7 +27,7 @@ int init_socket(void)
 	return 0;
 }
 
-int cleanup_socket(void)
+int cleanup_socket()
 {
 	WSACleanup();
 	return 0;
