@@ -25,16 +25,14 @@ static PCCERT_CONTEXT
 load_cert_context(LPCSTR subject, HCERTSTORE *phCertStore)
 {
 	PCCERT_CONTEXT	pCertContext;
-	WCHAR	*wSubject;
 
 	*phCertStore = CertOpenStore(CERT_STORE_PROV_SYSTEM, 0, (HCRYPTPROV)nullptr, CERT_SYSTEM_STORE_LOCAL_MACHINE, L"Root");
 	if (*phCertStore == nullptr) {
 		dbg("load_cert_context: failed to open certificate store: %lx", GetLastError());
 		return nullptr;
 	}
-	wSubject = utf8_to_wchar(subject);
-	pCertContext = CertFindCertificateInStore(*phCertStore, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_SUBJECT_STR, wSubject, nullptr);
-	free(wSubject);
+	auto wSubject = utf8_to_wchar(subject);
+	pCertContext = CertFindCertificateInStore(*phCertStore, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0, CERT_FIND_SUBJECT_STR, wSubject.c_str(), nullptr);
 
 	return pCertContext;
 }
@@ -54,7 +52,6 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	BYTE	pbOidSpOpusInfo[] = SP_OPUS_INFO_DATA;
 	BYTE	pbOidStatementType[] = STATEMENT_TYPE_DATA;
 	DWORD	dwIndex;
-	WCHAR	*wfpath;
 	PCCERT_CONTEXT		pCertContext;
 	PSIGNER_CONTEXT		pSignerContext = nullptr;
 	SignerSignEx_t			funcSignerSignEx;
@@ -75,9 +72,9 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 
 	// Setup SIGNER_FILE_INFO struct
 	signerFileInfo.cbSize = sizeof(SIGNER_FILE_INFO);
-	wfpath = utf8_to_wchar(fpath);
+	auto wfpath = utf8_to_wchar(fpath);
 
-	signerFileInfo.pwszFileName = wfpath;
+	signerFileInfo.pwszFileName = wfpath.c_str();
 	signerFileInfo.hFile = nullptr;
 
 	// Prepare SIGNER_SUBJECT_INFO struct
@@ -129,9 +126,9 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	}
 	ret = 0;
 out:
-	free(wfpath);
-	if (pSignerContext)
-		funcSignerFreeSignerContext(pSignerContext);
+        if (pSignerContext) {
+                funcSignerFreeSignerContext(pSignerContext);
+        }
 	CertFreeCertificateContext(pCertContext);
 	CertCloseStore(hCertStore, 0);
 	FreeLibrary(hMod);

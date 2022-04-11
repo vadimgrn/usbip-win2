@@ -3,25 +3,25 @@
 #include <cstdio>
 #include <cstdarg>
 #include <cstdlib>
+#include <vector>
 
 #include <windows.h>
 
-wchar_t *
-utf8_to_wchar(const char *str)
+std::wstring utf8_to_wchar(const char *str)
 {
-	wchar_t	*wstr;
-	int	size;
+        std::wstring wstr;
 
-	size = MultiByteToWideChar(CP_UTF8, 0, str, -1, nullptr, 0);
-	if (size <= 1)
-		return nullptr;
+	auto cch = MultiByteToWideChar(CP_UTF8, 0, str, -1, nullptr, 0);
+        if (!cch) {
+                return wstr;
+        }
 
-	if ((wstr = (wchar_t *)calloc(size, sizeof(wchar_t))) == nullptr)
-		return nullptr;
-	if (MultiByteToWideChar(CP_UTF8, 0, str, -1, wstr, size) != size) {
-		free(wstr);
-		return nullptr;
+        std::vector<wchar_t> v(cch);
+
+        if (MultiByteToWideChar(CP_UTF8, 0, str, -1, v.data(), cch) == cch) {
+		wstr.assign(v.data(), cch);
 	}
+
 	return wstr;
 }
 

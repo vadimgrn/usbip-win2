@@ -72,7 +72,7 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 	const GUID	pe_guid = { 0xC689AAB8, 0x8E78, 0x11D0,{ 0x8C, 0x47, 0x00, 0xC0, 0x4F, 0xC2, 0x95, 0xEE } };
 	LPCWSTR		wszOSAttr = L"2:5.1,2:5.2,2:6.0,2:6.1";
 	CRYPTCATMEMBER	*pCatMember;
-	WCHAR	wstrHash[2 * SHA1_HASH_LENGTH + 1], *wfname;
+	WCHAR	wstrHash[2 * SHA1_HASH_LENGTH + 1];
 	BYTE	pbHash[SHA1_HASH_LENGTH];
 	char	*fpath;
 	BYTE	pbEncoded[64];
@@ -126,15 +126,13 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 		return FALSE;
 	}
 
-	wfname = utf8_to_wchar(fname);
+	auto wfname = utf8_to_wchar(fname);
 	// Add the "File" and "OSAttr" attributes to the newly created member
-	if (CryptCATPutAttrInfo(hCat, pCatMember, L"File", ATTR_FLAGS, 2 * ((DWORD)wcslen(wfname) + 1), (BYTE*)wfname) == nullptr ||
+	if (CryptCATPutAttrInfo(hCat, pCatMember, L"File", ATTR_FLAGS, 2 * ((DWORD)wfname.size() + 1), (BYTE*)wfname.data()) == nullptr ||
 		CryptCATPutAttrInfo(hCat, pCatMember, L"OSAttr", ATTR_FLAGS, 2 * ((DWORD)wcslen(wszOSAttr) + 1), (BYTE*)wszOSAttr) == nullptr) {
-		free(wfname);
 		dbg("unable to create attributes: %s", fname);
 		return FALSE;
 	}
-	free(wfname);
 	return TRUE;
 }
 
@@ -142,9 +140,6 @@ BOOL
 build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 {
 	HCRYPTPROV	hProv;
-	HANDLE		hCat;
-	LPWSTR		wpath_cat, whwid;
-	char		*path_cat;
 	BOOL		res = FALSE;
 	LPCWSTR		wOS = L"7_X86,7_X64,8_X86,8_X64,8_ARM,10_X86,10_X64,10_ARM";
 
@@ -153,25 +148,28 @@ build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 		return FALSE;
 	}
 
-	asprintf(&path_cat, "%s\\%s", path, catname);
-	wpath_cat = utf8_to_wchar(path_cat);
-	free(path_cat);
-	hCat = CryptCATOpen(wpath_cat, CRYPTCAT_OPEN_CREATENEW, hProv, 0, 0);
-	free(wpath_cat);
+        std::wstring wpath_cat;
+
+        {
+                char* path_cat;
+                asprintf(&path_cat, "%s\\%s", path, catname);
+                wpath_cat = utf8_to_wchar(path_cat);
+                free(path_cat);
+        }
+
+	auto hCat = CryptCATOpen((LPWSTR)wpath_cat.c_str(), CRYPTCAT_OPEN_CREATENEW, hProv, 0, 0);
 	if (hCat == INVALID_HANDLE_VALUE) {
 		dbg("unable to create cat: %s", path);
 		CryptReleaseContext(hProv, 0);
 		return FALSE;
 	}
 
-	whwid = utf8_to_wchar(hwid);
+	auto whwid = utf8_to_wchar(hwid);
 	if (CryptCATPutCatAttrInfo(hCat, L"HWID1", CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
-		2 * ((DWORD)wcslen(whwid) + 1), (BYTE*)whwid) == nullptr) {
+		2 * ((DWORD)whwid.size() + 1), (BYTE*)whwid.data()) == nullptr) {
 		dbg("failed to set HWID1 cat attribute");
-		free(whwid);
 		goto out;
 	}
-	free(whwid);
 
 	if (CryptCATPutCatAttrInfo(hCat, L"OS", CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
 		2 * ((DWORD)wcslen(wOS) + 1), (BYTE*)wOS) == nullptr) {
