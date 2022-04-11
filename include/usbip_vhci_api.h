@@ -71,7 +71,7 @@ struct vhci_pluginfo_t
 	/* vhci_pluginfo_t structure size */
 	unsigned long size;
 	unsigned int devid;
-	char port;
+	int port;
 	wchar_t	wserial[MAX_VHCI_SERIAL_ID + 1];
 	USB_DEVICE_DESCRIPTOR dscr_dev;
 	/* variable length. It's a full-length configuration descriptor */
@@ -95,7 +95,7 @@ struct ioctl_usbip_vhci_unplug
 
 struct ioctl_usbip_vhci_imported_dev 
 {
-        char port;
+        int port;
         enum usbip_device_status status;
         unsigned short vendor;
         unsigned short product;

@@ -242,9 +242,7 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 			break;
 		}
 
-		dev->port = static_cast<char>(vpdo->port);
-		NT_ASSERT(dev->port == vpdo->port);
-
+		dev->port = vpdo->port;
                 dev->status = SDEV_ST_USED;
 
                 auto& d = vpdo->descriptor;

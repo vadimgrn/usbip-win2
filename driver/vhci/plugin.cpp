@@ -157,8 +157,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 	}
 
 	NT_ASSERT(vpdo->port); // was assigned
-	pluginfo->port = static_cast<char>(vpdo->port);
-	NT_ASSERT(pluginfo->port == vpdo->port);
+	pluginfo->port = vpdo->port;
 
 	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(NonPagedPool, pluginfo->wserial) : nullptr;
 
