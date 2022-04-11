@@ -29,19 +29,20 @@ is_service_usbip_stub(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data)
 static void
 copy_file(const char *fname, const char *path_drvpkg)
 {
-	char	*path_src, *path_dst;
-	char	*path_mod;
-
-	path_mod = get_module_dir();
-	if (path_mod == nullptr) {
+	auto path_mod = get_module_dir();
+	if (path_mod.empty()) {
 		return;
 	}
-	asprintf(&path_src, "%s\\%s", path_mod, fname);
-	free(path_mod);
-	asprintf(&path_dst, "%s\\%s", path_drvpkg, fname);
+        
+        char *path_src{};
+        asprintf(&path_src, "%s\\%s", path_mod.c_str(), fname);
+        
+        char *path_dst{};
+        asprintf(&path_dst, "%s\\%s", path_drvpkg, fname);
 
 	CopyFile(path_src, path_dst, TRUE);
-	free(path_src);
+
+        free(path_src);
 	free(path_dst);
 }
 
@@ -66,15 +67,15 @@ static void
 copy_stub_inf(const char *id_hw, const char *path_drvpkg)
 {
 	char	*path_inx, *path_dst;
-	char	*path_mod;
 	FILE	*in, *out;
 	errno_t	err;
 
-	path_mod = get_module_dir();
-	if (path_mod == nullptr)
-		return;
-	asprintf(&path_inx, "%s\\usbip_stub.inx", path_mod);
-	free(path_mod);
+	auto path_mod = get_module_dir();
+        if (path_mod.empty()) {
+                return;
+        }
+
+	asprintf(&path_inx, "%s\\usbip_stub.inx", path_mod.c_str());
 
 	err = fopen_s(&in, path_inx, "r");
 	free(path_inx);

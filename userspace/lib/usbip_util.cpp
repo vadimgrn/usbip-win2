@@ -1,7 +1,10 @@
+#include "usbip_util.h"
+
+#include <cstdio>
+#include <cstdarg>
+#include <cstdlib>
+
 #include <windows.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
 
 wchar_t *
 utf8_to_wchar(const char *str)
@@ -58,29 +61,19 @@ asprintf(char **strp, const char *fmt, ...)
 	return ret;
 }
 
-char *
-get_module_dir(void)
+std::string get_module_dir()
 {
-	DWORD	size = 1024;
+        std::string path;
 
-	while (TRUE) {
-		char	*path_mod;
+        char buf[MAX_PATH];
+        auto cnt = GetModuleFileName(nullptr, buf, MAX_PATH);
+        if (!(cnt > 0 && cnt < MAX_PATH)) {
+                return path;
+        }
 
-		path_mod = (char *)malloc(size);
-		if (path_mod == nullptr)
-			return nullptr;
-		if (GetModuleFileName(nullptr, path_mod, size) == size) {
-			free(path_mod);
-			if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
-				return nullptr;
-			size += 1024;
-		}
-		else {
-			char	*last_sep;
-			last_sep = strrchr(path_mod, '\\');
-			if (last_sep != nullptr)
-				*last_sep = '\0';
-			return path_mod;
-		}
-	}
-}
+        if (auto last_sep = strrchr(buf, '\\')) {
+                *last_sep = '\0';
+        }
+        
+        return path = buf;
+} 
