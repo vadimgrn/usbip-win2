@@ -10,18 +10,19 @@
 
 #include "usbip_proto.h"
 
-const char	*usbip_progname;
-
 int usbip_use_stderr;
 int usbip_use_debug;
+const char* usbip_progname;
 
-struct speed_string {
-	int num;
+struct speed_string 
+{
+	usb_device_speed val;
 	char *speed;
 	char *desc;
 };
 
-static const struct speed_string speed_strings[] = {
+static const speed_string speed_strings[] = 
+{
 	{ USB_SPEED_UNKNOWN, "unknown", "Unknown Speed"},
 	{ USB_SPEED_LOW,  "1.5", "Low Speed(1.5Mbps)"  },
 	{ USB_SPEED_FULL, "12",  "Full Speed(12Mbps)" },
@@ -29,15 +30,17 @@ static const struct speed_string speed_strings[] = {
 	{ USB_SPEED_WIRELESS, "53.3-480", "Wireless" },
 	{ USB_SPEED_SUPER, "5000", "Super Speed(5000Mbps)" },
 	{ USB_SPEED_SUPER_PLUS, "10000", "Super Speed Plus(10 Gbit/s)" },
-	{ 0, nullptr, nullptr }
+	{}
 };
 
-struct portst_string {
-	int num;
+struct portst_string 
+{
+        usbip_device_status status;
 	char *desc;
 };
 
-static struct portst_string portst_strings[] = {
+static portst_string portst_strings[] = 
+{
 	{ SDEV_ST_AVAILABLE,	"Device Available" },
 	{ SDEV_ST_USED,		"Device in Use" },
 	{ SDEV_ST_ERROR,	"Device Error"},
@@ -45,37 +48,39 @@ static struct portst_string portst_strings[] = {
 	{ VDEV_ST_NOTASSIGNED,	"Port Initializing"},
 	{ VDEV_ST_USED,		"Port in Use"},
 	{ VDEV_ST_ERROR,	"Port Error"},
-	{ 0, nullptr}
+	{}
 };
 
-const char *usbip_status_string(int32_t status)
+const char *usbip_status_string(usbip_device_status status)
 {
-	int i;
-	for (i=0; portst_strings[i].desc != nullptr; i++)
-		if (portst_strings[i].num == status)
-			return portst_strings[i].desc;
+        for (auto &i: portst_strings) {
+                if (i.status == status) {
+                        return i.desc;
+                }
+        }
 
 	return "Unknown Status";
 }
 
-const char *usbip_speed_string(int num)
+const char *usbip_speed_string(usb_device_speed speed)
 {
-	int i;
-	for (i=0; speed_strings[i].speed != nullptr; i++)
-		if (speed_strings[i].num == num)
-			return speed_strings[i].desc;
+        for (auto &i : speed_strings) {
+                if (i.val == speed) {
+                        return i.desc;
+                }
+        }
 
 	return "Unknown Speed";
 }
 
 
 #define DBG_UDEV_INTEGER(name)\
-	dbg("%-20s = %x", to_string(name), (int) udev->name)
+	dbg("%-20s = %x", #name, (int) udev->name)
 
 #define DBG_UINF_INTEGER(name)\
-	dbg("%-20s = %x", to_string(name), (int) uinf->name)
+	dbg("%-20s = %x", #name, (int) uinf->name)
 
-void dump_usb_interface(struct usbip_usb_interface *uinf)
+void dump_usb_interface(usbip_usb_interface *uinf)
 {
 	char buff[100];
 
@@ -83,10 +88,11 @@ void dump_usb_interface(struct usbip_usb_interface *uinf)
 			uinf->bInterfaceClass,
 			uinf->bInterfaceSubClass,
 			uinf->bInterfaceProtocol);
-	dbg("%-20s = %s", "Interface(C/SC/P)", buff);
+	
+        dbg("%-20s = %s", "Interface(C/SC/P)", buff);
 }
 
-void dump_usb_device(struct usbip_usb_device *udev)
+void dump_usb_device(usbip_usb_device *udev)
 {
 	char buff[100];
 
@@ -97,7 +103,8 @@ void dump_usb_device(struct usbip_usb_device *udev)
 			udev->bDeviceClass,
 			udev->bDeviceSubClass,
 			udev->bDeviceProtocol);
-	dbg("%-20s = %s", "Device(C/SC/P)", buff);
+	
+        dbg("%-20s = %s", "Device(C/SC/P)", buff);
 
 	DBG_UDEV_INTEGER(bcdDevice);
 
@@ -109,13 +116,13 @@ void dump_usb_device(struct usbip_usb_device *udev)
 	DBG_UDEV_INTEGER(bNumConfigurations);
 	DBG_UDEV_INTEGER(bNumInterfaces);
 
-	dbg("%-20s = %s", "speed", usbip_speed_string(udev->speed));
+	dbg("%-20s = %s", "speed", usbip_speed_string(static_cast<usb_device_speed>(udev->speed)));
 
 	DBG_UDEV_INTEGER(busnum);
 	DBG_UDEV_INTEGER(devnum);
 }
 
-int usbip_names_init(void)
+int usbip_names_init()
 {
 	char	*fpath_db, *fpath_mod;
 	int	ret;

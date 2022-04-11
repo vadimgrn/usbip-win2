@@ -24,7 +24,7 @@ enum { USBIP_MAX_ISO_PACKETS = 1024 };
  * <uapi/linux/usb/ch9.h>
  */
 enum usb_device_speed {
-	USB_SPEED_UNKNOWN = 0,			/* enumerating */
+	USB_SPEED_UNKNOWN,			/* enumerating */
 	USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
 	USB_SPEED_HIGH,				/* usb 2.0 */
 	USB_SPEED_WIRELESS,			/* wireless (usb 2.5) */

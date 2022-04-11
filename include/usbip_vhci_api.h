@@ -13,6 +13,7 @@ extern "C" {
 #endif
 
 #include <usbspec.h>
+#include "usbip_api_consts.h"
 
 //
 // Define an Interface Guid for bus vhci class.
