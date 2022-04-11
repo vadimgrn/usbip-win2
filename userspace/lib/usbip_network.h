@@ -16,9 +16,9 @@
 
 #include <cstdint>
 
-extern int usbip_port;
-extern char *usbip_port_string;
-void usbip_setup_port_number(char *arg);
+inline const char *usbip_port = "3240";
+
+void usbip_setup_port_number(const char *arg);
 
 #include <PSHPACK1.H>
 

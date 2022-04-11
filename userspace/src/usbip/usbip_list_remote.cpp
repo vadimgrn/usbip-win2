@@ -116,12 +116,12 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 int
 list_exported_devices(const char *host)
 {
-	auto sock = usbip_net_tcp_connect(host, usbip_port_string);
+	auto sock = usbip_net_tcp_connect(host, usbip_port);
 	if (!sock) {
 		err("failed to connect a remote host: %s", host);
 		return 3;
 	}
-	dbg("connected to %s:%s\n", host, usbip_port_string);
+	dbg("connected to %s:%s\n", host, usbip_port);
 
 	auto rc = get_exported_devices(host, sock.get());
 	if (rc < 0) {

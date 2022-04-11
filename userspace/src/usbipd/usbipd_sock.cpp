@@ -106,9 +106,9 @@ get_listen_sockfds(int family)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	rc = getaddrinfo(nullptr, usbip_port_string, &hints, &ainfos);
+	rc = getaddrinfo(nullptr, usbip_port, &hints, &ainfos);
 	if (rc != 0) {
-		dbg("failed to get a network address %s: %s", usbip_port_string, gai_strerror(rc));
+		dbg("failed to get a network address %s: %s", usbip_port, gai_strerror(rc));
 		return nullptr;
 	}
 

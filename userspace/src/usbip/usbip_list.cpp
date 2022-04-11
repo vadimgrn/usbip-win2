@@ -34,7 +34,7 @@ static const char usbip_list_usage_string[] =
 	"    -l, --local            List the local USB devices\n"
 	;
 
-void usbip_list_usage(void)
+void usbip_list_usage()
 {
 	printf("usage: %s", usbip_list_usage_string);
 }

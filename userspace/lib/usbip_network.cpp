@@ -10,13 +10,10 @@
 #include "usbip_network.h"
 #include "dbgcode.h"
 
-int usbip_port = 3240;
-char *usbip_port_string = "3240";
-
-void usbip_setup_port_number(char *arg)
+void usbip_setup_port_number(const char *arg)
 {
 	char *end;
-	unsigned long int port = strtoul(arg, &end, 10);
+	auto port = strtoul(arg, &end, 10);
 
 	if (end == arg) {
 		dbg("port: could not parse '%s' as a decimal integer", arg);
@@ -34,9 +31,8 @@ void usbip_setup_port_number(char *arg)
 		return;
 	}
 
-	usbip_port = port;
-	usbip_port_string = arg;
-	info("using port %d (\"%s\")", usbip_port, usbip_port_string);
+	usbip_port = arg;
+	info("using port \"%s\"", usbip_port);
 }
 
 void usbip_net_pack_uint32_t(int pack, uint32_t *num)
