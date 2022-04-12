@@ -74,15 +74,13 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 	CRYPTCATMEMBER	*pCatMember;
 	WCHAR	wstrHash[2 * SHA1_HASH_LENGTH + 1];
 	BYTE	pbHash[SHA1_HASH_LENGTH];
-	char	*fpath;
 	BYTE	pbEncoded[64];
 	DWORD	cbEncoded;
 	SPC_LINK	sSPCLink;
 	SIP_INDIRECT_DATA	sSIPData;
 
-	asprintf(&fpath, "%s\\%s", path, fname);
-	if (!calc_hash(fpath, pbHash)) {
-		free(fpath);
+        auto fpath = std::string(path) + '\\' + fname;
+	if (!calc_hash(fpath.c_str(), pbHash)) {
 		return FALSE;
 	}
 
@@ -151,10 +149,8 @@ build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
         std::wstring wpath_cat;
 
         {
-                char* path_cat;
-                asprintf(&path_cat, "%s\\%s", path, catname);
-                wpath_cat = utf8_to_wchar(path_cat);
-                free(path_cat);
+                auto path_cat = std::string(path) + '\\' + catname;
+                wpath_cat = utf8_to_wchar(path_cat.c_str());
         }
 
 	auto hCat = CryptCATOpen((LPWSTR)wpath_cat.c_str(), CRYPTCAT_OPEN_CREATENEW, hProv, 0, 0);

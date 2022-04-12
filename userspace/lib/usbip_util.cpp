@@ -49,18 +49,6 @@ vasprintf(char **strp, const char *fmt, va_list ap)
 	return ret;
 }
 
-int
-asprintf(char **strp, const char *fmt, ...)
-{
-	va_list	ap;
-	int	ret;
-
-	va_start(ap, fmt);
-	ret = vasprintf(strp, fmt, ap);
-	va_end(ap);
-	return ret;
-}
-
 std::string get_module_dir()
 {
         std::string path;
@@ -71,8 +59,8 @@ std::string get_module_dir()
                 return path;
         }
 
-        if (auto last_sep = strrchr(buf, '\\')) {
-                *last_sep = '\0';
+        if (auto pos = strrchr(buf, '\\')) {
+                *pos = '\0';
         }
         
         return path = buf;

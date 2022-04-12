@@ -24,7 +24,6 @@
 #pragma once
 
 #include <stdint.h>
-#include "list.h"
 #include "usbip_common.h"
 #include "usbip_setupdi.h"
 

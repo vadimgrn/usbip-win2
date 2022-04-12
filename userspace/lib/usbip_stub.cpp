@@ -29,21 +29,15 @@ is_service_usbip_stub(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data)
 static void
 copy_file(const char *fname, const char *path_drvpkg)
 {
-	auto path_mod = get_module_dir();
-	if (path_mod.empty()) {
+	auto path = get_module_dir();
+	if (path.empty()) {
 		return;
 	}
         
-        char *path_src{};
-        asprintf(&path_src, "%s\\%s", path_mod.c_str(), fname);
-        
-        char *path_dst{};
-        asprintf(&path_dst, "%s\\%s", path_drvpkg, fname);
+        auto src = path + '\\' + fname;
+        auto dst = std::string(path_drvpkg) + '\\' + fname;
 
-	CopyFile(path_src, path_dst, TRUE);
-
-        free(path_src);
-	free(path_dst);
+	CopyFile(src.c_str(), dst.c_str(), TRUE);
 }
 
 static void
@@ -66,26 +60,22 @@ translate_inf(const char *id_hw, FILE *in, FILE *out)
 static void
 copy_stub_inf(const char *id_hw, const char *path_drvpkg)
 {
-	char	*path_inx, *path_dst;
-	FILE	*in, *out;
-	errno_t	err;
-
 	auto path_mod = get_module_dir();
         if (path_mod.empty()) {
                 return;
         }
 
-	asprintf(&path_inx, "%s\\usbip_stub.inx", path_mod.c_str());
+	auto path_inx = path_mod + "\\usbip_stub.inx";
 
-	err = fopen_s(&in, path_inx, "r");
-	free(path_inx);
-	if (err != 0) {
+        FILE *in{};
+        if (fopen_s(&in, path_inx.c_str(), "r")) {
 		return;
 	}
-	asprintf(&path_dst, "%s\\usbip_stub.inf", path_drvpkg);
-	err = fopen_s(&out, path_dst, "w");
-	free(path_dst);
-	if (err != 0) {
+
+        auto path_dst = std::string(path_drvpkg) + "\\usbip_stub.inf";
+
+        FILE *out{};
+	if (fopen_s(&out, path_dst.c_str(), "w")) {
 		fclose(in);
 		return;
 	}
@@ -98,20 +88,17 @@ copy_stub_inf(const char *id_hw, const char *path_drvpkg)
 static void
 remove_dir_all(const char *path_dir)
 {
-	char	*fpat;
-	WIN32_FIND_DATA	wfd;
-	HANDLE	hfs;
+        std::string dirr = path_dir;
+        WIN32_FIND_DATA	wfd;
 
-	asprintf(&fpat, "%s\\*", path_dir);
-	hfs = FindFirstFile(fpat, &wfd);
-	free(fpat);
-	if (hfs != INVALID_HANDLE_VALUE) {
+        auto fpath = dirr + "\\*";
+	auto hfs = FindFirstFile(fpath.c_str(), &wfd);
+
+        if (hfs != INVALID_HANDLE_VALUE) {
 		do {
 			if (*wfd.cFileName != '.') {
-				char	*fpath;
-				asprintf(&fpath, "%s\\%s", path_dir, wfd.cFileName);
-				DeleteFile(fpath);
-				free(fpath);
+				fpath = dirr + '\\' + wfd.cFileName;
+                                DeleteFile(fpath.c_str());
 			}
 		} while (FindNextFile(hfs, &wfd));
 
@@ -123,7 +110,7 @@ remove_dir_all(const char *path_dir)
 static BOOL
 get_temp_drvpkg_path(char path_drvpkg[])
 {
-	char	tempdir[MAX_PATH + 1];
+	char tempdir[MAX_PATH + 1];
 
 	if (GetTempPath(MAX_PATH + 1, tempdir) == 0)
 		return FALSE;
@@ -141,18 +128,18 @@ static int
 apply_stub_fdo(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 {
 	char	path_drvpkg[MAX_PATH + 1];
-	char	*id_hw, *path_cat;
-	char	*path_inf;
 	BOOL	reboot_required;
-	int	ret;
 
-	id_hw = get_id_hw(dev_info, pdev_info_data);
-	if (id_hw == nullptr)
+	auto id_hw = get_id_hw(dev_info, pdev_info_data);
+	if (!id_hw) {
 		return ERR_GENERAL;
+        }
+
 	if (!get_temp_drvpkg_path(path_drvpkg)) {
 		free(id_hw);
 		return ERR_GENERAL;
 	}
+
 	copy_file("usbip_stub.sys", path_drvpkg);
 	copy_stub_inf(id_hw, path_drvpkg);
 
@@ -162,24 +149,23 @@ apply_stub_fdo(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 		return ERR_GENERAL;
 	}
 
-	asprintf(&path_cat, "%s\\usbip_stub.cat", path_drvpkg);
-	if ((ret = sign_file("USBIP Test", path_cat)) < 0) {
+        int ret = 0;
+        auto path = std::string(path_drvpkg) + "\\usbip_stub.cat";
+
+        if ((ret = sign_file("USBIP Test", path.c_str())) < 0) {
 		remove_dir_all(path_drvpkg);
-		free(path_cat);
 		free(id_hw);
 		if (ret == ERR_NOTEXIST)
 			return ERR_CERTIFICATE;
 		return ERR_GENERAL;
 	}
 
-	free(path_cat);
+        /* update driver */
+        path = std::string(path_drvpkg) + "\\usbip_stub.inf";
 
-	/* update driver */
-	asprintf(&path_inf, "%s\\usbip_stub.inf", path_drvpkg);
-	if (!UpdateDriverForPlugAndPlayDevicesA(nullptr, id_hw, path_inf, INSTALLFLAG_NONINTERACTIVE | INSTALLFLAG_FORCE, &reboot_required)) {
-		DWORD	err = GetLastError();
-		dbg("failed to update driver %s ; %s ; errorcode: 0x%lx", path_inf, id_hw, err);
-		free(path_inf);
+	if (!UpdateDriverForPlugAndPlayDevicesA(nullptr, id_hw, path.c_str(), INSTALLFLAG_NONINTERACTIVE | INSTALLFLAG_FORCE, &reboot_required)) {
+		auto err = GetLastError();
+		dbg("failed to update driver %s ; %s ; errorcode: 0x%lx", path.c_str(), id_hw, err);
 		free(id_hw);
 		remove_dir_all(path_drvpkg);
 		if (err == 0xe0000242) {
@@ -188,9 +174,8 @@ apply_stub_fdo(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 		}
 		return ERR_GENERAL;
 	}
-	free(path_inf);
-	free(id_hw);
 
+        free(id_hw);
 	remove_dir_all(path_drvpkg);
 
 	return 0;
