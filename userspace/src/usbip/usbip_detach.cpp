@@ -16,6 +16,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <windows.h>
+
 #include "usbip_windows.h"
 #include "getopt.h"
 #include "usbip_common.h"

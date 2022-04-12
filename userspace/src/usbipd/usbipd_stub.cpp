@@ -4,9 +4,9 @@
  */
 
 #include <initguid.h>
+#include <windows.h>
 
 #include "usbip_windows.h"
-
 #include "usbip_common.h"
 #include "usbip_stub_api.h"
 #include "usbip_setupdi.h"

@@ -1,10 +1,11 @@
+#include "usbip_setupdi.h"
 #include "usbip_common.h"
 #include "usbip_windows.h"
 
+#include <windows.h>
 #include <setupapi.h>
-#include <stdlib.h>
+#include <cstdlib>
 
-#include "usbip_setupdi.h"
 
 char *
 get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop)
