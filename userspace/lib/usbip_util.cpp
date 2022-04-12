@@ -1,10 +1,5 @@
 #include "usbip_util.h"
-
-#include <cstdio>
-#include <cstdarg>
-#include <cstdlib>
 #include <vector>
-
 #include <windows.h>
 
 std::wstring utf8_to_wchar(const char *str)
@@ -23,30 +18,6 @@ std::wstring utf8_to_wchar(const char *str)
 	}
 
 	return wstr;
-}
-
-int
-vasprintf(char **strp, const char *fmt, va_list ap)
-{
-	size_t	size;
-	int	ret;
-
-	int len = _vscprintf(fmt, ap);
-	if (len == -1) {
-		return -1;
-	}
-	size = (size_t)len + 1;
-	auto str = (char*)malloc(size);
-	if (!str) {
-		return -1;
-	}
-	ret = vsprintf_s(str, len + 1, fmt, ap);
-	if (ret == -1) {
-		free(str);
-		return -1;
-	}
-	*strp = str;
-	return ret;
 }
 
 std::string get_module_dir()

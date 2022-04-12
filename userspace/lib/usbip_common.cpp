@@ -113,9 +113,7 @@ void dump_usb_device(usbip_usb_device *udev)
 
 	DBG_UDEV_INTEGER(bcdDevice);
 
-	usbip_names_get_product(buff, sizeof(buff),
-			udev->idVendor,
-			udev->idProduct);
+	usbip_names_get_product(buff, sizeof(buff), udev->idVendor, udev->idProduct);
 	dbg("%-20s = %s", "Vendor/Product", buff);
 
 	DBG_UDEV_INTEGER(bNumConfigurations);
@@ -141,37 +139,43 @@ void usbip_names_free()
 void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t product)
 {
 	auto prod = names_product(vendor, product);
-	if (!prod)
+	if (!prod) {
 		prod = "unknown product";
-
+        }
 
 	auto vend = names_vendor(vendor);
-	if (!vend)
+	if (!vend) {
 		vend = "unknown vendor";
+        }
 
-	snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
+	auto ret = snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
+        assert(snprintf_ok(ret, size));
 }
 
 void usbip_names_get_class(char *buff, size_t size, uint8_t class_, uint8_t subclass, uint8_t protocol)
 {
 	const char *c, *s, *p;
 
-	if (class_ == 0 && subclass == 0 && protocol == 0) {
+	if (!(class_ && subclass && protocol)) {
 		snprintf(buff, size, "(Defined at Interface level) (%02x/%02x/%02x)", class_, subclass, protocol);
 		return;
 	}
 
 	p = names_protocol(class_, subclass, protocol);
-	if (!p)
-		p = "unknown protocol";
+	if (!p) {
+		p = "?";
+        }
 
 	s = names_subclass(class_, subclass);
-	if (!s)
-		s = "unknown subclass";
+	if (!s) {
+		s = "?";
+        }
 
 	c = names_class(class_);
-	if (!c)
-		c = "unknown class";
+	if (!c) {
+		c = "?";
+        }
 
-	snprintf(buff, size, "%s / %s / %s (%02x/%02x/%02x)", c, s, p, class_, subclass, protocol);
+        auto ret = snprintf(buff, size, "%s/%s/%s (%02x/%02x/%02x)", c, s, p, class_, subclass, protocol);
+        assert(snprintf_ok(ret, size));
 }

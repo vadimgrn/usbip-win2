@@ -1,12 +1,14 @@
 #pragma once
 
 #include <string>
-#include <cstdarg>
 
 std::string get_module_dir(); 
 std::wstring utf8_to_wchar(const char *str);
 
-int vasprintf(char **strp, const char *fmt, va_list ap);
+inline auto utf8_to_wchar(const std::string &s)
+{
+        return utf8_to_wchar(s.c_str());
+}
 
 constexpr auto snprintf_ok(int result, size_t buf_sz) noexcept
 {

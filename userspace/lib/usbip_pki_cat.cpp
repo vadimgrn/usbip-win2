@@ -150,7 +150,7 @@ build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 
         {
                 auto path_cat = std::string(path) + '\\' + catname;
-                wpath_cat = utf8_to_wchar(path_cat.c_str());
+                wpath_cat = utf8_to_wchar(path_cat);
         }
 
 	auto hCat = CryptCATOpen((LPWSTR)wpath_cat.c_str(), CRYPTCAT_OPEN_CREATENEW, hProv, 0, 0);
