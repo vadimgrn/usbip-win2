@@ -125,15 +125,17 @@ void dump_usb_device(usbip_usb_device *udev)
 	DBG_UDEV_INTEGER(devnum);
 }
 
-int usbip_names_init()
+InitUsbNames::InitUsbNames()
 {
-	auto path = get_module_dir() + "\\usb.ids";
-        return names_init(path.c_str());
+        auto path = get_module_dir() + "\\usb.ids";
+        m_ok = !names_init(path.c_str());
 }
 
-void usbip_names_free()
+InitUsbNames::~InitUsbNames()
 {
-	names_free();
+        if (m_ok) {
+                names_free();
+        }
 }
 
 void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t product)

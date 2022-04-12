@@ -85,12 +85,27 @@ void dump_usb_device(struct usbip_usb_device *);
 const char *usbip_speed_string(enum usb_device_speed speed);
 const char *usbip_status_string(enum usbip_device_status status);
 
-int usbip_names_init();
-void usbip_names_free();
-
 void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t product);
 void usbip_names_get_class(char *buff, size_t size, uint8_t class_, uint8_t subclass, uint8_t protocol);
 
 #ifdef __cplusplus
-}
-#endif
+
+} // extern "C"
+
+class InitUsbNames
+{
+public:
+        InitUsbNames();
+        ~InitUsbNames();
+
+        InitUsbNames(const InitUsbNames&) = delete;
+        InitUsbNames& operator=(const InitUsbNames&) = delete;
+
+        explicit operator bool() const noexcept { return m_ok; }
+        auto operator !() const noexcept { return !m_ok; }
+
+private:
+        bool m_ok{};
+};
+
+#endif // #ifdef __cplusplus

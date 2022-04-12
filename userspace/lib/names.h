@@ -45,7 +45,7 @@ const char *names_subclass(uint8_t classid, uint8_t subclassid);
 const char *names_protocol(uint8_t classid, uint8_t subclassid, uint8_t protocolid);
 
 int  names_init(const char *path);
-void names_free(void);
+void names_free();
 
 #ifdef __cplusplus
 }

@@ -59,7 +59,8 @@ int list_imported_devices(int port)
         printf("Imported USB devices\n");
         printf("====================\n");
 
-        if (usbip_names_init()) {
+        InitUsbNames names_init;
+        if (!names_init) {
                 dbg("failed to open usb id database");
         }
 
@@ -77,8 +78,6 @@ int list_imported_devices(int port)
                 }
                 usbip_vhci_imported_device_dump(&d);
         }
-
-        usbip_names_free();
 
         if (port > 0 && !found) {
                 /* port check failed */

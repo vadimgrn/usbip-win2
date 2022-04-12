@@ -183,7 +183,7 @@ static void *my_malloc(size_t size)
 	return p->mem;
 }
 
-void names_free(void)
+void names_free()
 {
 	struct pool *pool;
 
