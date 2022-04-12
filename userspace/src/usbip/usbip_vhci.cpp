@@ -53,9 +53,9 @@ int usbip_vhci_get_ports_status(HANDLE hdev, ioctl_usbip_vhci_get_ports_status &
 
 int get_n_max_ports(HANDLE hdev)
 {
-        ioctl_usbip_vhci_get_ports_status status;
-        auto err = usbip_vhci_get_ports_status(hdev, status);
-        return err < 0 ? err : status.n_max_ports;
+        ioctl_usbip_vhci_get_ports_status st;
+        auto err = usbip_vhci_get_ports_status(hdev, st);
+        return err < 0 ? err : st.n_max_ports;
 }
 
 } // namespace
@@ -118,14 +118,13 @@ usbip_vhci_attach_device(HANDLE hdev, struct vhci_pluginfo_t* pluginfo)
 int
 usbip_vhci_detach_device(HANDLE hdev, int port)
 {
-        ioctl_usbip_vhci_unplug  unplug;
-        DWORD	err;
+        ioctl_usbip_vhci_unplug unplug{ port };
 
-        unplug.addr = (char)port;
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE, &unplug, sizeof(unplug), nullptr, 0, nullptr, nullptr))
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE, &unplug, sizeof(unplug), nullptr, 0, nullptr, nullptr)) {
                 return 0;
+        }
 
-        err = GetLastError();
+        auto err = GetLastError();
         dbg("unplug error: 0x%lx", err);
 
         switch (err) {

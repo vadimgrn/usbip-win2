@@ -83,14 +83,13 @@ enum { VHCI_PORTS_MAX = 127 };
 struct ioctl_usbip_vhci_get_ports_status
 {
 	/* maximum number of ports */
-	unsigned char n_max_ports;
-	unsigned char port_status[VHCI_PORTS_MAX];
+	int n_max_ports;
+	bool port_status[VHCI_PORTS_MAX];
 };
 
 struct ioctl_usbip_vhci_unplug
 {
-	signed char addr;
-	char unused[3];
+	int port;
 };
 
 struct ioctl_usbip_vhci_imported_dev 

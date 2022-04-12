@@ -4,4 +4,4 @@
 #include <windows.h>
 
 int init_socket();
-int cleanup_socket();
+void cleanup_socket();

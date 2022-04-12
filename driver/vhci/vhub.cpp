@@ -202,7 +202,6 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_p
 	}
 
 	st.n_max_ports = vhub->NUM_PORTS;
-	NT_ASSERT(st.n_max_ports == vhub->NUM_PORTS);
 
 	int acquired = 0;
 
