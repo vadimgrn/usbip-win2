@@ -4,15 +4,10 @@
  */
 
 #include <ws2tcpip.h>
-
-#ifdef HAVE_CONFIG_H
-#include "../config.h"
-#endif
-
 #include <signal.h>
 
+#include "../config.h"
 #include "usbipd.h"
-
 #include "usbip_network.h"
 #include "getopt.h"
 #include "usbip_windows.h"
@@ -48,11 +43,13 @@ static const char usbipd_help_string[] =
 	"	-v, --version\n"
 	"		Show version.\n";
 
-static enum {
+enum {
 	cmd_standalone_mode = 1,
 	cmd_help,
 	cmd_version
-} cmd = cmd_standalone_mode;
+}; 
+
+static int cmd = cmd_standalone_mode;
 
 static int	family = AF_UNSPEC;
 

@@ -18,9 +18,7 @@
 
 #pragma once
 
-#ifdef HAVE_CONFIG_H
 #include "../config.h"
-#endif
 
 /* usbip commands */
 int usbip_attach(int argc, char *argv[]);

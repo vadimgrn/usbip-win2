@@ -4,11 +4,8 @@
 
 #pragma once
 
-#ifdef HAVE_CONFIG_H
 #include "../config.h"
-#endif
 
-#include <winsock2.h>
 #include <windows.h>
 
 #include "usbip_common.h"
