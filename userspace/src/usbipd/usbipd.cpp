@@ -94,7 +94,11 @@ do_standalone_mode(void)
 	int	n_sockfds;
 	int	ret = 0;
 
-	init_socket();
+	InitWinSock2 ws2;
+        if (!ws2) {
+                err("failed to init WinSock2");
+                return 2;
+        }
 
 	set_signal();
 
@@ -103,7 +107,6 @@ do_standalone_mode(void)
 	sockfds = get_listen_sockfds(family);
 	if (sockfds == nullptr) {
 		err("failed to open a listening socket");
-		cleanup_socket();
 		return 2;
 	}
 
@@ -128,7 +131,6 @@ do_standalone_mode(void)
 	}
 
 	info("shutting down " PROGNAME);
-	cleanup_socket();
 
 	return 0;
 }

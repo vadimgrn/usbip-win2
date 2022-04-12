@@ -8,26 +8,44 @@
 
 #include <winsock2.h>
 
-int init_socket()
+namespace
+{
+
+void cleanup_socket() noexcept
+{
+        [[maybe_unused]] auto err = WSACleanup();
+        assert(!err);
+}
+
+auto init_socket() noexcept
 {
 	WSADATA	wsaData;
 
         if (auto err = WSAStartup(MAKEWORD(2, 2), &wsaData)) {
 		dbg("WSAStartup error %#x", err);
-		return -1;
+		return false;
 	}
 
 	if (!(LOBYTE(wsaData.wVersion) == 2 && HIBYTE(wsaData.wVersion) == 2)) {
 		dbg("cannot find a winsock 2.2 version");
-		WSACleanup();
-		return -1;
+                cleanup_socket();
+                return false;
 	}
 
-	return 0;
+	return true;
 }
 
-void cleanup_socket()
+} // namespace
+
+
+InitWinSock2::InitWinSock2() :
+        m_ok(init_socket())
 {
-	[[maybe_unused]] auto err = WSACleanup();
-        assert(!err);
+}
+
+InitWinSock2::~InitWinSock2()
+{
+        if (m_ok) {
+                cleanup_socket();
+        }
 }

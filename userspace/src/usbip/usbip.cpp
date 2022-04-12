@@ -144,7 +144,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (init_socket() < 0) {
+        InitWinSock2 ws2;
+	if (!ws2) {
 		err("cannot setup windows socket");
 		return EXIT_FAILURE;
 	}
@@ -156,8 +157,7 @@ int main(int argc, char *argv[])
 				argc -= optind;
 				argv += optind;
 				optind = 0;
-				rc = run_command(&cmds[i], argc, argv);
-				goto out;
+				return run_command(&cmds[i], argc, argv);
 			}
 		err("invalid command: %s", cmd);
 	} else {
@@ -165,7 +165,5 @@ int main(int argc, char *argv[])
 		usbip_help(0, nullptr);
 	}
 
-out:
-	cleanup_socket();
 	return rc;
 }
