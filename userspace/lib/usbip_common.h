@@ -89,23 +89,5 @@ void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t 
 void usbip_names_get_class(char *buff, size_t size, uint8_t class_, uint8_t subclass, uint8_t protocol);
 
 #ifdef __cplusplus
-
-} // extern "C"
-
-class InitUsbNames
-{
-public:
-        InitUsbNames();
-        ~InitUsbNames();
-
-        InitUsbNames(const InitUsbNames&) = delete;
-        InitUsbNames& operator=(const InitUsbNames&) = delete;
-
-        explicit operator bool() const noexcept { return m_ok; }
-        auto operator !() const noexcept { return !m_ok; }
-
-private:
-        bool m_ok{};
-};
-
-#endif // #ifdef __cplusplus
+}
+#endif
