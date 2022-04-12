@@ -5,7 +5,7 @@
 
 #include "usbip_setupdi.h"
 
-#define STUB_DRIVER_SVCNAME	"usbip_stub"
+inline const char STUB_DRIVER_SVCNAME[] = "usbip_stub";
 
 BOOL is_service_usbip_stub(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data);
 

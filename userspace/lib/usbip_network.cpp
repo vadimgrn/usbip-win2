@@ -3,12 +3,12 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#include <ws2tcpip.h>
-#include <mstcpip.h>
-
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "dbgcode.h"
+
+#include <ws2tcpip.h>
+#include <mstcpip.h>
 
 void usbip_setup_port_number(const char *arg)
 {

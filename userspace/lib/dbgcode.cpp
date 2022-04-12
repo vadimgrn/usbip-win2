@@ -1,4 +1,4 @@
-#include "usbip_common.h"
+#include "dbgcode.h"
 #include <cmath>
 
 const char *dbg_opcode_status(int status)

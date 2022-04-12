@@ -101,13 +101,16 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
                 return ret;
         }
 
-	res = WSADuplicateSocketW(sockfd, pi.dwProcessId, &args.info);
+        usbip::Handle args_hdev(args.hdev);
+        
+        res = WSADuplicateSocketW(sockfd, pi.dwProcessId, &args.info);
 	if (res) {
 		dbg("failed to dup sockfd: %#x", WSAGetLastError());
                 return ret;
         }
 
 	if (write_data(pipe.second.get(), &args, sizeof(args))) {
+                args_hdev.release();
 		ret = 0;
 	}
 
