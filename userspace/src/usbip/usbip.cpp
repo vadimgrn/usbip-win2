@@ -33,7 +33,7 @@ namespace
 int usbip_help(int argc, char *argv[]);
 int usbip_version(int argc, char *argv[]);
 
-const char usbip_version_string[] = PACKAGE_STRING;
+auto &usbip_version_string = PACKAGE_STRING;
 
 const char usbip_usage_string[] =
 	"usbip [--debug] [--tcp-port PORT] [version]\n"

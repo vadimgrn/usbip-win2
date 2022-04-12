@@ -20,7 +20,7 @@
 extern SOCKET *get_listen_sockfds(int family);
 extern void accept_request(SOCKET *sockfds, fd_set *pfds);
 
-static const char usbip_version_string[] = PACKAGE_STRING;
+static auto &usbip_version_string = PACKAGE_STRING;
 
 static const char usbipd_help_string[] =
 	"usage: usbipd [options]\n"
