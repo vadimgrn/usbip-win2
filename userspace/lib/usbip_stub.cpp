@@ -34,7 +34,7 @@ copy_file(const char *fname, const char *path_drvpkg)
 		return;
 	}
         
-        auto src = path + '\\' + fname;
+        auto src = path + fname;
         auto dst = std::string(path_drvpkg) + '\\' + fname;
 
 	CopyFile(src.c_str(), dst.c_str(), TRUE);
@@ -65,7 +65,7 @@ copy_stub_inf(const char *id_hw, const char *path_drvpkg)
                 return;
         }
 
-	auto path_inx = path_mod + "\\usbip_stub.inx";
+	auto path_inx = path_mod + "usbip_stub.inx";
 
         FILE *in{};
         if (fopen_s(&in, path_inx.c_str(), "r")) {

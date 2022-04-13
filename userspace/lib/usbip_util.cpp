@@ -20,19 +20,31 @@ std::wstring utf8_to_wchar(const char *str)
 	return wstr;
 }
 
+/*
+ * The last char of returned path is '\\'.
+ */
 std::string get_module_dir()
 {
         std::string path;
+        std::vector<char> v(MAX_PATH);
 
-        char buf[MAX_PATH];
-        auto cnt = GetModuleFileName(nullptr, buf, MAX_PATH);
-        if (!(cnt > 0 && cnt < MAX_PATH)) {
-                return path;
+        while (true) {
+
+                auto cnt = GetModuleFileName(nullptr, v.data(), static_cast<DWORD>(v.size()));
+
+                if (cnt > 0 && cnt < v.size()) {
+                        path.assign(v.data(), cnt);
+                        auto pos = path.find_last_of('\\');
+                        if (pos != path.npos) {
+                                path.resize(++pos);
+                        }
+                        break;
+                } else if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+                        v.resize(2*v.size());
+                } else {
+                        break;
+                }
         }
 
-        if (auto pos = strrchr(buf, '\\')) {
-                *pos = '\0';
-        }
-        
-        return path = buf;
+        return path;
 } 

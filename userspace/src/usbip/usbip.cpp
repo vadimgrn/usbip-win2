@@ -108,7 +108,7 @@ int run_command(const struct command *cmd, int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	const option opts[] = {
+        const option opts[] = {
 		{ "debug",    no_argument,       nullptr, 'd' },
 		{ "tcp-port", required_argument, nullptr, 't' },
 		{}

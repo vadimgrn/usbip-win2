@@ -10,7 +10,7 @@
 
 InitUsbNames::InitUsbNames()
 {
-        auto path = get_module_dir() + "\\usb.ids";
+        auto path = get_module_dir() + "usb.ids";
         m_ok = !names_init(path.c_str());
 }
 

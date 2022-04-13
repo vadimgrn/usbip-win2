@@ -72,7 +72,7 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 		return ret;
 	}
 
-        auto exe_path = get_module_dir() + '\\' + usbip_xfer_binary;
+        auto exe_path = get_module_dir() + usbip_xfer_binary;
         
         char CommandLine[MAX_PATH];
         strncpy_s(CommandLine, exe_path.c_str(), MAX_PATH);
