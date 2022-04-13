@@ -175,7 +175,7 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
 
         usbip::Handle hdev;
         auto rhport = query_import_device(sock.get(), busid, hdev, serial);
-        if (rhport < 0) {
+        if (rhport <= 0) {
                 switch (rhport) {
                 case ERR_DRIVER:
                         err("vhci driver is not loaded");
@@ -200,18 +200,16 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
         if (!ret) {
                 if (terse) {
                         printf("%d\n", rhport);
-                }
-                else {
+                } else {
                         printf("succesfully attached to port %d\n", rhport);
                 }
-        }
-        else {
+        } else {
                 switch (ret) {
                 case ERR_NOTEXIST:
-                        err("%s not found", usbip_xfer_binary());
+                        err("%s not found", usbip_xfer_binary);
                         break;
                 default:
-                        err("failed to run %s", usbip_xfer_binary());
+                        err("failed to run %s", usbip_xfer_binary);
                         break;
                 }
                 ret = 4;

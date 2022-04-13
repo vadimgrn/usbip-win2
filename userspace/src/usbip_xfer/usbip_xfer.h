@@ -4,16 +4,8 @@
 #pragma once
 
 #include <WinSock2.h>
-#include <stdbool.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-__inline const char *usbip_xfer_binary() 
-{ 
-	return "usbip_xfer.exe"; 
-}
+inline const char usbip_xfer_binary[] = "usbip_xfer.exe"; 
 
 struct usbip_xfer_args
 {
@@ -21,7 +13,3 @@ struct usbip_xfer_args
 	WSAPROTOCOL_INFOW info;
 	bool client; // false -> server
 };
-
-#ifdef __cplusplus
-}
-#endif
