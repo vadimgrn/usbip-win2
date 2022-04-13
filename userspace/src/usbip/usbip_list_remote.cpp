@@ -22,8 +22,6 @@
 #include "usbip_network.h"
 #include "dbgcode.h"
 
-#include "usbip_windows.h"
-
 static int get_exported_devices(const char *host, SOCKET sockfd)
 {
 	struct op_devlist_reply reply;

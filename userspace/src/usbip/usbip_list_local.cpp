@@ -20,8 +20,6 @@
 
 #include "usbip_common.h"
 #include "usbip_network.h"
-
-#include "usbip_windows.h"
 #include "usbip_setupdi.h"
 
 typedef struct {

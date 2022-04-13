@@ -1,6 +1,4 @@
 #include "usbip_dscr.h"
-#include "usbip_windows.h"
-
 #include "usbip_proto.h"
 #include "usbip_network.h"
 

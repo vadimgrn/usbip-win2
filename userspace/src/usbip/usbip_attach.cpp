@@ -16,7 +16,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "usbip_windows.h"
 #include "getopt.h"
 #include "usbip_network.h"
 #include "usbip_vhci.h"

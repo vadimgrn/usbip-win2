@@ -1,10 +1,4 @@
-/*
- *
- * Copyright (C) 2005-2007 Takahiro Hirofuchi
- */
-
-#include "usbip_windows.h"
-#include "usbip_common.h"
+#include "names_cpp.h"
 #include "usbip_util.h"
 #include "names.h"
 

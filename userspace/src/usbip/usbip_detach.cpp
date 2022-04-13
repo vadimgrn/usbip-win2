@@ -18,7 +18,6 @@
 
 #include <windows.h>
 
-#include "usbip_windows.h"
 #include "getopt.h"
 #include "usbip_common.h"
 #include "usbip_vhci.h"

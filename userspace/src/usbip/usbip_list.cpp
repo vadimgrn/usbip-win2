@@ -21,8 +21,8 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "getopt.h"
-#include "usbip_windows.h"
 #include "usbip_setupdi.h"
+#include "names_cpp.h"
 
 int list_devices(BOOL parsable);
 int list_exported_devices(const char *host);
