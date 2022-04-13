@@ -10,7 +10,7 @@
 #include "usbipd.h"
 #include "usbip_network.h"
 #include "getopt.h"
-#include "usbip_windows.h"
+#include "win_socket.h"
 
 #undef  PROGNAME
 #define PROGNAME "usbipd"
@@ -91,7 +91,7 @@ do_standalone_mode(void)
 	int	n_sockfds;
 	int	ret = 0;
 
-	InitWinSock2 ws2;
+	usbip::InitWinSock2 ws2;
         if (!ws2) {
                 err("failed to init WinSock2");
                 return 2;

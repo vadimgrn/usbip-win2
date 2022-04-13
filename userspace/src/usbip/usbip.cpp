@@ -19,11 +19,11 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "usbip_windows.h"
 #include "getopt.h"
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip.h"
+#include "win_socket.h"
 
 #include <cstdlib>
 
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-        InitWinSock2 ws2;
+        usbip::InitWinSock2 ws2;
 	if (!ws2) {
 		err("cannot setup windows socket");
 		return EXIT_FAILURE;
