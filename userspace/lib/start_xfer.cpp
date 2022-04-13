@@ -27,17 +27,16 @@
 namespace
 {
 
-BOOL write_data(HANDLE hInWrite, const void *data, DWORD len)
+auto write_data(HANDLE hInWrite, const void *data, DWORD len)
 {
         DWORD nwritten = 0;
-        BOOL res = WriteFile(hInWrite, data, len, &nwritten, nullptr);
-
+        auto res = WriteFile(hInWrite, data, len, &nwritten, nullptr);
         if (res && nwritten == len) {
-                return TRUE;
+                return true;
         }
 
         dbg("failed to write handle value, len %d", len);
-        return FALSE;
+        return false;
 }
 
 auto create_pipe()
@@ -73,16 +72,16 @@ int start_xfer(HANDLE hdev, SOCKET sockfd, bool client)
 	}
 
         auto exe_path = get_module_dir() + usbip_xfer_binary;
-        
-        char CommandLine[MAX_PATH];
-        strncpy_s(CommandLine, exe_path.c_str(), MAX_PATH);
 
-	STARTUPINFO si{sizeof(si)};
+        std::vector<char> CommandLine(exe_path.begin(), exe_path.end());
+        CommandLine.push_back('\0');
+
+	STARTUPINFO si{ sizeof(si) };
 	si.hStdInput = pipe.first.get(), // read
 	si.dwFlags = STARTF_USESTDHANDLES;
 
 	PROCESS_INFORMATION pi{};
-        auto res = CreateProcess(nullptr, CommandLine, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi);
+        auto res = CreateProcess(nullptr, CommandLine.data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi);
 	if (!res) {
 		auto err = GetLastError();
 		if (err == ERROR_FILE_NOT_FOUND) {

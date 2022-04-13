@@ -22,7 +22,5 @@ const char *dbg_errcode(int err)
 	};
 
 	err = abs(err);
-
-	return err >= 0 && err < sizeof(v)/sizeof(*v) ? 
-		v[err] : "dbg_errcode: unexpected code";
+	return err < sizeof(v)/sizeof(*v) ? v[err] : "dbg_errcode: unexpected code";
 }

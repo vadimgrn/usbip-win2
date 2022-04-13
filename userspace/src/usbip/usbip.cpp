@@ -44,14 +44,16 @@ void usbip_usage()
 	printf("usage: %s", usbip_usage_string);
 }
 
-struct command {
+struct command 
+{
 	const char *name;
 	int (*fn)(int argc, char *argv[]);
 	const char *help;
-	void (*usage)(void);
+	void (*usage)();
 };
 
-const struct command cmds[] = {
+const command cmds[] =
+{
 	{ "help", usbip_help},
 	{ "version", usbip_version},
 	{ "attach", usbip_attach, "Attach a remote USB device",	usbip_attach_usage },
@@ -60,22 +62,19 @@ const struct command cmds[] = {
 	{ "bind", usbip_bind, "Bind device to usbip stub driver", usbip_bind_usage },
 	{ "unbind", usbip_unbind, "Unbind device from usbip stub driver", usbip_unbind_usage },
 	{ "port", usbip_port_show, "Show imported USB devices", usbip_port_usage },
-	{}
+        {}
 };
 
 int usbip_help(int argc, char *argv[])
 {
-	const struct command *cmd;
-
 	if (argc > 1) {
-		int	i;
-
-		for (i = 0; cmds[i].name != nullptr; i++)
-			if (strcmp(cmds[i].name, argv[1]) == 0) {
-				if (cmds[i].usage)
-					cmds[i].usage();
-				else
+		for (auto &c: cmds)
+			if (strcmp(c.name, argv[1]) == 0) {
+				if (c.usage) {
+					c.usage();
+                                } else {
 					printf("no help for command: %s\n", argv[1]);
+                                }
 				return 0;
 			}
 		err("no help for invalid command: %s", argv[1]);
@@ -84,9 +83,11 @@ int usbip_help(int argc, char *argv[])
 
 	usbip_usage();
 	printf("\n");
-	for (cmd = cmds; cmd->name != nullptr; cmd++)
-		if (cmd->help != nullptr)
-			printf("  %-10s %s\n", cmd->name, cmd->help);
+	for (auto &c: cmds) {
+		if (c.help) {
+			printf("  %-10s %s\n", c.name, c.help);
+                }
+        }
 	printf("\n");
 	return 0;
 }
@@ -105,10 +106,10 @@ int run_command(const struct command *cmd, int argc, char *argv[])
 
 } // namespace
 
-
 int main(int argc, char *argv[])
 {
-        const option opts[] = {
+        const option opts[] = 
+        {
 		{ "debug",    no_argument,       nullptr, 'd' },
 		{ "tcp-port", required_argument, nullptr, 't' },
 		{}
@@ -152,12 +153,12 @@ int main(int argc, char *argv[])
 
 	cmd = argv[optind];
 	if (cmd) {
-		for (int i = 0; cmds[i].name; i++)
-			if (!strcmp(cmds[i].name, cmd)) {
+		for (auto &c: cmds)
+			if (!strcmp(c.name, cmd)) {
 				argc -= optind;
 				argv += optind;
 				optind = 0;
-				return run_command(&cmds[i], argc, argv);
+				return run_command(&c, argc, argv);
 			}
 		err("invalid command: %s", cmd);
 	} else {
