@@ -24,7 +24,6 @@
 
 static int get_exported_devices(const char *host, SOCKET sockfd)
 {
-	struct op_devlist_reply reply;
 	uint16_t code = OP_REP_DEVLIST;
 	unsigned int i;
 	int	status;
@@ -42,8 +41,8 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 		return rc;
 	}
 
-	memset(&reply, 0, sizeof(reply));
-	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
+        op_devlist_reply reply{};
+        rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("failed to recv devlist: %s", dbg_errcode(rc));
 		return rc;
@@ -62,23 +61,21 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 	printf(" - %s\n", host);
 
 	for (i = 0; i < reply.ndev; i++) {
-		char product_name[100];
-		char class_name[100];
-		struct usbip_usb_device udev;
-		int j;
 
-		memset(&udev, 0, sizeof(udev));
-
-		rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
+                usbip_usb_device udev{};
+                rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
 		if (rc < 0) {
 			dbg("failed to recv devlist: usbip_usb_device[%d]: %s", i, dbg_errcode(rc));
 			return ERR_NETWORK;
 		}
 		usbip_net_pack_usb_device(0, &udev);
 
-		usbip_names_get_product(product_name, sizeof(product_name),
+                char product_name[100];
+                usbip_names_get_product(product_name, sizeof(product_name),
 					udev.idVendor, udev.idProduct);
-		usbip_names_get_class(class_name, sizeof(class_name),
+                
+                char class_name[100];
+                usbip_names_get_class(class_name, sizeof(class_name),
 				      udev.bDeviceClass, udev.bDeviceSubClass,
 				      udev.bDeviceProtocol);
 
@@ -86,9 +83,8 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 		printf("%11s: %s\n", "", udev.path);
 		printf("%11s: %s\n", "", class_name);
 
-		for (j = 0; j < udev.bNumInterfaces; j++) {
-			struct usbip_usb_interface uintf;
-
+		for (int j = 0; j < udev.bNumInterfaces; ++j) {
+                        usbip_usb_interface uintf{};
 			rc = usbip_net_recv(sockfd, &uintf, sizeof(uintf));
 			if (rc < 0) {
 				dbg("failed to recv devlist: usbip_usb_intf[%d]: %s", j, dbg_errcode(rc));
