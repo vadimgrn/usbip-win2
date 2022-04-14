@@ -13,15 +13,15 @@ PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &pdes
 PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_30_HUB_DESCRIPTOR &pdesc);
 
 PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &pinfo);
-PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG *poutlen);
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG &outlen);
 
 PAGEABLE NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo);
 PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub);
 
-PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG *poutlen);
+PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG &outlen);
 PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, size_t cnt);
 
-PAGEABLE constexpr auto is_valid_port(int port)
+constexpr auto is_valid_port(int port) noexcept
 {
 	return port > 0 && port <= vhub_dev_t::NUM_PORTS;
 }

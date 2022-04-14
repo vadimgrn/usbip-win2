@@ -73,7 +73,7 @@ PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, con
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG *psize)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG &size)
 {
 	PAGED_CODE();
 
@@ -104,18 +104,18 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 	ULONG outlen = sizeof(r) + dsc_len;
 
-	if (*psize < sizeof(r)) {
-		*psize = outlen;
+	if (size < sizeof(r)) {
+		size = outlen;
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto ncopy = *psize < outlen ? *psize - sizeof(r) : outlen;
+	auto ncopy = size < outlen ? size - sizeof(r) : outlen;
 	if (ncopy) {
 		RtlCopyMemory(r.Data, dsc_data, ncopy);
 	}
 
 	if (ncopy == outlen) {
-		*psize = outlen;
+		size = outlen;
 	}
 
 	return STATUS_SUCCESS;

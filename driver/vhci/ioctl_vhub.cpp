@@ -13,11 +13,11 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &nodeinfo, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &nodeinfo, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	*poutlen = sizeof(nodeinfo);
+	outlen = sizeof(nodeinfo);
 
 	if (inlen != sizeof(nodeinfo)) {
 		return STATUS_INVALID_BUFFER_SIZE;
@@ -33,30 +33,30 @@ PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &nodeinfo
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG *poutlen, bool ex)
+PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG &outlen, bool ex)
 {
 	PAGED_CODE();
 
 	static_assert(sizeof(USB_NODE_CONNECTION_INFORMATION) == sizeof(USB_NODE_CONNECTION_INFORMATION_EX));
 	auto &ci = *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX*>(buffer);
 
-	if (inlen < sizeof(ci) || *poutlen < sizeof(ci)) {
-		*poutlen = sizeof(ci);
+	if (inlen < sizeof(ci) || outlen < sizeof(ci)) {
+		outlen = sizeof(ci);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
 	NT_ASSERT(ci.ConnectionIndex);
 	auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex);
 
-	return vpdo_get_nodeconn_info(vpdo, ci, poutlen, ex);
+	return vpdo_get_nodeconn_info(vpdo, ci, outlen, ex);
 }
 
-PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 	
-	if (!(inlen == sizeof(ci) && *poutlen == sizeof(ci))) {
-		*poutlen = sizeof(ci);
+	if (!(inlen == sizeof(ci) && outlen == sizeof(ci))) {
+		outlen = sizeof(ci);
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
@@ -89,32 +89,32 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	if (inlen < sizeof(r)) {
-		*poutlen = sizeof(r);
+		outlen = sizeof(r);
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
 	if (auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex)) {
-		auto st = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, poutlen);
+		auto st = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, outlen);
 		return st;
 	}
 
 	return STATUS_NO_SUCH_DEVICE;
 }
 
-PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &r, ULONG *poutlen)
+PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	if (*poutlen == sizeof(r)) {
+	if (outlen == sizeof(r)) {
 		return vhub_get_information_ex(vhub, r);
 	}
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	return STATUS_INVALID_BUFFER_SIZE;
 }
 
@@ -123,12 +123,12 @@ constexpr auto HubIsHighSpeedCapable()
 	return false; // the hub is capable of running at high speed
 }
 
-PAGEABLE NTSTATUS get_hub_capabilities(USB_HUB_CAPABILITIES &r, ULONG *poutlen)
+PAGEABLE NTSTATUS get_hub_capabilities(USB_HUB_CAPABILITIES &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	bool ok = *poutlen >= sizeof(r);
-	*poutlen = sizeof(r);
+	bool ok = outlen >= sizeof(r);
+	outlen = sizeof(r);
 
 	if (ok) {
 		r.HubIs2xCapable = HubIsHighSpeedCapable();
@@ -137,12 +137,12 @@ PAGEABLE NTSTATUS get_hub_capabilities(USB_HUB_CAPABILITIES &r, ULONG *poutlen)
 	return ok ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
 }
 
-PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG *poutlen)
+PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	bool ok = *poutlen >= sizeof(r);
-	*poutlen = sizeof(r);
+	bool ok = outlen >= sizeof(r);
+	outlen = sizeof(r);
 	if (!ok) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
@@ -163,19 +163,19 @@ PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG *pou
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	if (inlen >= sizeof(r)) {
-		return vhub_get_port_connector_properties(vhub, r, poutlen);
+		return vhub_get_port_connector_properties(vhub, r, outlen);
 	}
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	return STATUS_BUFFER_TOO_SMALL;
 }
 
-PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_DRIVERKEY_NAME &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_DRIVERKEY_NAME &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -198,29 +198,29 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 
 	ULONG outlen_res = sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + driverkeylen - sizeof(WCHAR);
 
-	if (*poutlen >= sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
+	if (outlen >= sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME)) {
 		r.ActualLength = outlen_res;
-		if (*poutlen >= outlen_res) {
+		if (outlen >= outlen_res) {
 			RtlCopyMemory(r.DriverKeyName, driverkey, driverkeylen);
-			*poutlen = outlen_res;
+			outlen = outlen_res;
 		} else {
-			RtlCopyMemory(r.DriverKeyName, driverkey, *poutlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
+			RtlCopyMemory(r.DriverKeyName, driverkey, outlen - sizeof(USB_NODE_CONNECTION_DRIVERKEY_NAME) + sizeof(WCHAR));
 		}
 	} else {
 		status = STATUS_INSUFFICIENT_RESOURCES;
-		*poutlen = outlen_res;
+		outlen = outlen_res;
 	}
 
 	ExFreePoolWithTag(driverkey, USBIP_VHCI_POOL_TAG);
 	return status;
 }
 
-PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONNECTION_ATTRIBUTES &r, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONNECTION_ATTRIBUTES &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	if (!(inlen == sizeof(r) && *poutlen == sizeof(r))) {
-		*poutlen = sizeof(r);
+	if (!(inlen == sizeof(r) && outlen == sizeof(r))) {
+		outlen = sizeof(r);
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
@@ -238,7 +238,7 @@ PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONN
 } // namespace
 
 
-PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -246,37 +246,37 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, 
 
 	switch (ioctl_code) {
 	case IOCTL_USB_GET_NODE_INFORMATION:
-		status = get_node_info(vhub, *static_cast<USB_NODE_INFORMATION*>(buffer), inlen, poutlen);
+		status = get_node_info(vhub, *static_cast<USB_NODE_INFORMATION*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION:
-		status = get_nodeconn_info(vhub, buffer, inlen, poutlen, false);
+		status = get_nodeconn_info(vhub, buffer, inlen, outlen, false);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX:
-		status = get_nodeconn_info(vhub, buffer, inlen, poutlen, true);
+		status = get_nodeconn_info(vhub, buffer, inlen, outlen, true);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_INFORMATION_EX_V2:
-		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, poutlen);
+		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descriptor_from_nodeconn(vhub, irp, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, poutlen);
+		status = get_descriptor_from_nodeconn(vhub, irp, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_HUB_INFORMATION_EX:
-		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), poutlen);
+		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_HUB_CAPABILITIES:
-		status = get_hub_capabilities(*static_cast<USB_HUB_CAPABILITIES*>(buffer), poutlen);
+		status = get_hub_capabilities(*static_cast<USB_HUB_CAPABILITIES*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_HUB_CAPABILITIES_EX:
-		status = get_hub_capabilities_ex(*static_cast<USB_HUB_CAPABILITIES_EX*>(buffer), poutlen);
+		status = get_hub_capabilities_ex(*static_cast<USB_HUB_CAPABILITIES_EX*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_PORT_CONNECTOR_PROPERTIES:
-		status = get_port_connector_properties(vhub, *static_cast<USB_PORT_CONNECTOR_PROPERTIES*>(buffer), inlen, poutlen);
+		status = get_port_connector_properties(vhub, *static_cast<USB_PORT_CONNECTOR_PROPERTIES*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_DRIVERKEY_NAME:
-		status = get_node_driverkey_name(vhub, *static_cast<USB_NODE_CONNECTION_DRIVERKEY_NAME*>(buffer), inlen, poutlen);
+		status = get_node_driverkey_name(vhub, *static_cast<USB_NODE_CONNECTION_DRIVERKEY_NAME*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_NODE_CONNECTION_ATTRIBUTES:
-		status = get_node_connection_attributes(vhub, *static_cast<USB_NODE_CONNECTION_ATTRIBUTES*>(buffer), inlen, poutlen);
+		status = get_node_connection_attributes(vhub, *static_cast<USB_NODE_CONNECTION_ATTRIBUTES*>(buffer), inlen, outlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);

@@ -8,13 +8,13 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_POWER_INFO*>(request);
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	if (inlen != sizeof(r)) {
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
@@ -52,13 +52,13 @@ PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, ULONG inlen, U
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_controller_info(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_controller_info(vhci_dev_t*, void *request, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_CONTROLLER_INFO_0*>(request);
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	if (inlen != sizeof(r)) {
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
@@ -73,13 +73,13 @@ PAGEABLE NTSTATUS get_controller_info(vhci_dev_t*, void *request, ULONG inlen, U
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_DRIVER_VERSION_PARAMETERS*>(request);
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	if (inlen != sizeof(r)) {
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
@@ -95,7 +95,7 @@ PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, ULONG inlen
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, ULONG, ULONG *poutlen)
+PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, ULONG, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -106,17 +106,17 @@ PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, ULONG, 
 	static_assert(sizeof(r.Length) == sizeof(name.ActualLength));
 	static_assert(sizeof(r.String) == sizeof(name.DriverKeyName));
 
-	return get_hcd_driverkey_name(vhci, name, poutlen);
+	return get_hcd_driverkey_name(vhci, name, outlen);
 }
 
-PAGEABLE auto pass_thru(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto pass_thru(vhci_dev_t*, void *request, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_PASS_THRU_PARAMETERS*>(request);
 
 	if (inlen != sizeof(r)) {
-		*poutlen = sizeof(r);
+		outlen = sizeof(r);
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
@@ -124,7 +124,7 @@ PAGEABLE auto pass_thru(vhci_dev_t*, void *request, ULONG inlen, ULONG *poutlen)
 	return STATUS_NOT_SUPPORTED;
 }
 
-PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, ULONG, ULONG *poutlen)
+PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, ULONG, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -136,7 +136,7 @@ PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, ULONG, 
 	static_assert(sizeof(r.String) == sizeof(name.RootHubName));
 
 	auto vhub = vhub_from_vhci(vhci);
-	return vhub_get_roothub_name(vhub, name, poutlen);
+	return vhub_get_roothub_name(vhub, name, outlen);
 }
 
 PAGEABLE auto get_device_count(const vhub_dev_t *vhub)
@@ -152,13 +152,13 @@ PAGEABLE auto get_device_count(const vhub_dev_t *vhub)
 	return cnt;
 }
 
-PAGEABLE auto get_bandwidth_information(vhci_dev_t *vhci, void *request, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto get_bandwidth_information(vhci_dev_t *vhci, void *request, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_BANDWIDTH_INFO*>(request);
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	if (inlen != sizeof(r)) {
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
@@ -180,13 +180,13 @@ PAGEABLE auto GetCurrentSystemTime()
 	return CurrentTime;
 }
 
-PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_BUS_STATISTICS_0*>(request);
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 	if (inlen != sizeof(r)) {
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
@@ -221,12 +221,12 @@ PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, ULONG inlen,
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_usb2_hw_version(vhci_dev_t*, void *data, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto get_usb2_hw_version(vhci_dev_t*, void *data, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USB_USB2HW_VERSION_PARAMETERS*>(data);
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 
 	if (inlen == sizeof(r)) {
 		r.Usb2HwRevision = 0; // USB2HW_UNKNOWN
@@ -236,17 +236,17 @@ PAGEABLE auto get_usb2_hw_version(vhci_dev_t*, void *data, ULONG inlen, ULONG *p
 	return STATUS_INVALID_BUFFER_SIZE;
 }
 
-PAGEABLE auto usb_refresh_hct_reg(vhci_dev_t*, void *data, ULONG inlen, ULONG *poutlen)
+PAGEABLE auto usb_refresh_hct_reg(vhci_dev_t*, void *data, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto &r = *static_cast<USBUSER_REFRESH_HCT_REG*>(data);
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 
 	return inlen == sizeof(r) ? STATUS_NOT_SUPPORTED : STATUS_INVALID_BUFFER_SIZE;
 }
 
-using request_t = NTSTATUS(vhci_dev_t*, void *buffer, ULONG inlen, ULONG *poutlen);
+using request_t = NTSTATUS(vhci_dev_t*, void *buffer, ULONG inlen, ULONG &outlen);
 
 /*
  * The following APIS are enabled always
@@ -269,7 +269,7 @@ request_t* const requests[] =
 } // namespace
 
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, USBUSER_REQUEST_HEADER *hdr, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, USBUSER_REQUEST_HEADER *hdr, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -278,22 +278,22 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, USBUSER_REQUEST_HEAD
 	}
 
 	inlen -= sizeof(*hdr);
-	*poutlen -= sizeof(*hdr);
+	outlen -= sizeof(*hdr);
 
 	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
 	auto req = hdr->UsbUserRequest;
 
 	if (auto f = req < ARRAYSIZE(requests) ? requests[req] : nullptr) {
-		status = f(vhci, hdr + 1, inlen, poutlen);
+		status = f(vhci, hdr + 1, inlen, outlen);
 	} else {
 		Trace(TRACE_LEVEL_WARNING, "Unhandled %!usbuser!", req);
 		hdr->UsbUserStatusCode = req ? UsbUserNotSupported : UsbUserInvalidRequestCode;
 	}
 
-	*poutlen += sizeof(*hdr);
+	outlen += sizeof(*hdr);
 
 	if (NT_SUCCESS(status)) {
-		hdr->ActualBufferLength = *poutlen;
+		hdr->ActualBufferLength = outlen;
 		hdr->UsbUserStatusCode = UsbUserSuccess;
 	} else {
 		hdr->UsbUserStatusCode = UsbUserMiniportError;

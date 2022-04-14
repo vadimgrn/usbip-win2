@@ -120,7 +120,7 @@ PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE 
 /*
  * vpdo is NULL if device is not plugged into the port.
  */
-PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_INFORMATION_EX &ci, ULONG *poutlen, bool ex)
+PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_INFORMATION_EX &ci, ULONG &outlen, bool ex)
 {
 	PAGED_CODE();
 
@@ -136,7 +136,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 	RtlIsZeroMemory(ci.PipeList, sizeof(*ci.PipeList));
 
 	if (!vpdo) {
-		*poutlen = sizeof(ci);
+		outlen = sizeof(ci);
 		return STATUS_SUCCESS;
 	} else if (is_valid_dsc(&vpdo->descriptor)) {
 		RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
@@ -150,15 +150,15 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 		ci.NumberOfOpenPipes = iface->bNumEndpoints;
 	}
 
-	ULONG outlen = sizeof(ci) - sizeof(*ci.PipeList) + ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
+	ULONG len = sizeof(ci) - sizeof(*ci.PipeList) + ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
 	NTSTATUS status = STATUS_SUCCESS;
 
-	if (*poutlen < outlen) {
+	if (outlen < len) {
 		status = STATUS_BUFFER_TOO_SMALL;
 	} else if (ci.NumberOfOpenPipes > 0) {
 		dsc_for_each_endpoint(vpdo->actconfig, iface, copy_ep, ci.PipeList);
 	}
 
-	*poutlen = max(outlen, sizeof(ci));
+	outlen = max(len, sizeof(ci));
 	return status;
 }

@@ -127,7 +127,7 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG *poutlen)
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -135,11 +135,11 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (*poutlen < sizeof(r)) {
+	if (outlen < sizeof(r)) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	*poutlen = sizeof(r);
+	outlen = sizeof(r);
 
 	r.ActualLength = sizeof(r);
 
@@ -192,12 +192,12 @@ PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG *poutlen)
+PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	if (*poutlen != sizeof(st)) {
-		*poutlen = sizeof(st);
+	if (outlen != sizeof(st)) {
+		outlen = sizeof(st);
 		STATUS_INVALID_BUFFER_SIZE;
 	}
 

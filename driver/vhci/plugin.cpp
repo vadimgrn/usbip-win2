@@ -187,8 +187,8 @@ PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
-	if (port < 0) {
-		Trace(TRACE_LEVEL_INFORMATION, "Plugging out all the devices");
+	if (port <= 0) {
+		Trace(TRACE_LEVEL_VERBOSE, "Plugging out all devices");
 		vhub_unplug_all_vpdo(vhub);
 		return STATUS_SUCCESS;
 	}

@@ -35,7 +35,7 @@ PAGEABLE ULONG get_name_prefix_cch(const UNICODE_STRING &s)
 } // namespace
 
 
-PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, ULONG *poutlen)
+PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -49,21 +49,21 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, 
 	ULONG str_sz = str.Length - prefix_cch*sizeof(*str.Buffer);
 	ULONG r_sz = sizeof(r) - sizeof(*r.RootHubName) + str_sz;
 
-	if (*poutlen < sizeof(r)) {
-		*poutlen = r_sz;
+	if (outlen < sizeof(r)) {
+		outlen = r_sz;
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	*poutlen = min(*poutlen, r_sz);
+	outlen = min(outlen, r_sz);
 
 	r.ActualLength = r_sz;
-	RtlStringCbCopyW(r.RootHubName, *poutlen - offsetof(USB_ROOT_HUB_NAME, RootHubName), str.Buffer + prefix_cch);
+	RtlStringCbCopyW(r.RootHubName, outlen - offsetof(USB_ROOT_HUB_NAME, RootHubName), str.Buffer + prefix_cch);
 	
 	TraceCall("ActualLength %lu, RootHubName '%S'", r.ActualLength, r.RootHubName);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG *poutlen)
+PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -77,13 +77,13 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 
 	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
 
-	if (*poutlen >= sizeof(r)) {
-		*poutlen = min(*poutlen, r_sz);
+	if (outlen >= sizeof(r)) {
+		outlen = min(outlen, r_sz);
 		r.ActualLength = prop_sz;
-		RtlStringCbCopyW(r.DriverKeyName, *poutlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
+		RtlStringCbCopyW(r.DriverKeyName, outlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
 		TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
 	} else {
-		*poutlen = r_sz;
+		outlen = r_sz;
 		st = STATUS_BUFFER_TOO_SMALL;
 	}
 
@@ -91,7 +91,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	return st;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG *poutlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -100,29 +100,29 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack,
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
 		status = vhci_plugin_vpdo(vhci, static_cast<vhci_pluginfo_t*>(buffer), inlen, irpstack->FileObject);
-		*poutlen = sizeof(vhci_pluginfo_t);
+		outlen = sizeof(vhci_pluginfo_t);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
-		*poutlen = 0;
+		outlen = 0;
 		status = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
 			vhci_unplug_vpdo(vhci, static_cast<ioctl_usbip_vhci_unplug*>(buffer)->port) :
 			STATUS_INVALID_BUFFER_SIZE;
 		break;
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
-		status = vhub_get_ports_status(vhub_from_vhci(vhci), *static_cast<ioctl_usbip_vhci_get_ports_status*>(buffer), poutlen);
+		status = vhub_get_ports_status(vhub_from_vhci(vhci), *static_cast<ioctl_usbip_vhci_get_ports_status*>(buffer), outlen);
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
 		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
-						*poutlen/sizeof(ioctl_usbip_vhci_imported_dev));
+						outlen/sizeof(ioctl_usbip_vhci_imported_dev));
 		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:
-		status = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), poutlen);
+		status = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		status = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), poutlen);
+		status = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
-		status = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), inlen, poutlen);
+		status = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), inlen, outlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
