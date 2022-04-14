@@ -26,7 +26,8 @@ struct USBIP_BUS_WMI_STD_DATA
 	UINT32 ErrorCount;
 } ;
 
-enum vdev_type_t {
+enum vdev_type_t
+{
 	VDEV_ROOT,
 	VDEV_CPDO,
 	VDEV_VHCI,

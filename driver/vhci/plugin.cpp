@@ -89,8 +89,8 @@ PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 }
 
 /*
-* Many devices have 0 usb class number in a device descriptor.
-* 0 value means that class number is determined at interface level.
+* Many devices have zero usb class number in a device descriptor.
+* zero value means that class number is determined at interface level.
 * USB class, subclass and protocol numbers should be setup before importing.
 * Because windows vhci driver builds a device compatible id with those numbers.
 */
@@ -115,19 +115,20 @@ PAGEABLE auto init_vpdo(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 } // namespace
 
 
-PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, ULONG inlen, FILE_OBJECT *fo)
+PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG inlen, FILE_OBJECT *fo)
 {
 	PAGED_CODE();
 
-	if (inlen < sizeof(*pluginfo)) {
-		Trace(TRACE_LEVEL_ERROR, "too small input length: %lld < %lld", inlen, sizeof(*pluginfo));
+	if (inlen < sizeof(pi)) {
+		Trace(TRACE_LEVEL_ERROR, "Too small input length: %lld < %lld", inlen, sizeof(pi));
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto wTotalLength = pluginfo->dscr_conf.wTotalLength;
+	auto wTotalLength = pi.dscr_conf.wTotalLength;
+        auto expected_sz = sizeof(pi) - sizeof(pi.dscr_conf) + wTotalLength;
 
-	if (inlen != sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf)) {
-		Trace(TRACE_LEVEL_ERROR, "invalid pluginfo format: %lld != %lld", inlen, sizeof(*pluginfo) + wTotalLength - sizeof(pluginfo->dscr_conf));
+	if (!(inlen == expected_sz && pi.size == expected_sz)) {
+		Trace(TRACE_LEVEL_ERROR, "pluginfo: size %lld != %lld", inlen, expected_sz);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -138,15 +139,15 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	auto vpdo = to_vpdo_or_null(devobj);
 
-	vpdo->devid = pluginfo->devid;
+	vpdo->devid = pi.devid;
 	vpdo->parent = vhub_from_vhci(vhci);
 
-	if (auto err = init_vpdo(*vpdo, pluginfo->dscr_dev)) {
+	if (auto err = init_vpdo(*vpdo, pi.dscr_dev)) {
 		destroy_device(vpdo);
 		return err;
 	}
 	
-	if (auto err = init_vpdo(*vpdo, pluginfo->dscr_conf)) {
+	if (auto err = init_vpdo(*vpdo, pi.dscr_conf)) {
 		destroy_device(vpdo);
 		return err;
 	}
@@ -156,10 +157,10 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 		return err;
 	}
 
-	NT_ASSERT(vpdo->port); // was assigned
-	pluginfo->port = vpdo->port;
+	NT_ASSERT(vpdo->port > 0); // was assigned
+        pi.port = vpdo->port;
 
-	vpdo->SerialNumberUser = *pluginfo->wserial ? libdrv_strdupW(NonPagedPool, pluginfo->wserial) : nullptr;
+	vpdo->SerialNumberUser = *pi.wserial ? libdrv_strdupW(NonPagedPool, pi.wserial) : nullptr;
 
 	if (InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr)) {
 		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
@@ -169,11 +170,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t *pluginfo, 
 
 	vpdo->fo = fo;
 	
-	// Device Relation changes if a new vpdo is created. So let
-	// the PNP system now about that. This forces it to send bunch of pnp
-	// queries and cause the function driver to be loaded.
-	IoInvalidateDeviceRelations(vhci->pdo, BusRelations);
-
+	IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
 	return STATUS_SUCCESS;
 }
 

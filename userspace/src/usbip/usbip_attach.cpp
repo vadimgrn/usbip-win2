@@ -168,7 +168,7 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
 {
         auto sock = usbip_net_tcp_connect(host, usbip_port);
         if (!sock) {
-                err("failed to connect a remote host: %s", host);
+                err("can't connect to %s:%s", host, usbip_port);
                 return 2;
         }
 
@@ -236,9 +236,9 @@ int usbip_attach(int argc, char *argv[])
 		{}
 	};
 
-	char	*host = nullptr;
-	char	*busid = nullptr;
-	char	*serial = nullptr;
+	char *host{};
+	char *busid{};
+        char *serial{};
         bool terse{};
 
 	while (true) {

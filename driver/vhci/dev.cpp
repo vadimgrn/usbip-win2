@@ -12,22 +12,6 @@
 DEFINE_GUID(GUID_SD_USBIP_VHCI,
 	0x9d3039dd, 0xcca5, 0x4b4d, 0xb3, 0x3d, 0xe2, 0xdd, 0xc8, 0xa8, 0xc5, 0x2f);
 
-namespace
-{
-
-const ULONG ext_sizes_per_devtype[VDEV_SIZE] = 
-{
-	sizeof(root_dev_t),
-	sizeof(cpdo_dev_t),
-	sizeof(vhci_dev_t),
-	sizeof(hpdo_dev_t),
-	sizeof(vhub_dev_t),
-	sizeof(vpdo_dev_t)
-};
-
-} // namespace
-
-
 void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
 	ResultLength = 256;
@@ -58,8 +42,20 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	PAGED_CODE();
 
+        const ULONG ext_sizes[] = 
+        {
+                sizeof(root_dev_t),
+                sizeof(cpdo_dev_t),
+                sizeof(vhci_dev_t),
+                sizeof(hpdo_dev_t),
+                sizeof(vhub_dev_t),
+                sizeof(vpdo_dev_t)
+        };
+
+        static_assert(ARRAYSIZE(ext_sizes) == VDEV_SIZE);
+
 	DEVICE_OBJECT *devobj{};
-	auto extsize = ext_sizes_per_devtype[type];
+	auto extsize = ext_sizes[type];
 	NTSTATUS status{};
 
 	switch (type) {

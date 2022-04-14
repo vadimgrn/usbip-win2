@@ -99,7 +99,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, IO_STACK_LOCATION *irpstack,
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		status = vhci_plugin_vpdo(vhci, static_cast<vhci_pluginfo_t*>(buffer), inlen, irpstack->FileObject);
+		status = vhci_plugin_vpdo(vhci, *static_cast<vhci_pluginfo_t*>(buffer), inlen, irpstack->FileObject);
 		outlen = sizeof(vhci_pluginfo_t);
 		break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:

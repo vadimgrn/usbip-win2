@@ -99,24 +99,23 @@ std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE h
         return idevs;
 }
 
-int
-usbip_vhci_attach_device(HANDLE hdev, struct vhci_pluginfo_t* pluginfo)
+int usbip_vhci_attach_device(HANDLE hdev, vhci_pluginfo_t *pluginfo)
 {
-        if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE,
-                pluginfo, pluginfo->size, pluginfo, sizeof(*pluginfo), nullptr , nullptr)) {
-                DWORD err = GetLastError();
-                if (err == ERROR_HANDLE_EOF) {
-                        return ERR_PORTFULL;
-                }
-                dbg("usbip_vhci_attach_device: DeviceIoControl failed: err: 0x%lx", GetLastError());
-                return ERR_GENERAL;
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, pluginfo, pluginfo->size, 
+                                pluginfo, sizeof(*pluginfo), nullptr , nullptr)) {
+                return 0;
         }
 
-        return 0;
+        auto err = GetLastError();
+        if (err == ERROR_HANDLE_EOF) {
+                return ERR_PORTFULL;
+        }
+
+        dbg("%s: DeviceIoControl error %#x", __func__, err);
+        return ERR_GENERAL;
 }
 
-int
-usbip_vhci_detach_device(HANDLE hdev, int port)
+int usbip_vhci_detach_device(HANDLE hdev, int port)
 {
         ioctl_usbip_vhci_unplug unplug{ port };
 
@@ -125,7 +124,7 @@ usbip_vhci_detach_device(HANDLE hdev, int port)
         }
 
         auto err = GetLastError();
-        dbg("unplug error: 0x%lx", err);
+        dbg("%s: DeviceIoControl error %#x", __func__, err);
 
         switch (err) {
         case ERROR_FILE_NOT_FOUND:

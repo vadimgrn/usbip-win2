@@ -71,7 +71,7 @@ struct vhci_pluginfo_t
 	/* vhci_pluginfo_t structure size */
 	unsigned long size;
 	unsigned int devid;
-	int port;
+	int port; // OUT
 	wchar_t	wserial[MAX_VHCI_SERIAL_ID + 1];
 	USB_DEVICE_DESCRIPTOR dscr_dev;
 	/* variable length. It's a full-length configuration descriptor */
