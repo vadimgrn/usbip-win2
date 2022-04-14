@@ -27,26 +27,30 @@ namespace
 	VHUB_PREFIX L"&VID_" VHUB_VID L"&PID_" VHUB_PID L"\0"
 
 // vdev_type_t is an index
-const LPCWSTR vdev_devids[] = {
+const LPCWSTR vdev_devids[] = 
+{
 	nullptr, DEVID_VHCI,
 	nullptr, DEVID_VHUB,
 	nullptr, L"USB\\VID_%04hx&PID_%04hx" // 21 chars after formatting
 };
 
-const size_t vdev_devid_size[] = {
+const size_t vdev_devid_size[] = 
+{
 	0, sizeof(DEVID_VHCI),
 	0, sizeof(DEVID_VHUB),
 	0, (21 + 1)*sizeof(WCHAR)
 };
 
-const LPCWSTR vdev_hwids[] = {
+const LPCWSTR vdev_hwids[] = 
+{
 	nullptr, HWIDS_VHCI,
 	nullptr, HWIDS_VHUB,
 	nullptr, L"USB\\VID_%04hx&PID_%04hx&REV_%04hx;" // 31 chars after formatting
 	L"USB\\VID_%04hx&PID_%04hx;" // 22 chars after formatting
 };
 
-const size_t vdev_hwids_size[] = {
+const size_t vdev_hwids_size[] = 
+{
 	0, sizeof(HWIDS_VHCI),
 	0, sizeof(HWIDS_VHUB),
 	0, (31 + 22 + 1)*sizeof(WCHAR)
@@ -93,7 +97,7 @@ auto is_composite(const vpdo_dev_t &vpdo)
 /*
  * For all USB devices, the USB bus driver reports a device ID with the following format: USB\VID_xxxx&PID_yyyy
  */
-NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
+NTSTATUS setup_device_id(PWCHAR &result, bool&, vdev_t *vdev, IRP*)
 {
 	NTSTATUS status = STATUS_SUCCESS;
 
@@ -122,13 +126,13 @@ NTSTATUS setup_device_id(PWCHAR *result, bool*, vdev_t *vdev, IRP*)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		*result = id_dev;
+		result = id_dev;
 	}
 
 	return status;
 }
 
-NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
+NTSTATUS setup_hw_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 {
 	NTSTATUS status = STATUS_SUCCESS;
 
@@ -145,9 +149,9 @@ NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	*subst_result = vdev->type == VDEV_VPDO;
+	subst_result = vdev->type == VDEV_VPDO;
 
-	if (*subst_result) {
+	if (subst_result) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
 		
 		auto &d = vpdo->descriptor;
@@ -161,7 +165,7 @@ NTSTATUS setup_hw_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		*result = ids_hw;
+		result = ids_hw;
 	}
 
 	return status;
@@ -193,7 +197,7 @@ device ID and instance ID, uniquely identifies a device in the system.
 
 An instance ID is persistent across system restarts.
 */
-NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool*, vdev_t *vdev, IRP*, bool want_serial)
+NTSTATUS setup_inst_id_or_serial(PWCHAR &result, bool&, vdev_t *vdev, IRP*, bool want_serial)
 {
 	if (vdev->type != VDEV_VPDO) {
 		return STATUS_NOT_SUPPORTED;
@@ -219,13 +223,13 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR *result, bool*, vdev_t *vdev, IRP*, bool
 			RtlStringCchPrintfW(str, max_wchars, L"%d", vpdo->port);
 
 	if (status == STATUS_SUCCESS) {
-		*result = str;
+		result = str;
 	}
 
 	return status;
 }
 
-NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*)
+NTSTATUS setup_compat_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 {
 	if (vdev->type != VDEV_VPDO) {
 		return STATUS_NOT_SUPPORTED;
@@ -243,7 +247,7 @@ NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*
 
 	PWSTR ids_compat = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*ids_compat), USBIP_VHCI_POOL_TAG);
 	if (!ids_compat) {
-		Trace(TRACE_LEVEL_ERROR, "vpdo: query compatible id: out of memory");
+		Trace(TRACE_LEVEL_ERROR, "Out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -256,8 +260,8 @@ NTSTATUS setup_compat_ids(PWCHAR *result, bool *subst_result, vdev_t *vdev, IRP*
 						vpdo->bDeviceClass);
 
 	if (status == STATUS_SUCCESS) {
-		*result = ids_compat;
-		*subst_result = true;
+		result = ids_compat;
+		subst_result = true;
 		if (is_composite(*vpdo)) {
 			NT_ASSERT(remaining == ARRAYSIZE(comp));
 			RtlCopyMemory(dest_end, comp, sizeof(comp));
@@ -282,26 +286,26 @@ PAGEABLE NTSTATUS pnp_query_id(vdev_t *vdev, IRP *irp)
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	NTSTATUS status = STATUS_NOT_SUPPORTED;
 
-	PWCHAR result = nullptr;
+        WCHAR *result{};
 	bool subst_result = false;
 
 	auto type = irpstack->Parameters.QueryId.IdType;
 
 	switch (type) {
 	case BusQueryDeviceID:
-		status = setup_device_id(&result, &subst_result, vdev, irp);
+		status = setup_device_id(result, subst_result, vdev, irp);
 		break;
 	case BusQueryInstanceID:
-		status = setup_inst_id_or_serial(&result, &subst_result, vdev, irp, false);
+		status = setup_inst_id_or_serial(result, subst_result, vdev, irp, false);
 		break;
 	case BusQueryHardwareIDs:
-		status = setup_hw_ids(&result, &subst_result, vdev, irp);
+		status = setup_hw_ids(result, subst_result, vdev, irp);
 		break;
 	case BusQueryCompatibleIDs:
-		status = setup_compat_ids(&result, &subst_result, vdev, irp);
+		status = setup_compat_ids(result, subst_result, vdev, irp);
 		break;
 	case BusQueryDeviceSerialNumber:
-		status = setup_inst_id_or_serial(&result, &subst_result, vdev, irp, true);
+		status = setup_inst_id_or_serial(result, subst_result, vdev, irp, true);
 		break;
 	case BusQueryContainerID:
 		break;
