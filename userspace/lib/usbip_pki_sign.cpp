@@ -1,7 +1,8 @@
-#include <windows.h>
+#include "usbip_pki_sign.h"
 #include "mssign32.h"
 #include "usbip_common.h"
 #include "usbip_util.h"
+
 
 static BOOL
 load_mssign32_lib(HMODULE	*phMod, SignerSignEx_t *pfSignerSignEx, SignerFreeSignerContext_t *pfSignerFreeSignerContext)

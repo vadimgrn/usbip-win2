@@ -5,11 +5,11 @@
 #include <usbspec.h>
 
 /* sufficient large enough seq used to avoid conflict with normal vhci operation */
-static unsigned	seqnum = 0x7ffffff;
+static seqnum_t	seqnum = 0x7ffffff;
 
 static int fetch_descriptor(SOCKET sockfd, UINT8 dscr_type, unsigned int devid, void *dscr, USHORT dscr_size)
 {
-	struct usbip_header uhdr = {0};
+	usbip_header uhdr{};
 
 	uhdr.base.command = htonl(USBIP_CMD_SUBMIT);
 	uhdr.base.seqnum = seqnum++;
@@ -64,7 +64,7 @@ int fetch_device_descriptor(SOCKET sockfd, unsigned int devid, USB_DEVICE_DESCRI
 
 int fetch_conf_descriptor(SOCKET sockfd, unsigned int devid, USB_CONFIGURATION_DESCRIPTOR *cfgd, USHORT *wTotalLength)
 {
-	USB_CONFIGURATION_DESCRIPTOR hdr = {0};
+	USB_CONFIGURATION_DESCRIPTOR hdr{};
 	if (fetch_descriptor(sockfd, USB_CONFIGURATION_DESCRIPTOR_TYPE, devid, &hdr, sizeof(hdr)) < 0) {
 		return -1;
 	}

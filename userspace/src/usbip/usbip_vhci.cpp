@@ -99,10 +99,9 @@ std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE h
         return idevs;
 }
 
-int usbip_vhci_attach_device(HANDLE hdev, vhci_pluginfo_t *pluginfo)
+int usbip_vhci_attach_device(HANDLE hdev, vhci_pluginfo_t *pi)
 {
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, pluginfo, pluginfo->size, 
-                                pluginfo, sizeof(*pluginfo), nullptr , nullptr)) {
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, pi, pi->size, pi, sizeof(*pi), nullptr , nullptr)) {
                 return 0;
         }
 

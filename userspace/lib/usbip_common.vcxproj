@@ -122,6 +122,8 @@
     <ClInclude Include="pdu.h" />
     <ClInclude Include="usbip_common.h" />
     <ClInclude Include="getopt.h" />
+    <ClInclude Include="usbip_pki_cat.h" />
+    <ClInclude Include="usbip_pki_sign.h" />
     <ClInclude Include="usbip_setupdi.h" />
     <ClInclude Include="usbip_stub.h" />
     <ClInclude Include="usbip_util.h" />

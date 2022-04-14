@@ -9,10 +9,10 @@
 char *
 get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop)
 {
-	DWORD	length;
+	DWORD length;
 
 	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, nullptr, 0, &length)) {
-		DWORD	err = GetLastError();
+		auto err = GetLastError();
 		switch (err) {
 		case ERROR_INVALID_DATA:
 			return _strdup("");
@@ -22,22 +22,24 @@ get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop)
 			dbg("failed to get device property: err: %x", err);
 			return nullptr;
 		}
-	}
-	else {
+	} else {
 		dbg("unexpected case");
 		return nullptr;
 	}
-	auto value = (char*)malloc(length);
-	if (value == nullptr) {
+
+        auto value = (char*)malloc(length);
+	if (!value) {
 		dbg("out of memory");
 		return nullptr;
 	}
-	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, (PBYTE)value, length, &length)) {
+	
+        if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, (PBYTE)value, length, &length)) {
 		dbg("failed to get device property: err: %x", GetLastError());
 		free(value);
 		return nullptr;
 	}
-	return value;
+
+        return value;
 }
 
 char *

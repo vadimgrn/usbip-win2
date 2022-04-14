@@ -1,8 +1,9 @@
-#include <windows.h>
-#include <wincrypt.h>
-#include <mscat.h>
+#include "usbip_pki_cat.h"
 #include "usbip_common.h"
 #include "usbip_util.h"
+
+#include <wincrypt.h>
+#include <mscat.h>
 
 #define SHA1_HASH_LENGTH	20
 #define SPC_UUID_LENGTH		16
@@ -134,8 +135,7 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 	return TRUE;
 }
 
-BOOL
-build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
+BOOL build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 {
 	HCRYPTPROV	hProv;
 	BOOL		res = FALSE;

@@ -1,16 +1,14 @@
-#include "usbip_setupdi.h"
 #include "usbip_stub.h"
+#include "usbip_setupdi.h"
+#include "usbip_pki_cat.h"
+#include "usbip_pki_sign.h"
 #include "usbip_util.h"
 #include "usbip_common.h"
 
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
+
 #include <newdev.h>
-
-char *get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop);
-
-BOOL build_cat(const char *path, const char *catname, const char *hwid);
-int sign_file(LPCSTR subject, LPCSTR fpath);
 
 BOOL
 is_service_usbip_stub(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data)
