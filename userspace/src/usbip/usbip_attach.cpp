@@ -34,6 +34,60 @@ const char usbip_attach_usage_string[] =
 "    -s, --serial=<USB serial>  (Optional) USB serial to be overwritten\n"
 "    -t, --terse            show port number as a result\n";
 
+void log(const USB_DEVICE_DESCRIPTOR &d)
+{
+        dbg("USB_DEVICE_DESCRIPTOR\n"
+        "bLength %d\n"
+        "bDescriptorType %d\n"
+        "bcdUSB %x\n"
+        "bDeviceClass %x\n"
+        "bDeviceSubClass %x\n"
+        "bDeviceProtocol %x\n"
+        "bMaxPacketSize0 %d\n"
+        "idVendor %x\n"
+        "idProduct %x\n"
+        "bcdDevice %x\n"
+        "iManufacturer %d\n"
+        "iProduct %d\n"
+        "iSerialNumber %d\n"
+        "bNumConfigurations %d\n", 
+        d.bLength,
+        d.bDescriptorType,
+        d.bcdUSB,
+        d.bDeviceClass,
+        d.bDeviceSubClass,
+        d.bDeviceProtocol,
+        d.bMaxPacketSize0,
+        d.idVendor,
+        d.idProduct,
+        d.bcdDevice,
+        d.iManufacturer,
+        d.iProduct,
+        d.iSerialNumber,
+        d.bNumConfigurations);
+}
+
+void log(const USB_CONFIGURATION_DESCRIPTOR &d)
+{
+        dbg("USB_CONFIGURATION_DESCRIPTOR\n"
+        "bLength %d\n"
+        "bDescriptorType %#x\n"
+        "wTotalLength %d\n"
+        "bNumInterfaces %d\n"
+        "bConfigurationValue %d\n"
+        "iConfiguration %d\n"
+        "bmAttributes %x\n"
+        "MaxPower %d\n",
+        d.bLength,
+        d.bDescriptorType,
+        d.wTotalLength,
+        d.bNumInterfaces,
+        d.bConfigurationValue,
+        d.iConfiguration,
+        d.bmAttributes,
+        d.MaxPower);
+}
+
 int import_device(vhci_pluginfo_t *pluginfo, usbip::Handle &handle)
 {
         auto hdev = usbip_vhci_driver_open();
@@ -57,12 +111,27 @@ int import_device(vhci_pluginfo_t *pluginfo, usbip::Handle &handle)
         return pluginfo->port;
 }
 
+/*
+ * struct usbip_usb_device has most members of usb device descriptor.
+ *  
+ * Usb interface class/subclass/protocol present in struct usbip_usb_interface 
+ * which can be found in op_devinfo_reply (OP_DEVINFO) or op_devlist_reply_extra (OP_DEVLIST).
+ *
+ * OP_REQ_DEVINFO request is not implemented, see <linux>/tools/usb/usbip/src/usbipd.c, recv_pdu.
+ *
+ * OP_REQ_DEVLIST: op_devlist_reply_extra has zeros for udev.bNumInterfaces and udev.bConfigurationValue,
+ * see <linux>/tools/usb/usbip/libsrc/usbip_common.c, read_attr_value.
+ * 
+ * For these reasons reading of descriptors is used instead of issuing OP_DEVINFO or OP_DEVLIST.
+ */
 std::vector<char> build_pluginfo(SOCKET sockfd, unsigned int devid)
 {
         std::vector<char> v;
 
+        seqnum_t seqnum = 0xFFFF; // the first request after OP_REQ_IMPORT
         USHORT wTotalLength = 0;
-        if (fetch_conf_descriptor(sockfd, devid, nullptr, &wTotalLength) < 0) {
+
+        if (fetch_conf_descriptor(sockfd, seqnum, devid, nullptr, wTotalLength) < 0) {
                 dbg("failed to get configuration descriptor size");
                 return v;
         }
@@ -71,20 +140,23 @@ std::vector<char> build_pluginfo(SOCKET sockfd, unsigned int devid)
         v.resize(sizeof(*pi) - sizeof(pi->dscr_conf) + wTotalLength);
         pi = reinterpret_cast<vhci_pluginfo_t*>(v.data());
 
-        pi->size = static_cast<unsigned long>(v.size());
-        pi->devid = devid;
+        if (fetch_conf_descriptor(sockfd, seqnum, devid, &pi->dscr_conf, wTotalLength) < 0) {
+                dbg("failed to fetch configuration descriptor");
+                v.clear();
+                return v;
+        }
 
-        if (fetch_device_descriptor(sockfd, devid, &pi->dscr_dev) < 0) {
+        if (fetch_device_descriptor(sockfd, seqnum, devid, pi->dscr_dev) < 0) {
                 dbg("failed to fetch device descriptor");
                 v.clear();
                 return v;
         }
 
-        if (fetch_conf_descriptor(sockfd, devid, &pi->dscr_conf, &wTotalLength) < 0) {
-                dbg("failed to fetch configuration descriptor");
-                v.clear();
-                return v;
-        }
+        pi->size = static_cast<unsigned long>(v.size());
+        pi->devid = devid;
+
+        log(pi->dscr_dev);
+        log(pi->dscr_conf);
 
         return v;
 }

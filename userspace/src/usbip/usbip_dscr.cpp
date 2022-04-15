@@ -1,84 +1,85 @@
 #include "usbip_dscr.h"
-#include "usbip_proto.h"
 #include "usbip_network.h"
 
-#include <usbspec.h>
-
-/* sufficient large enough seq used to avoid conflict with normal vhci operation */
-static seqnum_t	seqnum = 0x7ffffff;
-
-static int fetch_descriptor(SOCKET sockfd, UINT8 dscr_type, unsigned int devid, void *dscr, USHORT dscr_size)
+namespace
 {
-	usbip_header uhdr{};
 
-	uhdr.base.command = htonl(USBIP_CMD_SUBMIT);
-	uhdr.base.seqnum = seqnum++;
-	uhdr.base.direction = htonl(USBIP_DIR_IN);
-	uhdr.base.devid = htonl(devid);
+int fetch_descriptor(SOCKET sockfd, seqnum_t &seqnum, UINT8 dscr_type, UINT8 dscr_idx, unsigned int devid, void *dscr, USHORT dscr_size)
+{
+        usbip_header hdr{};
 
-	USB_DEFAULT_PIPE_SETUP_PACKET *setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)uhdr.u.cmd_submit.setup; // get_submit_setup(&uhdr);
-	static_assert(sizeof(*setup) == sizeof(uhdr.u.cmd_submit.setup), "assert");
+        hdr.base.command = htonl(USBIP_CMD_SUBMIT);
+        hdr.base.seqnum = ++seqnum;
+        hdr.base.direction = htonl(USBIP_DIR_IN);
+        hdr.base.devid = htonl(devid);
 
-	setup->bmRequestType.s.Dir = BMREQUEST_DEVICE_TO_HOST;
-	setup->bmRequestType.s.Type = BMREQUEST_STANDARD;
-	setup->bmRequestType.s.Recipient = BMREQUEST_TO_DEVICE;
+        auto &r = *reinterpret_cast<USB_DEFAULT_PIPE_SETUP_PACKET*>(hdr.u.cmd_submit.setup);
+        static_assert(sizeof(r) == sizeof(hdr.u.cmd_submit.setup));
 
-	setup->bRequest = USB_REQUEST_GET_DESCRIPTOR;
-	setup->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(dscr_type, 0); // FIXME: index
-	setup->wIndex.W = 0; // zero or Language ID
-	setup->wLength = dscr_size;
+        r.bmRequestType.s.Dir = BMREQUEST_DEVICE_TO_HOST;
+        r.bmRequestType.s.Type = BMREQUEST_STANDARD;
+        r.bmRequestType.s.Recipient = BMREQUEST_TO_DEVICE;
 
-	uhdr.u.cmd_submit.transfer_buffer_length = htonl(dscr_size);
+        r.bRequest = USB_REQUEST_GET_DESCRIPTOR;
+        r.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(dscr_type, dscr_idx);
+        r.wIndex.W = 0; // Language ID, relevant for USB_STRING_DESCRIPTOR_TYPE only
+        r.wLength = dscr_size;
 
-	if (usbip_net_send(sockfd, &uhdr, sizeof(uhdr)) < 0) {
-		dbg("fetch_descriptor: failed to send usbip header\n");
-		return -1;
-	}
-	if (usbip_net_recv(sockfd, &uhdr, sizeof(uhdr)) < 0) {
-		dbg("fetch_descriptor: failed to recv usbip header\n");
-		return -1;
-	}
-	if (uhdr.u.ret_submit.status != 0) {
-		dbg("fetch_descriptor: command submit error: %d\n", uhdr.u.ret_submit.status);
-		return -1;
-	}
+        hdr.u.cmd_submit.transfer_buffer_length = htonl(dscr_size);
 
-	INT32 alen = ntohl(uhdr.u.ret_submit.actual_length);
-	if (alen < dscr_size) {
-		err("fetch_descriptor: too short response: actual length: %d\n", alen);
-		return -1;
-	}
+        if (usbip_net_send(sockfd, &hdr, sizeof(hdr)) < 0) {
+                dbg("%s: failed to send usbip header\n", __func__);
+                return -1;
+        }
+        if (usbip_net_recv(sockfd, &hdr, sizeof(hdr)) < 0) {
+                dbg("%s: failed to recv usbip header\n", __func__);
+                return -1;
+        }
+        if (auto st = hdr.u.ret_submit.status) {
+                dbg("%s: command submit error: %d\n", __func__, st);
+                return -1;
+        }
 
-	if (usbip_net_recv(sockfd, dscr, alen) < 0) {
-		err("fetch_descriptor: failed to recv usbip payload\n");
-		return -1;
-	}
-	
-	return 0;
+        auto alen = ntohl(hdr.u.ret_submit.actual_length);
+        if (alen != dscr_size) {
+                err("%s: actual length %d != %d\n", __func__, alen, dscr_size);
+                return -1;
+        }
+
+        if (usbip_net_recv(sockfd, dscr, dscr_size) < 0) {
+                err("%s: failed to recv usbip payload\n", __func__);
+                return -1;
+        }
+
+        return 0;
 }
 
-int fetch_device_descriptor(SOCKET sockfd, unsigned int devid, USB_DEVICE_DESCRIPTOR *dd)
+} // namespace
+
+
+int fetch_device_descriptor(SOCKET sockfd, seqnum_t &seqnum, unsigned int devid, USB_DEVICE_DESCRIPTOR &dd)
 {
-	return fetch_descriptor(sockfd, USB_DEVICE_DESCRIPTOR_TYPE, devid, dd, sizeof(*dd));
+	return fetch_descriptor(sockfd, seqnum, USB_DEVICE_DESCRIPTOR_TYPE, 0, devid, &dd, sizeof(dd));
 }
 
-int fetch_conf_descriptor(SOCKET sockfd, unsigned int devid, USB_CONFIGURATION_DESCRIPTOR *cfgd, USHORT *wTotalLength)
+int fetch_conf_descriptor(SOCKET sockfd, seqnum_t &seqnum, unsigned int devid, USB_CONFIGURATION_DESCRIPTOR *cfgd, USHORT &wTotalLength)
 {
-	USB_CONFIGURATION_DESCRIPTOR hdr{};
-	if (fetch_descriptor(sockfd, USB_CONFIGURATION_DESCRIPTOR_TYPE, devid, &hdr, sizeof(hdr)) < 0) {
+        const UINT8 dscr_idx = -1;
+
+        if (!cfgd) {
+	        USB_CONFIGURATION_DESCRIPTOR hdr{};
+	        if (fetch_descriptor(sockfd, seqnum, USB_CONFIGURATION_DESCRIPTOR_TYPE, dscr_idx, devid, &hdr, sizeof(hdr)) < 0) {
+		        return -1;
+	        }
+                wTotalLength = hdr.wTotalLength;
+                assert(wTotalLength > sizeof(hdr));
+                return 0;
+	}
+
+	if (wTotalLength <= sizeof(*cfgd)) {
+		err("%s: too small descriptor buffer\n", __func__);
 		return -1;
 	}
 
-	if (!cfgd) {
-		*wTotalLength = hdr.wTotalLength;
-		return 0;
-	}
-
-	if (*wTotalLength < hdr.wTotalLength) {
-		err("fetch_conf_descriptor: too small descriptor buffer\n");
-		return -1;
-	}
-
-	*wTotalLength = hdr.wTotalLength;
-	return fetch_descriptor(sockfd, USB_CONFIGURATION_DESCRIPTOR_TYPE, devid, cfgd, *wTotalLength);
+	return fetch_descriptor(sockfd, seqnum, USB_CONFIGURATION_DESCRIPTOR_TYPE, dscr_idx, devid, cfgd, wTotalLength);
 }
