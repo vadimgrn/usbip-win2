@@ -79,6 +79,11 @@ Source: {#BuildDir + "usbipd.exe"}; DestDir: "{app}"; Components: server
 Source: {#BuildDir + "package\usbip_stub.sys"}; DestDir: "{app}"; Components: server
 Source: {#SolutionDir + "driver\stub\usbip_stub.inx"}; DestDir: "{app}"; Components: server
 
+#if Configuration == "Debug"
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}/pdb";
+#endif
+
+
 [Tasks]
 Name: modifypath; Description: "&Add to PATH environment variable for all users"
 

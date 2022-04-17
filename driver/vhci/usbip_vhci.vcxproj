@@ -42,6 +42,7 @@
     <ClCompile Include="wmi.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\usbip_api_consts.h" />
     <ClInclude Include="..\..\include\usbip_vhci_api.h" />
     <ClInclude Include="..\..\include\usbip_proto.h" />
     <ClInclude Include="csq.h" />
