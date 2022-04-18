@@ -53,7 +53,7 @@ static int detach_port(const char* portstr)
 	hdev.reset();
 
 	if (!ret) {
-                if (port < 0) {
+                if (port <= 0) {
                         printf("all ports are detached\n");
                 } else {
                         printf("port %d is succesfully detached\n", port);
@@ -70,7 +70,6 @@ static int detach_port(const char* portstr)
 		break;
 	default:
 		err("failed to detach");
-		break;
 	}
 	
         return 3;
@@ -78,13 +77,14 @@ static int detach_port(const char* portstr)
 
 int usbip_detach(int argc, char *argv[])
 {
-	static const struct option opts[] = {
+	const struct option opts[] = 
+        {
 		{ "port", required_argument, nullptr, 'p' },
-		{ nullptr, 0, nullptr, 0 }
+		{}
 	};
 
 	for (;;) {
-		int	opt = getopt_long(argc, argv, "p:", opts, nullptr);
+		auto opt = getopt_long(argc, argv, "p:", opts, nullptr);
 
 		if (opt == -1)
 			break;
@@ -92,8 +92,6 @@ int usbip_detach(int argc, char *argv[])
 		switch (opt) {
 		case 'p':
 			return detach_port(optarg);
-		default:
-			break;
 		}
 	}
 

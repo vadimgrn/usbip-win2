@@ -115,10 +115,11 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 } // namespace
 
 
-PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG inlen, FILE_OBJECT*)
+PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *, ioctl_usbip_vhci_plugin &, ULONG, ULONG&)
 {
 	PAGED_CODE();
-
+        return STATUS_NOT_IMPLEMENTED;
+/*
 	if (inlen < sizeof(pi)) {
 		Trace(TRACE_LEVEL_ERROR, "Too small input length: %lld < %lld", inlen, sizeof(pi));
 		return STATUS_INVALID_PARAMETER;
@@ -171,6 +172,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG 
 
 	IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
 	return STATUS_SUCCESS;
+*/
 }
 
 PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)

@@ -233,8 +233,6 @@ extern "C" {
 
 PAGEABLE DRIVER_ADD_DEVICE vhci_add_device;
 	
-PAGEABLE __drv_dispatchType(IRP_MJ_READ) DRIVER_DISPATCH vhci_read;
-PAGEABLE __drv_dispatchType(IRP_MJ_WRITE) DRIVER_DISPATCH vhci_write;
 PAGEABLE __drv_dispatchType(IRP_MJ_DEVICE_CONTROL) DRIVER_DISPATCH vhci_ioctl;
 PAGEABLE __drv_dispatchType(IRP_MJ_INTERNAL_DEVICE_CONTROL) DRIVER_DISPATCH vhci_internal_ioctl;
 PAGEABLE __drv_dispatchType(IRP_MJ_PNP) DRIVER_DISPATCH vhci_pnp;
@@ -267,8 +265,6 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 
 	drvobj->MajorFunction[IRP_MJ_CREATE] = vhci_create;
 	drvobj->MajorFunction[IRP_MJ_CLOSE] = vhci_close;
-	drvobj->MajorFunction[IRP_MJ_READ] = vhci_read;
-	drvobj->MajorFunction[IRP_MJ_WRITE] = vhci_write;
 	drvobj->MajorFunction[IRP_MJ_PNP] = vhci_pnp;
 	drvobj->MajorFunction[IRP_MJ_POWER] = vhci_power;
 	drvobj->MajorFunction[IRP_MJ_DEVICE_CONTROL] = vhci_ioctl;

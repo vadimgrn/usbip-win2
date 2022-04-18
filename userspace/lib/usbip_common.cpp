@@ -7,7 +7,6 @@
 #include "usbip_common.h"
 #include "names.h"
 #include "usbip_util.h"
-
 #include "usbip_proto.h"
 
 int usbip_use_stderr;

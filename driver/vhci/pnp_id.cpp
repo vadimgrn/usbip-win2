@@ -141,7 +141,7 @@ NTSTATUS setup_hw_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	size_t str_sz = vdev_hwids_size[vdev->type];
+	auto str_sz = vdev_hwids_size[vdev->type];
 
 	auto ids_hw = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
@@ -203,24 +203,22 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR &result, bool&, vdev_t *vdev, IRP*, bool
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	const size_t max_wchars = MAX_VHCI_SERIAL_ID + 1;
-	//	static_assert(MAX_VHCI_SERIAL_ID <= MAX_DEVICE_ID_LEN);
+        auto vpdo = (vpdo_dev_t*)vdev;
+        const size_t cch = 200; // see MAX_DEVICE_ID_LEN, cfgmgr32.h
 
-	vpdo_dev_t *vpdo = (vpdo_dev_t*)vdev;
-
-	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 	if (!str) {
 		Trace(TRACE_LEVEL_ERROR, "vpdo: %s: out of memory", want_serial ? "DeviceSerialNumber" : "InstanceID");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
 	auto SerialNumber = vpdo->SerialNumberUser ? vpdo->SerialNumberUser :
-				vpdo->SerialNumber ? vpdo->SerialNumber :
-				L"";
+			    vpdo->SerialNumber ? vpdo->SerialNumber :
+			    L"";
 
-	NTSTATUS status = *SerialNumber || want_serial ?
-			RtlStringCchCopyW(str, max_wchars, SerialNumber) :
-			RtlStringCchPrintfW(str, max_wchars, L"%d", vpdo->port);
+	auto status = *SerialNumber || want_serial ?
+                        RtlStringCchCopyW(str, cch, SerialNumber) :
+			RtlStringCchPrintfW(str, cch, L"%d", vpdo->port);
 
 	if (status == STATUS_SUCCESS) {
 		result = str;

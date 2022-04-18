@@ -1,15 +1,11 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <guiddef.h>
 
 #ifdef _NTDDK_
-#include <ntddk.h>
+  #include <ntddk.h>
 #else
-#include <winioctl.h>
+  #include <winioctl.h>
 #endif
 
 #include <usbspec.h>
@@ -64,43 +60,34 @@ DEFINE_GUID(USBIP_NOTIFY_DEVICE_ARRIVAL_EVENT,
 #define IOCTL_USBIP_VHCI_GET_PORTS_STATUS	USBIP_VHCI_IOCTL(0x2)
 #define IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES	USBIP_VHCI_IOCTL(0x3)
 
-enum { MAX_VHCI_SERIAL_ID = 127 };
-
-struct vhci_pluginfo_t
-{
-	/* vhci_pluginfo_t structure size */
-	unsigned long size;
-	unsigned int devid;
-	int port; // OUT
-	wchar_t	wserial[MAX_VHCI_SERIAL_ID + 1];
-	USB_DEVICE_DESCRIPTOR dscr_dev;
-	/* variable length. It's a full-length configuration descriptor */
-	USB_CONFIGURATION_DESCRIPTOR dscr_conf;
-};
-
 enum { VHCI_PORTS_MAX = 127 };
 
 struct ioctl_usbip_vhci_get_ports_status
 {
-	/* maximum number of ports */
-	int n_max_ports;
+	int n_max_ports; // number of ports
 	bool port_status[VHCI_PORTS_MAX];
-};
-
-struct ioctl_usbip_vhci_unplug
-{
-	int port;
 };
 
 struct ioctl_usbip_vhci_imported_dev 
 {
         int port;
-        enum usbip_device_status status;
+        usbip_device_status status;
         unsigned short vendor;
         unsigned short product;
-        enum usb_device_speed speed;
+        usb_device_speed speed;
 };
 
-#ifdef __cplusplus
-}
-#endif
+struct ioctl_usbip_vhci_plugin
+{
+        int port; // OUT, must be the first member
+        char tcp_port[32];
+        char busid[USBIP_BUS_ID_SIZE];
+        char host[255];
+        wchar_t	wserial[255];
+};
+
+struct ioctl_usbip_vhci_unplug
+{
+        int port;
+};
+

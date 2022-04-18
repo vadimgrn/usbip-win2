@@ -4,8 +4,6 @@
 
 #include "dbgcommon.h"
 #include "irp.h"
-#include "dev.h"
-#include "read.h"
 #include "csq.h"
 
 namespace
@@ -396,6 +394,18 @@ NTSTATUS usb_get_port_status(ULONG *status)
 
 } // namespace
 
+
+NTSTATUS send_to_server(vpdo_dev_t*, IRP*) 
+{
+        Trace(TRACE_LEVEL_ERROR, "NOT_IMPLEMENTED");
+        return STATUS_NOT_IMPLEMENTED; 
+}
+
+NTSTATUS send_cmd_unlink(vpdo_dev_t*, IRP*) 
+{
+        Trace(TRACE_LEVEL_ERROR, "NOT_IMPLEMENTED");
+        return STATUS_NOT_IMPLEMENTED; 
+}
 
 NTSTATUS complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {

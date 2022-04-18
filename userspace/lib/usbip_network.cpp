@@ -115,10 +115,7 @@ int usbip_net_send(SOCKET sockfd, void *buff, size_t bufflen)
 
 int usbip_net_send_op_common(SOCKET sockfd, uint32_t code, uint32_t status)
 {
-	struct op_common op_common;
-	int rc;
-
-	memset(&op_common, 0, sizeof(op_common));
+        op_common op_common{};
 
 	op_common.version = USBIP_VERSION;
 	op_common.code    = code;
@@ -126,7 +123,7 @@ int usbip_net_send_op_common(SOCKET sockfd, uint32_t code, uint32_t status)
 
 	PACK_OP_COMMON(1, &op_common);
 
-	rc = usbip_net_send(sockfd, &op_common, sizeof(op_common));
+	auto rc = usbip_net_send(sockfd, &op_common, sizeof(op_common));
 	if (rc < 0) {
 		dbg("usbip_net_send failed: %d", rc);
 		return -1;

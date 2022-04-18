@@ -7,7 +7,7 @@
 #include "usbip_proto.h"
 #include "irp.h"
 #include "usbdsc.h"
-#include "read.h"
+#include "internal_ioctl.h"
 
 #include <ntstrsafe.h>
 

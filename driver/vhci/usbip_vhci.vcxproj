@@ -32,9 +32,7 @@
     <ClCompile Include="pnp_start.cpp" />
     <ClCompile Include="vhub.cpp" />
     <ClCompile Include="vpdo.cpp" />
-    <ClCompile Include="read.cpp" />
     <ClCompile Include="vpdo_dsc.cpp" />
-    <ClCompile Include="write.cpp" />
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="power.cpp" />
@@ -67,7 +65,6 @@
     <ClInclude Include="pnp_resources.h" />
     <ClInclude Include="pnp_start.h" />
     <ClInclude Include="proto.h" />
-    <ClInclude Include="read.h" />
     <ClInclude Include="vhub.h" />
     <ClInclude Include="vpdo.h" />
     <ClInclude Include="vpdo_dsc.h" />
