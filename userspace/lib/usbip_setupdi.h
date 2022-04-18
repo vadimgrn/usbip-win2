@@ -13,7 +13,8 @@ int traverse_intfdevs(walkfunc_t walker, LPCGUID pguid, void *ctx);
 char *get_id_hw(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data);
 char *get_upper_filters(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data);
 char *get_id_inst(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data);
-PSP_DEVICE_INTERFACE_DETAIL_DATA get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, LPCGUID pguid);
+
+SP_DEVICE_INTERFACE_DETAIL_DATA *get_intf_detail(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, LPCGUID pguid);
 
 devno_t get_devno_from_busid(const char *busid);
 

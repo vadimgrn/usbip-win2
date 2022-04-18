@@ -84,47 +84,42 @@ get_id_inst(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 	return id_inst;
 }
 
-PSP_DEVICE_INTERFACE_DETAIL_DATA
-get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, LPCGUID pguid)
+SP_DEVICE_INTERFACE_DETAIL_DATA *get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, LPCGUID pguid)
 {
-	SP_DEVICE_INTERFACE_DATA	dev_interface_data;
-	PSP_DEVICE_INTERFACE_DETAIL_DATA	pdev_interface_detail;
-	unsigned long len = 0;
-	DWORD	err;
+        SP_DEVICE_INTERFACE_DATA dev_interface_data{ sizeof(dev_interface_data) };
 
-	dev_interface_data.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA);
 	if (!SetupDiEnumDeviceInterfaces(dev_info, pdev_info_data, pguid, 0, &dev_interface_data)) {
-		DWORD	err = GetLastError();
-		if (err != ERROR_NO_MORE_ITEMS)
-			dbg("SetupDiEnumDeviceInterfaces failed: err: 0x%lx", err);
-		return nullptr;
-	}
-	SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, nullptr, 0, &len, nullptr);
-	err = GetLastError();
-	if (err != ERROR_INSUFFICIENT_BUFFER) {
-		dbg("SetupDiGetDeviceInterfaceDetail failed: err: 0x%lx", err);
+		auto err = GetLastError();
+		if (err != ERROR_NO_MORE_ITEMS) {
+			dbg("SetupDiEnumDeviceInterfaces error %#x", err);
+                }
 		return nullptr;
 	}
 
-	// Allocate the required memory and set the cbSize.
-	pdev_interface_detail = (PSP_DEVICE_INTERFACE_DETAIL_DATA)malloc(len);
-	if (pdev_interface_detail == nullptr) {
+        DWORD len = 0;
+        if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, nullptr, 0, &len, nullptr)) {
+                auto err = GetLastError();
+                if (err != ERROR_INSUFFICIENT_BUFFER) {
+                        dbg("SetupDiGetDeviceInterfaceDetail error %#x", err);
+                        return nullptr;
+                }
+        }
+
+        auto dev_interface_detail = (SP_DEVICE_INTERFACE_DETAIL_DATA*)malloc(len);
+	if (!dev_interface_detail) {
 		dbg("can't malloc %lu size memory", len);
 		return nullptr;
 	}
 
-	pdev_interface_detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA);
+	dev_interface_detail->cbSize = sizeof(*dev_interface_detail);
 
-	// Try to get device details.
-	if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data,
-		pdev_interface_detail, len, &len, nullptr)) {
-		// Errors.
-		dbg("SetupDiGetDeviceInterfaceDetail failed: err: 0x%lx", GetLastError());
-		free(pdev_interface_detail);
-		return nullptr;
+	if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, dev_interface_detail, len, nullptr, nullptr)) {
+		dbg("SetupDiGetDeviceInterfaceDetail error %#x", GetLastError());
+		free(dev_interface_detail);
+                dev_interface_detail = nullptr;
 	}
 
-	return pdev_interface_detail;
+	return dev_interface_detail;
 }
 
 BOOL
