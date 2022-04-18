@@ -124,13 +124,6 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
 		ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
 		vpdo->actconfig = nullptr;
 	}
-
-	if (auto fo = (FILE_OBJECT*)InterlockedExchangePointer((PVOID*)&vpdo->fo, nullptr)) {
-		auto ptr = (vpdo_dev_t*)InterlockedCompareExchangePointer(&fo->FsContext, nullptr, vpdo);
-		if (ptr != vpdo) {
-			Trace(TRACE_LEVEL_WARNING, "FsContext(%p) != this(%p)", ptr, vpdo);
-		}
-	}
 }
 
 } // namespace

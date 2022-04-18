@@ -15,15 +15,15 @@
 namespace
 {
 
-PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
+PAGEABLE auto init(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
-	vpdo.current_intf_num = 0;
-	vpdo.current_intf_alt = 0;
+	NT_ASSERT(!vpdo.current_intf_num);
+        NT_ASSERT(!vpdo.current_intf_alt);
 
-	vpdo.PnPState = pnp_state::NotStarted;
-	vpdo.PreviousPnPState = pnp_state::NotStarted;
+        NT_ASSERT(vpdo.PnPState == pnp_state::NotStarted);
+        NT_ASSERT(vpdo.PreviousPnPState == pnp_state::NotStarted);
 
 	// vpdo usually starts its life at D3
 	vpdo.DevicePowerState = PowerDeviceD3;
@@ -46,7 +46,7 @@ PAGEABLE auto vhci_init_vpdo(vpdo_dev_t &vpdo)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto init_vpdo(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
+PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
@@ -94,12 +94,12 @@ PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 * USB class, subclass and protocol numbers should be setup before importing.
 * Because windows vhci driver builds a device compatible id with those numbers.
 */
-PAGEABLE auto init_vpdo(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
+PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
 	NT_ASSERT(!vpdo.actconfig); // first time initialization
-	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(PagedPool, d.wTotalLength, USBIP_VHCI_POOL_TAG);
+	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(NonPagedPool, d.wTotalLength, USBIP_VHCI_POOL_TAG);
 
 	if (vpdo.actconfig) {
 		RtlCopyMemory(vpdo.actconfig, &d, d.wTotalLength);
@@ -115,7 +115,7 @@ PAGEABLE auto init_vpdo(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 } // namespace
 
 
-PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG inlen, FILE_OBJECT *fo)
+PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG inlen, FILE_OBJECT*)
 {
 	PAGED_CODE();
 
@@ -142,17 +142,17 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG 
 	vpdo->devid = pi.devid;
 	vpdo->parent = vhub_from_vhci(vhci);
 
-	if (auto err = init_vpdo(*vpdo, pi.dscr_dev)) {
+	if (auto err = init(*vpdo, pi.dscr_dev)) {
 		destroy_device(vpdo);
 		return err;
 	}
 	
-	if (auto err = init_vpdo(*vpdo, pi.dscr_conf)) {
+	if (auto err = init(*vpdo, pi.dscr_conf)) {
 		destroy_device(vpdo);
 		return err;
 	}
 
-	if (auto err = vhci_init_vpdo(*vpdo)) {
+	if (auto err = init(*vpdo)) {
 		destroy_device(vpdo);
 		return err;
 	}
@@ -160,16 +160,15 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, vhci_pluginfo_t &pi, ULONG 
 	NT_ASSERT(vpdo->port > 0); // was assigned
         pi.port = vpdo->port;
 
-	vpdo->SerialNumberUser = *pi.wserial ? libdrv_strdupW(NonPagedPool, pi.wserial) : nullptr;
+        if (*pi.wserial) {
+                vpdo->SerialNumberUser = libdrv_strdupW(NonPagedPool, pi.wserial);
+                if (!vpdo->SerialNumberUser) {
+                        Trace(TRACE_LEVEL_ERROR, "Can't allocate memory for '%S'", pi.wserial);
+                        destroy_device(vpdo);
+                        return STATUS_INSUFFICIENT_RESOURCES;
+                }
+        }
 
-	if (InterlockedCompareExchangePointer(&fo->FsContext, vpdo, nullptr)) {
-		Trace(TRACE_LEVEL_INFORMATION, "You can't plugin again");
-		destroy_device(vpdo);
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	vpdo->fo = fo;
-	
 	IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
 	return STATUS_SUCCESS;
 }

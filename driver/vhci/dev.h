@@ -106,7 +106,6 @@ struct vpdo_dev_t : vdev_t
 	ULONG current_frame_number;
 
 	UNICODE_STRING usb_dev_interface;
-	FILE_OBJECT *fo;
 	
 	unsigned int devid;
 	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));

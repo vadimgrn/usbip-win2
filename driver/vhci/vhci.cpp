@@ -49,23 +49,6 @@ ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, 
         return false;
 }
 
-PAGEABLE void cleanup_vpdo(IRP *irp)
-{
-	PAGED_CODE();
-
-	auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	auto fo = irpstack->FileObject;
-
-	if (auto vpdo = (vpdo_dev_t*)InterlockedExchangePointer(&fo->FsContext, nullptr)) {
-		auto ptr = (FILE_OBJECT*)InterlockedCompareExchangePointer((PVOID*)&vpdo->fo, nullptr, fo);
-		if (ptr == fo) {
-			vhub_unplug_vpdo(vpdo);
-		} else {
-			Trace(TRACE_LEVEL_WARNING, "FsContext(%p)->fo(%p) != FileObject(%p)", vpdo, ptr, fo);
-		}
-	}
-}
-
 PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
 	PAGED_CODE();
@@ -81,27 +64,6 @@ PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 
 	Irp->IoStatus.Information = 0;
 	return CompleteRequest(Irp);
-}
-
-PAGEABLE NTSTATUS vhci_cleanup(__in PDEVICE_OBJECT devobj, __in PIRP irp)
-{
-	PAGED_CODE();
-
-	auto vdev = to_vdev(devobj);
-
-	if (vdev->PnPState == pnp_state::Removed) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
-	}
-
-	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
-
-	if (vdev->type == VDEV_VHCI) {
-		cleanup_vpdo(irp);
-	}
-
-	irp->IoStatus.Information = 0;
-	return CompleteRequest(irp);
 }
 
 PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
@@ -304,7 +266,6 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 	}
 
 	drvobj->MajorFunction[IRP_MJ_CREATE] = vhci_create;
-	drvobj->MajorFunction[IRP_MJ_CLEANUP] = vhci_cleanup;
 	drvobj->MajorFunction[IRP_MJ_CLOSE] = vhci_close;
 	drvobj->MajorFunction[IRP_MJ_READ] = vhci_read;
 	drvobj->MajorFunction[IRP_MJ_WRITE] = vhci_write;
