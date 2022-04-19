@@ -44,20 +44,16 @@ int init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const 
         {
                 { r.tcp_port, ARRAYSIZE(r.tcp_port), usbip_port },
                 { r.busid, ARRAYSIZE(r.busid), busid },
-                { r.host, ARRAYSIZE(r.host), host }
+                { r.host, ARRAYSIZE(r.host), host },
+                { r.serial, ARRAYSIZE(r.serial), serial },
         };
 
         for (auto &i: v) {
-                if (auto err = strcpy_s(i.dst, i.len, i.src)) {
-                        dbg("'%s' copy error #%d", i.src, err);
-                        return ERR_GENERAL;
-                }
-        }
-
-        if (serial) {
-                if (auto err = mbstowcs_s(nullptr, r.wserial, ARRAYSIZE(r.wserial), serial, _TRUNCATE)) {
-                        dbg("mbstowcs_s('%s') error #%d", serial, err);
-                        return ERR_GENERAL;
+                if (auto src = i.src) {
+                        if (auto err = strcpy_s(i.dst, i.len, src)) {
+                                dbg("'%s' copy error #%d", src, err);
+                                return ERR_GENERAL;
+                        }
                 }
         }
 

@@ -2,7 +2,6 @@
 #include "trace.h"
 #include "plugin.tmh"
 
-#include "strutil.h"
 #include "vhub.h"
 #include "pnp.h"
 #include "usb_util.h"
@@ -112,6 +111,16 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 		set_class_subclass_proto(vpdo) : STATUS_SUCCESS;
 }
 
+PAGEABLE auto copy(UNICODE_STRING &dst, const char *src)
+{
+        PAGED_CODE();
+
+        UTF8_STRING s;
+        RtlInitUTF8String(&s, src);
+
+        return RtlUTF8StringToUnicodeString(&dst, &s, true);
+}
+
 PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULONG &outlen)
 {
         PAGED_CODE();
@@ -126,13 +135,12 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
         auto vpdo = to_vpdo_or_null(devobj);
         vpdo->parent = vhub_from_vhci(vhci);
 
-        if (*r.wserial) {
-                vpdo->SerialNumberUser = libdrv_strdupW(NonPagedPool, r.wserial);
-                if (!vpdo->SerialNumberUser) {
-                        Trace(TRACE_LEVEL_ERROR, "Can't allocate memory for '%S'", r.wserial);
-                        destroy_device(vpdo);
-                        return STATUS_INSUFFICIENT_RESOURCES;
-                }
+        if (!*r.serial) {
+                RtlInitUnicodeString(&vpdo->SerialNumberUser, nullptr);
+        } else if (auto err = copy(vpdo->SerialNumberUser, r.serial)) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.serial, err);
+                destroy_device(vpdo);
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
 /*
@@ -167,7 +175,8 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
 PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
-        TraceCall("irp %p: %s:%s, busid %s, serial '%!WSTR!'", irp, r.host, r.tcp_port, r.busid, r.wserial);
+        TraceCall("irp %p: %s:%s, busid %s, serial '%s'", irp, r.host, r.tcp_port, r.busid, *r.serial ? r.serial : "");
+
         return STATUS_NOT_IMPLEMENTED; // IoCsqInsertIrpEx(&vhci->irps_csq, irp, nullptr, &r);
 }
 

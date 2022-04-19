@@ -83,7 +83,7 @@ struct ioctl_usbip_vhci_plugin
         char busid[USBIP_BUS_ID_SIZE];
         char tcp_port[32];
         char host[255];
-        wchar_t	wserial[255];
+        char serial[255];
 };
 
 struct ioctl_usbip_vhci_unplug

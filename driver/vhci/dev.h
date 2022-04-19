@@ -101,7 +101,7 @@ struct vpdo_dev_t : vdev_t
 	PWSTR Manufacturer; // for descriptor.iManufacturer
 	PWSTR Product; // for descriptor.iProduct
 	PWSTR SerialNumber; // for descriptor.iSerialNumber
-	PWSTR SerialNumberUser; // user-defined serial number
+        UNICODE_STRING SerialNumberUser; // user-defined serial number
 
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 

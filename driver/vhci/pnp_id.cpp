@@ -212,12 +212,12 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR &result, bool&, vdev_t *vdev, IRP*, bool
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	auto SerialNumber = vpdo->SerialNumberUser ? vpdo->SerialNumberUser :
-			    vpdo->SerialNumber ? vpdo->SerialNumber :
-			    L"";
+	auto serial = vpdo->SerialNumberUser.Length ? vpdo->SerialNumberUser.Buffer :
+                        vpdo->SerialNumber ? vpdo->SerialNumber :
+                        L"";
 
-	auto status = *SerialNumber || want_serial ?
-                        RtlStringCchCopyW(str, cch, SerialNumber) :
+	auto status = *serial || want_serial ?
+                        RtlStringCchCopyW(str, cch, serial) :
 			RtlStringCchPrintfW(str, cch, L"%d", vpdo->port);
 
 	if (status == STATUS_SUCCESS) {

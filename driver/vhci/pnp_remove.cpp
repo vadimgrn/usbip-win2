@@ -119,14 +119,11 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 	free_usb_dev_interface(&vpdo.usb_dev_interface);
 	free_strings(vpdo);
 
-	if (vpdo.SerialNumberUser) {
-		libdrv_free(vpdo.SerialNumberUser);
-		vpdo.SerialNumberUser = nullptr;
-	}
+        RtlFreeUnicodeString(&vpdo.SerialNumberUser);
 
 	if (vpdo.actconfig) {
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
-		vpdo.actconfig = nullptr;
+                vpdo.actconfig = nullptr;
 	}
 }
 
