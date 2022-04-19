@@ -78,14 +78,14 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 
 	auto vdev = to_vdev(devobj);
 
-	vdev->PnPState = pnp_state::NotStarted;
-	vdev->PreviousPnPState = pnp_state::NotStarted;
+        vdev->Self = devobj;
+        vdev->type = type;
 
-	vdev->type = type;
-	vdev->Self = devobj;
+        NT_ASSERT(vdev->PnPState == pnp_state::NotStarted);
+        NT_ASSERT(vdev->PreviousPnPState == pnp_state::NotStarted);
 
-	vdev->DevicePowerState = PowerDeviceUnspecified;
-	vdev->SystemPowerState = PowerSystemWorking;
+        vdev->SystemPowerState = PowerSystemWorking;
+        NT_ASSERT(vdev->DevicePowerState == PowerDeviceUnspecified);
 
 	devobj->Flags |= DO_POWER_PAGABLE | DO_BUFFERED_IO;
 

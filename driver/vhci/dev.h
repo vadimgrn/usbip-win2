@@ -71,11 +71,15 @@ struct hpdo_dev_t : vdev_t {};
 
 struct vhci_dev_t : vdev_t
 {
-	UNICODE_STRING	DevIntfVhci;
-	UNICODE_STRING	DevIntfUSBHC;
+	UNICODE_STRING DevIntfVhci;
+	UNICODE_STRING DevIntfUSBHC;
 
-	WMILIB_CONTEXT	WmiLibInfo;
-	USBIP_BUS_WMI_STD_DATA	StdUSBIPBusData;
+	WMILIB_CONTEXT WmiLibInfo;
+	USBIP_BUS_WMI_STD_DATA StdUSBIPBusData;
+
+        IO_CSQ irps_csq;
+        LIST_ENTRY irps;
+        KSPIN_LOCK irps_lock;
 };
 
 // The device extension for the vpdo.

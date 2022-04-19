@@ -31,7 +31,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 
 	switch (vdev->type) {
 	case VDEV_VHCI:
-		status = vhci_ioctl_vhci((vhci_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
+		status = vhci_ioctl_vhci(irp, (vhci_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
 		break;
 	case VDEV_VHUB:
 		status = vhci_ioctl_vhub((vhub_dev_t*)vdev, irp, ioc.IoControlCode, buffer, inlen, outlen);
@@ -41,10 +41,9 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		outlen = 0;
 	}
 
-	irp->IoStatus.Information = outlen;
-
-	if (status != STATUS_PENDING) {
-		CompleteRequest(irp, status);
+        if (status != STATUS_PENDING) {
+                irp->IoStatus.Information = outlen;
+                CompleteRequest(irp, status);
 	}
 
 	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);

@@ -112,67 +112,63 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 		set_class_subclass_proto(vpdo) : STATUS_SUCCESS;
 }
 
-} // namespace
-
-
-PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *, ioctl_usbip_vhci_plugin &, ULONG, ULONG&)
+PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULONG &outlen)
 {
-	PAGED_CODE();
-        return STATUS_NOT_IMPLEMENTED;
-/*
-	if (inlen < sizeof(pi)) {
-		Trace(TRACE_LEVEL_ERROR, "Too small input length: %lld < %lld", inlen, sizeof(pi));
-		return STATUS_INVALID_PARAMETER;
-	}
+        PAGED_CODE();
 
-	auto wTotalLength = pi.dscr_conf.wTotalLength;
-        auto expected_sz = sizeof(pi) - sizeof(pi.dscr_conf) + wTotalLength;
+        outlen = 0;
 
-	if (!(inlen == expected_sz && pi.size == expected_sz)) {
-		Trace(TRACE_LEVEL_ERROR, "pluginfo: size %lld != %lld", inlen, expected_sz);
-		return STATUS_INVALID_PARAMETER;
-	}
+        auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
+        if (!devobj) {
+                return STATUS_UNSUCCESSFUL;
+        }
 
-	auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
-	if (!devobj) {
-		return STATUS_UNSUCCESSFUL;
-	}
+        auto vpdo = to_vpdo_or_null(devobj);
+        vpdo->parent = vhub_from_vhci(vhci);
 
-	auto vpdo = to_vpdo_or_null(devobj);
-
-	vpdo->devid = pi.devid;
-	vpdo->parent = vhub_from_vhci(vhci);
-
-	if (auto err = init(*vpdo, pi.dscr_dev)) {
-		destroy_device(vpdo);
-		return err;
-	}
-	
-	if (auto err = init(*vpdo, pi.dscr_conf)) {
-		destroy_device(vpdo);
-		return err;
-	}
-
-	if (auto err = init(*vpdo)) {
-		destroy_device(vpdo);
-		return err;
-	}
-
-	NT_ASSERT(vpdo->port > 0); // was assigned
-        pi.port = vpdo->port;
-
-        if (*pi.wserial) {
-                vpdo->SerialNumberUser = libdrv_strdupW(NonPagedPool, pi.wserial);
+        if (*r.wserial) {
+                vpdo->SerialNumberUser = libdrv_strdupW(NonPagedPool, r.wserial);
                 if (!vpdo->SerialNumberUser) {
-                        Trace(TRACE_LEVEL_ERROR, "Can't allocate memory for '%S'", pi.wserial);
+                        Trace(TRACE_LEVEL_ERROR, "Can't allocate memory for '%S'", r.wserial);
                         destroy_device(vpdo);
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
         }
 
-	IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
-	return STATUS_SUCCESS;
+/*
+        vpdo->devid = r.devid;
+
+        if (auto err = init(*vpdo, r.dscr_dev)) {
+                destroy_device(vpdo);
+                return err;
+        }
+
+        if (auto err = init(*vpdo, r.dscr_conf)) {
+                destroy_device(vpdo);
+                return err;
+        }
 */
+        if (auto err = init(*vpdo)) {
+                destroy_device(vpdo);
+                return err;
+        }
+
+        NT_ASSERT(vpdo->port > 0); // was assigned
+        r.port = vpdo->port;
+        outlen = sizeof(r.port);
+
+        IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
+        return STATUS_SUCCESS;
+}
+
+} // namespace
+
+
+PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugin &r)
+{
+	PAGED_CODE();
+        TraceCall("irp %p: %s:%s, busid %s, serial '%!WSTR!'", irp, r.host, r.tcp_port, r.busid, r.wserial);
+        return STATUS_NOT_IMPLEMENTED; // IoCsqInsertIrpEx(&vhci->irps_csq, irp, nullptr, &r);
 }
 
 PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)

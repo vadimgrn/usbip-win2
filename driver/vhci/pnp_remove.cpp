@@ -14,35 +14,39 @@
 namespace
 {
 
-PAGEABLE void destroy_vhci(vhci_dev_t *vhci)
+PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
-	TraceCall("%p", vhci);
+	TraceCall("%p", &vhci);
 
-	IoSetDeviceInterfaceState(&vhci->DevIntfVhci, FALSE);
-	IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, FALSE);
-	RtlFreeUnicodeString(&vhci->DevIntfVhci);
+        while (auto irp = IoCsqRemoveNextIrp(&vhci.irps_csq, nullptr)) {
+                complete_canceled_irp(irp);
+        }
+
+        IoSetDeviceInterfaceState(&vhci.DevIntfVhci, FALSE);
+	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, FALSE);
+	RtlFreeUnicodeString(&vhci.DevIntfVhci);
 
 	// Inform WMI to remove this DeviceObject from its list of providers.
-	dereg_wmi(vhci);
+	dereg_wmi(&vhci);
 
-	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object: %p", vhci->Self);
+	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object %p", vhci.Self);
 }
 
-PAGEABLE void destroy_vhub(vhub_dev_t *vhub)
+PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	TraceCall("%p", vhub);
+	TraceCall("%p", &vhub);
 
-	IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, FALSE);
-	RtlFreeUnicodeString(&vhub->DevIntfRootHub);
+	IoSetDeviceInterfaceState(&vhub.DevIntfRootHub, FALSE);
+	RtlFreeUnicodeString(&vhub.DevIntfRootHub);
 
 	// At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos.
-	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
-		if (auto p = vhub->vpdo[i]) {
-			Trace(TRACE_LEVEL_ERROR, "Port[%d] is acquired", i);
+	for (int i = 0; i < vhub.NUM_PORTS; ++i) {
+		if (vhub.vpdo[i]) {
+			Trace(TRACE_LEVEL_ERROR, "Port #%d is acquired", i);
 		}
 	}
 }
@@ -78,12 +82,12 @@ PAGEABLE void free_usb_dev_interface(UNICODE_STRING *iface)
 	iface->MaximumLength = 0;
 }
 
-PAGEABLE void cancel_pending_irps(vpdo_dev_t *vpdo)
+PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
-	TraceCall("%p", vpdo);
+	TraceCall("%p", &vpdo);
 
-	IO_CSQ* v[] { &vpdo->read_irp_csq, &vpdo->tx_irps_csq, &vpdo->rx_irps_csq };
+	IO_CSQ* v[] { &vpdo.read_irp_csq, &vpdo.tx_irps_csq, &vpdo.rx_irps_csq };
 
 	for (auto csq: v) {
 		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
@@ -102,27 +106,27 @@ PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 	}
 }
 
-PAGEABLE void destroy_vpdo(vpdo_dev_t *vpdo)
+PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
-	TraceCall("%p, port %d", vpdo, vpdo->port);
+	TraceCall("%p, port %d", &vpdo, vpdo.port);
 
 	cancel_pending_irps(vpdo);
-	complete_unlinked_irps(vpdo);
+	complete_unlinked_irps(&vpdo);
 
-	vhub_detach_vpdo(vpdo);
+	vhub_detach_vpdo(&vpdo);
 
-	free_usb_dev_interface(&vpdo->usb_dev_interface);
-	free_strings(*vpdo);
+	free_usb_dev_interface(&vpdo.usb_dev_interface);
+	free_strings(vpdo);
 
-	if (vpdo->SerialNumberUser) {
-		libdrv_free(vpdo->SerialNumberUser);
-		vpdo->SerialNumberUser = nullptr;
+	if (vpdo.SerialNumberUser) {
+		libdrv_free(vpdo.SerialNumberUser);
+		vpdo.SerialNumberUser = nullptr;
 	}
 
-	if (vpdo->actconfig) {
-		ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
-		vpdo->actconfig = nullptr;
+	if (vpdo.actconfig) {
+		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
+		vpdo.actconfig = nullptr;
 	}
 }
 
@@ -152,13 +156,13 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 
 	switch (vdev->type) {
 	case VDEV_VHCI:
-		destroy_vhci((vhci_dev_t*)vdev);
+		destroy_vhci(*(vhci_dev_t*)vdev);
 		break;
 	case VDEV_VHUB:
-		destroy_vhub((vhub_dev_t*)vdev);
+		destroy_vhub(*(vhub_dev_t*)vdev);
 		break;
 	case VDEV_VPDO:
-		destroy_vpdo((vpdo_dev_t*)vdev);
+		destroy_vpdo(*(vpdo_dev_t*)vdev);
 		break;
 	}
 

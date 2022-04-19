@@ -80,8 +80,8 @@ struct ioctl_usbip_vhci_imported_dev
 struct ioctl_usbip_vhci_plugin
 {
         int port; // OUT, must be the first member
-        char tcp_port[32];
         char busid[USBIP_BUS_ID_SIZE];
+        char tcp_port[32];
         char host[255];
         wchar_t	wserial[255];
 };
