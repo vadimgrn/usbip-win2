@@ -102,6 +102,9 @@
     <ClCompile Include="usbip_vhci.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\include\usbip_api_consts.h" />
+    <ClInclude Include="..\..\..\include\usbip_proto.h" />
+    <ClInclude Include="..\..\..\include\usbip_vhci_api.h" />
     <ClInclude Include="..\..\config.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />

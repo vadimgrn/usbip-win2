@@ -115,9 +115,9 @@ int usbip_vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
 
 int usbip_vhci_detach_device(HANDLE hdev, int port)
 {
-        ioctl_usbip_vhci_unplug unplug{ port };
+        ioctl_usbip_vhci_unplug r{ port };
 
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE, &unplug, sizeof(unplug), nullptr, 0, nullptr, nullptr)) {
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE, &r, sizeof(r), nullptr, 0, nullptr, nullptr)) {
                 return 0;
         }
 

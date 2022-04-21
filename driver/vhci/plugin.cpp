@@ -10,6 +10,7 @@
 #include "pnp_remove.h"
 #include "irp.h"
 #include "csq.h"
+#include "wsk_utils.h"
 
 namespace
 {
@@ -176,6 +177,13 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
 {
 	PAGED_CODE();
         TraceCall("irp %p: %s:%s, busid %s, serial '%s'", irp, r.host, r.tcp_port, r.busid, *r.serial ? r.serial : "");
+
+        auto f = [] (auto &tr)
+        {
+                TraceCall("Version %d, SocketType %d, Protocol %u, AddressFamily %d, ProviderId %!GUID!", 
+                        tr.Version, tr.SocketType, tr.Protocol, tr.AddressFamily, &tr.ProviderId);
+                return false;
+        };
 
         return STATUS_NOT_IMPLEMENTED; // IoCsqInsertIrpEx(&vhci->irps_csq, irp, nullptr, &r);
 }

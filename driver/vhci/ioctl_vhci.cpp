@@ -95,39 +95,39 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(IRP *irp, vhci_dev_t *vhci, ULONG ioctl_code, 
 {
 	PAGED_CODE();
 
-	NTSTATUS status = STATUS_INVALID_DEVICE_REQUEST;
+	auto st = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		status = inlen == sizeof(ioctl_usbip_vhci_plugin) ? 
+		st = inlen == sizeof(ioctl_usbip_vhci_plugin) && outlen == sizeof(ioctl_usbip_vhci_plugin::port) ? 
                         vhci_plugin_vpdo(irp, vhci, *static_cast<ioctl_usbip_vhci_plugin*>(buffer)) : 
                         STATUS_INVALID_BUFFER_SIZE;
                 break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		outlen = 0;
-		status = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
+		st = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
 			vhci_unplug_vpdo(vhci, static_cast<ioctl_usbip_vhci_unplug*>(buffer)->port) :
 			STATUS_INVALID_BUFFER_SIZE;
 		break;
 	case IOCTL_USBIP_VHCI_GET_PORTS_STATUS:
-		status = vhub_get_ports_status(vhub_from_vhci(vhci), *static_cast<ioctl_usbip_vhci_get_ports_status*>(buffer), outlen);
+		st = vhub_get_ports_status(vhub_from_vhci(vhci), *static_cast<ioctl_usbip_vhci_get_ports_status*>(buffer), outlen);
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
-		status = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
+		st = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
 						outlen/sizeof(ioctl_usbip_vhci_imported_dev));
 		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:
-		status = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), outlen);
+		st = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		status = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
+		st = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
-		status = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), inlen, outlen);
+		st = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), inlen, outlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
 
-	return status;
+	return st;
 }

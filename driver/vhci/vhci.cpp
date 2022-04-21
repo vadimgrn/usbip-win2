@@ -49,14 +49,14 @@ ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, 
         return false;
 }
 
-PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
 {
 	PAGED_CODE();
 
 	auto vdev = to_vdev(devobj);
 
 	if (vdev->PnPState == pnp_state::Removed) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
+		Trace(TRACE_LEVEL_INFORMATION, "%s(%!vdev_type_t!): no such device", what, vdev->type);
 		return CompleteRequest(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
@@ -66,21 +66,14 @@ PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 	return CompleteRequest(Irp);
 }
 
+PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+{
+        return vhci_complete(devobj, Irp, __func__);
+}
+
 PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-	PAGED_CODE();
-
-	auto vdev = to_vdev(devobj);
-
-	if (vdev->PnPState == pnp_state::Removed) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
-		return CompleteRequest(Irp, STATUS_NO_SUCH_DEVICE);
-	}
-
-	TraceCall("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
-
-	Irp->IoStatus.Information = 0;
-	return CompleteRequest(Irp);
+        return vhci_complete(devobj, Irp, __func__);
 }
 
 PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
@@ -219,14 +212,14 @@ PAGEABLE auto init_wsk()
 WSK_PROVIDER_NPI *GetProviderNPI()
 {
         static RTL_RUN_ONCE once = RTL_RUN_ONCE_INIT;
-        static WSK_PROVIDER_NPI provider;
+        static WSK_PROVIDER_NPI prov;
 
-        if (auto err = RtlRunOnceExecuteOnce(&once, ProviderNpiInit, &provider, nullptr)) {
+        if (auto err = RtlRunOnceExecuteOnce(&once, ProviderNpiInit, &prov, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlRunOnceExecuteOnce %!STATUS!", err);
                 return nullptr;
         }
 
-        return &provider;
+        return prov.Client ? &prov : nullptr;
 }
 
 extern "C" {
