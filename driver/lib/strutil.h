@@ -6,7 +6,7 @@ extern "C" {
 
 #include <wdm.h>
 
-LPWSTR libdrv_strdupW(POOL_TYPE PoolType, LPCWSTR str);
+LPWSTR libdrv_strdup(POOL_FLAGS Flags, LPCWSTR str);
 void libdrv_free(void *data);
 
 #ifdef __cplusplus

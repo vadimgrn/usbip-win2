@@ -377,7 +377,7 @@ NTSTATUS GetLocationString(
 	remaining -= 2;
 	auto sz = sizeof(buf) - remaining*sizeof(*buf);
 
-	*LocationStrings = (PZZWSTR)ExAllocatePoolWithTag(PagedPool, sz, USBIP_VHCI_POOL_TAG);
+	*LocationStrings = (PZZWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sz, USBIP_VHCI_POOL_TAG);
 	if (*LocationStrings) {
 		RtlCopyMemory(*LocationStrings, buf, sz);
 		return STATUS_SUCCESS;

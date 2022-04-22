@@ -34,20 +34,19 @@ PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJEC
 	return FALSE;
 }
 
-PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t *vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
 	BOOLEAN	child_exist = TRUE;
-	PDEVICE_RELATIONS	relations = *pdev_relations, relations_new;
-	PDEVICE_OBJECT	devobj_cpdo;
-	ULONG	size;
+	auto relations = *pdev_relations;
 
-	if (!vdev->child_pdo || vdev->child_pdo->PnPState == pnp_state::Removed)
+	if (!vdev->child_pdo || vdev->child_pdo->PnPState == pnp_state::Removed) {
 		child_exist = FALSE;
+        }
 
 	if (!relations) {
-		relations = (DEVICE_RELATIONS*)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
+		relations = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(*relations), USBIP_VHCI_POOL_TAG);
 		if (!relations) {
 			Trace(TRACE_LEVEL_ERROR, "no relations will be reported: out of memory");
 			return STATUS_INSUFFICIENT_RESOURCES;
@@ -59,8 +58,8 @@ PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pd
 		return STATUS_SUCCESS;
 	}
 
-	devobj_cpdo = vdev->child_pdo->Self;
-	if (relations->Count == 0) {
+	auto devobj_cpdo = vdev->child_pdo->Self;
+	if (!relations->Count) {
 		*pdev_relations = relations;
 		relations->Count = 1;
 		relations->Objects[0] = devobj_cpdo;
@@ -73,18 +72,19 @@ PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t * vdev, PDEVICE_RELATIONS *pd
 	}
 
 	// Need to allocate a new relations structure and add vhub to it
-	size = sizeof(DEVICE_RELATIONS) + relations->Count * sizeof(PDEVICE_OBJECT);
-	relations_new = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, size, USBIP_VHCI_POOL_TAG);
-	if (relations_new == nullptr) {
+	ULONG size = sizeof(*relations) + relations->Count*sizeof(*relations->Objects);
+	auto relations_new = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED, size, USBIP_VHCI_POOL_TAG);
+	if (!relations_new) {
 		Trace(TRACE_LEVEL_ERROR, "old relations will be used: out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
-	RtlCopyMemory(relations_new->Objects, relations->Objects, sizeof(PDEVICE_OBJECT) * relations->Count);
+
+	RtlCopyMemory(relations_new->Objects, relations->Objects, sizeof(*relations->Objects)*relations->Count);
 	relations_new->Count = relations->Count + 1;
 	relations_new->Objects[relations->Count] = devobj_cpdo;
 	ObReferenceObject(devobj_cpdo);
 
-	ExFreePool(relations);
+	ExFreePoolWithTag(relations, USBIP_VHCI_POOL_TAG);
 	*pdev_relations = relations_new;
 
 	return STATUS_SUCCESS;
@@ -101,12 +101,9 @@ vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
 	return nullptr;
 }
 
-BOOLEAN
-	is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
+BOOLEAN is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
 {
-	ULONG	i;
-
-	for (i = 0; i < n_counts; i++) {
+	for (ULONG i = 0; i < n_counts; ++i) {
 		if (vpdo->Self == devobjs[i]) {
 			return TRUE;
 		}
@@ -141,7 +138,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	// Need to allocate a new relations structure and add our vpdos to it
 	ULONG length = sizeof(DEVICE_RELATIONS) + (plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
 
-	auto relations = (DEVICE_RELATIONS*)ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
+	auto relations = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, length, USBIP_VHCI_POOL_TAG);
 	if (!relations) {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", length);
 		ExReleaseFastMutex(&vhub->Mutex);
@@ -190,15 +187,14 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE PDEVICE_RELATIONS get_self_dev_relation(vdev_t * vdev)
+PAGEABLE DEVICE_RELATIONS *get_self_dev_relation(vdev_t *vdev)
 {
 	PAGED_CODE();
 
-	PDEVICE_RELATIONS	dev_relations;
-
-	dev_relations = (PDEVICE_RELATIONS)ExAllocatePoolWithTag(PagedPool, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
-	if (dev_relations == nullptr)
+	auto dev_relations = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
+	if (!dev_relations) {
 		return nullptr;
+        }
 
 	// There is only one vpdo in the structure
 	// for this relation type. The PnP Manager removes

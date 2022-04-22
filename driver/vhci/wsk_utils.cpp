@@ -17,7 +17,7 @@ public:
         SOCKET_ASYNC_CONTEXT() { ctor(); } // works for allocations on stack only
         ~SOCKET_ASYNC_CONTEXT() { dtor(); }
 
-        NTSTATUS ctor(); // use if an object is allocated on heap, f.e. by ExAllocatePoolWithTag
+        NTSTATUS ctor(); // use if an object is allocated on heap, f.e. by ExAllocatePool2
         void dtor();
 
         SOCKET_ASYNC_CONTEXT(const SOCKET_ASYNC_CONTEXT&) = delete;
@@ -129,12 +129,11 @@ usbip::SOCKET *new_socket(_Out_opt_ NTSTATUS *Result)
                 return assign(Result);
         }
 
-        usbip::SOCKET *sock = (usbip::SOCKET*)ExAllocatePoolWithTag(PagedPool, sizeof(*sock), USBIP_VHCI_POOL_TAG);
+        usbip::SOCKET *sock = (usbip::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*sock), USBIP_VHCI_POOL_TAG);
         if (!sock) {
                 return assign(Result, STATUS_INSUFFICIENT_RESOURCES);
         }
 
-        RtlZeroBytes(sock, sizeof(*sock));
         sock->Provider = prov;
 
         auto err = sock->ctx.ctor();
@@ -208,7 +207,7 @@ auto usbip::socket(
 {
         auto sock = new_socket(Result);
         if (!sock) {
-                return assign(Result, STATUS_INSUFFICIENT_RESOURCES);
+                return nullptr;
         }
 
         auto WskSocket = sock->Provider->Dispatch->WskSocket;

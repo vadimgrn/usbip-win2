@@ -37,7 +37,7 @@ create_stub_res(unsigned int cmd, unsigned long seqnum, int err, PVOID data, int
 {
 	stub_res_t	*sres;
 
-	sres = ExAllocatePoolWithTag(NonPagedPool, sizeof(stub_res_t), USBIP_STUB_POOL_TAG);
+	sres = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(stub_res_t), USBIP_STUB_POOL_TAG);
 	if (sres == NULL) {
 		TraceError(TRACE_GENERAL, "out of memory");
 		if (data != NULL && !need_copy)
@@ -47,7 +47,7 @@ create_stub_res(unsigned int cmd, unsigned long seqnum, int err, PVOID data, int
 	if (data != NULL && need_copy) {
 		PVOID	data_copied;
 
-		data_copied = ExAllocatePoolWithTag(NonPagedPool, data_len, USBIP_STUB_POOL_TAG);
+		data_copied = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, data_len, USBIP_STUB_POOL_TAG);
 		if (data_copied == NULL) {
 			TraceError(TRACE_GENERAL, "out of memory. drop data.");
 			data_len = 0;

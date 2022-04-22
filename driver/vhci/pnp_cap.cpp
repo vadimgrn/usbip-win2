@@ -7,43 +7,38 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_device_capabilities(PDEVICE_OBJECT devobj, PDEVICE_CAPABILITIES pcaps)
+PAGEABLE NTSTATUS get_device_capabilities(DEVICE_OBJECT *devobj, DEVICE_CAPABILITIES *pcaps)
 {
 	PAGED_CODE();
 
-	IO_STATUS_BLOCK		ioStatus;
-	PIO_STACK_LOCATION	irpstack;
-	KEVENT		pnpEvent;
-	PIRP		irp;
-	NTSTATUS	status;
-
 	// Initialize the capabilities that we will send down
-	RtlZeroMemory(pcaps, sizeof(DEVICE_CAPABILITIES));
-	pcaps->Size = sizeof(DEVICE_CAPABILITIES);
+	RtlZeroMemory(pcaps, sizeof(*pcaps));
+	pcaps->Size = sizeof(*pcaps);
 	pcaps->Version = 1;
 	pcaps->Address = (ULONG)-1;
 	pcaps->UINumber = (ULONG)-1;
 
-	KeInitializeEvent(&pnpEvent, NotificationEvent, FALSE);
+        KEVENT pnpEvent;
+        KeInitializeEvent(&pnpEvent, NotificationEvent, FALSE);
 
-	// Build an Irp
-	irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ioStatus);
-	if (irp == nullptr) {
+        IO_STATUS_BLOCK ioStatus{};
+        auto irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ioStatus);
+	if (!irp) {
 		Trace(TRACE_LEVEL_WARNING, "failed to create irp");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
 	// Pnp Irps all begin life as STATUS_NOT_SUPPORTED;
 	irp->IoStatus.Status = STATUS_NOT_SUPPORTED;
-	irpstack = IoGetNextIrpStackLocation(irp);
+	auto irpstack = IoGetNextIrpStackLocation(irp);
 
 	// Set the top of stack
-	RtlZeroMemory(irpstack, sizeof(IO_STACK_LOCATION));
+	RtlZeroMemory(irpstack, sizeof(*irpstack));
 	irpstack->MajorFunction = IRP_MJ_PNP;
 	irpstack->MinorFunction = IRP_MN_QUERY_CAPABILITIES;
 	irpstack->Parameters.DeviceCapabilities.Capabilities = pcaps;
 
-	status = IoCallDriver(devobj, irp);
+	auto status = IoCallDriver(devobj, irp);
 	if (status == STATUS_PENDING) {
 		// Block until the irp comes back.
 		// Important thing to note here is when you allocate

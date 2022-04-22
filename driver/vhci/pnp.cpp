@@ -104,7 +104,7 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
 
-	PNP_BUS_INFORMATION *bi = (PNP_BUS_INFORMATION*)ExAllocatePoolWithTag(PagedPool, sizeof(*bi), USBIP_VHCI_POOL_TAG);
+	PNP_BUS_INFORMATION *bi = (PNP_BUS_INFORMATION*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(*bi), USBIP_VHCI_POOL_TAG);
 	if (bi) {
 		bi->BusTypeGuid = GUID_BUS_TYPE_USB;
 		bi->LegacyBusType = PNPBus;
@@ -208,7 +208,7 @@ PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 
 PAGEABLE void copy_str(LPCWSTR s, IO_STATUS_BLOCK &blk)
 {
-	if (auto str = libdrv_strdupW(PagedPool, s)) {
+	if (auto str = libdrv_strdup(POOL_FLAG_PAGED, s)) {
 		blk.Information = reinterpret_cast<ULONG_PTR>(str);
 		blk.Status = STATUS_SUCCESS;
 	}

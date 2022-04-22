@@ -85,7 +85,7 @@ process_get_desc(usbip_stub_dev_t *devstub, unsigned int seqnum, USB_DEFAULT_PIP
 
 	TraceInfo(TRACE_READWRITE, "%!usb_descriptor_type!", CSPKT_DESCRIPTOR_TYPE(csp));
 
-	pdesc = ExAllocatePoolWithTag(NonPagedPool, csp->wLength, USBIP_STUB_POOL_TAG);
+	pdesc = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, csp->wLength, USBIP_STUB_POOL_TAG);
 	if (pdesc == NULL) {
 		TraceError(TRACE_READWRITE, "out of memory");
 		reply_stub_req_err(devstub, USBIP_RET_SUBMIT, seqnum, -1);
@@ -232,7 +232,7 @@ process_class_vendor_request(usbip_stub_dev_t *devstub, USB_DEFAULT_PIPE_SETUP_P
 		data = NULL;
 	else {
 		if (is_in) {
-			data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
+			data = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
 			if (data == NULL) {
 				TraceError(TRACE_GENERAL, "out of memory");
 				reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
@@ -320,7 +320,7 @@ process_bulk_intr_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION inf
 	datalen = (ULONG)hdr->u.cmd_submit.transfer_buffer_length;
 	is_in = hdr->base.direction ? TRUE : FALSE;
 	if (is_in) {
-		data = ExAllocatePoolWithTag(NonPagedPool, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
+		data = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, (SIZE_T)datalen, USBIP_STUB_POOL_TAG);
 		if (data == NULL) {
 			TraceError(TRACE_GENERAL, "out of memory");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
@@ -360,7 +360,7 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 	if (dir_in) {
 		iso_descs = (struct usbip_iso_packet_descriptor*)(hdr + 1);
 		datalen = get_iso_descs_len(n_pkts, iso_descs, FALSE);
-		data = ExAllocatePoolWithTag(NonPagedPool, datalen + sizeof(*iso_descs)*n_pkts, USBIP_STUB_POOL_TAG);
+		data = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, datalen + sizeof(*iso_descs)*n_pkts, USBIP_STUB_POOL_TAG);
 		if (!data) {
 			TraceError(TRACE_GENERAL, "out of memory");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);
@@ -371,7 +371,7 @@ process_iso_transfer(usbip_stub_dev_t *devstub, PUSBD_PIPE_INFORMATION info_pipe
 		/* Allocate more space for iso descriptors which will maintain length field */
 		datalen = hdr->u.cmd_submit.transfer_buffer_length;
 		iso_descs = (struct usbip_iso_packet_descriptor*)((char*)(hdr + 1) + datalen);
-		data = ExAllocatePoolWithTag(NonPagedPool, datalen + iso_descs_len, USBIP_STUB_POOL_TAG);
+		data = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, datalen + iso_descs_len, USBIP_STUB_POOL_TAG);
 		if (!data) {
 			TraceError(TRACE_GENERAL, "out of memory");
 			reply_stub_req_err(devstub, USBIP_RET_SUBMIT, hdr->base.seqnum, -1);

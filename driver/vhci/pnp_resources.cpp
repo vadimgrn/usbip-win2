@@ -9,15 +9,13 @@ PAGEABLE PIO_RESOURCE_REQUIREMENTS_LIST get_query_empty_resource_requirements(vo
 {
 	PAGED_CODE();
 
-	IO_RESOURCE_REQUIREMENTS_LIST *r = (IO_RESOURCE_REQUIREMENTS_LIST*)ExAllocatePoolWithTag(PagedPool, sizeof(*r), USBIP_VHCI_POOL_TAG);
+	IO_RESOURCE_REQUIREMENTS_LIST *r = (IO_RESOURCE_REQUIREMENTS_LIST*)ExAllocatePool2(POOL_FLAG_PAGED, sizeof(*r), USBIP_VHCI_POOL_TAG);
 	if (r) {
 		r->ListSize = sizeof(*r);
 		r->BusNumber = 10;
 		r->SlotNumber = 1;
-		r->AlternativeLists = 0;
 		r->List[0].Version = 1;
 		r->List[0].Revision = 1;
-		r->List[0].Count = 0;
 	}
 
 	return r;
@@ -27,7 +25,7 @@ PAGEABLE PCM_RESOURCE_LIST get_query_empty_resources(void)
 {
 	PAGED_CODE();
 
-	CM_RESOURCE_LIST *r = (CM_RESOURCE_LIST*)ExAllocatePoolWithTag(PagedPool, sizeof(*r), USBIP_VHCI_POOL_TAG);
+	CM_RESOURCE_LIST *r = (CM_RESOURCE_LIST*)ExAllocatePool2(POOL_FLAG_PAGED, sizeof(*r), USBIP_VHCI_POOL_TAG);
 	if (r) {
 		r->Count = 0;
 	}

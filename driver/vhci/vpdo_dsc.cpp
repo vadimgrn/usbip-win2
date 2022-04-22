@@ -19,7 +19,7 @@ PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 	PAGED_CODE();
 
 	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
-	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
 	if (str) {
 		[[maybe_unused]] auto err = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
@@ -34,7 +34,7 @@ PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 
 PAGEABLE auto clone(const void *src, ULONG length)
 {
-	void *buf = ExAllocatePoolWithTag(PagedPool, length, USBIP_VHCI_POOL_TAG);
+	void *buf = ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, length, USBIP_VHCI_POOL_TAG);
 
 	if (buf) {
 		RtlCopyMemory(buf, src, length);

@@ -14,7 +14,7 @@ DEFINE_GUID(GUID_SD_USBIP_VHCI,
 void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
 	ResultLength = 256;
-	auto alloc = [] (auto len) { return ExAllocatePoolWithTag(PagedPool, len, USBIP_VHCI_POOL_TAG); };
+	auto alloc = [] (auto len) { return ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, len, USBIP_VHCI_POOL_TAG); };
 
 	for (auto buf = alloc(ResultLength); buf; ) {
 		

@@ -99,7 +99,8 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 	PAGED_CODE();
 
 	NT_ASSERT(!vpdo.actconfig); // first time initialization
-	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(NonPagedPool, d.wTotalLength, USBIP_VHCI_POOL_TAG);
+	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, 
+                                                                        d.wTotalLength, USBIP_VHCI_POOL_TAG);
 
 	if (vpdo.actconfig) {
 		RtlCopyMemory(vpdo.actconfig, &d, d.wTotalLength);

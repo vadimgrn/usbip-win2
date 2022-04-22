@@ -73,7 +73,7 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION
 		return STATUS_SUCCESS;
 	}
 
-	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePoolWithTag(PagedPool, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
+	vpdo->actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
 
 	if (vpdo->actconfig) {
 		RtlCopyMemory(vpdo->actconfig, cd, cd->wTotalLength);

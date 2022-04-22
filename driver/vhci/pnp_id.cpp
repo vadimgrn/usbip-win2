@@ -108,7 +108,7 @@ NTSTATUS setup_device_id(PWCHAR &result, bool&, vdev_t *vdev, IRP*)
 
 	auto str_sz = vdev_devid_size[vdev->type];
 
-	auto id_dev = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
+	auto id_dev = (PWCHAR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
 		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: query device id: out of memory", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -143,7 +143,7 @@ NTSTATUS setup_hw_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 
 	auto str_sz = vdev_hwids_size[vdev->type];
 
-	auto ids_hw = (PWCHAR)ExAllocatePoolWithTag(PagedPool, str_sz, USBIP_VHCI_POOL_TAG);
+	auto ids_hw = (PWCHAR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
 		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: query hw ids: out of memory", vdev->type);
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -206,7 +206,7 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR &result, bool&, vdev_t *vdev, IRP*, bool
         auto vpdo = (vpdo_dev_t*)vdev;
         const size_t cch = 200; // see MAX_DEVICE_ID_LEN, cfgmgr32.h
 
-	PWSTR str = (PWSTR)ExAllocatePoolWithTag(PagedPool, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 	if (!str) {
 		Trace(TRACE_LEVEL_ERROR, "vpdo: %s: out of memory", want_serial ? "DeviceSerialNumber" : "InstanceID");
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -243,7 +243,7 @@ NTSTATUS setup_compat_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*
 
 	auto vpdo = (vpdo_dev_t*)vdev;
 
-	PWSTR ids_compat = (PWSTR)ExAllocatePoolWithTag(PagedPool, max_wchars*sizeof(*ids_compat), USBIP_VHCI_POOL_TAG);
+	PWSTR ids_compat = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, max_wchars*sizeof(*ids_compat), USBIP_VHCI_POOL_TAG);
 	if (!ids_compat) {
 		Trace(TRACE_LEVEL_ERROR, "Out of memory");
 		return STATUS_INSUFFICIENT_RESOURCES;

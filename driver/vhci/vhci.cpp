@@ -141,7 +141,7 @@ PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 	UNICODE_STRING path;
 	path.Length = 0;
 	path.MaximumLength = RegistryPath->Length + params.Length;
-	path.Buffer = (PWCH)ExAllocatePoolWithTag(PagedPool, path.MaximumLength + sizeof(*path.Buffer), USBIP_VHCI_POOL_TAG);
+	path.Buffer = (PWCH)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, path.MaximumLength + sizeof(*path.Buffer), USBIP_VHCI_POOL_TAG);
 
 	if (!path.Buffer) {
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -174,7 +174,7 @@ PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
         auto &path = Globals.RegistryPath;
 	USHORT max_len = RegistryPath->Length + sizeof(UNICODE_NULL);
 
-	path.Buffer = (PWCH)ExAllocatePoolWithTag(NonPagedPool, max_len, USBIP_VHCI_POOL_TAG);
+	path.Buffer = (PWCH)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, max_len, USBIP_VHCI_POOL_TAG);
 	if (!path.Buffer) {
 		Trace(TRACE_LEVEL_CRITICAL, "Can't allocate %hu bytes", max_len);
 		return STATUS_INSUFFICIENT_RESOURCES;

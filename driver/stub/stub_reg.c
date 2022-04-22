@@ -23,7 +23,7 @@ static char *reg_get_property(PDEVICE_OBJECT pdo, int property)
 		return NULL;
 	}
 
-	buf = ExAllocatePoolWithTag(PagedPool, len + sizeof(WCHAR), USBIP_STUB_POOL_TAG);
+	buf = ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, len + sizeof(WCHAR), USBIP_STUB_POOL_TAG);
 	if (buf == NULL) {
 		TraceError(TRACE_GENERAL, "out of memory");
 		return NULL;
@@ -47,7 +47,7 @@ static char *reg_get_property(PDEVICE_OBJECT pdo, int property)
 		return NULL;
 	}
 
-	prop = ExAllocatePoolWithTag(PagedPool, prop_ansi.Length + 1, USBIP_STUB_POOL_TAG);
+	prop = ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, prop_ansi.Length + 1, USBIP_STUB_POOL_TAG);
 	if (prop == NULL) {
 		TraceError(TRACE_GENERAL, "out of memory");
 		RtlFreeAnsiString(&prop_ansi);
@@ -99,7 +99,7 @@ reg_get_properties(usbip_stub_dev_t *devstub)
 
 	pool_length = sizeof(KEY_VALUE_FULL_INFORMATION) + 512;
 
-	info = ExAllocatePool(NonPagedPool, pool_length);
+	info = ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, pool_length);
 	if (info == NULL) {
 		ZwClose(hkey);
 		TraceError(TRACE_GENERAL, "ExAllocatePool failed allocating %d bytes", pool_length);
