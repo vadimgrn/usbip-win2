@@ -42,7 +42,7 @@ int init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const 
 
         const Data v[] = 
         {
-                { r.tcp_port, ARRAYSIZE(r.tcp_port), usbip_port },
+                { r.service, ARRAYSIZE(r.service), usbip_port },
                 { r.busid, ARRAYSIZE(r.busid), busid },
                 { r.host, ARRAYSIZE(r.host), host },
                 { r.serial, ARRAYSIZE(r.serial), serial },

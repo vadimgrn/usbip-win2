@@ -177,14 +177,66 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
 PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
-        TraceCall("irp %p: %s:%s, busid %s, serial '%s'", irp, r.host, r.tcp_port, r.busid, *r.serial ? r.serial : "");
+        TraceCall("irp %p: %s:%s, busid %s, serial '%s'", irp, r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
-        auto f = [] (auto &tr)
+        UNICODE_STRING NodeName{};
+        if (auto err = copy(NodeName, r.host)) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.host, err);
+                return err;
+        }
+
+        UNICODE_STRING ServiceName{};
+        if (auto err = copy(ServiceName, r.service)) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.service, err);
+                RtlFreeUnicodeString(&NodeName);
+                return err;
+        }
+
+        ADDRINFOEXW hints{};
+        hints.ai_flags = AI_NUMERICSERV;
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP; // zero isn't work
+
+        ADDRINFOEXW *ai{};
+        if (auto err = wsk::getaddrinfo(ai, &NodeName, &ServiceName, &hints)) {
+                Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
+                RtlFreeUnicodeString(&NodeName);
+                RtlFreeUnicodeString(&ServiceName);
+                return err;
+        }
+
+        auto f = [] (auto sock, const auto &r, auto)
         {
-                TraceCall("Version %d, SocketType %d, Protocol %u, AddressFamily %d, ProviderId %!GUID!", 
-                        tr.Version, tr.SocketType, tr.Protocol, tr.AddressFamily, &tr.ProviderId);
-                return false;
+                if (auto err = set_nodelay(sock)) {
+                        Trace(TRACE_LEVEL_ERROR, "set_nodelay %!STATUS!", err);
+                        return err;
+                }
+
+                SOCKADDR_INET any{ static_cast<ADDRESS_FAMILY>(r.ai_family) }; // see INADDR_ANY, IN6ADDR_ANY_INIT
+
+                if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&any))) {
+                        Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", err);
+                        return err;
+                }
+
+                return connect(sock, r.ai_addr);
         };
+
+        void *socket_context{};
+        WSK_CLIENT_CONNECTION_DISPATCH dispatch{};
+
+        if (auto sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, socket_context, nullptr, ai, f, nullptr)) {
+                Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &NodeName, &ServiceName);
+                disconnect(sock);
+                close(sock);
+        } else {
+                TraceCall("Can't create a socket");
+        }
+
+        wsk::free(ai);
+        RtlFreeUnicodeString(&NodeName);
+        RtlFreeUnicodeString(&ServiceName);
 
         return STATUS_NOT_IMPLEMENTED; // IoCsqInsertIrpEx(&vhci->irps_csq, irp, nullptr, &r);
 }

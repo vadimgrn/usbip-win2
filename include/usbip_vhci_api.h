@@ -81,7 +81,7 @@ struct ioctl_usbip_vhci_plugin
 {
         int port; // OUT, must be the first member
         char busid[USBIP_BUS_ID_SIZE];
-        char tcp_port[32];
+        char service[32];
         char host[255];
         char serial[255];
 };
