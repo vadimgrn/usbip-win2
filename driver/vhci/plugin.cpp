@@ -174,6 +174,9 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
 } // namespace
 
 
+/*
+ * TCP_NODELAY => STATUS_NOT_SUPPORTED
+ */
 PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
@@ -208,9 +211,32 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
 
         auto f = [] (auto sock, const auto &r, auto)
         {
-                if (auto err = set_nodelay(sock)) {
-                        Trace(TRACE_LEVEL_ERROR, "set_nodelay %!STATUS!", err);
+                enum { KEEPIDLE = 30, KEEPCNT = 9, KEEPINTVL = 10 };
+
+                if (auto err = set_keepalive(sock, KEEPIDLE, KEEPCNT, KEEPINTVL)) {
+                        Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
                         return err;
+                }
+
+                bool optval{};
+                if (auto err = get_keepalive(sock, optval)) {
+                        Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
+                        return err;
+                } else {
+                        Trace(TRACE_LEVEL_VERBOSE, "keepalive %d", optval);
+                }
+
+                int idle = 0;
+                int cnt = 0;
+                int intvl = 0;
+
+                if (auto err = get_keepalive_opts(sock, &idle, &cnt, &intvl)) {
+                        Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", err);
+                        return err;
+                } else {
+                        auto timeout = idle + cnt*intvl;
+                        Trace(TRACE_LEVEL_VERBOSE, "keepalive: idle(%d sec) + cnt(%d) * intvl(%d sec) => %d sec.", 
+                                                        idle, cnt, intvl, timeout);
                 }
 
                 SOCKADDR_INET any{ static_cast<ADDRESS_FAMILY>(r.ai_family) }; // see INADDR_ANY, IN6ADDR_ANY_INIT

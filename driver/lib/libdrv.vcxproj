@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dbgcommon.cpp" />
+    <ClCompile Include="mdl_cpp.cpp" />
     <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
     <ClCompile Include="strutil.cpp" />
@@ -115,6 +116,7 @@
     <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="dbgcommon.h" />
+    <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
     <ClInclude Include="strutil.h" />

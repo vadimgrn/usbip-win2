@@ -1,6 +1,6 @@
 #include "wsk_utils.h"
-#include "trace.h"
-#include "wsk_utils.tmh"
+//#include "trace.h"
+//#include "wsk_utils.tmh"
 
 #include "vhci.h"
 
@@ -147,6 +147,24 @@ void free(_In_ wsk::SOCKET *sock)
         }
 }
 
+auto setsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
+{
+        return control(sock, WskSetOption, optname, level, optsize, optval, 0, nullptr, nullptr, true);
+}
+
+auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t &optsize)
+{
+        SIZE_T actual_sz = 0;
+        auto err = control(sock, WskGetOption, optname, level, 0, nullptr, optsize, optval, &actual_sz, true);
+
+        if (!err && optsize != actual_sz) {
+                err = STATUS_INVALID_BUFFER_SIZE;
+                optsize = actual_sz;
+        }
+        
+        return err;
+}
+
 } // namespace
 
 
@@ -236,19 +254,27 @@ NTSTATUS wsk::control(
         _In_ SIZE_T OutputSize,
         _Out_writes_bytes_opt_(OutputSize) PVOID OutputBuffer,
         _Out_opt_ SIZE_T *OutputSizeReturned,
-        _In_ bool async)
+        _In_ bool use_irp)
 {
+        if (use_irp && OutputBuffer && !OutputSizeReturned) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
         auto &ctx = sock->ctx;
-        if (async) {
+        if (use_irp) {
                 ctx.reset();
         }
 
         auto err = sock->Basic->WskControlSocket(sock->Self, RequestType, ControlCode, Level, 
-                                        InputSize, InputBuffer, 
-                                        OutputSize, OutputBuffer, OutputSizeReturned, 
-                                        async ? ctx.irp() : nullptr);
+                                                InputSize, InputBuffer, 
+                                                OutputSize, OutputBuffer, OutputSizeReturned, 
+                                                use_irp ? ctx.irp() : nullptr);
 
-        return async ? ctx.wait_for_completion(err) : err;
+        if (use_irp && !ctx.wait_for_completion(err) && OutputSizeReturned) {
+                *OutputSizeReturned = ctx.irp()->IoStatus.Information;
+        }
+
+        return err;
 }
 
 NTSTATUS wsk::close(_In_ SOCKET *sock)
@@ -342,8 +368,8 @@ auto wsk::for_each(
                            ai->ai_protocol, Flags, SocketContext, Dispatch)) {
                         // continue;
                 } else if (f(sock, *ai, ctx)) {
-                        auto st = close(sock);
-                        NT_ASSERT(!st);
+                        auto err = close(sock);
+                        NT_ASSERT(!err);
                 } else {
                         return sock;
                 }
@@ -353,87 +379,40 @@ auto wsk::for_each(
 }
 
 /*
- * @see reactos\ntoskrnl\io\iomgr\iomdl.c
+ * TCP_NODELAY is not supperted.
  */
-wsk::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
-        m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr))
+NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
 {
+        auto optsize = sizeof(optval);
+        return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, optsize);
 }
 
-wsk::Mdl::~Mdl()
+/*
+ * TCP_KEEPIDLE default is 2*60*60 sec.
+ * TCP_KEEPCNT default is 10
+ * TCP_KEEPINTVL default is 10 sec.
+ */
+NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
 {
-        if (*this) {
-                unlock();
-                IoFreeMdl(m_mdl);
-        }
-}
-
-bool wsk::Mdl::lock()
-{
-        if (!*this) {
-                return false;
-        }
-
-        bool ok = true;
-
-        __try {
-                MmProbeAndLockPages(m_mdl, KernelMode, IoWriteAccess);
-                NT_ASSERT(locked());
-        } __except (EXCEPTION_EXECUTE_HANDLER) {
-                ok = false;
-        }
-
-        return ok;
-}
-
-void wsk::Mdl::unlock() 
-{ 
-        if (locked()) {
-                MmUnlockPages(m_mdl); 
-        }
-}
-
-NTSTATUS wsk::setsockopt(_In_ SOCKET *sock, int level, int optname, int optval)
-{
-        return control(sock, WskSetOption, optname, level, sizeof(optval), &optval, 0, nullptr, nullptr, false);
-}
-
-NTSTATUS wsk::getsockopt(_In_ SOCKET *sock, int level, int optname, int &optval)
-{
-        SIZE_T actual_sz = 0;
-
-        auto err = control(sock, WskGetOption, optname, level, 0, nullptr, sizeof(optval), &optval, &actual_sz, false);
-        if (!err) {
-                NT_ASSERT(actual_sz == sizeof(optval));
-        }
-
-        return err;
-}
-
-NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idletime, int tries_cnt, int tries_intvl)
-{
-        if (auto err = setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, 1)) {
-                Trace(TRACE_LEVEL_ERROR, "SO_KEEPALIVE %!STATUS!", err);
+        bool optval = true;
+        if (auto err = setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval))) {
                 return err;
         }
 
-        if (idletime > 0) {
-                if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, idletime)) { // seconds
-                        Trace(TRACE_LEVEL_ERROR, "TCP_KEEPIDLE(%d) %!STATUS!", idletime, err);
+        if (idle > 0) {
+                if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle))) { // seconds
                         return err;
                 }
         }
 
-        if (tries_cnt > 0) {
-                if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, tries_cnt)) {
-                        Trace(TRACE_LEVEL_ERROR, "TCP_KEEPCNT(%d) %!STATUS!", tries_cnt, err);
+        if (cnt > 0) {
+                if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, &cnt, sizeof(cnt))) {
                         return err;
                 }
         }
 
-        if (tries_intvl > 0) {
-                if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, tries_intvl)) { // seconds
-                        Trace(TRACE_LEVEL_ERROR, "TCP_KEEPINTVL(%d) %!STATUS!", tries_intvl, err);
+        if (intvl > 0) {
+                if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, &intvl, sizeof(intvl))) { // seconds
                         return err;
                 }
         }
@@ -441,25 +420,24 @@ NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idletime, int tries_cnt, int 
         return STATUS_SUCCESS;
 }
 
-NTSTATUS wsk::get_keepalive_values(_In_ SOCKET *sock, int *idletime, int *tries_cnt, int *tries_intvl)
+NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl)
 {
-        if (idletime) {
-                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, *idletime)) {
-                        Trace(TRACE_LEVEL_ERROR, "TCP_KEEPIDLE %!STATUS!", err);
+        auto optsize = sizeof(*idle);
+
+        if (idle) {
+                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, idle, optsize)) {
                         return err;
                 }
         }
 
-        if (tries_cnt) {
-                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, *tries_cnt)) {
-                        Trace(TRACE_LEVEL_ERROR, "TCP_KEEPCNT %!STATUS!", err);
+        if (cnt) {
+                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, cnt, optsize)) {
                         return err;
                 }
         }
 
-        if (tries_intvl) {
-                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, *tries_intvl)) {
-                        Trace(TRACE_LEVEL_ERROR, "TCP_KEEPINTVL %!STATUS!", err);
+        if (intvl) {
+                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, intvl, optsize)) {
                         return err;
                 }
         }

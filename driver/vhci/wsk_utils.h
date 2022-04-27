@@ -27,7 +27,7 @@ NTSTATUS control(
         _In_ SIZE_T OutputSize,
         _Out_writes_bytes_opt_(OutputSize) PVOID OutputBuffer,
         _Out_opt_ SIZE_T *OutputSizeReturned,
-        _In_ bool async);
+        _In_ bool use_irp);
 
 NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
 NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress);
@@ -51,22 +51,13 @@ NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ 
 NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
 NTSTATUS close(_In_ SOCKET *sock);
 
-NTSTATUS setsockopt(_In_ SOCKET *sock, int level, int optname, int optval);
-NTSTATUS getsockopt(_In_ SOCKET *sock, int level, int optname, int &optval);
+//
 
-inline auto set_nodelay(_In_ SOCKET *sock)
-{
-        return setsockopt(sock, SOL_SOCKET, TCP_NODELAY, 1);
-}
+NTSTATUS get_keepalive(_In_ SOCKET *sock, bool &optval);
+NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl);
+NTSTATUS set_keepalive(_In_ SOCKET *sock, int idle = 0, int cnt = 0, int intvl = 0);
 
-NTSTATUS set_keepalive(_In_ SOCKET *sock, int idletime = 0, int tries_cnt = 0, int tries_intvl = 0);
-
-inline auto get_keepalive(_In_ SOCKET *sock, int &optval)
-{
-        return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, optval);
-}
-
-NTSTATUS get_keepalive_values(_In_ SOCKET *sock, int *idletime, int *tries_cnt, int *tries_intvl);
+//
 
 NTSTATUS getaddrinfo(
         _Out_ ADDRINFOEXW* &Result,
@@ -76,6 +67,7 @@ NTSTATUS getaddrinfo(
 
 void free(_In_ ADDRINFOEXW *AddrInfo);
 
+//
 
 using addrinfo_f = NTSTATUS (*)(SOCKET *sock, const ADDRINFOEXW &ai, void *ctx);
 
@@ -83,31 +75,5 @@ SOCKET *for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
         _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _In_opt_ void *ctx);
 
-
-class Mdl
-{
-public:
-        Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
-        ~Mdl();
-
-        Mdl(const Mdl&) = delete;
-        Mdl& operator=(const Mdl&) = delete;
-
-        explicit operator bool() const { return m_mdl; }
-        auto operator !() const { return !m_mdl; }
-
-        auto get() const { return m_mdl; }
-
-        auto addr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : 0; }
-        auto offset() const { return m_mdl ? MmGetMdlByteOffset(m_mdl) : 0; }
-        auto size() const { return m_mdl ? MmGetMdlByteCount(m_mdl) : 0; }
-
-        bool lock();
-        auto locked() const { return m_mdl && (m_mdl->MdlFlags & MDL_PAGES_LOCKED); }
-        void unlock();
-
-private:
-        MDL *m_mdl{};
-};
 
 } // namespace wsk
