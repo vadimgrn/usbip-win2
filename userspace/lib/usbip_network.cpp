@@ -5,6 +5,7 @@
 
 #include "usbip_common.h"
 #include "usbip_network.h"
+#include "usbip_proto_op.h"
 #include "dbgcode.h"
 
 #include <ws2tcpip.h>

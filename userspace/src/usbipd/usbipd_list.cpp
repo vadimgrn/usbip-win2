@@ -2,6 +2,7 @@
 #include "list.h"
 #include "usbip_network.h"
 #include "usbipd_stub.h"
+#include "usbip_proto_op.h"
 
 typedef struct {
 	struct usbip_usb_device	udev;

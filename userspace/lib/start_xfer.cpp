@@ -21,6 +21,7 @@
 #include "usbip_network.h"
 #include "win_handle.h"
 #include "usbip_util.h"
+#include "usbip_common.h"
 
 #include <cassert>
 

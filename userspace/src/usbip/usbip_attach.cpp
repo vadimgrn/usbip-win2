@@ -19,6 +19,7 @@
 #include "getopt.h"
 #include "usbip_network.h"
 #include "usbip_vhci.h"
+#include "usbip_common.h"
 
 namespace
 {

@@ -4,6 +4,7 @@
 #include "usbipd_stub.h"
 #include "usbip_setupdi.h"
 #include "start_xfer.h"
+#include "usbip_proto_op.h"
 
 static int
 export_device(devno_t devno, SOCKET sockfd)

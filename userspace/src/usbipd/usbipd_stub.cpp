@@ -9,6 +9,7 @@
 #include "usbip_common.h"
 #include "usbip_stub_api.h"
 #include "usbip_setupdi.h"
+#include "usbip_proto_op.h"
 
 #include <winsock2.h>
 #include <stdlib.h>

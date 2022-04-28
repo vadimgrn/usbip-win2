@@ -113,6 +113,7 @@
     <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\usbip_proto_op.h" />
     <ClInclude Include="..\config.h" />
     <ClInclude Include="dbgcode.h" />
     <ClInclude Include="generic_handle.h" />

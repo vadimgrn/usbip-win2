@@ -10,7 +10,7 @@
 
 #include <usbspec.h>
 #include "usbip_api_consts.h"
-
+#include "usbip_proto.h"
 //
 // Define an Interface Guid for bus vhci class.
 // This GUID is used to register (IoRegisterDeviceInterface) 

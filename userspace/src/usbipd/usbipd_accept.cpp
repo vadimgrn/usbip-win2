@@ -4,6 +4,7 @@
 
 #include "usbip_network.h"
 #include "usbipd_stub.h"
+#include "usbip_proto_op.h"
 
 static void
 recv_pdu(SOCKET connfd, BOOL *pneed_close_sockfd)
