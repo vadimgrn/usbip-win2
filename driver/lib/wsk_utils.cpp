@@ -1,8 +1,6 @@
+#include <ntddk.h>
 #include "wsk_utils.h"
-//#include "trace.h"
-//#include "wsk_utils.tmh"
-
-#include "vhci.h"
+#include <wdm.h>
 
 /*
 * @see https://github.com/wbenny/KSOCKET
@@ -10,6 +8,13 @@
 
 namespace
 {
+
+const ULONG WSK_POOL_TAG = 'AKSW';
+
+const WSK_CLIENT_DISPATCH g_WskDispatch{ MAKE_WSK_VERSION(1, 0) };
+WSK_REGISTRATION g_WskRegistration;
+bool g_registration;
+
 
 class SOCKET_ASYNC_CONTEXT
 {
@@ -92,13 +97,47 @@ NTSTATUS SOCKET_ASYNC_CONTEXT::wait_for_completion(_Inout_ NTSTATUS &status)
         return status;
 }
 
+_Use_decl_annotations_
+ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, [[maybe_unused]] _Inout_opt_ PVOID* Context)
+{
+        NT_ASSERT(!Context);
+        auto prov = static_cast<WSK_PROVIDER_NPI*>(Parameter);
+        return prov && !WskCaptureProviderNPI(&g_WskRegistration, WSK_INFINITE_WAIT, prov);
+}
+
+WSK_PROVIDER_NPI *GetProviderNPIOnce(bool testonly = false)
+{
+        static RTL_RUN_ONCE once = RTL_RUN_ONCE_INIT;
+        static WSK_PROVIDER_NPI prov;
+
+        if (RtlRunOnceExecuteOnce(&once, ProviderNpiInit, testonly ? nullptr : &prov, nullptr)) {
+                NT_ASSERT(!prov.Client);
+        }
+
+        return prov.Client ? &prov : nullptr;
+}
+
+void ReleaseProviderNPIOnce()
+{
+        if (GetProviderNPIOnce(true)) {
+                WskReleaseProviderNPI(&g_WskRegistration);
+        }
+}
+
+void deinitialize()
+{
+        static_assert(sizeof(g_registration) == sizeof(CHAR));
+
+        if (InterlockedExchange8(reinterpret_cast<CHAR*>(&g_registration), false)) {
+                WskDeregister(&g_WskRegistration);
+        }
+}
+
 } // namespace
 
 
 struct wsk::SOCKET
 {
-        WSK_PROVIDER_NPI *Provider;
-        SOCKET_ASYNC_CONTEXT ctx;
         WSK_SOCKET *Self;
 
         union { // shortcuts to Self->Dispatch
@@ -108,6 +147,8 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_CONNECTION_DISPATCH *Connection;
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
+
+        SOCKET_ASYNC_CONTEXT ctx;
 };
 
 
@@ -116,23 +157,14 @@ namespace
 
 NTSTATUS alloc_socket(_Out_ wsk::SOCKET* &sock)
 {
-        sock = nullptr;
-
-        auto prov = GetProviderNPI();
-        if (!prov) {
-                return STATUS_UNSUCCESSFUL;
-        }
-
-        sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*sock), USBIP_VHCI_POOL_TAG);
+        sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*sock), WSK_POOL_TAG);
         if (!sock) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        sock->Provider = prov;
-
         auto err = sock->ctx.ctor();
         if (err) {
-                ExFreePoolWithTag(sock, USBIP_VHCI_POOL_TAG);
+                ExFreePoolWithTag(sock, WSK_POOL_TAG);
                 sock = nullptr;
         }
 
@@ -143,7 +175,7 @@ void free(_In_ wsk::SOCKET *sock)
 {
         if (sock) {
                 sock->ctx.dtor();
-                ExFreePoolWithTag(sock, USBIP_VHCI_POOL_TAG);
+                ExFreePoolWithTag(sock, WSK_POOL_TAG);
         }
 }
 
@@ -176,7 +208,7 @@ NTSTATUS wsk::getaddrinfo(
 {
         Result = nullptr;
 
-        auto prov = GetProviderNPI();
+        auto prov = GetProviderNPIOnce();
         if (!prov) {
                 return STATUS_UNSUCCESSFUL;
         }
@@ -201,7 +233,7 @@ NTSTATUS wsk::getaddrinfo(
 void wsk::free(_In_ ADDRINFOEXW *AddrInfo)
 {
         if (AddrInfo) {
-                auto prov = GetProviderNPI();
+                auto prov = GetProviderNPIOnce();
                 NT_ASSERT(prov);
                 prov->Dispatch->WskFreeAddressInfo(prov->Client, AddrInfo);
         }
@@ -217,15 +249,20 @@ NTSTATUS wsk::socket(
         _In_opt_ const void *Dispatch)
 {
         auto &sock = Result;
+        sock = nullptr;
+
+        auto prov = GetProviderNPIOnce();
+        if (!prov) {
+                return STATUS_UNSUCCESSFUL;
+        }
 
         if (auto err = alloc_socket(sock)) {
                 return err;
         }
 
-        auto &prov = *sock->Provider;
         auto irp = sock->ctx.irp();
 
-        auto err = prov.Dispatch->WskSocket(prov.Client, AddressFamily, SocketType, Protocol, Flags, SocketContext, Dispatch,
+        auto err = prov->Dispatch->WskSocket(prov->Client, AddressFamily, SocketType, Protocol, Flags, SocketContext, Dispatch,
                                                 nullptr, // OwningProcess
                                                 nullptr, // OwningThread
                                                 nullptr, // SecurityDescriptor
@@ -367,8 +404,8 @@ auto wsk::for_each(
                 if (socket(sock, static_cast<ADDRESS_FAMILY>(ai->ai_family), static_cast<USHORT>(ai->ai_socktype), 
                            ai->ai_protocol, Flags, SocketContext, Dispatch)) {
                         // continue;
-                } else if (f(sock, *ai, ctx)) {
-                        auto err = close(sock);
+                } else if (auto err = f(sock, *ai, ctx)) {
+                        err = close(sock);
                         NT_ASSERT(!err);
                 } else {
                         return sock;
@@ -379,7 +416,7 @@ auto wsk::for_each(
 }
 
 /*
- * TCP_NODELAY is not supperted.
+ * TCP_NODELAY is not supported.
  */
 NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
 {
@@ -389,8 +426,6 @@ NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
 
 /*
  * TCP_KEEPIDLE default is 2*60*60 sec.
- * TCP_KEEPCNT default is 10
- * TCP_KEEPINTVL default is 10 sec.
  */
 NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
 {
@@ -443,4 +478,25 @@ NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *in
         }
 
         return STATUS_SUCCESS;
+}
+
+NTSTATUS wsk::initialize()
+{
+        WSK_CLIENT_NPI npi{ nullptr, &g_WskDispatch };
+
+        auto err = WskRegister(&npi, &g_WskRegistration);
+        g_registration = !err;
+
+        return err;
+}
+
+void wsk::shutdown()
+{
+        ReleaseProviderNPIOnce();
+        deinitialize();
+}
+
+WSK_PROVIDER_NPI* wsk::GetProviderNPI()
+{
+        return GetProviderNPIOnce();
 }

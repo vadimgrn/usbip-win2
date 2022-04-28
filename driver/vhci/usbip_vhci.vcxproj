@@ -38,7 +38,6 @@
     <ClCompile Include="power.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="wmi.cpp" />
-    <ClCompile Include="wsk_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip_api_consts.h" />
@@ -70,7 +69,6 @@
     <ClInclude Include="vpdo.h" />
     <ClInclude Include="vpdo_dsc.h" />
     <ClInclude Include="wmi.h" />
-    <ClInclude Include="wsk_utils.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip_vhci.inf" />

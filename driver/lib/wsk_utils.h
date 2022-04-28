@@ -6,6 +6,11 @@
 namespace wsk
 {
 
+NTSTATUS initialize();
+void shutdown(); 
+
+WSK_PROVIDER_NPI *GetProviderNPI();
+
 struct SOCKET;
 
 NTSTATUS socket(

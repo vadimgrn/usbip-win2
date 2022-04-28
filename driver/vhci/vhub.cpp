@@ -162,9 +162,8 @@ PAGEABLE NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 	NT_ASSERT(vpdo);
 
 	static_assert(sizeof(vpdo->unplugged) == sizeof(CHAR));
-	auto &ch = reinterpret_cast<volatile CHAR&>(vpdo->unplugged);
 
-	if (InterlockedExchange8(&ch, true)) {
+	if (InterlockedExchange8(reinterpret_cast<volatile CHAR*>(&vpdo->unplugged), true)) {
 		Trace(TRACE_LEVEL_INFORMATION, "Device is already unplugged, port %d", vpdo->port);
 		return STATUS_OPERATION_IN_PROGRESS;
 	}

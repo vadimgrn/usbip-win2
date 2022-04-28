@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ntdef.h>
-#include <wdm.h>
 
 const ULONG USBIP_VHCI_POOL_TAG = 'ICHV';
 
@@ -11,6 +10,3 @@ struct GLOBALS
 };
 
 extern GLOBALS Globals;
-
-struct _WSK_PROVIDER_NPI;
-_WSK_PROVIDER_NPI *GetProviderNPI();

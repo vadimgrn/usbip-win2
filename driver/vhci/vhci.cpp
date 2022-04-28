@@ -1,53 +1,19 @@
-#include <ntddk.h>
 #include "vhci.h"
+#include <wdm.h>
 #include "trace.h"
 #include "vhci.tmh"
 
 #include "pnp.h"
 #include "irp.h"
 #include "vhub.h"
+#include "wsk_utils.h"
 
 #include <ntstrsafe.h>
-#include <wsk.h>
 
 GLOBALS Globals;
 
 namespace
 {
-
-enum { WSK_REGISTER = 1, WSK_CAPTURE_PROVIDER = 2, REGISTRY_PATH = 4 }; // bits
-unsigned int init_flags;
-
-const WSK_CLIENT_DISPATCH WskDispatch{ MAKE_WSK_VERSION(1, 0) };
-WSK_REGISTRATION WskRegistration;
-
-_Use_decl_annotations_
-ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, [[maybe_unused]] _Inout_opt_ PVOID *Context)
-{
-        NT_ASSERT(!Context);
-        auto ProviderNpi = static_cast<WSK_PROVIDER_NPI*>(Parameter);
-
-        auto err = WskCaptureProviderNPI(&WskRegistration, WSK_NO_WAIT, ProviderNpi);
-        if (!err) {
-                init_flags |= WSK_CAPTURE_PROVIDER;
-                auto ver = ProviderNpi->Dispatch->Version;
-                Trace(TRACE_LEVEL_INFORMATION, "NPI v.%d.%d", WSK_MAJOR_VERSION(ver), WSK_MINOR_VERSION(ver));
-                return true;
-        }
-
-        Trace(TRACE_LEVEL_ERROR, "WskCaptureProviderNPI %!STATUS!", err);
-
-        if (err == STATUS_NOINTERFACE) { // client's requested version is not supported
-                WSK_PROVIDER_CHARACTERISTICS r;
-                if (NT_SUCCESS(WskQueryProviderCharacteristics(&WskRegistration, &r))) {
-                        Trace(TRACE_LEVEL_INFORMATION, "Supported NPI v.%d.%d-%d.%d",
-                                WSK_MAJOR_VERSION(r.LowestVersion), WSK_MINOR_VERSION(r.LowestVersion),
-                                WSK_MAJOR_VERSION(r.HighestVersion), WSK_MINOR_VERSION(r.HighestVersion));
-                }
-        }
-
-        return false;
-}
 
 PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
 {
@@ -83,17 +49,10 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 	TraceCall("%p", drvobj);
         // NT_ASSERT(!drvobj->DeviceObject);
 
-        if (init_flags & WSK_CAPTURE_PROVIDER) {
-                WskReleaseProviderNPI(&WskRegistration);
-        }
+        wsk::shutdown();
 
-        if (init_flags & WSK_REGISTER) {
-                WskDeregister(&WskRegistration);
-        }
-
-        if (init_flags & REGISTRY_PATH) {
-                NT_ASSERT(Globals.RegistryPath.Buffer);
-	        ExFreePoolWithTag(Globals.RegistryPath.Buffer, USBIP_VHCI_POOL_TAG);
+        if (auto buf = Globals.RegistryPath.Buffer) {
+	        ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
         }
 
         WPP_CLEANUP(drvobj);
@@ -180,8 +139,6 @@ PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-        init_flags |= REGISTRY_PATH;
-        
         NT_ASSERT(!path.Length);
 	path.MaximumLength = max_len;
 
@@ -191,36 +148,8 @@ PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
         return STATUS_SUCCESS;
 }
 
-PAGEABLE auto init_wsk()
-{
-        PAGED_CODE();
-
-        WSK_CLIENT_NPI npi{ nullptr, &WskDispatch };
-
-        if (auto err = WskRegister(&npi, &WskRegistration)) {
-                Trace(TRACE_LEVEL_CRITICAL, "WskRegister: %!STATUS!", err);
-                return err;
-        }
-
-        init_flags |= WSK_REGISTER;
-        return STATUS_SUCCESS;
-}
-
 } // namespace
 
-
-WSK_PROVIDER_NPI *GetProviderNPI()
-{
-        static RTL_RUN_ONCE once = RTL_RUN_ONCE_INIT;
-        static WSK_PROVIDER_NPI prov;
-
-        if (auto err = RtlRunOnceExecuteOnce(&once, ProviderNpiInit, &prov, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlRunOnceExecuteOnce %!STATUS!", err);
-                return nullptr;
-        }
-
-        return prov.Client ? &prov : nullptr;
-}
 
 extern "C" {
 
@@ -246,7 +175,8 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 
 	TraceCall("%p", drvobj);
 
-        if (auto err = init_wsk()) {
+        if (auto err = wsk::initialize()) {
+                Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
                 DriverUnload(drvobj);
                 return err;
         }

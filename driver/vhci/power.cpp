@@ -1,4 +1,4 @@
-#include "vhci.h"
+#include <wdm.h>
 #include "trace.h"
 #include "power.tmh"
 
