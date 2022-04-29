@@ -36,48 +36,6 @@ void usbip_setup_port_number(const char *arg)
 	info("using port \"%s\"", usbip_port);
 }
 
-void usbip_net_pack_uint32_t(int pack, uint32_t *num)
-{
-	uint32_t i;
-
-	if (pack)
-		i = htonl(*num);
-	else
-		i = ntohl(*num);
-
-	*num = i;
-}
-
-void usbip_net_pack_uint16_t(int pack, uint16_t *num)
-{
-	uint16_t i;
-
-	if (pack)
-		i = htons(*num);
-	else
-		i = ntohs(*num);
-
-	*num = i;
-}
-
-void usbip_net_pack_usb_device(int pack, struct usbip_usb_device *udev)
-{
-	usbip_net_pack_uint32_t(pack, &udev->busnum);
-	usbip_net_pack_uint32_t(pack, &udev->devnum);
-	usbip_net_pack_uint32_t(pack, &udev->speed);
-
-	usbip_net_pack_uint16_t(pack, &udev->idVendor);
-	usbip_net_pack_uint16_t(pack, &udev->idProduct);
-	usbip_net_pack_uint16_t(pack, &udev->bcdDevice);
-}
-
-void usbip_net_pack_usb_interface(int pack, struct usbip_usb_interface *udev)
-{
-	UNREFERENCED_PARAMETER(pack);
-	UNREFERENCED_PARAMETER(udev);
-	/* uint8_t members need nothing */
-}
-
 static int usbip_net_xmit(SOCKET sockfd, void *buff, size_t bufflen, int sending)
 {
 	int total = 0;

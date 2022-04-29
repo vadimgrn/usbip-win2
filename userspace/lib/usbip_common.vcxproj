@@ -104,6 +104,7 @@
     <ClCompile Include="getopt_long.c" />
     <ClCompile Include="usbip_pki_cat.cpp" />
     <ClCompile Include="usbip_pki_sign.cpp" />
+    <ClCompile Include="usbip_proto_op.cpp" />
     <ClCompile Include="usbip_setupdi.cpp" />
     <ClCompile Include="usbip_stub.cpp" />
     <ClCompile Include="usbip_util.cpp" />
@@ -113,6 +114,7 @@
     <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\usbip_api_consts.h" />
     <ClInclude Include="..\..\include\usbip_proto_op.h" />
     <ClInclude Include="..\config.h" />
     <ClInclude Include="dbgcode.h" />

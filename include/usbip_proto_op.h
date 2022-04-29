@@ -5,16 +5,16 @@ extern "C" {
 #endif
 
 #include "usbip_api_consts.h"
-#include <stdint.h>
+#include <basetsd.h>
 
 #include <PSHPACK1.H>
 
 struct usbip_usb_interface 
 {
-        uint8_t bInterfaceClass;
-        uint8_t bInterfaceSubClass;
-        uint8_t bInterfaceProtocol;
-        uint8_t padding;	/* alignment */
+        UINT8 bInterfaceClass;
+        UINT8 bInterfaceSubClass;
+        UINT8 bInterfaceProtocol;
+        UINT8 padding;	/* alignment */
 };
 
 struct usbip_usb_device 
@@ -22,34 +22,34 @@ struct usbip_usb_device
         char path[USBIP_DEV_PATH_MAX];
         char busid[USBIP_BUS_ID_SIZE];
 
-        uint32_t busnum;
-        uint32_t devnum;
-        uint32_t speed;
+        UINT32 busnum;
+        UINT32 devnum;
+        UINT32 speed;
 
-        uint16_t idVendor;
-        uint16_t idProduct;
-        uint16_t bcdDevice;
+        UINT16 idVendor;
+        UINT16 idProduct;
+        UINT16 bcdDevice;
 
-        uint8_t bDeviceClass;
-        uint8_t bDeviceSubClass;
-        uint8_t bDeviceProtocol;
-        uint8_t bConfigurationValue;
-        uint8_t bNumConfigurations;
-        uint8_t bNumInterfaces;
+        UINT8 bDeviceClass;
+        UINT8 bDeviceSubClass;
+        UINT8 bDeviceProtocol;
+        UINT8 bConfigurationValue;
+        UINT8 bNumConfigurations;
+        UINT8 bNumInterfaces;
 };
 
 
 /* ---------------------------------------------------------------------- */
 /* Common header for all the kinds of PDUs. */
 struct op_common {
-        uint16_t version;
+        UINT16 version;
 
 #define OP_REQUEST	(0x80 << 8)
 #define OP_REPLY	(0x00 << 8)
-                uint16_t code;
+        UINT16 code;
 
-                uint32_t status; /* op_code status (for reply) */
-        };
+        UINT32 status; /* op_code status (for reply) */
+};
 
 #define PACK_OP_COMMON(pack, op_common)  do {\
 	usbip_net_pack_uint16_t(pack, &(op_common)->version);\
@@ -81,7 +81,7 @@ struct op_import_request {
 
 struct op_import_reply {
         struct usbip_usb_device udev;
-        //	struct usbip_usb_interface uinf[];
+//	struct usbip_usb_interface uinf[];
 };
 
 #define PACK_OP_IMPORT_REQUEST(pack, request)  do {\
@@ -142,11 +142,11 @@ struct op_unexport_reply {
 
 struct op_crypkey_request {
         /* 128bit key */
-        uint32_t key[4];
+        UINT32 key[4];
 };
 
 struct op_crypkey_reply {
-        uint32_t _reserved;
+        UINT32 _reserved;
 };
 
 
@@ -158,11 +158,11 @@ struct op_crypkey_reply {
 
 struct op_devlist_request {
         /* Struct or union must have at leat one member in MSC */
-        uint32_t _reserved;
+        UINT32 _reserved;
 };
 
 struct op_devlist_reply {
-        uint32_t ndev;
+        UINT32 ndev;
         /* followed by reply_extra[] */
 };
 
@@ -180,8 +180,8 @@ struct op_devlist_reply_extra {
 
 #include <POPPACK.H>
 
-void usbip_net_pack_uint32_t(int pack, uint32_t *num);
-void usbip_net_pack_uint16_t(int pack, uint16_t *num);
+void usbip_net_pack_uint32_t(int pack, UINT32 *num);
+void usbip_net_pack_uint16_t(int pack, UINT16 *num);
 void usbip_net_pack_usb_device(int pack, struct usbip_usb_device *udev);
 void usbip_net_pack_usb_interface(int pack, struct usbip_usb_interface *uinf);
 

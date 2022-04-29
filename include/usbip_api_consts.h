@@ -51,4 +51,9 @@ enum usbip_device_status
 	VDEV_ST_ERROR
 };
 
-enum { USBIP_DEV_PATH_MAX = 256, USBIP_BUS_ID_SIZE = 32 };
+enum 
+{ 
+        USBIP_VERSION = 0x111, 
+        USBIP_DEV_PATH_MAX = 256, 
+        USBIP_BUS_ID_SIZE = 32 
+};

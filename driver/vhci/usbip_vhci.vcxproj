@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\userspace\lib\usbip_proto_op.cpp" />
     <ClCompile Include="csq.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="vhci.cpp" />
@@ -41,6 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip_api_consts.h" />
+    <ClInclude Include="..\..\include\usbip_proto_op.h" />
     <ClInclude Include="..\..\include\usbip_vhci_api.h" />
     <ClInclude Include="..\..\include\usbip_proto.h" />
     <ClInclude Include="csq.h" />
