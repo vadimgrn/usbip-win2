@@ -80,5 +80,4 @@ SOCKET *for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
         _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _In_opt_ void *ctx);
 
-
 } // namespace wsk

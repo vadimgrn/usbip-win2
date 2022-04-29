@@ -13,7 +13,9 @@ const ULONG WSK_POOL_TAG = 'AKSW';
 
 const WSK_CLIENT_DISPATCH g_WskDispatch{ MAKE_WSK_VERSION(1, 0) };
 WSK_REGISTRATION g_WskRegistration;
-bool g_registration;
+
+enum { F_REGISTER, F_CAPTURE };
+LONG g_init_flags;
 
 
 class SOCKET_ASYNC_CONTEXT
@@ -102,7 +104,13 @@ ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, 
 {
         NT_ASSERT(!Context);
         auto prov = static_cast<WSK_PROVIDER_NPI*>(Parameter);
-        return prov && !WskCaptureProviderNPI(&g_WskRegistration, WSK_INFINITE_WAIT, prov);
+
+        bool ok = prov && !WskCaptureProviderNPI(&g_WskRegistration, WSK_INFINITE_WAIT, prov);
+        if (ok) {
+                InterlockedBitTestAndSet(&g_init_flags, F_CAPTURE);
+        }
+
+        return ok;
 }
 
 WSK_PROVIDER_NPI *GetProviderNPIOnce(bool testonly = false)
@@ -119,16 +127,14 @@ WSK_PROVIDER_NPI *GetProviderNPIOnce(bool testonly = false)
 
 void ReleaseProviderNPIOnce()
 {
-        if (GetProviderNPIOnce(true)) {
+        if (GetProviderNPIOnce(true) && InterlockedBitTestAndReset(&g_init_flags, F_CAPTURE)) {
                 WskReleaseProviderNPI(&g_WskRegistration);
         }
 }
 
 void deinitialize()
 {
-        static_assert(sizeof(g_registration) == sizeof(CHAR));
-
-        if (InterlockedExchange8(reinterpret_cast<CHAR*>(&g_registration), false)) {
+        if (InterlockedBitTestAndReset(&g_init_flags, F_REGISTER)) {
                 WskDeregister(&g_WskRegistration);
         }
 }
@@ -485,7 +491,9 @@ NTSTATUS wsk::initialize()
         WSK_CLIENT_NPI npi{ nullptr, &g_WskDispatch };
 
         auto err = WskRegister(&npi, &g_WskRegistration);
-        g_registration = !err;
+        if (!err) {
+                InterlockedBitTestAndSet(&g_init_flags, F_REGISTER);
+        }
 
         return err;
 }

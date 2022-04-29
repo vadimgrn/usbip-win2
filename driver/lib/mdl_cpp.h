@@ -19,7 +19,7 @@ public:
 
         auto get() const { return m_mdl; }
 
-        auto addr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : 0; }
+        auto addr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : nullptr; }
         auto offset() const { return m_mdl ? MmGetMdlByteOffset(m_mdl) : 0; }
         auto size() const { return m_mdl ? MmGetMdlByteCount(m_mdl) : 0; }
 
