@@ -1,9 +1,14 @@
 #pragma once
 
-#include "wsk_utils.h"
+#include <basetsd.h>
+#include <ntdef.h>
 
-bool usbip_net_recv(wsk::SOCKET *sock, void *buf, size_t len);
-bool usbip_net_send(wsk::SOCKET *sock, void *buf, size_t len);
+namespace wsk 
+{
+        struct SOCKET;
+}
 
-bool usbip_net_send_op_common(wsk::SOCKET *sock, UINT16 code, UINT32 status);
-bool usbip_net_recv_op_common(wsk::SOCKET *sock, UINT16 &code, UINT32 &status);
+bool usbip_net_send(wsk::SOCKET *sock, void *data, ULONG len);
+bool usbip_net_recv(wsk::SOCKET *sock, void *data, ULONG len);
+
+bool usbip_net_recv_op_common(wsk::SOCKET *sock, UINT16 response_code, UINT32 *status = nullptr);

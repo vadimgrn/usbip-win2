@@ -11,6 +11,9 @@
 #include "irp.h"
 #include "csq.h"
 #include "wsk_utils.h"
+#include "usbip_proto_op.h"
+#include "usbip_network.h"
+#include "mdl_cpp.h"
 
 namespace
 {
@@ -171,6 +174,70 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
         return STATUS_SUCCESS;
 }
 
+PAGEABLE void process(wsk::SOCKET *sock, const char *busid)
+{
+        PAGED_CODE();
+
+        {
+                struct {
+                        op_common hdr{ USBIP_VERSION, OP_REQ_IMPORT, ST_OK };
+                        op_import_request body;
+                } req;
+
+                static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
+
+                strcpy_s(req.body.busid, sizeof(req.body.busid), busid);
+
+                PACK_OP_COMMON(0, &req.hdr);
+                PACK_OP_IMPORT_REQUEST(0, &req.body);
+
+                usbip::Mdl mdl(usbip::memory_pool::stack, &req, sizeof(req));
+                if (!mdl.prepare(IoReadAccess)) {
+                        return;
+                }
+
+                WSK_BUF buf{ mdl.get(), 0, mdl.size() };
+
+                SIZE_T actual = 0;
+                auto err = send(sock, &buf, WSK_FLAG_NODELAY, actual);
+
+                if (err || actual != buf.Length) {
+                        Trace(TRACE_LEVEL_ERROR, "Failed to send OP_REQ_IMPORT");
+                        return;
+                }
+        }
+
+        if (!usbip_net_recv_op_common(sock, OP_REP_IMPORT)) {
+                return;
+        }
+
+        op_import_reply reply{};
+
+        if (!usbip_net_recv(sock, &reply, sizeof(reply))) {
+                Trace(TRACE_LEVEL_ERROR, "Failed to recv import reply");
+                return;
+        }
+
+        PACK_OP_IMPORT_REPLY(0, &reply);
+
+        if (strncmp(reply.udev.busid, busid, sizeof(reply.udev.busid))) {
+                Trace(TRACE_LEVEL_ERROR, "Recv different busid '%s'", reply.udev.busid);
+                return;
+        }
+
+//        unsigned int devid = reply.udev.busnum << 16 | reply.udev.devnum;
+
+        auto &d = reply.udev;
+
+        Trace(TRACE_LEVEL_VERBOSE, "usbip_usb_device{ path '%s', busid %s, busnum %d, devnum %d, speed %d,"
+                "vid %#x, pid %#x, rev %#x, class/sub/proto %x/%x/%x, "
+                "bConfigurationValue %d, bNumConfigurations %d, bNumInterfaces %d }", 
+                d.path, d.busid, d.busnum, d.devnum, d.speed, 
+                d.idVendor, d.idProduct, d.bcdDevice,
+                d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, 
+                d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
+}
+
 } // namespace
 
 
@@ -254,6 +321,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
 
         if (auto sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, socket_context, nullptr, ai, f, nullptr)) {
                 Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &NodeName, &ServiceName);
+                process(sock, r.busid);
                 disconnect(sock);
                 close(sock);
         } else {
