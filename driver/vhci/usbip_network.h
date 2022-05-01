@@ -1,14 +1,21 @@
 #pragma once
 
-#include <basetsd.h>
-#include <ntdef.h>
+#include "mdl_cpp.h"
+#include "wsk_cpp.h"
 
-namespace wsk 
+namespace usbip
 {
-        struct SOCKET;
+
+using wsk::SOCKET;
+
+bool send(SOCKET *sock, memory pool, void *data, ULONG len);
+bool receive(SOCKET *sock, memory pool, void *data, ULONG len);
+
+bool receive_op_common(SOCKET *sock, UINT16 response_code, UINT32 *status = nullptr);
+
+inline WSK_BUF make_buffer(const Mdl &mdl)
+{
+        return { mdl.get(), 0, mdl.size() };
 }
 
-bool usbip_net_send(wsk::SOCKET *sock, void *data, ULONG len);
-bool usbip_net_recv(wsk::SOCKET *sock, void *data, ULONG len);
-
-bool usbip_net_recv_op_common(wsk::SOCKET *sock, UINT16 response_code, UINT32 *status = nullptr);
+} // namespace usbip

@@ -1,20 +1,17 @@
 #include "usbip_network.h"
-#include <wdm.h>
 #include "trace.h"
 #include "usbip_network.tmh"
 
 #include "usbip_proto_op.h"
-#include "wsk_utils.h"
-#include "mdl_cpp.h"
 
-bool usbip_net_send(wsk::SOCKET *sock, void *data, ULONG len)
+bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
 {
-        usbip::Mdl mdl(usbip::memory_pool::stack, data, len);
-        if (!mdl.prepare(IoReadAccess)) {
+        Mdl mdl(pool, data, len);
+        if (mdl.prepare(IoReadAccess)) {
                 return false;
         }
 
-        WSK_BUF buf{ mdl.get(), 0, mdl.size() };
+        auto buf = make_buffer(mdl);
 
         SIZE_T actual = 0;
         auto err = send(sock, &buf, WSK_FLAG_NODELAY, actual);
@@ -23,14 +20,14 @@ bool usbip_net_send(wsk::SOCKET *sock, void *data, ULONG len)
         return !err && actual == len;
 }
 
-bool usbip_net_recv(wsk::SOCKET *sock, void *data, ULONG len)
+bool usbip::receive(SOCKET *sock, memory pool, void *data, ULONG len)
 {
-        usbip::Mdl mdl(usbip::memory_pool::stack, data, len);
-        if (!mdl.prepare(IoWriteAccess)) {
+        Mdl mdl(pool, data, len);
+        if (mdl.prepare(IoWriteAccess)) {
                 return false;
         }
 
-        WSK_BUF buf{ mdl.get(), 0, mdl.size() };
+        auto buf = make_buffer(mdl);
 
         SIZE_T actual = 0;
         auto err = receive(sock, &buf, WSK_FLAG_WAITALL, actual);
@@ -39,11 +36,11 @@ bool usbip_net_recv(wsk::SOCKET *sock, void *data, ULONG len)
         return !err && actual == len;
 }
 
-bool usbip_net_recv_op_common(wsk::SOCKET *sock, UINT16 response_code, UINT32 *status)
+bool usbip::receive_op_common(SOCKET *sock, UINT16 response_code, UINT32 *status)
 {
         op_common r;
 
-        if (!usbip_net_recv(sock, &r, sizeof(r))) {
+        if (!receive(sock, memory::stack, &r, sizeof(r))) {
                 return false;
         }
 

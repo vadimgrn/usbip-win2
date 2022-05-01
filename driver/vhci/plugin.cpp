@@ -10,10 +10,8 @@
 #include "pnp_remove.h"
 #include "irp.h"
 #include "csq.h"
-#include "wsk_utils.h"
 #include "usbip_proto_op.h"
 #include "usbip_network.h"
-#include "mdl_cpp.h"
 
 namespace
 {
@@ -179,7 +177,8 @@ PAGEABLE void process(wsk::SOCKET *sock, const char *busid)
         PAGED_CODE();
 
         {
-                struct {
+                struct 
+                {
                         op_common hdr{ USBIP_VERSION, OP_REQ_IMPORT, ST_OK };
                         op_import_request body;
                 } req;
@@ -191,29 +190,20 @@ PAGEABLE void process(wsk::SOCKET *sock, const char *busid)
                 PACK_OP_COMMON(0, &req.hdr);
                 PACK_OP_IMPORT_REQUEST(0, &req.body);
 
-                usbip::Mdl mdl(usbip::memory_pool::stack, &req, sizeof(req));
-                if (!mdl.prepare(IoReadAccess)) {
-                        return;
-                }
-
-                WSK_BUF buf{ mdl.get(), 0, mdl.size() };
-
-                SIZE_T actual = 0;
-                auto err = send(sock, &buf, WSK_FLAG_NODELAY, actual);
-
-                if (err || actual != buf.Length) {
+                if (!send(sock, usbip::memory::stack, &req, sizeof(req))) {
                         Trace(TRACE_LEVEL_ERROR, "Failed to send OP_REQ_IMPORT");
                         return;
                 }
         }
 
-        if (!usbip_net_recv_op_common(sock, OP_REP_IMPORT)) {
+        if (!usbip::receive_op_common(sock, OP_REP_IMPORT)) {
+                Trace(TRACE_LEVEL_ERROR, "Failed to receive OP_REP_IMPORT");
                 return;
         }
 
         op_import_reply reply{};
 
-        if (!usbip_net_recv(sock, &reply, sizeof(reply))) {
+        if (!receive(sock, usbip::memory::stack, &reply, sizeof(reply))) {
                 Trace(TRACE_LEVEL_ERROR, "Failed to recv import reply");
                 return;
         }
@@ -225,7 +215,7 @@ PAGEABLE void process(wsk::SOCKET *sock, const char *busid)
                 return;
         }
 
-//        unsigned int devid = reply.udev.busnum << 16 | reply.udev.devnum;
+//      unsigned int devid = reply.udev.busnum << 16 | reply.udev.devnum;
 
         auto &d = reply.udev;
 

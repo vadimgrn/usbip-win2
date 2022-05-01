@@ -1,5 +1,5 @@
 #include <ntddk.h>
-#include "wsk_utils.h"
+#include "wsk_cpp.h"
 #include <wdm.h>
 
 /*

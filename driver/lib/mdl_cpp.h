@@ -5,20 +5,19 @@
 namespace usbip
 {
 
-enum class memory_pool { nonpaged, paged, stack = paged };
+enum class memory { nonpaged, paged, stack = paged };
 
 /*
  * Usage:
- * a) create an instance
- * b) prepare()
- * c) sysaddr()
- * d) unprepare()
+ * a) prepare()
+ * b) sysaddr()
+ * c) unprepare()
  */
 class Mdl
 {
         enum { DEF_ACCESS_MODE = KernelMode };
 public:
-        Mdl(_In_ memory_pool pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
+        Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
         ~Mdl();
 
         explicit operator bool() const { return m_mdl; }
@@ -33,10 +32,10 @@ public:
         auto next() const { return m_mdl ? m_mdl->Next : nullptr; }
         Mdl& next(_Inout_ Mdl &m);
 
-        bool prepare_nonpaged();
-        bool prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
+        NTSTATUS prepare_nonpaged();
+        NTSTATUS prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
 
-        bool prepare(_In_ LOCK_OPERATION Operation = IoReadAccess, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
+        NTSTATUS prepare(_In_ LOCK_OPERATION Operation = IoReadAccess, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
         void unprepare();
 
         auto sysaddr(_In_ ULONG Priority = NormalPagePriority)
@@ -45,10 +44,10 @@ public:
         }
 
 private:
-        bool m_paged{};
         MDL *m_mdl{};
+        bool m_paged{};
 
-        bool lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
+        NTSTATUS lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
         auto locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }
         void unlock();
 
@@ -58,17 +57,27 @@ private:
 
 size_t list_size(_In_ const Mdl &head);
 
-template<typename MDL1, typename... MDLN>
-inline auto prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode, _Inout_ MDL1 &m1, _Inout_ MDLN&... mn)
+template<typename T>
+inline auto prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode, _Inout_ T &t)
 {
-        return (m1.prepare(Operation, AccessMode) && ... && mn.prepare(Operation, AccessMode)); // binary left fold 
+        return t.prepare(Operation, AccessMode);
 }
 
-template<typename MDL1, typename... MDLN>
-inline void unprepare(_Inout_ MDL1 &m1, _Inout_ MDLN&... mn)
+template<typename T1, typename... TN>
+inline auto prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode, _Inout_ T1 &t1, _Inout_ TN&... tn)
 {
-        m1.unprepare();
-        (... , mn.unprepare()); // unary left fold 
+        if (auto err = prepare(Operation, AccessMode, t1)) {
+                return err;
+        }
+
+        return prepare(Operation, AccessMode, tn...);
+}
+
+template<typename T1, typename... TN>
+inline void unprepare(_Inout_ T1 &t1, _Inout_ TN&... tn)
+{
+        t1.unprepare();
+        (... , tn.unprepare()); // unary left fold 
 }
 
 } // namespace usbip

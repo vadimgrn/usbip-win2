@@ -3,9 +3,9 @@
 /*
 * @see reactos\ntoskrnl\io\iomgr\iomdl.c
 */
-usbip::Mdl::Mdl(_In_ memory_pool pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
-        m_paged(pool == memory_pool::paged),
-        m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr))
+usbip::Mdl::Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
+        m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr)),
+        m_paged(pool == memory::paged)
 {
 }
 
@@ -17,21 +17,21 @@ usbip::Mdl::~Mdl()
         }
 }
 
-bool usbip::Mdl::lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation)
+NTSTATUS usbip::Mdl::lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation)
 {
         NT_ASSERT(m_mdl);
         NT_ASSERT(m_paged);
 
-        bool ok = true;
+        if (locked()) { // may not lock again until unlock() is called
+                return STATUS_ALREADY_COMPLETE;
+        }
 
         __try {
                 MmProbeAndLockPages(m_mdl, AccessMode, Operation);
-                NT_ASSERT(locked());
         } __except (EXCEPTION_EXECUTE_HANDLER) {
-                ok = false;
         }
 
-        return ok;
+        return locked() ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
 void usbip::Mdl::unlock() 
@@ -53,26 +53,30 @@ usbip::Mdl& usbip::Mdl::next(_Inout_ Mdl &m)
         return m;
 }
 
-bool usbip::Mdl::prepare_nonpaged()
+NTSTATUS usbip::Mdl::prepare_nonpaged()
 {
-        auto ok = m_mdl && !m_paged;
-        if (ok) {
-                MmBuildMdlForNonPagedPool(m_mdl);
+        if (!m_mdl) {
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        return ok;
+        if (m_paged) {
+                return STATUS_INVALID_DEVICE_REQUEST;
+        }
+        
+        MmBuildMdlForNonPagedPool(m_mdl);
+        return STATUS_SUCCESS;
 }
 
-bool usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode)
+NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode)
 {
-        return m_mdl && m_paged && lock(AccessMode, Operation);
-}
-
-bool usbip::Mdl::prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode)
-{
-        return !m_mdl ? false :
+        return !m_mdl ? STATUS_INSUFFICIENT_RESOURCES :
                 m_paged ? lock(AccessMode, Operation) : 
-                prepare_nonpaged();
+                STATUS_INVALID_DEVICE_REQUEST;
+}
+
+NTSTATUS usbip::Mdl::prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode)
+{
+        return m_paged ? prepare_paged(Operation, AccessMode) : prepare_nonpaged();
 }
 
 void usbip::Mdl::unprepare()

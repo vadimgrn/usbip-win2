@@ -18,7 +18,7 @@
     <ClCompile Include="strutil.cpp" />
     <ClCompile Include="usb_util.cpp" />
     <ClCompile Include="usbd_helper.cpp" />
-    <ClCompile Include="wsk_utils.cpp" />
+    <ClCompile Include="wsk_cpp.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{27AB4325-4980-4634-9818-AE6BD61DE532}</ProjectGuid>
@@ -123,7 +123,7 @@
     <ClInclude Include="strutil.h" />
     <ClInclude Include="usbd_helper.h" />
     <ClInclude Include="usb_util.h" />
-    <ClInclude Include="wsk_utils.h" />
+    <ClInclude Include="wsk_cpp.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
