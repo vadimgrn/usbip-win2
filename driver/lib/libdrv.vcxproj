@@ -88,6 +88,9 @@
     <Inf>
       <TimeStamp>0.3.0.0</TimeStamp>
     </Inf>
+    <Lib>
+      <AdditionalDependencies>$(SDK_LIB_PATH)uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -108,6 +111,9 @@
     <Inf>
       <TimeStamp>0.3.0.0</TimeStamp>
     </Inf>
+    <Lib>
+      <AdditionalDependencies>$(SDK_LIB_PATH)uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />
