@@ -287,6 +287,46 @@ NTSTATUS wsk::socket(
         return err;
 }
 
+NTSTATUS wsk::control_client(
+        _In_ ULONG ControlCode,
+        _In_ SIZE_T InputSize,
+        _In_reads_bytes_opt_(InputSize) void *InputBuffer,
+        _In_ SIZE_T OutputSize,
+        _Out_writes_bytes_opt_(OutputSize) void *OutputBuffer,
+        _Out_opt_ SIZE_T *OutputSizeReturned,
+        _In_ bool use_irp)
+{
+        if (use_irp && OutputBuffer && !OutputSizeReturned) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        auto prov = GetProviderNPIOnce();
+        if (!prov) {
+                return STATUS_UNSUCCESSFUL;
+        }
+
+        auto WskControlClient = prov->Dispatch->WskControlClient;
+
+        if (!use_irp) {
+                return WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer, 
+                        OutputSize, OutputBuffer, OutputSizeReturned, nullptr);
+        }
+
+        SOCKET_ASYNC_CONTEXT ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        auto err = WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer,
+                OutputSize, OutputBuffer, OutputSizeReturned, ctx.irp());
+
+        if (!ctx.wait_for_completion(err) && OutputSizeReturned) {
+                *OutputSizeReturned = ctx.irp()->IoStatus.Information;
+        }
+
+        return err;
+}
+
 NTSTATUS wsk::control(
         _In_ SOCKET *sock,
         _In_ WSK_CONTROL_SOCKET_TYPE RequestType,

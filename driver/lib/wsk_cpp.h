@@ -11,6 +11,15 @@ void shutdown();
 
 WSK_PROVIDER_NPI *GetProviderNPI();
 
+NTSTATUS control_client(
+        _In_ ULONG ControlCode,
+        _In_ SIZE_T InputSize,
+        _In_reads_bytes_opt_(InputSize) void *InputBuffer,
+        _In_ SIZE_T OutputSize,
+        _Out_writes_bytes_opt_(OutputSize) void *OutputBuffer,
+        _Out_opt_ SIZE_T *OutputSizeReturned,
+        _In_ bool use_irp);
+
 struct SOCKET;
 
 NTSTATUS socket(
