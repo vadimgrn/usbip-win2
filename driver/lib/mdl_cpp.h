@@ -57,10 +57,20 @@ private:
 
 size_t list_size(_In_ const Mdl &head);
 
-template<typename T>
-inline auto prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode, _Inout_ T &t)
+inline auto& operator +=(_Inout_ Mdl &left, _Inout_ Mdl &right)
+{ 
+        return left.next(right);
+}
+
+template<typename T1, typename... TN>
+inline decltype(auto) tie(_Inout_ T1 &t1, _Inout_ TN&... tn)
 {
-        return t.prepare(Operation, AccessMode);
+        return (t1 += ... += tn);
+}
+
+inline auto prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode, _Inout_ Mdl &m)
+{
+        return m.prepare(Operation, AccessMode);
 }
 
 template<typename T1, typename... TN>

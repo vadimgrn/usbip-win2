@@ -11,7 +11,7 @@ bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
                 return false;
         }
 
-        auto buf = make_buffer(mdl);
+        WSK_BUF buf{ mdl.get(), 0, len };
 
         SIZE_T actual = 0;
         auto err = send(sock, &buf, WSK_FLAG_NODELAY, actual);
@@ -27,7 +27,7 @@ bool usbip::receive(SOCKET *sock, memory pool, void *data, ULONG len)
                 return false;
         }
 
-        auto buf = make_buffer(mdl);
+        WSK_BUF buf{ mdl.get(), 0, len };
 
         SIZE_T actual = 0;
         auto err = receive(sock, &buf, WSK_FLAG_WAITALL, actual);
