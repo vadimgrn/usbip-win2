@@ -86,7 +86,7 @@ void usbip::Mdl::unprepare()
         }
 }
 
-size_t usbip::list_size(_In_ const Mdl &head)
+size_t usbip::size(_In_ const Mdl &head)
 {
         size_t total = 0;
 

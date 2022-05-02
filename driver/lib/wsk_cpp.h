@@ -54,8 +54,9 @@ inline auto receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, S
         return transfer(sock, buffer, flags, actual, false);
 }
 
-NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
 NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
+
+NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
 NTSTATUS close(_In_ SOCKET *sock);
 
 //

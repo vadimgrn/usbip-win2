@@ -196,8 +196,8 @@ PAGEABLE void process(wsk::SOCKET *sock, const char *busid)
                 }
         }
 
-        if (!usbip::receive_op_common(sock, OP_REP_IMPORT)) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to receive OP_REP_IMPORT");
+        if (auto err = usbip::receive_op_common(sock, OP_REP_IMPORT)) {
+                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT error %!op_status_t!", err);
                 return;
         }
 

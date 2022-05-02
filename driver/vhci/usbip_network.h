@@ -1,5 +1,6 @@
 #pragma once
 
+#include "usbip_api_consts.h"
 #include "mdl_cpp.h"
 #include "wsk_cpp.h"
 
@@ -11,6 +12,6 @@ using wsk::SOCKET;
 bool send(SOCKET *sock, memory pool, void *data, ULONG len);
 bool receive(SOCKET *sock, memory pool, void *data, ULONG len);
 
-bool receive_op_common(SOCKET *sock, UINT16 response_code, UINT32 *status = nullptr);
+err_t receive_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status = nullptr);
 
 } // namespace usbip

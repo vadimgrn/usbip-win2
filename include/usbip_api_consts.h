@@ -2,9 +2,8 @@
 
 #include <assert.h>
 
-/* Defines for op_code status in server/client op_common PDUs */
-        
-enum {
+enum op_status_t // op_common.status
+{
         ST_OK,
         ST_NA, /* Device requested for import is not available */
         ST_DEV_BUSY, /* Device requested for import is in error state */
@@ -14,7 +13,8 @@ enum {
 };
 
 /* error codes for userspace tools and library */
-enum {
+enum err_t
+{
         ERR_CERTIFICATE	= -12,
         ERR_ACCESS,
         ERR_PORTFULL,
@@ -26,10 +26,11 @@ enum {
         ERR_VERSION,
         ERR_NETWORK,
         ERR_INVARG,
-        ERR_GENERAL
+        ERR_GENERAL,
+        ERR_NONE
 };
 
-static_assert(ERR_GENERAL == -1, "assert");
+static_assert(!ERR_NONE, "assert");
 
 enum usbip_device_status 
 {

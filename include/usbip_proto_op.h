@@ -42,13 +42,13 @@ struct usbip_usb_device
 /* ---------------------------------------------------------------------- */
 /* Common header for all the kinds of PDUs. */
 struct op_common {
-        UINT16 version;
+        UINT16 version; // USBIP_VERSION
 
 #define OP_REQUEST	(0x80 << 8)
 #define OP_REPLY	(0x00 << 8)
         UINT16 code;
 
-        UINT32 status; /* op_code status (for reply) */
+        UINT32 status; // op_status_t, for reply
 };
 
 #define PACK_OP_COMMON(pack, op_common)  do {\

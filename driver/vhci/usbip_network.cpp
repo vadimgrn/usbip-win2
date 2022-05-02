@@ -36,34 +36,38 @@ bool usbip::receive(SOCKET *sock, memory pool, void *data, ULONG len)
         return !err && actual == len;
 }
 
-bool usbip::receive_op_common(SOCKET *sock, UINT16 response_code, UINT32 *status)
+err_t usbip::receive_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status)
 {
         op_common r;
 
         if (!receive(sock, memory::stack, &r, sizeof(r))) {
-                return false;
+                return ERR_NETWORK;
         }
 
 	PACK_OP_COMMON(0, &r);
 
 	if (r.version != USBIP_VERSION) {
 		Trace(TRACE_LEVEL_ERROR, "Version %#x != %#x", r.version, USBIP_VERSION);
-		return false;
+		return ERR_VERSION;
 	}
 
-        if (r.code != response_code) {
-                Trace(TRACE_LEVEL_ERROR, "Code %#x != %#x", r.code, response_code);
-                return false;
+        if (r.code != expected_code) {
+                Trace(TRACE_LEVEL_ERROR, "Code %#x != %#x", r.code, expected_code);
+                return ERR_PROTOCOL;
         }
 
         if (status) {
-                *status = r.status;
+                *status = static_cast<op_status_t>(r.status);
+                if (static_cast<decltype(r.status)>(*status) != r.status) {
+                        Trace(TRACE_LEVEL_ERROR, "op_status_t(%d) != status(%d)", *status, r.status);
+                        return ERR_STATUS;
+                }
         }
 
         if (r.status != ST_OK) {
                 Trace(TRACE_LEVEL_ERROR, "Request failed: status %d", r.status);
-                return false;
+                return ERR_STATUS;
 	}
 
-        return true;
+        return ERR_NONE;
 }

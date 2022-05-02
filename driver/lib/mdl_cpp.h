@@ -35,7 +35,7 @@ public:
         NTSTATUS prepare_nonpaged();
         NTSTATUS prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
 
-        NTSTATUS prepare(_In_ LOCK_OPERATION Operation = IoReadAccess, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
+        NTSTATUS prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
         void unprepare();
 
         auto sysaddr(_In_ ULONG Priority = NormalPagePriority)
@@ -55,7 +55,7 @@ private:
 };
 
 
-size_t list_size(_In_ const Mdl &head);
+size_t size(_In_ const Mdl &head);
 
 inline auto& operator +=(_Inout_ Mdl &left, _Inout_ Mdl &right)
 { 
