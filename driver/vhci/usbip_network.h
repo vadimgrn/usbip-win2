@@ -10,8 +10,8 @@ namespace usbip
 using wsk::SOCKET;
 
 bool send(SOCKET *sock, memory pool, void *data, ULONG len);
-bool receive(SOCKET *sock, memory pool, void *data, ULONG len);
+bool recv(SOCKET *sock, memory pool, void *data, ULONG len);
 
-err_t receive_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status = nullptr);
+err_t recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status = nullptr);
 
 } // namespace usbip

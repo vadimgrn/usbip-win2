@@ -20,7 +20,7 @@ bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
         return !err && actual == len;
 }
 
-bool usbip::receive(SOCKET *sock, memory pool, void *data, ULONG len)
+bool usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
 {
         Mdl mdl(pool, data, len);
         if (mdl.prepare(IoWriteAccess)) {
@@ -36,11 +36,11 @@ bool usbip::receive(SOCKET *sock, memory pool, void *data, ULONG len)
         return !err && actual == len;
 }
 
-err_t usbip::receive_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status)
+err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status)
 {
         op_common r;
 
-        if (!receive(sock, memory::stack, &r, sizeof(r))) {
+        if (!recv(sock, memory::stack, &r, sizeof(r))) {
                 return ERR_NETWORK;
         }
 

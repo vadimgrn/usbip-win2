@@ -12,9 +12,18 @@
 #include "csq.h"
 #include "usbip_proto_op.h"
 #include "usbip_network.h"
+#include "proto.h"
+#include "ch9.h"
+#include "dbgcommon.h"
+#include "pdu.h"
 
 namespace
 {
+
+constexpr unsigned int make_devid(int busnum, int devnum)
+{
+        return (busnum << 16) | devnum;
+}
 
 PAGEABLE auto init(vpdo_dev_t &vpdo)
 {
@@ -172,60 +181,204 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
         return STATUS_SUCCESS;
 }
 
-PAGEABLE void process(wsk::SOCKET *sock, const char *busid)
+PAGEABLE auto send_req_import(wsk::SOCKET *sock, const char *busid)
 {
         PAGED_CODE();
 
+        struct 
         {
-                struct 
-                {
-                        op_common hdr{ USBIP_VERSION, OP_REQ_IMPORT, ST_OK };
-                        op_import_request body;
-                } req;
+                op_common hdr{ USBIP_VERSION, OP_REQ_IMPORT, ST_OK };
+                op_import_request body;
+        } req;
 
-                static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
+        static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
 
-                strcpy_s(req.body.busid, sizeof(req.body.busid), busid);
+        strcpy_s(req.body.busid, sizeof(req.body.busid), busid);
 
-                PACK_OP_COMMON(0, &req.hdr);
-                PACK_OP_IMPORT_REQUEST(0, &req.body);
+        PACK_OP_COMMON(0, &req.hdr);
+        PACK_OP_IMPORT_REQUEST(0, &req.body);
 
-                if (!send(sock, usbip::memory::stack, &req, sizeof(req))) {
-                        Trace(TRACE_LEVEL_ERROR, "Failed to send OP_REQ_IMPORT");
-                        return;
-                }
-        }
+        return send(sock, usbip::memory::stack, &req, sizeof(req)) ? ERR_NONE : ERR_NETWORK;
+}
 
-        if (auto err = usbip::receive_op_common(sock, OP_REP_IMPORT)) {
-                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT error %!op_status_t!", err);
-                return;
+PAGEABLE auto recv_rep_import(wsk::SOCKET *sock, const char *busid, unsigned int &devid)
+{
+        PAGED_CODE();
+
+        if (auto err = usbip::recv_op_common(sock, OP_REP_IMPORT)) {
+                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT(op_common) error %!op_status_t!", err);
+                return err;
         }
 
         op_import_reply reply{};
 
-        if (!receive(sock, usbip::memory::stack, &reply, sizeof(reply))) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to recv import reply");
-                return;
+        if (!recv(sock, usbip::memory::stack, &reply, sizeof(reply))) {
+                Trace(TRACE_LEVEL_ERROR, "Failed to recv OP_REP_IMPORT(op_import_reply)");
+                return ERR_NETWORK;
         }
 
         PACK_OP_IMPORT_REPLY(0, &reply);
 
         if (strncmp(reply.udev.busid, busid, sizeof(reply.udev.busid))) {
-                Trace(TRACE_LEVEL_ERROR, "Recv different busid '%s'", reply.udev.busid);
-                return;
+                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, busid);
+                return ERR_PROTOCOL;
         }
 
-//      unsigned int devid = reply.udev.busnum << 16 | reply.udev.devnum;
-
         auto &d = reply.udev;
+        devid = make_devid(d.busnum, d.devnum);
 
         Trace(TRACE_LEVEL_VERBOSE, "usbip_usb_device{ path '%s', busid %s, busnum %d, devnum %d, speed %d,"
-                "vid %#x, pid %#x, rev %#x, class/sub/proto %x/%x/%x, "
-                "bConfigurationValue %d, bNumConfigurations %d, bNumInterfaces %d }", 
-                d.path, d.busid, d.busnum, d.devnum, d.speed, 
-                d.idVendor, d.idProduct, d.bcdDevice,
-                d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, 
-                d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
+                                "vid %#x, pid %#x, rev %#x, class/sub/proto %x/%x/%x, "
+                                "bConfigurationValue %d, bNumConfigurations %d, bNumInterfaces %d }", 
+                                d.path, d.busid, d.busnum, d.devnum, d.speed, 
+                                d.idVendor, d.idProduct, d.bcdDevice,
+                                d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, 
+                                d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
+
+        return ERR_NONE;
+}
+
+PAGEABLE auto init_req_get_descr(usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBufferLength)
+{
+        PAGED_CODE();
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
+
+        if (auto err = set_cmd_submit_usbip_header(&vpdo, &hdr, EP0, TransferFlags, TransferBufferLength)) {
+                return err == STATUS_INVALID_PARAMETER ? ERR_INVARG : ERR_GENERAL;
+        }
+
+        auto pkt = get_submit_setup(&hdr);
+        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
+        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(type, 0);
+        pkt->wIndex.W = 0; // Zero or Language ID for string descriptor
+        pkt->wLength = TransferBufferLength;
+
+        return ERR_NONE;
+}
+
+PAGEABLE auto read_descr_hdr(wsk::SOCKET *sock, vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBufferLength)
+{
+        PAGED_CODE();
+
+        usbip_header hdr{};
+        if (auto err = init_req_get_descr(hdr, vpdo, type, TransferBufferLength)) {
+                return err;
+        }
+
+        char buf[DBG_USBIP_HDR_BUFSZ];
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+
+        byteswap_header(hdr, swap_dir::host2net);
+
+        if (!send(sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
+                Trace(TRACE_LEVEL_ERROR, "send hdr error: %!usb_descriptor_type!, %u", type, TransferBufferLength);
+                return ERR_NETWORK;
+        }
+
+        if (!recv(sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
+                Trace(TRACE_LEVEL_ERROR, "recv hdr error: %!usb_descriptor_type!, %u", type, TransferBufferLength);
+                return ERR_NETWORK;
+        }
+
+        byteswap_header(hdr, swap_dir::net2host);
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+
+        auto &b = hdr.base;
+        if (!(b.command == USBIP_RET_SUBMIT && b.seqnum == vpdo.seqnum)) {
+                return ERR_PROTOCOL;
+        }
+
+        auto &ret = hdr.u.ret_submit;
+        return !ret.status && ret.actual_length == TransferBufferLength ? ERR_NONE : ERR_PROTOCOL;
+}
+
+PAGEABLE auto read_dev_descr(USB_DEVICE_DESCRIPTOR &dd, wsk::SOCKET *sock, vpdo_dev_t &vpdo)
+{
+        PAGED_CODE();
+
+        if (auto err = read_descr_hdr(sock, vpdo, USB_DEVICE_DESCRIPTOR_TYPE, sizeof(dd))) {
+                return err;
+        }
+
+        return recv(sock, usbip::memory::stack, &dd, sizeof(dd)) ? ERR_NONE : ERR_NETWORK;
+}
+
+PAGEABLE auto read_cfg_descr(USB_CONFIGURATION_DESCRIPTOR* &cfgd, wsk::SOCKET *sock, vpdo_dev_t &vpdo)
+{
+        PAGED_CODE();
+
+        USB_CONFIGURATION_DESCRIPTOR cd{};
+        if (auto err = read_descr_hdr(sock, vpdo, USB_CONFIGURATION_DESCRIPTOR_TYPE, sizeof(cd))) {
+                return err;
+        }
+
+        if (!recv(sock, usbip::memory::stack, &cd, sizeof(cd))) {
+                return ERR_NETWORK;
+        }
+
+        cfgd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cd.wTotalLength, USBIP_VHCI_POOL_TAG);
+        if (!cfgd) {
+                return ERR_GENERAL;
+        }
+
+        if (auto err = read_descr_hdr(sock, vpdo, USB_CONFIGURATION_DESCRIPTOR_TYPE, cd.wTotalLength)) {
+                return err;
+        }
+
+        return recv(sock, usbip::memory::stack, cfgd, cd.wTotalLength) ? ERR_NONE : ERR_NETWORK;
+}
+
+PAGEABLE auto process(wsk::SOCKET *sock, const char *busid)
+{
+        PAGED_CODE();
+
+        if (auto err = send_req_import(sock, busid)) {
+                Trace(TRACE_LEVEL_ERROR, "OP_REQ_IMPORT %!err_t!", err);
+                return err;
+        }
+
+        vpdo_dev_t vpdo{};
+
+        if (auto err = recv_rep_import(sock, busid, vpdo.devid)) {
+                return err;
+        }
+
+        USB_DEVICE_DESCRIPTOR dd{};
+        if (auto err = read_dev_descr(dd, sock, vpdo)) {
+                return err;
+        }
+
+        USB_CONFIGURATION_DESCRIPTOR *cd{};
+        if (auto err = read_cfg_descr(cd, sock, vpdo)) {
+                if (cd) {
+                        ExFreePoolWithTag(cd, USBIP_VHCI_POOL_TAG);
+                }
+                return err;
+        }
+
+        Trace(TRACE_LEVEL_VERBOSE,
+                "DeviceDescriptor(bLength %d, %!usb_descriptor_type!, bcdUSB %#x, "
+                "bDeviceClass %#x, bDeviceSubClass %#x, bDeviceProtocol %#x, bMaxPacketSize0 %d, "
+                "idVendor %#x, idProduct %#x, bcdDevice %#x, "
+                "iManufacturer %d, iProduct %d, iSerialNumber %d, "
+                "bNumConfigurations %d)",
+                dd.bLength, dd.bDescriptorType, dd.bcdUSB,
+                dd.bDeviceClass, dd.bDeviceSubClass, dd.bDeviceProtocol, dd.bMaxPacketSize0,
+                dd.idVendor, dd.idProduct, dd.bcdDevice,
+                dd.iManufacturer, dd.iProduct, dd.iSerialNumber,
+                dd.bNumConfigurations);
+
+        Trace(TRACE_LEVEL_VERBOSE,
+                "ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu, "
+                "bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
+                cd->bLength, cd->bDescriptorType, cd->wTotalLength,
+                cd->bNumInterfaces, cd->bConfigurationValue, cd->iConfiguration, cd->bmAttributes, cd->MaxPower);
+
+        ExFreePoolWithTag(cd, USBIP_VHCI_POOL_TAG);
+        return ERR_NONE;
+
 }
 
 } // namespace
@@ -239,6 +392,9 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
 	PAGED_CODE();
         TraceCall("irp %p: %s:%s, busid %s, serial '%s'", irp, r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
+        auto &error = r.port; // err_t
+        error = ERR_GENERAL;
+
         UNICODE_STRING NodeName{};
         if (auto err = copy(NodeName, r.host)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.host, err);
@@ -251,6 +407,8 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
                 RtlFreeUnicodeString(&NodeName);
                 return err;
         }
+
+        error = ERR_NETWORK;
 
         ADDRINFOEXW hints{};
         hints.ai_flags = AI_NUMERICSERV;
@@ -311,7 +469,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
 
         if (auto sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, socket_context, nullptr, ai, f, nullptr)) {
                 Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &NodeName, &ServiceName);
-                process(sock, r.busid);
+                error = process(sock, r.busid);
                 disconnect(sock);
                 close(sock);
         } else {
