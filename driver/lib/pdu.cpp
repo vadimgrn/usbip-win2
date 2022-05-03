@@ -1,105 +1,161 @@
+/*
+* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 #include "pdu.h"
 #include "usbip_proto.h"
 
-#include <wdm.h>
+#include <intrin.h>
+
+#ifdef _KERNEL_MODE
+  #include <wdm.h>
+  #define USBIP_ASSERT NT_ASSERT
+#else
+  #include <cassert>
+  #define USBIP_ASSERT assert
+#endif
 
 namespace
 {
 
-void swap_cmd_submit(usbip_header_cmd_submit &r)
+void byteswap(usbip_header_basic &r) 
 {
-	r.transfer_flags = RtlUlongByteSwap(r.transfer_flags);
-	r.transfer_buffer_length = RtlUlongByteSwap(r.transfer_buffer_length);
-	r.start_frame = RtlUlongByteSwap(r.start_frame);
-	r.number_of_packets = RtlUlongByteSwap(r.number_of_packets);
-	r.interval = RtlUlongByteSwap(r.interval);
+        UINT32* v[]{ &r.command, &r.seqnum, &r.devid, &r.direction, &r.ep };
+        static_assert(sizeof(*v[0]) == sizeof(unsigned long));
+
+        for (auto val: v) {
+		*val = _byteswap_ulong(*val); // RtlUlongByteSwap
+	}
 }
 
-void swap_ret_submit(usbip_header_ret_submit &r)
+void byteswap(usbip_header_cmd_submit &r) 
 {
-	r.status = RtlUlongByteSwap(r.status);
-	r.actual_length = RtlUlongByteSwap(r.actual_length);
-	r.start_frame = RtlUlongByteSwap(r.start_frame);
-	r.number_of_packets = RtlUlongByteSwap(r.number_of_packets);
-	r.error_count = RtlUlongByteSwap(r.error_count);
+	static_assert(sizeof(r.transfer_flags) == sizeof(unsigned long));
+	r.transfer_flags = _byteswap_ulong(r.transfer_flags);
+
+        INT32 *v[] {&r.transfer_buffer_length, &r.start_frame, &r.number_of_packets, &r.interval};
+        static_assert(sizeof(*v[0]) == sizeof(unsigned long));
+
+	for (auto val: v) {
+		*val = _byteswap_ulong(*val);
+	}
 }
 
-inline void swap_cmd_unlink(usbip_header_cmd_unlink &r)
+void byteswap(usbip_header_ret_submit &r) 
 {
-	r.seqnum = RtlUlongByteSwap(r.seqnum);
+        INT32 *v[] {&r.status, &r.actual_length, &r.start_frame, &r.number_of_packets, &r.error_count};
+        static_assert(sizeof(*v[0]) == sizeof(unsigned long));
+
+	for (auto val: v) {
+		*val = _byteswap_ulong(*val);
+	}
 }
 
-inline void swap_ret_unlink(usbip_header_ret_unlink &r)
+inline void byteswap(usbip_header_cmd_unlink &r) 
 {
-	r.status = RtlUlongByteSwap(r.status);
+	static_assert(sizeof(r.seqnum) == sizeof(unsigned long));
+	r.seqnum = _byteswap_ulong(r.seqnum);
+}
+
+inline void byteswap(usbip_header_ret_unlink &r) 
+{
+	static_assert(sizeof(r.status) == sizeof(unsigned long));
+	r.status = _byteswap_ulong(r.status);
+}
+
+void byteswap(usbip_iso_packet_descriptor *d, int cnt) 
+{
+	for (int i = 0; i < cnt; ++i, ++d) {
+
+                UINT32 *v[] {&d->offset, &d->length, &d->actual_length, &d->status};
+                static_assert(sizeof(*v[0]) == sizeof(unsigned long));
+
+                for (auto val: v) {
+			*val = _byteswap_ulong(*val);
+		}
+	}
 }
 
 } // namespace
 
 
-void swap_usbip_header(usbip_header *hdr)
+void byteswap_header(usbip_header &hdr, swap_dir dir) 
 {
-	hdr->base.seqnum = RtlUlongByteSwap(hdr->base.seqnum);
-	hdr->base.devid = RtlUlongByteSwap(hdr->base.devid);
-	hdr->base.direction = RtlUlongByteSwap(hdr->base.direction);
-	hdr->base.ep = RtlUlongByteSwap(hdr->base.ep);
+	if (dir == swap_dir::net2host) {
+		byteswap(hdr.base);
+	}
 
-	switch (hdr->base.command) {
+	switch (hdr.base.command) {
 	case USBIP_CMD_SUBMIT:
-		swap_cmd_submit(hdr->u.cmd_submit);
+		byteswap(hdr.u.cmd_submit);
 		break;
 	case USBIP_RET_SUBMIT:
-		swap_ret_submit(hdr->u.ret_submit);
+		byteswap(hdr.u.ret_submit);
 		break;
 	case USBIP_CMD_UNLINK:
-		swap_cmd_unlink(hdr->u.cmd_unlink);
+		byteswap(hdr.u.cmd_unlink);
 		break;
 	case USBIP_RET_UNLINK:
-		swap_ret_unlink(hdr->u.ret_unlink);
+		byteswap(hdr.u.ret_unlink);
 		break;
 	}
 
-	hdr->base.command = RtlUlongByteSwap(hdr->base.command);
-}
-
-void swap_usbip_ds(usbip_header *hdr)
-{
-	auto cnt = hdr->u.ret_submit.number_of_packets;
-	auto d = (usbip_iso_packet_descriptor*)((char*)(hdr + 1) + hdr->u.ret_submit.actual_length);
-	
-	for (int i = 0; i < cnt; ++i, ++d) {
-		d->offset = RtlUlongByteSwap(d->offset);
-		d->length = RtlUlongByteSwap(d->length);
-		d->actual_length = RtlUlongByteSwap(d->actual_length);
-		d->status = RtlUlongByteSwap(d->status);
+	if (dir == swap_dir::host2net) {
+		byteswap(hdr.base);
 	}
 }
 
-size_t get_pdu_payload_size(const usbip_header *hdr)
+void byteswap_payload(usbip_header &hdr) 
 {
-	NT_ASSERT(hdr);
+	usbip_iso_packet_descriptor *isoc{};
 
-	int dir_out = hdr->base.direction == USBIP_DIR_OUT;
-	size_t len = 0;
+	if (auto cnt = get_isoc_descr(isoc, hdr)) {
+		byteswap(isoc, cnt);
+	}
+}
 
-	switch (hdr->base.command) {
+/*
+ * Server's responses always have zeroes in usbip_header_basic's devid, direction, ep.
+ * See: <linux>/Documentation/usb/usbip_protocol.rst, usbip_header_basic.
+ */
+int get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr) 
+{
+	auto dir_out = hdr.base.direction == USBIP_DIR_OUT;
+
+	auto buf_end = reinterpret_cast<char*>(&hdr + 1);
+	int cnt = 0;
+
+	switch (hdr.base.command) {
 	case USBIP_CMD_SUBMIT:
-		len += dir_out ? hdr->u.cmd_submit.transfer_buffer_length : 0;
-		len += hdr->u.cmd_submit.number_of_packets*sizeof(usbip_iso_packet_descriptor);
+		buf_end += dir_out ? hdr.u.cmd_submit.transfer_buffer_length : 0;
+		cnt = hdr.u.cmd_submit.number_of_packets;
 		break;
 	case USBIP_RET_SUBMIT:
-		len += dir_out ? 0 : hdr->u.ret_submit.actual_length;
-		len += hdr->u.ret_submit.number_of_packets*sizeof(usbip_iso_packet_descriptor);
+		buf_end += dir_out ? 0 : hdr.u.ret_submit.actual_length; // harmless if direction was not corrected
+		cnt = hdr.u.ret_submit.number_of_packets;
 		break;
 	case USBIP_CMD_UNLINK:
 	case USBIP_RET_UNLINK:
 		break;
+	default:
+                USBIP_ASSERT(!"Invalid command, wrong endianness?");
 	}
 
-	return len;
+	isoc = reinterpret_cast<usbip_iso_packet_descriptor*>(buf_end);
+	return cnt;
 }
 
-size_t get_pdu_size(const usbip_header *hdr)
+size_t get_payload_size(const usbip_header &hdr) 
 {
-	return sizeof(*hdr) + get_pdu_payload_size(hdr);
+	usbip_iso_packet_descriptor *isoc{};
+	auto cnt = get_isoc_descr(isoc, const_cast<usbip_header&>(hdr));
+
+	auto buf = reinterpret_cast<const char*>(&hdr + 1);
+        USBIP_ASSERT((char*)isoc >= buf);
+
+	return reinterpret_cast<char*>(isoc + cnt) - buf;
+}
+
+size_t get_total_size(const usbip_header &hdr) 
+{
+	return sizeof(hdr) + get_payload_size(hdr);
 }

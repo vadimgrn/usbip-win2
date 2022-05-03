@@ -5,7 +5,6 @@
 #include "usbip_proto.h"
 #include "stub_res.h"
 #include "stub_dbg.h"
-#include "pdu.h"
 
 #include "strutil.h"
 

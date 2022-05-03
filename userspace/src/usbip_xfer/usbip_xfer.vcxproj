@@ -11,12 +11,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\lib\pdu.cpp" />
+    <ClCompile Include="..\..\..\driver\lib\pdu.cpp" />
     <ClCompile Include="debug.cpp" />
     <ClCompile Include="usbip_xfer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\lib\pdu.h" />
+    <ClInclude Include="..\..\..\driver\lib\pdu.h" />
     <ClInclude Include="debug.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="trace.h" />
