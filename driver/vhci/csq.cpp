@@ -278,22 +278,6 @@ auto dequeue(LIST_ENTRY *head, seqnum_t seqnum, bool unlink)
 } // namespace
 
 
-PAGEABLE NTSTATUS init_queues(vhci_dev_t &vhci)
-{
-        PAGED_CODE();
-
-        InitializeListHead(&vhci.irps);
-        KeInitializeSpinLock(&vhci.irps_lock);
-
-        return IoCsqInitialize(&vhci.irps_csq,
-                                InsertIrp_tx,
-                                RemoveIrp,
-                                PeekNextIrp_tx,
-                                AcquireLock_tx,
-                                ReleaseLock_tx,
-                                CompleteCanceledIrp_tx);
-}
-
 PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();

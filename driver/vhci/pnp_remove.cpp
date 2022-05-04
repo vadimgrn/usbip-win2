@@ -10,6 +10,7 @@
 #include "usbip_vhci_api.h"
 #include "strutil.h"
 #include "csq.h"
+#include "wsk_cpp.h"
 
 namespace
 {
@@ -19,10 +20,6 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 	PAGED_CODE();
 
 	TraceCall("%p", &vhci);
-
-        while (auto irp = IoCsqRemoveNextIrp(&vhci.irps_csq, nullptr)) {
-                complete_canceled_irp(irp);
-        }
 
         IoSetDeviceInterfaceState(&vhci.DevIntfVhci, FALSE);
 	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, FALSE);
@@ -111,6 +108,16 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 	TraceCall("%p, port %d", &vpdo, vpdo.port);
 
+        if (auto &sock = vpdo.sock) {
+                if (auto err = disconnect(sock)) {
+                        Trace(TRACE_LEVEL_ERROR, "Socket disconnect error %!STATUS!", err);
+                }
+                if (auto err = close(sock)) {
+                        Trace(TRACE_LEVEL_ERROR, "Socket close error %!STATUS!", err);
+                }
+                sock = nullptr;
+        }
+
 	cancel_pending_irps(vpdo);
 	complete_unlinked_irps(&vpdo);
 
@@ -119,7 +126,12 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 	free_usb_dev_interface(&vpdo.usb_dev_interface);
 	free_strings(vpdo);
 
-        RtlFreeUnicodeString(&vpdo.SerialNumberUser);
+        libdrv_free(vpdo.busid);
+        vpdo.busid = nullptr;
+        
+        RtlFreeUnicodeString(&vpdo.node_name);
+        RtlFreeUnicodeString(&vpdo.service_name);
+        RtlFreeUnicodeString(&vpdo.serial);
 
 	if (vpdo.actconfig) {
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
@@ -133,6 +145,10 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 PAGEABLE void destroy_device(vdev_t *vdev)
 {
 	PAGED_CODE();
+
+        if (!vdev) {
+                return;
+        }
 
 	TraceCall("%!vdev_type_t! %p", vdev->type, vdev);
 

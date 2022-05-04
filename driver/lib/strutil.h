@@ -1,14 +1,8 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <wdm.h>
 
+LPSTR libdrv_strdup(POOL_FLAGS Flags, LPCSTR str);
 LPWSTR libdrv_strdup(POOL_FLAGS Flags, LPCWSTR str);
-void libdrv_free(void *data);
 
-#ifdef __cplusplus
-}
-#endif
+void libdrv_free(void *data);

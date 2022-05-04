@@ -6,6 +6,11 @@
 #include "devconf.h"
 #include "usbdsc.h"
 
+namespace wsk
+{
+        struct SOCKET;
+}
+
 // These are the states a vpdo or vhub transition upon
 // receiving a specific PnP Irp. Refer to the PnP Device States
 // diagram in DDK documentation for better understanding.
@@ -76,21 +81,28 @@ struct vhci_dev_t : vdev_t
 
 	WMILIB_CONTEXT WmiLibInfo;
 	USBIP_BUS_WMI_STD_DATA StdUSBIPBusData;
-
-        IO_CSQ irps_csq;
-        LIST_ENTRY irps;
-        KSPIN_LOCK irps_lock;
 };
 
 // The device extension for the vpdo.
 // That's of the USBIP device which this bus driver enumerates.
 struct vpdo_dev_t : vdev_t
 {
-	int port; // unique port number of the device on hub, [1, vhub_dev_t::NUM_PORTS]
+        // from ioctl_usbip_vhci_plugin
+        PSTR busid;
+        UNICODE_STRING node_name;
+        UNICODE_STRING service_name;
+        UNICODE_STRING serial; // user-defined
+        //
+
+        wsk::SOCKET *sock;
+        
+        int port; // unique port number of the device on hub, [1, vhub_dev_t::NUM_PORTS]
 	volatile bool unplugged; // see IOCTL_USBIP_VHCI_UNPLUG_HARDWARE
 
-	USB_DEVICE_DESCRIPTOR descriptor;
+        unsigned int devid;
+        static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
+        USB_DEVICE_DESCRIPTOR descriptor;
 	usb_device_speed speed; // corresponding speed for descriptor.bcdUSB 
 
 	// use instead of corresponding members of device descriptor
@@ -101,7 +113,6 @@ struct vpdo_dev_t : vdev_t
 	PWSTR Manufacturer; // for descriptor.iManufacturer
 	PWSTR Product; // for descriptor.iProduct
 	PWSTR SerialNumber; // for descriptor.iSerialNumber
-        UNICODE_STRING SerialNumberUser; // user-defined serial number
 
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 
@@ -111,9 +122,6 @@ struct vpdo_dev_t : vdev_t
 
 	UNICODE_STRING usb_dev_interface;
 	
-	unsigned int devid;
-	static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
-
 	seqnum_t seqnum;
 	seqnum_t seqnum_payload; // *ioctl irp which is waiting for read irp for payload transfer
 

@@ -16,6 +16,7 @@
 #include "ch9.h"
 #include "dbgcommon.h"
 #include "pdu.h"
+#include "strutil.h"
 
 namespace
 {
@@ -84,6 +85,46 @@ PAGEABLE auto is_configured(const usbip_usb_device &d)
         return d.bConfigurationValue && d.bNumInterfaces;
 }
 
+PAGEABLE auto copy(UNICODE_STRING &dst, const char *src)
+{
+        PAGED_CODE();
+
+        UTF8_STRING s;
+        RtlInitUTF8String(&s, src);
+
+        return RtlUTF8StringToUnicodeString(&dst, &s, true);
+}
+
+PAGEABLE auto copy(vpdo_dev_t *vpdo, const ioctl_usbip_vhci_plugin &r)
+{
+        PAGED_CODE();
+
+        vpdo->busid = libdrv_strdup(POOL_FLAG_NON_PAGED, r.busid);
+        if (!vpdo->busid) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error", r.busid);
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (auto err = copy(vpdo->node_name, r.host)) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.host, err);
+                return err;
+        }
+
+        if (auto err = copy(vpdo->service_name, r.service)) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.service, err);
+                return err;
+        }
+
+        if (!*r.serial) {
+                RtlInitUnicodeString(&vpdo->serial, nullptr);
+        } else if (auto err = copy(vpdo->serial, r.serial)) {
+                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.serial, err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
 PAGEABLE auto init(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
@@ -111,7 +152,7 @@ PAGEABLE auto init(vpdo_dev_t &vpdo)
 		return STATUS_END_OF_FILE;
 	}
 
-	Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
+        Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
 	return STATUS_SUCCESS;
 }
 
@@ -182,21 +223,11 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
 		set_class_subclass_proto(vpdo) : STATUS_SUCCESS;
 }
 
-PAGEABLE auto copy(UNICODE_STRING &dst, const char *src)
+PAGEABLE NTSTATUS create_vpdo(vpdo_dev_t* &result, vhci_dev_t *vhci, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
 
-        UTF8_STRING s;
-        RtlInitUTF8String(&s, src);
-
-        return RtlUTF8StringToUnicodeString(&dst, &s, true);
-}
-
-PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULONG &outlen)
-{
-        PAGED_CODE();
-
-        outlen = 0;
+        result = nullptr;
 
         auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
         if (!devobj) {
@@ -206,13 +237,12 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
         auto vpdo = to_vpdo_or_null(devobj);
         vpdo->parent = vhub_from_vhci(vhci);
 
-        if (!*r.serial) {
-                RtlInitUnicodeString(&vpdo->SerialNumberUser, nullptr);
-        } else if (auto err = copy(vpdo->SerialNumberUser, r.serial)) {
-                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.serial, err);
-                destroy_device(vpdo);
-                return STATUS_INSUFFICIENT_RESOURCES;
+        if (auto err = copy(vpdo, r)) {
+                return err;
         }
+
+        result = vpdo;
+        return STATUS_SUCCESS;
 
 /*
         vpdo->devid = r.devid;
@@ -226,7 +256,7 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
                 destroy_device(vpdo);
                 return err;
         }
-*/
+
         if (auto err = init(*vpdo)) {
                 destroy_device(vpdo);
                 return err;
@@ -238,6 +268,7 @@ PAGEABLE NTSTATUS create_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r, ULON
 
         IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
         return STATUS_SUCCESS;
+*/
 }
 
 PAGEABLE auto send_req_import(wsk::SOCKET *sock, const char *busid)
@@ -436,34 +467,9 @@ PAGEABLE auto process(wsk::SOCKET *sock, const char *busid)
         return ERR_NONE;
 }
 
-} // namespace
-
-
-/*
- * TCP_NODELAY => STATUS_NOT_SUPPORTED
- */
-PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugin &r)
+PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t *vpdo)
 {
-	PAGED_CODE();
-        TraceCall("irp %p: %s:%s, busid %s, serial '%s'", irp, r.host, r.service, r.busid, *r.serial ? r.serial : "");
-
-        auto &error = r.port; // err_t
-        error = ERR_GENERAL;
-
-        UNICODE_STRING NodeName{};
-        if (auto err = copy(NodeName, r.host)) {
-                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.host, err);
-                return err;
-        }
-
-        UNICODE_STRING ServiceName{};
-        if (auto err = copy(ServiceName, r.service)) {
-                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.service, err);
-                RtlFreeUnicodeString(&NodeName);
-                return err;
-        }
-
-        error = ERR_NETWORK;
+        PAGED_CODE();
 
         ADDRINFOEXW hints{};
         hints.ai_flags = AI_NUMERICSERV;
@@ -471,71 +477,114 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(IRP *irp, vhci_dev_t*, ioctl_usbip_vhci_plugi
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP; // zero isn't work
 
-        ADDRINFOEXW *ai{};
-        if (auto err = wsk::getaddrinfo(ai, &NodeName, &ServiceName, &hints)) {
-                Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                RtlFreeUnicodeString(&NodeName);
-                RtlFreeUnicodeString(&ServiceName);
+        return wsk::getaddrinfo(result, &vpdo->node_name, &vpdo->service_name, &hints);
+}
+
+PAGEABLE auto set_options(wsk::SOCKET *sock)
+{
+        PAGED_CODE();
+
+        enum { KEEPIDLE = 30, KEEPCNT = 9, KEEPINTVL = 10 };
+
+        if (auto err = set_keepalive(sock, KEEPIDLE, KEEPCNT, KEEPINTVL)) {
+                Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
                 return err;
         }
 
-        auto f = [] (auto sock, const auto &r, auto)
-        {
-                enum { KEEPIDLE = 30, KEEPCNT = 9, KEEPINTVL = 10 };
-
-                if (auto err = set_keepalive(sock, KEEPIDLE, KEEPCNT, KEEPINTVL)) {
-                        Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
-                        return err;
-                }
-
-                bool optval{};
-                if (auto err = get_keepalive(sock, optval)) {
-                        Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
-                        return err;
-                } else {
-                        Trace(TRACE_LEVEL_VERBOSE, "keepalive %d", optval);
-                }
-
-                int idle = 0;
-                int cnt = 0;
-                int intvl = 0;
-
-                if (auto err = get_keepalive_opts(sock, &idle, &cnt, &intvl)) {
-                        Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", err);
-                        return err;
-                } else {
-                        auto timeout = idle + cnt*intvl;
-                        Trace(TRACE_LEVEL_VERBOSE, "keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec.", 
-                                                        idle, cnt, intvl, timeout);
-                }
-
-                SOCKADDR_INET any{ static_cast<ADDRESS_FAMILY>(r.ai_family) }; // see INADDR_ANY, IN6ADDR_ANY_INIT
-
-                if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&any))) {
-                        Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", err);
-                        return err;
-                }
-
-                return connect(sock, r.ai_addr);
-        };
-
-        void *socket_context{};
-        WSK_CLIENT_CONNECTION_DISPATCH dispatch{};
-
-        if (auto sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, socket_context, nullptr, ai, f, nullptr)) {
-                Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &NodeName, &ServiceName);
-                error = process(sock, r.busid);
-                disconnect(sock);
-                close(sock);
+        bool optval{};
+        if (auto err = get_keepalive(sock, optval)) {
+                Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
+                return err;
         } else {
-                TraceCall("Can't create a socket");
+                Trace(TRACE_LEVEL_VERBOSE, "keepalive %d", optval);
         }
 
-        wsk::free(ai);
-        RtlFreeUnicodeString(&NodeName);
-        RtlFreeUnicodeString(&ServiceName);
+        int idle = 0;
+        int cnt = 0;
+        int intvl = 0;
 
-        return STATUS_NOT_IMPLEMENTED; // IoCsqInsertIrpEx(&vhci->irps_csq, irp, nullptr, &r);
+        if (auto err = get_keepalive_opts(sock, &idle, &cnt, &intvl)) {
+                Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", err);
+                return err;
+        }
+
+        auto timeout = idle + cnt*intvl;
+        Trace(TRACE_LEVEL_VERBOSE, "keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec.", idle, cnt, intvl, timeout);
+
+        return STATUS_SUCCESS;
+}
+
+PAGEABLE auto prepare_socket(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
+{
+        PAGED_CODE();
+
+        if (auto err = set_options(sock)) {
+                return err;
+        }
+
+        SOCKADDR_INET any{ static_cast<ADDRESS_FAMILY>(ai.ai_family) }; // see INADDR_ANY, IN6ADDR_ANY_INIT
+
+        if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&any))) {
+                Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", err);
+                return err;
+        }
+
+        return connect(sock, ai.ai_addr);
+}
+
+PAGEABLE auto connect(vpdo_dev_t *vpdo)
+{
+        PAGED_CODE();
+
+        ADDRINFOEXW *ai{};
+        if (auto err = getaddrinfo(ai, vpdo)) {
+                Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
+                return err;
+        }
+
+        static WSK_CLIENT_CONNECTION_DISPATCH dispatch;
+        
+        NT_ASSERT(!vpdo->sock);
+        vpdo->sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, vpdo, &dispatch, ai, prepare_socket, nullptr);
+
+        wsk::free(ai);
+        return vpdo->sock ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+}
+
+} // namespace
+
+
+/*
+ * TCP_NODELAY => STATUS_NOT_SUPPORTED
+ */
+PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
+{
+	PAGED_CODE();
+        TraceCall("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
+
+        auto &error = r.port; // err_t
+        error = ERR_GENERAL;
+
+        vpdo_dev_t *vpdo{};
+        if (auto err = create_vpdo(vpdo, vhci, r)) {
+                destroy_device(vpdo);
+                return err;
+        }
+
+        error = ERR_NETWORK;
+
+        if (auto err = connect(vpdo)) {
+                Trace(TRACE_LEVEL_ERROR, "Can't connect to a server");
+                destroy_device(vpdo);
+                return err;
+        }
+
+        Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &vpdo->node_name, &vpdo->service_name);
+
+        error = process(vpdo->sock, vpdo->busid);
+        destroy_device(vpdo);
+
+        return STATUS_NOT_IMPLEMENTED;
 }
 
 PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)

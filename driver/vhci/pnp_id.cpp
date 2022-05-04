@@ -212,7 +212,7 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR &result, bool&, vdev_t *vdev, IRP*, bool
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	auto serial = vpdo->SerialNumberUser.Length ? vpdo->SerialNumberUser.Buffer :
+	auto serial = vpdo->serial.Length ? vpdo->serial.Buffer :
                         vpdo->SerialNumber ? vpdo->SerialNumber :
                         L"";
 

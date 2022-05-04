@@ -80,11 +80,14 @@ PAGEABLE auto init(vhci_dev_t &vhci)
 	PAGED_CODE();
 
 	vhci.child_pdo = create_child_pdo(&vhci, VDEV_HPDO);
+        if (!vhci.child_pdo) {
+                return STATUS_UNSUCCESSFUL;
+        }
 
 	RtlUnicodeStringInitEx(&vhci.DevIntfVhci, nullptr, STRSAFE_IGNORE_NULLS);
 	RtlUnicodeStringInitEx(&vhci.DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 
-        return init_queues(vhci);
+        return STATUS_SUCCESS;
 }
 
 PAGEABLE auto init(vhub_dev_t &vhub)

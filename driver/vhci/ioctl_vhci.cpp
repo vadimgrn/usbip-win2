@@ -91,7 +91,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	return st;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhci(IRP *irp, vhci_dev_t *vhci, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -100,7 +100,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(IRP *irp, vhci_dev_t *vhci, ULONG ioctl_code, 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
 		st = inlen == sizeof(ioctl_usbip_vhci_plugin) && outlen == sizeof(ioctl_usbip_vhci_plugin::port) ? 
-                        vhci_plugin_vpdo(irp, vhci, *static_cast<ioctl_usbip_vhci_plugin*>(buffer)) : 
+                        vhci_plugin_vpdo(vhci, *static_cast<ioctl_usbip_vhci_plugin*>(buffer)) : 
                         STATUS_INVALID_BUFFER_SIZE;
                 break;
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:

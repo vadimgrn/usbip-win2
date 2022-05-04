@@ -9,9 +9,6 @@
 struct vpdo_dev_t;
 PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo);
 
-struct vhci_dev_t;
-PAGEABLE NTSTATUS init_queues(vhci_dev_t &vhci);
-
 constexpr void *InsertTail() { return nullptr; }
 constexpr void *InsertHead() { return InsertTail; }
 

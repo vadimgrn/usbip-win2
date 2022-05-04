@@ -6,8 +6,6 @@
 #include "stub_res.h"
 #include "stub_dbg.h"
 
-#include "strutil.h"
-
 const char *dbg_stub_res(char *buf, unsigned int len, stub_res_t *sres, usbip_stub_dev_t *devstub)
 {
 	if (sres == devstub->sres_ongoing) {

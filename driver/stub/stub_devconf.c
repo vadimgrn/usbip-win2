@@ -8,8 +8,6 @@
 #include "stub_usbd.h"
 #include "usbdsc.h"
 
-#include "strutil.h"
-
 const char *dbg_info_intf(char *buf, unsigned int len, const USBD_INTERFACE_INFORMATION *info_intf)
 {
 	if (!info_intf) {
