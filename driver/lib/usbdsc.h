@@ -9,12 +9,8 @@ extern "C" {
 
 #include <stdbool.h>
 
-__inline bool is_valid_dsc(const USB_DEVICE_DESCRIPTOR *d)
-{
-	NT_ASSERT(d);
-	return  d->bLength == sizeof(*d) &&
-		d->bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
-}
+bool is_valid_dsc(const USB_DEVICE_DESCRIPTOR *d);
+bool is_valid_cfg_dsc(const USB_CONFIGURATION_DESCRIPTOR *d);
 
 __inline USB_COMMON_DESCRIPTOR *dsc_next(USB_COMMON_DESCRIPTOR *d)
 {

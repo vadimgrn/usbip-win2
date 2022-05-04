@@ -24,7 +24,7 @@ struct usbip_usb_device
 
         UINT32 busnum;
         UINT32 devnum;
-        UINT32 speed;
+        UINT32 speed; // enum usb_device_speed
 
         UINT16 idVendor;
         UINT16 idProduct;
@@ -33,7 +33,9 @@ struct usbip_usb_device
         UINT8 bDeviceClass;
         UINT8 bDeviceSubClass;
         UINT8 bDeviceProtocol;
+
         UINT8 bConfigurationValue;
+        
         UINT8 bNumConfigurations;
         UINT8 bNumInterfaces;
 };

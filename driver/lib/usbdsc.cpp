@@ -59,3 +59,18 @@ void *dsc_for_each_endpoint(
 
 	return nullptr;
 }
+
+bool is_valid_dsc(const USB_DEVICE_DESCRIPTOR *d)
+{
+        NT_ASSERT(d);
+        return  d->bLength == sizeof(*d) &&
+                d->bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
+}
+
+bool is_valid_cfg_dsc(const USB_CONFIGURATION_DESCRIPTOR *d)
+{
+        NT_ASSERT(d);
+        return  d->bLength == sizeof(*d) &&
+                d->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE &&
+                d->wTotalLength > d->bLength;
+}
