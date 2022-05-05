@@ -5,6 +5,7 @@
 #include <usbdi.h>
 
 #include "usbip_proto.h" 
+#include "usbip_api_consts.h"
 
 NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, usb_device_speed speed);
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);

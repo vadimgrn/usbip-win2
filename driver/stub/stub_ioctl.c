@@ -25,7 +25,7 @@
 #include "stub_irp.h"
 #include "usbip_stub_api.h"
 #include "usbip_proto.h"
-
+#include "usbip_api_consts.h"
 #include "stub_usbd.h"
 #include "stub_devconf.h"
 

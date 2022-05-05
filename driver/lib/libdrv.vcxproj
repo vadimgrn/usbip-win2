@@ -119,6 +119,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\include\usbip_api_consts.h" />
     <ClInclude Include="..\..\include\usbip_proto.h" />
     <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />

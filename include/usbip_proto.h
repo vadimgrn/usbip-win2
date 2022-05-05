@@ -10,7 +10,8 @@ extern "C" {
  * Declarations from <drivers/usb/usbip/usbip_common.h>
  */
 
-enum usbip_request_type {
+enum usbip_request_type 
+{
 	USBIP_CMD_SUBMIT = 1,
 	USBIP_CMD_UNLINK,
 	USBIP_RET_SUBMIT,
@@ -19,18 +20,6 @@ enum usbip_request_type {
 
 enum usbip_dir { USBIP_DIR_OUT, USBIP_DIR_IN }; // transfer direction like USB_DIR_IN, USB_DIR_OUT
 enum { USBIP_MAX_ISO_PACKETS = 1024 };
-
-/*
- * <uapi/linux/usb/ch9.h>
- */
-enum usb_device_speed {
-	USB_SPEED_UNKNOWN,			/* enumerating */
-	USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
-	USB_SPEED_HIGH,				/* usb 2.0 */
-	USB_SPEED_WIRELESS,			/* wireless (usb 2.5) */
-	USB_SPEED_SUPER,			/* usb 3.0 */
-	USB_SPEED_SUPER_PLUS			/* usb 3.1 */
-};
 
 typedef UINT32 seqnum_t;
 
