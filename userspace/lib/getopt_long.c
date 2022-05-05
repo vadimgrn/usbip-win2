@@ -512,12 +512,7 @@ getopt(int nargc, char * const *nargv, const char *options)
  *	Parse argc/argv argument vector.
  */
 int
-getopt_long(nargc, nargv, options, long_options, idx)
-	int nargc;
-	char * const *nargv;
-	const char *options;
-	const struct option *long_options;
-	int *idx;
+getopt_long(int nargc, char * const *nargv, const char *options, const struct option *long_options, int *idx)
 {
 
 	return (getopt_internal(nargc, nargv, options, long_options, idx,
@@ -529,12 +524,7 @@ getopt_long(nargc, nargv, options, long_options, idx)
  *	Parse argc/argv argument vector.
  */
 int
-getopt_long_only(nargc, nargv, options, long_options, idx)
-	int nargc;
-	char * const *nargv;
-	const char *options;
-	const struct option *long_options;
-	int *idx;
+getopt_long_only(int nargc, char * const *nargv, const char *options, const struct option *long_options, int *idx)
 {
 
 	return (getopt_internal(nargc, nargv, options, long_options, idx,

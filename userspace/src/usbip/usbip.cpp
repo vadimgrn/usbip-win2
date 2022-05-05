@@ -92,7 +92,7 @@ int usbip_help(int argc, char *argv[])
 	return 0;
 }
 
-int usbip_version(int argc, char *argv[])
+int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
 {
 	printf("usbip (%s)\n", usbip_version_string);
 	return 0;

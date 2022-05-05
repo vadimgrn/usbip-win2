@@ -38,7 +38,7 @@ typedef struct {
 } edev_list_ctx_t;
 
 static int
-walker_edev_list(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
+walker_edev_list(HDEVINFO, PSP_DEVINFO_DATA, devno_t devno, void *ctx)
 {
 	edev_t	*edev;
 	edev_list_ctx_t	*pctx = (edev_list_ctx_t *)ctx;

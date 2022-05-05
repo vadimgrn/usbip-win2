@@ -44,10 +44,8 @@ translate_inf(const char *id_hw, FILE *in, FILE *out)
 	char	buf[4096];
 	char	*line;
 
-	while ((line = fgets(buf, 4096, in))) {
-		char	*mark;
-
-		mark = strstr(line, "%hwid%");
+	while (bool(line = fgets(buf, 4096, in))) {
+		auto mark = strstr(line, "%hwid%");
 		if (mark) {
 			strcpy_s(mark, 4096 - (mark - buf), id_hw);
 		}

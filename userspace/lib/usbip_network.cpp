@@ -72,7 +72,7 @@ int usbip_net_send(SOCKET sockfd, void *buff, size_t bufflen)
 	return usbip_net_xmit(sockfd, buff, bufflen, 1);
 }
 
-int usbip_net_send_op_common(SOCKET sockfd, uint32_t code, uint32_t status)
+int usbip_net_send_op_common(SOCKET sockfd, uint16_t code, uint32_t status)
 {
         op_common op_common{};
 

@@ -32,9 +32,7 @@ int	optopt;
 char	*optarg;
 
 int
-getopt(argc, argv, opts)
-int	argc;
-char	**argv, *opts;
+getopt(int argc, char **argv, char *opts)
 {
 	static int sp = 1;
 	register int c;
@@ -50,7 +48,7 @@ char	**argv, *opts;
 		}
 	optopt = c = argv[optind][sp];
 	if(c == ':' || (cp=strchr(opts, c)) == NULL) {
-		ERR(": illegal option -- ", c);
+		ERR(": illegal option -- ", (char)c);
 		if(argv[optind][++sp] == '\0') {
 			optind++;
 			sp = 1;
@@ -61,7 +59,7 @@ char	**argv, *opts;
 		if(argv[optind][sp+1] != '\0')
 			optarg = &argv[optind++][sp+1];
 		else if(++optind >= argc) {
-			ERR(": option requires an argument -- ", c);
+			ERR(": option requires an argument -- ", (char)c);
 			sp = 1;
 			return('?');
 		} else

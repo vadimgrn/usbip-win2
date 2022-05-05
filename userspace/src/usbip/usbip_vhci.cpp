@@ -11,7 +11,7 @@
 namespace
 {
 
-int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, devno_t devno, void *ctx)
+int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, devno_t, void *ctx)
 {
         auto id_hw = get_id_hw(dev_info, dev_info_data);
         if (!id_hw || (_stricmp(id_hw, "usbipwin\\vhci") && _stricmp(id_hw, "root\\vhci_ude"))) {

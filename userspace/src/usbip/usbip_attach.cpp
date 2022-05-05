@@ -91,6 +91,11 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
 {
         auto port = import_device(host, busid, serial);
         if (port > 0) {
+                if (terse) {
+                        printf("%d\n", port);
+                } else {
+                        printf("succesfully attached to port %d\n", port);
+                }
                 return 0;
         }
 

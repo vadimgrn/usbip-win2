@@ -20,7 +20,7 @@ typedef struct {
 } devpath_ctx_t;
 
 static int
-walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
+walker_devpath(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t, void *ctx)
 {
 	devpath_ctx_t	*pctx = (devpath_ctx_t *)ctx;
 	PSP_DEVICE_INTERFACE_DETAIL_DATA	pdetail;
@@ -124,7 +124,7 @@ get_devpath_from_devno(devno_t devno)
 }
 
 static int
-walker_check_stub(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
+walker_check_stub(HDEVINFO, PSP_DEVINFO_DATA, devno_t devno, void *ctx)
 {
 	devno_t	*pdevno = (devno_t *)ctx;
 
