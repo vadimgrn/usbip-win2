@@ -9,6 +9,11 @@
 struct vpdo_dev_t;
 PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo);
 
+inline bool is_initialized(const IO_CSQ &csq)
+{
+        return csq.CsqAcquireLock;
+}
+
 constexpr void *InsertTail() { return nullptr; }
 constexpr void *InsertHead() { return InsertTail; }
 

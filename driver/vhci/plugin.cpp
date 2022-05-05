@@ -21,11 +21,6 @@
 namespace
 {
 
-constexpr unsigned int make_devid(int busnum, int devnum)
-{
-        return (busnum << 16) | devnum;
-}
-
 inline void log(const usbip_usb_device &d)
 {
         Trace(TRACE_LEVEL_VERBOSE, "usbip_usb_device(path '%s', busid %s, busnum %d, devnum %d, %!usb_device_speed!,"
@@ -61,8 +56,10 @@ inline void log(const USB_CONFIGURATION_DESCRIPTOR &d)
                 d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
 }
 
-PAGEABLE auto is_same(const usbip_usb_device &dev, const USB_DEVICE_DESCRIPTOR &dsc)
+PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_DEVICE_DESCRIPTOR &dsc)
 {
+        PAGED_CODE();
+
         return  dev.idVendor == dsc.idVendor &&
                 dev.idProduct == dsc.idProduct &&
                 dev.bcdDevice == dsc.bcdDevice &&
@@ -74,14 +71,17 @@ PAGEABLE auto is_same(const usbip_usb_device &dev, const USB_DEVICE_DESCRIPTOR &
                 dev.bNumConfigurations == dsc.bNumConfigurations;
 }
 
-PAGEABLE auto is_same(const usbip_usb_device &dev, const USB_CONFIGURATION_DESCRIPTOR &cd)
+PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_CONFIGURATION_DESCRIPTOR &cd)
 {
+        PAGED_CODE();
+
         return  dev.bConfigurationValue == cd.bConfigurationValue &&
                 dev.bNumInterfaces == cd.bNumInterfaces;
 }
 
 PAGEABLE auto is_configured(const usbip_usb_device &d)
 {
+        PAGED_CODE();
         return d.bConfigurationValue && d.bNumInterfaces;
 }
 
@@ -95,29 +95,29 @@ PAGEABLE auto copy(UNICODE_STRING &dst, const char *src)
         return RtlUTF8StringToUnicodeString(&dst, &s, true);
 }
 
-PAGEABLE auto copy(vpdo_dev_t *vpdo, const ioctl_usbip_vhci_plugin &r)
+PAGEABLE auto copy(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
 
-        vpdo->busid = libdrv_strdup(POOL_FLAG_NON_PAGED, r.busid);
-        if (!vpdo->busid) {
+        vpdo.busid = libdrv_strdup(POOL_FLAG_NON_PAGED, r.busid);
+        if (!vpdo.busid) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error", r.busid);
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = copy(vpdo->node_name, r.host)) {
+        if (auto err = copy(vpdo.node_name, r.host)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.host, err);
                 return err;
         }
 
-        if (auto err = copy(vpdo->service_name, r.service)) {
+        if (auto err = copy(vpdo.service_name, r.service)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.service, err);
                 return err;
         }
 
         if (!*r.serial) {
-                RtlInitUnicodeString(&vpdo->serial, nullptr);
-        } else if (auto err = copy(vpdo->serial, r.serial)) {
+                RtlInitUnicodeString(&vpdo.serial, nullptr);
+        } else if (auto err = copy(vpdo.serial, r.serial)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.serial, err);
                 return err;
         }
@@ -125,66 +125,26 @@ PAGEABLE auto copy(vpdo_dev_t *vpdo, const ioctl_usbip_vhci_plugin &r)
         return STATUS_SUCCESS;
 }
 
-PAGEABLE auto init(vpdo_dev_t &vpdo)
-{
-	PAGED_CODE();
-
-	NT_ASSERT(!vpdo.current_intf_num);
-        NT_ASSERT(!vpdo.current_intf_alt);
-
-        NT_ASSERT(vpdo.PnPState == pnp_state::NotStarted);
-        NT_ASSERT(vpdo.PreviousPnPState == pnp_state::NotStarted);
-
-	// vpdo usually starts its life at D3
-	vpdo.DevicePowerState = PowerDeviceD3;
-	vpdo.SystemPowerState = PowerSystemWorking;
-
-	if (auto err = init_queues(vpdo)) {
-		Trace(TRACE_LEVEL_ERROR, "init_queues -> %!STATUS!", err);
-		return err;
-	}
-
-	auto &Flags = vpdo.Self->Flags;
-	Flags |= DO_POWER_PAGABLE|DO_DIRECT_IO;
-
-	if (!vhub_attach_vpdo(&vpdo)) {
-		Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");
-		return STATUS_END_OF_FILE;
-	}
-
-        Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
-	return STATUS_SUCCESS;
-}
-
-PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
-{
-	PAGED_CODE();
-
-	if (is_valid_dsc(&d)) {
-		NT_ASSERT(!is_valid_dsc(&vpdo.descriptor)); // first time initialization
-		RtlCopyMemory(&vpdo.descriptor, &d, sizeof(d));
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Invalid device descriptor");
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	vpdo.speed = get_usb_speed(d.bcdUSB);
-
-	vpdo.bDeviceClass = d.bDeviceClass;
-	vpdo.bDeviceSubClass = d.bDeviceSubClass;
-	vpdo.bDeviceProtocol = d.bDeviceProtocol;
-
-	return STATUS_SUCCESS;
-}
-
+/*
+ * Many devices have zero usb class number in a device descriptor.
+ * zero value means that class number is determined at interface level.
+ * USB class, subclass and protocol numbers should be setup before importing.
+ * Because windows vhci driver builds a device compatible id with those numbers.
+ */
 PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
+        NT_ASSERT(vpdo.actconfig);
+
+        auto required = vpdo.actconfig->bNumInterfaces == 1 && !(vpdo.bDeviceClass || vpdo.bDeviceSubClass || vpdo.bDeviceProtocol);
+        if (!required) {
+                return true;
+        }
 
 	auto d = dsc_find_next_intf(vpdo.actconfig, nullptr);
 	if (!d) {
 		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
-		return STATUS_INVALID_PARAMETER;
+		return false;
 	}
 
 	vpdo.bDeviceClass = d->bInterfaceClass;
@@ -195,83 +155,40 @@ PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 					vpdo.bDeviceClass, vpdo.bDeviceSubClass, vpdo.bDeviceProtocol,
 					d->bInterfaceNumber, d->bAlternateSetting);
 
-	return STATUS_SUCCESS;
+	return true;
 }
 
-/*
-* Many devices have zero usb class number in a device descriptor.
-* zero value means that class number is determined at interface level.
-* USB class, subclass and protocol numbers should be setup before importing.
-* Because windows vhci driver builds a device compatible id with those numbers.
-*/
-PAGEABLE auto init(vpdo_dev_t &vpdo, const USB_CONFIGURATION_DESCRIPTOR &d)
-{
-	PAGED_CODE();
-
-	NT_ASSERT(!vpdo.actconfig); // first time initialization
-	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, 
-                                                                        d.wTotalLength, USBIP_VHCI_POOL_TAG);
-
-	if (vpdo.actconfig) {
-		RtlCopyMemory(vpdo.actconfig, &d, d.wTotalLength);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes of memory", d.wTotalLength);
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	return d.bNumInterfaces == 1 && !(vpdo.bDeviceClass || vpdo.bDeviceSubClass || vpdo.bDeviceProtocol) ?
-		set_class_subclass_proto(vpdo) : STATUS_SUCCESS;
-}
-
-PAGEABLE NTSTATUS create_vpdo(vpdo_dev_t* &result, vhci_dev_t *vhci, const ioctl_usbip_vhci_plugin &r)
+PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
-
-        result = nullptr;
+        NT_ASSERT(!vpdo);
 
         auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
         if (!devobj) {
-                return STATUS_UNSUCCESSFUL;
+                return ERR_GENERAL;
         }
 
-        auto vpdo = to_vpdo_or_null(devobj);
+        vpdo = to_vpdo_or_null(devobj);
         vpdo->parent = vhub_from_vhci(vhci);
 
-        if (auto err = copy(vpdo, r)) {
-                return err;
+        vpdo->DevicePowerState = PowerDeviceD3;
+        vpdo->SystemPowerState = PowerSystemWorking;
+
+        vpdo->Self->Flags |= DO_POWER_PAGABLE | DO_DIRECT_IO;
+
+        if (copy(*vpdo, r)) {
+                return ERR_GENERAL;
         }
 
-        result = vpdo;
-        return STATUS_SUCCESS;
-
-/*
-        vpdo->devid = r.devid;
-
-        if (auto err = init(*vpdo, r.dscr_dev)) {
-                destroy_device(vpdo);
-                return err;
+        if (auto err = init_queues(*vpdo)) {
+                Trace(TRACE_LEVEL_ERROR, "init_queues %!STATUS!", err);
+                return ERR_GENERAL;
         }
 
-        if (auto err = init(*vpdo, r.dscr_conf)) {
-                destroy_device(vpdo);
-                return err;
-        }
-
-        if (auto err = init(*vpdo)) {
-                destroy_device(vpdo);
-                return err;
-        }
-
-        NT_ASSERT(vpdo->port > 0); // was assigned
-        r.port = vpdo->port;
-        outlen = sizeof(r.port);
-
-        IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
-        return STATUS_SUCCESS;
-*/
+        return ERR_NONE;
 }
 
-PAGEABLE auto send_req_import(wsk::SOCKET *sock, const char *busid)
+PAGEABLE auto send_req_import(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
@@ -283,32 +200,32 @@ PAGEABLE auto send_req_import(wsk::SOCKET *sock, const char *busid)
 
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
 
-        strcpy_s(req.body.busid, sizeof(req.body.busid), busid);
+        strcpy_s(req.body.busid, sizeof(req.body.busid), vpdo.busid);
 
         PACK_OP_COMMON(0, &req.hdr);
         PACK_OP_IMPORT_REQUEST(0, &req.body);
 
-        return send(sock, usbip::memory::stack, &req, sizeof(req)) ? ERR_NONE : ERR_NETWORK;
+        return send(vpdo.sock, usbip::memory::stack, &req, sizeof(req)) ? ERR_NONE : ERR_NETWORK;
 }
 
-PAGEABLE auto recv_rep_import(wsk::SOCKET *sock, const char *busid, usbip::memory pool, op_import_reply &reply)
+PAGEABLE auto recv_rep_import(vpdo_dev_t &vpdo, usbip::memory pool, op_import_reply &reply)
 {
         PAGED_CODE();
 
-        if (auto err = usbip::recv_op_common(sock, OP_REP_IMPORT)) {
+        if (auto err = usbip::recv_op_common(vpdo.sock, OP_REP_IMPORT)) {
                 Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT(op_common) error %!op_status_t!", err);
                 return err;
         }
 
-        if (!recv(sock, pool, &reply, sizeof(reply))) {
+        if (!recv(vpdo.sock, pool, &reply, sizeof(reply))) {
                 Trace(TRACE_LEVEL_ERROR, "Failed to recv OP_REP_IMPORT(op_import_reply)");
                 return ERR_NETWORK;
         }
 
         PACK_OP_IMPORT_REPLY(0, &reply);
 
-        if (strncmp(reply.udev.busid, busid, sizeof(reply.udev.busid))) {
-                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, busid);
+        if (strncmp(reply.udev.busid, vpdo.busid, sizeof(reply.udev.busid))) {
+                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, vpdo.busid);
                 return ERR_PROTOCOL;
         }
 
@@ -335,7 +252,7 @@ PAGEABLE auto init_req_get_descr(usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type
         return ERR_NONE;
 }
 
-PAGEABLE auto read_descr_hdr(wsk::SOCKET *sock, vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBufferLength)
+PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBufferLength)
 {
         PAGED_CODE();
 
@@ -349,12 +266,12 @@ PAGEABLE auto read_descr_hdr(wsk::SOCKET *sock, vpdo_dev_t &vpdo, UCHAR type, US
 
         byteswap_header(hdr, swap_dir::host2net);
 
-        if (!send(sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
+        if (!send(vpdo.sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
                 Trace(TRACE_LEVEL_ERROR, "Send hdr error: %!usb_descriptor_type!", type);
                 return ERR_NETWORK;
         }
 
-        if (!recv(sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
+        if (!recv(vpdo.sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
                 Trace(TRACE_LEVEL_ERROR, "Recv hdr error: %!usb_descriptor_type!", type);
                 return ERR_NETWORK;
         }
@@ -371,103 +288,119 @@ PAGEABLE auto read_descr_hdr(wsk::SOCKET *sock, vpdo_dev_t &vpdo, UCHAR type, US
         return !ret.status && ret.actual_length == TransferBufferLength ? ERR_NONE : ERR_GENERAL;
 }
 
-PAGEABLE auto read_descr(usbip::memory pool, USB_DEVICE_DESCRIPTOR &dd, wsk::SOCKET *sock, vpdo_dev_t &vpdo)
+PAGEABLE auto read_descr(vpdo_dev_t &vpdo, UCHAR type, usbip::memory pool, void *dest, USHORT len)
 {
         PAGED_CODE();
 
-        if (auto err = read_descr_hdr(sock, vpdo, USB_DEVICE_DESCRIPTOR_TYPE, sizeof(dd))) {
+        if (auto err = read_descr_hdr(vpdo, type, len)) {
                 return err;
         }
 
-        if (!recv(sock, pool, &dd, sizeof(dd))) {
-                return ERR_NETWORK;
-        }
-
-        return is_valid_dsc(&dd) ? ERR_NONE : ERR_GENERAL;
+        return recv(vpdo.sock, pool, dest, len) ? ERR_NONE : ERR_NETWORK;
 }
 
-PAGEABLE auto read_descr(USB_CONFIGURATION_DESCRIPTOR* &cfgd, wsk::SOCKET *sock, vpdo_dev_t &vpdo)
+PAGEABLE auto read_device_descr(vpdo_dev_t &vpdo)
+{
+        PAGED_CODE();
+
+        if (auto err = read_descr(vpdo, USB_DEVICE_DESCRIPTOR_TYPE, usbip::memory::nonpaged, &vpdo.descriptor, sizeof(vpdo.descriptor))) {
+                return err;
+        }
+
+        return is_valid_dsc(&vpdo.descriptor) ? ERR_NONE : ERR_GENERAL;
+}
+
+PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo, usbip::memory pool, USB_CONFIGURATION_DESCRIPTOR *cd, USHORT len)
+{
+        PAGED_CODE();
+
+        if (auto err = read_descr(vpdo, USB_CONFIGURATION_DESCRIPTOR_TYPE, pool, cd, len)) {
+                return err;
+        }
+
+        return is_valid_cfg_dsc(cd) ? ERR_NONE : ERR_GENERAL;
+}
+
+PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
         USB_CONFIGURATION_DESCRIPTOR cd{};
-        if (auto err = read_descr_hdr(sock, vpdo, USB_CONFIGURATION_DESCRIPTOR_TYPE, sizeof(cd))) {
+        if (auto err = read_config_descr(vpdo, usbip::memory::stack, &cd, sizeof(cd))) {
                 return err;
         }
 
-        if (!recv(sock, usbip::memory::stack, &cd, sizeof(cd))) {
-                return ERR_NETWORK;
-        }
+        NT_ASSERT(!vpdo.actconfig);
 
-        cfgd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cd.wTotalLength, USBIP_VHCI_POOL_TAG);
-        if (!cfgd) {
-                return ERR_GENERAL;
-        }
+        vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(
+                POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, cd.wTotalLength, USBIP_VHCI_POOL_TAG);
 
-        if (auto err = read_descr_hdr(sock, vpdo, USB_CONFIGURATION_DESCRIPTOR_TYPE, cd.wTotalLength)) {
-                return err;
-        }
-
-        if (!recv(sock, usbip::memory::nonpaged, cfgd, cd.wTotalLength)) {
-                return ERR_NETWORK;
-        }
-
-        return is_valid_cfg_dsc(cfgd) ? ERR_NONE : ERR_GENERAL;
+        return vpdo.actconfig ? read_config_descr(vpdo, usbip::memory::nonpaged, vpdo.actconfig, cd.wTotalLength) : ERR_GENERAL;
 }
 
-PAGEABLE auto process(wsk::SOCKET *sock, const char *busid)
+PAGEABLE void init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
+{
+        PAGED_CODE();
+        vpdo.speed = get_usb_speed(d.bcdUSB);
+
+        vpdo.bDeviceClass = d.bDeviceClass;
+        vpdo.bDeviceSubClass = d.bDeviceSubClass;
+        vpdo.bDeviceProtocol = d.bDeviceProtocol;
+}
+
+PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
 {
         PAGED_CODE();
 
-        if (auto err = send_req_import(sock, busid)) {
+        if (auto err = read_device_descr(vpdo)) {
+                return err;
+        }
+
+        log(vpdo.descriptor);
+
+        if (is_same_device(udev, vpdo.descriptor)) {
+                init(vpdo, vpdo.descriptor);
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "USB_DEVICE_DESCRIPTOR mismatches op_import_reply.udev");
+                return ERR_GENERAL;
+        }
+
+        if (auto err = read_config_descr(vpdo)) {
+                return err;
+        }
+
+        log(*vpdo.actconfig);
+        TraceUrb("USB_CONFIGURATION_DESCRIPTOR: %!BIN!", WppBinary(vpdo.actconfig, vpdo.actconfig->wTotalLength));
+
+        if (is_configured(udev) && !is_same_device(udev, *vpdo.actconfig)) {
+                Trace(TRACE_LEVEL_ERROR, "USB_CONFIGURATION_DESCRIPTOR mismatches op_import_reply.udev");
+                return ERR_GENERAL;
+        }
+
+        return set_class_subclass_proto(vpdo) ? ERR_GENERAL : ERR_NONE;
+}
+
+PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
+{
+        PAGED_CODE();
+
+        if (auto err = send_req_import(vpdo)) {
                 Trace(TRACE_LEVEL_ERROR, "OP_REQ_IMPORT %!err_t!", err);
                 return err;
         }
 
         op_import_reply reply{};
-        if (auto err = recv_rep_import(sock, busid, usbip::memory::stack, reply)) {
+        if (auto err = recv_rep_import(vpdo, usbip::memory::stack, reply)) {
                 return err;
         }
 
         log(reply.udev);
 
-        vpdo_dev_t vpdo{};
-        vpdo.devid = make_devid(reply.udev.busnum, reply.udev.devnum);
-
-        USB_DEVICE_DESCRIPTOR dd{};
-        if (auto err = read_descr(usbip::memory::stack, dd, sock, vpdo)) {
-                return err;
-        }
-
-        log(dd);
-
-        if (!is_same(reply.udev, dd)) {
-                Trace(TRACE_LEVEL_ERROR, "USB_DEVICE_DESCRIPTOR mismatches op_import_reply.udev");
-                return ERR_GENERAL;
-        }
-
-        USB_CONFIGURATION_DESCRIPTOR *cd{};
-        if (auto err = read_descr(cd, sock, vpdo)) {
-                if (cd) {
-                        ExFreePoolWithTag(cd, USBIP_VHCI_POOL_TAG);
-                }
-                return err;
-        }
-
-        TraceUrb("USB_CONFIGURATION_DESCRIPTOR: %!BIN!", WppBinary(cd, cd->wTotalLength));
-        log(*cd);
-
-        if (is_configured(reply.udev) && !is_same(reply.udev, *cd)) {
-                Trace(TRACE_LEVEL_ERROR, "USB_CONFIGURATION_DESCRIPTOR mismatches op_import_reply.udev");
-                ExFreePoolWithTag(cd, USBIP_VHCI_POOL_TAG);
-                return ERR_GENERAL;
-        }
-
-        ExFreePoolWithTag(cd, USBIP_VHCI_POOL_TAG);
-        return ERR_NONE;
+        vpdo.devid = make_devid(static_cast<UINT16>(reply.udev.busnum), static_cast<UINT16>(reply.udev.devnum));
+        return fetch_descriptors(vpdo, reply.udev);
 }
 
-PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t *vpdo)
+PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
@@ -477,9 +410,12 @@ PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t *vpdo)
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP; // zero isn't work
 
-        return wsk::getaddrinfo(result, &vpdo->node_name, &vpdo->service_name, &hints);
+        return wsk::getaddrinfo(result, &vpdo.node_name, &vpdo.service_name, &hints);
 }
 
+/*
+ * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
+ */
 PAGEABLE auto set_options(wsk::SOCKET *sock)
 {
         PAGED_CODE();
@@ -492,11 +428,13 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
         }
 
         bool optval{};
+
         if (auto err = get_keepalive(sock, optval)) {
                 Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
                 return err;
-        } else {
-                Trace(TRACE_LEVEL_VERBOSE, "keepalive %d", optval);
+        } else if (!optval) {
+                Trace(TRACE_LEVEL_ERROR, "tcp keepalive is not set");
+                return STATUS_UNSUCCESSFUL;
         }
 
         int idle = 0;
@@ -514,7 +452,7 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
         return STATUS_SUCCESS;
 }
 
-PAGEABLE auto prepare_socket(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
+PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
 {
         PAGED_CODE();
 
@@ -532,59 +470,72 @@ PAGEABLE auto prepare_socket(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
         return connect(sock, ai.ai_addr);
 }
 
-PAGEABLE auto connect(vpdo_dev_t *vpdo)
+PAGEABLE auto connect(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
         ADDRINFOEXW *ai{};
         if (auto err = getaddrinfo(ai, vpdo)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                return err;
+                return ERR_NETWORK;
         }
 
         static WSK_CLIENT_CONNECTION_DISPATCH dispatch;
         
-        NT_ASSERT(!vpdo->sock);
-        vpdo->sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, vpdo, &dispatch, ai, prepare_socket, nullptr);
+        NT_ASSERT(!vpdo.sock);
+        vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &dispatch, ai, try_connect, nullptr);
 
         wsk::free(ai);
-        return vpdo->sock ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+        return vpdo.sock ? ERR_NONE : ERR_NETWORK;
 }
 
 } // namespace
 
 
-/*
- * TCP_NODELAY => STATUS_NOT_SUPPORTED
- */
 PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
         TraceCall("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
         auto &error = r.port; // err_t
-        error = ERR_GENERAL;
 
         vpdo_dev_t *vpdo{};
-        if (auto err = create_vpdo(vpdo, vhci, r)) {
+        if (bool(error = create_vpdo(vpdo, vhci, r))) {
                 destroy_device(vpdo);
-                return err;
+                return STATUS_SUCCESS;
         }
 
-        error = ERR_NETWORK;
-
-        if (auto err = connect(vpdo)) {
-                Trace(TRACE_LEVEL_ERROR, "Can't connect to a server");
+        if (bool(error = connect(*vpdo))) {
+                Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &vpdo->node_name, &vpdo->service_name);
                 destroy_device(vpdo);
-                return err;
+                return STATUS_SUCCESS;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &vpdo->node_name, &vpdo->service_name);
 
-        error = process(vpdo->sock, vpdo->busid);
+        if (bool(error = import_remote_device(*vpdo))) {
+                destroy_device(vpdo);
+                return STATUS_SUCCESS;
+        }
+
+        if (vhub_attach_vpdo(vpdo)) {
+                r.port = vpdo->port;
+        } else {
+                error = ERR_PORTFULL;
+                Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");
+                destroy_device(vpdo);
+                return STATUS_SUCCESS;
+        }
+
+//      vpdo->Self->Flags &= ~DO_DEVICE_INITIALIZING; // should be the last step in initialization
+//      IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
+
+        Trace(TRACE_LEVEL_INFORMATION, "SUCCESS");
+
+        error = ERR_GENERAL;
         destroy_device(vpdo);
 
-        return STATUS_NOT_IMPLEMENTED;
+        return STATUS_SUCCESS;
 }
 
 PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)

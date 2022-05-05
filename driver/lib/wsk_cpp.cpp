@@ -474,7 +474,7 @@ auto wsk::for_each(
 }
 
 /*
- * TCP_NODELAY is not supported.
+ * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
  */
 NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
 {

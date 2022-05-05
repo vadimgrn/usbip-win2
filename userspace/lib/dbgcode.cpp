@@ -16,9 +16,9 @@ const char *dbg_errcode(int err)
 {
 	const char* v[] =
 	{
-		"ERR_GENERAL", "ERR_INVARG", "ERR_NETWORK", "ERR_VERSION", "ERR_PROTOCOL", 
-		"ERR_STATUS", "ERR_EXIST", "ERR_NOTEXIST", "ERR_DRIVER", "ERR_PORTFULL", 
-		"ERR_ACCESS", "ERR_CERTIFICATE", "ERR_NONE"
+                "ERR_NONE", "ERR_GENERAL", "ERR_INVARG", "ERR_NETWORK", "ERR_VERSION", 
+                "ERR_PROTOCOL", "ERR_STATUS", "ERR_EXIST", "ERR_NOTEXIST", "ERR_DRIVER", 
+                "ERR_PORTFULL", "ERR_ACCESS", "ERR_CERTIFICATE"
 	};
 
 	err = abs(err);

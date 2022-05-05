@@ -20,6 +20,7 @@
 #include "usbip_network.h"
 #include "usbip_vhci.h"
 #include "usbip_common.h"
+#include "dbgcode.h"
 
 namespace
 {
@@ -74,16 +75,11 @@ int import_device(const char *host, const char *busid, const char *serial)
                 return ERR_DRIVER;
         }
 
-        auto rc = usbip_vhci_attach_device(hdev.get(), r);
-        if (rc < 0) {
-                if (rc == ERR_PORTFULL) {
-                        dbg("no free port");
-                } else {
-                        dbg("failed to attach device: %d", rc);
-                }
-                return rc;
+        if (!usbip_vhci_attach_device(hdev.get(), r)) {
+                dbg("usbip_vhci_attach_device failed");
+                return ERR_GENERAL;
         }
-
+               
         return r.port;
 }
 
@@ -99,7 +95,7 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
                 return 0;
         }
 
-        switch (port) {
+        switch (static_cast<err_t>(port)) {
         case ERR_DRIVER:
                 err("vhci driver is not loaded");
                 break;
@@ -113,7 +109,7 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
                 err("no available port");
                 break;
         default:
-                err("failed to attach");
+                err("failed to attach: #%d %s", port, dbg_errcode(port));
         }
 
         return 3;

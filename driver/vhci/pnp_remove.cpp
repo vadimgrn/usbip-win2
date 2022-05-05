@@ -48,35 +48,40 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 	}
 }
 
+PAGEABLE void free_usb_dev_interface(UNICODE_STRING *symlink_name)
+{
+        PAGED_CODE();
+
+        if (symlink_name->Buffer) {
+                if (auto err = IoSetDeviceInterfaceState(symlink_name, false)) {
+                        Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState %!STATUS!", err);
+                }
+        }
+
+        RtlFreeUnicodeString(symlink_name);
+}
+
 PAGEABLE void free_strings(vpdo_dev_t &d)
 {
 	PAGED_CODE();
 
-	PWSTR *v[] { &d.Manufacturer, &d.Product, &d.SerialNumber };
+        PWSTR *v[] { &d.Manufacturer, &d.Product, &d.SerialNumber };
 
-	for (auto i: v) {
-		if (auto &ptr = *i) {
-			ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
-			ptr = nullptr;
-		}
-	}
-}
+        for (auto i: v) {
+                if (auto &ptr = *i) {
+                        ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
+                        ptr = nullptr;
+                }
+        }
 
-PAGEABLE void free_usb_dev_interface(UNICODE_STRING *iface)
-{
-	PAGED_CODE();
-	
-	if (iface->Buffer) {
-		if (auto err = IoSetDeviceInterfaceState(iface, FALSE)) {
-			Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState %!STATUS!", err);
-		}
+        libdrv_free(d.busid);
+        d.busid = nullptr;
 
-		RtlFreeUnicodeString(iface);
-		iface->Buffer = nullptr;
-	}
+        RtlFreeUnicodeString(&d.node_name);
+        RtlFreeUnicodeString(&d.service_name);
+        RtlFreeUnicodeString(&d.serial);
 
-	iface->Length = 0;
-	iface->MaximumLength = 0;
+        free_usb_dev_interface(&d.usb_dev_interface);
 }
 
 PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
@@ -87,9 +92,11 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	IO_CSQ* v[] { &vpdo.read_irp_csq, &vpdo.tx_irps_csq, &vpdo.rx_irps_csq };
 
 	for (auto csq: v) {
-		while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
-			complete_canceled_irp(irp);
-		}
+                if (is_initialized(*csq)) {
+                        while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
+                                complete_canceled_irp(irp);
+                        }
+                }
 	}
 }
 
@@ -103,35 +110,32 @@ PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 	}
 }
 
-PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
+PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 {
-	PAGED_CODE();
-	TraceCall("%p, port %d", &vpdo, vpdo.port);
+        PAGED_CODE();
 
-        if (auto &sock = vpdo.sock) {
+        if (auto sock = (wsk::SOCKET*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo.sock), nullptr)) {
                 if (auto err = disconnect(sock)) {
                         Trace(TRACE_LEVEL_ERROR, "Socket disconnect error %!STATUS!", err);
                 }
                 if (auto err = close(sock)) {
                         Trace(TRACE_LEVEL_ERROR, "Socket close error %!STATUS!", err);
                 }
-                sock = nullptr;
         }
+}
+
+PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
+{
+	PAGED_CODE();
+	TraceCall("%p, port %d", &vpdo, vpdo.port);
+
+        close_socket(vpdo);
 
 	cancel_pending_irps(vpdo);
 	complete_unlinked_irps(&vpdo);
 
 	vhub_detach_vpdo(&vpdo);
-
-	free_usb_dev_interface(&vpdo.usb_dev_interface);
 	free_strings(vpdo);
-
-        libdrv_free(vpdo.busid);
-        vpdo.busid = nullptr;
-        
-        RtlFreeUnicodeString(&vpdo.node_name);
-        RtlFreeUnicodeString(&vpdo.service_name);
-        RtlFreeUnicodeString(&vpdo.serial);
 
 	if (vpdo.actconfig) {
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);

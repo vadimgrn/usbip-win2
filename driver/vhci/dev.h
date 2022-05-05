@@ -99,7 +99,7 @@ struct vpdo_dev_t : vdev_t
         int port; // unique port number of the device on hub, [1, vhub_dev_t::NUM_PORTS]
 	volatile bool unplugged; // see IOCTL_USBIP_VHCI_UNPLUG_HARDWARE
 
-        unsigned int devid;
+        UINT32 devid;
         static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
         USB_DEVICE_DESCRIPTOR descriptor;
@@ -193,4 +193,9 @@ inline auto ptr4log(const void *ptr) // use format "%04x"
 inline auto ph4log(USBD_PIPE_HANDLE handle)
 {
 	return reinterpret_cast<uintptr_t>(handle);
+}
+
+constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
+{
+        return (busnum << 16) | devnum;
 }

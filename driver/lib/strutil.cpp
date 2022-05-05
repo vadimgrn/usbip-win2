@@ -4,7 +4,7 @@
 namespace
 {
 
-const ULONG libdrv_pooltag = 'vrdl';
+const ULONG libdrv_pooltag = 'VRDL';
 
 inline auto RtlStringCchLength(PCSTR  s, size_t *len) { return RtlStringCchLengthA(s, NTSTRSAFE_MAX_CCH, len); }
 inline auto RtlStringCchLength(PCWSTR s, size_t *len) { return RtlStringCchLengthW(s, NTSTRSAFE_MAX_CCH, len); }
