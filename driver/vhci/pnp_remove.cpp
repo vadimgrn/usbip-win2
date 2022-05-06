@@ -48,17 +48,17 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 	}
 }
 
-PAGEABLE void free_usb_dev_interface(UNICODE_STRING *symlink_name)
+PAGEABLE void free_usb_dev_interface(UNICODE_STRING &symlink_name)
 {
         PAGED_CODE();
 
-        if (symlink_name->Buffer) {
-                if (auto err = IoSetDeviceInterfaceState(symlink_name, false)) {
+        if (symlink_name.Buffer) {
+                if (auto err = IoSetDeviceInterfaceState(&symlink_name, false)) {
                         Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState %!STATUS!", err);
                 }
         }
 
-        RtlFreeUnicodeString(symlink_name);
+        RtlFreeUnicodeString(&symlink_name);
 }
 
 PAGEABLE void free_strings(vpdo_dev_t &d)
@@ -81,7 +81,7 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
         RtlFreeUnicodeString(&d.service_name);
         RtlFreeUnicodeString(&d.serial);
 
-        free_usb_dev_interface(&d.usb_dev_interface);
+        free_usb_dev_interface(d.usb_dev_interface);
 }
 
 PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)

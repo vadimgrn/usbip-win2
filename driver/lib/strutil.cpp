@@ -48,3 +48,16 @@ void libdrv_free(void *data)
 		ExFreePoolWithTag(data, libdrv_pooltag);
 	}
 }
+
+/*
+ * RtlFreeUnicodeString must be used to release memory.
+ */
+NTSTATUS strnew(UNICODE_STRING &dst, const char *utf8)
+{
+        PAGED_CODE();
+
+        UTF8_STRING s;
+        RtlInitUTF8String(&s, utf8);
+
+        return RtlUTF8StringToUnicodeString(&dst, &s, true);
+}

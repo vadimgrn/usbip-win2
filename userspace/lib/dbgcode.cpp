@@ -1,5 +1,4 @@
 #include "dbgcode.h"
-#include <cmath>
 
 const char *dbg_opcode_status(int status)
 {
@@ -21,6 +20,9 @@ const char *dbg_errcode(int err)
                 "ERR_PORTFULL", "ERR_ACCESS", "ERR_CERTIFICATE"
 	};
 
-	err = abs(err);
-	return err < sizeof(v)/sizeof(*v) ? v[err] : "dbg_errcode: unexpected code";
+	if (err < 0) {
+                err = -err;
+        }
+
+        return err < sizeof(v)/sizeof(*v) ? v[err] : "dbg_errcode: unexpected code";
 }

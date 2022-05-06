@@ -76,13 +76,15 @@ int import_device(const char *host, const char *busid, const char *serial)
         }
 
         if (!usbip_vhci_attach_device(hdev.get(), r)) {
-                dbg("usbip_vhci_attach_device failed");
                 return ERR_GENERAL;
         }
                
         return r.port;
 }
 
+/*
+ * @see vhci/usbip_network.cpp, map_error. 
+ */
 int attach_device(const char *host, const char *busid, const char *serial, bool terse)
 {
         auto port = import_device(host, busid, serial);
@@ -99,14 +101,23 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
         case ERR_DRIVER:
                 err("vhci driver is not loaded");
                 break;
-        case ERR_EXIST:
-                err("already used bus id: %s", busid);
-                break;
-        case ERR_NOTEXIST:
-                err("non-existent bus id: %s", busid);
+        case ERR_NETWORK:
+                err("can't connect to %s:%s", host, usbip_port);
                 break;
         case ERR_PORTFULL:
                 err("no available port");
+                break;
+        case ERR_EXIST: // ST_DEV_BUSY
+                err("already used bus id: %s", busid);
+                break;
+        case ERR_NOTEXIST: // ST_NODEV
+                err("non-existent bus id: %s", busid);
+                break;
+        case ERR_STATUS: // ST_ERROR
+                err("device is unusable because of a fatal error");
+                break;
+        case ERR_INVARG: // ST_NA
+                err("device is not available");
                 break;
         default:
                 err("failed to attach: #%d %s", port, dbg_errcode(port));

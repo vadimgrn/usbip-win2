@@ -5,11 +5,11 @@
 enum op_status_t // op_common.status
 {
         ST_OK,
-        ST_NA, /* Device requested for import is not available */
-        ST_DEV_BUSY, /* Device requested for import is in error state */
-        ST_DEV_ERR,
-        ST_NODEV,
-        ST_ERROR
+        ST_NA, // !SDEV_ST_AVAILABLE
+        ST_DEV_BUSY, // SDEV_ST_USED
+        ST_DEV_ERR, // SDEV_ST_ERROR
+        ST_NODEV, // requested device not found by busid
+        ST_ERROR // ST_DEV_ERR?
 };
 
 /* error codes for userspace tools and library */
@@ -32,7 +32,7 @@ enum err_t
 
 static_assert(!ERR_NONE, "assert");
 
-enum usbip_device_status 
+enum usbip_device_status
 {
 	/* dev status unknown. */
 	DEV_ST_UNKNOWN,

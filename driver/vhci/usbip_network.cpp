@@ -4,6 +4,32 @@
 
 #include "usbip_proto_op.h"
 
+namespace
+{
+
+/*
+ * @see usbip_attach.cpp, attach_device
+ */
+auto map_error(op_status_t st)
+{
+        switch (st) {
+        case ST_OK:
+                return ERR_NONE;
+        case ST_DEV_BUSY:
+                return ERR_EXIST;
+        case ST_NODEV:
+                return ERR_NOTEXIST;
+        case ST_ERROR:
+                return ERR_STATUS;
+        case ST_NA:
+                return ERR_INVARG;
+        default:
+                return ERR_GENERAL;
+        }
+}
+
+} // namespace
+
 bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
 {
         Mdl mdl(pool, data, len);
@@ -36,7 +62,7 @@ bool usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
         return !err && actual == len;
 }
 
-err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *status)
+err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code)
 {
         op_common r;
 
@@ -47,27 +73,19 @@ err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t *sta
 	PACK_OP_COMMON(0, &r);
 
 	if (r.version != USBIP_VERSION) {
-		Trace(TRACE_LEVEL_ERROR, "Version %#x != %#x", r.version, USBIP_VERSION);
+		Trace(TRACE_LEVEL_ERROR, "Version(%#x) != expected(%#x)", r.version, USBIP_VERSION);
 		return ERR_VERSION;
 	}
 
         if (r.code != expected_code) {
-                Trace(TRACE_LEVEL_ERROR, "Code %#x != %#x", r.code, expected_code);
+                Trace(TRACE_LEVEL_ERROR, "Code(%#x) != expected(%#x)", r.code, expected_code);
                 return ERR_PROTOCOL;
         }
 
-        if (status) {
-                *status = static_cast<op_status_t>(r.status);
-                if (static_cast<decltype(r.status)>(*status) != r.status) {
-                        Trace(TRACE_LEVEL_ERROR, "op_status_t(%d) != status(%d)", *status, r.status);
-                        return ERR_STATUS;
-                }
+        auto st = static_cast<op_status_t>(r.status);
+        if (st != ST_OK) {
+                Trace(TRACE_LEVEL_ERROR, "Request failed: %!op_status_t!", st);
         }
 
-        if (r.status != ST_OK) {
-                Trace(TRACE_LEVEL_ERROR, "Request failed: status %d", r.status);
-                return ERR_STATUS;
-	}
-
-        return ERR_NONE;
+        return map_error(st);
 }

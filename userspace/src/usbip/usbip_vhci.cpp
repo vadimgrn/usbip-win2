@@ -100,7 +100,12 @@ std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE h
 
 bool usbip_vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
 {
-        return DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
+        auto ok = DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
+        if (!ok) {
+                auto err = GetLastError();
+                dbg("%s: DeviceIoControl error %#x", __func__, err);
+        }
+        return ok;
 }
 
 int usbip_vhci_detach_device(HANDLE hdev, int port)
