@@ -86,7 +86,7 @@ void free(_In_ ADDRINFOEXW *AddrInfo);
 
 //
 
-using addrinfo_f = NTSTATUS (*)(SOCKET *sock, const ADDRINFOEXW &ai, void *ctx);
+using addrinfo_f = NTSTATUS (SOCKET *sock, const ADDRINFOEXW &ai, void *ctx);
 
 SOCKET *for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
