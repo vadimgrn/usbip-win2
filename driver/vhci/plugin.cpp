@@ -338,6 +338,7 @@ PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
                 return err;
         }
 
+        log(cd);
         NT_ASSERT(!vpdo.actconfig);
 
         vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(
@@ -378,7 +379,6 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
                 return err;
         }
 
-        log(*vpdo.actconfig);
         TraceUrb("USB_CONFIGURATION_DESCRIPTOR: %!BIN!", WppBinary(vpdo.actconfig, vpdo.actconfig->wTotalLength));
 
         if (is_configured(udev) && !is_same_device(udev, *vpdo.actconfig)) {
@@ -433,23 +433,6 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
 {
         PAGED_CODE();
 
-        enum { KEEPIDLE = 30, KEEPCNT = 9, KEEPINTVL = 10 };
-
-        if (auto err = set_keepalive(sock, KEEPIDLE, KEEPCNT, KEEPINTVL)) {
-                Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
-                return err;
-        }
-
-        bool optval{};
-
-        if (auto err = get_keepalive(sock, optval)) {
-                Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
-                return err;
-        } else if (!optval) {
-                Trace(TRACE_LEVEL_ERROR, "tcp keepalive is not set");
-                return STATUS_UNSUCCESSFUL;
-        }
-
         int idle = 0;
         int cnt = 0;
         int intvl = 0;
@@ -459,10 +442,24 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
                 return err;
         }
 
-        auto timeout = idle + cnt*intvl;
-        Trace(TRACE_LEVEL_VERBOSE, "keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec.", idle, cnt, intvl, timeout);
+        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
 
-        return timeout == (KEEPIDLE + KEEPCNT*KEEPINTVL) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
+                idle, cnt, intvl, keepalive(idle, cnt, intvl));
+
+        idle = 30;
+        cnt = 9;
+        intvl = 10;
+
+        if (auto err = set_keepalive(sock, idle, cnt, intvl)) {
+                Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
+                return err;
+        }
+
+        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
+                idle, cnt, intvl, keepalive(idle, cnt, intvl));
+
+        return STATUS_SUCCESS;
 }
 
 PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
