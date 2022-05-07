@@ -82,6 +82,17 @@ PAGEABLE auto is_configured(const usbip_usb_device &d)
         return d.bConfigurationValue && d.bNumInterfaces;
 }
 
+/*
+ * err_t are negative, op_status_t are positive.
+ */
+constexpr auto make_error(err_t err, op_status_t status = ST_OK)
+{
+        static_assert(sizeof(int) == sizeof(INT32));
+        return int(status ? status : err) << 16;
+}
+
+static_assert(!make_error(ERR_NONE));
+
 PAGEABLE auto init(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
@@ -152,7 +163,7 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
 
         auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
         if (!devobj) {
-                return ERR_GENERAL;
+                return make_error(ERR_GENERAL);
         }
 
         vpdo = to_vpdo_or_null(devobj);
@@ -164,15 +175,15 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
         vpdo->Self->Flags |= DO_POWER_PAGABLE | DO_DIRECT_IO;
 
         if (init(*vpdo, r)) {
-                return ERR_GENERAL;
+                return make_error(ERR_GENERAL);
         }
 
         if (auto err = init_queues(*vpdo)) {
                 Trace(TRACE_LEVEL_ERROR, "init_queues %!STATUS!", err);
-                return ERR_GENERAL;
+                return make_error(ERR_GENERAL);
         }
 
-        return ERR_NONE;
+        return make_error(ERR_NONE);
 }
 
 /*
@@ -195,30 +206,37 @@ PAGEABLE auto send_req_import(vpdo_dev_t &vpdo)
         PACK_OP_COMMON(0, &req.hdr);
         PACK_OP_IMPORT_REQUEST(0, &req.body);
 
-        return send(vpdo.sock, usbip::memory::stack, &req, sizeof(req)) ? ERR_NONE : ERR_NETWORK;
+        return send(vpdo.sock, usbip::memory::stack, &req, sizeof(req));
 }
 
 PAGEABLE auto recv_rep_import(vpdo_dev_t &vpdo, usbip::memory pool, op_import_reply &reply)
 {
         PAGED_CODE();
 
-        if (auto err = usbip::recv_op_common(vpdo.sock, OP_REP_IMPORT)) {
-                return err;
+        auto status = ST_OK;
+
+        if (auto err = usbip::recv_op_common(vpdo.sock, OP_REP_IMPORT, status)) {
+                return make_error(err);
+        }
+
+        if (status) {
+                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT %!op_status_t!", status);
+                return make_error(ERR_NONE, status);
         }
 
         if (!recv(vpdo.sock, pool, &reply, sizeof(reply))) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to recv OP_REP_IMPORT(op_import_reply)");
-                return ERR_NETWORK;
+                Trace(TRACE_LEVEL_ERROR, "Failed to receive struct op_import_reply");
+                return make_error(ERR_NETWORK);
         }
 
         PACK_OP_IMPORT_REPLY(0, &reply);
 
         if (strncmp(reply.udev.busid, vpdo.busid, sizeof(reply.udev.busid))) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, vpdo.busid);
-                return ERR_PROTOCOL;
+                return make_error(ERR_PROTOCOL);
         }
 
-        return ERR_NONE;
+        return make_error(ERR_NONE);
 }
 
 PAGEABLE auto init_req_get_descr(usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBufferLength)
@@ -375,15 +393,14 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
-        if (auto err = send_req_import(vpdo)) {
-                Trace(TRACE_LEVEL_ERROR, "OP_REQ_IMPORT error %d", err);
-                return err;
+        if (!send_req_import(vpdo)) {
+                Trace(TRACE_LEVEL_ERROR, "Failed to send OP_REQ_IMPORT");
+                return make_error(ERR_NETWORK);
         }
 
         op_import_reply reply{};
 
-        if (auto err = recv_rep_import(vpdo, usbip::memory::stack, reply)) {
-                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT error %d", err);
+        if (auto err = recv_rep_import(vpdo, usbip::memory::stack, reply)) { // result made by make_error()
                 return err;
         }
 
@@ -391,7 +408,9 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
         log(udev);
 
         vpdo.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
-        return fetch_descriptors(vpdo, udev);
+
+        auto err = fetch_descriptors(vpdo, udev);
+        return make_error(err);
 }
 
 PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t &vpdo)
@@ -477,7 +496,7 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
         ADDRINFOEXW *ai{};
         if (auto err = getaddrinfo(ai, vpdo)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                return ERR_NETWORK;
+                return make_error(ERR_NETWORK);
         }
 
         static WSK_CLIENT_CONNECTION_DISPATCH dispatch;
@@ -486,7 +505,7 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
         vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &dispatch, ai, try_connect, nullptr);
 
         wsk::free(ai);
-        return vpdo.sock ? ERR_NONE : ERR_NETWORK;
+        return make_error(vpdo.sock ? ERR_NONE : ERR_NETWORK);
 }
 
 } // namespace
@@ -497,7 +516,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
 	PAGED_CODE();
         TraceCall("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
-        auto &error = r.port; // err_t
+        auto &error = r.port;
 
         vpdo_dev_t *vpdo{};
         if (bool(error = create_vpdo(vpdo, vhci, r))) {
@@ -521,7 +540,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
         if (vhub_attach_vpdo(vpdo)) {
                 r.port = vpdo->port;
         } else {
-                error = ERR_PORTFULL;
+                error = make_error(ERR_PORTFULL);
                 Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");
                 destroy_device(vpdo);
                 return STATUS_SUCCESS;

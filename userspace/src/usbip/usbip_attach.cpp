@@ -83,44 +83,69 @@ int import_device(const char *host, const char *busid, const char *serial)
 }
 
 /*
- * @see vhci/usbip_network.cpp, map_error. 
+ * @see vhci/plugin.cpp, make_error
  */
 int attach_device(const char *host, const char *busid, const char *serial, bool terse)
 {
-        auto port = import_device(host, busid, serial);
-        if (port > 0) {
+        auto result = import_device(host, busid, serial);
+        static_assert(sizeof(result) == sizeof(int32_t));
+
+        if (int port = result & 0xFFFF) {
+
+                assert(port > 0);
+                assert(!(result >> 16));
+
                 if (terse) {
                         printf("%d\n", port);
                 } else {
                         printf("succesfully attached to port %d\n", port);
                 }
+
                 return 0;
         }
 
-        switch (static_cast<err_t>(port)) {
-        case ERR_DRIVER:
-                err("vhci driver is not loaded");
-                break;
-        case ERR_NETWORK:
-                err("can't connect to %s:%s", host, usbip_port);
-                break;
-        case ERR_PORTFULL:
-                err("no available port");
-                break;
-        case ERR_EXIST: // ST_DEV_BUSY
-                err("already used bus id: %s", busid);
-                break;
-        case ERR_NOTEXIST: // ST_NODEV
-                err("non-existent bus id: %s", busid);
-                break;
-        case ERR_STATUS: // ST_ERROR
-                err("device is unusable because of a fatal error");
-                break;
-        case ERR_INVARG: // ST_NA
-                err("device is not available");
-                break;
-        default:
-                err("failed to attach: #%d %s", port, dbg_errcode(port));
+        result >>= 16;
+        assert(result);
+
+        if (result > ST_OK) { // <linux>/tools/usb/usbip/libsrc/usbip_common.c, op_common_status_strings
+                switch (auto err = static_cast<op_status_t>(result)) {
+                case ST_NA:
+                        err("device not available");
+                        break;
+                case ST_DEV_BUSY:
+                        err("device busy (already exported)");
+                        break;
+                case ST_DEV_ERR:
+                        err("device in error state");
+                        break;
+                case ST_NODEV:
+                        err("device not found by bus id: %s", busid);
+                        break;
+                case ST_ERROR:
+                        err("unexpected response");
+                        break;
+                default:
+                        err("failed to attach: #%d %s", err, dbg_opcode_status(err));
+                }
+
+        } else switch (auto err = static_cast<err_t>(result)) {
+                case ERR_DRIVER:
+                        err("vhci driver is not loaded");
+                        break;
+                case ERR_NETWORK:
+                        err("can't connect to %s:%s", host, usbip_port);
+                        break;
+                case ERR_PORTFULL:
+                        err("no available port");
+                        break;
+                case ERR_PROTOCOL:
+                        err("protocol error");
+                        break;
+                case ERR_VERSION:
+                        err("incompatible protocol version");
+                        break;
+                default:
+                        err("failed to attach: #%d %s", err, dbg_errcode(err));
         }
 
         return 3;

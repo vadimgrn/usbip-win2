@@ -4,32 +4,6 @@
 
 #include "usbip_proto_op.h"
 
-namespace
-{
-
-/*
- * @see usbip_attach.cpp, attach_device
- */
-auto map_error(op_status_t st)
-{
-        switch (st) {
-        case ST_OK:
-                return ERR_NONE;
-        case ST_DEV_BUSY:
-                return ERR_EXIST;
-        case ST_NODEV:
-                return ERR_NOTEXIST;
-        case ST_ERROR:
-                return ERR_STATUS;
-        case ST_NA:
-                return ERR_INVARG;
-        default:
-                return ERR_GENERAL;
-        }
-}
-
-} // namespace
-
 bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
 {
         Mdl mdl(pool, data, len);
@@ -62,11 +36,12 @@ bool usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
         return !err && actual == len;
 }
 
-err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code)
+err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t &status)
 {
         op_common r;
 
         if (!recv(sock, memory::stack, &r, sizeof(r))) {
+                Trace(TRACE_LEVEL_ERROR, "Failed to receive struct op_common");
                 return ERR_NETWORK;
         }
 
@@ -82,10 +57,6 @@ err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code)
                 return ERR_PROTOCOL;
         }
 
-        auto st = static_cast<op_status_t>(r.status);
-        if (st != ST_OK) {
-                Trace(TRACE_LEVEL_ERROR, "Request failed: %!op_status_t!", st);
-        }
-
-        return map_error(st);
+        status = static_cast<op_status_t>(r.status);
+        return ERR_NONE;
 }

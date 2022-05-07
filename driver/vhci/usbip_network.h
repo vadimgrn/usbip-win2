@@ -12,6 +12,6 @@ using wsk::SOCKET;
 bool send(SOCKET *sock, memory pool, void *data, ULONG len);
 bool recv(SOCKET *sock, memory pool, void *data, ULONG len);
 
-err_t recv_op_common(SOCKET *sock, UINT16 expected_code);
+err_t recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t &status);
 
 } // namespace usbip
