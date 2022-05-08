@@ -422,6 +422,8 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
 {
         PAGED_CODE();
 
+        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
+
         int idle = 0;
         int cnt = 0;
         int intvl = 0;
@@ -431,24 +433,29 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
                 return err;
         }
 
-        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
-
         Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
 
-        idle = 30;
-        cnt = 9;
-        intvl = 10;
+        enum { IDLE = 30, CNT = 9, INTVL = 10 };
 
-        if (auto err = set_keepalive(sock, idle, cnt, intvl)) {
+        if (auto err = set_keepalive(sock, IDLE, CNT, INTVL)) {
                 Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
                 return err;
         }
 
+        bool optval{};
+        if (auto err = get_keepalive(sock, optval)) {
+                Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
+                return err;
+        }
+
+        NT_VERIFY(!get_keepalive_opts(sock, &idle, &cnt, &intvl));
+
         Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
 
-        return STATUS_SUCCESS;
+        bool ok = optval && keepalive(idle, cnt, intvl) == keepalive(IDLE, CNT, INTVL);
+        return ok ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
 PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)

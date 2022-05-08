@@ -187,20 +187,18 @@ void free(_In_ wsk::SOCKET *sock)
 
 auto setsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
 {
-        return control(sock, WskSetOption, optname, level, optsize, optval, 0, nullptr, nullptr, true);
+        return control(sock, WskSetOption, optname, level, optsize, optval, 0, nullptr, nullptr, true, nullptr);
 }
 
-auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t &optsize)
+auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
 {
-        SIZE_T actual_sz = 0;
-        auto err = control(sock, WskGetOption, optname, level, 0, nullptr, optsize, optval, &actual_sz, true);
-
-        if (!err && optsize != actual_sz) {
-                err = STATUS_INVALID_BUFFER_SIZE;
-                optsize = actual_sz;
+        SIZE_T actual = 0;
+        if (auto err = control(sock, WskGetOption, optname, level, 0, nullptr, optsize, optval, nullptr, true, &actual)) {
+                return err;
         }
-        
-        return err;
+
+        return actual == optsize ?  STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+
 }
 
 } // namespace
@@ -337,24 +335,24 @@ NTSTATUS wsk::control(
         _In_ SIZE_T OutputSize,
         _Out_writes_bytes_opt_(OutputSize) PVOID OutputBuffer,
         _Out_opt_ SIZE_T *OutputSizeReturned,
-        _In_ bool use_irp)
+        _In_ bool use_irp,
+        _Out_opt_ SIZE_T *OutputSizeReturnedIrp)
 {
-        if (use_irp && OutputBuffer && !OutputSizeReturned) {
-                return STATUS_INVALID_PARAMETER;
-        }
-
         auto &ctx = sock->ctx;
         if (use_irp) {
                 ctx.reset();
         }
 
         auto err = sock->Basic->WskControlSocket(sock->Self, RequestType, ControlCode, Level, 
-                                                InputSize, InputBuffer, 
-                                                OutputSize, OutputBuffer, OutputSizeReturned, 
-                                                use_irp ? ctx.irp() : nullptr);
+                                                 InputSize, InputBuffer, 
+                                                 OutputSize, OutputBuffer, OutputSizeReturned, 
+                                                 use_irp ? ctx.irp() : nullptr);
 
-        if (use_irp && !ctx.wait_for_completion(err) && OutputSizeReturned) {
-                *OutputSizeReturned = ctx.irp()->IoStatus.Information;
+        if (use_irp) {
+                ctx.wait_for_completion(err);
+                if (OutputSizeReturnedIrp) {
+                        *OutputSizeReturnedIrp = ctx.irp()->IoStatus.Information;
+                }
         }
 
         return err;
@@ -368,8 +366,8 @@ NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sy
 
         WSK_EVENT_CALLBACK_CONTROL r{ &NPI_WSK_INTERFACE_ID, EventMask };
 
-        return control(sock, WskSetOption, SO_WSK_EVENT_CALLBACK, SOL_SOCKET, sizeof(r), &r, 
-                0, nullptr, nullptr, sync_disable);
+        return control(sock, WskSetOption, SO_WSK_EVENT_CALLBACK, SOL_SOCKET, 
+                       sizeof(r), &r, 0, nullptr, nullptr, true, nullptr);
 }
 
 NTSTATUS wsk::close(_In_ SOCKET *sock)
@@ -474,23 +472,25 @@ auto wsk::for_each(
 }
 
 /*
- * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
+ * Error if optval is ULONG, one byte is written actually.
  */
 NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
 {
-        auto optsize = sizeof(optval);
-        return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, optsize);
+        return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
 }
 
 /*
+ * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
  * TCP_KEEPIDLE default is 2*60*60 sec.
  */
 NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
 {
-        bool optval = true;
+        bool optval = true; // ULONG is OK too
         if (auto err = setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval))) {
                 return err;
         }
+
+        static_assert(sizeof(idle) == sizeof(ULONG));
 
         if (idle > 0) {
                 if (auto err = setsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, &idle, sizeof(idle))) { // seconds
@@ -515,22 +515,20 @@ NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
 
 NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl)
 {
-        auto optsize = sizeof(*idle);
-
         if (idle) {
-                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, idle, optsize)) {
+                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPIDLE, idle, sizeof(*idle))) {
                         return err;
                 }
         }
 
         if (cnt) {
-                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, cnt, optsize)) {
+                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPCNT, cnt, sizeof(*cnt))) {
                         return err;
                 }
         }
 
         if (intvl) {
-                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, intvl, optsize)) {
+                if (auto err = getsockopt(sock, IPPROTO_TCP, TCP_KEEPINTVL, intvl, sizeof(*intvl))) {
                         return err;
                 }
         }

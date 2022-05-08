@@ -41,7 +41,8 @@ NTSTATUS control(
         _In_ SIZE_T OutputSize,
         _Out_writes_bytes_opt_(OutputSize) PVOID OutputBuffer,
         _Out_opt_ SIZE_T *OutputSizeReturned,
-        _In_ bool use_irp);
+        _In_ bool use_irp,
+        _Out_opt_ SIZE_T *OutputSizeReturnedIrp);
 
 NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sync_disable);
 
