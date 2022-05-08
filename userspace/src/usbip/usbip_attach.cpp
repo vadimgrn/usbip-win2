@@ -33,7 +33,7 @@ const char usbip_attach_usage_string[] =
 "    -t, --terse            show port number as a result\n";
 
 
-int init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const char *serial)
+auto init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const char *serial)
 {
         struct Data
         {
@@ -59,24 +59,24 @@ int init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const 
                 }
         }
 
-        return 0;
+        return ERR_NONE;
 }
 
-int import_device(const char *host, const char *busid, const char *serial)
+auto import_device(const char *host, const char *busid, const char *serial)
 {
         ioctl_usbip_vhci_plugin r{};
         if (auto err = init(r, host, busid, serial)) {
-                return err;
+                return make_error(err);
         }
         
         auto hdev = usbip_vhci_driver_open();
         if (!hdev) {
                 dbg("failed to open vhci driver");
-                return ERR_DRIVER;
+                return make_error(ERR_DRIVER);
         }
 
         if (!usbip_vhci_attach_device(hdev.get(), r)) {
-                return ERR_GENERAL;
+                return make_error(ERR_GENERAL);
         }
                
         return r.port;
@@ -88,7 +88,6 @@ int import_device(const char *host, const char *busid, const char *serial)
 int attach_device(const char *host, const char *busid, const char *serial, bool terse)
 {
         auto result = import_device(host, busid, serial);
-        static_assert(sizeof(result) == sizeof(int32_t));
 
         if (int port = result & 0xFFFF) {
 

@@ -71,3 +71,19 @@ enum usb_device_speed
         USB_SPEED_SUPER,			/* usb 3.0 */
         USB_SPEED_SUPER_PLUS			/* usb 3.1 */
 };
+
+
+#ifdef __cplusplus
+
+/*
+ * err_t are negative, op_status_t are positive.
+ */
+constexpr auto make_error(err_t err, op_status_t status = ST_OK)
+{
+        static_assert(sizeof(int) == 4);
+        return int(status ? status : err) << 16;
+}
+
+static_assert(!make_error(ERR_NONE));
+
+#endif // __cplusplus

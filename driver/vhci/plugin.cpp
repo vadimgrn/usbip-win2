@@ -82,17 +82,6 @@ PAGEABLE auto is_configured(const usbip_usb_device &d)
         return d.bConfigurationValue && d.bNumInterfaces;
 }
 
-/*
- * err_t are negative, op_status_t are positive.
- */
-constexpr auto make_error(err_t err, op_status_t status = ST_OK)
-{
-        static_assert(sizeof(int) == sizeof(INT32));
-        return int(status ? status : err) << 16;
-}
-
-static_assert(!make_error(ERR_NONE));
-
 PAGEABLE auto init(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();

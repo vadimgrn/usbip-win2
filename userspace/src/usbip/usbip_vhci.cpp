@@ -102,8 +102,7 @@ bool usbip_vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
 {
         auto ok = DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
         if (!ok) {
-                auto err = GetLastError();
-                dbg("%s: DeviceIoControl error %#x", __func__, err);
+                dbg("%s: DeviceIoControl error %#x", __func__, GetLastError());
         }
         return ok;
 }
