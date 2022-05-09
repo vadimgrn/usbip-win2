@@ -367,7 +367,7 @@ NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sy
         WSK_EVENT_CALLBACK_CONTROL r{ &NPI_WSK_INTERFACE_ID, EventMask };
 
         return control(sock, WskSetOption, SO_WSK_EVENT_CALLBACK, SOL_SOCKET, 
-                       sizeof(r), &r, 0, nullptr, nullptr, true, nullptr);
+                       sizeof(r), &r, 0, nullptr, nullptr, sync_disable, nullptr);
 }
 
 NTSTATUS wsk::close(_In_ SOCKET *sock)
