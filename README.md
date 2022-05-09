@@ -173,10 +173,10 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
 
 ## Obtaining USBIP log on Linux
 ```
-killall usbipd
-modprobe -r usbip-host usbip-vudc vhci-hcd usbip-core
-modprobe usbip-core usbip_debug_flag=0xFFFFFFFF
-modprobe -a usbip-host usbip-vudc vhci-hcd
-usbipd -D
+sudo killall usbipd
+sudo modprobe -r usbip-host usbip-vudc vhci-hcd usbip-core
+sudo modprobe usbip-core usbip_debug_flag=0xFFFFFFFF
+sudo modprobe -a usbip-host usbip-vudc vhci-hcd
+sudo usbipd -D
 dmesg --follow | tee ~/usbip.log
 ```

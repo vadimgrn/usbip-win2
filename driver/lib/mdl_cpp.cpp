@@ -9,12 +9,35 @@ usbip::Mdl::Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress
 {
 }
 
-usbip::Mdl::~Mdl()
+usbip::Mdl::Mdl(Mdl&& m) :
+        m_mdl(m.release()),
+        m_paged(m.m_paged)
+{
+}
+
+auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
+{
+        auto pool = m.m_paged ? memory::paged : memory::nonpaged;
+        reset(m.release(), pool);
+        return *this;
+}
+
+MDL* usbip::Mdl::release()
+{
+        auto m = m_mdl;
+        m_mdl = nullptr;
+        return m;
+}
+
+void usbip::Mdl::reset(_In_ MDL *mdl, _In_ memory pool)
 {
         if (m_mdl) {
                 unprepare();
                 IoFreeMdl(m_mdl);
         }
+
+        m_mdl = mdl;
+        m_paged = pool == memory::paged;
 }
 
 NTSTATUS usbip::Mdl::lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation)
@@ -44,13 +67,11 @@ void usbip::Mdl::unlock()
         }
 }
 
-usbip::Mdl& usbip::Mdl::next(_Inout_ Mdl &m)
+void usbip::Mdl::next(_In_ MDL *m)
 { 
         if (m_mdl) {
-                m_mdl->Next = m.get(); 
+                m_mdl->Next = m; 
         }
-
-        return m;
 }
 
 NTSTATUS usbip::Mdl::prepare_nonpaged()

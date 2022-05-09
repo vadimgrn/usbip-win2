@@ -17,8 +17,18 @@ class Mdl
 {
         enum { DEF_ACCESS_MODE = KernelMode };
 public:
+        Mdl() = default;
         Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
-        ~Mdl();
+        ~Mdl() { reset(); }
+
+        Mdl(const Mdl&) = delete;
+        Mdl& operator =(const Mdl&) = delete;
+
+        Mdl(Mdl&& m);
+        Mdl& operator =(Mdl&& m);
+
+        MDL *release();
+        void reset() { reset(nullptr, memory::nonpaged); }
 
         explicit operator bool() const { return m_mdl; }
         auto operator !() const { return !m_mdl; }
@@ -30,7 +40,8 @@ public:
         auto size() const { return m_mdl ? MmGetMdlByteCount(m_mdl) : 0; }
 
         auto next() const { return m_mdl ? m_mdl->Next : nullptr; }
-        Mdl& next(_Inout_ Mdl &m);
+        void next(_In_ MDL *m);
+        auto& next(_Inout_ Mdl &m) { next(m.get()); return m; }
 
         NTSTATUS prepare_nonpaged();
         NTSTATUS prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
@@ -46,6 +57,8 @@ public:
 private:
         MDL *m_mdl{};
         bool m_paged{};
+
+        void reset(_In_ MDL *mdl, _In_ memory pool);
 
         NTSTATUS lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
         auto locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }
