@@ -4,34 +4,34 @@
 
 #include "usbip_proto_op.h"
 
-bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
+NTSTATUS usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
 {
         Mdl mdl(pool, data, len);
-        if (mdl.prepare(IoReadAccess)) {
-                return false;
+        if (auto err = mdl.prepare(IoReadAccess)) {
+                return err;
         }
 
         WSK_BUF buf{ mdl.get(), 0, len };
-        return !send(sock, &buf, WSK_FLAG_NODELAY);
+        return send(sock, &buf, WSK_FLAG_NODELAY);
 }
 
-bool usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
+NTSTATUS usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
 {
         Mdl mdl(pool, data, len);
-        if (mdl.prepare(IoWriteAccess)) {
-                return false;
+        if (auto err = mdl.prepare(IoWriteAccess)) {
+                return err;
         }
 
         WSK_BUF buf{ mdl.get(), 0, len };
-        return !receive(sock, &buf, WSK_FLAG_WAITALL);
+        return receive(sock, &buf, WSK_FLAG_WAITALL);
 }
 
 err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t &status)
 {
         op_common r;
 
-        if (!recv(sock, memory::stack, &r, sizeof(r))) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to receive struct op_common");
+        if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
+                Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
                 return ERR_NETWORK;
         }
 

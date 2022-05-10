@@ -213,8 +213,8 @@ PAGEABLE auto recv_rep_import(vpdo_dev_t &vpdo, usbip::memory pool, op_import_re
                 return make_error(ERR_NONE, status);
         }
 
-        if (!recv(vpdo.sock, pool, &reply, sizeof(reply))) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to receive struct op_import_reply");
+        if (auto err = recv(vpdo.sock, pool, &reply, sizeof(reply))) {
+                Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }
 
@@ -262,13 +262,13 @@ PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBuffer
 
         byteswap_header(hdr, swap_dir::host2net);
 
-        if (!send(vpdo.sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
-                Trace(TRACE_LEVEL_ERROR, "Send header error: %!usb_descriptor_type!", type);
+        if (auto err = send(vpdo.sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
+                Trace(TRACE_LEVEL_ERROR, "Send header of %!usb_descriptor_type! %!STATUS!", type, err);
                 return ERR_NETWORK;
         }
 
-        if (!recv(vpdo.sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
-                Trace(TRACE_LEVEL_ERROR, "Recv header error: %!usb_descriptor_type!", type);
+        if (auto err = recv(vpdo.sock, usbip::memory::stack, &hdr, sizeof(hdr))) {
+                Trace(TRACE_LEVEL_ERROR, "Recv header of %!usb_descriptor_type! %!STATUS!", type, err);
                 return ERR_NETWORK;
         }
 
@@ -292,7 +292,12 @@ PAGEABLE auto read_descr(vpdo_dev_t &vpdo, UCHAR type, usbip::memory pool, void 
                 return err;
         }
 
-        return recv(vpdo.sock, pool, dest, len) ? ERR_NONE : ERR_NETWORK;
+        if (auto err = recv(vpdo.sock, pool, dest, len)) {
+                Trace(TRACE_LEVEL_ERROR, "%!usb_descriptor_type!, length %d -> %!STATUS!", type, len, err);
+                return ERR_NETWORK;
+        }
+
+        return ERR_NONE;
 }
 
 PAGEABLE auto read_device_descr(vpdo_dev_t &vpdo)
@@ -382,8 +387,8 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
-        if (!send_req_import(vpdo)) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to send OP_REQ_IMPORT");
+        if (auto err = send_req_import(vpdo)) {
+                Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }
 
