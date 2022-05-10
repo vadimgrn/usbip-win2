@@ -78,27 +78,26 @@ void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, const IRP *irp)
                 ptr4log(irp), pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 }
 
-auto make_buffer_mdl(usbip::Mdl &mdl, URB &urb, usbip::Mdl &hdr)
+auto make_buffer_mdl(usbip::Mdl &mdl, URB &urb)
 {
-        mdl.reset();
-
+        auto err = STATUS_INVALID_PARAMETER;
         auto r = AsUrbTransfer(&urb);
-        if (!r->TransferBufferLength) { // should never happen
-                return STATUS_INVALID_BUFFER_SIZE;
-        }
 
-        if (auto buf = r->TransferBuffer) {
+        if (!r->TransferBufferLength) {
+                // should never happen
+        } else if (auto buf = r->TransferBuffer) {
                 mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
-                if (auto err = mdl.prepare_nonpaged()) {
-                        mdl.reset();
-                        return err;
-                }
-        } else if (!(r->TransferBufferMDL && MmGetMdlByteCount(r->TransferBufferMDL) == r->TransferBufferLength)) { // should never happen
-                return STATUS_INVALID_PARAMETER;
+                err = mdl.prepare_nonpaged();
+        } else if (auto m = r->TransferBufferMDL) {
+                mdl = usbip::Mdl(m);
+                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
         }
 
-        hdr.next(mdl ? mdl.get() : r->TransferBufferMDL); // result
-        return STATUS_SUCCESS;
+        if (err) {
+                mdl.reset();
+        }
+
+        return err;
 }
 
 auto assign(ULONG &TransferBufferLength, int actual_length)
@@ -111,27 +110,26 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
         return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
-auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr, bool dir_in)
+auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr)
 {
-        auto r = AsUrbTransfer(&urb);
-        auto seqnum = hdr.base.seqnum;
-
         usbip::Mdl mdl_hdr(usbip::memory::stack, &hdr, sizeof(hdr));
-
-        if (auto err = mdl_hdr.prepare(IoReadAccess)) {
+        if (auto err = mdl_hdr.prepare(IoModifyAccess)) {
                 Trace(TRACE_LEVEL_ERROR, "Read prepare %!STATUS!", err);
                 return err;
         }
 
-        usbip::Mdl dummy;
-        if (auto err = make_buffer_mdl(dummy, urb, mdl_hdr)) {
+        usbip::Mdl mdl_buf;
+        if (auto err = make_buffer_mdl(mdl_buf, urb)) {
                 Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
                 return err;
         }
 
-        auto mdl_data = mdl_hdr.next();
-        if (dir_in) {
-                mdl_hdr.next(nullptr);
+        auto &base = hdr.base;
+        auto seqnum = base.seqnum;
+        auto direction = base.direction;
+
+        if (direction == USBIP_DIR_OUT) {
+                mdl_hdr.next(mdl_buf);
         }
 
         debug(hdr, mdl_hdr, irp);
@@ -150,14 +148,7 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr, bool dir
                 return STATUS_UNSUCCESSFUL;
         }
 
-        //
-
-        mdl_hdr.unprepare();
-
-        if (auto err = mdl_hdr.prepare(IoWriteAccess)) {
-                Trace(TRACE_LEVEL_ERROR, "Write prepare %!STATUS!", err);
-                return err;
-        }
+        // receive header
 
         mdl_hdr.next(nullptr);
         buf.Length = mdl_hdr.size();
@@ -174,8 +165,7 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr, bool dir
 
         byteswap_header(hdr, swap_dir::net2host);
 
-        auto &base = hdr.base;
-        base.direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT; // restore
+        base.direction = direction; // restore
 
         {
                 char buff[DBG_USBIP_HDR_BUFSZ];
@@ -183,28 +173,26 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr, bool dir
                         ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buff, sizeof(buff), &hdr));
         }
 
-
         if (!(base.command == USBIP_RET_SUBMIT && base.seqnum == seqnum)) {
                 Trace(TRACE_LEVEL_ERROR, "%!usbip_request_type!, seqnum %u", base.command, base.seqnum);
                 return STATUS_UNSUCCESSFUL;
         }
 
-        auto &ret_submit = hdr.u.ret_submit;
 
         {
-                auto err = ret_submit.status;
-                urb.UrbHeader.Status = err ? to_windows_status(err) : USBD_STATUS_SUCCESS;
-        }
+                auto &r = hdr.u.ret_submit;
+                urb.UrbHeader.Status = r.status ? to_windows_status(r.status) : USBD_STATUS_SUCCESS;
 
-        {
-                auto err = assign(r->TransferBufferLength, ret_submit.actual_length);
-                if (err || !dir_in) { 
+                auto err = assign(AsUrbTransfer(&urb)->TransferBufferLength, r.actual_length);
+                if (err || direction == USBIP_DIR_OUT) { 
                         return err;
                 }
         }
 
-        buf.Mdl = mdl_data;
-        buf.Length = MmGetMdlByteCount(mdl_data); // r->TransferBufferLength
+        // receive data
+
+        buf.Mdl = mdl_buf.get();
+        buf.Length = mdl_buf.size(); // TransferBufferLength
 
         if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL, actual)) {
                 Trace(TRACE_LEVEL_ERROR, "Receive data %!STATUS!", err);
@@ -216,9 +204,7 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr, bool dir
                 return STATUS_UNSUCCESSFUL;
         }
 
-        TraceUrb("%!BIN!", WppBinary(MmGetSystemAddressForMdlSafe(mdl_data, LowPagePriority),
-                static_cast<USHORT>(buf.Length)));
-
+        TraceUrb("%!BIN!", WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(mdl_buf.size())));
         return STATUS_SUCCESS;
 }
 
@@ -631,7 +617,7 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB &ur
         pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-        return send_recv(vpdo, irp, urb, hdr, dir_in);
+        return send_recv(vpdo, irp, urb, hdr);
 }
 
 PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
