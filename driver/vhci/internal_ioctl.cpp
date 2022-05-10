@@ -7,14 +7,11 @@
 #include "irp.h"
 #include "csq.h"
 #include "proto.h"
-#include "ch9.h"
 #include "ch11.h"
 #include "usb_util.h"
 #include "urbtransfer.h"
 #include "usbd_helper.h"
-#include "pdu.h"
-#include "mdl_cpp.h"
-#include "wsk_cpp.h"
+#include "usbip_network.h"
 
 namespace
 {
@@ -66,130 +63,10 @@ const void *get_urb_buffer(void *buf, MDL *mdl)
         return buf;
 }
 
-void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, bool send)
-{
-        auto pdu_sz = get_total_size(hdr);
-
-        [[maybe_unused]] auto buf_sz = size(mdl_hdr);
-        NT_ASSERT(buf_sz == sizeof(hdr) || buf_sz == pdu_sz);
-
-        char buf[DBG_USBIP_HDR_BUFSZ];
-        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "%s %Iu%s", 
-                send ? "OUT" : "IN", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
-}
-
-auto make_buffer_mdl(usbip::Mdl &mdl, URB &urb)
-{
-        auto err = STATUS_INVALID_PARAMETER;
-        auto r = AsUrbTransfer(&urb);
-
-        if (!r->TransferBufferLength) {
-                // should never happen
-        } else if (auto buf = r->TransferBuffer) {
-                mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
-                err = mdl.prepare_nonpaged();
-        } else if (auto m = r->TransferBufferMDL) {
-                mdl = usbip::Mdl(m);
-                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
-        }
-
-        if (err) {
-                mdl.reset();
-        }
-
-        return err;
-}
-
-auto assign(ULONG &TransferBufferLength, int actual_length)
-{
-        PAGED_CODE();
-
-        bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
-        TransferBufferLength = ok ? actual_length : 0;
-
-        return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
-}
-
-auto send_recv(vpdo_dev_t *vpdo, URB &urb, usbip_header &hdr)
-{
-        usbip::Mdl mdl_hdr(usbip::memory::stack, &hdr, sizeof(hdr));
-        if (auto err = mdl_hdr.prepare(IoModifyAccess)) {
-                Trace(TRACE_LEVEL_ERROR, "Read prepare %!STATUS!", err);
-                return err;
-        }
-
-        usbip::Mdl mdl_buf;
-        if (auto err = make_buffer_mdl(mdl_buf, urb)) {
-                Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
-                return err;
-        }
-
-        auto &base = hdr.base;
-        auto seqnum = base.seqnum;
-        auto direction = base.direction;
-
-        if (direction == USBIP_DIR_OUT) {
-                mdl_hdr.next(mdl_buf);
-        }
-
-        debug(hdr, mdl_hdr, true);
-        byteswap_header(hdr, swap_dir::host2net);
-
-        WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
-
-        if (auto err = send(vpdo->sock, &buf, WSK_FLAG_NODELAY)) {
-                Trace(TRACE_LEVEL_ERROR, "Send %!STATUS!", err);
-                return err;
-        }
-
-        // receive header
-
-        mdl_hdr.next(nullptr);
-        buf.Length = mdl_hdr.size();
-
-        if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL)) {
-                Trace(TRACE_LEVEL_ERROR, "Receive usbip_header: %!STATUS!", err);
-                return err;
-        }
-
-        byteswap_header(hdr, swap_dir::net2host);
-
-        base.direction = direction; // restore
-        debug(hdr, mdl_hdr, false);
-
-        if (!(base.command == USBIP_RET_SUBMIT && base.seqnum == seqnum)) {
-                Trace(TRACE_LEVEL_ERROR, "%!usbip_request_type!, seqnum %u", base.command, base.seqnum);
-                return STATUS_UNSUCCESSFUL;
-        }
-
-        {
-                auto &r = hdr.u.ret_submit;
-                urb.UrbHeader.Status = r.status ? to_windows_status(r.status) : USBD_STATUS_SUCCESS;
-
-                auto err = assign(AsUrbTransfer(&urb)->TransferBufferLength, r.actual_length);
-                if (err || direction == USBIP_DIR_OUT) { 
-                        return err;
-                }
-        }
-
-        // receive buffer
-
-        buf.Mdl = mdl_buf.get();
-        buf.Length = mdl_buf.size(); // TransferBufferLength
-
-        if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL)) {
-                Trace(TRACE_LEVEL_ERROR, "Receive buffer %!STATUS!", err);
-                return err;
-        }
-
-        TraceUrb("%!BIN!", WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(mdl_buf.size())));
-        return STATUS_SUCCESS;
-}
-
 /*
-* PAGED_CODE() fails.
-* USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
-*/
+ * PAGED_CODE() fails.
+ * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
+ */
 NTSTATUS do_copy_payload(void *dst_buf, const _URB_ISOCH_TRANSFER &r, ULONG *transferred)
 {
         NT_ASSERT(dst_buf);
@@ -570,14 +447,14 @@ PAGEABLE NTSTATUS class_other(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
-PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
+PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, URB &urb, bool dir_in, UCHAR recipient)
 {
         PAGED_CODE();
 
         auto &r = urb.UrbControlDescriptorRequest;
 
-        TraceUrb("irp %04x -> %s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
-                ptr4log(irp), urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
+        TraceUrb("%s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
+                urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
                 r.Index, r.DescriptorType, r.LanguageId);
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | 
@@ -595,37 +472,37 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB &ur
         pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-        return send_recv(vpdo, urb, hdr);
+        return usbip::send_recv_cmd(vpdo->sock, urb, hdr);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
+PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP*, URB &urb)
 {
-        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
+        return control_descriptor_request(vpdo, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
+PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t *vpdo, IRP*, URB &urb)
 {
-        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
+        return control_descriptor_request(vpdo, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
+PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t *vpdo, IRP*, URB &urb)
 {
-        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
+        return control_descriptor_request(vpdo, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
+PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t *vpdo, IRP*, URB &urb)
 {
-        return control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
+        return control_descriptor_request(vpdo, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
+PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t *vpdo, IRP*, URB &urb)
 {
-        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
+        return control_descriptor_request(vpdo, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
+PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t *vpdo, IRP*, URB &urb)
 {
-        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
+        return control_descriptor_request(vpdo, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
 PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t *vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
