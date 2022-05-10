@@ -66,16 +66,16 @@ const void *get_urb_buffer(void *buf, MDL *mdl)
         return buf;
 }
 
-void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, const IRP *irp)
+void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, bool send)
 {
         auto pdu_sz = get_total_size(hdr);
 
         [[maybe_unused]] auto buf_sz = size(mdl_hdr);
-        NT_ASSERT(buf_sz == sizeof(hdr) || (buf_sz > sizeof(hdr) && buf_sz == pdu_sz));
+        NT_ASSERT(buf_sz == sizeof(hdr) || buf_sz == pdu_sz);
 
         char buf[DBG_USBIP_HDR_BUFSZ];
-        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                ptr4log(irp), pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "%s %Iu%s", 
+                send ? "OUT" : "IN", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 }
 
 auto make_buffer_mdl(usbip::Mdl &mdl, URB &urb)
@@ -110,7 +110,7 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
         return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
-auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr)
+auto send_recv(vpdo_dev_t *vpdo, URB &urb, usbip_header &hdr)
 {
         usbip::Mdl mdl_hdr(usbip::memory::stack, &hdr, sizeof(hdr));
         if (auto err = mdl_hdr.prepare(IoModifyAccess)) {
@@ -132,20 +132,14 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr)
                 mdl_hdr.next(mdl_buf);
         }
 
-        debug(hdr, mdl_hdr, irp);
+        debug(hdr, mdl_hdr, true);
         byteswap_header(hdr, swap_dir::host2net);
 
-        SIZE_T actual = 0;
         WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
 
-        if (auto err = send(vpdo->sock, &buf, WSK_FLAG_NODELAY, actual)) {
+        if (auto err = send(vpdo->sock, &buf, WSK_FLAG_NODELAY)) {
                 Trace(TRACE_LEVEL_ERROR, "Send %!STATUS!", err);
                 return err;
-        }
-
-        if (actual != buf.Length) {
-                Trace(TRACE_LEVEL_ERROR, "Send: actual %Iu != total %Iu", actual, buf.Length);
-                return STATUS_UNSUCCESSFUL;
         }
 
         // receive header
@@ -153,31 +147,20 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr)
         mdl_hdr.next(nullptr);
         buf.Length = mdl_hdr.size();
 
-        if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL, actual)) {
+        if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL)) {
                 Trace(TRACE_LEVEL_ERROR, "Receive usbip_header: %!STATUS!", err);
                 return err;
-        }
-
-        if (actual != buf.Length) {
-                Trace(TRACE_LEVEL_ERROR, "Receive usbip_header: actual %Iu != total %Iu", actual, buf.Length);
-                return STATUS_UNSUCCESSFUL;
         }
 
         byteswap_header(hdr, swap_dir::net2host);
 
         base.direction = direction; // restore
-
-        {
-                char buff[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-                        ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buff, sizeof(buff), &hdr));
-        }
+        debug(hdr, mdl_hdr, false);
 
         if (!(base.command == USBIP_RET_SUBMIT && base.seqnum == seqnum)) {
                 Trace(TRACE_LEVEL_ERROR, "%!usbip_request_type!, seqnum %u", base.command, base.seqnum);
                 return STATUS_UNSUCCESSFUL;
         }
-
 
         {
                 auto &r = hdr.u.ret_submit;
@@ -189,19 +172,14 @@ auto send_recv(vpdo_dev_t *vpdo, IRP *irp, URB &urb, usbip_header &hdr)
                 }
         }
 
-        // receive data
+        // receive buffer
 
         buf.Mdl = mdl_buf.get();
         buf.Length = mdl_buf.size(); // TransferBufferLength
 
-        if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL, actual)) {
-                Trace(TRACE_LEVEL_ERROR, "Receive data %!STATUS!", err);
+        if (auto err = receive(vpdo->sock, &buf, WSK_FLAG_WAITALL)) {
+                Trace(TRACE_LEVEL_ERROR, "Receive buffer %!STATUS!", err);
                 return err;
-        }
-
-        if (actual != buf.Length) {
-                Trace(TRACE_LEVEL_ERROR, "Receive data: actual %Iu != total %Iu", actual, buf.Length);
-                return STATUS_UNSUCCESSFUL;
         }
 
         TraceUrb("%!BIN!", WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(mdl_buf.size())));
@@ -617,7 +595,7 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB &ur
         pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-        return send_recv(vpdo, irp, urb, hdr);
+        return send_recv(vpdo, urb, hdr);
 }
 
 PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP *irp, URB &urb)

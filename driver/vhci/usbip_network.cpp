@@ -12,12 +12,7 @@ bool usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
         }
 
         WSK_BUF buf{ mdl.get(), 0, len };
-
-        SIZE_T actual = 0;
-        auto err = send(sock, &buf, WSK_FLAG_NODELAY, actual);
-
-        mdl.unprepare();
-        return !err && actual == len;
+        return !send(sock, &buf, WSK_FLAG_NODELAY);
 }
 
 bool usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
@@ -28,12 +23,7 @@ bool usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
         }
 
         WSK_BUF buf{ mdl.get(), 0, len };
-
-        SIZE_T actual = 0;
-        auto err = receive(sock, &buf, WSK_FLAG_WAITALL, actual);
-
-        mdl.unprepare();
-        return !err && actual == len;
+        return !receive(sock, &buf, WSK_FLAG_WAITALL);
 }
 
 err_t usbip::recv_op_common(SOCKET *sock, UINT16 expected_code, op_status_t &status)

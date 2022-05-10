@@ -201,8 +201,55 @@ auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, si
 
 }
 
+auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, bool send)
+{
+        auto &ctx = sock->ctx;
+        ctx.reset();
+
+        auto f = send ? sock->Connection->WskSend : sock->Connection->WskReceive; 
+
+        auto err = f(sock->Self, buffer, flags, ctx.irp());
+        ctx.wait_for_completion(err);
+
+        actual = err ? 0 : ctx.irp()->IoStatus.Information;
+        return err;
+}
+
 } // namespace
 
+
+NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual)
+{
+        SIZE_T sent = 0;
+        auto err = transfer(sock, buffer, flags, sent, true);
+        
+        if (actual) {
+                *actual = sent;
+        } else {
+                NT_ASSERT(err || sent == buffer->Length);
+        }
+
+        return err;
+}
+
+NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual)
+{
+        bool wait_all = flags & WSK_FLAG_WAITALL;
+        if (!(wait_all || actual)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        SIZE_T received = 0;
+        auto err = transfer(sock, buffer, flags, received, false);
+
+        if (actual) {
+                *actual = received;
+        } else {
+                NT_ASSERT(err || received == buffer->Length);
+        }
+
+        return err;
+}
 
 NTSTATUS wsk::getaddrinfo(
         _Out_ ADDRINFOEXW* &Result,
@@ -415,20 +462,6 @@ NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_ ULONG
 NTSTATUS wsk::release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication)
 {
         return sock->Connection->WskRelease(sock->Self, DataIndication);
-}
-
-NTSTATUS wsk::transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, bool send)
-{
-        auto &ctx = sock->ctx;
-        ctx.reset();
-
-        auto f = send ? sock->Connection->WskSend : sock->Connection->WskReceive; 
-
-        auto err = f(sock->Self, buffer, flags, ctx.irp());
-        ctx.wait_for_completion(err);
-
-        actual = err ? 0 : ctx.irp()->IoStatus.Information;
-        return err;
 }
 
 NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress)
