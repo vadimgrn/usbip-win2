@@ -89,8 +89,14 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
         if (m_paged) {
                 return STATUS_INVALID_DEVICE_REQUEST;
         }
-        
+
+        if (nonpaged_prepared()) {
+                return STATUS_ALREADY_COMPLETE;
+        }
+
         MmBuildMdlForNonPagedPool(m_mdl);
+        NT_ASSERT(nonpaged_prepared());
+
         return STATUS_SUCCESS;
 }
 

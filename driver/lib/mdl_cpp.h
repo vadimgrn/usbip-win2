@@ -62,11 +62,12 @@ private:
         void reset(_In_ MDL *mdl, _In_ int paged);
 
         NTSTATUS lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
-        auto locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }
+        bool locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }
         void unlock();
 
         void do_unprepare();
         void unprepare_nonpaged() {} // no "undo" operation is required for MmBuildMdlForNonPagedPool
+        bool nonpaged_prepared() const { return m_mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL; }
 };
 
 
