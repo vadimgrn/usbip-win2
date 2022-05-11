@@ -12,6 +12,7 @@
 #include "urbtransfer.h"
 #include "usbd_helper.h"
 #include "usbip_network.h"
+#include "pdu.h"
 
 namespace
 {
@@ -1123,6 +1124,45 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
         return CompleteRequest(irp, status);
 }
 
+auto copy(_Out_ void *dest, _In_ size_t len, _In_ const WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated)
+{
+        NT_ASSERT(DataIndication);
+        
+        if (BytesIndicated < len) {
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        for (auto i = DataIndication; i && len; i = i->Next) {
+
+                auto &buf = i->Buffer;
+                auto list_sz = usbip::size(buf.Mdl);
+
+                Trace(TRACE_LEVEL_VERBOSE, "WSK_BUF: Offset %lu, Length %Iu, list size %Iu", buf.Offset, buf.Length, list_sz);
+                NT_ASSERT(list_sz == buf.Offset + buf.Length);
+
+                if (!buf.Length) {
+                        continue;
+                }
+
+                auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, NormalPagePriority | MdlMappingNoWrite | MdlMappingNoExecute);
+                if (!sysaddr) {
+                        return STATUS_INSUFFICIENT_RESOURCES;
+                }
+
+                sysaddr += buf.Offset;
+                list_sz -= buf.Offset;
+
+                if (auto n = min(len, list_sz)) {
+                        RtlCopyMemory(dest, sysaddr, n);
+                        dest = static_cast<char*>(dest) + n;
+                        len -= n;
+                }
+        }
+
+        NT_ASSERT(!len);
+        return STATUS_SUCCESS;
+}
+
 } // namespace
 
 
@@ -1175,18 +1215,29 @@ NTSTATUS WskReceiveEvent(
 {
         auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
 
-        TraceCall("vpdo %p, Flags %#x, DataIndication %p, BytesIndicated %Iu", vpdo, Flags, DataIndication, BytesIndicated);
-
-        for (auto i = DataIndication; i; i = i->Next) {
-                auto &buf = i->Buffer;
-                TraceCall("WSK_BUF: Offset %lu, Length %Iu, Total %Iu", buf.Offset, buf.Length, usbip::size(buf.Mdl));
-                for (auto cur = buf.Mdl; cur; cur = cur->Next) {
-                        TraceCall("MDL(%p): size %lu", cur, MmGetMdlByteCount(cur));
-                }
+        {
+                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
+                Trace(TRACE_LEVEL_VERBOSE, "vpdo %p, [%s], BytesIndicated %Iu", 
+                        vpdo, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), BytesIndicated);
         }
 
-        *BytesAccepted = 0;
-        return STATUS_NOT_IMPLEMENTED;
+        if (!DataIndication) { // the socket is no longer functional and must be closed ASAP
+                return STATUS_SUCCESS;
+        }
+
+        usbip_header hdr;
+
+        if (auto err = copy(&hdr, sizeof(hdr), DataIndication, BytesIndicated)) {
+                Trace(TRACE_LEVEL_VERBOSE, "Copy header error %!STATUS!", err); 
+                return STATUS_DATA_NOT_ACCEPTED;
+        } else {
+                byteswap_header(hdr, swap_dir::net2host);
+                char buf[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+        }
+
+        *BytesAccepted += sizeof(hdr);
+        return STATUS_SUCCESS;
 }
 
 /*

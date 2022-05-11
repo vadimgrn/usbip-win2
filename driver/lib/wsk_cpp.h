@@ -45,6 +45,7 @@ NTSTATUS control(
         _Out_opt_ SIZE_T *OutputSizeReturnedIrp);
 
 NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sync_disable);
+NTSTATUS resume_receive_event(_In_ SOCKET *sock);
 
 NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
 NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress);
@@ -83,5 +84,8 @@ using addrinfo_f = NTSTATUS (SOCKET *sock, const ADDRINFOEXW &ai, void *ctx);
 SOCKET *for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
         _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _In_opt_ void *ctx);
+
+enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
+const char *ReceiveEventFlags(char *buf, size_t len, ULONG Flags);
 
 } // namespace wsk

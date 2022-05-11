@@ -1,6 +1,7 @@
 #include <ntddk.h>
 #include "wsk_cpp.h"
 #include <wdm.h>
+#include <ntstrsafe.h>
 
 /*
 * @see https://github.com/wbenny/KSOCKET
@@ -417,6 +418,12 @@ NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sy
                        sizeof(r), &r, 0, nullptr, nullptr, sync_disable, nullptr);
 }
 
+NTSTATUS wsk::resume_receive_event(_In_ SOCKET *sock)
+{
+        WSK_BUF buf{};
+        return receive(sock, &buf, 0); 
+}
+
 NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
         if (!sock) {
@@ -590,4 +597,14 @@ void wsk::shutdown()
 WSK_PROVIDER_NPI* wsk::GetProviderNPI()
 {
         return GetProviderNPIOnce();
+}
+
+const char* wsk::ReceiveEventFlags(char *buf, size_t len, ULONG Flags)
+{
+        auto st = RtlStringCbPrintfA(buf, len, "%s%s%s",
+                                        Flags & WSK_FLAG_RELEASE_ASAP ? ":RELEASE_ASAP" : "",
+                                        Flags & WSK_FLAG_ENTIRE_MESSAGE ? ":ENTIRE_MESSAGE" : "",
+                                        Flags & WSK_FLAG_AT_DISPATCH_LEVEL ? ":AT_DISPATCH_LEVEL" : "");
+
+        return st != STATUS_INVALID_PARAMETER ? buf : "ReceiveEventFlags invalid parameter";
 }
