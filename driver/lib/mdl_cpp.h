@@ -71,7 +71,8 @@ private:
 };
 
 
-size_t size(_In_ const Mdl &head);
+size_t size(_In_ const MDL *head);
+inline auto size(_In_ const Mdl &head) { return size(head.get()); }
 
 inline auto& operator +=(_Inout_ Mdl &left, _Inout_ Mdl &right)
 { 

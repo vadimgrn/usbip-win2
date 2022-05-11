@@ -47,11 +47,11 @@ void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, bool send)
 
 auto make_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ URB &urb)
 {
-        auto err = STATUS_INVALID_PARAMETER;
+        auto err = STATUS_SUCCESS;
         auto r = AsUrbTransfer(&urb);
 
         if (!r->TransferBufferLength) {
-                // should never happen
+                mdl.reset();
         } else if (auto buf = r->TransferBuffer) {
                 mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
                 err = mdl.prepare_nonpaged();
@@ -67,40 +67,7 @@ auto make_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ URB &urb)
         return err;
 }
 
-auto send_cmd(_In_ wsk::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, 
-        _Out_ usbip::Mdl &mdl_hdr, _Out_ usbip::Mdl &mdl_buf)
-{
-        mdl_hdr = usbip::Mdl(usbip::memory::stack, &hdr, sizeof(hdr));
-
-        if (auto err = mdl_hdr.prepare(IoModifyAccess)) {
-                Trace(TRACE_LEVEL_ERROR, "Prepare usbip_header %!STATUS!", err);
-                return err;
-        }
-
-        if (auto err = make_buffer_mdl(mdl_buf, urb)) {
-                Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
-                return err;
-        }
-
-        if (hdr.base.direction == USBIP_DIR_OUT) {
-                mdl_hdr.next(mdl_buf);
-        }
-
-        debug(hdr, mdl_hdr, true);
-        byteswap_header(hdr, swap_dir::host2net);
-
-        WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
-
-        if (auto err = send(sock, &buf, WSK_FLAG_NODELAY)) {
-                Trace(TRACE_LEVEL_ERROR, "Send %!STATUS!", err);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
-auto recv_ret_submit_buffer(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr, 
-        _Inout_ usbip::Mdl &mdl_buf)
+auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
 {
         auto &base = hdr.base;
         NT_ASSERT(base.command == USBIP_RET_SUBMIT);
@@ -112,7 +79,7 @@ auto recv_ret_submit_buffer(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_
                 urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
                 auto err = assign(tr->TransferBufferLength, ret.actual_length);
-                if (err || base.direction == USBIP_DIR_OUT) { 
+                if (err || base.direction == USBIP_DIR_OUT || !tr->TransferBufferLength) { 
                         return err;
                 }
         }
@@ -179,6 +146,38 @@ err_t usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ 
         return ERR_NONE;
 }
 
+NTSTATUS usbip::send_cmd(
+        _In_ SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Out_ Mdl &mdl_hdr, _Out_ Mdl &mdl_buf)
+{
+        mdl_hdr = Mdl(memory::stack, &hdr, sizeof(hdr));
+
+        if (auto err = mdl_hdr.prepare(IoModifyAccess)) {
+                Trace(TRACE_LEVEL_ERROR, "Prepare usbip_header %!STATUS!", err);
+                return err;
+        }
+
+        if (auto err = make_buffer_mdl(mdl_buf, urb)) {
+                Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                return err;
+        }
+
+        if (hdr.base.direction == USBIP_DIR_OUT) {
+                mdl_hdr.next(mdl_buf);
+        }
+
+        debug(hdr, mdl_hdr, true);
+        byteswap_header(hdr, swap_dir::host2net);
+
+        WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
+
+        if (auto err = send(sock, &buf, WSK_FLAG_NODELAY)) {
+                Trace(TRACE_LEVEL_ERROR, "Send %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
 NTSTATUS usbip::send_recv_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr)
 {
         auto &base = hdr.base;
@@ -212,5 +211,5 @@ NTSTATUS usbip::send_recv_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbi
                 return STATUS_UNSUCCESSFUL;
         }
 
-        return base.command == USBIP_RET_SUBMIT ? recv_ret_submit_buffer(sock, urb, hdr, mdl_buf) : STATUS_SUCCESS;
+        return base.command == USBIP_RET_SUBMIT ? recv_ret_submit(sock, urb, hdr, mdl_buf) : STATUS_SUCCESS;
 }

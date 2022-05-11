@@ -472,7 +472,12 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, URB &urb, bool di
         pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-        return usbip::send_recv_cmd(vpdo->sock, urb, hdr);
+//      return usbip::send_recv_cmd(vpdo->sock, urb, hdr);
+
+        usbip::Mdl mdl_hdr;
+        usbip::Mdl mdl_buf;
+
+        return usbip::send_cmd(vpdo->sock, urb, hdr, mdl_hdr, mdl_buf);
 }
 
 PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP*, URB &urb)
@@ -1158,6 +1163,39 @@ NTSTATUS send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
         set_seqnum_unlink(irp, seqnum);
         send_to_server(vpdo, irp);
 
+        return STATUS_SUCCESS;
+}
+
+/*
+ * PFN_WSK_RECEIVE_EVENT 
+ */
+NTSTATUS WskReceiveEvent(
+        _In_opt_ PVOID SocketContext, _In_ ULONG Flags, _In_opt_ WSK_DATA_INDICATION *DataIndication,
+        _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T *BytesAccepted)
+{
+        auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
+
+        TraceCall("vpdo %p, Flags %#x, DataIndication %p, BytesIndicated %Iu", vpdo, Flags, DataIndication, BytesIndicated);
+
+        for (auto i = DataIndication; i; i = i->Next) {
+                auto &buf = i->Buffer;
+                TraceCall("WSK_BUF: Offset %lu, Length %Iu, Total %Iu", buf.Offset, buf.Length, usbip::size(buf.Mdl));
+                for (auto cur = buf.Mdl; cur; cur = cur->Next) {
+                        TraceCall("MDL(%p): size %lu", cur, MmGetMdlByteCount(cur));
+                }
+        }
+
+        *BytesAccepted = 0;
+        return STATUS_NOT_IMPLEMENTED;
+}
+
+/*
+ * PFN_WSK_DISCONNECT_EVENT
+ */
+NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
+{
+        auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
+        TraceCall("vpdo %p, Flags %#x", vpdo, Flags);
         return STATUS_SUCCESS;
 }
 

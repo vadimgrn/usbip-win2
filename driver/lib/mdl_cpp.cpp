@@ -128,11 +128,11 @@ void usbip::Mdl::do_unprepare()
         m_paged ? unlock() : unprepare_nonpaged();
 }
 
-size_t usbip::size(_In_ const Mdl &head)
+size_t usbip::size(_In_ const MDL *head)
 {
         size_t total = 0;
 
-        for (auto cur = head.get(); cur; cur = cur->Next) {
+        for (auto cur = head; cur; cur = cur->Next) {
                 total += MmGetMdlByteCount(cur);
         }
 

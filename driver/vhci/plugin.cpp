@@ -14,6 +14,7 @@
 #include "dbgcommon.h"
 #include "pdu.h"
 #include "strutil.h"
+#include "internal_ioctl.h"
 
 namespace
 {
@@ -403,8 +404,16 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
 
         vpdo.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
 
-        auto err = fetch_descriptors(vpdo, udev);
-        return make_error(err);
+        if (auto err = fetch_descriptors(vpdo, udev)) {
+                return make_error(err);
+        }
+
+        if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_RECEIVE | WSK_EVENT_DISCONNECT, false)) {
+                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+                return make_error(ERR_NETWORK);
+        }
+
+        return make_error(ERR_NONE);
 }
 
 PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t &vpdo)
@@ -497,8 +506,8 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
                 return make_error(ERR_NETWORK);
         }
 
-        static WSK_CLIENT_CONNECTION_DISPATCH dispatch;
-        
+        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ WskReceiveEvent, WskDisconnectEvent };
+
         NT_ASSERT(!vpdo.sock);
         vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &dispatch, ai, try_connect, nullptr);
 
