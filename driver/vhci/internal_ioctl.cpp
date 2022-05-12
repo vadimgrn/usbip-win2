@@ -1236,7 +1236,7 @@ NTSTATUS WskReceiveEvent(
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
         }
 
-        *BytesAccepted += sizeof(hdr);
+        *BytesAccepted = sizeof(hdr);
         return STATUS_SUCCESS;
 }
 

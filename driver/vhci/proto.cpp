@@ -58,7 +58,7 @@ NTSTATUS set_cmd_submit_usbip_header(
 
 	if (auto r = &hdr->base) {
 		r->command = USBIP_CMD_SUBMIT;
-		r->seqnum = next_seqnum(vpdo);
+		r->seqnum = next_seqnum(vpdo, dir_in);
 		r->devid = vpdo->devid;
 		r->direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
 		r->ep = get_endpoint_number(PipeHandle);
@@ -81,9 +81,9 @@ void set_cmd_unlink_usbip_header(vpdo_dev_t *vpdo, usbip_header *hdr, seqnum_t s
 	auto &r = hdr->base;
 
 	r.command = USBIP_CMD_UNLINK;
-	r.seqnum = next_seqnum(vpdo);
 	r.devid = vpdo->devid;
 	r.direction = USBIP_DIR_OUT;
+	r.seqnum = next_seqnum(vpdo, r.direction);
 	r.ep = 0;
 
 	NT_ASSERT(seqnum_unlink);

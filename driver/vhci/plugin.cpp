@@ -278,7 +278,7 @@ PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBuffer
         TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 
         auto &b = hdr.base;
-        if (!(b.command == USBIP_RET_SUBMIT && b.seqnum == vpdo.seqnum)) {
+        if (!(b.command == USBIP_RET_SUBMIT && extract_num(b.seqnum) == vpdo.seqnum)) {
                 return ERR_PROTOCOL;
         }
 

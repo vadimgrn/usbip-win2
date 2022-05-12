@@ -178,7 +178,10 @@ hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
-seqnum_t next_seqnum(vpdo_dev_t *vpdo);
+// first bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN)
+seqnum_t next_seqnum(vpdo_dev_t *vpdo, bool dir_in);
+constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
+constexpr auto extract_dir(seqnum_t seqnum) { return usbip_dir(seqnum & 1); }
 
 inline auto ptr4log(const void *ptr) // use format "%04x"
 {

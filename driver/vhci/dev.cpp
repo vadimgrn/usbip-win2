@@ -5,6 +5,7 @@
 #include "vhci.h"
 #include "irp.h"
 
+#include <limits.h>
 #include <wdmsec.h>
 #include <initguid.h> // required for GUID definitions
 
@@ -129,8 +130,25 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)
 	return vdev->type == VDEV_VPDO ? static_cast<vpdo_dev_t*>(vdev) : nullptr;
 }
 
-seqnum_t next_seqnum(vpdo_dev_t *vpdo)
+/*
+ * Can't be zero. 
+ */
+seqnum_t next_seqnum(vpdo_dev_t *vpdo, bool dir_in)
 {
+	static_assert(!USBIP_DIR_OUT);
+	static_assert(USBIP_DIR_IN);
+
 	auto &val = vpdo->seqnum;
-	return ++val ? val : ++val; // skip zero in case of overflow
+
+	while (true) {
+
+		auto next = (++val << 1) | usbip_dir(dir_in);
+
+		if (next & seqnum_t(1 << (CHAR_BIT*sizeof(next) - 1))) { // overflow
+			val = 0;
+		} else {
+			NT_ASSERT(next >> 1);
+			return next;
+		}
+	}
 }
