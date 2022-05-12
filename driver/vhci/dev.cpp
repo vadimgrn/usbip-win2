@@ -139,16 +139,14 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo, bool dir_in)
 	static_assert(USBIP_DIR_IN);
 
 	auto &val = vpdo->seqnum;
+	const auto leftmost_bit_on = seqnum_t(1 << (CHAR_BIT*sizeof(val) - 1));
 
 	while (true) {
-
-		auto next = (++val << 1) | usbip_dir(dir_in);
-
-		if (next & seqnum_t(1 << (CHAR_BIT*sizeof(next) - 1))) { // overflow
+		if (++val & leftmost_bit_on) {
 			val = 0;
 		} else {
-			NT_ASSERT(next >> 1);
-			return next;
+			NT_ASSERT(val);
+			return (val << 1) | seqnum_t(dir_in);
 		}
 	}
 }

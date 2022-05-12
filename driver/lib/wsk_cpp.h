@@ -88,4 +88,6 @@ SOCKET *for_each(
 enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
 const char *ReceiveEventFlags(char *buf, size_t len, ULONG Flags);
 
+size_t size(const WSK_DATA_INDICATION *di);
+
 } // namespace wsk

@@ -7,7 +7,7 @@
 #include <usb.h>
 
 struct vpdo_dev_t;
-PAGEABLE NTSTATUS init_queues(vpdo_dev_t &vpdo);
+PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo);
 
 inline bool is_initialized(const IO_CSQ &csq)
 {
@@ -17,16 +17,13 @@ inline bool is_initialized(const IO_CSQ &csq)
 constexpr void *InsertTail() { return nullptr; }
 constexpr void *InsertHead() { return InsertTail; }
 
-// for read irp only
-constexpr void *InsertIfRxEmpty() { return InsertHead; }
-
 struct peek_context
 {
 	bool use_seqnum;
 	union {
 		seqnum_t seqnum;
 		USBD_PIPE_HANDLE handle;
-	} u;
+	};
 };
 
 constexpr auto make_peek_context(seqnum_t seqnum)
@@ -38,12 +35,12 @@ inline auto make_peek_context(USBD_PIPE_HANDLE handle)
 {
 	NT_ASSERT(handle);
 	peek_context ctx{false};
-	ctx.u.handle = handle;
+	ctx.handle = handle;
 	return ctx;
 }
 
-void enqueue_rx_unlink_irp(vpdo_dev_t *vpdo, IRP *irp);
-IRP *dequeue_rx_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink = 0);
+void enqueue_unlink_irp(vpdo_dev_t *vpdo, IRP *irp);
+IRP *dequeue_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink = 0);
 
 inline auto as_seqnum(const void *p)
 {
@@ -56,9 +53,9 @@ inline auto as_pointer(seqnum_t seqnum)
 }
 
 /*
-* IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
-* Drivers that use these routines to queue IRPs must leave that member unused.
-*/
+ * IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
+ * Drivers that use these routines to queue IRPs must leave that member unused.
+ */
 inline void set_seqnum(IRP *irp, seqnum_t seqnum)
 {
 	irp->Tail.Overlay.DriverContext[0] = as_pointer(seqnum);

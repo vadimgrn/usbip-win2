@@ -208,6 +208,19 @@ PAGEABLE NTSTATUS urb_isoch_transfer_payload(IRP *irp, URB &urb)
         return dst ? copy_payload(dst, irp, r, sz) : STATUS_BUFFER_TOO_SMALL;
 }
 
+auto dequeue_irp(vpdo_dev_t &vpdo, seqnum_t seqnum)
+{
+        NT_ASSERT(seqnum);
+        auto ctx = make_peek_context(seqnum);
+
+        auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
+        if (!irp) { // irp is cancelled
+//              irp = dequeue_rx_unlink_irp(vpdo, seqnum); // may be irp is still waiting for read irp to issue CMD_UNLINK
+        }
+
+        return irp;
+}
+
 NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 {
 	TraceUrb("PipeHandle %#Ix", ph4log(PipeHandle));
@@ -218,12 +231,8 @@ NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
 
 	auto ctx = make_peek_context(PipeHandle);
 
-	while (auto irp = IoCsqRemoveNextIrp(&vpdo->tx_irps_csq, &ctx)) {
+	while (auto irp = IoCsqRemoveNextIrp(&vpdo->irps_csq, &ctx)) {
 		send_cmd_unlink(vpdo, irp);
-	}
-
-	while (auto irp = IoCsqRemoveNextIrp(&vpdo->rx_irps_csq, &ctx)) {
-		complete_canceled_irp(irp);
 	}
 
 	return STATUS_SUCCESS;
@@ -448,7 +457,7 @@ PAGEABLE NTSTATUS class_other(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
-PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, URB &urb, bool dir_in, UCHAR recipient)
+PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
 {
         PAGED_CODE();
 
@@ -473,42 +482,53 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t *vpdo, URB &urb, bool di
         pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-//      return usbip::send_recv_cmd(vpdo->sock, urb, hdr);
+        {
+                clear_context(irp, false);
+                set_seqnum(irp, hdr.base.seqnum);
+                if (auto err = IoCsqInsertIrpEx(&vpdo->irps_csq, irp, nullptr, InsertTail())) {
+                        return err;
+                }
+        }
 
         usbip::Mdl mdl_hdr;
         usbip::Mdl mdl_buf;
 
-        return usbip::send_cmd(vpdo->sock, urb, hdr, mdl_hdr, mdl_buf);
+        if (auto err = usbip::send_cmd(vpdo->sock, urb, hdr, mdl_hdr, mdl_buf)) {
+                NT_VERIFY(dequeue_irp(*vpdo, hdr.base.seqnum)); // can't be canceled, we still in IRP_MJ_INTERNAL_DEVICE_CONTROL
+                return err;
+        }
+
+        return STATUS_PENDING;
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP*, URB &urb)
+PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
 {
-        return control_descriptor_request(vpdo, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
+        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t *vpdo, IRP*, URB &urb)
+PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
 {
-        return control_descriptor_request(vpdo, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
+        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t *vpdo, IRP*, URB &urb)
+PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
 {
-        return control_descriptor_request(vpdo, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
+        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t *vpdo, IRP*, URB &urb)
+PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
 {
-        return control_descriptor_request(vpdo, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
+        return control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t *vpdo, IRP*, URB &urb)
+PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
 {
-        return control_descriptor_request(vpdo, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
+        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
-PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t *vpdo, IRP*, URB &urb)
+PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t *vpdo, IRP *irp, URB &urb)
 {
-        return control_descriptor_request(vpdo, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
+        return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
 PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t *vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
@@ -1193,15 +1213,15 @@ NTSTATUS send_to_server(vpdo_dev_t*, IRP*)
  * IRP will be cancelled as soon as read thread will dequeue it from rx_irps_unlink and CMD_UNLINK will be issued.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
-NTSTATUS send_cmd_unlink(vpdo_dev_t *vpdo, IRP *irp)
+NTSTATUS send_cmd_unlink(vpdo_dev_t*, IRP *irp)
 {
         auto seqnum = get_seqnum(irp);
-        NT_ASSERT(seqnum);
+//        NT_ASSERT(seqnum);
 
         TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
 
-        set_seqnum_unlink(irp, seqnum);
-        send_to_server(vpdo, irp);
+//        set_seqnum_unlink(irp, seqnum);
+//        send_to_server(vpdo, irp);
 
         return STATUS_SUCCESS;
 }
@@ -1221,6 +1241,8 @@ NTSTATUS WskReceiveEvent(
                         vpdo, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), BytesIndicated);
         }
 
+        NT_ASSERT(wsk::size(DataIndication) == BytesIndicated);
+
         if (!DataIndication) { // the socket is no longer functional and must be closed ASAP
                 return STATUS_SUCCESS;
         }
@@ -1230,13 +1252,32 @@ NTSTATUS WskReceiveEvent(
         if (auto err = copy(&hdr, sizeof(hdr), DataIndication, BytesIndicated)) {
                 Trace(TRACE_LEVEL_VERBOSE, "Copy header error %!STATUS!", err); 
                 return STATUS_DATA_NOT_ACCEPTED;
-        } else {
-                byteswap_header(hdr, swap_dir::net2host);
-                char buf[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
         }
 
         *BytesAccepted = sizeof(hdr);
+        byteswap_header(hdr, swap_dir::net2host);
+
+        auto &base = hdr.base;
+        auto cmd = static_cast<usbip_request_type>(base.command);
+
+        if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
+                Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
+                return STATUS_SUCCESS;
+        }
+
+        auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(*vpdo, base.seqnum) : nullptr;
+
+        {
+                char buf[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
+                        ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+        }
+
+        if (irp) {
+//              ret_submit(vpdo, irp, hdr);
+                complete_internal_ioctl(irp, STATUS_SUCCESS);
+        }
+
         return STATUS_SUCCESS;
 }
 

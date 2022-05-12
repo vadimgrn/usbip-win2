@@ -601,3 +601,14 @@ const char* wsk::ReceiveEventFlags(char *buf, size_t len, ULONG Flags)
 
         return st != STATUS_INVALID_PARAMETER ? buf : "ReceiveEventFlags invalid parameter";
 }
+
+size_t wsk::size(const WSK_DATA_INDICATION *di)
+{
+        size_t total = 0;
+
+        for (auto i = di; i; i = i->Next) {
+                total += i->Buffer.Length;
+        }
+
+        return total;
+}

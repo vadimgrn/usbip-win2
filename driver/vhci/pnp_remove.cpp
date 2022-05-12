@@ -89,15 +89,11 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 	TraceCall("%p", &vpdo);
 
-	IO_CSQ* v[] { &vpdo.read_irp_csq, &vpdo.tx_irps_csq, &vpdo.rx_irps_csq };
-
-	for (auto csq: v) {
-                if (is_initialized(*csq)) {
-                        while (auto irp = IoCsqRemoveNextIrp(csq, nullptr)) {
-                                complete_canceled_irp(irp);
-                        }
+	if (is_initialized(vpdo.irps_csq)) {
+                while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, nullptr)) {
+                        complete_canceled_irp(irp);
                 }
-	}
+        }
 }
 
 PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
@@ -105,7 +101,7 @@ PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 	PAGED_CODE();
 	TraceCall("%p", vpdo);
 
-	while (auto irp = dequeue_rx_unlink_irp(vpdo)) {
+	while (auto irp = dequeue_unlink_irp(vpdo)) {
 		complete_canceled_irp(irp);
 	}
 }

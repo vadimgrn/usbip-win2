@@ -122,20 +122,11 @@ struct vpdo_dev_t : vdev_t
 
 	UNICODE_STRING usb_dev_interface;
 	
-	seqnum_t seqnum;
-	seqnum_t seqnum_payload; // *ioctl irp which is waiting for read irp for payload transfer
+	seqnum_t seqnum; // @see next_seqnum
 
-	IO_CSQ read_irp_csq; // waiting for irp from *ioctl
-	IRP *read_irp; // from vhci_read, can be only one
-
-	IO_CSQ rx_irps_csq; // waiting for irp from vhci_read
-	LIST_ENTRY rx_irps; // from *ioctl
-	LIST_ENTRY rx_irps_unlink; // from CompleteCanceledIrp_tx
-	KSPIN_LOCK rx_irps_lock;
-
-	IO_CSQ tx_irps_csq; // waiting for irp from vhci_write
-	LIST_ENTRY tx_irps; // from *ioctl
-	KSPIN_LOCK tx_irps_lock;
+	IO_CSQ irps_csq;
+	LIST_ENTRY irps;
+	KSPIN_LOCK irps_lock;
 };
 
 // The device extension of the vhub.  From whence vpdo's are born.
