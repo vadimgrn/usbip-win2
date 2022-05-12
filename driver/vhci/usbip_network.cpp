@@ -87,7 +87,7 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_
         NT_ASSERT(mdl_buf.size() >= tr->TransferBufferLength);
         WSK_BUF buf{ mdl_buf.get(), 0, tr->TransferBufferLength };
 
-        if (auto err = receive(sock, &buf, WSK_FLAG_WAITALL)) {
+        if (auto err = receive(sock, &buf)) {
                 Trace(TRACE_LEVEL_ERROR, "Receive buffer[%Iu] %!STATUS!", buf.Length, err);
                 return err;
         }
@@ -118,7 +118,7 @@ NTSTATUS usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
         }
 
         WSK_BUF buf{ mdl.get(), 0, len };
-        return receive(sock, &buf, WSK_FLAG_WAITALL);
+        return receive(sock, &buf);
 }
 
 err_t usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
@@ -196,7 +196,7 @@ NTSTATUS usbip::send_recv_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbi
         mdl_hdr.next(nullptr);
         WSK_BUF buf{ mdl_hdr.get(), 0, mdl_hdr.size() };
 
-        if (auto err = receive(sock, &buf, WSK_FLAG_WAITALL)) {
+        if (auto err = receive(sock, &buf)) {
                 Trace(TRACE_LEVEL_ERROR, "Receive usbip_header %!STATUS!", err);
                 return err;
         }

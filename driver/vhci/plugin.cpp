@@ -1,4 +1,5 @@
 #include "plugin.h"
+#include <wdm.h>
 #include "trace.h"
 #include "plugin.tmh"
 

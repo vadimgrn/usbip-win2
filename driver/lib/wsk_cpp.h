@@ -53,8 +53,8 @@ NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress);
 NTSTATUS getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress);
 NTSTATUS getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress);
 
-NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual = nullptr);
-NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual = nullptr);
+NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0);
+NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0, _Out_opt_ SIZE_T *actual = nullptr);
 
 NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
 

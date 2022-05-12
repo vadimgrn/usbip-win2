@@ -219,25 +219,18 @@ auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SI
 } // namespace
 
 
-NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual)
+NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags)
 {
-        SIZE_T sent = 0;
-        auto err = transfer(sock, buffer, flags, sent, true);
-        
-        if (actual) {
-                *actual = sent;
-        } else {
-                NT_ASSERT(err || sent == buffer->Length);
-        }
-
+        SIZE_T actual = 0;
+        auto err = transfer(sock, buffer, flags, actual, true);
+        NT_ASSERT(err || actual == buffer->Length);
         return err;
 }
 
 NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual)
 {
-        bool wait_all = flags & WSK_FLAG_WAITALL;
-        if (!(wait_all || actual)) {
-                return STATUS_INVALID_PARAMETER;
+        if (!actual) {
+                flags |= WSK_FLAG_WAITALL;
         }
 
         SIZE_T received = 0;
@@ -421,7 +414,7 @@ NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sy
 NTSTATUS wsk::resume_receive_event(_In_ SOCKET *sock)
 {
         WSK_BUF buf{};
-        return receive(sock, &buf, 0); 
+        return receive(sock, &buf); 
 }
 
 NTSTATUS wsk::close(_In_ SOCKET *sock)
