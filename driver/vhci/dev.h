@@ -6,6 +6,8 @@
 #include "devconf.h"
 #include "usbdsc.h"
 
+struct _WSK_DATA_INDICATION;
+
 namespace wsk
 {
         struct SOCKET;
@@ -123,6 +125,11 @@ struct vpdo_dev_t : vdev_t
 	UNICODE_STRING usb_dev_interface;
 	
 	seqnum_t seqnum; // @see next_seqnum
+
+	_WSK_DATA_INDICATION* wsk_data[2];
+	int wsk_data_cnt;
+	size_t wsk_data_offset; // for wsk_data[0]
+	bool wsk_data_release_tail;
 
 	IO_CSQ irps_csq;
 	LIST_ENTRY irps;

@@ -11,6 +11,9 @@
 #include "strutil.h"
 #include "csq.h"
 #include "wsk_cpp.h"
+#include "wsk_data.h"
+
+const ULONG WskEventMask = WSK_EVENT_RECEIVE | WSK_EVENT_DISCONNECT;
 
 namespace
 {
@@ -106,18 +109,41 @@ PAGEABLE void complete_unlinked_irps(vpdo_dev_t *vpdo)
 	}
 }
 
+PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
+{
+	PAGED_CODE();
+
+	while (wsk_data_pop(vpdo));
+
+	NT_ASSERT(!*vpdo.wsk_data);
+	NT_ASSERT(!vpdo.wsk_data_cnt);
+	NT_ASSERT(!vpdo.wsk_data_offset);
+	NT_ASSERT(!vpdo.wsk_data_release_tail);
+}
+
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
-        if (auto sock = (wsk::SOCKET*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vpdo.sock), nullptr)) {
-                if (auto err = disconnect(sock)) {
-                        Trace(TRACE_LEVEL_ERROR, "Socket disconnect error %!STATUS!", err);
-                }
-                if (auto err = close(sock)) {
-                        Trace(TRACE_LEVEL_ERROR, "Socket close error %!STATUS!", err);
-                }
+        if (!vpdo.sock) {
+		return;
+	}
+		
+	if (auto err = disconnect(vpdo.sock)) {
+                Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
         }
+
+	if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_DISABLE | WskEventMask, true)) {
+		Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+	}
+
+	release_wsk_data(vpdo);
+
+	if (auto err = close(vpdo.sock)) {
+                Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
+        }
+
+	vpdo.sock = nullptr;
 }
 
 PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)

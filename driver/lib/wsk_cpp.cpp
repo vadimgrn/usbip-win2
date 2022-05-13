@@ -399,16 +399,16 @@ NTSTATUS wsk::control(
         return err;
 }
 
-NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sync_disable)
+NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable)
 {
-        if (sync_disable && !(EventMask & WSK_EVENT_DISABLE)) {
+        if (wait4disable && !(EventMask & WSK_EVENT_DISABLE)) {
                 return STATUS_INVALID_PARAMETER;
         }
 
         WSK_EVENT_CALLBACK_CONTROL r{ &NPI_WSK_INTERFACE_ID, EventMask };
 
         return control(sock, WskSetOption, SO_WSK_EVENT_CALLBACK, SOL_SOCKET, 
-                       sizeof(r), &r, 0, nullptr, nullptr, sync_disable, nullptr);
+                       sizeof(r), &r, 0, nullptr, nullptr, wait4disable, nullptr);
 }
 
 NTSTATUS wsk::resume_receive_event(_In_ SOCKET *sock)

@@ -6,6 +6,7 @@
 #include "irp.h"
 
 #include <limits.h>
+#include <wsk.h>
 #include <wdmsec.h>
 #include <initguid.h> // required for GUID definitions
 

@@ -10,7 +10,7 @@
 #include "vpdo.h"
 #include "vpdo_dsc.h"
 #include "wsk_cpp.h"
-#include "mdl_cpp.h"
+#include "wsk_data.h"
 #include "csq.h"
 
 namespace
@@ -487,7 +487,7 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
         return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
-void ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header &hdr)
+void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 {
         auto irpstack = IoGetCurrentIrpStackLocation(irp);
         auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
@@ -497,7 +497,7 @@ void ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header &hdr)
 
         switch (ioctl_code) {
         case IOCTL_INTERNAL_USB_SUBMIT_URB:
-                st = usb_submit_urb(*vpdo, *(URB*)URB_FROM_IRP(irp), hdr);
+                st = usb_submit_urb(vpdo, *(URB*)URB_FROM_IRP(irp), hdr);
                 break;
         case IOCTL_INTERNAL_USB_RESET_PORT:
                 st = usb_reset_port(hdr);
@@ -511,46 +511,6 @@ void ret_submit(vpdo_dev_t *vpdo, IRP *irp, const usbip_header &hdr)
 
         TraceCall("%04x %!STATUS!, Information %Iu", ptr4log(irp), st, irp->IoStatus.Information);
         IoCompleteRequest(irp, IO_NO_INCREMENT);
-}
-
-
-auto copy(_Out_ void *dest, _In_ size_t len, _In_ const WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated)
-{
-	NT_ASSERT(DataIndication);
-
-	if (BytesIndicated < len) {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	for (auto i = DataIndication; i && len; i = i->Next) {
-
-		auto &buf = i->Buffer;
-		auto list_sz = usbip::size(buf.Mdl);
-
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_BUF: Offset %lu, Length %Iu, list size %Iu", buf.Offset, buf.Length, list_sz);
-		NT_ASSERT(list_sz == buf.Offset + buf.Length);
-
-		if (!buf.Length) {
-			continue;
-		}
-
-		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, NormalPagePriority | MdlMappingNoWrite | MdlMappingNoExecute);
-		if (!sysaddr) {
-			return STATUS_INSUFFICIENT_RESOURCES;
-		}
-
-		sysaddr += buf.Offset;
-		list_sz -= buf.Offset;
-
-		if (auto n = min(len, list_sz)) {
-			RtlCopyMemory(dest, sysaddr, n);
-			dest = static_cast<char*>(dest) + n;
-			len -= n;
-		}
-	}
-
-	NT_ASSERT(!len);
-	return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -579,7 +539,7 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 
 NTSTATUS WskReceiveEvent(
         _In_opt_ PVOID SocketContext, _In_ ULONG Flags, _In_opt_ WSK_DATA_INDICATION *DataIndication,
-        _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T *BytesAccepted)
+        _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T* /*BytesAccepted*/)
 {
         auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
 
@@ -589,22 +549,30 @@ NTSTATUS WskReceiveEvent(
                         vpdo, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), BytesIndicated);
         }
 
-        NT_ASSERT(wsk::size(DataIndication) == BytesIndicated);
-
         if (!DataIndication) { // the socket is no longer functional and must be closed ASAP
                 return STATUS_SUCCESS;
         }
 
-        usbip_header hdr;
+	if (!wsk_data_push(*vpdo, DataIndication, BytesIndicated)) {
+		Trace(TRACE_LEVEL_ERROR, "wsk_data array is full"); 
+		return STATUS_DATA_NOT_ACCEPTED;
+	}
 
-        if (auto err = copy(&hdr, sizeof(hdr), DataIndication, BytesIndicated)) {
+	auto data_size = wsk_data_size(*vpdo);
+	usbip_header hdr;
+
+	if (data_size < sizeof(hdr)) {
+		return wsk_data_retain_tail(*vpdo);
+	}
+
+        if (auto err = wsk_data_copy(&hdr, sizeof(hdr), *vpdo)) {
                 Trace(TRACE_LEVEL_VERBOSE, "Copy header error %!STATUS!", err); 
                 return STATUS_DATA_NOT_ACCEPTED;
         }
 
-        *BytesAccepted = sizeof(hdr);
-        byteswap_header(hdr, swap_dir::net2host);
+	data_size -= sizeof(hdr);
 
+	byteswap_header(hdr, swap_dir::net2host);
         auto &base = hdr.base;
 
         auto cmd = static_cast<usbip_request_type>(base.command);
@@ -628,7 +596,7 @@ NTSTATUS WskReceiveEvent(
         }
 
         if (irp) {
-                ret_submit(vpdo, irp, hdr);
+                ret_submit(*vpdo, irp, hdr);
         }
 
         return STATUS_SUCCESS;

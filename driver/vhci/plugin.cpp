@@ -409,7 +409,7 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
                 return make_error(err);
         }
 
-        if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_RECEIVE | WSK_EVENT_DISCONNECT, false)) {
+        if (auto err = event_callback_control(vpdo.sock, WskEventMask, false)) {
                 Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }

@@ -44,7 +44,7 @@ NTSTATUS control(
         _In_ bool use_irp,
         _Out_opt_ SIZE_T *OutputSizeReturnedIrp);
 
-NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool sync_disable);
+NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable);
 NTSTATUS resume_receive_event(_In_ SOCKET *sock);
 
 NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
