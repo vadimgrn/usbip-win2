@@ -15,7 +15,7 @@
 #include "dbgcommon.h"
 #include "pdu.h"
 #include "strutil.h"
-#include "internal_ioctl.h"
+#include "wsk_events.h"
 
 namespace
 {

@@ -12,7 +12,7 @@
 #include "urbtransfer.h"
 #include "usbd_helper.h"
 #include "usbip_network.h"
-#include "pdu.h"
+#include "wsk_events.h"
 
 namespace
 {
@@ -206,19 +206,6 @@ PAGEABLE NTSTATUS urb_isoch_transfer_payload(IRP *irp, URB &urb)
         auto dst = try_get_irp_buffer(irp, sz);
 
         return dst ? copy_payload(dst, irp, r, sz) : STATUS_BUFFER_TOO_SMALL;
-}
-
-auto dequeue_irp(vpdo_dev_t &vpdo, seqnum_t seqnum)
-{
-        NT_ASSERT(seqnum);
-        auto ctx = make_peek_context(seqnum);
-
-        auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
-        if (!irp) { // irp is cancelled
-//              irp = dequeue_rx_unlink_irp(vpdo, seqnum); // may be irp is still waiting for read irp to issue CMD_UNLINK
-        }
-
-        return irp;
 }
 
 NTSTATUS abort_pipe(vpdo_dev_t *vpdo, USBD_PIPE_HANDLE PipeHandle)
@@ -1144,45 +1131,6 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
         return CompleteRequest(irp, status);
 }
 
-auto copy(_Out_ void *dest, _In_ size_t len, _In_ const WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated)
-{
-        NT_ASSERT(DataIndication);
-        
-        if (BytesIndicated < len) {
-                return STATUS_BUFFER_TOO_SMALL;
-        }
-
-        for (auto i = DataIndication; i && len; i = i->Next) {
-
-                auto &buf = i->Buffer;
-                auto list_sz = usbip::size(buf.Mdl);
-
-                Trace(TRACE_LEVEL_VERBOSE, "WSK_BUF: Offset %lu, Length %Iu, list size %Iu", buf.Offset, buf.Length, list_sz);
-                NT_ASSERT(list_sz == buf.Offset + buf.Length);
-
-                if (!buf.Length) {
-                        continue;
-                }
-
-                auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, NormalPagePriority | MdlMappingNoWrite | MdlMappingNoExecute);
-                if (!sysaddr) {
-                        return STATUS_INSUFFICIENT_RESOURCES;
-                }
-
-                sysaddr += buf.Offset;
-                list_sz -= buf.Offset;
-
-                if (auto n = min(len, list_sz)) {
-                        RtlCopyMemory(dest, sysaddr, n);
-                        dest = static_cast<char*>(dest) + n;
-                        len -= n;
-                }
-        }
-
-        NT_ASSERT(!len);
-        return STATUS_SUCCESS;
-}
-
 } // namespace
 
 
@@ -1219,75 +1167,11 @@ NTSTATUS send_cmd_unlink(vpdo_dev_t*, IRP *irp)
 //        NT_ASSERT(seqnum);
 
         TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
+        complete_canceled_irp(irp);
 
 //        set_seqnum_unlink(irp, seqnum);
 //        send_to_server(vpdo, irp);
 
-        return STATUS_SUCCESS;
-}
-
-/*
- * PFN_WSK_RECEIVE_EVENT 
- */
-NTSTATUS WskReceiveEvent(
-        _In_opt_ PVOID SocketContext, _In_ ULONG Flags, _In_opt_ WSK_DATA_INDICATION *DataIndication,
-        _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T *BytesAccepted)
-{
-        auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
-
-        {
-                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
-                Trace(TRACE_LEVEL_VERBOSE, "vpdo %p, [%s], BytesIndicated %Iu", 
-                        vpdo, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), BytesIndicated);
-        }
-
-        NT_ASSERT(wsk::size(DataIndication) == BytesIndicated);
-
-        if (!DataIndication) { // the socket is no longer functional and must be closed ASAP
-                return STATUS_SUCCESS;
-        }
-
-        usbip_header hdr;
-
-        if (auto err = copy(&hdr, sizeof(hdr), DataIndication, BytesIndicated)) {
-                Trace(TRACE_LEVEL_VERBOSE, "Copy header error %!STATUS!", err); 
-                return STATUS_DATA_NOT_ACCEPTED;
-        }
-
-        *BytesAccepted = sizeof(hdr);
-        byteswap_header(hdr, swap_dir::net2host);
-
-        auto &base = hdr.base;
-        auto cmd = static_cast<usbip_request_type>(base.command);
-
-        if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
-                Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
-                return STATUS_SUCCESS;
-        }
-
-        auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(*vpdo, base.seqnum) : nullptr;
-
-        {
-                char buf[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-                        ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
-        }
-
-        if (irp) {
-//              ret_submit(vpdo, irp, hdr);
-                complete_internal_ioctl(irp, STATUS_SUCCESS);
-        }
-
-        return STATUS_SUCCESS;
-}
-
-/*
- * PFN_WSK_DISCONNECT_EVENT
- */
-NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
-{
-        auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
-        TraceCall("vpdo %p, Flags %#x", vpdo, Flags);
         return STATUS_SUCCESS;
 }
 
@@ -1347,4 +1231,3 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 
 	return status;
 }
-
