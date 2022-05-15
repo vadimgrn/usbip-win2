@@ -111,6 +111,7 @@ begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
 end;
 
+
 // Inno Setup Third-Party Files, PathMgr.dll
 // https://github.com/Bill-Stewart/PathMgr
 // Code is copied as is from [Code] section of EditPath.iss
@@ -222,19 +223,17 @@ end;
 // end of PathMgr.dll
 
 
+
 // UninsIS.dll
 // https://github.com/Bill-Stewart/UninsIS
-// Code is copied as is from [Code] section of UninsIS.iss
+// Code is copied from [Code] section of UninsIS.iss, following modifications are made:
+// 1) CompareISPackageVersion is removed because it MUST always be uninstalled
+// 2) PrepareToInstall does not call it
 
 // Import IsISPackageInstalled() function from UninsIS.dll at setup time
 function DLLIsISPackageInstalled(AppId: string; Is64BitInstallMode,
   IsAdminInstallMode: DWORD): DWORD;
   external 'IsISPackageInstalled@files:UninsIS.dll stdcall setuponly';
-
-// Import CompareISPackageVersion() function from UninsIS.dll at setup time
-function DLLCompareISPackageVersion(AppId, InstallingVersion: string;
-  Is64BitInstallMode, IsAdminInstallMode: DWORD): LongInt;
-  external 'CompareISPackageVersion@files:UninsIS.dll stdcall setuponly';
 
 // Import UninstallISPackage() function from UninsIS.dll at setup time
 function DLLUninstallISPackage(AppId: string; Is64BitInstallMode,
@@ -252,25 +251,6 @@ begin
     Log('UninsIS.dll - Package detected as installed')
   else
     Log('UninsIS.dll - Package not detected as installed');
-end;
-
-// Wrapper for UninsIS.dll CompareISPackageVersion() function
-// Returns:
-// < 0 if version we are installing is < installed version
-// 0   if version we are installing is = installed version
-// > 0 if version we are installing is > installed version
-function CompareISPackageVersion(): LongInt;
-begin
-  result := DLLCompareISPackageVersion('{#AppGUID}',  // AppId
-    '{#AppVersion}',                                  // InstallingVersion
-    DWORD(Is64BitInstallMode()),                      // Is64BitInstallMode
-    DWORD(IsAdminInstallMode()));                     // IsAdminInstallMode
-  if result < 0 then
-    Log('UninsIS.dll - This version {#AppVersion} older than installed version')
-  else if result = 0 then
-    Log('UninsIS.dll - This version {#AppVersion} same as installed version')
-  else
-    Log('UninsIS.dll - This version {#AppVersion} newer than installed version');
 end;
 
 // Wrapper for UninsIS.dll UninstallISPackage() function
@@ -295,6 +275,6 @@ begin
   // automatically uninstall only...
   // ...when downgrading: change <> to <
   // ...when upgrading:   change <> to >
-  if IsISPackageInstalled() and (CompareISPackageVersion() <> 0) then
+  if IsISPackageInstalled() then // and (CompareISPackageVersion() <> 0)
     UninstallISPackage();
 end;
