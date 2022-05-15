@@ -14,10 +14,11 @@
 namespace
 {
 
-PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
+/*
+ * Called from DISPATCH_LEVEL.
+ */
+auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 {
-	PAGED_CODE();
-
 	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
 	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
@@ -32,20 +33,10 @@ PAGEABLE auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 	return str;
 }
 
-PAGEABLE auto clone(const void *src, ULONG length)
-{
-	void *buf = ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, length, USBIP_VHCI_POOL_TAG);
-
-	if (buf) {
-		RtlCopyMemory(buf, src, length);
-	} else { 
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", length);
-	}
-
-	return buf;
-}
-
-PAGEABLE void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
+/*
+ * Called from DISPATCH_LEVEL.
+ */
+void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
 {
 	NT_ASSERT(Index);
 	NT_ASSERT(is_valid_dsc(&dd));
@@ -123,11 +114,10 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 /*
  * Configuration descriptor will be saved on usb request select configuration.
+ * Called from DISPATCH_LEVEL.
  */
-PAGEABLE void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_REQUEST &r, const USB_COMMON_DESCRIPTOR *dsc)
+void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_REQUEST &r, const USB_COMMON_DESCRIPTOR *dsc)
 {
-	PAGED_CODE();
-
 	NT_ASSERT(dsc->bLength > sizeof(*dsc));
 
 	if (dsc->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE) {

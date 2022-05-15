@@ -129,7 +129,6 @@ struct vpdo_dev_t : vdev_t
 	_WSK_DATA_INDICATION* wsk_data[2];
 	int wsk_data_cnt;
 	size_t wsk_data_offset; // for wsk_data[0]
-	bool wsk_data_release_tail;
 
 	IO_CSQ irps_csq;
 	LIST_ENTRY irps;

@@ -45,28 +45,6 @@ void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, bool send)
                 send ? "OUT" : "IN", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 }
 
-auto make_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ URB &urb)
-{
-        auto err = STATUS_SUCCESS;
-        auto r = AsUrbTransfer(&urb);
-
-        if (!r->TransferBufferLength) {
-                mdl.reset();
-        } else if (auto buf = r->TransferBuffer) {
-                mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
-                err = mdl.prepare_nonpaged();
-        } else if (auto m = r->TransferBufferMDL) {
-                mdl = usbip::Mdl(m);
-                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
-        }
-
-        if (err) {
-                mdl.reset();
-        }
-
-        return err;
-}
-
 auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
 {
         auto &base = hdr.base;
@@ -94,6 +72,29 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_
 
         TraceUrb("[%Iu]%!BIN!", buf.Length, WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(buf.Length)));
         return STATUS_SUCCESS;
+}
+
+
+auto make_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ URB &urb)
+{
+        auto err = STATUS_SUCCESS;
+        auto r = AsUrbTransfer(&urb);
+
+        if (!r->TransferBufferLength) {
+                mdl.reset();
+        } else if (auto buf = r->TransferBuffer) {
+                mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
+                err = mdl.prepare_nonpaged();
+        } else if (auto m = r->TransferBufferMDL) {
+                mdl = usbip::Mdl(m);
+                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+        }
+
+        if (err) {
+                mdl.reset();
+        }
+
+        return err;
 }
 
 } // namespace

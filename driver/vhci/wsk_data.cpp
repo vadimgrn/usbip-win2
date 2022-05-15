@@ -8,25 +8,29 @@
 namespace
 {
 
-auto copy(_Out_ void* &dest, _Inout_ size_t &len, _In_ const WSK_DATA_INDICATION *DataIndication, _In_ size_t offset)
+auto copy(_Out_ void* &dest, _Inout_ size_t &len, 
+	_In_ int index, _In_ const WSK_DATA_INDICATION *DataIndication, _In_ size_t offset)
 {
-	for (auto i = DataIndication; i && len; i = i->Next) {
+	int j = 0;
 
-		auto idx = i - DataIndication;
+	for (auto i = DataIndication; i && len; i = i->Next, ++j) {
+
 		auto &buf = i->Buffer;
-
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%Id]: length %Iu, offset %Iu, left to copy %Iu", 
-			idx, buf.Length, offset, len);
 
 		if (!buf.Length) {
 			continue;
 		} else if (offset >= buf.Length) {
+			Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d][%d]: buffer length %Iu, offset %Iu, skipped, left to copy %Iu",
+				                    index, j, buf.Length, offset, len);
 			offset -= buf.Length;
 			continue;
 		}
 
-		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, NormalPagePriority | MdlMappingNoWrite | MdlMappingNoExecute);
+		const ULONG priority = NormalPagePriority | MdlMappingNoWrite | MdlMappingNoExecute;
+
+		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, priority);
 		if (!sysaddr) {
+			Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION[%d][%d]: MmGetSystemAddressForMdlSafe error", index, j);
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 
@@ -34,13 +38,14 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len, _In_ const WSK_DATA_INDICATION
 		auto remaining = buf.Length - offset;
 
 		auto cnt = min(len, remaining);
-		RtlCopyMemory(dest, sysaddr, cnt);
 
+		RtlCopyMemory(dest, sysaddr, cnt);
 		dest = static_cast<char*>(dest) + cnt;
 		len -= cnt;
 
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%Id]: length %Iu, copied %Iu bytes from offset %Iu", 
-			idx, buf.Length, cnt, offset);
+		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d][%d]: buffer length %Iu, "
+					   "%Iu bytes %s from offset %Iu, left to copy %Iu", 
+			                    index, j, buf.Length, cnt, dest ? "copied" : "skipped", offset, len);
 
 		offset = 0;
 	}
@@ -57,32 +62,20 @@ bool wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 	NT_ASSERT(DataIndication);
 	NT_ASSERT(wsk::size(DataIndication) == BytesIndicated);
 
-	auto &i = vpdo.wsk_data_cnt;
-	NT_ASSERT(i || !vpdo.wsk_data_offset);
+	auto &cnt = vpdo.wsk_data_cnt;
+	NT_ASSERT(cnt || !vpdo.wsk_data_offset);
 
-	bool ok = i < ARRAYSIZE(vpdo.wsk_data);
+	bool ok = cnt < ARRAYSIZE(vpdo.wsk_data);
 	if (ok) {
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d] = %p, size %Iu", i, DataIndication, BytesIndicated);
-		vpdo.wsk_data[i++] = DataIndication;
-		vpdo.wsk_data_release_tail = false;
+		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d] = %04x, size %Iu", cnt, ptr4log(DataIndication), BytesIndicated);
+		vpdo.wsk_data[cnt++] = DataIndication;
 	}
 
 	return ok;
 }
 
-NTSTATUS wsk_data_retain_tail(_Inout_ vpdo_dev_t &vpdo)
+bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo, _In_ bool skip_release_back)
 {
-	if (vpdo.wsk_data_cnt) {
-		vpdo.wsk_data_release_tail = true;
-		return STATUS_PENDING;
-	}
-
-	return STATUS_DATA_NOT_ACCEPTED;
-}
-
-bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo)
-{
-	NT_ASSERT(!vpdo.wsk_data_offset);
 	auto &cnt = vpdo.wsk_data_cnt;
 
 	if (cnt) {
@@ -102,22 +95,18 @@ bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo)
 
 	vpdo.wsk_data_offset = 0;
 
-	if (!(cnt || vpdo.wsk_data_release_tail)) {
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION %p dropped, remaining %d", victim, cnt);
+	if (!cnt && skip_release_back) {
+		Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION %04x skipped", ptr4log(victim));
 	} else if (auto err = release(vpdo.sock, victim)) {
-		Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION %p release %!STATUS!", victim, err);
+		Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION %04x release %!STATUS!", ptr4log(victim), err);
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION %p released, remaining %d", victim, cnt);
-	}
-
-	if (!cnt) {
-		vpdo.wsk_data_release_tail = false;
+		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION %04x released, remaining %d", ptr4log(victim), cnt);
 	}
 
 	return true;
 }
 
-void wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
+void wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 {
 	for (int cnt = vpdo.wsk_data_cnt, i = 0; i < cnt && len; ++i) {
 
@@ -125,7 +114,7 @@ void wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		const auto di_len = wsk::size(di);
 		auto remaining = di_len - vpdo.wsk_data_offset;
 
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d]: size %Iu, offset %Iu, left to release %Iu", 
+		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d]: size %Iu, offset %Iu, left to consume %Iu", 
 			i, di_len, vpdo.wsk_data_offset, len);
 
 		if (remaining > len) {
@@ -136,7 +125,7 @@ void wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		}
 
 		len -= remaining;
-		NT_VERIFY(wsk_data_pop(vpdo));
+		NT_VERIFY(wsk_data_pop(vpdo, true));
 	}
 }
 
@@ -151,16 +140,22 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
 	return total - vpdo.wsk_data_offset;
 }
 
-NTSTATUS wsk_data_copy(_Out_ void *dest, _In_ size_t len, _Inout_ vpdo_dev_t &vpdo)
+NTSTATUS wsk_data_copy(_Inout_ vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t len)
 {
 	for (int i = 0; i < vpdo.wsk_data_cnt && len; ++i) {
 
 		auto offset = i ? 0 : vpdo.wsk_data_offset;
 
-		if (auto err = copy(dest, len, vpdo.wsk_data[i], offset)) {
+		if (auto err = copy(dest, len, i, vpdo.wsk_data[i], offset)) {
 			return err;
 		}
 	}
 
 	return len ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
+}
+
+WSK_DATA_INDICATION *wsk_data_back(_In_ const vpdo_dev_t &vpdo)
+{
+	auto cnt = vpdo.wsk_data_cnt;
+	return cnt ? vpdo.wsk_data[cnt - 1] : nullptr;
 }

@@ -118,7 +118,6 @@ PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 	NT_ASSERT(!*vpdo.wsk_data);
 	NT_ASSERT(!vpdo.wsk_data_cnt);
 	NT_ASSERT(!vpdo.wsk_data_offset);
-	NT_ASSERT(!vpdo.wsk_data_release_tail);
 }
 
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)

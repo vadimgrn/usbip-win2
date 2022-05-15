@@ -140,7 +140,7 @@ seqnum_t next_seqnum(vpdo_dev_t *vpdo, bool dir_in)
 	static_assert(USBIP_DIR_IN);
 
 	auto &val = vpdo->seqnum;
-	const auto leftmost_bit_on = seqnum_t(1 << (CHAR_BIT*sizeof(val) - 1));
+	const auto leftmost_bit_on = seqnum_t(1) << (CHAR_BIT*sizeof(val) - 1);
 
 	while (true) {
 		if (++val & leftmost_bit_on) {
