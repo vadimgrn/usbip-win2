@@ -385,6 +385,17 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
         return set_class_subclass_proto(vpdo) ? ERR_NONE : ERR_GENERAL;
 }
 
+PAGEABLE auto make_event_mask()
+{
+        ULONG mask = 0;
+
+        for (auto evt: WskEvents) {
+                mask |= evt;
+        }
+
+        return mask;
+}
+
 PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -409,7 +420,9 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
                 return make_error(err);
         }
 
-        if (auto err = event_callback_control(vpdo.sock, WskEventMask, false)) {
+        auto event_mask = make_event_mask();
+
+        if (auto err = event_callback_control(vpdo.sock, event_mask, false)) {
                 Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }

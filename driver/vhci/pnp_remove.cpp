@@ -13,7 +13,7 @@
 #include "wsk_cpp.h"
 #include "wsk_data.h"
 
-const ULONG WskEventMask = WSK_EVENT_RECEIVE | WSK_EVENT_DISCONNECT;
+const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
 namespace
 {
@@ -132,8 +132,10 @@ PAGEABLE void close_socket(vpdo_dev_t &vpdo)
                 Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
         }
 
-	if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_DISABLE | WskEventMask, true)) {
-		Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+	for (auto evt: WskEvents) {
+		if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_DISABLE | evt, true)) {
+			Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, err);
+		}
 	}
 
 	release_wsk_data(vpdo);
