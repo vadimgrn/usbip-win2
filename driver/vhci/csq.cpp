@@ -176,3 +176,17 @@ void clear_context(IRP *irp, bool skip_unlink)
 
 	set_pipe_handle(irp, USBD_PIPE_HANDLE());
 }
+
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
+{
+	NT_ASSERT(extract_num(seqnum));
+	auto ctx = make_peek_context(seqnum);
+
+	auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
+	if (!irp) { // irp is cancelled
+//              irp = dequeue_rx_unlink_irp(vpdo, seqnum); // may be irp is still waiting for read irp to issue CMD_UNLINK
+	}
+
+	return irp;
+}
+

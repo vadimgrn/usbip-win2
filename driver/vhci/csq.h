@@ -87,3 +87,5 @@ inline auto get_pipe_handle(IRP *irp)
 }
 
 void clear_context(IRP *irp, bool skip_unlink);
+
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);

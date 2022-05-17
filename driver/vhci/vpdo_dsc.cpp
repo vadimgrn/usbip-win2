@@ -15,7 +15,7 @@ namespace
 {
 
 /*
- * Called from DISPATCH_LEVEL.
+ * Calls from DISPATCH_LEVEL.
  */
 auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 {
@@ -34,7 +34,7 @@ auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 }
 
 /*
- * Called from DISPATCH_LEVEL.
+ * Calls from DISPATCH_LEVEL.
  */
 void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
 {
@@ -114,7 +114,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 
 /*
  * Configuration descriptor will be saved on usb request select configuration.
- * Called from DISPATCH_LEVEL.
+ * Calls from DISPATCH_LEVEL.
  */
 void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_REQUEST &r, const USB_COMMON_DESCRIPTOR *dsc)
 {

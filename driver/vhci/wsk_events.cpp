@@ -12,54 +12,36 @@
 #include "wsk_cpp.h"
 #include "wsk_data.h"
 #include "csq.h"
+#include "usbip_network.h"
 
 namespace
 {
 
-inline auto get_irp_buffer(const IRP *irp)
-{
-	return irp->AssociatedIrp.SystemBuffer;
-}
-
-void *get_urb_buffer(void *buf, MDL *bufMDL)
-{
-	if (buf) {
-		return buf;
-	}
-
-	if (!bufMDL) {
-		Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
-		return nullptr;
-	}
-
-	buf = MmGetSystemAddressForMdlSafe(bufMDL, NormalPagePriority | MdlMappingNoExecute);
-	if (!buf) {
-		Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
-	}
-
-	return buf;
-}
-
 /*
  * Actual TransferBufferLength must already be set.
  */
-auto copy_to_transfer_buffer(_Out_ NTSTATUS &result, vpdo_dev_t &vpdo, URB &urb)
+auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 {
+	auto err = STATUS_SUCCESS;
+
 	bool mdl = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
 	NT_ASSERT(urb.UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
 	auto &r = *AsUrbTransfer(&urb);
-	auto buf = get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL);
+	buf = usbip::get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL, false);
 
 	if (buf) {
-		result = wsk_data_copy(vpdo, buf, r.TransferBufferLength);
-		NT_ASSERT(result != STATUS_BUFFER_TOO_SMALL);
+		err = wsk_data_copy(vpdo, buf, r.TransferBufferLength);
+		if (err) {
+			NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
+			buf = nullptr;
+		}
 	} else {
-		result = STATUS_INSUFFICIENT_RESOURCES; // MmGetSystemAddressForMdlSafe failed
+		err = STATUS_INSUFFICIENT_RESOURCES;
 		r.TransferBufferLength = 0;
 	}
 
-	return buf;
+	return err;
 }
 
 auto assign(ULONG &TransferBufferLength, int actual_length)
@@ -67,7 +49,7 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
 	bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
 	TransferBufferLength = ok ? actual_length : 0;
 
-	return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return ok ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
 }
 
 NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
@@ -82,7 +64,8 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 	auto func = urb.UrbHeader.Function;
 	bool log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
 
-	auto buf = copy_to_transfer_buffer(err, vpdo, urb);
+	void *buf{};
+	err = copy_to_transfer_buffer(buf, vpdo, urb);
 	if (!err && log) {
 		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r->TransferBufferLength));
 	}
@@ -142,11 +125,8 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		return err;
 	}
 
-	switch (r.Hdr.Function) {
-	case URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE:
-	case URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE:
-	case URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT:
-		return STATUS_SUCCESS; // USB_DIR_OUT
+	if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+		return STATUS_SUCCESS;
 	}
 
 	const USB_COMMON_DESCRIPTOR *dsc{};
@@ -154,12 +134,10 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 	if (r.TransferBufferLength < sizeof(*dsc)) {
 		Trace(TRACE_LEVEL_ERROR, "usb descriptor's header expected: TransferBufferLength(%lu)", r.TransferBufferLength);
 		r.TransferBufferLength = 0;
-		return STATUS_INVALID_PARAMETER;
+		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	NTSTATUS err{};
-	dsc = (const USB_COMMON_DESCRIPTOR*)copy_to_transfer_buffer(err, vpdo, urb);
-	if (err) {
+	if (auto err = copy_to_transfer_buffer((void*&)dsc, vpdo, urb)) {
 		return err;
 	}
 
@@ -301,7 +279,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 	auto src = reinterpret_cast<const usbip_iso_packet_descriptor*>(src_buf + src_len);
 
 	auto ptr = r.Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? nullptr : r.TransferBuffer;
-	auto buf = (char*)get_urb_buffer(ptr, r.TransferBufferMDL);
+	auto buf = (char*)usbip::get_urb_buffer(ptr, r.TransferBufferMDL, false);
 
 	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : nullptr, src_len) : STATUS_UNSUCCESSFUL;
 }
@@ -439,7 +417,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
         return err;
 }
 
-NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_header &hdr)
+NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_header &hdr, USB_DESCRIPTOR_REQUEST &r)
 {
         auto irpstack = IoGetCurrentIrpStackLocation(irp);
         auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // r.Data[]
@@ -451,12 +429,11 @@ NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_header &hdr)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto r = (USB_DESCRIPTOR_REQUEST*)get_irp_buffer(irp);
-        RtlCopyMemory(r->Data, &hdr + 1, actual_length);
+        RtlCopyMemory(r.Data, &hdr + 1, actual_length);
 
         TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
-                ptr4log(irp), r->ConnectionIndex, data_sz, actual_length, 
-                WppBinary(r->Data, (USHORT)actual_length));
+                ptr4log(irp), r.ConnectionIndex, data_sz, actual_length, 
+                WppBinary(r.Data, (USHORT)actual_length));
 
         auto err = to_windows_status(hdr.u.ret_submit.status);
         return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
@@ -491,7 +468,8 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
                 st = usb_reset_port(hdr);
                 break;
         case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-                st = get_descriptor_from_node_connection(irp, hdr);
+                st = get_descriptor_from_node_connection(irp, hdr, 
+			*static_cast<USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer));
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
@@ -518,17 +496,17 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 	}
 
 	auto avail = wsk_data_size(vpdo);
-	Trace(TRACE_LEVEL_VERBOSE, "Buffer size %Iu", avail);
+	TraceWSK("Buffer size %Iu", avail);
 
 	usbip_header hdr;
 
 	if (avail < sizeof(hdr)) {
-		Trace(TRACE_LEVEL_VERBOSE, "Buffer %Iu < sizeof(usbip_header), retaining", avail); 
+		TraceWSK("Buffer %Iu < sizeof(usbip_header), retaining", avail); 
 		return STATUS_PENDING;
 	}
 
 	if (auto err = wsk_data_copy(vpdo, &hdr, sizeof(hdr))) {
-		Trace(TRACE_LEVEL_VERBOSE, "Copy header %!STATUS!", err); 
+		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
 		return STATUS_PENDING;
 	}
 
@@ -559,7 +537,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 	if (avail >= payload_size) {
 		wsk_data_consume(vpdo, sizeof(hdr));
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "Buffer %Iu < payload %Iu, retaining", avail, payload_size); 
+		TraceWSK("Buffer %Iu < payload %Iu, retaining", avail, payload_size); 
 		return STATUS_PENDING;
 	}
 
@@ -581,19 +559,6 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 } // namespace
 
-
-IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
-{
-	NT_ASSERT(seqnum);
-	auto ctx = make_peek_context(seqnum);
-
-	auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
-	if (!irp) { // irp is cancelled
-//              irp = dequeue_rx_unlink_irp(vpdo, seqnum); // may be irp is still waiting for read irp to issue CMD_UNLINK
-	}
-
-	return irp;
-}
 
 NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {

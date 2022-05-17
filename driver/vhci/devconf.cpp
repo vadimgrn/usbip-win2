@@ -169,6 +169,8 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
  * An URB_FUNCTION_SELECT_CONFIGURATION URB consists of a _URB_SELECT_CONFIGURATION structure 
  * followed by a sequence of variable-length array of USBD_INTERFACE_INFORMATION structures, 
  * each element in the array for each unique interface number in the configuration. 
+ *
+ * Calls from DISPATCH_LEVEL.
  */
 NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed)
 {
@@ -187,6 +189,9 @@ NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed spee
 	return STATUS_SUCCESS;
 }
 
+/*
+ * Calls from DISPATCH_LEVEL.
+ */
 const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg)
 {
 	auto cd = cfg->ConfigurationDescriptor;
@@ -199,7 +204,7 @@ const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CO
 	
 	const char *result = buf;
 
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
+	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"ConfigurationHandle %#Ix, "
 			"ConfigurationDescriptor(bLength %d, bDescriptorType %d (must be %d), wTotalLength %hu, "
 			"bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",

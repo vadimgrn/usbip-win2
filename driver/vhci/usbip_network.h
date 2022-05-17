@@ -20,4 +20,6 @@ err_t recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_stat
 NTSTATUS send_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr, _Out_ Mdl &mdl_hdr, _Out_ Mdl &mdl_buf);
 NTSTATUS send_recv_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr);
 
+void *get_urb_buffer(_In_ void *buf, _In_ MDL *bufMDL, _In_ bool readonly);
+
 } // namespace usbip

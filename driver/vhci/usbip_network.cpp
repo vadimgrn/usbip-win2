@@ -214,3 +214,24 @@ NTSTATUS usbip::send_recv_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbi
 
         return base.command == USBIP_RET_SUBMIT ? recv_ret_submit(sock, urb, hdr, mdl_buf) : STATUS_SUCCESS;
 }
+
+void* usbip::get_urb_buffer(_In_ void *buf, _In_ MDL *bufMDL, _In_ bool readonly)
+{
+        if (buf) {
+                return buf;
+        }
+
+        NT_ASSERT(bufMDL);
+
+        ULONG Priority = NormalPagePriority | MdlMappingNoExecute;
+        if (readonly) {
+                Priority |= MdlMappingNoWrite;
+        }
+
+        buf = MmGetSystemAddressForMdlSafe(bufMDL, Priority);
+        if (!buf) {
+                Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
+        }
+
+        return buf;
+}

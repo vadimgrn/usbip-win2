@@ -12,7 +12,6 @@
 #include "urbtransfer.h"
 #include "usbd_helper.h"
 #include "usbip_network.h"
-#include "wsk_events.h"
 
 namespace
 {
@@ -45,25 +44,6 @@ inline auto get_usbip_header(const IRP *irp, bool unchecked = false)
         return static_cast<usbip_header*>(ptr);
 }
 
-const void *get_urb_buffer(void *buf, MDL *mdl)
-{
-        if (buf) {
-                return buf;
-        }
-
-        if (!mdl) {
-                Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
-                return nullptr;
-        }
-
-        buf = MmGetSystemAddressForMdlSafe(mdl, NormalPagePriority | MdlMappingNoExecute | MdlMappingNoWrite);
-        if (!buf) {
-                Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
-        }
-
-        return buf;
-}
-
 /*
  * PAGED_CODE() fails.
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
@@ -75,7 +55,7 @@ NTSTATUS do_copy_payload(void *dst_buf, const _URB_ISOCH_TRANSFER &r, ULONG *tra
         *transferred = 0;
         bool mdl = r.Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
 
-        auto src_buf = get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL);
+        auto src_buf = usbip::get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL, true);
         if (!src_buf) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -136,7 +116,7 @@ NTSTATUS do_copy_transfer_buffer(void *dst, const URB &urb, IRP *irp)
 
         auto r = AsUrbTransfer(&urb);
 
-        auto buf = get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL);
+        auto buf = usbip::get_urb_buffer(mdl ? nullptr : r->TransferBuffer, r->TransferBufferMDL, true);
         if (buf) {
                 RtlCopyMemory(dst, buf, r->TransferBufferLength);
                 TRANSFERRED(irp) += r->TransferBufferLength;
@@ -1158,7 +1138,7 @@ NTSTATUS send_to_server(vpdo_dev_t*, IRP*)
  * 
  * Case b) is unavoidable because CSQ library calls CsqCompleteCanceledIrp after releasing a lock.
  * For that reason the cancellation logic is simplified and tx_irps_unlink is removed.
- * IRP will be cancelled as soon as read thread will dequeue it from rx_irps_unlink and CMD_UNLINK will be issued.
+ * IRP will be completed as soon as read thread will dequeue it from rx_irps_unlink and CMD_UNLINK will be issued.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
 NTSTATUS send_cmd_unlink(vpdo_dev_t*, IRP *irp)

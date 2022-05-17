@@ -56,10 +56,11 @@ PAGEABLE auto copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION *r)
+/*
+ * Calls from DISPATCH_LEVEL.
+ */
+NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION *r)
 {
-	PAGED_CODE();
-
 	if (vpdo->actconfig) {
 		ExFreePoolWithTag(vpdo->actconfig, USBIP_VHCI_POOL_TAG);
 		vpdo->actconfig = nullptr;
@@ -94,10 +95,11 @@ PAGEABLE NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION
 	return status;
 }
 
-PAGEABLE NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE *r)
+/*
+ * Calls from DISPATCH_LEVEL.
+ */
+NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE *r)
 {
-	PAGED_CODE();
-
 	if (!vpdo->actconfig) {
 		Trace(TRACE_LEVEL_ERROR, "Device is unconfigured");
 		return STATUS_INVALID_DEVICE_REQUEST;
