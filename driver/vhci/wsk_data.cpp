@@ -18,10 +18,11 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 		auto &buf = i->Buffer;
 
 		if (!buf.Length) {
+			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, skipped", index, j, ptr4log(i), buf.Length);
 			continue;
 		} else if (offset >= buf.Length) {
-			Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d][%d]: buffer length %Iu, offset %Iu, skipped, left to copy %Iu",
-				                    index, j, buf.Length, offset, len);
+			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, skipped to copy %Iu bytes from offset %Iu",
+				  index, j, ptr4log(i), buf.Length, len, offset);
 			offset -= buf.Length;
 			continue;
 		}
@@ -30,7 +31,8 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 
 		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, priority);
 		if (!sysaddr) {
-			Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION[%d][%d]: MmGetSystemAddressForMdlSafe error", index, j);
+			Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION[%d][%d]=%04x: MmGetSystemAddressForMdlSafe error", 
+				index, j, ptr4log(i));
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 
@@ -43,9 +45,8 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 		dest = static_cast<char*>(dest) + cnt;
 		len -= cnt;
 
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d][%d]: buffer length %Iu, "
-					   "%Iu bytes %s from offset %Iu, left to copy %Iu", 
-			                    index, j, buf.Length, cnt, dest ? "copied" : "skipped", offset, len);
+		TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, %Iu bytes copied from offset %Iu, left to copy %Iu", 
+			  index, j, ptr4log(i), buf.Length, cnt, offset, len);
 
 		offset = 0;
 	}
@@ -67,14 +68,14 @@ bool wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 	bool ok = cnt < ARRAYSIZE(vpdo.wsk_data);
 	if (ok) {
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d] = %04x, size %Iu", cnt, ptr4log(DataIndication), BytesIndicated);
+		TraceWSK("DATA_INDICATION[%d] = %04x, size %Iu", cnt, ptr4log(DataIndication), BytesIndicated);
 		vpdo.wsk_data[cnt++] = DataIndication;
 	}
 
 	return ok;
 }
 
-bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo, _In_ bool skip_release_back)
+bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo, _In_ bool release_last)
 {
 	auto &cnt = vpdo.wsk_data_cnt;
 
@@ -95,12 +96,12 @@ bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo, _In_ bool skip_release_back)
 
 	vpdo.wsk_data_offset = 0;
 
-	if (!cnt && skip_release_back) {
-		Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION %04x skipped", ptr4log(victim));
+	if (!(cnt || release_last)) {
+		TraceWSK("DATA_INDICATION %04x dropped", ptr4log(victim));
 	} else if (auto err = release(vpdo.sock, victim)) {
-		Trace(TRACE_LEVEL_ERROR, "WSK_DATA_INDICATION %04x release %!STATUS!", ptr4log(victim), err);
+		Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION %04x release %!STATUS!", ptr4log(victim), err);
 	} else {
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION %04x released, remaining %d", ptr4log(victim), cnt);
+		TraceWSK("DATA_INDICATION %04x released, remaining %d", ptr4log(victim), cnt);
 	}
 
 	return true;
@@ -108,19 +109,19 @@ bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo, _In_ bool skip_release_back)
 
 void wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 {
-	for (int cnt = vpdo.wsk_data_cnt, i = 0; i < cnt && len; ++i) {
+	while (len && vpdo.wsk_data_cnt) {
 
 		auto di = *vpdo.wsk_data;
-		const auto di_len = wsk::size(di);
+		auto di_len = wsk::size(di);
 		auto remaining = di_len - vpdo.wsk_data_offset;
 
-		Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d]: size %Iu, offset %Iu, left to consume %Iu", 
-			i, di_len, vpdo.wsk_data_offset, len);
+		TraceWSK("DATA_INDICATION %04x: size %Iu, left to consume %Iu from offset %Iu", 
+			  ptr4log(di), di_len, len, vpdo.wsk_data_offset);
 
 		if (remaining > len) {
 			vpdo.wsk_data_offset += len;
-			Trace(TRACE_LEVEL_VERBOSE, "WSK_DATA_INDICATION[%d] retained, size %Iu, offset %Iu", 
-				                    i, di_len, vpdo.wsk_data_offset);
+			TraceWSK("DATA_INDICATION %04x retained, size %Iu, offset %Iu", 
+				  ptr4log(di), di_len, vpdo.wsk_data_offset);
 			break;
 		}
 
