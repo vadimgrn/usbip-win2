@@ -1,8 +1,6 @@
 #pragma once
 
-#include <wdm.h>
-
+struct _IRP;
 struct vpdo_dev_t;
 
-NTSTATUS send_to_server(vpdo_dev_t*, IRP*);
-NTSTATUS send_cmd_unlink(vpdo_dev_t*, IRP*);
+void send_cmd_unlink(vpdo_dev_t &vpdo, _IRP *irp);

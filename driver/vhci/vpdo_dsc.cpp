@@ -64,7 +64,7 @@ void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_ST
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG &size)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIPTOR_REQUEST &r, ULONG &size)
 {
 	PAGED_CODE();
 
@@ -90,7 +90,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 	}
 
 	if (!dsc_data) {
-		return send_to_server(vpdo, irp);
+		return STATUS_NOT_IMPLEMENTED; // send_to_server(vpdo, irp);
 	}
 
 	ULONG outlen = sizeof(r) + dsc_len;

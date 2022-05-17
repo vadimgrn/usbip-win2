@@ -17,8 +17,8 @@ inline auto to_vpdo(IO_CSQ *csq)
 auto InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 {
 	auto seqnum = get_seqnum(irp);
-	if (!seqnum) {
-		TraceCSQ("%04x -> seqnum is not set", ptr4log(irp));
+	if (!extract_num(seqnum)) {
+		TraceCSQ("%04x -> invalid seqnum %u", ptr4log(irp), seqnum);
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -102,7 +102,7 @@ void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	TraceCSQ("%04x", ptr4log(irp));
 	auto vpdo = to_vpdo(csq);
-	send_cmd_unlink(vpdo, irp);
+	send_cmd_unlink(*vpdo, irp);
 }
 
 auto dequeue(LIST_ENTRY *head, seqnum_t seqnum, bool unlink)

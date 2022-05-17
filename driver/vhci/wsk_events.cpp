@@ -12,10 +12,26 @@
 #include "wsk_cpp.h"
 #include "wsk_data.h"
 #include "csq.h"
-#include "usbip_network.h"
+//#include "usbip_network.h"
 
 namespace
 {
+
+auto get_urb_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
+{
+	if (TransferBuffer) {
+		return TransferBuffer;
+	}
+
+	NT_ASSERT(TransferBufferMDL);
+
+	TransferBuffer = MmGetSystemAddressForMdlSafe(TransferBufferMDL, NormalPagePriority | MdlMappingNoExecute);
+	if (!TransferBuffer) {
+		Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
+	}
+
+	return TransferBuffer;
+}
 
 /*
  * Actual TransferBufferLength must already be set.
@@ -28,7 +44,7 @@ auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 	NT_ASSERT(urb.UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
 
 	auto &r = *AsUrbTransfer(&urb);
-	buf = usbip::get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL, false);
+	buf = get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL);
 
 	if (buf) {
 		err = wsk_data_copy(vpdo, buf, r.TransferBufferLength);
@@ -279,7 +295,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 	auto src = reinterpret_cast<const usbip_iso_packet_descriptor*>(src_buf + src_len);
 
 	auto ptr = r.Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? nullptr : r.TransferBuffer;
-	auto buf = (char*)usbip::get_urb_buffer(ptr, r.TransferBufferMDL, false);
+	auto buf = (char*)get_urb_buffer(ptr, r.TransferBufferMDL);
 
 	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : nullptr, src_len) : STATUS_UNSUCCESSFUL;
 }

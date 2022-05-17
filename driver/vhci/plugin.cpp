@@ -236,7 +236,7 @@ PAGEABLE auto init_req_get_descr(usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
-        if (auto err = set_cmd_submit_usbip_header(&vpdo, &hdr, EP0, TransferFlags, TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, TransferBufferLength)) {
                 return false;
         }
 

@@ -40,7 +40,7 @@ ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
  * Always use direction from PipeHandle if URB has one.
  */
 NTSTATUS set_cmd_submit_usbip_header(
-	vpdo_dev_t *vpdo, usbip_header *hdr, USBD_PIPE_HANDLE PipeHandle, ULONG TransferFlags, ULONG TransferBufferLength)
+	vpdo_dev_t &vpdo, usbip_header &hdr, USBD_PIPE_HANDLE PipeHandle, ULONG TransferFlags, ULONG TransferBufferLength)
 {
 	bool ep0 = TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
 	if (ep0 == !!PipeHandle) {
@@ -56,15 +56,15 @@ NTSTATUS set_cmd_submit_usbip_header(
 
 	bool dir_in = IsTransferDirectionIn(TransferFlags); // many URBs don't have PipeHandle
 
-	if (auto r = &hdr->base) {
+	if (auto r = &hdr.base) {
 		r->command = USBIP_CMD_SUBMIT;
 		r->seqnum = next_seqnum(vpdo, dir_in);
-		r->devid = vpdo->devid;
+		r->devid = vpdo.devid;
 		r->direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
 		r->ep = get_endpoint_number(PipeHandle);
 	}
 
-	if (auto r = &hdr->u.cmd_submit) {
+	if (auto r = &hdr.u.cmd_submit) {
 		r->transfer_flags = to_linux_flags(TransferFlags, dir_in);
 		r->transfer_buffer_length = TransferBufferLength;
 		r->start_frame = 0;
@@ -76,16 +76,16 @@ NTSTATUS set_cmd_submit_usbip_header(
 	return STATUS_SUCCESS;
 }
 
-void set_cmd_unlink_usbip_header(vpdo_dev_t *vpdo, usbip_header *hdr, seqnum_t seqnum_unlink)
+void set_cmd_unlink_usbip_header(vpdo_dev_t &vpdo, usbip_header &hdr, seqnum_t seqnum_unlink)
 {
-	auto &r = hdr->base;
+	auto &r = hdr.base;
 
 	r.command = USBIP_CMD_UNLINK;
-	r.devid = vpdo->devid;
+	r.devid = vpdo.devid;
 	r.direction = USBIP_DIR_OUT;
 	r.seqnum = next_seqnum(vpdo, r.direction);
 	r.ep = 0;
 
 	NT_ASSERT(seqnum_unlink);
-	hdr->u.cmd_unlink.seqnum = seqnum_unlink;
+	hdr.u.cmd_unlink.seqnum = seqnum_unlink;
 }

@@ -33,19 +33,7 @@ UINT32 get_request(UINT32 response)
         }
 }
 
-void debug(const usbip_header &hdr, const usbip::Mdl &mdl_hdr, bool send)
-{
-        auto pdu_sz = get_total_size(hdr);
-
-        [[maybe_unused]] auto buf_sz = size(mdl_hdr);
-        NT_ASSERT(buf_sz == sizeof(hdr) || buf_sz == pdu_sz);
-
-        char buf[DBG_USBIP_HDR_BUFSZ];
-        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "%s %Iu%s", 
-                send ? "OUT" : "IN", pdu_sz, dbg_usbip_hdr(buf, sizeof(buf), &hdr));
-}
-
-auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
+auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
 {
         auto &base = hdr.base;
         NT_ASSERT(base.command == USBIP_RET_SUBMIT);
@@ -74,20 +62,29 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_
         return STATUS_SUCCESS;
 }
 
-
-auto make_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ URB &urb)
+/*
+ * URB must have TransferBuffer* members.
+ */
+auto make_transfer_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ const URB &urb)
 {
+        auto func = urb.UrbHeader.Function;
+        bool use_mdl = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ||
+                       func == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
+
         auto err = STATUS_SUCCESS;
         auto r = AsUrbTransfer(&urb);
 
         if (!r->TransferBufferLength) {
-                mdl.reset();
-        } else if (auto buf = r->TransferBuffer) {
+                NT_ASSERT(!mdl);
+        } else if (auto buf = use_mdl ? nullptr : r->TransferBuffer) {
                 mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
                 err = mdl.prepare_nonpaged();
         } else if (auto m = r->TransferBufferMDL) {
                 mdl = usbip::Mdl(m);
                 err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
+                err = STATUS_INVALID_PARAMETER;
         }
 
         if (err) {
@@ -147,29 +144,36 @@ err_t usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ 
         return ERR_NONE;
 }
 
-NTSTATUS usbip::send_cmd(
-        _In_ SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Out_ Mdl &mdl_hdr, _Out_ Mdl &mdl_buf)
+NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer)
 {
-        mdl_hdr = Mdl(memory::stack, &hdr, sizeof(hdr));
+        usbip::Mdl mdl_hdr(memory::stack, &hdr, sizeof(hdr));
 
-        if (auto err = mdl_hdr.prepare(IoModifyAccess)) {
+        if (auto err = mdl_hdr.prepare(IoReadAccess)) {
                 Trace(TRACE_LEVEL_ERROR, "Prepare usbip_header %!STATUS!", err);
                 return err;
         }
 
-        if (auto err = make_buffer_mdl(mdl_buf, urb)) {
-                Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
-                return err;
-        }
+        usbip::Mdl mdl_buf;
 
-        if (hdr.base.direction == USBIP_DIR_OUT) {
+        if (transfer_buffer && is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+                if (auto err = make_transfer_buffer_mdl(mdl_buf, *transfer_buffer)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                        return err;
+                }
                 mdl_hdr.next(mdl_buf);
         }
 
-        debug(hdr, mdl_hdr, true);
-        byteswap_header(hdr, swap_dir::host2net);
-
         WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
+
+        {
+                auto pdu_sz = get_total_size(hdr);
+                NT_ASSERT(buf.Length == sizeof(hdr) || buf.Length == pdu_sz);
+
+                char str[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", pdu_sz, dbg_usbip_hdr(str, sizeof(str), &hdr));
+        }
+
+        byteswap_header(hdr, swap_dir::host2net);
 
         if (auto err = send(sock, &buf, WSK_FLAG_NODELAY)) {
                 Trace(TRACE_LEVEL_ERROR, "Send %!STATUS!", err);
@@ -177,61 +181,4 @@ NTSTATUS usbip::send_cmd(
         }
 
         return STATUS_SUCCESS;
-}
-
-NTSTATUS usbip::send_recv_cmd(_In_ SOCKET *sock, _Inout_ _URB &urb, _Inout_ usbip_header &hdr)
-{
-        auto &base = hdr.base;
-
-        auto command = base.command;
-        auto seqnum = base.seqnum;
-        auto direction = base.direction;
-
-        usbip::Mdl mdl_hdr;
-        usbip::Mdl mdl_buf;
-
-        if (auto err = send_cmd(sock, urb, hdr, mdl_hdr, mdl_buf)) {
-                return err;
-        }
-
-        mdl_hdr.next(nullptr);
-        WSK_BUF buf{ mdl_hdr.get(), 0, mdl_hdr.size() };
-
-        if (auto err = receive(sock, &buf)) {
-                Trace(TRACE_LEVEL_ERROR, "Receive usbip_header %!STATUS!", err);
-                return err;
-        }
-
-        byteswap_header(hdr, swap_dir::net2host);
-
-        base.direction = direction; // restore, always zero in server response
-        debug(hdr, mdl_hdr, false);
-
-        if (!(base.seqnum == seqnum && get_request(base.command) == command)) {
-                Trace(TRACE_LEVEL_ERROR, "Unexpected command or seqnum");
-                return STATUS_UNSUCCESSFUL;
-        }
-
-        return base.command == USBIP_RET_SUBMIT ? recv_ret_submit(sock, urb, hdr, mdl_buf) : STATUS_SUCCESS;
-}
-
-void* usbip::get_urb_buffer(_In_ void *buf, _In_ MDL *bufMDL, _In_ bool readonly)
-{
-        if (buf) {
-                return buf;
-        }
-
-        NT_ASSERT(bufMDL);
-
-        ULONG Priority = NormalPagePriority | MdlMappingNoExecute;
-        if (readonly) {
-                Priority |= MdlMappingNoWrite;
-        }
-
-        buf = MmGetSystemAddressForMdlSafe(bufMDL, Priority);
-        if (!buf) {
-                Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
-        }
-
-        return buf;
 }
