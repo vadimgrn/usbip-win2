@@ -56,6 +56,8 @@ NTSTATUS getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress);
 NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0);
 NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0, _Out_opt_ SIZE_T *actual = nullptr);
 
+NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp);
+
 NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
 
 NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
