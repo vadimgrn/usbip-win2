@@ -164,13 +164,11 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_op
         }
 
         WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
+        NT_ASSERT(buf.Length == get_total_size(hdr));
 
         {
-                auto pdu_sz = get_total_size(hdr);
-                NT_ASSERT(buf.Length == sizeof(hdr) || buf.Length == pdu_sz);
-
                 char str[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", pdu_sz, dbg_usbip_hdr(str, sizeof(str), &hdr));
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr));
         }
 
         byteswap_header(hdr, swap_dir::host2net);

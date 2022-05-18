@@ -12,7 +12,6 @@
 #include "wsk_cpp.h"
 #include "wsk_data.h"
 #include "csq.h"
-//#include "usbip_network.h"
 
 namespace
 {
@@ -591,9 +590,12 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 {
         auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
 
-        char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
-	TraceCall("Enter: vpdo %04x, [%s], DataIndication %04x, BytesIndicated %Iu", 
-		ptr4log(vpdo), wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), ptr4log(DataIndication), BytesIndicated);
+	{
+		char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
+		TraceCall("Enter: vpdo %04x, [%s], DataIndication %04x, BytesIndicated %Iu", 
+			   ptr4log(vpdo), wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), 
+			   ptr4log(DataIndication), BytesIndicated);
+	}
 
 	auto st = DataIndication ? receive_event(*vpdo, DataIndication, BytesIndicated) : STATUS_SUCCESS;
 

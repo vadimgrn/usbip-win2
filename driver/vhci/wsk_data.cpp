@@ -21,7 +21,7 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, skipped", index, j, ptr4log(i), buf.Length);
 			continue;
 		} else if (offset >= buf.Length) {
-			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, skipped to copy %Iu bytes from offset %Iu",
+			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, %Iu bytes skipped to copy from offset %Iu",
 				  index, j, ptr4log(i), buf.Length, len, offset);
 			offset -= buf.Length;
 			continue;
@@ -115,7 +115,7 @@ void wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		auto di_len = wsk::size(di);
 		auto remaining = di_len - vpdo.wsk_data_offset;
 
-		TraceWSK("DATA_INDICATION %04x: size %Iu, left to consume %Iu from offset %Iu", 
+		TraceWSK("DATA_INDICATION %04x: size %Iu, %Iu bytes left to consume from offset %Iu", 
 			  ptr4log(di), di_len, len, vpdo.wsk_data_offset);
 
 		if (remaining > len) {
@@ -126,7 +126,7 @@ void wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		}
 
 		len -= remaining;
-		NT_VERIFY(wsk_data_pop(vpdo, true));
+		NT_VERIFY(wsk_data_pop(vpdo, false)); // do not release last (just pushed) element 
 	}
 }
 
