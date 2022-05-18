@@ -14,7 +14,7 @@ inline auto to_vpdo(IO_CSQ *csq)
 	return CONTAINING_RECORD(csq, vpdo_dev_t, irps_csq);
 }
 
-auto InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
+auto InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID /*InsertContext*/)
 {
 	auto seqnum = get_seqnum(irp);
 	if (!extract_num(seqnum)) {
@@ -23,12 +23,9 @@ auto InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID InsertContext)
 	}
 
 	auto vpdo = to_vpdo(csq);
-	bool tail = InsertContext == InsertTail();
+	InsertTailList(&vpdo->irps, list_entry(irp));
 
-	auto func = tail ? InsertTailList : InsertHeadList;
-	func(&vpdo->irps, list_entry(irp));
-
-	TraceCSQ("%04x(seqnum %u) -> %s ", ptr4log(irp), seqnum, tail ? "tail" : "head");
+	TraceCSQ("%04x(seqnum %u)", ptr4log(irp), seqnum);
 	return STATUS_SUCCESS;
 }
 
@@ -105,26 +102,6 @@ void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 	send_cmd_unlink(*vpdo, irp);
 }
 
-auto dequeue(LIST_ENTRY *head, seqnum_t seqnum, bool unlink)
-{
-	auto func = unlink ? get_seqnum_unlink : get_seqnum;
-	IRP *irp{};
-
-	for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
-
-		auto entry_irp = get_irp(entry);
-
-		if (!seqnum || seqnum == func(entry_irp)) {
-			RemoveEntryList(entry);
-			InitializeListHead(entry);
-			irp = entry_irp;
-			break;
-		}
-	}
-
-	return irp;
-}
-
 } // namespace
 
 
@@ -144,36 +121,9 @@ PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
 				CompleteCanceledIrp);
 }
 
-void enqueue_unlink_irp(vpdo_dev_t*, IRP *irp)
-{
-	NT_ASSERT(get_seqnum_unlink(irp));
-	TraceCSQ("irp %04x, unlink seqnum %u", ptr4log(irp), get_seqnum_unlink(irp));
-
-//	KIRQL irql;
-//	KeAcquireSpinLock(&vpdo->irps_lock, &irql);
-//	InsertTailList(&vpdo->rx_irps_unlink, list_entry(irp));
-//	KeReleaseSpinLock(&vpdo->rx_irps_lock, irql);
-}
-
-IRP *dequeue_unlink_irp(vpdo_dev_t*, seqnum_t /*seqnum_unlink*/)
-{
-//	KIRQL irql;
-//	KeAcquireSpinLock(&vpdo->irps_lock, &irql);
-//	auto irp = dequeue(&vpdo->irps_unlink, seqnum_unlink, true);
-//	KeReleaseSpinLock(&vpdo->irps_lock, irql);		
-
-//	TraceCSQ("unlink seqnum %u -> irp %04x", seqnum_unlink, ptr4log(irp));
-	return nullptr;
-}
-
-void clear_context(IRP *irp, bool skip_unlink)
+void clear_context(IRP *irp)
 {
 	set_seqnum(irp, 0);
-
-	if (!skip_unlink) {
-		set_seqnum_unlink(irp, 0);
-	}
-
 	set_pipe_handle(irp, USBD_PIPE_HANDLE());
 }
 
@@ -181,12 +131,5 @@ IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
 {
 	NT_ASSERT(extract_num(seqnum));
 	auto ctx = make_peek_context(seqnum);
-
-	auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
-	if (!irp) { // irp is cancelled
-//              irp = dequeue_rx_unlink_irp(vpdo, seqnum); // may be irp is still waiting for read irp to issue CMD_UNLINK
-	}
-
-	return irp;
+	return IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
 }
-

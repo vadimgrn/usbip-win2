@@ -14,33 +14,30 @@ inline bool is_initialized(const IO_CSQ &csq)
         return csq.CsqAcquireLock;
 }
 
-constexpr void *InsertTail() { return nullptr; }
-constexpr void *InsertHead() { return InsertTail; }
-
 struct peek_context
 {
-	bool use_seqnum;
 	union {
 		seqnum_t seqnum;
 		USBD_PIPE_HANDLE handle;
 	};
+	bool use_seqnum;
 };
+
+void clear_context(IRP *irp);
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
 
 constexpr auto make_peek_context(seqnum_t seqnum)
 {
-	return peek_context{true, {seqnum}};
+	return peek_context{{seqnum}, true};
 }
 
 inline auto make_peek_context(USBD_PIPE_HANDLE handle)
 {
 	NT_ASSERT(handle);
-	peek_context ctx{false};
+	peek_context ctx{};
 	ctx.handle = handle;
 	return ctx;
 }
-
-void enqueue_unlink_irp(vpdo_dev_t *vpdo, IRP *irp);
-IRP *dequeue_unlink_irp(vpdo_dev_t *vpdo, seqnum_t seqnum_unlink = 0);
 
 inline auto as_seqnum(const void *p)
 {
@@ -66,26 +63,12 @@ inline auto get_seqnum(IRP *irp)
 	return as_seqnum(irp->Tail.Overlay.DriverContext[0]);
 }
 
-inline void set_seqnum_unlink(IRP *irp, seqnum_t seqnum_unlink)
-{
-	irp->Tail.Overlay.DriverContext[1] = as_pointer(seqnum_unlink);
-}
-
-inline auto get_seqnum_unlink(IRP *irp)
-{
-	return as_seqnum(irp->Tail.Overlay.DriverContext[1]);
-}
-
 inline void set_pipe_handle(IRP *irp, USBD_PIPE_HANDLE PipeHandle)
 {
-	irp->Tail.Overlay.DriverContext[2] = PipeHandle;
+	irp->Tail.Overlay.DriverContext[1] = PipeHandle;
 }
 
 inline auto get_pipe_handle(IRP *irp)
 {
-	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
+	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[1]);
 }
-
-void clear_context(IRP *irp, bool skip_unlink);
-
-IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);

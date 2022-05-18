@@ -22,10 +22,10 @@ namespace
 auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, 
         _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
 {
-        clear_context(irp, false);
+        clear_context(irp);
         set_seqnum(irp, hdr.base.seqnum);
 
-        if (auto err = IoCsqInsertIrpEx(&vpdo.irps_csq, irp, nullptr, InsertTail())) {
+        if (auto err = IoCsqInsertIrpEx(&vpdo.irps_csq, irp, nullptr, nullptr)) {
                 return err;
         }
 
@@ -932,39 +932,34 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 
 
 /*
- * There is a race condition between RET_SUBMIT and CMD_UNLINK.
+ * There is a race condition between IRP cancelation and RET_SUBMIT.
  * Sequence of events:
- * 1.Pending IRPs are waiting for RET_SUBMIT in tx_irps.
+ * 1.IRP is waiting for RET_SUBMIT in CSQ.
  * 2.An upper driver cancels IRP.
- * 3.IRP is removed from tx_irps, CsqCompleteCanceledIrp callback is called.
- * 4.IRP is inserted into rx_irps_unlink (waiting for read IRP).
- * 5.IRP is dequeued from rx_irps_unlink and appended into tx_irps_unlink atomically.
- * 6.CMD_UNLINK is issued.
+ * 3.IRP is removed from CSQ, IO_CSQ_COMPLETE_CANCELED_IRP callback is called.
+ * 4.The callback inserts IRP into a list of unlinked IRPs (this step is imaginary).
  * 
  * RET_SUBMIT can be received
- * a)Before #3 - normal case, IRP will be dequeued from tx_irps.
- * b)Between #3 and #4, IRP will not be found.
- * c)Between #4 and #5, IRP will be dequeued from rx_irps_unlink.
- * d)After #5, IRP will be dequeued from tx_irps_unlink.
+ * a)Before #3 - normal case, IRP will be dequeued from CSQ.
+ * b)Before #4 - IRP will not be found in CSQ and the list.
+ * c)After #4 - IRP will be found in the list.
  * 
- * Case b) is unavoidable because CSQ library calls CsqCompleteCanceledIrp after releasing a lock.
- * For that reason the cancellation logic is simplified and tx_irps_unlink is removed.
- * IRP will be completed as soon as read thread will dequeue it from rx_irps_unlink and CMD_UNLINK will be issued.
+ * Case b) is unavoidable because CSQ library calls IO_CSQ_COMPLETE_CANCELED_IRP after releasing a lock.
+ * For that reason the cancellation logic is simplified and list of unlinked IRPs is not used.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
-        auto seqnum = get_seqnum(irp);
-        NT_ASSERT(extract_num(seqnum));
+        if (auto sock = vpdo.sock) {
+                auto seqnum = get_seqnum(irp);
+                TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
 
-        TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
-        set_seqnum_unlink(irp, seqnum);
+                usbip_header hdr{};
+                set_cmd_unlink_usbip_header(vpdo, hdr, seqnum);
 
-        usbip_header hdr{};
-        set_cmd_unlink_usbip_header(vpdo, hdr, seqnum);
-
-        if (auto err = usbip::send_cmd(vpdo.sock, hdr)) {
-                Trace(TRACE_LEVEL_ERROR, "send_cmd %!STATUS!", err);
+                if (auto err = usbip::send_cmd(sock, hdr)) {
+                        Trace(TRACE_LEVEL_ERROR, "send_cmd %!STATUS!", err);
+                }
         }
 
         complete_canceled_irp(irp);

@@ -86,6 +86,6 @@ void set_cmd_unlink_usbip_header(vpdo_dev_t &vpdo, usbip_header &hdr, seqnum_t s
 	r.seqnum = next_seqnum(vpdo, r.direction);
 	r.ep = 0;
 
-	NT_ASSERT(seqnum_unlink);
+	NT_ASSERT(extract_num(seqnum_unlink));
 	hdr.u.cmd_unlink.seqnum = seqnum_unlink;
 }
