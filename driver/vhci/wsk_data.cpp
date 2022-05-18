@@ -18,11 +18,10 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 		auto &buf = i->Buffer;
 
 		if (!buf.Length) {
-			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, skipped", index, j, ptr4log(i), buf.Length);
 			continue;
 		} else if (offset >= buf.Length) {
-			TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, %Iu bytes skipped to copy from offset %Iu",
-				  index, j, ptr4log(i), buf.Length, len, offset);
+			TraceWSK("DATA_INDICATION[%d][%d]=%04x: length %Iu, skipped, offset %Iu",
+				  index, j, ptr4log(i), buf.Length, offset);
 			offset -= buf.Length;
 			continue;
 		}
@@ -32,7 +31,7 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, priority);
 		if (!sysaddr) {
 			Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION[%d][%d]=%04x: MmGetSystemAddressForMdlSafe error", 
-				index, j, ptr4log(i));
+				                  index, j, ptr4log(i));
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 
@@ -45,7 +44,7 @@ auto copy(_Out_ void* &dest, _Inout_ size_t &len,
 		dest = static_cast<char*>(dest) + cnt;
 		len -= cnt;
 
-		TraceWSK("DATA_INDICATION[%d][%d]=%04x: buffer length %Iu, %Iu bytes copied from offset %Iu, left to copy %Iu", 
+		TraceWSK("DATA_INDICATION[%d][%d]=%04x: length %Iu, %Iu bytes copied from offset %Iu, left to copy %Iu", 
 			  index, j, ptr4log(i), buf.Length, cnt, offset, len);
 
 		offset = 0;
@@ -68,7 +67,7 @@ bool wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 	bool ok = cnt < ARRAYSIZE(vpdo.wsk_data);
 	if (ok) {
-		TraceWSK("DATA_INDICATION[%d] = %04x, size %Iu", cnt, ptr4log(DataIndication), BytesIndicated);
+		TraceWSK("DATA_INDICATION[%d]=%04x, size %Iu", cnt, ptr4log(DataIndication), BytesIndicated);
 		vpdo.wsk_data[cnt++] = DataIndication;
 	}
 
@@ -101,7 +100,7 @@ bool wsk_data_pop(_Inout_ vpdo_dev_t &vpdo, _In_ bool release_last)
 	} else if (auto err = release(vpdo.sock, victim)) {
 		Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION %04x release %!STATUS!", ptr4log(victim), err);
 	} else {
-		TraceWSK("DATA_INDICATION %04x released, remaining %d", ptr4log(victim), cnt);
+		TraceWSK("DATA_INDICATION %04x released", ptr4log(victim));
 	}
 
 	return true;
@@ -115,17 +114,19 @@ void wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		auto di_len = wsk::size(di);
 		auto remaining = di_len - vpdo.wsk_data_offset;
 
-		TraceWSK("DATA_INDICATION %04x: size %Iu, %Iu bytes left to consume from offset %Iu", 
-			  ptr4log(di), di_len, len, vpdo.wsk_data_offset);
-
 		if (remaining > len) {
+			TraceWSK("DATA_INDICATION %04x, size %Iu, %Iu bytes consumed from offset %Iu, %Iu bytes remaining", 
+				  ptr4log(di), di_len, len, vpdo.wsk_data_offset, remaining - len);
+
 			vpdo.wsk_data_offset += len;
-			TraceWSK("DATA_INDICATION %04x retained, size %Iu, offset %Iu", 
-				  ptr4log(di), di_len, vpdo.wsk_data_offset);
 			break;
 		}
 
 		len -= remaining;
+
+		TraceWSK("DATA_INDICATION %04x, size %Iu, %Iu bytes consumed from offset %Iu, %Iu bytes left to consume",
+			  ptr4log(di), di_len, remaining, vpdo.wsk_data_offset, len);
+
 		NT_VERIFY(wsk_data_pop(vpdo, false)); // do not release last (just pushed) element 
 	}
 }

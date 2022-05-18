@@ -62,38 +62,6 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_h
         return STATUS_SUCCESS;
 }
 
-/*
- * URB must have TransferBuffer* members.
- */
-auto make_transfer_buffer_mdl(_Out_ usbip::Mdl &mdl, _In_ const URB &urb)
-{
-        auto func = urb.UrbHeader.Function;
-        bool use_mdl = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ||
-                       func == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
-
-        auto err = STATUS_SUCCESS;
-        auto r = AsUrbTransfer(&urb);
-
-        if (!r->TransferBufferLength) {
-                NT_ASSERT(!mdl);
-        } else if (auto buf = use_mdl ? nullptr : r->TransferBuffer) {
-                mdl = usbip::Mdl(usbip::memory::nonpaged, buf, r->TransferBufferLength);
-                err = mdl.prepare_nonpaged();
-        } else if (auto m = r->TransferBufferMDL) {
-                mdl = usbip::Mdl(m);
-                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
-        } else {
-                Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
-                err = STATUS_INVALID_PARAMETER;
-        }
-
-        if (err) {
-                mdl.reset();
-        }
-
-        return err;
-}
-
 } // namespace
 
 
@@ -179,4 +147,37 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_op
         }
 
         return STATUS_SUCCESS;
+}
+
+/*
+ * URB must have TransferBuffer* members.
+ */
+NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ const URB &urb)
+{
+        auto func = urb.UrbHeader.Function;
+
+        bool use_mdl = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ||
+                       func == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
+
+        auto err = STATUS_SUCCESS;
+        auto r = AsUrbTransfer(&urb);
+
+        if (!r->TransferBufferLength) {
+                NT_ASSERT(!mdl);
+        } else if (auto buf = use_mdl ? nullptr : r->TransferBuffer) {
+                mdl = Mdl(memory::nonpaged, buf, r->TransferBufferLength);
+                err = mdl.prepare_nonpaged();
+        } else if (auto m = r->TransferBufferMDL) {
+                mdl = Mdl(m);
+                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
+                err = STATUS_INVALID_PARAMETER;
+        }
+
+        if (err) {
+                mdl.reset();
+        }
+
+        return err;
 }

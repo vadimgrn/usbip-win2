@@ -87,9 +87,14 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
         free_usb_dev_interface(d.usb_dev_interface);
 }
 
+/*
+ * The socket is closed, there is no concurrency with send_complete from internal _ioctl.cpp
+ */
 PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
+	NT_ASSERT(!vpdo.sock);
+
 	TraceCall("%p", &vpdo);
 
 	if (is_initialized(vpdo.irps_csq)) {

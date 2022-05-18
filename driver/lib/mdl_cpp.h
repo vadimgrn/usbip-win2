@@ -35,9 +35,9 @@ public:
 
         auto get() const { return m_mdl; }
 
-        bool managed() const { return m_kind; }
-        bool nonpaged() const { return m_kind < 0; }
-        bool paged() const { return m_kind > 0; }
+        bool managed() const { return m_type; }
+        auto nonpaged() const { return m_type == 1; }
+        auto paged() const { return m_type == 2; }
 
         auto addr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : nullptr; }
         auto offset() const { return m_mdl ? MmGetMdlByteOffset(m_mdl) : 0; }
@@ -59,10 +59,10 @@ public:
         }
 
 private:
-        int m_kind = 0;
+        int m_type = 0;
         MDL *m_mdl{};
 
-        void reset(_In_ MDL *mdl, _In_ int kind);
+        void reset(_In_ MDL *mdl, _In_ int type);
 
         NTSTATUS lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
         bool locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }

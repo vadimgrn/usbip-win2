@@ -126,7 +126,7 @@ struct vpdo_dev_t : vdev_t
 	
 	seqnum_t seqnum; // @see next_seqnum
 
-	_WSK_DATA_INDICATION* wsk_data[2];
+	_WSK_DATA_INDICATION* wsk_data[8];
 	int wsk_data_cnt;
 	size_t wsk_data_offset; // for wsk_data[0]
 

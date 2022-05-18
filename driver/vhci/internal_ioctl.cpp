@@ -12,12 +12,21 @@
 #include "urbtransfer.h"
 #include "usbd_helper.h"
 #include "usbip_network.h"
+#include "vhci.h"
+#include "pdu.h"
 
 namespace
 {
 
+auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
+{
+        TraceCall("irp %04x %!STATUS!", ptr4log(irp), status);
+        NT_ASSERT(!irp->IoStatus.Information);
+        return CompleteRequest(irp, status);
+}
+
 /*
- * IRP can be canceled only if STATUS_PENDING is returned from IRP_MJ_INTERNAL_DEVICE_CONTROL.
+ * IRP can be canceled only when STATUS_PENDING was returned from IRP_MJ_INTERNAL_DEVICE_CONTROL.
  */
 auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, 
         _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
@@ -25,7 +34,7 @@ auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         clear_context(irp);
         set_seqnum(irp, hdr.base.seqnum);
 
-        if (auto err = IoCsqInsertIrpEx(&vpdo.irps_csq, irp, nullptr, nullptr)) {
+        if (auto err = enqueue_irp(vpdo, irp)) {
                 return err;
         }
 
@@ -35,6 +44,107 @@ auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         }
 
         return STATUS_PENDING;
+}
+
+struct WskAsyncContext
+{
+        WSK_BUF buf;
+        usbip_header hdr;
+        usbip::Mdl mdl_hdr;
+        usbip::Mdl mdl_buf;
+        usbip::Mdl mdl_isoc;
+        usbip_iso_packet_descriptor isoc[0];
+};
+
+static_assert(sizeof(WSK_BUF) == 24);
+static_assert(sizeof(usbip_header) == 48);
+static_assert(sizeof(usbip::Mdl) == 16);
+static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
+
+/*
+ * WskReceiveEvent can run concurrently with this completion handler, do not touch ioctl IRP.
+ */
+NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+{
+        auto &r = wsk_irp->IoStatus;
+        TraceWSK("WSK irp %04x, %!STATUS!, Information %Iu(%#Ix)", ptr4log(wsk_irp), r.Status, r.Information, r.Information);
+
+        auto ctx = static_cast<WskAsyncContext*>(Context);
+        auto &vpdo = *static_cast<vpdo_dev_t*>(wsk_irp->Tail.Overlay.DriverContext[0]);
+
+        if (!r.Status) { // request has sent
+                NT_ASSERT(ctx->buf.Length == static_cast<ULONG>(r.Information));
+        } else if (auto irp = dequeue_irp(vpdo, ctx->hdr.base.seqnum)) {
+                complete_internal_ioctl(irp, STATUS_UNSUCCESSFUL);
+        } else {
+                // IRP was canceled
+        }
+
+        ctx->mdl_hdr.reset();
+        ctx->mdl_buf.reset();
+        ExFreePoolWithTag(ctx, USBIP_VHCI_POOL_TAG);
+
+        IoFreeIrp(wsk_irp);
+        return StopCompletion;
+}
+
+auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, 
+        _In_ const usbip_header &hdr, _Inout_opt_ const URB &transfer_buffer)
+{
+        clear_context(irp);
+        set_seqnum(irp, hdr.base.seqnum);
+
+        if (auto err = enqueue_irp(vpdo, irp)) {
+                return err;
+        }
+
+        auto wsk_irp = IoAllocateIrp(1, false);
+        NT_ASSERT(wsk_irp);
+
+        wsk_irp->Tail.Overlay.DriverContext[0] = &vpdo;
+
+        WskAsyncContext *ctx = (WskAsyncContext*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ctx), USBIP_VHCI_POOL_TAG);
+        NT_ASSERT(ctx);
+
+        RtlCopyMemory(&ctx->hdr, &hdr, sizeof(ctx->hdr));
+
+        ctx->mdl_hdr = usbip::Mdl(usbip::memory::nonpaged, &ctx->hdr, sizeof(ctx->hdr));
+        NT_VERIFY(!ctx->mdl_hdr.prepare_nonpaged());
+
+        if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                        NT_VERIFY(!dequeue_irp(vpdo, hdr.base.seqnum));
+                        return err;
+                }
+                ctx->mdl_hdr.next(ctx->mdl_buf);
+        }
+
+        ctx->buf.Mdl = ctx->mdl_hdr.get();
+        ctx->buf.Length = size(ctx->mdl_hdr);
+
+        NT_ASSERT(ctx->buf.Length == get_total_size(hdr));
+
+        {
+                char str[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
+                        ptr4log(irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr));
+        }
+
+        byteswap_header(ctx->hdr, swap_dir::host2net);
+
+        IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
+        
+        switch (auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, wsk_irp)) {
+        case STATUS_PENDING:
+        case STATUS_SUCCESS:
+                TraceWSK("WSK irp %04x", ptr4log(wsk_irp));
+                return STATUS_PENDING;
+        default:
+                Trace(TRACE_LEVEL_ERROR, "WskSend %!STATUS!", err);
+                NT_VERIFY(!dequeue_irp(vpdo, hdr.base.seqnum));
+                return STATUS_UNSUCCESSFUL;
+        }
 }
 
 /*
@@ -136,7 +246,7 @@ NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
 	auto ctx = make_peek_context(PipeHandle);
 
 	while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx)) {
-		send_cmd_unlink(vpdo, irp);
+                send_cmd_unlink(vpdo, irp);
 	}
 
 	return STATUS_SUCCESS;
@@ -469,10 +579,8 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         auto &r = urb.UrbSelectConfiguration;
         auto cd = r.ConfigurationDescriptor; // nullptr if unconfigured
 
-        {
-                char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-                TraceUrb("irp %04x -> %s", ptr4log(irp), select_configuration_str(buf, sizeof(buf), &r));
-        }
+        UCHAR value = cd ? cd->bConfigurationValue : 0;
+        TraceUrb("bConfigurationValue %d", value);
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
@@ -484,7 +592,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         auto pkt = get_submit_setup(&hdr);
         pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
         pkt->bRequest = USB_REQUEST_SET_CONFIGURATION;
-        pkt->wValue.W = cd ? cd->bConfigurationValue : 0;
+        pkt->wValue.W = value;
 
         return send_to_server(vpdo, irp, hdr);
 }
@@ -494,12 +602,11 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         PAGED_CODE();
 
         auto &r = urb.UrbSelectInterface;
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
+        auto &iface = r.Interface;
 
-        {
-                char buf[SELECT_INTERFACE_STR_BUFSZ];
-                TraceUrb("irp %04x -> %s", ptr4log(irp), select_interface_str(buf, sizeof(buf), &urb.UrbSelectInterface));
-        }
+        TraceUrb("InterfaceNumber %d, AlternateSetting %d", iface.InterfaceNumber, iface.AlternateSetting);
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
         usbip_header hdr{};
         if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags)) {
@@ -509,8 +616,8 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         auto pkt = get_submit_setup(&hdr);
         pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
         pkt->bRequest = USB_REQUEST_SET_INTERFACE;
-        pkt->wValue.W = r.Interface.AlternateSetting;
-        pkt->wIndex.W = r.Interface.InterfaceNumber;
+        pkt->wValue.W = iface.AlternateSetting;
+        pkt->wIndex.W = iface.InterfaceNumber;
 
         return send_to_server(vpdo, irp, hdr);
 }
@@ -600,11 +707,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         set_pipe_handle(irp, r.PipeHandle);
 
-        if (KeGetCurrentIrql() >= DISPATCH_LEVEL) {
-                return STATUS_INVALID_LEVEL;
-        }
-
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send_to_server_async(vpdo, irp, hdr, urb);
 }
 
 /*
@@ -919,13 +1022,6 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
         pkt->wValue.W = USB_PORT_FEAT_RESET;
 
         return send_to_server(vpdo, irp, hdr);
-}
-
-auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
-{
-        TraceCall("irp %04x %!STATUS!", ptr4log(irp), status);
-        NT_ASSERT(!irp->IoStatus.Information);
-        return CompleteRequest(irp, status);
 }
 
 } // namespace

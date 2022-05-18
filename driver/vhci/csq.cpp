@@ -25,7 +25,7 @@ auto InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID /*InsertContext*/)
 	auto vpdo = to_vpdo(csq);
 	InsertTailList(&vpdo->irps, list_entry(irp));
 
-	TraceCSQ("%04x(seqnum %u)", ptr4log(irp), seqnum);
+	TraceCSQ("%04x", ptr4log(irp));
 	return STATUS_SUCCESS;
 }
 
@@ -125,6 +125,11 @@ void clear_context(IRP *irp)
 {
 	set_seqnum(irp, 0);
 	set_pipe_handle(irp, USBD_PIPE_HANDLE());
+}
+
+NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp)
+{
+	return IoCsqInsertIrpEx(&vpdo.irps_csq, irp, nullptr, nullptr);
 }
 
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)

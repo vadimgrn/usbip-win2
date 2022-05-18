@@ -4,13 +4,13 @@
 * @see reactos\ntoskrnl\io\iomgr\iomdl.c
 */
 usbip::Mdl::Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
-        m_kind(pool == memory::nonpaged ? -1 : 1),
+        m_type(pool == memory::nonpaged ? 1 : 2),
         m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr))
 {
 }
 
 usbip::Mdl::Mdl(Mdl&& m) :
-        m_kind(m.m_kind),
+        m_type(m.m_type),
         m_mdl(m.release())
 {
 }
@@ -18,8 +18,8 @@ usbip::Mdl::Mdl(Mdl&& m) :
 auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 {
         if (m_mdl != m.m_mdl) {
-                auto kind = m.m_kind;
-                reset(m.release(), kind);
+                auto type = m.m_type;
+                reset(m.release(), type);
         }
 
         return *this;
@@ -27,14 +27,14 @@ auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 
 MDL* usbip::Mdl::release()
 {
-        m_kind = 0;
+        m_type = 0;
 
         auto m = m_mdl;
         m_mdl = nullptr;
         return m;
 }
 
-void usbip::Mdl::reset(_In_ MDL *mdl, _In_ int kind)
+void usbip::Mdl::reset(_In_ MDL *mdl, _In_ int type)
 {
         if (m_mdl && managed()) {
                 NT_ASSERT(m_mdl != mdl);
@@ -42,7 +42,7 @@ void usbip::Mdl::reset(_In_ MDL *mdl, _In_ int kind)
                 IoFreeMdl(m_mdl);
         }
 
-        m_kind = kind;
+        m_type = type;
         m_mdl = mdl;
 }
 

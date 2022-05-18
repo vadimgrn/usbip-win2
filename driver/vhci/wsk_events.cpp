@@ -9,27 +9,37 @@
 #include "urbtransfer.h"
 #include "vpdo.h"
 #include "vpdo_dsc.h"
-#include "wsk_cpp.h"
 #include "wsk_data.h"
 #include "csq.h"
+#include "usbip_network.h"
 
 namespace
 {
 
-auto get_urb_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
+/*
+ * URB must have TransferBuffer* members.
+ */
+auto get_urb_buffer(_In_ URB &urb)
 {
-	if (TransferBuffer) {
-		return TransferBuffer;
+	auto func = urb.UrbHeader.Function;
+
+	bool mdl = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ||
+		   func == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
+
+	auto &r = *AsUrbTransfer(&urb);
+
+	if (!mdl && r.TransferBuffer) {
+		return r.TransferBuffer;
 	}
 
-	NT_ASSERT(TransferBufferMDL);
+	NT_ASSERT(r.TransferBufferMDL);
 
-	TransferBuffer = MmGetSystemAddressForMdlSafe(TransferBufferMDL, NormalPagePriority | MdlMappingNoExecute);
-	if (!TransferBuffer) {
+	auto buf = MmGetSystemAddressForMdlSafe(r.TransferBufferMDL, NormalPagePriority | MdlMappingNoExecute);
+	if (!buf) {
 		Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
 	}
 
-	return TransferBuffer;
+	return buf;
 }
 
 /*
@@ -37,23 +47,18 @@ auto get_urb_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
  */
 auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 {
-	auto err = STATUS_SUCCESS;
-
-	bool mdl = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL;
-	NT_ASSERT(urb.UrbHeader.Function != URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL);
-
 	auto &r = *AsUrbTransfer(&urb);
-	buf = get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL);
 
-	if (buf) {
-		err = wsk_data_copy(vpdo, buf, r.TransferBufferLength);
-		if (err) {
-			NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
-			buf = nullptr;
-		}
-	} else {
-		err = STATUS_INSUFFICIENT_RESOURCES;
+	buf = get_urb_buffer(urb);
+	if (!buf) {
 		r.TransferBufferLength = 0;
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	auto err = wsk_data_copy(vpdo, buf, r.TransferBufferLength);
+	if (err) {
+		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
+		buf = nullptr;
 	}
 
 	return err;
@@ -292,9 +297,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 	ULONG src_len = dir_in ? res.actual_length : 0;
 
 	auto src = reinterpret_cast<const usbip_iso_packet_descriptor*>(src_buf + src_len);
-
-	auto ptr = r.Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? nullptr : r.TransferBuffer;
-	auto buf = (char*)get_urb_buffer(ptr, r.TransferBufferMDL);
+	auto buf = (char*)get_urb_buffer(urb);
 
 	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : nullptr, src_len) : STATUS_UNSUCCESSFUL;
 }
@@ -490,8 +493,8 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
                 Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
         }
 
-        TraceCall("Complete %04x, %!STATUS!", ptr4log(irp), st);
-        IoCompleteRequest(irp, IO_NO_INCREMENT);
+	TraceCall("Complete irp %04x, %!STATUS!", ptr4log(irp), st);
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
 /*
@@ -578,7 +581,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
-	TraceCall("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
+	TraceWSK("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
 	return STATUS_SUCCESS;
 }
 
@@ -592,13 +595,11 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 
 	{
 		char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
-		TraceCall("Enter: vpdo %04x, [%s], DataIndication %04x, BytesIndicated %Iu", 
-			   ptr4log(vpdo), wsk::ReceiveEventFlags(buf, sizeof(buf), Flags), 
-			   ptr4log(DataIndication), BytesIndicated);
+		TraceWSK("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
 	}
 
 	auto st = DataIndication ? receive_event(*vpdo, DataIndication, BytesIndicated) : STATUS_SUCCESS;
 
-	TraceCall("Exit %!STATUS!", st);
+	TraceWSK("Exit %!STATUS!", st);
 	return st;
 }
