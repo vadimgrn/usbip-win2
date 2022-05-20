@@ -14,19 +14,14 @@ inline auto to_vpdo(IO_CSQ *csq)
 	return CONTAINING_RECORD(csq, vpdo_dev_t, irps_csq);
 }
 
-auto InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp, _In_ PVOID /*InsertContext*/)
+void InsertIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	auto seqnum = get_seqnum(irp);
-	if (!extract_num(seqnum)) {
-		TraceCSQ("%04x -> invalid seqnum %u", ptr4log(irp), seqnum);
-		return STATUS_INVALID_PARAMETER;
-	}
+	NT_ASSERT(is_valid_seqnum(get_seqnum(irp)));
 
 	auto vpdo = to_vpdo(csq);
 	InsertTailList(&vpdo->irps, list_entry(irp));
 
 	TraceCSQ("%04x", ptr4log(irp));
-	return STATUS_SUCCESS;
 }
 
 void RemoveIrp(_In_ IO_CSQ*, _In_ IRP *irp)
@@ -97,7 +92,7 @@ void ReleaseLock(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 
 void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	TraceCSQ("%04x", ptr4log(irp));
+	TraceCSQ("irql %!irql!, irp %04x", KeGetCurrentIrql(), ptr4log(irp));
 	auto vpdo = to_vpdo(csq);
 	send_cmd_unlink(*vpdo, irp);
 }
@@ -112,7 +107,7 @@ PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
 	InitializeListHead(&vpdo.irps);
 	KeInitializeSpinLock(&vpdo.irps_lock);
 
-	return IoCsqInitializeEx(&vpdo.irps_csq,
+	return IoCsqInitialize(&vpdo.irps_csq,
 				InsertIrp,
 				RemoveIrp,
 				PeekNextIrp,
@@ -127,14 +122,25 @@ void clear_context(IRP *irp)
 	set_pipe_handle(irp, USBD_PIPE_HANDLE());
 }
 
-NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp)
+NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ bool add)
 {
-	return IoCsqInsertIrpEx(&vpdo.irps_csq, irp, nullptr, nullptr);
+	if (add) {
+		auto seqnum = get_seqnum(irp);
+		if (auto err = complete_irps_add(vpdo, seqnum)) {
+			return err;
+		}
+	}
+	
+	IoCsqInsertIrp(&vpdo.irps_csq, irp, nullptr);
+	return STATUS_SUCCESS;
 }
 
-IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum, _In_ bool remove)
 {
-	NT_ASSERT(extract_num(seqnum));
+	if (remove) {
+		complete_irps_remove(vpdo, seqnum);
+	}
+
 	auto ctx = make_peek_context(seqnum);
 	return IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
 }

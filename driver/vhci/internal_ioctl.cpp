@@ -32,14 +32,17 @@ auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
 {
         clear_context(irp);
-        set_seqnum(irp, hdr.base.seqnum);
 
-        if (auto err = enqueue_irp(vpdo, irp)) {
+        auto seqnum = hdr.base.seqnum;
+        set_seqnum(irp, seqnum);
+
+        bool add_remove = false;
+        if (auto err = enqueue_irp(vpdo, irp, add_remove)) {
                 return err;
         }
 
         if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
-                NT_VERIFY(dequeue_irp(vpdo, hdr.base.seqnum));
+                NT_VERIFY(dequeue_irp(vpdo, seqnum, add_remove)); // hdr.base.seqnum is in network byte order
                 return err;
         }
 
@@ -48,6 +51,8 @@ auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
 
 struct WskAsyncContext
 {
+        vpdo_dev_t *vpdo;
+        IRP *irp;
         WSK_BUF buf;
         usbip_header hdr;
         usbip::Mdl mdl_hdr;
@@ -63,21 +68,31 @@ static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 
 /*
  * WskReceiveEvent can run concurrently with this completion handler, do not touch ioctl IRP.
+ * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  */
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-        auto &r = wsk_irp->IoStatus;
-        TraceWSK("WSK irp %04x, %!STATUS!, Information %Iu(%#Ix)", ptr4log(wsk_irp), r.Status, r.Information, r.Information);
-
         auto ctx = static_cast<WskAsyncContext*>(Context);
-        auto &vpdo = *static_cast<vpdo_dev_t*>(wsk_irp->Tail.Overlay.DriverContext[0]);
+
+        auto &vpdo = *ctx->vpdo;
+        auto seqnum = get_seqnum(ctx->irp); // ctx->hdr.base.seqnum is in network byte order
+
+        auto &r = wsk_irp->IoStatus;
+        TraceWSK("Enter irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu(%#Ix)", 
+                KeGetCurrentIrql(), ptr4log(wsk_irp), r.Status, r.Information, r.Information);
+
+        auto canceled = !complete_irps_remove(vpdo, seqnum); // CompleteCanceledIrp was first
 
         if (!r.Status) { // request has sent
                 NT_ASSERT(ctx->buf.Length == static_cast<ULONG>(r.Information));
-        } else if (auto irp = dequeue_irp(vpdo, ctx->hdr.base.seqnum)) {
-                complete_internal_ioctl(irp, STATUS_UNSUCCESSFUL);
-        } else {
-                // IRP was canceled
+                if (canceled) {
+                        complete_canceled_irp(ctx->irp);
+                }
+        } else if (auto victim = dequeue_irp(vpdo, seqnum, true)) {
+                NT_ASSERT(victim == ctx->irp);
+                complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
+//        } else {
+//              complete_canceled_irp(irp);
         }
 
         ctx->mdl_hdr.reset();
@@ -85,6 +100,8 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         ExFreePoolWithTag(ctx, USBIP_VHCI_POOL_TAG);
 
         IoFreeIrp(wsk_irp);
+
+        TraceWSK("Exit, wsk irp %04x", ptr4log(wsk_irp));
         return StopCompletion;
 }
 
@@ -92,19 +109,24 @@ auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         _In_ const usbip_header &hdr, _Inout_opt_ const URB &transfer_buffer)
 {
         clear_context(irp);
-        set_seqnum(irp, hdr.base.seqnum);
 
-        if (auto err = enqueue_irp(vpdo, irp)) {
+        auto seqnum = hdr.base.seqnum;
+        set_seqnum(irp, seqnum);
+
+        bool add_remove = true;
+        if (auto err = enqueue_irp(vpdo, irp, add_remove)) {
+                Trace(TRACE_LEVEL_ERROR, "enqueue_irp %!STATUS!", err);
                 return err;
         }
 
         auto wsk_irp = IoAllocateIrp(1, false);
         NT_ASSERT(wsk_irp);
 
-        wsk_irp->Tail.Overlay.DriverContext[0] = &vpdo;
-
         WskAsyncContext *ctx = (WskAsyncContext*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ctx), USBIP_VHCI_POOL_TAG);
         NT_ASSERT(ctx);
+
+        ctx->vpdo = &vpdo;
+        ctx->irp = irp;
 
         RtlCopyMemory(&ctx->hdr, &hdr, sizeof(ctx->hdr));
 
@@ -114,7 +136,7 @@ auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
                 if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
-                        NT_VERIFY(!dequeue_irp(vpdo, hdr.base.seqnum));
+                        NT_VERIFY(!dequeue_irp(vpdo, seqnum, add_remove));
                         return err;
                 }
                 ctx->mdl_hdr.next(ctx->mdl_buf);
@@ -138,11 +160,11 @@ auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         switch (auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, wsk_irp)) {
         case STATUS_PENDING:
         case STATUS_SUCCESS:
-                TraceWSK("WSK irp %04x", ptr4log(wsk_irp));
+                TraceWSK("wsk irp %04x", ptr4log(wsk_irp));
                 return STATUS_PENDING;
         default:
                 Trace(TRACE_LEVEL_ERROR, "WskSend %!STATUS!", err);
-                NT_VERIFY(!dequeue_irp(vpdo, hdr.base.seqnum));
+                NT_VERIFY(!dequeue_irp(vpdo, seqnum, add_remove)); // hdr.base.seqnum is in network byte order
                 return STATUS_UNSUCCESSFUL;
         }
 }
@@ -1046,10 +1068,10 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  */
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
-        if (auto sock = vpdo.sock) {
-                auto seqnum = get_seqnum(irp);
-                TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
+        auto seqnum = get_seqnum(irp);
+        TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
 
+        if (auto sock = vpdo.sock) {
                 usbip_header hdr{};
                 set_cmd_unlink_usbip_header(vpdo, hdr, seqnum);
 
@@ -1058,7 +1080,10 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
                 }
         }
 
-        complete_canceled_irp(irp);
+        auto send_complete = !complete_irps_remove(vpdo, seqnum);
+        if (send_complete) {
+                complete_canceled_irp(irp);
+        }
 }
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)

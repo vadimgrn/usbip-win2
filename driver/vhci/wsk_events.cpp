@@ -542,7 +542,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 	auto seqnum = base.seqnum;
 
-	if (extract_num(seqnum)) {
+	if (is_valid_seqnum(seqnum)) {
 		base.direction = extract_dir(seqnum); // always zero in server response
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum");
@@ -559,7 +559,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 		return STATUS_PENDING;
 	}
 
-	auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, seqnum) : nullptr;
+	auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, seqnum, false) : nullptr;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];

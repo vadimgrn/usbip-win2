@@ -23,8 +23,8 @@ struct peek_context
 	bool use_seqnum;
 };
 
-NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);
-IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
+NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ bool add);
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum, _In_ bool remove);
 
 void clear_context(IRP *irp);
 

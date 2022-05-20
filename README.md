@@ -168,6 +168,8 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
   - Run following commands and copy the output
 ```
 !analyze -v
+!wmitrace.searchpath %TEMP%\tmfs
+!wmitrace.setprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wmitrace.logdump usbip-vhci
 ```
 

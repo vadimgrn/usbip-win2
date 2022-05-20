@@ -150,6 +150,13 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
         close_socket(vpdo);
 	cancel_pending_irps(vpdo);
 
+	if (auto &ptr = vpdo.complete_irps) {
+		ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
+		ptr = nullptr;
+		Trace(TRACE_LEVEL_VERBOSE, "complete_irps_cnt %d", vpdo.complete_irps_cnt);
+		vpdo.complete_irps_cnt = 0;
+	}
+
 	vhub_detach_vpdo(&vpdo);
 	free_strings(vpdo);
 

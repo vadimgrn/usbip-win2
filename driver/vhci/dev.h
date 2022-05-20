@@ -125,6 +125,10 @@ struct vpdo_dev_t : vdev_t
 	UNICODE_STRING usb_dev_interface;
 	
 	seqnum_t seqnum; // @see next_seqnum
+	
+	seqnum_t *complete_irps;
+	int complete_irps_cnt;
+	KSPIN_LOCK complete_irps_lock;
 
 	_WSK_DATA_INDICATION* wsk_data[8];
 	int wsk_data_cnt;
@@ -177,8 +181,10 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
 // first bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN)
 seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in);
+
 constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
 constexpr auto extract_dir(seqnum_t seqnum) { return usbip_dir(seqnum & 1); }
+constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 
 inline auto ptr4log(const void *ptr) // use format "%04x"
 {
@@ -199,3 +205,7 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
         return (busnum << 16) | devnum;
 }
+
+NTSTATUS realloc_complete_irps(vpdo_dev_t &vpdo);
+NTSTATUS complete_irps_add(vpdo_dev_t &vpdo, seqnum_t seqnum);
+bool complete_irps_remove(vpdo_dev_t &vpdo, seqnum_t seqnum);

@@ -165,6 +165,13 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
 
         vpdo->Self->Flags |= DO_POWER_PAGABLE | DO_DIRECT_IO;
 
+        KeInitializeSpinLock(&vpdo->complete_irps_lock);
+
+        if (auto err = realloc_complete_irps(*vpdo)) {
+                Trace(TRACE_LEVEL_ERROR, "realloc_complete_irps %!STATUS!", err);
+                return make_error(ERR_GENERAL);
+        }
+
         if (init(*vpdo, r)) {
                 return make_error(ERR_GENERAL);
         }
