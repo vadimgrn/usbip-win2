@@ -23,10 +23,11 @@ struct peek_context
 	bool use_seqnum;
 };
 
-NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ bool add);
-IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum, _In_ bool remove);
+void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
 
-void clear_context(IRP *irp);
+enum irp_status_t { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED };
+void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, bool clear_pipe_handle);
 
 constexpr auto make_peek_context(seqnum_t seqnum)
 {
@@ -65,12 +66,17 @@ inline auto get_seqnum(IRP *irp)
 	return as_seqnum(irp->Tail.Overlay.DriverContext[0]);
 }
 
+inline auto get_status(IRP *irp)
+{
+	return reinterpret_cast<LONG*>(irp->Tail.Overlay.DriverContext + 1);
+}
+
 inline void set_pipe_handle(IRP *irp, USBD_PIPE_HANDLE PipeHandle)
 {
-	irp->Tail.Overlay.DriverContext[1] = PipeHandle;
+	irp->Tail.Overlay.DriverContext[2] = PipeHandle;
 }
 
 inline auto get_pipe_handle(IRP *irp)
 {
-	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[1]);
+	return static_cast<USBD_PIPE_HANDLE>(irp->Tail.Overlay.DriverContext[2]);
 }

@@ -493,8 +493,13 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
                 Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
         }
 
-	TraceCall("Complete irp %04x, %!STATUS!", ptr4log(irp), st);
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	auto old_status = InterlockedCompareExchange(get_status(irp), ST_RECV_COMPLETE, ST_NONE);
+	NT_ASSERT(old_status != ST_IRP_CANCELED);
+
+	if (old_status == ST_SEND_COMPLETE) {
+		TraceCall("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
+		IoCompleteRequest(irp, IO_NO_INCREMENT);
+	}
 }
 
 /*
@@ -559,7 +564,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 		return STATUS_PENDING;
 	}
 
-	auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, seqnum, false) : nullptr;
+	auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, seqnum) : nullptr;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];

@@ -141,96 +141,10 @@ seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in)
 	static_assert(USBIP_DIR_IN);
 
 	static_assert(sizeof(vpdo.seqnum) == sizeof(LONG));
-	auto ptr = reinterpret_cast<LONG*>(&vpdo.seqnum);
 
 	while (true) {
-		auto num = InterlockedIncrement(ptr);
-		if (num > 0) {
-			return (static_cast<seqnum_t>(num) << 1) | seqnum_t(dir_in);
-		}
-		InterlockedExchange(ptr, 0);
-	}
-}
-
-/*
- * KeAcquireInStackQueuedSpinLock(&vpdo.complete_irps_lock, ...) must be acquired.
- */
-NTSTATUS realloc_complete_irps(vpdo_dev_t &vpdo)
-{
-	enum { INITIAL_COUNT = 16 };
-	auto err = STATUS_SUCCESS;
-
-	auto &ptr = vpdo.complete_irps;
-	auto &cnt = vpdo.complete_irps_cnt;
-
-	auto new_cnt = ptr && cnt ? 2*cnt : INITIAL_COUNT;
-
-	if (auto new_ptr = (seqnum_t*)ExAllocatePool2(POOL_FLAG_NON_PAGED, new_cnt*sizeof(*ptr), USBIP_VHCI_POOL_TAG)) {
-		RtlCopyMemory(new_ptr, ptr, cnt*sizeof(*ptr));
-		if (ptr) {
-			ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
-		}
-		ptr = new_ptr;
-		cnt = new_cnt;
-	} else {
-		err = STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	TraceCall("%d, %!STATUS!", vpdo.complete_irps_cnt, err);
-	return err;
-}
-
-NTSTATUS complete_irps_add(vpdo_dev_t &vpdo, seqnum_t seqnum)
-{
-	if (!is_valid_seqnum(seqnum)) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	auto err = STATUS_SUCCESS;
-
-	KLOCK_QUEUE_HANDLE qh;
-	KeAcquireInStackQueuedSpinLock(&vpdo.complete_irps_lock, &qh);
-
-	NT_ASSERT(vpdo.complete_irps_cnt); // initialized
-
-	int i = 0;
-	for ( ; i < vpdo.complete_irps_cnt; ++i) {
-		auto &val = vpdo.complete_irps[i];
-		if (!val) {
-			val = seqnum;
-			break;
-		} else if (i == vpdo.complete_irps_cnt - 1) { // last element
-			err = realloc_complete_irps(vpdo);
+		if (seqnum_t num = InterlockedIncrement(reinterpret_cast<LONG*>(&vpdo.seqnum)) << 1) {
+			return num |= seqnum_t(dir_in);
 		}
 	}
-
-	KeReleaseInStackQueuedSpinLock(&qh);
-
-	TraceCall("[%d]=%u, %!STATUS!", i, seqnum, err);
-	return err;
 }
-
-bool complete_irps_remove(vpdo_dev_t &vpdo, seqnum_t seqnum)
-{
-	NT_ASSERT(is_valid_seqnum(seqnum));
-	bool found = false;
-
-	KLOCK_QUEUE_HANDLE qh;
-	KeAcquireInStackQueuedSpinLock(&vpdo.complete_irps_lock, &qh);
-
-	int i = 0;
-	for ( ; i < vpdo.complete_irps_cnt; ++i) {
-		auto &val = vpdo.complete_irps[i];
-		if (val == seqnum) {
-			val = 0;
-			found = true;
-			break;
-		}
-	}
-
-	KeReleaseInStackQueuedSpinLock(&qh);
-
-	TraceCall("[%d]=%u -> %s", found ? i : -1, seqnum, found ? "removed" : "not found");
-	return found;
-}
-

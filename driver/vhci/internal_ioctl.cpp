@@ -25,30 +25,6 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
         return CompleteRequest(irp, status);
 }
 
-/*
- * IRP can be canceled only when STATUS_PENDING was returned from IRP_MJ_INTERNAL_DEVICE_CONTROL.
- */
-auto send_to_server(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, 
-        _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
-{
-        clear_context(irp);
-
-        auto seqnum = hdr.base.seqnum;
-        set_seqnum(irp, seqnum);
-
-        bool add_remove = false;
-        if (auto err = enqueue_irp(vpdo, irp, add_remove)) {
-                return err;
-        }
-
-        if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
-                NT_VERIFY(dequeue_irp(vpdo, seqnum, add_remove)); // hdr.base.seqnum is in network byte order
-                return err;
-        }
-
-        return STATUS_PENDING;
-}
-
 struct WskAsyncContext
 {
         vpdo_dev_t *vpdo;
@@ -67,32 +43,52 @@ static_assert(sizeof(usbip::Mdl) == 16);
 static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 
 /*
- * WskReceiveEvent can run concurrently with this completion handler, do not touch ioctl IRP.
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
+ * 
+ * In general, you must not touch IRP that was put in Cancel-Safe Queue because it can be canceled at any moment.
+ * You should remove IRP from the CSQ and then use it. BUT you can do read-only access if IRP is alive.
+ *
+ * To avoid copying of IRP's transfer buffer, it must not be completed until this handler will be called.
+ * This means that:
+ * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete.
+ * 2.WskReceiveEvent must not complete IRP if it was called before send_complete.
+ * 3.CompleteCanceledIrp and WskReceiveEvent are mutually exclusive because IRP was dequeued from the CSQ.
+ * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceiveEvent.
  */
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
         auto ctx = static_cast<WskAsyncContext*>(Context);
 
         auto &vpdo = *ctx->vpdo;
-        auto seqnum = get_seqnum(ctx->irp); // ctx->hdr.base.seqnum is in network byte order
+        auto irp = ctx->irp;
+        auto seqnum = get_seqnum(irp); // ctx->hdr.base.seqnum is in network byte order
 
-        auto &r = wsk_irp->IoStatus;
-        TraceWSK("Enter irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu(%#Ix)", 
-                KeGetCurrentIrql(), ptr4log(wsk_irp), r.Status, r.Information, r.Information);
+        auto &st = wsk_irp->IoStatus;
+        auto old_status = InterlockedCompareExchange(get_status(irp), ST_SEND_COMPLETE, ST_NONE);
 
-        auto canceled = !complete_irps_remove(vpdo, seqnum); // CompleteCanceledIrp was first
+        TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!", 
+                  KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information, old_status);
 
-        if (!r.Status) { // request has sent
-                NT_ASSERT(ctx->buf.Length == static_cast<ULONG>(r.Information));
-                if (canceled) {
-                        complete_canceled_irp(ctx->irp);
+        if (NT_SUCCESS(st.Status)) { // request has sent
+
+                NT_ASSERT(ctx->buf.Length == static_cast<ULONG>(st.Information));
+
+                switch (old_status) {
+                case ST_RECV_COMPLETE:
+                        TraceCall("Complete irp %04x, %!STATUS!, Information %#Ix",
+                                   ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
+                        IoCompleteRequest(irp, IO_NO_INCREMENT);
+                        break;
+                case ST_IRP_CANCELED:
+                        complete_canceled_irp(irp);
+                        break;
                 }
-        } else if (auto victim = dequeue_irp(vpdo, seqnum, true)) {
-                NT_ASSERT(victim == ctx->irp);
+
+        } else if (auto victim = dequeue_irp(vpdo, seqnum)) {
+                NT_ASSERT(victim == irp);
                 complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
-//        } else {
-//              complete_canceled_irp(irp);
+        } else if (old_status == ST_IRP_CANCELED) {
+              complete_canceled_irp(irp);
         }
 
         ctx->mdl_hdr.reset();
@@ -100,24 +96,13 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         ExFreePoolWithTag(ctx, USBIP_VHCI_POOL_TAG);
 
         IoFreeIrp(wsk_irp);
-
-        TraceWSK("Exit, wsk irp %04x", ptr4log(wsk_irp));
         return StopCompletion;
 }
 
-auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, 
-        _In_ const usbip_header &hdr, _Inout_opt_ const URB &transfer_buffer)
+auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_header &hdr, _Inout_opt_ const URB &transfer_buffer)
 {
-        clear_context(irp);
-
         auto seqnum = hdr.base.seqnum;
-        set_seqnum(irp, seqnum);
-
-        bool add_remove = true;
-        if (auto err = enqueue_irp(vpdo, irp, add_remove)) {
-                Trace(TRACE_LEVEL_ERROR, "enqueue_irp %!STATUS!", err);
-                return err;
-        }
+        set_context(irp, seqnum, ST_NONE, false); // all async transfers have pipe handle
 
         auto wsk_irp = IoAllocateIrp(1, false);
         NT_ASSERT(wsk_irp);
@@ -136,7 +121,6 @@ auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
                 if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
-                        NT_VERIFY(!dequeue_irp(vpdo, seqnum, add_remove));
                         return err;
                 }
                 ctx->mdl_hdr.next(ctx->mdl_buf);
@@ -154,19 +138,48 @@ auto send_to_server_async(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp,
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
+        enqueue_irp(vpdo, irp);
 
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
-        
-        switch (auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, wsk_irp)) {
-        case STATUS_PENDING:
-        case STATUS_SUCCESS:
+        auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, wsk_irp);
+
+        if (NT_SUCCESS(err)) {
                 TraceWSK("wsk irp %04x", ptr4log(wsk_irp));
                 return STATUS_PENDING;
-        default:
+        } else {
                 Trace(TRACE_LEVEL_ERROR, "WskSend %!STATUS!", err);
-                NT_VERIFY(!dequeue_irp(vpdo, seqnum, add_remove)); // hdr.base.seqnum is in network byte order
+                NT_VERIFY(!dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
                 return STATUS_UNSUCCESSFUL;
         }
+}
+
+/*
+ * Only CONTROL_TRANSFER can be sent synchronously.
+ */
+inline auto has_pipe_handle(const URB &urb)
+{
+        auto f = urb.UrbHeader.Function;
+        return f == URB_FUNCTION_CONTROL_TRANSFER || f == URB_FUNCTION_CONTROL_TRANSFER_EX;
+}
+
+/*
+ * I/O Manager can issue IoCancelIrp only when a driver returned STATUS_PENDING from its dispatch routine.
+ * That's means during the execution of dispatch routine IRP can't be canceled.
+ */
+auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
+{
+        auto seqnum = hdr.base.seqnum;
+        auto has_handle = transfer_buffer && has_pipe_handle(*transfer_buffer);
+
+        set_context(irp, seqnum, ST_SEND_COMPLETE, !has_handle);
+        enqueue_irp(vpdo, irp);
+
+        if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
+                NT_VERIFY(dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
+                return err;
+        }
+
+        return STATUS_PENDING;
 }
 
 /*
@@ -306,7 +319,7 @@ PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, UR
         pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
         pkt->wIndex.W = get_endpoint_address(r.PipeHandle);
 
-        return send_to_server(vpdo, irp, hdr);
+        return send(vpdo, irp, hdr);
 }
 
 /*
@@ -375,7 +388,7 @@ PAGEABLE NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &ur
         pkt->wIndex.W = r.Index;
         pkt->wLength = (USHORT)r.TransferBufferLength; // must be 2
 
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb);
 }
 
 PAGEABLE NTSTATUS get_status_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
@@ -428,7 +441,7 @@ PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &
         pkt->wIndex.W = r.Index;
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb);
 }
 
 PAGEABLE NTSTATUS vendor_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
@@ -496,7 +509,7 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &ur
         pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb);
 }
 
 PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
@@ -551,7 +564,7 @@ PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, 
         pkt->wValue.W = r.FeatureSelector;
         pkt->wIndex.W = r.Index;
 
-        return send_to_server(vpdo, irp, hdr);
+        return send(vpdo, irp, hdr);
 }
 
 PAGEABLE NTSTATUS set_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
@@ -616,7 +629,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt->bRequest = USB_REQUEST_SET_CONFIGURATION;
         pkt->wValue.W = value;
 
-        return send_to_server(vpdo, irp, hdr);
+        return send(vpdo, irp, hdr);
 }
 
 NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
@@ -641,7 +654,7 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt->wValue.W = iface.AlternateSetting;
         pkt->wIndex.W = iface.InterfaceNumber;
 
-        return send_to_server(vpdo, irp, hdr);
+        return send(vpdo, irp, hdr);
 }
 
 /*
@@ -693,7 +706,7 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         static_assert(sizeof(hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(hdr.u.cmd_submit.setup));
 
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb);
 }
 
 /*
@@ -729,7 +742,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         set_pipe_handle(irp, r.PipeHandle);
 
-        return send_to_server_async(vpdo, irp, hdr, urb);
+        return async_send(vpdo, irp, hdr, urb);
 }
 
 /*
@@ -803,7 +816,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt->bRequest = USB_REQUEST_GET_CONFIGURATION;
         pkt->wLength = (USHORT)r.TransferBufferLength; // must be 1
 
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb);
 }
 
 NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
@@ -828,7 +841,7 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt->wIndex.W = r.Interface;
         pkt->wLength = (USHORT)r.TransferBufferLength; // must be 1
 
-        return send_to_server(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb);
 }
 
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t&, IRP *irp, URB &urb)
@@ -1021,7 +1034,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp
         char buf[USB_SETUP_PKT_STR_BUFBZ];
         TraceUrb("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
 
-        return send_to_server(vpdo, irp, hdr);
+        return send(vpdo, irp, hdr);
 }
 
 /*
@@ -1043,7 +1056,7 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
         pkt->bRequest = USB_REQUEST_SET_FEATURE;
         pkt->wValue.W = USB_PORT_FEAT_RESET;
 
-        return send_to_server(vpdo, irp, hdr);
+        return send(vpdo, irp, hdr);
 }
 
 } // namespace
@@ -1068,20 +1081,24 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  */
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
+        PAGED_CODE(); // KeWaitForSingleObject is used
+
         auto seqnum = get_seqnum(irp);
-        TraceCall("irp %04x, unlink seqnum %u", ptr4log(irp), seqnum);
+
+        auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);
+        NT_ASSERT(old_status != ST_RECV_COMPLETE);
+
+        TraceCall("irp %04x, unlink seqnum %u, %!irp_status_t!", ptr4log(irp), seqnum, old_status);
 
         if (auto sock = vpdo.sock) {
                 usbip_header hdr{};
                 set_cmd_unlink_usbip_header(vpdo, hdr, seqnum);
-
                 if (auto err = usbip::send_cmd(sock, hdr)) {
                         Trace(TRACE_LEVEL_ERROR, "send_cmd %!STATUS!", err);
                 }
         }
 
-        auto send_complete = !complete_irps_remove(vpdo, seqnum);
-        if (send_complete) {
+        if (old_status == ST_SEND_COMPLETE) {
                 complete_canceled_irp(irp);
         }
 }

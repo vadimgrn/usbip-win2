@@ -126,11 +126,7 @@ struct vpdo_dev_t : vdev_t
 	
 	seqnum_t seqnum; // @see next_seqnum
 	
-	seqnum_t *complete_irps;
-	int complete_irps_cnt;
-	KSPIN_LOCK complete_irps_lock;
-
-	_WSK_DATA_INDICATION* wsk_data[8];
+	_WSK_DATA_INDICATION* wsk_data[128];
 	int wsk_data_cnt;
 	size_t wsk_data_offset; // for wsk_data[0]
 
@@ -205,7 +201,3 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
         return (busnum << 16) | devnum;
 }
-
-NTSTATUS realloc_complete_irps(vpdo_dev_t &vpdo);
-NTSTATUS complete_irps_add(vpdo_dev_t &vpdo, seqnum_t seqnum);
-bool complete_irps_remove(vpdo_dev_t &vpdo, seqnum_t seqnum);

@@ -116,31 +116,23 @@ PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
 				CompleteCanceledIrp);
 }
 
-void clear_context(IRP *irp)
+void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, bool clear_pipe_handle)
 {
-	set_seqnum(irp, 0);
-	set_pipe_handle(irp, USBD_PIPE_HANDLE());
+	set_seqnum(irp, seqnum);
+	*get_status(irp) = status;
+
+	if (clear_pipe_handle) {
+		set_pipe_handle(irp, USBD_PIPE_HANDLE());
+	}
 }
 
-NTSTATUS enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ bool add)
+void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp)
 {
-	if (add) {
-		auto seqnum = get_seqnum(irp);
-		if (auto err = complete_irps_add(vpdo, seqnum)) {
-			return err;
-		}
-	}
-	
 	IoCsqInsertIrp(&vpdo.irps_csq, irp, nullptr);
-	return STATUS_SUCCESS;
 }
 
-IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum, _In_ bool remove)
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
 {
-	if (remove) {
-		complete_irps_remove(vpdo, seqnum);
-	}
-
 	auto ctx = make_peek_context(seqnum);
 	return IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
 }
