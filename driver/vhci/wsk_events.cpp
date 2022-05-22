@@ -504,7 +504,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 
 /*
  * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
- * @see do_read
+ * @see send_cmd_unlink
  *
  * USBIP_RET_UNLINK
  * 1) if UNLINK is successful, status is -ECONNRESET
@@ -513,10 +513,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
  */
 auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated)
 {
-	if (!wsk_data_push(vpdo, DataIndication, BytesIndicated)) {
-		Trace(TRACE_LEVEL_ERROR, "wsk_data array is full"); 
-		return STATUS_DATA_NOT_ACCEPTED;
-	}
+	wsk_data_push(vpdo, DataIndication, BytesIndicated);
 
 	auto avail = wsk_data_size(vpdo);
 	TraceWSK("Buffer size %Iu", avail);
@@ -536,13 +533,18 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 	avail -= sizeof(hdr);
 	byteswap_header(hdr, swap_dir::net2host);
 
+	auto consume = [&vpdo] (auto len)
+	{ 
+		NT_VERIFY(!wsk_data_consume(vpdo, len));
+		return STATUS_PENDING; 
+	};
+
 	auto &base = hdr.base;
 	auto cmd = static_cast<usbip_request_type>(base.command);
 
 	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
-		wsk_data_consume(vpdo, sizeof(hdr));
-		return wsk_data_back(vpdo) == DataIndication ? STATUS_PENDING : STATUS_SUCCESS;
+		return consume(sizeof(hdr));
 	}
 
 	auto seqnum = base.seqnum;
@@ -551,14 +553,13 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 		base.direction = extract_dir(seqnum); // always zero in server response
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum");
-		wsk_data_consume(vpdo, sizeof(hdr));
-		return wsk_data_back(vpdo) == DataIndication ? STATUS_PENDING : STATUS_SUCCESS;
+		return consume(sizeof(hdr));
 	}
 
 	auto payload_size = get_payload_size(hdr);
 
 	if (avail >= payload_size) {
-		wsk_data_consume(vpdo, sizeof(hdr));
+		consume(sizeof(hdr));
 	} else {
 		TraceWSK("Buffer %Iu < payload %Iu, retaining", avail, payload_size); 
 		return STATUS_PENDING;
@@ -576,8 +577,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 		ret_submit(vpdo, irp, hdr);
 	}
 
-	wsk_data_consume(vpdo, payload_size);
-	return wsk_data_back(vpdo) == DataIndication ? STATUS_PENDING : STATUS_SUCCESS;
+	return consume(payload_size);
 }
 
 } // namespace

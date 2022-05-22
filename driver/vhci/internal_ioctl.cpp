@@ -25,7 +25,7 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
         return CompleteRequest(irp, status);
 }
 
-struct WskAsyncContext
+struct send_context
 {
         vpdo_dev_t *vpdo;
         IRP *irp;
@@ -57,7 +57,7 @@ static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
  */
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-        auto ctx = static_cast<WskAsyncContext*>(Context);
+        auto ctx = static_cast<send_context*>(Context);
 
         auto &vpdo = *ctx->vpdo;
         auto irp = ctx->irp;
@@ -75,8 +75,8 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        TraceCall("Complete irp %04x, %!STATUS!, Information %#Ix",
-                                   ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
+                        TraceWSK("Complete irp %04x, %!STATUS!, Information %#Ix",
+                                  ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
                         IoCompleteRequest(irp, IO_NO_INCREMENT);
                         break;
                 case ST_IRP_CANCELED:
@@ -107,7 +107,7 @@ auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_hea
         auto wsk_irp = IoAllocateIrp(1, false);
         NT_ASSERT(wsk_irp);
 
-        WskAsyncContext *ctx = (WskAsyncContext*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ctx), USBIP_VHCI_POOL_TAG);
+        send_context *ctx = (send_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ctx), USBIP_VHCI_POOL_TAG);
         NT_ASSERT(ctx);
 
         ctx->vpdo = &vpdo;
@@ -134,7 +134,7 @@ auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_hea
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                        ptr4log(irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr));
+                            ptr4log(irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr));
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -164,7 +164,7 @@ inline auto has_pipe_handle(const URB &urb)
 
 /*
  * I/O Manager can issue IoCancelIrp only when a driver returned STATUS_PENDING from its dispatch routine.
- * That's means during the execution of dispatch routine IRP can't be canceled.
+ * This means during the execution of dispatch routine IRP can't be canceled.
  */
 auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
 {
@@ -1081,8 +1081,6 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  */
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
-        PAGED_CODE(); // KeWaitForSingleObject is used
-
         auto seqnum = get_seqnum(irp);
 
         auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);

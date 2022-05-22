@@ -126,9 +126,8 @@ struct vpdo_dev_t : vdev_t
 	
 	seqnum_t seqnum; // @see next_seqnum
 	
-	_WSK_DATA_INDICATION* wsk_data[128];
-	int wsk_data_cnt;
-	size_t wsk_data_offset; // for wsk_data[0]
+	_WSK_DATA_INDICATION* wsk_data;
+	size_t wsk_data_offset; // less than wsk_data->Buffer.Length
 
 	IO_CSQ irps_csq;
 	LIST_ENTRY irps;

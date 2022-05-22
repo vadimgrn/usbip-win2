@@ -108,11 +108,14 @@ PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
-	while (wsk_data_pop(vpdo));
+	vpdo.wsk_data_offset = 0;
 
-	NT_ASSERT(!*vpdo.wsk_data);
-	NT_ASSERT(!vpdo.wsk_data_cnt);
-	NT_ASSERT(!vpdo.wsk_data_offset);
+	if (auto &di = vpdo.wsk_data) {
+		if (auto err = release(vpdo.sock, di)) {
+			Trace(TRACE_LEVEL_ERROR, "release %!STATUS!", err);
+		}
+		di = nullptr;
+	}
 }
 
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)

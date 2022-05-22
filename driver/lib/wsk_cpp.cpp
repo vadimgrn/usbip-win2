@@ -607,7 +607,7 @@ const char* wsk::ReceiveEventFlags(char *buf, size_t len, ULONG Flags)
         return st != STATUS_INVALID_PARAMETER ? buf : "ReceiveEventFlags invalid parameter";
 }
 
-size_t wsk::size(const WSK_DATA_INDICATION *di)
+size_t wsk::size(_In_ const WSK_DATA_INDICATION *di)
 {
         size_t total = 0;
 
@@ -617,3 +617,11 @@ size_t wsk::size(const WSK_DATA_INDICATION *di)
 
         return total;
 }
+
+WSK_DATA_INDICATION* wsk::get_tail(_In_ WSK_DATA_INDICATION *head)
+{
+        auto i = head;
+        for ( ; i && i->Next; i = i->Next);
+        return i;
+}
+
