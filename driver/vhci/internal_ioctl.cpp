@@ -18,6 +18,8 @@
 namespace
 {
 
+LOOKASIDE_LIST_EX send_context_list;
+
 auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
         TraceCall("irp %04x %!STATUS!", ptr4log(irp), status);
@@ -93,7 +95,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
         ctx->mdl_hdr.reset();
         ctx->mdl_buf.reset();
-        ExFreePoolWithTag(ctx, USBIP_VHCI_POOL_TAG);
+        ExFreeToLookasideListEx(&send_context_list, ctx);
 
         IoFreeIrp(wsk_irp);
         return StopCompletion;
@@ -107,7 +109,7 @@ auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_hea
         auto wsk_irp = IoAllocateIrp(1, false);
         NT_ASSERT(wsk_irp);
 
-        send_context *ctx = (send_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ctx), USBIP_VHCI_POOL_TAG);
+        auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
         NT_ASSERT(ctx);
 
         ctx->vpdo = &vpdo;
@@ -1102,6 +1104,17 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         if (old_status == ST_SEND_COMPLETE) {
                 complete_canceled_irp(irp);
         }
+}
+
+NTSTATUS init_lookaside_list()
+{
+        return ExInitializeLookasideListEx(&send_context_list, nullptr, nullptr, 
+                NonPagedPool, 0, sizeof(send_context), 'LKSW', 0);
+}
+
+void delete_lookaside_list()
+{
+        ExDeleteLookasideListEx(&send_context_list);
 }
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)

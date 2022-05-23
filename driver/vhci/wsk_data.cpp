@@ -47,7 +47,8 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	auto &head = vpdo.wsk_data;
 	auto old_size = wsk::size(head);
 
-	TraceWSK("Consume %Iu of %Iu bytes from offset %Iu", len, old_size, offset);
+	TraceWSK("DATA_INDICATION %04x chain size %Iu bytes, consume %Iu bytes from offset %Iu", 
+		  ptr4log(head), old_size, len, offset);
 
 	auto victim = head;
 	size_t victim_size = 0;
@@ -61,7 +62,7 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		if (buf.Length > offset + len) {
 			// BBBBBBBBBBB - buffer
 			// O...OL...L  - offset, len
-			TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes consumed from offset %Iu",
+			TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, HEAD",
 				  i, ptr4log(head), buf.Length, len, offset);
 
 			if (prev) {
@@ -78,7 +79,7 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		auto remaining = buf.Length - offset;
 		len -= remaining;
 
-		TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes consumed from offset %Iu, %Iu bytes left to consume",
+		TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, %Iu bytes left",
 			  i, ptr4log(head), buf.Length, remaining, offset, len);
 
 		victim_size += buf.Length;
@@ -115,9 +116,7 @@ NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_
 
 		const auto &buf = i->Buffer;
 
-		if (!buf.Length) {
-			continue;
-		} else if (offset >= buf.Length) {
+		if (offset >= buf.Length) {
 			TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, skipped, offset %Iu", j, ptr4log(i), buf.Length, offset);
 			offset -= buf.Length;
 			continue;
@@ -140,7 +139,7 @@ NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_
 		dest = static_cast<char*>(dest) + cnt;
 		len -= cnt;
 
-		TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes copied from offset %Iu, left to copy %Iu", 
+		TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, %Iu bytes left", 
 			  j, ptr4log(i), buf.Length, cnt, offset, len);
 
 		offset = 0;

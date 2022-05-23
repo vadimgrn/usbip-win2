@@ -7,6 +7,7 @@
 #include "irp.h"
 #include "vhub.h"
 #include "wsk_cpp.h"
+#include "internal_ioctl.h"
 
 #include <ntstrsafe.h>
 
@@ -14,6 +15,9 @@ GLOBALS Globals;
 
 namespace
 {
+
+enum { INIT_LOOKASIDE_LIST = 1 }; // bits
+unsigned int g_init_flags;
 
 PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
 {
@@ -47,9 +51,12 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 	PAGED_CODE();
 
 	TraceCall("%p", drvobj);
-        // NT_ASSERT(!drvobj->DeviceObject);
 
         wsk::shutdown();
+
+	if (g_init_flags & INIT_LOOKASIDE_LIST) {
+		delete_lookaside_list();
+	}
 
         if (auto buf = Globals.RegistryPath.Buffer) {
 	        ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
@@ -174,6 +181,14 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 	}
 
 	TraceCall("%p", drvobj);
+
+	if (auto err = init_lookaside_list()) {
+		Trace(TRACE_LEVEL_CRITICAL, "init_lookaside_list %!STATUS!", err);
+		DriverUnload(drvobj);
+		return err;
+	} else {
+		g_init_flags |= INIT_LOOKASIDE_LIST;
+	}
 
         if (auto err = wsk::initialize()) {
                 Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
