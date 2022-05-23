@@ -122,16 +122,17 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_op
         }
 
         usbip::Mdl mdl_buf;
+        ULONG transfer_buffer_length = 0;
 
         if (transfer_buffer && is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(mdl_buf, *transfer_buffer)) {
+                if (auto err = make_transfer_buffer_mdl(mdl_buf, transfer_buffer_length, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
                         return err;
                 }
                 mdl_hdr.next(mdl_buf);
         }
 
-        WSK_BUF buf{ mdl_hdr.get(), 0, size(mdl_hdr) };
+        WSK_BUF buf{ mdl_hdr.get(), 0, mdl_hdr.size() + transfer_buffer_length };
         NT_ASSERT(buf.Length == get_total_size(hdr));
 
         {
@@ -152,7 +153,7 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_op
 /*
  * URB must have TransferBuffer* members.
  */
-NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ const URB &urb)
+NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _Out_ ULONG &TransferBufferLength, _In_ const URB &urb)
 {
         auto func = urb.UrbHeader.Function;
 
@@ -160,16 +161,18 @@ NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ const URB &urb)
                        func == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
 
         auto err = STATUS_SUCCESS;
-        auto r = AsUrbTransfer(&urb);
 
-        if (!r->TransferBufferLength) {
+        auto r = AsUrbTransfer(&urb);
+        TransferBufferLength = r->TransferBufferLength;
+
+        if (!TransferBufferLength) {
                 NT_ASSERT(!mdl);
         } else if (auto buf = use_mdl ? nullptr : r->TransferBuffer) {
-                mdl = Mdl(memory::nonpaged, buf, r->TransferBufferLength);
+                mdl = Mdl(memory::nonpaged, buf, TransferBufferLength);
                 err = mdl.prepare_nonpaged();
         } else if (auto m = r->TransferBufferMDL) {
                 mdl = Mdl(m);
-                err = mdl.size() == r->TransferBufferLength ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+                err = mdl.size() >= TransferBufferLength ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
         } else {
                 Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
                 err = STATUS_INVALID_PARAMETER;

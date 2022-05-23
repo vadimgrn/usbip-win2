@@ -535,7 +535,9 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 	auto consume = [&vpdo] (auto len)
 	{ 
-		NT_VERIFY(!wsk_data_consume(vpdo, len));
+		if (len) {
+			NT_VERIFY(!wsk_data_consume(vpdo, len));
+		}
 		return STATUS_PENDING; 
 	};
 

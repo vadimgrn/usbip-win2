@@ -18,6 +18,6 @@ NTSTATUS recv(SOCKET *sock, memory pool, void *data, ULONG len);
 err_t recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status);
 NTSTATUS send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ const _URB *transfer_buffer = nullptr);
 
-NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ const _URB &urb);
+NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _Out_ ULONG &TransferBufferLength, _In_ const _URB &urb);
 
 } // namespace usbip

@@ -118,8 +118,10 @@ auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_hea
         ctx->mdl_hdr = usbip::Mdl(usbip::memory::nonpaged, &ctx->hdr, sizeof(ctx->hdr));
         NT_VERIFY(!ctx->mdl_hdr.prepare_nonpaged());
 
+        ULONG transfer_buffer_length = 0;
+
         if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
-                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
+                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer_length, transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
                         return err;
                 }
@@ -127,7 +129,7 @@ auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_hea
         }
 
         ctx->buf.Mdl = ctx->mdl_hdr.get();
-        ctx->buf.Length = size(ctx->mdl_hdr);
+        ctx->buf.Length = ctx->mdl_hdr.size() + transfer_buffer_length;
 
         NT_ASSERT(ctx->buf.Length == get_total_size(hdr));
 
@@ -138,9 +140,10 @@ auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_hea
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
-        enqueue_irp(vpdo, irp);
 
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
+        enqueue_irp(vpdo, irp);
+
         auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, wsk_irp);
 
         if (NT_SUCCESS(err)) {
