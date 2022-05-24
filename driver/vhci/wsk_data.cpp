@@ -107,8 +107,13 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
 	return wsk::size(vpdo.wsk_data) - vpdo.wsk_data_offset;
 }
 
-NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t len, _In_ size_t offset)
+NTSTATUS wsk_data_copy(
+	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, _Out_ size_t *actual)
 {
+	if (actual) {
+		*actual = 0;
+	}
+
 	offset += vpdo.wsk_data_offset;
 
 	int j = 0;
@@ -136,6 +141,10 @@ NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_
 		auto cnt = min(len, remaining);
 
 		RtlCopyMemory(dest, sysaddr, cnt);
+		if (actual) {
+			*actual += cnt;
+		}
+
 		dest = static_cast<char*>(dest) + cnt;
 		len -= cnt;
 

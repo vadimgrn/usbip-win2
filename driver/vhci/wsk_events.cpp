@@ -55,7 +55,7 @@ auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	auto err = wsk_data_copy(vpdo, buf, r.TransferBufferLength);
+	auto err = wsk_data_copy(vpdo, buf, 0, r.TransferBufferLength);
 	if (err) {
 		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
 		buf = nullptr;
@@ -525,7 +525,8 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 		return STATUS_PENDING;
 	}
 
-	if (auto err = wsk_data_copy(vpdo, &hdr, sizeof(hdr))) {
+	if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
+		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
 		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
 		return STATUS_PENDING;
 	}
