@@ -15,10 +15,142 @@
 #include "vhci.h"
 #include "pdu.h"
 
+LOOKASIDE_LIST_EX send_context_list;
+
 namespace
 {
 
-LOOKASIDE_LIST_EX send_context_list;
+const ULONG AllocTag = 'LKSW';
+
+struct send_context
+{
+        vpdo_dev_t *vpdo;
+        IRP *irp;
+        IRP *wsk_irp;
+
+        WSK_BUF buf;
+        usbip_header hdr;
+
+        usbip::Mdl mdl_hdr;
+        usbip::Mdl mdl_buf;
+        usbip::Mdl mdl_isoc;
+
+        usbip_iso_packet_descriptor *isoc;
+        ULONG isoc_alloc_cnt;
+};
+
+static_assert(sizeof(WSK_BUF) == 24);
+static_assert(sizeof(usbip_header) == 48);
+static_assert(sizeof(usbip::Mdl) == 16);
+static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
+
+_IRQL_requires_same_
+_Function_class_(allocate_function_ex)
+void *allocate_function_ex(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX*)
+{
+        NT_ASSERT(PoolType == NonPagedPool);
+        NT_ASSERT(Tag == AllocTag);
+
+        auto ctx = (send_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, NumberOfBytes, Tag);
+        if (!ctx) {
+                Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", NumberOfBytes);
+                return nullptr;
+        }
+
+        ctx->mdl_hdr = usbip::Mdl(usbip::memory::nonpaged, &ctx->hdr, sizeof(ctx->hdr));
+
+        if (auto err = ctx->mdl_hdr.prepare_nonpaged()) {
+                Trace(TRACE_LEVEL_ERROR, "mdl_hdr %!STATUS!", err);
+                ExFreePoolWithTag(ctx, Tag);
+                return nullptr;
+        }
+
+        ctx->wsk_irp = IoAllocateIrp(1, false);
+        if (!ctx->wsk_irp) {
+                Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp -> NULL");
+                ctx->mdl_hdr.reset();
+                ExFreePoolWithTag(ctx, Tag);
+                return nullptr;
+        }
+
+        TraceWSK("-> %04x", ptr4log(ctx));
+        return ctx;
+}
+
+_IRQL_requires_same_
+_Function_class_(free_function_ex)
+void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_LIST_EX*)
+{
+        auto ctx = static_cast<send_context*>(Buffer);
+        NT_ASSERT(ctx);
+
+        TraceWSK("%04x, number of packets %Iu, isoc_alloc_cnt %lu", ptr4log(ctx), 
+                  ctx->mdl_isoc.size()/sizeof(*ctx->isoc), ctx->isoc_alloc_cnt);
+
+        ctx->mdl_hdr.reset();
+        ctx->mdl_buf.reset();
+        ctx->mdl_isoc.reset();
+
+        if (auto irp = ctx->wsk_irp) {
+                IoFreeIrp(irp);
+        }
+
+        if (auto ptr = ctx->isoc) {
+                ExFreePoolWithTag(ptr, AllocTag);
+        }
+
+        ExFreePoolWithTag(ctx, AllocTag);
+}
+
+send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0)
+{
+        auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
+        if (!(ctx && NumberOfPackets)) {
+                return ctx;
+        }
+
+        ULONG isoc_len = NumberOfPackets*sizeof(*ctx->isoc);
+
+        if (ctx->isoc_alloc_cnt < NumberOfPackets) {
+                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, AllocTag);
+                if (!isoc) {
+                        Trace(TRACE_LEVEL_ERROR, "Can't allocate usbip_iso_packet_descriptor[%lu]", NumberOfPackets);
+                        ExFreeToLookasideListEx(&send_context_list, ctx);
+                        return nullptr;
+                }
+
+                if (ctx->isoc) {
+                        ExFreePoolWithTag(ctx->isoc, AllocTag);
+                }
+
+                ctx->isoc = isoc;
+                ctx->isoc_alloc_cnt = NumberOfPackets;
+
+                ctx->mdl_isoc.reset();
+        }
+
+        if (ctx->mdl_isoc.size() != isoc_len) {
+                ctx->mdl_isoc = usbip::Mdl(usbip::memory::nonpaged, ctx->isoc, isoc_len);
+
+                if (auto err = ctx->mdl_isoc.prepare_nonpaged()) {
+                        Trace(TRACE_LEVEL_ERROR, "mdl_isoc %!STATUS!", err);
+                        ctx->mdl_isoc.reset();
+                        ExFreeToLookasideListEx(&send_context_list, ctx);
+                        return nullptr;
+                }
+        }
+
+        return ctx;
+}
+
+void free(_In_ send_context *ctx)
+{
+        if (ctx) {
+                ctx->mdl_buf.reset();
+                IoReuseIrp(ctx->wsk_irp, STATUS_UNSUCCESSFUL);
+                ExFreeToLookasideListEx(&send_context_list, ctx);
+        }
+}
 
 auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
@@ -26,23 +158,6 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
         NT_ASSERT(!irp->IoStatus.Information);
         return CompleteRequest(irp, status);
 }
-
-struct send_context
-{
-        vpdo_dev_t *vpdo;
-        IRP *irp;
-        WSK_BUF buf;
-        usbip_header hdr;
-        usbip::Mdl mdl_hdr;
-        usbip::Mdl mdl_buf;
-        usbip::Mdl mdl_isoc;
-        usbip_iso_packet_descriptor isoc[0];
-};
-
-static_assert(sizeof(WSK_BUF) == 24);
-static_assert(sizeof(usbip_header) == 48);
-static_assert(sizeof(usbip::Mdl) == 16);
-static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
@@ -60,6 +175,7 @@ static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
         auto ctx = static_cast<send_context*>(Context);
+        NT_ASSERT(ctx->wsk_irp == wsk_irp);
 
         auto &vpdo = *ctx->vpdo;
         auto irp = ctx->irp;
@@ -93,69 +209,65 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
               complete_canceled_irp(irp);
         }
 
-        ctx->mdl_hdr.reset();
-        ctx->mdl_buf.reset();
-        ExFreeToLookasideListEx(&send_context_list, ctx);
-
-        IoFreeIrp(wsk_irp);
+        free(ctx);
         return StopCompletion;
 }
 
-auto async_send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _In_ const usbip_header &hdr, _Inout_opt_ const URB &transfer_buffer)
+auto async_send_cmd_submit(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_opt_ const URB &transfer_buffer)
 {
-        auto seqnum = hdr.base.seqnum;
-        set_context(irp, seqnum, ST_NONE, false); // all async transfers have pipe handle
-
-        auto wsk_irp = IoAllocateIrp(1, false);
-        NT_ASSERT(wsk_irp);
-
-        auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
-        NT_ASSERT(ctx);
+        auto ctx = alloc_send_context();
+        if (!ctx) {
+                Trace(TRACE_LEVEL_ERROR, "Can't allocate context");
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         ctx->vpdo = &vpdo;
         ctx->irp = irp;
 
-        RtlCopyMemory(&ctx->hdr, &hdr, sizeof(ctx->hdr));
+        if (auto r = AsUrbTransfer(&transfer_buffer)) {
+                set_pipe_handle(irp, r->PipeHandle);
+                if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r->PipeHandle, r->TransferFlags, r->TransferBufferLength)) {
+                        free(ctx);
+                        return err;
+                }
+        }
 
-        ctx->mdl_hdr = usbip::Mdl(usbip::memory::nonpaged, &ctx->hdr, sizeof(ctx->hdr));
-        NT_VERIFY(!ctx->mdl_hdr.prepare_nonpaged());
+        auto seqnum = ctx->hdr.base.seqnum;
+        set_context(irp, seqnum, ST_NONE, false);
 
-        ULONG transfer_buffer_length = 0;
+        ULONG transfer_buffer_length = 0; // TransferBufferLength, ctx->hdr.u.cmd_submit.transfer_buffer_length
 
-        if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+        if (is_transfer_direction_out(&ctx->hdr)) { // TransferFlags can have wrong direction
                 if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer_length, transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                        free(ctx);
                         return err;
                 }
                 ctx->mdl_hdr.next(ctx->mdl_buf);
         }
 
         ctx->buf.Mdl = ctx->mdl_hdr.get();
+        NT_ASSERT(!ctx->buf.Offset);
         ctx->buf.Length = ctx->mdl_hdr.size() + transfer_buffer_length;
 
-        NT_ASSERT(ctx->buf.Length == get_total_size(hdr));
+        NT_ASSERT(ctx->buf.Length == get_total_size(ctx->hdr));
 
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                            ptr4log(irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr));
+                            ptr4log(irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr));
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
-        IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
+        IoSetCompletionRoutine(ctx->wsk_irp, send_complete, ctx, true, true, true);
         enqueue_irp(vpdo, irp);
 
-        auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, wsk_irp);
+        auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, ctx->wsk_irp);
+        NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
-        if (NT_SUCCESS(err)) {
-                TraceWSK("wsk irp %04x", ptr4log(wsk_irp));
-                return STATUS_PENDING;
-        } else {
-                Trace(TRACE_LEVEL_ERROR, "WskSend %!STATUS!", err);
-                NT_VERIFY(!dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
-                return STATUS_UNSUCCESSFUL;
-        }
+        TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(ctx->wsk_irp), err);
+        return STATUS_PENDING;
 }
 
 /*
@@ -727,10 +839,8 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
                 TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu%s",
-                        ptr4log(irp), ph4log(r.PipeHandle),
-		        usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
-		        r.TransferBufferLength,
-		        func);
+                         ptr4log(irp), ph4log(r.PipeHandle), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
+		         r.TransferBufferLength, func);
         }
 
         auto type = get_endpoint_type(r.PipeHandle);
@@ -740,14 +850,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
-                return err;
-        }
-
-        set_pipe_handle(irp, r.PipeHandle);
-
-        return async_send(vpdo, irp, hdr, urb);
+        return async_send_cmd_submit(vpdo, irp, urb);
 }
 
 /*
@@ -1106,15 +1209,10 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         }
 }
 
-NTSTATUS init_lookaside_list()
+NTSTATUS init_send_context_list()
 {
-        return ExInitializeLookasideListEx(&send_context_list, nullptr, nullptr, 
-                NonPagedPool, 0, sizeof(send_context), 'LKSW', 0);
-}
-
-void delete_lookaside_list()
-{
-        ExDeleteLookasideListEx(&send_context_list);
+        return ExInitializeLookasideListEx(&send_context_list, allocate_function_ex, free_function_ex, 
+                                            NonPagedPool, 0, sizeof(send_context), AllocTag, 0);
 }
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)

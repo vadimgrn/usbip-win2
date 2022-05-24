@@ -12,6 +12,7 @@
 #include "csq.h"
 #include "wsk_cpp.h"
 #include "wsk_data.h"
+#include "internal_ioctl.h"
 
 const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
@@ -160,6 +161,8 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
                 vpdo.actconfig = nullptr;
 	}
+
+	ExFlushLookasideListEx(&send_context_list); // FIXME: flush if vpdo is last
 }
 
 } // namespace

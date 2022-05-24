@@ -16,7 +16,7 @@ GLOBALS Globals;
 namespace
 {
 
-enum { INIT_LOOKASIDE_LIST = 1 }; // bits
+enum { INIT_SEND_CTX_LIST = 1 }; // bits
 unsigned int g_init_flags;
 
 PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
@@ -54,8 +54,8 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 
         wsk::shutdown();
 
-	if (g_init_flags & INIT_LOOKASIDE_LIST) {
-		delete_lookaside_list();
+	if (g_init_flags & INIT_SEND_CTX_LIST) {
+		ExDeleteLookasideListEx(&send_context_list);
 	}
 
         if (auto buf = Globals.RegistryPath.Buffer) {
@@ -182,12 +182,12 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 
 	TraceCall("%p", drvobj);
 
-	if (auto err = init_lookaside_list()) {
-		Trace(TRACE_LEVEL_CRITICAL, "init_lookaside_list %!STATUS!", err);
+	if (auto err = init_send_context_list()) {
+		Trace(TRACE_LEVEL_CRITICAL, "init_send_context_list %!STATUS!", err);
 		DriverUnload(drvobj);
 		return err;
 	} else {
-		g_init_flags |= INIT_LOOKASIDE_LIST;
+		g_init_flags |= INIT_SEND_CTX_LIST;
 	}
 
         if (auto err = wsk::initialize()) {
