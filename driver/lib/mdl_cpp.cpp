@@ -138,3 +138,10 @@ size_t usbip::size(_In_ const MDL *head)
 
         return total;
 }
+
+MDL *usbip::get_tail(_In_ MDL *head)
+{
+        auto tail = head;
+        for ( ; tail && tail->Next; tail = tail->Next);
+        return tail;
+}

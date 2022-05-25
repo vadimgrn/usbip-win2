@@ -62,19 +62,6 @@ inline void byteswap(usbip_header_ret_unlink &r)
 	r.status = _byteswap_ulong(r.status);
 }
 
-void byteswap(usbip_iso_packet_descriptor *d, int cnt) 
-{
-	for (int i = 0; i < cnt; ++i, ++d) {
-
-                UINT32 *v[] {&d->offset, &d->length, &d->actual_length, &d->status};
-                static_assert(sizeof(*v[0]) == sizeof(unsigned long));
-
-                for (auto val: v) {
-			*val = _byteswap_ulong(*val);
-		}
-	}
-}
-
 } // namespace
 
 
@@ -104,6 +91,19 @@ void byteswap_header(usbip_header &hdr, swap_dir dir)
 	}
 }
 
+void byteswap(usbip_iso_packet_descriptor *d, size_t cnt) 
+{
+	for (size_t i = 0; i < cnt; ++i, ++d) {
+
+		UINT32 *v[] {&d->offset, &d->length, &d->actual_length, &d->status};
+		static_assert(sizeof(*v[0]) == sizeof(unsigned long));
+
+		for (auto val: v) {
+			*val = _byteswap_ulong(*val);
+		}
+	}
+}
+
 void byteswap_payload(usbip_header &hdr) 
 {
 	usbip_iso_packet_descriptor *isoc{};
@@ -117,12 +117,12 @@ void byteswap_payload(usbip_header &hdr)
  * Server's responses always have zeroes in usbip_header_basic's devid, direction, ep.
  * See: <linux>/Documentation/usb/usbip_protocol.rst, usbip_header_basic.
  */
-int get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr) 
+size_t get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr) 
 {
 	auto dir_out = hdr.base.direction == USBIP_DIR_OUT;
 
 	auto buf_end = reinterpret_cast<char*>(&hdr + 1);
-	int cnt = 0;
+	size_t cnt = 0;
 
 	switch (hdr.base.command) {
 	case USBIP_CMD_SUBMIT:

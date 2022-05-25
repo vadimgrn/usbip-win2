@@ -194,36 +194,40 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
  * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
-NTSTATUS copy_isoc_data(
-	_URB_ISOCH_TRANSFER &r, char *dst_buf, 
-	const usbip_iso_packet_descriptor *src, const char *src_buf, ULONG src_len)
+auto copy_isoc_data(_URB_ISOCH_TRANSFER &r, char *dst_buf, vpdo_dev_t &src_buf, ULONG src_len)
 {
-	bool dir_out = !src_buf;
+	auto dir_out = !dst_buf;
+	ULONG descr_base = dir_out ? 0 : src_len; // from src_buf, usbip_iso_packet_descriptor[]
+	ULONG src_offset = 0; // from src_buf
+
 	auto dst = r.IsoPacket;
+	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++dst) {
 
-	ULONG src_offset = r.NumberOfPackets ? src->offset : 0;
-	NT_ASSERT(!src_offset);
+		usbip_iso_packet_descriptor src;
+		if (auto err = wsk_data_copy(src_buf, &src, descr_base + i*sizeof(src), sizeof(src))) {
+			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy usbip_iso_packet_descriptor[%lu] %!STATUS!", i, err);
+			return err;
+		}
+		byteswap(&src, 1);
 
-	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++src, ++dst) {
-
-		dst->Status = src->status ? to_windows_status_isoch(src->status) : USBD_STATUS_SUCCESS;
+		dst->Status = src.status ? to_windows_status_isoch(src.status) : USBD_STATUS_SUCCESS;
 
 		if (dir_out) {
 			continue; // dst->Length not used for OUT transfers
 		}
 
-		if (!src->actual_length) {
+		if (!src.actual_length) {
 			dst->Length = 0;
 			continue;
 		}
 
-		if (src->actual_length > src->length) {
-			Trace(TRACE_LEVEL_ERROR, "src->actual_length(%u) > src->length(%u)", src->actual_length, src->length);
+		if (src.actual_length > src.length) {
+			Trace(TRACE_LEVEL_ERROR, "actual_length(%u) > length(%u)", src.actual_length, src.length);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src->offset != dst->Offset) { // buffer is compacted, but offsets are intact
-			Trace(TRACE_LEVEL_ERROR, "src->offset(%u) != dst->Offset(%lu)", src->offset, dst->Offset);
+		if (src.offset != dst->Offset) { // buffer is compacted, but offsets are intact
+			Trace(TRACE_LEVEL_ERROR, "src.offset(%u) != dst.Offset(%lu)", src.offset, dst->Offset);
 			return STATUS_INVALID_PARAMETER;
 		}
 
@@ -232,24 +236,25 @@ NTSTATUS copy_isoc_data(
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src_offset + src->actual_length > src_len) {
-			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)", 
-				src_offset, src->actual_length, src_len);
-
+		if (src_offset + src.actual_length > src_len) {
+			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src.actual_length(%u) > src_len(%lu)", 
+				                  src_offset, src.actual_length, src_len);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (dst->Offset + src->actual_length > r.TransferBufferLength) {
+		if (dst->Offset + src.actual_length > r.TransferBufferLength) {
 			Trace(TRACE_LEVEL_ERROR, "dst->Offset(%lu) + src->actual_length(%u) > r.TransferBufferLength(%lu)", 
-				dst->Offset, src->actual_length, r.TransferBufferLength);
-
+				                  dst->Offset, src.actual_length, r.TransferBufferLength);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		RtlCopyMemory(dst_buf + dst->Offset, src_buf + src_offset, src->actual_length);
+		if (auto err = wsk_data_copy(src_buf, dst_buf + dst->Offset, src_offset, src.actual_length)) {
+			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
+			return err;
+		}
 
-		dst->Length = src->actual_length;
-		src_offset += src->actual_length;
+		dst->Length = src.actual_length;
+		src_offset += src.actual_length;
 	}
 
 	bool ok = src_offset == src_len;
@@ -261,7 +266,7 @@ NTSTATUS copy_isoc_data(
 }
 
 /*
- * Layout: usbip_header, data(IN only), usbip_iso_packet_descriptor[].
+ * Layout: usbip_header, transfer buffer(IN only), usbip_iso_packet_descriptor[].
  */
 NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
@@ -291,15 +296,14 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 
 	vpdo.current_frame_number = res.start_frame;
 
-	bool dir_in = is_transfer_direction_in(&hdr); // TransferFlags can have wrong direction
+	auto dir_in = is_transfer_direction_in(&hdr); // TransferFlags can have wrong direction
 
-	auto src_buf = (const char*)(&hdr + 1);
-	ULONG src_len = dir_in ? res.actual_length : 0;
+	auto dst_buf = dir_in ? (char*)get_urb_buffer(urb) : nullptr;
+	if (!dst_buf && dir_in) {
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
 
-	auto src = reinterpret_cast<const usbip_iso_packet_descriptor*>(src_buf + src_len);
-	auto buf = (char*)get_urb_buffer(urb);
-
-	return buf ? copy_isoc_data(r, buf, src, dir_in ? src_buf : nullptr, src_len) : STATUS_UNSUCCESSFUL;
+	return copy_isoc_data(r, dst_buf, vpdo, res.actual_length);
 }
 
 /*

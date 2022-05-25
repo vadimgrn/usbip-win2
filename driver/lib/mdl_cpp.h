@@ -53,7 +53,7 @@ public:
         NTSTATUS prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
         void unprepare();
 
-        auto sysaddr(_In_ ULONG Priority = NormalPagePriority)
+        auto sysaddr(_In_ ULONG Priority = NormalPagePriority | MdlMappingNoExecute)
         { 
                 return m_mdl ? MmGetSystemAddressForMdlSafe(m_mdl, Priority) : nullptr; 
         }
@@ -73,6 +73,9 @@ private:
         bool nonpaged_prepared() const { return m_mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL; }
 };
 
+
+MDL *get_tail(_In_ MDL *head);
+inline auto get_tail(_In_ const Mdl &head) { return get_tail(head.get()); }
 
 size_t size(_In_ const MDL *head);
 inline auto size(_In_ const Mdl &head) { return size(head.get()); }

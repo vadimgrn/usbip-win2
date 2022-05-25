@@ -116,14 +116,11 @@ PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
 				CompleteCanceledIrp);
 }
 
-void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, bool clear_pipe_handle)
+void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, const USBD_PIPE_HANDLE *handle)
 {
 	set_seqnum(irp, seqnum);
 	*get_status(irp) = status;
-
-	if (clear_pipe_handle) {
-		set_pipe_handle(irp, USBD_PIPE_HANDLE());
-	}
+	set_pipe_handle(irp, handle ? *handle : USBD_PIPE_HANDLE());
 }
 
 void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp)

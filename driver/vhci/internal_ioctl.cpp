@@ -37,12 +37,18 @@ struct send_context
 
         usbip_iso_packet_descriptor *isoc;
         ULONG isoc_alloc_cnt;
+        bool is_isoc;
 };
 
 static_assert(sizeof(WSK_BUF) == 24);
 static_assert(sizeof(usbip_header) == 48);
 static_assert(sizeof(usbip::Mdl) == 16);
 static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
+
+inline auto number_of_packets(_In_ const send_context &ctx)
+{
+        return ctx.mdl_isoc.size()/sizeof(*ctx.isoc);
+}
 
 _IRQL_requires_same_
 _Function_class_(allocate_function_ex)
@@ -84,8 +90,7 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
         auto ctx = static_cast<send_context*>(Buffer);
         NT_ASSERT(ctx);
 
-        TraceWSK("%04x, number of packets %Iu, isoc_alloc_cnt %lu", ptr4log(ctx), 
-                  ctx->mdl_isoc.size()/sizeof(*ctx->isoc), ctx->isoc_alloc_cnt);
+        TraceWSK("%04x, number of packets %Iu, isoc_alloc_cnt %lu", ptr4log(ctx), number_of_packets(*ctx), ctx->isoc_alloc_cnt);
 
         ctx->mdl_hdr.reset();
         ctx->mdl_buf.reset();
@@ -102,10 +107,19 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
         ExFreePoolWithTag(ctx, AllocTag);
 }
 
+/*
+ * If use ExFreeToLookasideListEx in case of error, next ExAllocateFromLookasideListEx will return the same pointer.
+ * free_function_ex is used instead in hope that next object in the LookasideList may have required buffer.
+ */
 send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0)
 {
         auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
-        if (!(ctx && NumberOfPackets)) {
+        if (!ctx) {
+                Trace(TRACE_LEVEL_ERROR, "Can't allocate context");
+                return ctx;
+        }
+        
+        if (!(ctx->is_isoc = NumberOfPackets)) { // assignment
                 return ctx;
         }
 
@@ -115,7 +129,7 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0)
                 auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, AllocTag);
                 if (!isoc) {
                         Trace(TRACE_LEVEL_ERROR, "Can't allocate usbip_iso_packet_descriptor[%lu]", NumberOfPackets);
-                        ExFreeToLookasideListEx(&send_context_list, ctx);
+                        free_function_ex(ctx, &send_context_list);
                         return nullptr;
                 }
 
@@ -131,13 +145,12 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0)
 
         if (ctx->mdl_isoc.size() != isoc_len) {
                 ctx->mdl_isoc = usbip::Mdl(usbip::memory::nonpaged, ctx->isoc, isoc_len);
-
                 if (auto err = ctx->mdl_isoc.prepare_nonpaged()) {
                         Trace(TRACE_LEVEL_ERROR, "mdl_isoc %!STATUS!", err);
-                        ctx->mdl_isoc.reset();
-                        ExFreeToLookasideListEx(&send_context_list, ctx);
+                        free_function_ex(ctx, &send_context_list);
                         return nullptr;
                 }
+                NT_ASSERT(number_of_packets(*ctx) == NumberOfPackets);
         }
 
         return ctx;
@@ -163,12 +176,13 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  * 
  * In general, you must not touch IRP that was put in Cancel-Safe Queue because it can be canceled at any moment.
- * You should remove IRP from the CSQ and then use it. BUT you can do read-only access if IRP is alive.
+ * You should remove IRP from the CSQ and then use it. BUT you can access IRP if you shure it is alive.
  *
  * To avoid copying of IRP's transfer buffer, it must not be completed until this handler will be called.
  * This means that:
- * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete.
- * 2.WskReceiveEvent must not complete IRP if it was called before send_complete.
+ * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete because WskSend can still access
+ *   IRP transfer buffer.
+ * 2.WskReceiveEvent must not complete IRP if it was called before send_complete because it modifies *get_status(irp).
  * 3.CompleteCanceledIrp and WskReceiveEvent are mutually exclusive because IRP was dequeued from the CSQ.
  * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceiveEvent.
  */
@@ -213,32 +227,12 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         return StopCompletion;
 }
 
-auto async_send_cmd_submit(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_opt_ const URB &transfer_buffer)
+auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
 {
-        auto ctx = alloc_send_context();
-        if (!ctx) {
-                Trace(TRACE_LEVEL_ERROR, "Can't allocate context");
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        ctx->vpdo = &vpdo;
-        ctx->irp = irp;
-
-        if (auto r = AsUrbTransfer(&transfer_buffer)) {
-                set_pipe_handle(irp, r->PipeHandle);
-                if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r->PipeHandle, r->TransferFlags, r->TransferBufferLength)) {
-                        free(ctx);
-                        return err;
-                }
-        }
-
-        auto seqnum = ctx->hdr.base.seqnum;
-        set_context(irp, seqnum, ST_NONE, false);
-
-        ULONG transfer_buffer_length = 0; // TransferBufferLength, ctx->hdr.u.cmd_submit.transfer_buffer_length
+        NT_ASSERT(!ctx->mdl_buf);
 
         if (is_transfer_direction_out(&ctx->hdr)) { // TransferFlags can have wrong direction
-                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer_length, transfer_buffer)) {
+                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
                         free(ctx);
                         return err;
@@ -246,24 +240,32 @@ auto async_send_cmd_submit(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_op
                 ctx->mdl_hdr.next(ctx->mdl_buf);
         }
 
+        if (ctx->is_isoc) {
+                NT_ASSERT(ctx->mdl_isoc);
+                auto &tail = ctx->mdl_buf ? ctx->mdl_buf : ctx->mdl_hdr;
+                tail.next(ctx->mdl_isoc);
+                byteswap(ctx->isoc, number_of_packets(*ctx));
+        }
+
         ctx->buf.Mdl = ctx->mdl_hdr.get();
         NT_ASSERT(!ctx->buf.Offset);
-        ctx->buf.Length = ctx->mdl_hdr.size() + transfer_buffer_length;
+        ctx->buf.Length = get_total_size(ctx->hdr);
 
-        NT_ASSERT(ctx->buf.Length == get_total_size(ctx->hdr));
+        NT_ASSERT(ctx->buf.Length >= ctx->mdl_hdr.size());
+        NT_ASSERT(ctx->buf.Length <= size(ctx->mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
 
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                            ptr4log(irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr));
+                            ptr4log(ctx->irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr));
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
         IoSetCompletionRoutine(ctx->wsk_irp, send_complete, ctx, true, true, true);
-        enqueue_irp(vpdo, irp);
+        enqueue_irp(*ctx->vpdo, ctx->irp);
 
-        auto err = send(vpdo.sock, &ctx->buf, WSK_FLAG_NODELAY, ctx->wsk_irp);
+        auto err = send(ctx->vpdo->sock, &ctx->buf, WSK_FLAG_NODELAY, ctx->wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
         TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(ctx->wsk_irp), err);
@@ -271,24 +273,15 @@ auto async_send_cmd_submit(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_op
 }
 
 /*
- * Only CONTROL_TRANSFER can be sent synchronously.
- */
-inline auto has_pipe_handle(const URB &urb)
-{
-        auto f = urb.UrbHeader.Function;
-        return f == URB_FUNCTION_CONTROL_TRANSFER || f == URB_FUNCTION_CONTROL_TRANSFER_EX;
-}
-
-/*
  * I/O Manager can issue IoCancelIrp only when a driver returned STATUS_PENDING from its dispatch routine.
  * This means during the execution of dispatch routine IRP can't be canceled.
  */
-auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, _Inout_opt_ const URB *transfer_buffer = nullptr)
+auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
+        _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ const USBD_PIPE_HANDLE *handle = nullptr)
 {
         auto seqnum = hdr.base.seqnum;
-        auto has_handle = transfer_buffer && has_pipe_handle(*transfer_buffer);
+        set_context(irp, seqnum, ST_SEND_COMPLETE, handle);
 
-        set_context(irp, seqnum, ST_SEND_COMPLETE, !has_handle);
         enqueue_irp(vpdo, irp);
 
         if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
@@ -303,37 +296,21 @@ auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr,
  * PAGED_CODE() fails.
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
  */
-NTSTATUS do_copy_payload(void *dst_buf, const _URB_ISOCH_TRANSFER &r, ULONG *transferred)
+auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 {
-        NT_ASSERT(dst_buf);
+        ULONG length = 0;
 
-        *transferred = 0;
-//        bool mdl = r.Hdr.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
-
-        void *src_buf = nullptr;// usbip::get_urb_buffer(mdl ? nullptr : r.TransferBuffer, r.TransferBufferMDL, true);
-        if (!src_buf) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        auto buf_sz = is_endpoint_direction_out(r.PipeHandle) ? r.TransferBufferLength : 0; // TransferFlags can have wrong direction
-
-        RtlCopyMemory(dst_buf, src_buf, buf_sz);
-        *transferred += buf_sz;
-
-        auto dsc = reinterpret_cast<usbip_iso_packet_descriptor*>((char*)dst_buf + buf_sz);
-        ULONG sum = 0;
-
-        for (ULONG i = 0; i < r.NumberOfPackets; ++dsc) {
+        for (ULONG i = 0; i < r.NumberOfPackets; ++d) {
 
                 auto offset = r.IsoPacket[i].Offset;
                 auto next_offset = ++i < r.NumberOfPackets ? r.IsoPacket[i].Offset : r.TransferBufferLength;
 
                 if (next_offset >= offset && next_offset <= r.TransferBufferLength) {
-                        dsc->offset = offset;
-                        dsc->length = next_offset - offset;
-                        dsc->actual_length = 0;
-                        dsc->status = 0;
-                        sum += dsc->length;
+                        d->offset = offset;
+                        d->length = next_offset - offset;
+                        d->actual_length = 0;
+                        d->status = 0;
+                        length += d->length;
                 } else {
                         Trace(TRACE_LEVEL_ERROR, "[%lu] next_offset(%lu) >= offset(%lu) && next_offset <= r.TransferBufferLength(%lu)",
                                 i, next_offset, offset, r.TransferBufferLength);
@@ -342,49 +319,8 @@ NTSTATUS do_copy_payload(void *dst_buf, const _URB_ISOCH_TRANSFER &r, ULONG *tra
                 }
         }
 
-        *transferred += r.NumberOfPackets*sizeof(*dsc);
-
-        NT_ASSERT(sum == r.TransferBufferLength);
+        NT_ASSERT(length == r.TransferBufferLength);
         return STATUS_SUCCESS;
-}
-
-/*
- * PAGED_CODE() fails.
- */
-auto get_payload_size(const _URB_ISOCH_TRANSFER &r)
-{
-        ULONG len = r.NumberOfPackets*sizeof(usbip_iso_packet_descriptor);
-
-        if (is_endpoint_direction_out(r.PipeHandle)) {
-                len += r.TransferBufferLength;
-        }
-
-        return len;
-}
-
-/*
- * PAGED_CODE() fails.
- */
-NTSTATUS copy_payload(void *dst, IRP*, const _URB_ISOCH_TRANSFER &r, [[maybe_unused]] ULONG expected)
-{
-        ULONG transferred = 0;
-        NTSTATUS err = do_copy_payload(dst, r, &transferred);
-
-        if (!err) {
-                NT_ASSERT(transferred == expected);
-        }
-
-        return err;
-}
-
-PAGEABLE NTSTATUS urb_isoch_transfer_payload(IRP *irp, URB &urb)
-{
-        PAGED_CODE();
-
-        auto &r = urb.UrbIsochronousTransfer;
-        auto sz = get_payload_size(r);
-        auto dst = nullptr;
-        return dst ? copy_payload(dst, irp, r, sz) : STATUS_BUFFER_TOO_SMALL;
 }
 
 NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
@@ -813,8 +749,6 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return err;
         }
 
-        set_pipe_handle(irp, r.PipeHandle);
-
         if (is_transfer_direction_out(&hdr) != is_transfer_dir_out(&urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
                 Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
                 return STATUS_INVALID_PARAMETER;
@@ -823,7 +757,7 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         static_assert(sizeof(hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(hdr.u.cmd_submit.setup));
 
-        return send(vpdo, irp, hdr, &urb);
+        return send(vpdo, irp, hdr, &urb, &r.PipeHandle);
 }
 
 /*
@@ -850,7 +784,21 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        return async_send_cmd_submit(vpdo, irp, urb);
+        auto ctx = alloc_send_context();
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        ctx->vpdo = &vpdo;
+        ctx->irp = irp;
+
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
+                return err;
+        }
+
+        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, &r.PipeHandle);
+        return async_send(urb, ctx);
 }
 
 /*
@@ -881,20 +829,30 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        usbip_header hdr{};
-        auto err = set_cmd_submit_usbip_header(vpdo, hdr, r.PipeHandle, r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, 
-                                               r.TransferBufferLength);
+        auto ctx = alloc_send_context(r.NumberOfPackets);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
-        if (err) {
+        ctx->vpdo = &vpdo;
+        ctx->irp = irp;
+
+        if (auto err = repack(ctx->isoc, r)) {
+                free(ctx);
                 return err;
         }
 
-        set_pipe_handle(irp, r.PipeHandle);
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, 
+                                                 r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
+                free(ctx);
+                return err;
+        }
 
-        hdr.u.cmd_submit.start_frame = r.StartFrame;
-        hdr.u.cmd_submit.number_of_packets = r.NumberOfPackets;
+        ctx->hdr.u.cmd_submit.start_frame = r.StartFrame;
+        ctx->hdr.u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
-        return STATUS_NOT_IMPLEMENTED;
+        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, &r.PipeHandle);
+        return async_send(urb, ctx);
 }
 
 NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
