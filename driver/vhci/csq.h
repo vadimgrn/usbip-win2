@@ -27,7 +27,7 @@ void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
 
 enum irp_status_t { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED };
-void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, const USBD_PIPE_HANDLE *handle);
+void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, USBD_PIPE_HANDLE hpipe);
 
 constexpr auto make_peek_context(seqnum_t seqnum)
 {

@@ -130,10 +130,10 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
  * This means during the execution of dispatch routine IRP can't be canceled.
  */
 auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
-        _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ const USBD_PIPE_HANDLE *handle = nullptr)
+        _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ USBD_PIPE_HANDLE hpipe = USBD_PIPE_HANDLE())
 {
         auto seqnum = hdr.base.seqnum;
-        set_context(irp, seqnum, ST_SEND_COMPLETE, handle);
+        set_context(irp, seqnum, ST_SEND_COMPLETE, hpipe);
 
         enqueue_irp(vpdo, irp);
 
@@ -166,8 +166,7 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
                         length += d->length;
                 } else {
                         Trace(TRACE_LEVEL_ERROR, "[%lu] next_offset(%lu) >= offset(%lu) && next_offset <= r.TransferBufferLength(%lu)",
-                                i, next_offset, offset, r.TransferBufferLength);
-
+                                                  i, next_offset, offset, r.TransferBufferLength);
                         return STATUS_INVALID_PARAMETER;
                 }
         }
@@ -610,7 +609,7 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         static_assert(sizeof(hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(hdr.u.cmd_submit.setup));
 
-        return send(vpdo, irp, hdr, &urb, &r.PipeHandle);
+        return send(vpdo, irp, hdr, &urb, r.PipeHandle);
 }
 
 /*
@@ -650,7 +649,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return err;
         }
 
-        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, &r.PipeHandle);
+        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, r.PipeHandle);
         return async_send(urb, ctx);
 }
 
@@ -704,7 +703,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         ctx->hdr.u.cmd_submit.start_frame = r.StartFrame;
         ctx->hdr.u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
-        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, &r.PipeHandle);
+        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, r.PipeHandle);
         return async_send(urb, ctx);
 }
 

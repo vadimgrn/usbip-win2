@@ -309,9 +309,9 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc);
 		free(ctx);
 		return err;
+	} else {
+		return STATUS_INSUFFICIENT_RESOURCES;
 	}
-
-	return STATUS_SUCCESS;
 }
 
 /*
