@@ -7,7 +7,7 @@
 #include "irp.h"
 #include "vhub.h"
 #include "wsk_cpp.h"
-#include "internal_ioctl.h"
+#include "send_context.h"
 
 #include <ntstrsafe.h>
 

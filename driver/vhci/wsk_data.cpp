@@ -54,8 +54,8 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	size_t victim_size = 0;
 	int victim_cnt = 0;
 
-	int i = 0;
-	for (WSK_DATA_INDICATION *prev{}; head && len; prev = head, head = head->Next, ++victim_cnt, ++i) {
+	WSK_DATA_INDICATION *prev{};
+	for (int i = 0; head && len; prev = head, head = head->Next, ++victim_cnt, ++i) {
 
 		const auto &buf = head->Buffer;
 
@@ -64,10 +64,6 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 			// O...OL...L  - offset, len
 			TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, HEAD",
 				  i, ptr4log(head), buf.Length, len, offset);
-
-			if (prev) {
-				prev->Next = nullptr;
-			}
 
 			offset += len;
 			len = 0;
@@ -87,6 +83,9 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	}
 
 	if (victim != head) {
+		if (prev) {
+			prev->Next = nullptr;
+		}
 		assert_wsk_data_offset(vpdo);
 		NT_ASSERT(victim_size == wsk::size(victim));
 		NT_ASSERT(victim_size + wsk::size(head) == old_size);

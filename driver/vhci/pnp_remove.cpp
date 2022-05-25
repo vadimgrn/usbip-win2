@@ -12,7 +12,7 @@
 #include "csq.h"
 #include "wsk_cpp.h"
 #include "wsk_data.h"
-#include "internal_ioctl.h"
+#include "send_context.h"
 
 const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
