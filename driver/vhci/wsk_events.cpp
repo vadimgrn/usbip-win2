@@ -519,6 +519,51 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	}
 }
 
+void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
+{
+	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
+
+	{
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
+			ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+	}
+
+	if (irp) {
+		ret_submit(vpdo, irp, hdr);
+	}
+}
+
+auto process_header(_Inout_ vpdo_dev_t &vpdo, _Inout_ usbip_header &hdr, _In_ size_t &avail)
+{
+	auto &base = hdr.base;
+	auto cmd = static_cast<usbip_request_type>(base.command);
+
+	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
+		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
+		return sizeof(hdr);
+	}
+
+	if (is_valid_seqnum(base.seqnum)) {
+		base.direction = extract_dir(base.seqnum); // always zero in server response
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum");
+		return sizeof(hdr);
+	}
+
+	auto total_size = get_total_size(hdr);
+	if (avail < total_size) {
+		TraceWSK("%Iu of %Iu bytes available, retaining", avail, total_size); 
+		return avail = 0; // break caller's loop
+	}
+
+	NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
+	avail -= sizeof(hdr);
+
+	ret_command(vpdo, hdr);
+	return total_size - sizeof(hdr); // payload size
+}
+
 /*
  * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
  * @see send_cmd_unlink
@@ -532,72 +577,27 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 {
 	wsk_data_push(vpdo, DataIndication, BytesIndicated);
 
-	auto avail = wsk_data_size(vpdo);
-	TraceWSK("Buffer size %Iu", avail);
-
 	usbip_header hdr;
 
-	if (avail < sizeof(hdr)) {
-		TraceWSK("Buffer %Iu < sizeof(usbip_header), retaining", avail); 
-		return STATUS_PENDING;
-	}
+	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); ) {
 
-	if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
-		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
-		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
-		return STATUS_PENDING;
-	}
+		TraceWSK("Buffer size %Iu", avail);
 
-	avail -= sizeof(hdr);
-	byteswap_header(hdr, swap_dir::net2host);
-
-	auto consume = [&vpdo] (auto len)
-	{ 
-		if (len) {
-			NT_VERIFY(!wsk_data_consume(vpdo, len));
+		if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
+			NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
+			Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
+			break;
 		}
-		return STATUS_PENDING; 
-	};
 
-	auto &base = hdr.base;
-	auto cmd = static_cast<usbip_request_type>(base.command);
+		byteswap_header(hdr, swap_dir::net2host);
 
-	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
-		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
-		return consume(sizeof(hdr));
+		if (auto n = process_header(vpdo, hdr, avail)) {
+			NT_VERIFY(!wsk_data_consume(vpdo, n));
+			avail -= n;
+		}
 	}
 
-	auto seqnum = base.seqnum;
-
-	if (is_valid_seqnum(seqnum)) {
-		base.direction = extract_dir(seqnum); // always zero in server response
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum");
-		return consume(sizeof(hdr));
-	}
-
-	auto payload_size = get_payload_size(hdr);
-
-	if (avail >= payload_size) {
-		consume(sizeof(hdr));
-	} else {
-		TraceWSK("Buffer %Iu < payload %Iu, retaining", avail, payload_size); 
-		return STATUS_PENDING;
-	}
-
-	auto irp = cmd == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, seqnum) : nullptr;
-
-	{
-		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-			    ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
-	}
-
-	if (irp) {
-		ret_submit(vpdo, irp, hdr);
-	}
-
-	return consume(payload_size);
+	return STATUS_PENDING;
 }
 
 } // namespace
