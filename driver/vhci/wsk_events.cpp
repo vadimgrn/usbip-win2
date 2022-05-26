@@ -195,68 +195,71 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
  * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
-auto copy_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf, 
-	_Inout_ vpdo_dev_t &src_buf, _In_ ULONG src_len, _Out_ usbip_iso_packet_descriptor *src)
+auto copy_isoc_data(
+	_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf, 
+	_Inout_ vpdo_dev_t &src_buf, _In_ ULONG src_len, 
+	_Out_ usbip_iso_packet_descriptor *sd, _In_ size_t sd_len)
 {
 	auto dir_out = !dst_buf;
+	auto sd_offset = dir_out ? 0 : src_len;
 
-	if (auto err = wsk_data_copy(src_buf, src, dir_out ? 0 : src_len, r.NumberOfPackets*sizeof(*src))) {
+	if (auto err = wsk_data_copy(src_buf, sd, sd_offset, sd_len)) {
 		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy usbip_iso_packet_descriptor[%lu] %!STATUS!", r.NumberOfPackets, err);
 		return err;
 	}
 
-	byteswap(src, r.NumberOfPackets);
+	byteswap(sd, r.NumberOfPackets);
 
 	ULONG src_offset = 0; // from src_buf
-	auto dst = r.IsoPacket;
+	auto dd = r.IsoPacket;
 
-	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++src, ++dst) {
+	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++sd, ++dd) {
 
-		dst->Status = src->status ? to_windows_status_isoch(src->status) : USBD_STATUS_SUCCESS;
+		dd->Status = sd->status ? to_windows_status_isoch(sd->status) : USBD_STATUS_SUCCESS;
 
 		if (dir_out) {
-			continue; // dst->Length not used for OUT transfers
+			continue; // dd->Length is not used for OUT transfers
 		}
 
-		if (!src->actual_length) {
-			dst->Length = 0;
+		if (!sd->actual_length) {
+			dd->Length = 0;
 			continue;
 		}
 
-		if (src->actual_length > src->length) {
-			Trace(TRACE_LEVEL_ERROR, "actual_length(%u) > length(%u)", src->actual_length, src->length);
+		if (sd->actual_length > sd->length) {
+			Trace(TRACE_LEVEL_ERROR, "actual_length(%u) > length(%u)", sd->actual_length, sd->length);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src->offset != dst->Offset) { // buffer is compacted, but offsets are intact
-			Trace(TRACE_LEVEL_ERROR, "src.offset(%u) != dst.Offset(%lu)", src->offset, dst->Offset);
+		if (sd->offset != dd->Offset) { // buffer is compacted, but offsets are intact
+			Trace(TRACE_LEVEL_ERROR, "src.offset(%u) != dst.Offset(%lu)", sd->offset, dd->Offset);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src_offset > dst->Offset) {// source buffer has no gaps
-			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) > dst.Offset(%lu)", src_offset, dst->Offset);
+		if (src_offset > dd->Offset) {// source buffer has no gaps
+			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) > dst.Offset(%lu)", src_offset, dd->Offset);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src_offset + src->actual_length > src_len) {
+		if (src_offset + sd->actual_length > src_len) {
 			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)", 
-				                  src_offset, src->actual_length, src_len);
+				                  src_offset, sd->actual_length, src_len);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (dst->Offset + src->actual_length > r.TransferBufferLength) {
+		if (dd->Offset + sd->actual_length > r.TransferBufferLength) {
 			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) + src.actual_length(%u) > r.TransferBufferLength(%lu)", 
-				                  dst->Offset, src->actual_length, r.TransferBufferLength);
+				                  dd->Offset, sd->actual_length, r.TransferBufferLength);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (auto err = wsk_data_copy(src_buf, dst_buf + dst->Offset, src_offset, src->actual_length)) {
+		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length)) {
 			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
 			return err;
 		}
 
-		dst->Length = src->actual_length;
-		src_offset += src->actual_length;
+		dd->Length = sd->actual_length;
+		src_offset += sd->actual_length;
 	}
 
 	bool ok = src_offset == src_len;
@@ -306,8 +309,8 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 	}
 
 	if (auto ctx = alloc_send_context(r.NumberOfPackets)) {
-		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc);
-		free(ctx);
+		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc, ctx->mdl_isoc.size());
+		free(ctx, false);
 		return err;
 	} else {
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -585,7 +588,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-			ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+			    ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 	}
 
 	if (irp) {

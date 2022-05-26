@@ -82,8 +82,6 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
 auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
 {
-        NT_ASSERT(!ctx->mdl_buf);
-
         if (is_transfer_direction_out(&ctx->hdr)) { // TransferFlags can have wrong direction
                 if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
@@ -91,6 +89,8 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
                         return err;
                 }
                 ctx->mdl_hdr.next(ctx->mdl_buf);
+        } else {
+                NT_ASSERT(!ctx->mdl_buf);
         }
 
         if (ctx->is_isoc) {
@@ -1000,11 +1000,7 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
         auto seqnum = get_seqnum(irp);
-
-        auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);
-        NT_ASSERT(old_status != ST_RECV_COMPLETE);
-
-        TraceCall("irp %04x, unlink seqnum %u, %!irp_status_t!", ptr4log(irp), seqnum, old_status);
+        TraceCall("irp %04x, seqnum %u", ptr4log(irp), seqnum);
 
         if (auto sock = vpdo.sock) {
                 usbip_header hdr{};
@@ -1013,6 +1009,9 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
                         Trace(TRACE_LEVEL_ERROR, "send_cmd %!STATUS!", err);
                 }
         }
+
+        auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);
+        NT_ASSERT(old_status != ST_RECV_COMPLETE);
 
         if (old_status == ST_SEND_COMPLETE) {
                 complete_canceled_irp(irp);

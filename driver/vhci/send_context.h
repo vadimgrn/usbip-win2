@@ -34,7 +34,7 @@ static_assert(sizeof(usbip::Mdl) == 16);
 static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 
 send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0);
-void free(_In_ send_context *ctx);
+void free(_In_ send_context *ctx, _In_ bool reuse = true);
 
 inline auto number_of_packets(_In_ const send_context &ctx)
 {

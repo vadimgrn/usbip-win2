@@ -55,28 +55,18 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	int victim_cnt = 0;
 
 	WSK_DATA_INDICATION *prev{};
-	for (int i = 0; head && len; prev = head, head = head->Next, ++victim_cnt, ++i) {
+	for ( ; head && len; prev = head, head = head->Next, ++victim_cnt) {
 
 		const auto &buf = head->Buffer;
 
 		if (buf.Length > offset + len) {
-			// BBBBBBBBBBB - buffer
-			// O...OL...L  - offset, len
-			TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, HEAD",
-				  i, ptr4log(head), buf.Length, len, offset);
-
-			offset += len;
-			len = 0;
+			offset += len; // BBBBBBBBBBB - buffer
+			len = 0;       // O...OL...L  - offset, len
 			break;
 		}
 
-		// BBBBBBBBBB - buffer
-		// OOOOOOOOOL...L - max offset, len
-		auto remaining = buf.Length - offset;
-		len -= remaining;
-
-		TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, %Iu bytes left",
-			  i, ptr4log(head), buf.Length, remaining, offset, len);
+		auto remaining = buf.Length - offset; // BBBBBBBBBB - buffer
+		len -= remaining;                     // OOOOOOOOOL...L - max offset, len
 
 		victim_size += buf.Length;
 		offset = 0;
@@ -86,6 +76,7 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 		if (prev) {
 			prev->Next = nullptr;
 		}
+
 		assert_wsk_data_offset(vpdo);
 		NT_ASSERT(victim_size == wsk::size(victim));
 		NT_ASSERT(victim_size + wsk::size(head) == old_size);
@@ -106,8 +97,10 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
 	return wsk::size(vpdo.wsk_data) - vpdo.wsk_data_offset;
 }
 
-NTSTATUS wsk_data_copy(
-	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, _Out_ size_t *actual)
+/*
+ * Calls for each usbip_iso_packet_descriptor[] for isoc transfer, do not use logging.
+ */
+NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, _Out_ size_t *actual)
 {
 	if (actual) {
 		*actual = 0;
@@ -115,13 +108,11 @@ NTSTATUS wsk_data_copy(
 
 	offset += vpdo.wsk_data_offset;
 
-	int j = 0;
-	for (auto i = vpdo.wsk_data; i && len; i = i->Next, ++j) {
+	for (auto i = vpdo.wsk_data; i && len; i = i->Next) {
 
 		const auto &buf = i->Buffer;
 
 		if (offset >= buf.Length) {
-			TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, skipped, offset %Iu", j, ptr4log(i), buf.Length, offset);
 			offset -= buf.Length;
 			continue;
 		}
@@ -130,27 +121,22 @@ NTSTATUS wsk_data_copy(
 
 		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, priority);
 		if (!sysaddr) {
-			Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION[%d]=%04x: MmGetSystemAddressForMdlSafe error", j, ptr4log(i));
+			Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION %04x: MmGetSystemAddressForMdlSafe error", ptr4log(i));
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 
 		sysaddr += buf.Offset + offset;
-
 		auto remaining = buf.Length - offset;
-		auto cnt = min(len, remaining);
+		offset = 0;
 
+		auto cnt = min(len, remaining);
 		RtlCopyMemory(dest, sysaddr, cnt);
-		if (actual) {
-			*actual += cnt;
-		}
 
 		dest = static_cast<char*>(dest) + cnt;
 		len -= cnt;
-
-		TraceWSK("DATA_INDICATION[%d]=%04x: length %Iu, %Iu bytes from offset %Iu, %Iu bytes left", 
-			  j, ptr4log(i), buf.Length, cnt, offset, len);
-
-		offset = 0;
+		if (actual) {
+			*actual += cnt;
+		}
 	}
 
 	return len ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
