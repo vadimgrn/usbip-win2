@@ -450,7 +450,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
         return err;
 }
 
-NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_header &hdr, USB_DESCRIPTOR_REQUEST &r)
+NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, USB_DESCRIPTOR_REQUEST &r)
 {
         auto irpstack = IoGetCurrentIrpStackLocation(irp);
         auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // r.Data[]
@@ -462,13 +462,15 @@ NTSTATUS get_descriptor_from_node_connection(IRP *irp, const usbip_header &hdr, 
                 return STATUS_INVALID_PARAMETER;
         }
 
-        RtlCopyMemory(r.Data, &hdr + 1, actual_length);
+	if (auto err = wsk_data_copy(vpdo, r.Data, 0, actual_length)) {
+		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy %!STATUS!", err);
+		return err;
+	}
 
-        TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
-                ptr4log(irp), r.ConnectionIndex, data_sz, actual_length, 
-                WppBinary(r.Data, (USHORT)actual_length));
+	TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
+		  ptr4log(irp), r.ConnectionIndex, data_sz, actual_length, WppBinary(r.Data, (USHORT)actual_length));
 
-        auto err = to_windows_status(hdr.u.ret_submit.status);
+	auto err = to_windows_status(hdr.u.ret_submit.status);
         return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
@@ -501,7 +503,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
                 st = usb_reset_port(hdr);
                 break;
         case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-                st = get_descriptor_from_node_connection(irp, hdr, 
+                st = get_descriptor_from_node_connection(vpdo, irp, hdr, 
 			*static_cast<USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer));
                 break;
         default:
