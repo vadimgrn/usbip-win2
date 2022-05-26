@@ -16,6 +16,7 @@
 #include "pdu.h"
 #include "strutil.h"
 #include "wsk_events.h"
+#include "pnp.h"
 
 namespace
 {
@@ -156,6 +157,8 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
         if (!devobj) {
                 return make_error(ERR_GENERAL);
         }
+
+        InterlockedIncrement(&VpdoCount);
 
         vpdo = to_vpdo_or_null(devobj);
         vpdo->parent = vhub_from_vhci(vhci);

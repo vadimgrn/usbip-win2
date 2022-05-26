@@ -162,7 +162,9 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
                 vpdo.actconfig = nullptr;
 	}
 
-	ExFlushLookasideListEx(&send_context_list); // FIXME: flush if vpdo is last
+	if (!InterlockedDecrement(&VpdoCount)) {
+		ExFlushLookasideListEx(&send_context_list);
+	}
 }
 
 } // namespace
