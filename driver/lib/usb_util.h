@@ -4,6 +4,7 @@
 extern "C" {
 #endif
 
+#include "usbip_api_consts.h"
 #include "usbip_proto.h"
 
 #include <ntdef.h>

@@ -87,7 +87,7 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 	convert_to_hashstr(pbHash, wstrHash);
 
 	sSPCLink.dwLinkChoice = SPC_FILE_LINK_CHOICE;
-	sSPCLink.pwszUrl = L"<<<Obsolete>>>";
+	sSPCLink.pwszUrl = const_cast<wchar_t*>(L"<<<Obsolete>>>");
 	cbEncoded = sizeof(pbEncoded);
 
 	if (isPEType) {
@@ -110,10 +110,10 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 		}
 	}
 	// Populate the SHA1 Hash OID
-	sSIPData.Data.pszObjId = (isPEType) ? OBJID_SPC_PE_IMAGE: OBJID_SPC_CAB_DATA;
+	sSIPData.Data.pszObjId = const_cast<char*>(isPEType ? OBJID_SPC_PE_IMAGE : OBJID_SPC_CAB_DATA);
 	sSIPData.Data.Value.cbData = cbEncoded;
 	sSIPData.Data.Value.pbData = pbEncoded;
-	sSIPData.DigestAlgorithm.pszObjId = szOID_OIWSEC_sha1;
+	sSIPData.DigestAlgorithm.pszObjId = const_cast<char*>(szOID_OIWSEC_sha1);
 	sSIPData.DigestAlgorithm.Parameters.cbData = 0;
 	sSIPData.Digest.cbData = SHA1_HASH_LENGTH;
 	sSIPData.Digest.pbData = pbHash;
@@ -126,8 +126,8 @@ add_file_hash(HANDLE hCat, LPCSTR path, LPCSTR fname, BOOL isPEType)
 
 	auto wfname = utf8_to_wchar(fname);
 	// Add the "File" and "OSAttr" attributes to the newly created member
-	if (CryptCATPutAttrInfo(hCat, pCatMember, L"File", ATTR_FLAGS, 2 * ((DWORD)wfname.size() + 1), (BYTE*)wfname.data()) == nullptr ||
-		CryptCATPutAttrInfo(hCat, pCatMember, L"OSAttr", ATTR_FLAGS, 2 * ((DWORD)wcslen(wszOSAttr) + 1), (BYTE*)wszOSAttr) == nullptr) {
+	if (CryptCATPutAttrInfo(hCat, pCatMember, const_cast<wchar_t*>(L"File"), ATTR_FLAGS, 2 * ((DWORD)wfname.size() + 1), (BYTE*)wfname.data()) == nullptr ||
+		CryptCATPutAttrInfo(hCat, pCatMember, const_cast<wchar_t*>(L"OSAttr"), ATTR_FLAGS, 2 * ((DWORD)wcslen(wszOSAttr) + 1), (BYTE*)wszOSAttr) == nullptr) {
 		dbg("unable to create attributes: %s", fname);
 		return FALSE;
 	}
@@ -160,13 +160,13 @@ BOOL build_cat(LPCSTR path, LPCSTR catname, LPCSTR hwid)
 	}
 
 	auto whwid = utf8_to_wchar(hwid);
-	if (CryptCATPutCatAttrInfo(hCat, L"HWID1", CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
+	if (CryptCATPutCatAttrInfo(hCat, const_cast<wchar_t*>(L"HWID1"), CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
 		2 * ((DWORD)whwid.size() + 1), (BYTE*)whwid.data()) == nullptr) {
 		dbg("failed to set HWID1 cat attribute");
 		goto out;
 	}
 
-	if (CryptCATPutCatAttrInfo(hCat, L"OS", CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
+	if (CryptCATPutCatAttrInfo(hCat, const_cast<wchar_t*>(L"OS"), CRYPTCAT_ATTR_AUTHENTICATED | CRYPTCAT_ATTR_NAMEASCII | CRYPTCAT_ATTR_DATAASCII,
 		2 * ((DWORD)wcslen(wOS) + 1), (BYTE*)wOS) == nullptr) {
 		dbg("failed to set OS cat attribute");
 		goto out;

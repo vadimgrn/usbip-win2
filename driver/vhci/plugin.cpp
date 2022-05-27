@@ -18,6 +18,8 @@
 #include "wsk_events.h"
 #include "pnp.h"
 
+#pragma warning(disable:5054) // operator '|': deprecated between enumerations of different types
+
 namespace
 {
 

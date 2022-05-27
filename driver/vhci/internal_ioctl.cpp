@@ -15,6 +15,8 @@
 #include "pdu.h"
 #include "send_context.h"
 
+#pragma warning(disable:5054) // operator '|': deprecated between enumerations of different types
+
 namespace
 {
 

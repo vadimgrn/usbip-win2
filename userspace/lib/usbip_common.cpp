@@ -26,8 +26,8 @@ namespace
 struct speed_string 
 {
         usb_device_speed val;
-        char *speed;
-        char *desc;
+        const char *speed;
+	const char *desc;
 };
 
 const speed_string speed_strings[] = 
@@ -45,7 +45,7 @@ const speed_string speed_strings[] =
 struct portst_string 
 {
         usbip_device_status status;
-        char *desc;
+        const char *desc;
 };
 
 const portst_string portst_strings[] = 

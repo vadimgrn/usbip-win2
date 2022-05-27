@@ -104,10 +104,10 @@ sign_file(LPCSTR subject, LPCSTR fpath)
 	oidStatementTypeBlob.pbData = pbOidStatementType;
 	cryptAttribute[0].cValue = 1;
 	cryptAttribute[0].rgValue = &oidSpOpusInfoBlob;
-	cryptAttribute[0].pszObjId = "1.3.6.1.4.1.311.2.1.12"; // SPC_SP_OPUS_INFO_OBJID in wintrust.h
+	cryptAttribute[0].pszObjId = const_cast<char*>("1.3.6.1.4.1.311.2.1.12"); // SPC_SP_OPUS_INFO_OBJID in wintrust.h
 	cryptAttribute[1].cValue = 1;
 	cryptAttribute[1].rgValue = &oidStatementTypeBlob;
-	cryptAttribute[1].pszObjId = "1.3.6.1.4.1.311.2.1.11"; // SPC_STATEMENT_TYPE_OBJID in wintrust.h
+	cryptAttribute[1].pszObjId = const_cast<char*>("1.3.6.1.4.1.311.2.1.11"); // SPC_STATEMENT_TYPE_OBJID in wintrust.h
 	cryptAttributesArray.cAttr = 2;
 	cryptAttributesArray.rgAttr = cryptAttribute;
 
