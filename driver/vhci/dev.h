@@ -96,8 +96,6 @@ struct vpdo_dev_t : vdev_t
         UNICODE_STRING serial; // user-defined
         //
 
-        wsk::SOCKET *sock;
-        
         int port; // unique port number of the device on hub, [1, vhub_dev_t::NUM_PORTS]
 	volatile bool unplugged; // see IOCTL_USBIP_VHCI_UNPLUG_HARDWARE
 
@@ -126,6 +124,8 @@ struct vpdo_dev_t : vdev_t
 	
 	seqnum_t seqnum; // @see next_seqnum
 	
+	wsk::SOCKET *sock;
+
 	_WSK_DATA_INDICATION* wsk_data;
 	size_t wsk_data_offset; // less than wsk_data->Buffer.Length
 

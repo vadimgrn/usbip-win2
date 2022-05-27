@@ -210,6 +210,7 @@ auto copy_isoc_data(
 
 	byteswap(sd, r.NumberOfPackets);
 
+	WskDataCopyState consume{};
 	ULONG src_offset = 0; // from src_buf
 	auto dd = r.IsoPacket;
 
@@ -253,7 +254,7 @@ auto copy_isoc_data(
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length)) {
+		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length, &consume)) {
 			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
 			return err;
 		}

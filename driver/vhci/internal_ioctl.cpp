@@ -691,13 +691,13 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         ctx->vpdo = &vpdo;
         ctx->irp = irp;
 
-        if (auto err = repack(ctx->isoc, r)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, 
+                                                 r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
                 free(ctx);
                 return err;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, 
-                                                 r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
+        if (auto err = repack(ctx->isoc, r)) {
                 free(ctx);
                 return err;
         }
