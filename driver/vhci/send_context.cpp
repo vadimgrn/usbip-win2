@@ -37,7 +37,7 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
 
 _IRQL_requires_same_
 _Function_class_(allocate_function_ex)
-void *allocate_function_ex(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
+void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {
         NT_ASSERT(PoolType == NonPagedPool);
         NT_ASSERT(Tag == AllocTag);
@@ -83,7 +83,7 @@ NTSTATUS init_send_context_list()
 send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
 {
         auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
-        if (!(ctx && (ctx->is_isoc = NumberOfPackets))) { // assignment
+        if (!(ctx && bool(ctx->is_isoc = NumberOfPackets))) { // assignment
                 return ctx;
         }
         

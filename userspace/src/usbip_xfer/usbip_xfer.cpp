@@ -416,7 +416,7 @@ void Forwarder::async_start()
 		async_read_header(std::make_shared<buffer_t>(), true);
 		break;
 	case std::future_status::timeout:
-		Trace(TRACE_LEVEL_ERROR, "%s -> read timeout %d sec.", target(false), vhci_read_timeout.count());
+		Trace(TRACE_LEVEL_ERROR, "%s -> read timeout %lld sec.", target(false), vhci_read_timeout.count());
 		break;
 	case std::future_status::deferred:
 		assert(!"future_status::deferred");
@@ -616,7 +616,7 @@ void on_stdin_ready(const boost::system::error_code &ec, boost::asio::windows::o
 	auto sockfd = WSASocket(FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, FROM_PROTOCOL_INFO, &args.info, 0, WSA_FLAG_OVERLAPPED);
 
 	if (args.hdev == INVALID_HANDLE_VALUE || sockfd == INVALID_SOCKET) {
-		Trace(TRACE_LEVEL_ERROR, "Invalid handle(s): hdev(%p), sockfd(%x)", args.hdev, sockfd);
+		Trace(TRACE_LEVEL_ERROR, "Invalid handle(s): hdev(%p), sockfd(%Ix)", args.hdev, sockfd);
 		g_exit_code = EXIT_FAILURE;
 		return;
 	}

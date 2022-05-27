@@ -37,6 +37,7 @@
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <SupportsPackaging>
     </SupportsPackaging>
+    <TargetVersion>Windows10</TargetVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -46,6 +47,7 @@
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     <SupportsPackaging>
     </SupportsPackaging>
+    <TargetVersion>Windows10</TargetVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

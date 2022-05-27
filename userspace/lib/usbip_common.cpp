@@ -137,7 +137,7 @@ void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t 
 		vend = "unknown vendor";
         }
 
-	auto ret = snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
+	[[maybe_unused]] auto ret = snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
         assert(snprintf_ok(ret, size));
 }
 
@@ -165,6 +165,6 @@ void usbip_names_get_class(char *buff, size_t size, uint8_t class_, uint8_t subc
 		c = "?";
         }
 
-        auto ret = snprintf(buff, size, "%s/%s/%s (%02x/%02x/%02x)", c, s, p, class_, subclass, protocol);
+	[[maybe_unused]] auto ret = snprintf(buff, size, "%s/%s/%s (%02x/%02x/%02x)", c, s, p, class_, subclass, protocol);
         assert(snprintf_ok(ret, size));
 }
