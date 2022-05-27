@@ -578,8 +578,6 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); ) {
 
-		TraceWSK("Available %Iu bytes", avail);
-
 		if (auto n = get_header(hdr, vpdo)) {
 			if (n > 0) {
 				NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
@@ -603,9 +601,6 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 			NT_VERIFY(!wsk_data_consume(vpdo, payload_size));
 			avail -= payload_size;
 		}
-
-		TraceWSK("Remains %Iu bytes", avail);
-		break;
 	}
 
 	return STATUS_PENDING;

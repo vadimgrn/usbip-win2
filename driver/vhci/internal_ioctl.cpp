@@ -1038,26 +1038,20 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		return complete_internal_ioctl(irp, STATUS_DEVICE_NOT_CONNECTED);
 	}
 
-        auto buffer = URB_FROM_IRP(irp); // irpstack->Parameters.Others.Argument1
-        if (!buffer) {
-                Trace(TRACE_LEVEL_ERROR, "Buffer is NULL");
-                return complete_internal_ioctl(irp, STATUS_INVALID_PARAMETER);
-        }
-
         auto status = STATUS_NOT_SUPPORTED;
 
 	switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = usb_submit_urb(*vpdo, irp, *static_cast<URB*>(buffer));
+		status = usb_submit_urb(*vpdo, irp, *static_cast<URB*>(URB_FROM_IRP(irp)));
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
-		status = usb_get_port_status(*static_cast<ULONG*>(buffer));
+		status = usb_get_port_status(*(ULONG*)irpstack->Parameters.Others.Argument1);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
 		status = usb_reset_port(*vpdo, irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
-		status = setup_topology_address(vpdo, *static_cast<USB_TOPOLOGY_ADDRESS*>(buffer));
+		status = setup_topology_address(vpdo, *(USB_TOPOLOGY_ADDRESS*)irpstack->Parameters.Others.Argument1);
 		break;
         case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
                 status = get_descriptor_from_node_connection(*vpdo, irp);
