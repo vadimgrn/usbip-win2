@@ -55,7 +55,7 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	int victim_cnt = 0;
 
 	WSK_DATA_INDICATION *prev{};
-	for ( ; head && len; prev = head, head = head->Next, ++victim_cnt) {
+	for ( ; head && len; prev = head, head = head->Next) {
 
 		const auto &buf = head->Buffer;
 
@@ -67,13 +67,15 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 
 		auto remaining = buf.Length - offset; // BBBBBBBBBB - buffer
 		len -= remaining;                     // OOOOOOOOOL...L - max offset, len
+		offset = 0;
 
 		victim_size += buf.Length;
-		offset = 0;
+		++victim_cnt;
 	}
 
 	if (victim != head) {
 		if (prev) {
+			NT_ASSERT(prev->Next == head);
 			prev->Next = nullptr;
 		}
 
@@ -127,8 +129,7 @@ NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_
 
 		sysaddr += buf.Offset + offset;
 		auto remaining = buf.Length - offset;
-		offset = 0;
-
+		
 		auto cnt = min(len, remaining);
 		RtlCopyMemory(dest, sysaddr, cnt);
 
@@ -136,6 +137,12 @@ NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_
 		len -= cnt;
 		if (actual) {
 			*actual += cnt;
+		}
+
+		if (cnt < remaining) {
+			offset += cnt;
+		} else {
+			offset = 0;
 		}
 	}
 

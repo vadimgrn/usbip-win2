@@ -534,36 +534,33 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	}
 }
 
-auto process_header(_Inout_ vpdo_dev_t &vpdo, _Inout_ usbip_header &hdr, _In_ size_t &avail)
+auto get_header(_Out_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 {
+	if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
+		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
+		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
+		return -1;
+	}
+
+	byteswap_header(hdr, swap_dir::net2host);
+
 	auto &base = hdr.base;
 	auto cmd = static_cast<usbip_request_type>(base.command);
 
 	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
-		return sizeof(hdr);
+		return 1;
 	}
 
 	if (is_valid_seqnum(base.seqnum)) {
 		base.direction = extract_dir(base.seqnum); // always zero in server response
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum");
-		return sizeof(hdr);
+		return 1;
 	}
 
-	auto total_size = get_total_size(hdr);
-	if (avail < total_size) {
-		TraceWSK("%Iu of %Iu bytes available, retaining", avail, total_size); 
-		return avail = 0; // break caller's loop
-	}
-
-	NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
-	avail -= sizeof(hdr);
-
-	ret_command(vpdo, hdr);
-	return total_size - sizeof(hdr); // payload size
+	return 0;
 }
-
 /*
  * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
  * @see send_cmd_unlink
@@ -581,20 +578,34 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 
 	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); ) {
 
-		TraceWSK("Buffer size %Iu", avail);
+		TraceWSK("Available %Iu bytes", avail);
 
-		if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
-			NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
-			Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
+		if (auto n = get_header(hdr, vpdo)) {
+			if (n > 0) {
+				NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
+			}
 			break;
 		}
 
-		byteswap_header(hdr, swap_dir::net2host);
-
-		if (auto n = process_header(vpdo, hdr, avail)) {
-			NT_VERIFY(!wsk_data_consume(vpdo, n));
-			avail -= n;
+		avail -= sizeof(hdr);
+		auto payload_size = get_payload_size(hdr);
+		
+		if (avail >= payload_size) {
+			NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
+		} else {
+			TraceWSK("Available %Iu < payload %Iu, pending", avail, payload_size); 
+			break;
 		}
+
+		ret_command(vpdo, hdr);
+
+		if (payload_size) {
+			NT_VERIFY(!wsk_data_consume(vpdo, payload_size));
+			avail -= payload_size;
+		}
+
+		TraceWSK("Remains %Iu bytes", avail);
+		break;
 	}
 
 	return STATUS_PENDING;
