@@ -57,9 +57,6 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                   KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information, old_status);
 
         if (NT_SUCCESS(st.Status)) { // request has sent
-
-                NT_ASSERT(ctx->buf.Length == static_cast<ULONG>(st.Information));
-
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
                         TraceWSK("Complete irp %04x, %!STATUS!, Information %#Ix",
@@ -70,7 +67,6 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                         complete_canceled_irp(irp);
                         break;
                 }
-
         } else if (auto victim = dequeue_irp(vpdo, seqnum)) {
                 NT_ASSERT(victim == irp);
                 complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
@@ -102,17 +98,15 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
                 byteswap(ctx->isoc, number_of_packets(*ctx));
         }
 
-        ctx->buf.Mdl = ctx->mdl_hdr.get();
-        NT_ASSERT(!ctx->buf.Offset);
-        ctx->buf.Length = get_total_size(ctx->hdr);
+        WSK_BUF buf{ ctx->mdl_hdr.get(), 0, get_total_size(ctx->hdr) };
 
-        NT_ASSERT(ctx->buf.Length >= ctx->mdl_hdr.size());
-        NT_ASSERT(ctx->buf.Length <= size(ctx->mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
+        NT_ASSERT(buf.Length >= ctx->mdl_hdr.size());
+        NT_ASSERT(buf.Length <= size(ctx->mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
 
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                            ptr4log(ctx->irp), ctx->buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr));
+                            ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr));
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -120,7 +114,7 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
         IoSetCompletionRoutine(ctx->wsk_irp, send_complete, ctx, true, true, true);
         enqueue_irp(*ctx->vpdo, ctx->irp);
 
-        auto err = send(ctx->vpdo->sock, &ctx->buf, WSK_FLAG_NODELAY, ctx->wsk_irp);
+        auto err = send(ctx->vpdo->sock, &buf, WSK_FLAG_NODELAY, ctx->wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
         TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(ctx->wsk_irp), err);

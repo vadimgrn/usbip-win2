@@ -3,8 +3,6 @@
 #include "usbip_proto.h"
 #include "mdl_cpp.h"
 
-#include <wsk.h>
-
 struct vpdo_dev_t;
 
 extern LOOKASIDE_LIST_EX send_context_list;
@@ -16,7 +14,6 @@ struct send_context
         IRP *irp;
         IRP *wsk_irp;
 
-        WSK_BUF buf;
         usbip_header hdr;
 
         usbip::Mdl mdl_hdr;
@@ -28,7 +25,6 @@ struct send_context
         bool is_isoc;
 };
 
-static_assert(sizeof(WSK_BUF) == 24);
 static_assert(sizeof(usbip_header) == 48);
 static_assert(sizeof(usbip::Mdl) == 16);
 static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
