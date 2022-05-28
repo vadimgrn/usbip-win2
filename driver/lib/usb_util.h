@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "usbip_api_consts.h"
 #include "usbip_proto.h"
 
@@ -22,7 +18,3 @@ __inline USB_DEFAULT_PIPE_SETUP_PACKET *get_submit_setup(struct usbip_header *hd
 }
 
 enum usb_device_speed get_usb_speed(USHORT bcdUSB);
-
-#ifdef __cplusplus
-}
-#endif

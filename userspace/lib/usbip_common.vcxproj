@@ -99,19 +99,14 @@
   <ItemGroup>
     <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="names.c" />
-    <ClCompile Include="pdu.cpp" />
     <ClCompile Include="usbip_common.cpp" />
     <ClCompile Include="getopt.c" />
     <ClCompile Include="getopt_long.c" />
-    <ClCompile Include="usbip_pki_cat.cpp" />
-    <ClCompile Include="usbip_pki_sign.cpp" />
     <ClCompile Include="usbip_proto_op.cpp" />
     <ClCompile Include="usbip_setupdi.cpp" />
-    <ClCompile Include="usbip_stub.cpp" />
     <ClCompile Include="usbip_util.cpp" />
     <ClCompile Include="names_cpp.cpp" />
     <ClCompile Include="usbip_network.cpp" />
-    <ClCompile Include="start_xfer.cpp" />
     <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -123,17 +118,12 @@
     <ClInclude Include="list.h" />
     <ClInclude Include="mssign32.h" />
     <ClInclude Include="names.h" />
-    <ClInclude Include="pdu.h" />
     <ClInclude Include="usbip_common.h" />
     <ClInclude Include="getopt.h" />
-    <ClInclude Include="usbip_pki_cat.h" />
-    <ClInclude Include="usbip_pki_sign.h" />
     <ClInclude Include="usbip_setupdi.h" />
-    <ClInclude Include="usbip_stub.h" />
     <ClInclude Include="usbip_util.h" />
     <ClInclude Include="names_cpp.h" />
     <ClInclude Include="usbip_network.h" />
-    <ClInclude Include="start_xfer.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
   </ItemGroup>

@@ -11,9 +11,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\stub\usbip_stub.vcxproj">
-      <Project>{08230aff-8015-437b-9df1-af8d0112df59}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\vhci\usbip_vhci.vcxproj">
       <Project>{f35a874e-e790-44b5-9c14-749c8854a0c4}</Project>
     </ProjectReference>

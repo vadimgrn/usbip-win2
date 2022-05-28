@@ -71,16 +71,8 @@
       <Project>{7a610672-f2ef-4048-883a-41195d0977dc}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="..\usbipd\usbipd.vcxproj">
-      <Project>{0c5c92aa-37f0-4521-86ea-76f32b43e7b4}</Project>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
     <ProjectReference Include="..\usbip\usbip.vcxproj">
       <Project>{36cee68d-d6cf-4413-978c-794488f44555}</Project>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
-    <ProjectReference Include="..\usbip_xfer\usbip_xfer.vcxproj">
-      <Project>{d89776ab-dc80-4ad8-862e-18c084bd3e60}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>

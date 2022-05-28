@@ -59,8 +59,6 @@ const command cmds[] =
 	{ "attach", usbip_attach, "Attach a remote USB device",	usbip_attach_usage },
 	{ "detach", usbip_detach, "Detach a remote USB device", usbip_detach_usage },
 	{ "list", usbip_list, "List exportable or local USB devices", usbip_list_usage },
-	{ "bind", usbip_bind, "Bind device to usbip stub driver", usbip_bind_usage },
-	{ "unbind", usbip_unbind, "Unbind device from usbip stub driver", usbip_unbind_usage },
 	{ "port", usbip_port_show, "Show imported USB devices", usbip_port_usage },
         {}
 };

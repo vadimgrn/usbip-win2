@@ -91,13 +91,11 @@
   <ItemGroup>
     <ClCompile Include="usbip.cpp" />
     <ClCompile Include="usbip_attach.cpp" />
-    <ClCompile Include="usbip_bind.cpp" />
     <ClCompile Include="usbip_detach.cpp" />
     <ClCompile Include="usbip_list.cpp" />
     <ClCompile Include="usbip_list_local.cpp" />
     <ClCompile Include="usbip_list_remote.cpp" />
     <ClCompile Include="usbip_port.cpp" />
-    <ClCompile Include="usbip_unbind.cpp" />
     <ClCompile Include="usbip_vhci.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -112,10 +110,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\lib\usbip_common.vcxproj">
       <Project>{2c173853-88c0-4334-85bf-0b46cfd5a007}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\usbip_xfer\usbip_xfer.vcxproj">
-      <Project>{d89776ab-dc80-4ad8-862e-18c084bd3e60}</Project>
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

@@ -21,7 +21,6 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "getopt.h"
-#include "usbip_setupdi.h"
 #include "names_cpp.h"
 
 int list_devices(BOOL parsable);
