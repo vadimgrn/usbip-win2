@@ -22,6 +22,8 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
         auto ctx = static_cast<send_context*>(Buffer);
         NT_ASSERT(ctx);
 
+        TraceWSK("%04x, isoc[%Iu]", ptr4log(ctx), ctx->isoc_alloc_cnt);
+
         ctx->mdl_hdr.reset();
         ctx->mdl_buf.reset();
         ctx->mdl_isoc.reset();

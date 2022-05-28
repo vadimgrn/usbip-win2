@@ -1,18 +1,15 @@
 ![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")
 
 # USB/IP Client for Windows
-
-- Is fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
+- **Is fully implemented**
+- Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
+- Works with Linux USBIP server at least for kernels 4.19 - 5.13
+- **Is not ready for production use**, can cause BSOD or hang
+- The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows so far
 
 ## Requirements
 - Windows 10 x64, version 2004 and later ([ExAllocatePool2](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepool2) is used)
-
-## Status of VHCI driver (client)
-- **Is fully implemented**
-- Fully compatible with Linux USBIP server (at least for kernels 4.19 - 5.13)
-- **Is not ready for production use**, can cause BSOD or hang
-- The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 
 ## Differences with parent [project](https://github.com/cezanne/usbip-win)
 - x86 build is not supported
@@ -23,7 +20,7 @@
   - The core of the driver was rewritten from scratch
   - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
   - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
-    - The driver establishes TCP/IP connection with a server and handles data exchange without help of userspace app (usbip_xfer.exe or attacher.exe)
+    - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app (usbip_xfer.exe or attacher.exe)
     - This means low latencies and high throughput
     - [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented in both directions (send/receive)
       - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))

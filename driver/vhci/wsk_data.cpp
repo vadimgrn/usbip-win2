@@ -12,9 +12,9 @@
 namespace
 {
 
-inline auto check_wsk_data_offset(_In_ WSK_DATA_INDICATION *i, _In_ size_t offset)
+inline auto check_wsk_data_offset(_In_ const WSK_DATA_INDICATION *di, _In_ size_t offset)
 {
-	return i ? offset < i->Buffer.Length : !offset;
+	return di ? offset < di->Buffer.Length : !offset;
 }
 
 } // namespace
@@ -102,7 +102,7 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
  * 
  * @param offset to copy from, will be ignored for each next call if consume is used
  * @param consume resume copying from the last position, the same effect as if call wsk_data_consume after wsk_data_copy,
- *      but the internal state is saved in this parameter and wsk_data_offset is not affected
+ *      but the internal state is saved in this parameter and wsk_data/wsk_data_offset are not affected
  */
 NTSTATUS wsk_data_copy(
 	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, 
@@ -154,10 +154,10 @@ NTSTATUS wsk_data_copy(
 		}
 
 		if (cnt < remaining) { // BBBBBBBBBB - buffer
-			offset += cnt; // OOOOOOOL...L - max offset, len
+			offset += cnt; // OOOOL...L  - offset, len
 			break;
-		} else {
-			offset = 0;
+		} else {               // BBBBBBBBBB - buffer
+			offset = 0;    // OOOOOOOOOL...L - max offset, len
 		}
 	}
 
@@ -166,6 +166,9 @@ NTSTATUS wsk_data_copy(
 		consume->offset = offset;
 		consume->next = true;
 	}
+	
+	NT_ASSERT(check_wsk_data_offset(consume ? consume->cur : cur,
+		                        consume ? consume->offset : offset));
 
 	return len ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
 }
