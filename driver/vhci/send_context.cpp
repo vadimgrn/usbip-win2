@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "send_context.h"
 #include "trace.h"
 #include "send_context.tmh"

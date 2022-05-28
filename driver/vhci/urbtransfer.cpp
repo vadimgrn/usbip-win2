@@ -1,8 +1,12 @@
+/*
+ * Copyright (C) 2021, 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "urbtransfer.h"
 
 /*
-* These URBs have the same layout from the beginning of the structure.
-*/
+ * These URBs have the same layout from the beginning of the structure.
+ */
 
 const auto off_pipe = offsetof(UrbTransfer::type, PipeHandle);
 static_assert(offsetof(_URB_CONTROL_TRANSFER_EX, PipeHandle) == off_pipe);

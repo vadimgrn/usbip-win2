@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2021, 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
 
 #include "usbip_api_consts.h"

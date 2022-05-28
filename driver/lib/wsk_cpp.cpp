@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include <ntddk.h>
 #include "wsk_cpp.h"
 #include <wdm.h>

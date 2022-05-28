@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2021, 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "csq.h"
 #include "trace.h"
 #include "csq.tmh"

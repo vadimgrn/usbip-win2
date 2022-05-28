@@ -1,4 +1,8 @@
-﻿#include "wsk_events.h"
+﻿/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
+#include "wsk_events.h"
 #include "trace.h"
 #include "wsk_events.tmh"
 

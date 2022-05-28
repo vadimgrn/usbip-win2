@@ -1,4 +1,8 @@
-﻿#include "wsk_data.h"
+﻿/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
+#include "wsk_data.h"
 #include "wsk_cpp.h"
 #include "trace.h"
 #include "wsk_data.tmh"

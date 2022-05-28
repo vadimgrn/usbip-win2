@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "usbip_network.h"
 #include "trace.h"
 #include "usbip_network.tmh"
