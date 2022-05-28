@@ -2,18 +2,35 @@
 
 # USB/IP Client for Windows
 
-- This is USB/IP Client for Windows which is fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- There is no official USB/IP client for Windows so far
+- Is fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
+- There is no "official" USB/IP client for Windows so far
 
-## Status
+## Requirements
+- Windows 10 x64, version 2004 and later ([ExAllocatePool2](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepool2) is used)
+
+## Status of VHCI driver (client)
+- **Is fully implemented**
+- Fully compatible with Linux USBIP server (at least for kernels 4.19 - 5.13)
+- **Is not ready for production use**, can cause BSOD or hang
+- The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
+
+## Differences with parent [project](https://github.com/cezanne/usbip-win)
+- x86 build is not supported
+- Server (stub driver) is removed
+- UDE client driver is removed, VHCI driver is superseded it
 - Client (VHCI driver)
-  - **Is fully implemented**
-  - Fully compatible with Linux USBIP server (at least for kernels 4.19 - 5.13)
-  - **Is not ready for production use**, can cause BSOD or hang in the kernel. This usually happens during disconnection of a device or uninstallation of the driver.
-  - The driver is not signed (Windows Test Signing Mode must be enabled)
-  - Works on Windows 11/10 x64, x86 build is not supported
-- UDE client driver from the parent repo is removed. VHCI driver is superseded it.
-- Server (stub driver) is not the goal of this project. It is updated from original repo AS IS.
+  - Significantly refactored and improved
+  - The core of the driver was rewritten from scratch
+  - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
+  - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
+    - The driver establishes TCP/IP connection with a server and handles data exchange without help of userspace app (usbip_xfer.exe or attacher.exe)
+    - This means low latencies and high throughput
+    - [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented in both directions (send/receive)
+      - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
+      - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data directly from URB transfer buffer
+      - [WskReceiveEvent](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive_event) buffers are directly copied to URB transfer buffer
+- InnoSetup installer is used for installation of the driver and userspace stuff
+- C++ 20 is used for all projects
 
 ## Devices that work (list is incomplete)
   - USB 2.0/3.X flash drives
@@ -34,24 +51,14 @@
 ## Build
 
 ### Notes
-- Build is tested on Windows 11 x64, projects are configured for Win10 target by default
+- Build is tested on Windows 11, projects are configured for Win10 target by default
 - x86 platform is not supported
 
 ### Build Tools
-- The latest Microsoft Visual Studio Community 2019
-- Windows 11 SDK (10.1.22000.194)
-- Windows Driver Kit (10.1.22000.1)
-- vcpkg
+- The latest Microsoft Visual Studio Community 2022
+- SDK for Windows 11, version 22H2 (10.0.22621.0)
+- WDK for Windows 11, version 22H2 (10.0.22621.0)
 - InnoSetup
-
-### Install Boost C++
-- Install [vcpkg](https://vcpkg.io/en/getting-started.html)
-  - git clone https://github.com/Microsoft/vcpkg.git
-  - .\vcpkg\bootstrap-vcpkg.bat
-- Integrate vcpkg with Visual Studio
-  - vcpkg integrate install
-- Install Boost C++ libraries
-  - vcpkg install boost:x64-windows
 
 ### Install InnoSetup
 - Install the latest release of [InnoSetup](https://jrsoftware.org/isdl.php#stable)
@@ -59,7 +66,7 @@
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`
-- Set certificate driver signing for `package`, `usbip_stub`, `usbip_vhci` projects
+- Set certificate driver signing for `package`, `usbip_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Enter `..\usbip_test.pfx` (password: usbip)
 - Build the solution
@@ -93,7 +100,7 @@ usbip: info: bind device on busid 3-2: complete
 - `bcdedit.exe /set testsigning on`
 - Reboot the system to apply
 
-### Install USB/IP app
+### Install USB/IP
 - Download and run an installer from [releases](https://github.com/vadimgrn/usbip-win2/releases)
 
 ### Use usbip.exe to attach remote device(s)
@@ -128,19 +135,17 @@ port 1 is successfully detached
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
-- Use these tracing GUIDs
-  - `8b56380d-5174-4b15-b6f4-4c47008801a4` for vhci driver
-  - `8b56380d-5174-4b15-b6f4-4c47008801a4` for usbip_xfer utility
-- Start real-time log session for vhci driver
+- Use this tracing GUID for vhci driver
+  - `8b56380d-5174-4b15-b6f4-4c47008801a4`
+- Start a log session for vhci driver
 ```
 @echo off
 set NAME=usbip-vhci
 set TMFS=%TEMP%\tmfs
 set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
-tracelog.exe -start %NAME% -rt -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x3F -level 5
+tracelog.exe -start %NAME% -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x3F -level 5
 tracepdb.exe -f D:\usbip-win2\x64\Debug -p %TMFS%
-rem start /MAX tracefmt.exe -nosummary -p %TMFS% -displayonly -rt %NAME%
 ```
 - Stop the log session and get plain text log
 ```
@@ -158,13 +163,13 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
   - Open "System Properties" dialog bog
   - Select "Advanced" tab
   - Click on "Settings" in "Startup and Recovery"
-  - "System failure", "Write debugging information", pick "Kernel Memory Dump"
+  - "System failure", "Write debugging information", pick "Automatic Memory Dump" or "Kernel Memory Dump"
   - Check "Overwrite any existing file"
 - Start WPP tracing session for vhci driver as described in the previous topic
 - When BSOD has occured
   - Reboot PC if automatic reboot is not set
   - Run Windows debugger WinDbg.exe as Administrator
-  - Press Ctrl+D to open crash dump
+  - Press Ctrl+D to open crash dump in C:\Windows
   - Run following commands and copy the output
 ```
 !analyze -v
