@@ -49,7 +49,7 @@ create_usbdev_list(void)
 }
 
 static void
-add_usbdev(usbdev_list_t *usbdev_list, const char *id_hw, devno_t devno)
+add_usbdev(usbdev_list_t *usbdev_list, const std::string &id_hw, devno_t devno)
 {
 	unsigned short	vendor, product;
 	usbdev_t	*usbdevs, *usbdev;
@@ -58,8 +58,8 @@ add_usbdev(usbdev_list_t *usbdev_list, const char *id_hw, devno_t devno)
 		dbg("exceed maximum usb devices");
 		return;
 	}
-	if (!get_usbdev_info(id_hw, &vendor, &product)) {
-		dbg("drop hub or multifunction interface: %s", id_hw);
+	if (!get_usbdev_info(id_hw, vendor, product)) {
+		dbg("drop hub or multifunction interface: %s", id_hw.c_str());
 		return;
 	}
 	usbdevs = (usbdev_t *)realloc(usbdev_list->usbdevs, sizeof(usbdev_t) * (usbdev_list->n_usbdevs + 1));
@@ -108,18 +108,15 @@ list_device(usbdev_t *usbdev, BOOL parsable)
 static int
 walker_list(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx)
 {
-	usbdev_list_t	*usbdev_list = (usbdev_list_t *)ctx;
-	char	*id_hw;
+	auto usbdev_list = (usbdev_list_t *)ctx;
 
-	id_hw = get_id_hw(dev_info, pdev_info_data);
-	if (id_hw == nullptr) {
+	auto id_hw = get_id_hw(dev_info, pdev_info_data);
+	if (id_hw.empty()) {
 		dbg("failed to get hw id\n");
 		return 0;
 	}
 
 	add_usbdev(usbdev_list, id_hw, devno);
-
-	free(id_hw);
 	return 0;
 }
 

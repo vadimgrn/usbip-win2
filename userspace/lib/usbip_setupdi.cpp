@@ -1,96 +1,92 @@
 #include "usbip_setupdi.h"
 #include "usbip_common.h"
 
-#include <windows.h>
-#include <setupapi.h>
 #include <cstdlib>
 
 namespace
 {
 
-char *get_id_inst(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
+auto get_id_inst(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data)
 {
-	char	*id_inst;
-	DWORD	length;
+	std::string id_inst;
 
+	DWORD length;
 	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, nullptr, 0, &length)) {
-		DWORD	err = GetLastError();
+		auto err = GetLastError();
 		if (err != ERROR_INSUFFICIENT_BUFFER) {
 			dbg("get_id_inst: failed to get instance id: err: 0x%lx", err);
-			return nullptr;
+			return id_inst;
 		}
-	}
-	else {
+	} else {
 		dbg("get_id_inst: unexpected case");
-		return nullptr;
+		return id_inst;
 	}
-	id_inst = (char *)malloc(length);
-	if (id_inst == nullptr) {
-		dbg("get_id_inst: out of memory");
-		return nullptr;
-	}
-	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, id_inst, length, nullptr)) {
+
+	auto val = std::make_unique<char[]>(length);
+
+	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, val.get(), length, nullptr)) {
 		dbg("failed to get instance id");
-		free(id_inst);
-		return nullptr;
+		return id_inst;
 	}
+
+	id_inst.assign(val.get(), length);
+	val.release();
+
 	return id_inst;
 }
 
-char *get_dev_property(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, DWORD prop)
+std::string get_dev_property(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, DWORD prop)
 {
-	DWORD length;
+	std::string str;
 
+	DWORD length;
 	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, nullptr, 0, &length)) {
-		auto err = GetLastError();
-		switch (err) {
+		switch (auto err = GetLastError()) {
 		case ERROR_INVALID_DATA:
-			return _strdup("");
+			return str;
 		case ERROR_INSUFFICIENT_BUFFER:
 			break;
 		default:
 			dbg("failed to get device property: err: %x", err);
-			return nullptr;
+			return str;
 		}
 	} else {
 		dbg("unexpected case");
-		return nullptr;
+		return str;
 	}
 
-        auto value = (char*)malloc(length);
-	if (!value) {
-		dbg("out of memory");
-		return nullptr;
-	}
+	auto val = std::make_unique<BYTE[]>(length);
 	
-        if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, (PBYTE)value, length, &length)) {
+        if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, val.get(), length, nullptr)) {
 		dbg("failed to get device property: err: %x", GetLastError());
-		free(value);
-		return nullptr;
+		return str;
 	}
 
-        return value;
+	str.assign((char*)val.get(), length);
+	val.release();
+
+        return str;
 }
 
-unsigned char get_devno_from_inst_id(unsigned char devno_map[], const char *id_inst)
+unsigned char get_devno_from_inst_id(unsigned char devno_map[], const std::string &id_inst)
 {
-	unsigned char	devno = 0;
-	int	ndevs;
-	int	i;
+	UCHAR devno = 0;
 
-	for (i = 0; id_inst[i]; i++) {
-		devno += (unsigned char)(id_inst[i] * 19 + 13);
+	for (auto i: id_inst) {
+		devno += (unsigned char)(i*19 + 13); // FIXME: ???
 	}
-	if (devno == 0)
-		devno++;
+	if (!devno) {
+		++devno;
+	}
 
-	ndevs = 0;
+	int ndevs = 0;
 	while (devno_map[devno - 1]) {
-		if (devno == 255)
+		if (devno == UCHAR_MAX) {
 			devno = 1;
-		else
+		} else {
 			devno++;
-		if (ndevs == 255) {
+		}
+		if (ndevs == UCHAR_MAX) {
 			/* devno map is full */
 			return 0;
 		}
@@ -102,113 +98,120 @@ unsigned char get_devno_from_inst_id(unsigned char devno_map[], const char *id_i
 
 int traverse_dev_info(HDEVINFO dev_info, walkfunc_t walker, void *ctx)
 {
-	SP_DEVINFO_DATA	dev_info_data;
-	unsigned char	devno_map[255];
-	int	idx;
-	int	ret = 0;
+	unsigned char devno_map[UCHAR_MAX]{};
+	int ret = 0;
 
-	memset(devno_map, 0, 255);
-	dev_info_data.cbSize = sizeof(SP_DEVINFO_DATA);
-	for (idx = 0;; idx++) {
-		char	*id_inst;
-		devno_t	devno;
+	SP_DEVINFO_DATA	dev_info_data{ sizeof(dev_info_data) };
 
+	for (int idx = 0; !ret; ++idx) {
 		if (!SetupDiEnumDeviceInfo(dev_info, idx, &dev_info_data)) {
-			DWORD	err = GetLastError();
-
+			auto err = GetLastError();
 			if (err != ERROR_NO_MORE_ITEMS) {
 				dbg("SetupDiEnumDeviceInfo failed to get device information: err: 0x%lx", err);
 			}
 			break;
 		}
-		id_inst = get_id_inst(dev_info, &dev_info_data);
-		if (id_inst == nullptr)
+		
+		auto id_inst = get_id_inst(dev_info, &dev_info_data);
+		if (id_inst.empty()) {
 			continue;
-		devno = get_devno_from_inst_id(devno_map, id_inst);
-		free(id_inst);
-		if (devno == 0)
+		}
+
+		auto devno = get_devno_from_inst_id(devno_map, id_inst);
+		if (!devno) {
 			continue;
+		}
+		
 		ret = walker(dev_info, &dev_info_data, devno, ctx);
-		if (ret != 0)
-			break;
 	}
 
-	SetupDiDestroyDeviceInfoList(dev_info);
 	return ret;
 }
 
-bool is_valid_usb_dev(const char *id_hw)
+/*
+ * A valid USB hardware identifer(stub or vhci accepts) has one of following patterns:
+ * - USB\VID_0000&PID_0000&REV_0000
+ * - USB\VID_0000&PID_0000 (Is it needed?)
+ * Hardware ids of multi-interface device are not valid such as USB\VID_0000&PID_0000&MI_00.
+ */
+bool is_valid_usb_dev(const std::string &id_hw)
 {
-	/*
-	* A valid USB hardware identifer(stub or vhci accepts) has one of following patterns:
-	* - USB\VID_0000&PID_0000&REV_0000
-	* - USB\VID_0000&PID_0000 (Is it needed?)
-	* Hardware ids of multi-interface device are not valid such as USB\VID_0000&PID_0000&MI_00.
-	*/
-	if (id_hw == nullptr)
-		return FALSE;
-	if (strncmp(id_hw, "USB\\", 4) != 0)
-		return FALSE;
-	if (strncmp(id_hw + 4, "VID_", 4) != 0)
-		return FALSE;
-	if (strlen(id_hw + 8) < 4)
-		return FALSE;
-	if (strncmp(id_hw + 12, "&PID_", 5) != 0)
-		return FALSE;
-	if (strlen(id_hw + 17) < 4)
-		return FALSE;
-	if (id_hw[21] == '\0')
-		return TRUE;
-	if (strncmp(id_hw + 21, "&REV_", 5) != 0)
-		return FALSE;
-	if (strlen(id_hw + 26) < 4)
-		return FALSE;
-	if (id_hw[30] != '\0')
-		return FALSE;
-	return TRUE;
+	if (id_hw.empty()) {
+		return false;
+	}
+
+	auto s = id_hw.c_str();
+
+	if (strncmp(s, "USB\\", 4))
+		return false;
+
+	if (strncmp(s + 4, "VID_", 4))
+		return false;
+
+	if (strlen(s + 8) < 4)
+		return false;
+
+	if (strncmp(s + 12, "&PID_", 5))
+		return false;
+
+	if (strlen(s + 17) < 4)
+		return false;
+
+	if (s[21] == '\0')
+		return true;
+
+	if (strncmp(s + 21, "&REV_", 5))
+		return false;
+
+	if (strlen(s + 26) < 4)
+		return false;
+
+	if (s[30] != '\0')
+		return false;
+
+	return true;
 }
 
 } // namespace
 
 
-char *get_id_hw(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
+std::string get_id_hw(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 {
 	return get_dev_property(dev_info, pdev_info_data, SPDRP_HARDWAREID);
 }
 
-SP_DEVICE_INTERFACE_DETAIL_DATA *get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, LPCGUID pguid)
+std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> get_intf_detail(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, const GUID &guid)
 {
-        SP_DEVICE_INTERFACE_DATA dev_interface_data{ sizeof(dev_interface_data) };
+	std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> dev_interface_detail;
 
-	if (!SetupDiEnumDeviceInterfaces(dev_info, pdev_info_data, pguid, 0, &dev_interface_data)) {
+	auto dev_interface_data = std::make_unique<SP_DEVICE_INTERFACE_DATA>();
+	dev_interface_data->cbSize = sizeof(*dev_interface_data);
+
+	if (!SetupDiEnumDeviceInterfaces(dev_info, pdev_info_data, &guid, 0, dev_interface_data.get())) {
 		auto err = GetLastError();
 		if (err != ERROR_NO_MORE_ITEMS) {
 			dbg("SetupDiEnumDeviceInterfaces error %#x", err);
                 }
-		return nullptr;
+		return dev_interface_detail;
 	}
 
-        DWORD len = 0;
-        if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, nullptr, 0, &len, nullptr)) {
+        DWORD len;
+        if (!SetupDiGetDeviceInterfaceDetail(dev_info, dev_interface_data.get(), nullptr, 0, &len, nullptr)) {
                 auto err = GetLastError();
                 if (err != ERROR_INSUFFICIENT_BUFFER) {
                         dbg("SetupDiGetDeviceInterfaceDetail error %#x", err);
-                        return nullptr;
-                }
+			return dev_interface_detail;
+		}
         }
 
-        auto dev_interface_detail = (SP_DEVICE_INTERFACE_DETAIL_DATA*)malloc(len);
-	if (!dev_interface_detail) {
-		dbg("can't malloc %lu size memory", len);
-		return nullptr;
-	}
-
+	dev_interface_detail.reset(reinterpret_cast<SP_DEVICE_INTERFACE_DETAIL_DATA*>(new char[len]), 
+		                   [](auto ptr) { delete[] reinterpret_cast<char*>(ptr); });
+	
 	dev_interface_detail->cbSize = sizeof(*dev_interface_detail);
 
-	if (!SetupDiGetDeviceInterfaceDetail(dev_info, &dev_interface_data, dev_interface_detail, len, nullptr, nullptr)) {
+	if (!SetupDiGetDeviceInterfaceDetail(dev_info, dev_interface_data.get(), dev_interface_detail.get(), len, nullptr, nullptr)) {
 		dbg("SetupDiGetDeviceInterfaceDetail error %#x", GetLastError());
-		free(dev_interface_detail);
-                dev_interface_detail = nullptr;
+		dev_interface_detail.reset();
 	}
 
 	return dev_interface_detail;
@@ -216,44 +219,48 @@ SP_DEVICE_INTERFACE_DETAIL_DATA *get_intf_detail(HDEVINFO dev_info, PSP_DEVINFO_
 
 int traverse_usbdevs(walkfunc_t walker, BOOL present_only, void *ctx)
 {
-	HDEVINFO	dev_info;
-	DWORD	flags = DIGCF_ALLCLASSES;
-
-	if (present_only)
+	DWORD flags = DIGCF_ALLCLASSES;
+ 	if (present_only) {
 		flags |= DIGCF_PRESENT;
-	dev_info = SetupDiGetClassDevs(nullptr, "USB", nullptr, flags);
+	}
+	
+	auto dev_info = SetupDiGetClassDevs(nullptr, "USB", nullptr, flags);
 	if (dev_info == INVALID_HANDLE_VALUE) {
 		dbg("SetupDiGetClassDevs failed: 0x%lx", GetLastError());
 		return ERR_GENERAL;
 	}
 
-	return traverse_dev_info(dev_info, walker, ctx);
+	auto ret = traverse_dev_info(dev_info, walker, ctx);
+	SetupDiDestroyDeviceInfoList(dev_info);
+	return ret;
 }
 
-int traverse_intfdevs(walkfunc_t walker, LPCGUID pguid, void *ctx)
+int traverse_intfdevs(walkfunc_t walker, const GUID &guid, void *ctx)
 {
-	HDEVINFO	dev_info;
-
-	dev_info = SetupDiGetClassDevs(pguid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+	auto dev_info = SetupDiGetClassDevs(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
 	if (dev_info == INVALID_HANDLE_VALUE) {
 		dbg("SetupDiGetClassDevs failed: 0x%lx", GetLastError());
 		return ERR_GENERAL;
 	}
 
-	return traverse_dev_info(dev_info, walker, ctx);
+	auto ret = traverse_dev_info(dev_info, walker, ctx);
+	SetupDiDestroyDeviceInfoList(dev_info);
+	return ret;
 }
 
-BOOL get_usbdev_info(const char *cid_hw, unsigned short *pvendor, unsigned short *pproduct)
+bool get_usbdev_info(const std::string &id_hw, unsigned short &vendor, unsigned short &product)
 {
-	auto id_hw = _strdup(cid_hw);
-
 	if (!is_valid_usb_dev(id_hw)) {
-		return FALSE;
+		return false;
 	}
 
-	id_hw[12] = '\0';
-	sscanf_s(id_hw + 8, "%hx", pvendor);
-	id_hw[21] = '\0';
-	sscanf_s(id_hw + 17, "%hx", pproduct);
-	return TRUE;
+	std::string s = id_hw;
+
+	s[12] = '\0';
+	sscanf_s(s.c_str() + 8, "%hx", &vendor);
+
+	s[21] = '\0';
+	sscanf_s(s.c_str() + 17, "%hx", &product);
+
+	return true;
 }

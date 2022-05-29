@@ -3,14 +3,16 @@
 #include <windows.h>
 #include <setupapi.h>
 
-typedef unsigned char devno_t;
-using walkfunc_t = int(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data, devno_t devno, void *ctx);
+#include <memory>
+#include <string>
+
+using devno_t = UCHAR;
+using walkfunc_t = int(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, devno_t devno, void *ctx);
 
 int traverse_usbdevs(walkfunc_t walker, BOOL present_only, void *ctx);
-int traverse_intfdevs(walkfunc_t walker, LPCGUID pguid, void *ctx);
+int traverse_intfdevs(walkfunc_t walker, const GUID &guid, void *ctx);
 
-char *get_id_hw(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data);
+std::string get_id_hw(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data);
+std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> get_intf_detail(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, const GUID &pguid);
 
-SP_DEVICE_INTERFACE_DETAIL_DATA *get_intf_detail(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, LPCGUID pguid);
-
-BOOL get_usbdev_info(const char *id_hw, unsigned short *pvendor, unsigned short *pproduct);
+bool get_usbdev_info(const std::string &id_hw, unsigned short &vendor, unsigned short &product);

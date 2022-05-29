@@ -14,16 +14,14 @@ namespace
 int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, devno_t, void *ctx)
 {
         auto id_hw = get_id_hw(dev_info, dev_info_data);
-        if (!id_hw || (_stricmp(id_hw, "usbipwin\\vhci") && _stricmp(id_hw, "root\\vhci_ude"))) {
-                dbg("invalid hw id: %s", id_hw ? id_hw : "");
-                free(id_hw);
+
+        if (_stricmp(id_hw.c_str(), "usbipwin\\vhci")) { // usbip_vhci.inf
+                dbg("invalid hw id: %s", id_hw.c_str());
                 return 0;
         }
-        free(id_hw);
 
-        if (auto inf = get_intf_detail(dev_info, dev_info_data, &GUID_DEVINTERFACE_VHCI_USBIP)) {
-                static_cast<std::string*>(ctx)->assign(inf->DevicePath);
-                free(inf);
+        if (auto inf = get_intf_detail(dev_info, dev_info_data, GUID_DEVINTERFACE_VHCI_USBIP)) {
+                *static_cast<std::string*>(ctx) = inf->DevicePath;
                 return 1;
         }
 
@@ -33,7 +31,7 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, devno_t, v
 auto get_vhci_devpath()
 {
         std::string path;
-        traverse_intfdevs(walker_devpath, &GUID_DEVINTERFACE_VHCI_USBIP, &path);
+        traverse_intfdevs(walker_devpath, GUID_DEVINTERFACE_VHCI_USBIP, &path);
         return path;
 }
 

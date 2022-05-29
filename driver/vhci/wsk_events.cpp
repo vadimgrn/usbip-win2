@@ -596,7 +596,7 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 		if (avail >= payload_size) {
 			NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
 		} else {
-			TraceWSK("Available %Iu < payload %Iu, pending", avail, payload_size); 
+//			TraceWSK("Available %Iu < payload %Iu", avail, payload_size); // too often
 			break;
 		}
 
