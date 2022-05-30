@@ -156,9 +156,11 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
+/*
+ * Can be called on IRQL = DISPATCH_LEVEL.
+ */
+NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 {
-	PAGED_CODE();
 	NT_ASSERT(vpdo);
 
 	static_assert(sizeof(vpdo->unplugged) == sizeof(CHAR));

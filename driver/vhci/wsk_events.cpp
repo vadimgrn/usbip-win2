@@ -17,6 +17,7 @@
 #include "csq.h"
 #include "usbip_network.h"
 #include "send_context.h"
+#include "vhub.h"
 
 namespace
 {
@@ -627,6 +628,8 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
 	TraceCall("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
+
+	vhub_unplug_vpdo(vpdo);
 	return STATUS_SUCCESS;
 }
 
@@ -649,6 +652,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 		wsk_data_push(*vpdo, DataIndication, BytesIndicated);
 		receive_event(*vpdo);
 	} else {
+		vhub_unplug_vpdo(vpdo);
 		st = STATUS_SUCCESS;
 	}
 

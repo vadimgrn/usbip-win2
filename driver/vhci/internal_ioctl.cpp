@@ -14,6 +14,7 @@
 #include "usbip_network.h"
 #include "pdu.h"
 #include "send_context.h"
+#include "vhub.h"
 
 #pragma warning(disable:5054) // operator '|': deprecated between enumerations of different types
 
@@ -72,6 +73,10 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                 complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == ST_IRP_CANCELED) {
               complete_canceled_irp(irp);
+        }
+
+        if (st.Status == STATUS_FILE_FORCED_CLOSED) {
+                vhub_unplug_vpdo(&vpdo);
         }
 
         free(ctx);
@@ -135,6 +140,9 @@ auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr,
 
         if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
                 NT_VERIFY(dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
+                if (err == STATUS_FILE_FORCED_CLOSED) {
+                        vhub_unplug_vpdo(&vpdo);
+                }
                 return err;
         }
 
