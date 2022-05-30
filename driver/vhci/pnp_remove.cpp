@@ -117,6 +117,8 @@ PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 		}
 		di = nullptr;
 	}
+
+	RtlZeroMemory(&vpdo.wsk_data_hdr, sizeof(vpdo.wsk_data_hdr));
 }
 
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)

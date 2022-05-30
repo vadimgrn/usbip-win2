@@ -539,8 +539,20 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	}
 }
 
-auto get_header(_Out_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
+inline void invalidate(_Inout_ usbip_header &hdr)
 {
+	static_assert(!is_valid_seqnum(0));
+	hdr.base.seqnum = 0;
+}
+
+auto get_header(_Inout_ vpdo_dev_t &vpdo, _Inout_ usbip_header &hdr)
+{
+	auto &base = hdr.base;
+
+	if (is_valid_seqnum(base.seqnum)) { // already read
+		return 0;
+	}
+
 	if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
 		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
 		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
@@ -549,7 +561,6 @@ auto get_header(_Out_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 
 	byteswap_header(hdr, swap_dir::net2host);
 
-	auto &base = hdr.base;
 	auto cmd = static_cast<usbip_request_type>(base.command);
 
 	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
@@ -577,14 +588,15 @@ auto get_header(_Out_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
  */
 void receive_event(_Inout_ vpdo_dev_t &vpdo)
 {
-	usbip_header hdr;
+	auto &hdr = vpdo.wsk_data_hdr;
 
-	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); ) {
+	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); invalidate(hdr)) {
 
-		if (auto n = get_header(hdr, vpdo)) {
+		if (auto n = get_header(vpdo, hdr)) {
 			if (n > 0) {
 				NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
 			}
+			invalidate(hdr);
 			break;
 		}
 
