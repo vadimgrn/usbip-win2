@@ -6,33 +6,33 @@
 namespace
 {
 
+using DeviceInfoListPtr = std::unique_ptr<void, decltype(SetupDiDestroyDeviceInfoList)&>;
+
 auto get_id_inst(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data)
 {
-	std::string id_inst;
+	std::string str;
 
 	DWORD length;
 	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, nullptr, 0, &length)) {
 		auto err = GetLastError();
 		if (err != ERROR_INSUFFICIENT_BUFFER) {
 			dbg("get_id_inst: failed to get instance id: err: 0x%lx", err);
-			return id_inst;
+			return str;
 		}
 	} else {
 		dbg("get_id_inst: unexpected case");
-		return id_inst;
+		return str;
 	}
 
-	auto val = std::make_unique<char[]>(length);
+	auto val = std::make_unique_for_overwrite<char[]>(length);
 
 	if (!SetupDiGetDeviceInstanceId(dev_info, pdev_info_data, val.get(), length, nullptr)) {
 		dbg("failed to get instance id");
-		return id_inst;
+		return str;
 	}
 
-	id_inst.assign(val.get(), length);
-	val.release();
-
-	return id_inst;
+	str.assign(val.get(), length);
+	return str;
 }
 
 std::string get_dev_property(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, DWORD prop)
@@ -55,7 +55,7 @@ std::string get_dev_property(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data,
 		return str;
 	}
 
-	auto val = std::make_unique<BYTE[]>(length);
+	auto val = std::make_unique_for_overwrite<BYTE[]>(length);
 	
         if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, val.get(), length, nullptr)) {
 		dbg("failed to get device property: err: %x", GetLastError());
@@ -63,8 +63,6 @@ std::string get_dev_property(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data,
 	}
 
 	str.assign((char*)val.get(), length);
-	val.release();
-
         return str;
 }
 
@@ -184,7 +182,7 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> get_intf_detail(HDEVINFO dev_in
 {
 	std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> dev_interface_detail;
 
-	auto dev_interface_data = std::make_unique<SP_DEVICE_INTERFACE_DATA>();
+	auto dev_interface_data = std::make_unique_for_overwrite<SP_DEVICE_INTERFACE_DATA>();
 	dev_interface_data->cbSize = sizeof(*dev_interface_data);
 
 	if (!SetupDiEnumDeviceInterfaces(dev_info, pdev_info_data, &guid, 0, dev_interface_data.get())) {
@@ -230,9 +228,8 @@ int traverse_usbdevs(walkfunc_t walker, BOOL present_only, void *ctx)
 		return ERR_GENERAL;
 	}
 
-	auto ret = traverse_dev_info(dev_info, walker, ctx);
-	SetupDiDestroyDeviceInfoList(dev_info);
-	return ret;
+	DeviceInfoListPtr ptr(dev_info, SetupDiDestroyDeviceInfoList);
+	return traverse_dev_info(ptr.get(), walker, ctx);
 }
 
 int traverse_intfdevs(walkfunc_t walker, const GUID &guid, void *ctx)
@@ -243,9 +240,8 @@ int traverse_intfdevs(walkfunc_t walker, const GUID &guid, void *ctx)
 		return ERR_GENERAL;
 	}
 
-	auto ret = traverse_dev_info(dev_info, walker, ctx);
-	SetupDiDestroyDeviceInfoList(dev_info);
-	return ret;
+	DeviceInfoListPtr ptr(dev_info, SetupDiDestroyDeviceInfoList);
+	return traverse_dev_info(dev_info, walker, ctx);
 }
 
 bool get_usbdev_info(const std::string &id_hw, unsigned short &vendor, unsigned short &product)

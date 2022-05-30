@@ -6,14 +6,7 @@
 #include "usbip_proto.h"
 
 #include <intrin.h>
-
-#ifdef _KERNEL_MODE
-  #include <wdm.h>
-  #define USBIP_ASSERT NT_ASSERT
-#else
-  #include <cassert>
-  #define USBIP_ASSERT assert
-#endif
+#include <wdm.h>
 
 namespace
 {
@@ -138,25 +131,22 @@ size_t get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr)
 	case USBIP_RET_UNLINK:
 		break;
 	default:
-                USBIP_ASSERT(!"Invalid command, wrong endianness?");
+		NT_ASSERT(!"Invalid command, wrong endianness?");
 	}
 
 	isoc = reinterpret_cast<usbip_iso_packet_descriptor*>(buf_end);
 	return cnt;
 }
 
-size_t get_payload_size(const usbip_header &hdr) 
+size_t get_total_size(const usbip_header &hdr) 
 {
 	usbip_iso_packet_descriptor *isoc{};
 	auto cnt = get_isoc_descr(isoc, const_cast<usbip_header&>(hdr));
 
-	auto buf = reinterpret_cast<const char*>(&hdr + 1);
-        USBIP_ASSERT((char*)isoc >= buf);
-
-	return reinterpret_cast<char*>(isoc + cnt) - buf;
+	return reinterpret_cast<char*>(isoc + cnt) - reinterpret_cast<const char*>(&hdr);
 }
 
-size_t get_total_size(const usbip_header &hdr) 
+size_t get_payload_size(const usbip_header &hdr)
 {
-	return sizeof(hdr) + get_payload_size(hdr);
+	return get_total_size(hdr) - sizeof(hdr);
 }

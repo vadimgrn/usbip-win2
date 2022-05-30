@@ -575,10 +575,8 @@ auto get_header(_Out_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
  * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
-auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated)
+void receive_event(_Inout_ vpdo_dev_t &vpdo)
 {
-	wsk_data_push(vpdo, DataIndication, BytesIndicated);
-
 	usbip_header hdr;
 
 	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); ) {
@@ -607,8 +605,6 @@ auto receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 			avail -= payload_size;
 		}
 	}
-
-	return STATUS_PENDING;
 }
 
 } // namespace
@@ -634,7 +630,14 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 		TraceWSK("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
 	}
 
-	auto st = DataIndication ? receive_event(*vpdo, DataIndication, BytesIndicated) : STATUS_SUCCESS;
+	auto st = STATUS_PENDING;
+
+	if (DataIndication) {
+		wsk_data_push(*vpdo, DataIndication, BytesIndicated);
+		receive_event(*vpdo);
+	} else {
+		st = STATUS_SUCCESS;
+	}
 
 	TraceWSK("Exit %!STATUS!", st);
 	return st;

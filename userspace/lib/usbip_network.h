@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "../config.h"
 #include "win_socket.h"
 
 inline const char *usbip_port = "3240";
