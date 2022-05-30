@@ -70,7 +70,7 @@
       </Command>
     </PreBuildEvent>
     <Lib>
-      <AdditionalDependencies>legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>legacy_stdio_definitions.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -93,11 +93,12 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>legacy_stdio_definitions.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>legacy_stdio_definitions.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dbgcode.cpp" />
+    <ClCompile Include="file_ver.cpp" />
     <ClCompile Include="names.c" />
     <ClCompile Include="usbip_common.cpp" />
     <ClCompile Include="getopt.c" />
@@ -112,11 +113,9 @@
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip_api_consts.h" />
     <ClInclude Include="..\..\include\usbip_proto_op.h" />
-    <ClInclude Include="..\config.h" />
     <ClInclude Include="dbgcode.h" />
+    <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="list.h" />
-    <ClInclude Include="mssign32.h" />
     <ClInclude Include="names.h" />
     <ClInclude Include="usbip_common.h" />
     <ClInclude Include="getopt.h" />

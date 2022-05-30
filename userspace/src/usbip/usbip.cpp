@@ -24,6 +24,7 @@
 #include "usbip_network.h"
 #include "usbip.h"
 #include "win_socket.h"
+#include "file_ver.h"
 
 #include <cstdlib>
 
@@ -32,8 +33,6 @@ namespace
 
 int usbip_help(int argc, char *argv[]);
 int usbip_version(int argc, char *argv[]);
-
-auto &usbip_version_string = PACKAGE_STRING;
 
 const char usbip_usage_string[] =
 	"usbip [--debug] [--tcp-port PORT] [version]\n"
@@ -92,7 +91,8 @@ int usbip_help(int argc, char *argv[])
 
 int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
 {
-	printf("usbip (%s)\n", usbip_version_string);
+	FileVersion v;
+	printf("usbip (%s)\n", v.GetFileVersion().c_str());
 	return 0;
 }
 

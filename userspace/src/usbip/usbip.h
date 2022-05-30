@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "../config.h"
-
 /* usbip commands */
 int usbip_attach(int argc, char *argv[]);
 int usbip_detach(int argc, char *argv[]);
