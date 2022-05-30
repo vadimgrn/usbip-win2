@@ -96,7 +96,7 @@ void ReleaseLock(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 
 void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
-	TraceCSQ("%04x", ptr4log(irp));
+	TraceCall("%04x", ptr4log(irp));
 	auto vpdo = to_vpdo(csq);
 	send_cmd_unlink(*vpdo, irp);
 }

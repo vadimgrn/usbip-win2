@@ -59,7 +59,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        TraceWSK("Complete irp %04x, %!STATUS!, Information %#Ix",
+                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix",
                                   ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
                         IoCompleteRequest(irp, IO_NO_INCREMENT);
                         break;
@@ -1021,8 +1021,8 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-	TraceCall("Enter irql %!irql!, %s(%#08lX), irp %04x", 
-			KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
+        TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x", 
+		  KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
 
         auto vpdo = to_vpdo_or_null(devobj);
 	if (!vpdo) {
@@ -1057,7 +1057,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	}
 
 	if (status == STATUS_PENDING) {
-		TraceCall("Leave %!STATUS!, irp %04x", status, ptr4log(irp));
+                TraceDbg("Leave %!STATUS!, irp %04x", status, ptr4log(irp));
 	} else {
 		complete_internal_ioctl(irp, status);
 	}

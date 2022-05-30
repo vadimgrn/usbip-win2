@@ -108,8 +108,8 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 	auto vdev = to_vdev(devobj);
 	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceCall("%!vdev_type_t!: irql %!irql!, %!powermn!", 
-			vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
+	TraceDbg("%!vdev_type_t!: irql %!irql!, %!powermn!", 
+		 vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: no such device", vdev->type);
@@ -121,6 +121,6 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 			vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
 			vhci_power_vdev(vdev, irp, irpstack);
 
-	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
+	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
 	return st;
 }

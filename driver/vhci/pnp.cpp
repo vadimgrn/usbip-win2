@@ -328,7 +328,7 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 	auto vdev = to_vdev(devobj);
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
-	TraceCall("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
+	TraceDbg("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	NTSTATUS status = STATUS_SUCCESS;
 
@@ -341,6 +341,6 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 		status = CompleteRequestIoStatus(irp);
 	}
 
-	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
+	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
 	return status;
 }

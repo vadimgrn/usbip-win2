@@ -172,7 +172,7 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 {
 	PAGED_CODE();
 
-	NTSTATUS st = set_ifr_verbose(RegistryPath);
+	auto st = set_ifr_verbose(RegistryPath);
 	WPP_INIT_TRACING(drvobj, RegistryPath);
 	if (st) {
 		Trace(TRACE_LEVEL_CRITICAL, "Can't set IFR parameter: %!STATUS!", st);

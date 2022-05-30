@@ -20,8 +20,8 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto &ioc = irpstack->Parameters.DeviceIoControl;
 
-	TraceCall("%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
-			vdev->type, KeGetCurrentIrql(), dbg_ioctl_code(ioc.IoControlCode), ioc.IoControlCode);
+	TraceDbg("%!vdev_type_t!: enter irql %!irql!, %s(%#08lX)",
+		 vdev->type, KeGetCurrentIrql(), dbg_ioctl_code(ioc.IoControlCode), ioc.IoControlCode);
 
 	auto inlen = ioc.InputBufferLength;
 	auto outlen = ioc.OutputBufferLength;
@@ -46,6 +46,6 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
                 CompleteRequest(irp, status);
 	}
 
-	TraceCall("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
+	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
 	return status;
 }

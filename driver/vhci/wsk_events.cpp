@@ -519,7 +519,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		TraceCall("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
+		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 }
@@ -531,7 +531,7 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
 		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-			ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+			    ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
 	}
 
 	if (irp) {
@@ -625,7 +625,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
-	TraceWSK("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
+	TraceCall("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
 	return STATUS_SUCCESS;
 }
 
@@ -639,7 +639,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 
 	{
 		char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
-		TraceWSK("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
+		TraceDbg("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
 	}
 
 	auto st = STATUS_PENDING;
@@ -651,6 +651,6 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 		st = STATUS_SUCCESS;
 	}
 
-	TraceWSK("Exit %!STATUS!", st);
+	TraceDbg("Exit %!STATUS!", st);
 	return st;
 }

@@ -155,7 +155,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 {
 	PAGED_CODE();
 
-	TraceCall("Enter irql %!irql!", KeGetCurrentIrql());
+	TraceDbg("Enter irql %!irql!", KeGetCurrentIrql());
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
@@ -198,14 +198,14 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 		status = IoCallDriver(vhci->devobj_lower, irp);
 	}
 
-	TraceCall("Leave %!STATUS!", status);
+	TraceDbg("Leave %!STATUS!", status);
 	return status;
 }
 
 PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
-	TraceCall("%p", vhci);
+	TraceDbg("%p", vhci);
 
 	vhci->WmiLibInfo.GuidCount = ARRAYSIZE(USBIPBusWmiGuidList);
 	vhci->WmiLibInfo.GuidList = USBIPBusWmiGuidList;
@@ -222,7 +222,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	// Initialize the Std device data structure
 	vhci->StdUSBIPBusData.ErrorCount = 0;
 
-	Trace(TRACE_LEVEL_VERBOSE, "irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
+	TraceDbg("irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
 	return status;
 }
 
@@ -230,6 +230,6 @@ PAGEABLE NTSTATUS
 dereg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
-	TraceCall("%p", vhci);
+	TraceDbg("%p", vhci);
 	return IoWMIRegistrationControl(vhci->Self, WMIREG_ACTION_DEREGISTER);
 }
