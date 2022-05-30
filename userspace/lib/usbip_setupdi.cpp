@@ -6,8 +6,6 @@
 namespace
 {
 
-using DeviceInfoListPtr = std::unique_ptr<void, decltype(SetupDiDestroyDeviceInfoList)&>;
-
 auto get_id_inst(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data)
 {
 	std::string str;
@@ -126,50 +124,6 @@ int traverse_dev_info(HDEVINFO dev_info, walkfunc_t walker, void *ctx)
 	return ret;
 }
 
-/*
- * A valid USB hardware identifer(stub or vhci accepts) has one of following patterns:
- * - USB\VID_0000&PID_0000&REV_0000
- * - USB\VID_0000&PID_0000 (Is it needed?)
- * Hardware ids of multi-interface device are not valid such as USB\VID_0000&PID_0000&MI_00.
- */
-bool is_valid_usb_dev(const std::string &id_hw)
-{
-	if (id_hw.empty()) {
-		return false;
-	}
-
-	auto s = id_hw.c_str();
-
-	if (strncmp(s, "USB\\", 4))
-		return false;
-
-	if (strncmp(s + 4, "VID_", 4))
-		return false;
-
-	if (strlen(s + 8) < 4)
-		return false;
-
-	if (strncmp(s + 12, "&PID_", 5))
-		return false;
-
-	if (strlen(s + 17) < 4)
-		return false;
-
-	if (s[21] == '\0')
-		return true;
-
-	if (strncmp(s + 21, "&REV_", 5))
-		return false;
-
-	if (strlen(s + 26) < 4)
-		return false;
-
-	if (s[30] != '\0')
-		return false;
-
-	return true;
-}
-
 } // namespace
 
 
@@ -215,23 +169,6 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> get_intf_detail(HDEVINFO dev_in
 	return dev_interface_detail;
 }
 
-int traverse_usbdevs(walkfunc_t walker, BOOL present_only, void *ctx)
-{
-	DWORD flags = DIGCF_ALLCLASSES;
- 	if (present_only) {
-		flags |= DIGCF_PRESENT;
-	}
-	
-	auto dev_info = SetupDiGetClassDevs(nullptr, "USB", nullptr, flags);
-	if (dev_info == INVALID_HANDLE_VALUE) {
-		dbg("SetupDiGetClassDevs failed: 0x%lx", GetLastError());
-		return ERR_GENERAL;
-	}
-
-	DeviceInfoListPtr ptr(dev_info, SetupDiDestroyDeviceInfoList);
-	return traverse_dev_info(ptr.get(), walker, ctx);
-}
-
 int traverse_intfdevs(walkfunc_t walker, const GUID &guid, void *ctx)
 {
 	auto dev_info = SetupDiGetClassDevs(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
@@ -240,23 +177,6 @@ int traverse_intfdevs(walkfunc_t walker, const GUID &guid, void *ctx)
 		return ERR_GENERAL;
 	}
 
-	DeviceInfoListPtr ptr(dev_info, SetupDiDestroyDeviceInfoList);
+	std::unique_ptr<void, decltype(SetupDiDestroyDeviceInfoList)&> ptr(dev_info, SetupDiDestroyDeviceInfoList);
 	return traverse_dev_info(dev_info, walker, ctx);
-}
-
-bool get_usbdev_info(const std::string &id_hw, unsigned short &vendor, unsigned short &product)
-{
-	if (!is_valid_usb_dev(id_hw)) {
-		return false;
-	}
-
-	std::string s = id_hw;
-
-	s[12] = '\0';
-	sscanf_s(s.c_str() + 8, "%hx", &vendor);
-
-	s[21] = '\0';
-	sscanf_s(s.c_str() + 17, "%hx", &product);
-
-	return true;
 }

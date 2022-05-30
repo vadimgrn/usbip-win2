@@ -93,7 +93,6 @@
     <ClCompile Include="usbip_attach.cpp" />
     <ClCompile Include="usbip_detach.cpp" />
     <ClCompile Include="usbip_list.cpp" />
-    <ClCompile Include="usbip_list_local.cpp" />
     <ClCompile Include="usbip_list_remote.cpp" />
     <ClCompile Include="usbip_port.cpp" />
     <ClCompile Include="usbip_vhci.cpp" />
@@ -102,7 +101,6 @@
     <ClInclude Include="..\..\..\include\usbip_api_consts.h" />
     <ClInclude Include="..\..\..\include\usbip_proto.h" />
     <ClInclude Include="..\..\..\include\usbip_vhci_api.h" />
-    <ClInclude Include="..\..\config.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />
     <ClInclude Include="usbip_vhci.h" />

@@ -524,6 +524,15 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	}
 }
 
+/*
+ * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
+ * @see send_cmd_unlink
+ *
+ * USBIP_RET_UNLINK
+ * 1) if UNLINK is successful, status is -ECONNRESET
+ * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
+ * See: <kernel>/Documentation/usb/usbip_protocol.rst
+ */
 void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 {
 	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
@@ -545,7 +554,7 @@ inline void invalidate(_Inout_ usbip_header &hdr)
 	hdr.base.seqnum = 0;
 }
 
-auto get_header(_Inout_ vpdo_dev_t &vpdo, _Inout_ usbip_header &hdr)
+auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 {
 	auto &base = hdr.base;
 
@@ -577,27 +586,19 @@ auto get_header(_Inout_ vpdo_dev_t &vpdo, _Inout_ usbip_header &hdr)
 
 	return 0;
 }
-/*
- * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
- * @see send_cmd_unlink
- *
- * USBIP_RET_UNLINK
- * 1) if UNLINK is successful, status is -ECONNRESET
- * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
- * See: <kernel>/Documentation/usb/usbip_protocol.rst
- */
+
 void receive_event(_Inout_ vpdo_dev_t &vpdo)
 {
 	auto &hdr = vpdo.wsk_data_hdr;
 
 	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); invalidate(hdr)) {
 
-		if (auto n = get_header(vpdo, hdr)) {
+		if (auto n = get_header(hdr, vpdo)) {
 			if (n > 0) {
 				NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
 			}
-			invalidate(hdr);
-			break;
+			avail = 0; // invalidate header and break the loop
+			continue;
 		}
 
 		avail -= sizeof(hdr);

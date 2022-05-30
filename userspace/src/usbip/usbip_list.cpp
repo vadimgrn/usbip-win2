@@ -23,14 +23,12 @@
 #include "getopt.h"
 #include "names_cpp.h"
 
-int list_devices(BOOL parsable);
 int list_exported_devices(const char *host);
 
 static const char usbip_list_usage_string[] =
 	"usbip list [-p|--parsable] <args>\n"
 	"    -p, --parsable         Parsable list format\n"
 	"    -r, --remote=<host>    List the exported USB devices on <host>\n"
-	"    -l, --local            List the local USB devices\n"
 	;
 
 void usbip_list_usage()
@@ -43,7 +41,6 @@ int usbip_list(int argc, char *argv[])
 	const struct option opts[] = {
 		{ "parsable", no_argument, nullptr, 'p' },
 		{ "remote", required_argument, nullptr, 'r' },
-		{ "local", no_argument, nullptr, 'l' },
 		{}
 	};
 
@@ -53,11 +50,12 @@ int usbip_list(int argc, char *argv[])
 
         InitUsbNames names_init;
 
-	if (!names_init)
+	if (!names_init) {
 		dbg("failed to open usb id database");
+	}
 
 	for (;;) {
-		opt = getopt_long(argc, argv, "pr:l", opts, nullptr);
+		opt = getopt_long(argc, argv, "pr:", opts, nullptr);
 
 		if (opt == -1)
 			break;
@@ -69,15 +67,11 @@ int usbip_list(int argc, char *argv[])
 		case 'r':
 			ret = list_exported_devices(optarg);
 			goto out;
-		case 'l':
-			ret = list_devices(parsable);
-			goto out;
-		default:
 			break;
 		}
 	}
 
-	err("-r or -l option required");
+	err("-r option required");
 	usbip_list_usage();
 out:
 	return ret;
