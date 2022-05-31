@@ -59,7 +59,7 @@ PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, 
 	r.ActualLength = r_sz;
 	RtlStringCbCopyW(r.RootHubName, outlen - offsetof(USB_ROOT_HUB_NAME, RootHubName), str.Buffer + prefix_cch);
 	
-	TraceCall("ActualLength %lu, RootHubName '%S'", r.ActualLength, r.RootHubName);
+	TraceMsg("ActualLength %lu, RootHubName '%S'", r.ActualLength, r.RootHubName);
 	return STATUS_SUCCESS;
 }
 
@@ -81,7 +81,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 		outlen = min(outlen, r_sz);
 		r.ActualLength = prop_sz;
 		RtlStringCbCopyW(r.DriverKeyName, outlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
-		TraceCall("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
+		TraceMsg("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
 	} else {
 		outlen = r_sz;
 		st = STATUS_BUFFER_TOO_SMALL;

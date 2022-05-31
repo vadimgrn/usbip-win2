@@ -69,7 +69,7 @@ NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 
 void complete_canceled_irp(IRP *irp)
 {
-	TraceCall("%04x", ptr4log(irp));
+	TraceMsg("%04x", ptr4log(irp));
 
 	irp->IoStatus.Status = STATUS_CANCELLED;
 	irp->IoStatus.Information = 0;

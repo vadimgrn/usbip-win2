@@ -62,7 +62,7 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_h
                 return err;
         }
 
-        TraceCall("[%Iu]%!BIN!", buf.Length, WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(buf.Length)));
+        TraceDbg("[%Iu]%!BIN!", buf.Length, WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(buf.Length)));
         return STATUS_SUCCESS;
 }
 

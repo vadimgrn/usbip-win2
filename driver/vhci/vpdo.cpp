@@ -126,7 +126,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 {
 	PAGED_CODE();
 
-	TraceCall("ConnectionIndex %lu", ci.ConnectionIndex); // input parameter
+	TraceMsg("ConnectionIndex %lu", ci.ConnectionIndex); // input parameter
 
 	RtlZeroMemory(&ci.DeviceDescriptor, sizeof(ci.DeviceDescriptor));
 	ci.CurrentConfigurationValue = vpdo && vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;

@@ -15,12 +15,11 @@
         UsbipVhciTraceGuid, (8b56380d,5174,4b15,b6f4,4c47008801a4),      \
                                                                          \
         WPP_DEFINE_BIT(FLAG_GENERAL)           /* bit  0 = 0x00000001 */ \
-        WPP_DEFINE_BIT(FLAG_CALL)              /* bit  1 = 0x00000002 */ \
+        WPP_DEFINE_BIT(FLAG_USBIP)             /* bit  1 = 0x00000002 */ \
         WPP_DEFINE_BIT(FLAG_URB)               /* bit  2 = 0x00000004 */ \
-        WPP_DEFINE_BIT(FLAG_USBIP)             /* bit  3 = 0x00000008 */ \
-        WPP_DEFINE_BIT(FLAG_CSQ)               /* bit  4 = 0x00000010 */ \
-        WPP_DEFINE_BIT(FLAG_WSK)               /* bit  5 = 0x00000020 */ \
-        WPP_DEFINE_BIT(FLAG_DBG)               /* bit  6 = 0x00000040 */ \
+        WPP_DEFINE_BIT(FLAG_CSQ)               /* bit  3 = 0x00000008 */ \
+        WPP_DEFINE_BIT(FLAG_WSK)               /* bit  4 = 0x00000010 */ \
+        WPP_DEFINE_BIT(FLAG_DBG)               /* bit  5 = 0x00000020 */ \
         )                             
 
 #define WPP_FLAG_LEVEL_LOGGER(flag, level) \

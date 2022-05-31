@@ -161,14 +161,13 @@ NTSTATUS wsk_data_copy(
 		}
 	}
 
+	NT_ASSERT(!cur || check_wsk_data_offset(cur, offset));
+
 	if (consume) {
 		consume->cur = cur;
 		consume->offset = offset;
 		consume->next = true;
 	}
 	
-	NT_ASSERT(check_wsk_data_offset(consume ? consume->cur : cur,
-		                        consume ? consume->offset : offset));
-
 	return len ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
 }

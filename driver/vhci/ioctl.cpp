@@ -13,7 +13,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto vdev = to_vdev(devobj);
 
 	if (vdev->PnPState == pnp_state::Removed) {
-		TraceCall("%!vdev_type_t! -> NO_SUCH_DEVICE", vdev->type);
+		TraceMsg("%!vdev_type_t! -> NO_SUCH_DEVICE", vdev->type);
 		return CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
 	}
 

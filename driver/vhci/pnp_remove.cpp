@@ -23,7 +23,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
-	TraceCall("%p", &vhci);
+	TraceMsg("%p", &vhci);
 
         IoSetDeviceInterfaceState(&vhci.DevIntfVhci, FALSE);
 	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, FALSE);
@@ -39,7 +39,7 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	TraceCall("%p", &vhub);
+	TraceMsg("%p", &vhub);
 
 	IoSetDeviceInterfaceState(&vhub.DevIntfRootHub, FALSE);
 	RtlFreeUnicodeString(&vhub.DevIntfRootHub);
@@ -96,7 +96,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 	NT_ASSERT(!vpdo.sock);
 
-	TraceCall("%p", &vpdo);
+	TraceMsg("%p", &vpdo);
 
 	if (is_initialized(vpdo.irps_csq)) {
                 while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, nullptr)) {
@@ -151,7 +151,7 @@ PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
-	TraceCall("%p, port %d", &vpdo, vpdo.port);
+	TraceMsg("%p, port %d", &vpdo, vpdo.port);
 
         close_socket(vpdo);
 	cancel_pending_irps(vpdo);
@@ -180,7 +180,7 @@ PAGEABLE void destroy_device(vdev_t *vdev)
                 return;
         }
 
-	TraceCall("%!vdev_type_t! %p", vdev->type, vdev);
+	TraceMsg("%!vdev_type_t! %p", vdev->type, vdev);
 
 	if (vdev->child_pdo) {
 		vdev->child_pdo->parent = nullptr;
@@ -220,7 +220,7 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	if (vdev->PnPState == pnp_state::Removed) {
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: already removed", vdev->type);

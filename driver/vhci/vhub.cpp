@@ -49,7 +49,7 @@ PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo)
 
 	ExReleaseFastMutex(&vhub->Mutex);
 
-	TraceCall("%p, port %d", vpdo, vpdo->port);
+	TraceMsg("%p, port %d", vpdo, vpdo->port);
 	return vpdo->port;
 }
 
@@ -57,7 +57,7 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	TraceCall("%p, port %d", vpdo, vpdo->port);
+	TraceMsg("%p, port %d", vpdo, vpdo->port);
 
 	if (!vpdo->port) { // was not attached
 		return;
@@ -216,7 +216,7 @@ PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_p
 
 	ExReleaseFastMutex(&vhub->Mutex);
 
-	TraceCall("Acquired ports %d/%d", acquired, vhub->NUM_PORTS);
+	TraceMsg("Acquired ports %d/%d", acquired, vhub->NUM_PORTS);
 	return STATUS_SUCCESS;
 }
 
@@ -224,7 +224,7 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 {
 	PAGED_CODE();
 
-	TraceCall("cnt %Iu", cnt);
+	TraceMsg("cnt %Iu", cnt);
 
 	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;

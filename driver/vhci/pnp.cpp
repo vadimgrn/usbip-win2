@@ -39,7 +39,7 @@ PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	set_state(*vdev, pnp_state::StopPending);
 	return irp_pass_down_or_success(vdev, irp);
@@ -48,7 +48,7 @@ PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	if (vdev->PnPState == pnp_state::StopPending) {
 		// We did receive a query-stop, so restore.
@@ -62,7 +62,7 @@ PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	set_state(*vdev, pnp_state::Stopped);
 	return irp_pass_down_or_success(vdev, irp);
@@ -71,7 +71,7 @@ PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
@@ -84,7 +84,7 @@ PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	if (vdev->PnPState == pnp_state::RemovePending) {
 		set_previous_pnp_state(*vdev);
@@ -96,7 +96,7 @@ PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	set_state(*vdev, pnp_state::SurpriseRemovePending);
 	return irp_pass_down_or_success(vdev, irp);
@@ -122,21 +122,21 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequestIoStatus(irp);
 }
 
@@ -150,7 +150,7 @@ PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
@@ -163,14 +163,14 @@ PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequestIoStatus(irp);
 }
 
 PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 
 	irp->IoStatus.Information = 0;
 	return CompleteRequest(irp);
@@ -186,14 +186,14 @@ PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequest(irp, STATUS_UNSUCCESSFUL);
 }
 
 PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequestIoStatus(irp);
 }
 
@@ -204,7 +204,7 @@ PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceCall("%p", vdev);
+	TraceMsg("%p", vdev);
 	return CompleteRequest(irp);
 }
 

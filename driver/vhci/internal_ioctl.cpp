@@ -23,7 +23,7 @@ namespace
 
 auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
-        TraceCall("irp %04x %!STATUS!", ptr4log(irp), status);
+        TraceMsg("irp %04x %!STATUS!", ptr4log(irp), status);
         NT_ASSERT(!irp->IoStatus.Information);
         return CompleteRequest(irp, status);
 }
@@ -1004,7 +1004,7 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
         auto seqnum = get_seqnum(irp);
-        TraceCall("irp %04x, seqnum %u", ptr4log(irp), seqnum);
+        TraceMsg("irp %04x, seqnum %u", ptr4log(irp), seqnum);
 
         if (auto sock = vpdo.sock) {
                 usbip_header hdr{};

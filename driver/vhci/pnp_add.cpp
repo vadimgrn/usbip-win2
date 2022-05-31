@@ -27,7 +27,7 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 		return err;
 	}
 
-	TraceCall("%!USTR!", &hwid);
+	TraceDbg("%!USTR!", &hwid);
 
 	const wchar_t* v[] = { HWID_ROOT, HWID_VHCI, HWID_VHUB };
 
@@ -174,7 +174,7 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PD
 		type = vhci ? VDEV_VHUB : VDEV_VHCI;
 	}
 
-	TraceCall("irql %!irql!", KeGetCurrentIrql());
+	TraceMsg("irql %!irql!", KeGetCurrentIrql());
 
 	return add_vdev(drvobj, pdo, type);
 }

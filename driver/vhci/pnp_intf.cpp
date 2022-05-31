@@ -148,7 +148,7 @@ NTSTATUS USB_BUSIFFN QueryBusInformation(
 
 NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
 {
-	TraceCall("Not supported");
+	TraceMsg("Not supported");
 	return STATUS_NOT_SUPPORTED;
 }
 
@@ -160,7 +160,7 @@ NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID BusContext, _Out_opt_ ULONG *Curren
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
 	*CurrentUsbFrame = get_current_frame_number(*vpdo);
-	TraceCall("CurrentUsbFrame -> %lu", *CurrentUsbFrame);
+	TraceMsg("CurrentUsbFrame -> %lu", *CurrentUsbFrame);
 
 	return STATUS_SUCCESS;
 }
@@ -177,7 +177,7 @@ NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID BusContext, _Out_opt_ ULONG *
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
 	*HighSpeedFrameCounter = get_current_frame_number(*vpdo) << 3;
-	TraceCall("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter);
+	TraceMsg("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter);
 
 	return STATUS_SUCCESS;
 }
@@ -194,8 +194,8 @@ VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID BusContext, IN OUT PUSBD_VERSION_INFOR
 
 	*HcdCapabilities = 0; // see USB_HCD_CAPS_SUPPORTS_RT_THREADS
 
-	TraceCall("USBDI_Version %#04lx, Supported_USB_Version %#04lx, HcdCapabilities %#04lx", 
-			inf->USBDI_Version, inf->Supported_USB_Version, *HcdCapabilities);
+	TraceMsg("USBDI_Version %#04lx, Supported_USB_Version %#04lx, HcdCapabilities %#04lx", 
+		  inf->USBDI_Version, inf->Supported_USB_Version, *HcdCapabilities);
 }
 
 UCHAR getPciProgIf(USHORT idProduct)
@@ -272,7 +272,7 @@ NTSTATUS QueryControllerType(
 
 NTSTATUS USB_BUSIFFN EnumLogEntry(_In_ PVOID /*BusContext*/, _In_ ULONG DriverTag, _In_ ULONG EnumTag, _In_ ULONG P1, _In_ ULONG P2)
 {
-	TraceCall("DriverTag %lu, EnumTag %lu, P1 %lu, P2 %lu -> not supported", DriverTag, EnumTag, P1, P2);
+	TraceMsg("DriverTag %lu, EnumTag %lu, P1 %lu, P2 %lu -> not supported", DriverTag, EnumTag, P1, P2);
 	return STATUS_NOT_SUPPORTED;
 }
 
@@ -433,6 +433,6 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 		irp->IoStatus.Information = 0;
 	}
 
-	TraceCall("%!GUID! -> %!STATUS!", qi.InterfaceType, status);
+	TraceMsg("%!GUID! -> %!STATUS!", qi.InterfaceType, status);
 	return CompleteRequest(irp, status);
 }

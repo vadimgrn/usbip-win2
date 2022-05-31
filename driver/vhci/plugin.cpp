@@ -381,7 +381,7 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
                 return err;
         }
 
-        TraceCall("USB_CONFIGURATION_DESCRIPTOR: %!BIN!", WppBinary(vpdo.actconfig, vpdo.actconfig->wTotalLength));
+        TraceDbg("USB_CONFIGURATION_DESCRIPTOR: %!BIN!", WppBinary(vpdo.actconfig, vpdo.actconfig->wTotalLength));
 
         if (is_configured(udev) && !is_same_device(udev, *vpdo.actconfig)) {
                 Trace(TRACE_LEVEL_ERROR, "USB_CONFIGURATION_DESCRIPTOR mismatches op_import_reply.udev");
@@ -541,7 +541,7 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
 PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
-        TraceCall("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
+        TraceMsg("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
         auto &error = r.port;
 

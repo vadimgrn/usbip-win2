@@ -627,7 +627,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
-	TraceCall("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
+	TraceMsg("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
 
 	vhub_unplug_vpdo(vpdo);
 	return STATUS_SUCCESS;

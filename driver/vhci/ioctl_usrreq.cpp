@@ -91,7 +91,7 @@ PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, ULONG inlen
 	r.CheckedMiniportDriver = false;
 	r.USB_Version = 0; // BCD usb version 0x0110 (1.1) 0x0200 (2.0)
 
-	TraceCall("USBDI_Version %#04lx, USB_Version %04lx", r.USBDI_Version, r.USB_Version);
+	TraceMsg("USBDI_Version %#04lx, USB_Version %04lx", r.USBDI_Version, r.USB_Version);
 	return STATUS_SUCCESS;
 }
 
@@ -120,7 +120,7 @@ PAGEABLE auto pass_thru(vhci_dev_t*, void *request, ULONG inlen, ULONG &outlen)
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	TraceCall("FunctionGUID %!GUID!, ParameterLength %lu", &r.FunctionGUID, r.ParameterLength);
+	TraceMsg("FunctionGUID %!GUID!, ParameterLength %lu", &r.FunctionGUID, r.ParameterLength);
 	return STATUS_NOT_SUPPORTED;
 }
 
@@ -300,6 +300,6 @@ PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, USBUSER_REQUEST_HEAD
 
 	}
 
-	TraceCall("%!usbuser! -> %!USB_USER_ERROR_CODE!, %!STATUS!", hdr->UsbUserRequest, hdr->UsbUserStatusCode, status);
+	TraceMsg("%!usbuser! -> %!USB_USER_ERROR_CODE!, %!STATUS!", hdr->UsbUserRequest, hdr->UsbUserStatusCode, status);
 	return status;
 }

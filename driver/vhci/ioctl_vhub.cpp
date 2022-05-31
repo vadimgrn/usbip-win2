@@ -65,7 +65,7 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 	}
 
 	NT_ASSERT(ci.ConnectionIndex);
-	TraceCall("ConnectionIndex %lu", ci.ConnectionIndex);
+	TraceMsg("ConnectionIndex %lu", ci.ConnectionIndex);
 
 	ci.SupportedUsbProtocols.ul = 0; // by the port
 	ci.SupportedUsbProtocols.Usb110 = true;
@@ -225,7 +225,7 @@ PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONN
 	}
 
 	NT_ASSERT(r.ConnectionIndex);
-	TraceCall("ConnectionIndex %lu", r.ConnectionIndex);
+	TraceMsg("ConnectionIndex %lu", r.ConnectionIndex);
 
 	auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex);
 

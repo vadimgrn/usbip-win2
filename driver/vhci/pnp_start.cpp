@@ -87,7 +87,7 @@ PAGEABLE auto start_vpdo(vpdo_dev_t *vpdo)
 		return err;
 	}
 
-	TraceCall("SymbolicLinkName '%!USTR!'", iface);
+	TraceMsg("SymbolicLinkName '%!USTR!'", iface);
 	return STATUS_SUCCESS;
 }
 
