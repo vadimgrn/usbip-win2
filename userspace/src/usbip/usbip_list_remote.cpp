@@ -21,6 +21,7 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "usbip_proto_op.h"
+#include "usbip.h"
 #include "dbgcode.h"
 
 static int get_exported_devices(const char *host, SOCKET sockfd)
@@ -70,19 +71,14 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 			return ERR_NETWORK;
 		}
 		usbip_net_pack_usb_device(0, &udev);
+		
+		auto &ids = get_ids();
+                auto product_name = usbip_names_get_product(ids, udev.idVendor, udev.idProduct);
+                auto class_name = usbip_names_get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
 
-                char product_name[100];
-                usbip_names_get_product(product_name, sizeof(product_name),
-					udev.idVendor, udev.idProduct);
-                
-                char class_name[100];
-                usbip_names_get_class(class_name, sizeof(class_name),
-				      udev.bDeviceClass, udev.bDeviceSubClass,
-				      udev.bDeviceProtocol);
-
-		printf("%11s: %s\n", udev.busid, product_name);
+		printf("%11s: %s\n", udev.busid, product_name.c_str());
 		printf("%11s: %s\n", "", udev.path);
-		printf("%11s: %s\n", "", class_name);
+		printf("%11s: %s\n", "", class_name.c_str());
 
 		for (int j = 0; j < udev.bNumInterfaces; ++j) {
                         usbip_usb_interface uintf{};
@@ -94,12 +90,8 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 
 			usbip_net_pack_usb_interface(0, &uintf);
 
-			usbip_names_get_class(class_name, sizeof(class_name),
-					      uintf.bInterfaceClass,
-					      uintf.bInterfaceSubClass,
-					      uintf.bInterfaceProtocol);
-
-			printf("%11s: %2d - %s\n", "", j, class_name);
+			auto csp = usbip_names_get_class(ids, uintf.bInterfaceClass, uintf.bInterfaceSubClass, uintf.bInterfaceProtocol);
+			printf("%11s: %2d - %s\n", "", j, csp.c_str());
 		}
 
 		printf("\n");

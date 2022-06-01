@@ -18,7 +18,7 @@
 #include "usbip_common.h"
 #include "usbip_vhci.h"
 #include "getopt.h"
-#include "names_cpp.h"
+#include "usbip.h"
 
 namespace
 {
@@ -31,10 +31,9 @@ int usbip_vhci_imported_device_dump(ioctl_usbip_vhci_imported_dev* idev)
 
         printf("Port %02d: <%s> at %s\n", idev->port, usbip_status_string(idev->status), usbip_speed_string(idev->speed));
 
-        char product_name[128];
-        usbip_names_get_product(product_name, sizeof(product_name), idev->vendor, idev->product);
+        auto product_name = usbip_names_get_product(get_ids(), idev->vendor, idev->product);
 
-        printf("       %s\n", product_name);
+        printf("       %s\n", product_name.c_str());
 
         printf("       ?-? -> unknown host, remote port and remote busid\n");
         printf("           -> remote bus/dev ???/???\n");
@@ -58,11 +57,6 @@ int list_imported_devices(int port)
 
         printf("Imported USB devices\n");
         printf("====================\n");
-
-        InitUsbNames names_init;
-        if (!names_init) {
-                dbg("failed to open usb id database");
-        }
 
         bool found{};
 

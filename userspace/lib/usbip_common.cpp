@@ -2,13 +2,11 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#include <windows.h>
-
 #include "usbip_common.h"
-#include "names.h"
 #include "usbip_util.h"
-#include "usbip_proto.h"
 #include "usbip_proto_op.h"
+
+#include <format>
 
 int usbip_use_stderr;
 int usbip_use_debug;
@@ -85,36 +83,24 @@ const char *usbip_speed_string(usb_device_speed speed)
 	return "Unknown Speed";
 }
 
-void dump_usb_interface(usbip_usb_interface *uinf)
+void dump_usb_interface(const UsbIds &ids, usbip_usb_interface *uinf)
 {
-	char buff[100];
-
-	usbip_names_get_class(buff, sizeof(buff),
-			uinf->bInterfaceClass,
-			uinf->bInterfaceSubClass,
-			uinf->bInterfaceProtocol);
-	
-        dbg("%-20s = %s", "Interface(C/SC/P)", buff);
+	auto csp = usbip_names_get_class(ids, uinf->bInterfaceClass, uinf->bInterfaceSubClass, uinf->bInterfaceProtocol);
+        dbg("%-20s = %s", "Interface(C/SC/P)", csp.c_str());
 }
 
-void dump_usb_device(usbip_usb_device *udev)
+void dump_usb_device(const UsbIds &ids, usbip_usb_device *udev)
 {
-	char buff[100];
-
 	dbg("%-20s = %s", "path",  udev->path);
 	dbg("%-20s = %s", "busid", udev->busid);
 
-	usbip_names_get_class(buff, sizeof(buff),
-			udev->bDeviceClass,
-			udev->bDeviceSubClass,
-			udev->bDeviceProtocol);
-	
-        dbg("%-20s = %s", "Device(C/SC/P)", buff);
+	auto csp = usbip_names_get_class(ids, udev->bDeviceClass, udev->bDeviceSubClass, udev->bDeviceProtocol);
+        dbg("%-20s = %s", "Device(C/SC/P)", csp.c_str());
 
 	DBG_UDEV_INTEGER(bcdDevice);
 
-	usbip_names_get_product(buff, sizeof(buff), udev->idVendor, udev->idProduct);
-	dbg("%-20s = %s", "Vendor/Product", buff);
+	auto vp = usbip_names_get_product(ids, udev->idVendor, udev->idProduct);
+	dbg("%-20s = %s", "Vendor/Product", vp.c_str());
 
 	DBG_UDEV_INTEGER(bNumConfigurations);
 	DBG_UDEV_INTEGER(bNumInterfaces);
@@ -125,46 +111,40 @@ void dump_usb_device(usbip_usb_device *udev)
 	DBG_UDEV_INTEGER(devnum);
 }
 
-void usbip_names_get_product(char *buff, size_t size, uint16_t vendor, uint16_t product)
+std::string usbip_names_get_product(const UsbIds &ids, uint16_t vendor, uint16_t product)
 {
-	auto prod = names_product(vendor, product);
-	if (!prod) {
+        auto [vend, prod] = ids.find_product(vendor, product);
+
+        if (prod.empty()) {
 		prod = "unknown product";
         }
 
-	auto vend = names_vendor(vendor);
-	if (!vend) {
+	if (vend.empty()) {
 		vend = "unknown vendor";
         }
 
-	[[maybe_unused]] auto ret = snprintf(buff, size, "%s : %s (%04x:%04x)", vend, prod, vendor, product);
-        assert(snprintf_ok(ret, size));
+	return std::format("{} : {} ({:04x}:{:04x})", vend, prod, vendor, product);
 }
 
-void usbip_names_get_class(char *buff, size_t size, uint8_t class_, uint8_t subclass, uint8_t protocol)
+std::string usbip_names_get_class(const UsbIds &ids, uint8_t class_, uint8_t subclass, uint8_t protocol)
 {
-	const char *c, *s, *p;
-
 	if (!(class_ && subclass && protocol)) {
-		snprintf(buff, size, "(Defined at Interface level) (%02x/%02x/%02x)", class_, subclass, protocol);
-		return;
+		return "(Defined at Interface level) (00/00/00)";
 	}
 
-	p = names_protocol(class_, subclass, protocol);
-	if (!p) {
-		p = "?";
-        }
+	auto [c, s, p] = ids.find_class_subclass_proto(class_, subclass, protocol);
 
-	s = names_subclass(class_, subclass);
-	if (!s) {
+        if (c.empty()) {
+                c = "?";
+        }
+        
+	if (s.empty()) {
 		s = "?";
         }
 
-	c = names_class(class_);
-	if (!c) {
-		c = "?";
+        if (p.empty()) {
+                p = "?";
         }
 
-	[[maybe_unused]] auto ret = snprintf(buff, size, "%s/%s/%s (%02x/%02x/%02x)", c, s, p, class_, subclass, protocol);
-        assert(snprintf_ok(ret, size));
+	return std::format("{}/{}/{} ({:02x}/{:02x}/{:02x})", c, s, p, class_, subclass, protocol);
 }

@@ -99,15 +99,14 @@
   <ItemGroup>
     <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="names.c" />
     <ClCompile Include="usbip_common.cpp" />
     <ClCompile Include="getopt.c" />
     <ClCompile Include="getopt_long.c" />
     <ClCompile Include="usbip_proto_op.cpp" />
     <ClCompile Include="usbip_setupdi.cpp" />
     <ClCompile Include="usbip_util.cpp" />
-    <ClCompile Include="names_cpp.cpp" />
     <ClCompile Include="usbip_network.cpp" />
+    <ClCompile Include="usb_ids.cpp" />
     <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -116,13 +115,12 @@
     <ClInclude Include="dbgcode.h" />
     <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="names.h" />
     <ClInclude Include="usbip_common.h" />
     <ClInclude Include="getopt.h" />
     <ClInclude Include="usbip_setupdi.h" />
     <ClInclude Include="usbip_util.h" />
-    <ClInclude Include="names_cpp.h" />
     <ClInclude Include="usbip_network.h" />
+    <ClInclude Include="usb_ids.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
   </ItemGroup>

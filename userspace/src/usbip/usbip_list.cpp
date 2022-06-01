@@ -21,7 +21,6 @@
 #include "usbip_common.h"
 #include "usbip_network.h"
 #include "getopt.h"
-#include "names_cpp.h"
 
 int list_exported_devices(const char *host);
 
@@ -47,12 +46,6 @@ int usbip_list(int argc, char *argv[])
 	BOOL parsable = FALSE;
 	int opt;
 	int ret = 1;
-
-        InitUsbNames names_init;
-
-	if (!names_init) {
-		dbg("failed to open usb id database");
-	}
 
 	for (;;) {
 		opt = getopt_long(argc, argv, "pr:", opts, nullptr);

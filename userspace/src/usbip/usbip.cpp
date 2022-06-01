@@ -25,8 +25,8 @@
 #include "usbip.h"
 #include "win_socket.h"
 #include "file_ver.h"
-
-#include <cstdlib>
+#include "resource.h"
+#include "usb_ids.h"
 
 namespace
 {
@@ -102,12 +102,27 @@ int run_command(const struct command *cmd, int argc, char *argv[])
 	return cmd->fn(argc, argv);
 }
 
+auto get_ids_data()
+{
+	Resource r(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDR_USB_IDS), RT_RCDATA);
+	assert(r);
+	return r.str();
+}
+
 } // namespace
+
+
+UsbIds& get_ids()
+{
+	static UsbIds ids(get_ids_data());
+	assert(ids);
+	return ids;
+}
 
 int main(int argc, char *argv[])
 {
-        const option opts[] = 
-        {
+	const option opts[] = 
+	{
 		{ "debug",    no_argument,       nullptr, 'd' },
 		{ "tcp-port", required_argument, nullptr, 't' },
 		{}
@@ -143,7 +158,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-        usbip::InitWinSock2 ws2;
+	usbip::InitWinSock2 ws2;
 	if (!ws2) {
 		err("cannot setup windows socket");
 		return EXIT_FAILURE;

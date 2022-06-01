@@ -53,7 +53,6 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 
 [Files]
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
-Source: {#SolutionDir + "userspace\usb.ids"}; DestDir: "{app}"
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
 Source: {#SolutionDir + "driver\usbip_test.pfx"}; DestDir: "{tmp}"
 Source: {#SolutionDir + "userspace\src\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall
