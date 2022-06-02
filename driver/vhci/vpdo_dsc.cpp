@@ -20,7 +20,7 @@ namespace
 auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 {
 	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
-	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
 	if (str) {
 		[[maybe_unused]] auto err = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
@@ -64,7 +64,7 @@ void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_ST
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIPTOR_REQUEST &r, ULONG &size)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIPTOR_REQUEST &r, [[maybe_unused]] ULONG &size)
 {
 	PAGED_CODE();
 
@@ -89,8 +89,11 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIP
 		break;
 	}
 
+	return STATUS_NOT_IMPLEMENTED; // FIXME
+
+/*
 	if (!dsc_data) {
-		return STATUS_NOT_IMPLEMENTED; // send_to_server(vpdo, irp);
+		return STATUS_NOT_IMPLEMENTED;
 	}
 
 	ULONG outlen = sizeof(r) + dsc_len;
@@ -110,6 +113,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIP
 	}
 
 	return STATUS_SUCCESS;
+*/
 }
 
 /*
