@@ -104,6 +104,7 @@
     </DriverTargetPlatform>
     <SpectreMitigation>false</SpectreMitigation>
     <TargetVersion>Windows10</TargetVersion>
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -114,6 +115,7 @@
     </DriverTargetPlatform>
     <SpectreMitigation>false</SpectreMitigation>
     <TargetVersion>Windows10</TargetVersion>
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

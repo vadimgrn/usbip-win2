@@ -9,7 +9,7 @@
 - There is no "official" USB/IP client for Windows so far
 
 ## Requirements
-- Windows 10 x64, version 2004 and later ([ExAllocatePool2](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-exallocatepool2) is used)
+- Windows 10 x64, version 2004 and later ([NTDDI_WIN10_VB](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable))
 
 ## Differences with parent [project](https://github.com/cezanne/usbip-win)
 - x86 build is not supported
