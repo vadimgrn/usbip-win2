@@ -622,7 +622,7 @@ size_t wsk::size(_In_ const WSK_DATA_INDICATION *di)
         return total;
 }
 
-WSK_DATA_INDICATION* wsk::get_tail(_In_ WSK_DATA_INDICATION *head)
+WSK_DATA_INDICATION* wsk::tail(_In_ WSK_DATA_INDICATION *head)
 {
         auto i = head;
         for ( ; i && i->Next; i = i->Next);

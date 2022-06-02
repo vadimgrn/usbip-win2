@@ -110,6 +110,8 @@ PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 
 	vpdo.wsk_data_offset = 0;
+	vpdo.wsk_data_tail = nullptr;
+	RtlZeroMemory(&vpdo.wsk_data_hdr, sizeof(vpdo.wsk_data_hdr));
 
 	if (auto &di = vpdo.wsk_data) {
 		if (auto err = release(vpdo.sock, di)) {
@@ -117,8 +119,6 @@ PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 		}
 		di = nullptr;
 	}
-
-	RtlZeroMemory(&vpdo.wsk_data_hdr, sizeof(vpdo.wsk_data_hdr));
 }
 
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)

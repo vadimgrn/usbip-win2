@@ -128,6 +128,7 @@ struct vpdo_dev_t : vdev_t
 
 	_WSK_DATA_INDICATION* wsk_data;
 	size_t wsk_data_offset; // less than wsk_data->Buffer.Length
+	_WSK_DATA_INDICATION* wsk_data_tail; // shortcut for wsk::tail(wsk_data)
 	usbip_header wsk_data_hdr; // valid if is_valid_seqnum(wsk_data_hdr.base.seqnum)
 
 	IO_CSQ irps_csq;

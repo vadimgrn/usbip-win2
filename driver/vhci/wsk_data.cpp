@@ -26,12 +26,14 @@ void wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
 	NT_ASSERT(wsk::size(DataIndication) == BytesIndicated);
 
 	if (auto &head = vpdo.wsk_data) {
-		wsk::get_tail(head)->Next = DataIndication;
+		NT_ASSERT(vpdo.wsk_data_tail == wsk::tail(head));
+		vpdo.wsk_data_tail->Next = DataIndication;
 	} else {
 		head = DataIndication;
 		NT_ASSERT(!vpdo.wsk_data_offset);
 	}
 
+	vpdo.wsk_data_tail = wsk::tail(DataIndication);
 	TraceWSK("DATA_INDICATION %04x, size %Iu", ptr4log(DataIndication), BytesIndicated);
 }
 
@@ -160,8 +162,6 @@ NTSTATUS wsk_data_copy(
 			offset = 0;    // OOOOOOOOOL...L - max offset, len
 		}
 	}
-
-	NT_ASSERT(!cur || check_wsk_data_offset(cur, offset));
 
 	if (consume) {
 		consume->cur = cur;
