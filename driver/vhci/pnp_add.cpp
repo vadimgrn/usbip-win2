@@ -15,31 +15,30 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
 
-	UNICODE_STRING hwid{};
-
 	NTSTATUS err{};
 	ULONG dummy;
-
-	if (auto s = (PWSTR)GetDeviceProperty(devobj, DevicePropertyHardwareID, err, dummy)) {
-		RtlInitUnicodeString(&hwid, s);
-		ExFreePoolWithTag(s, USBIP_VHCI_POOL_TAG);
-	} else {
+	auto hwid_wstr = (PWSTR)GetDeviceProperty(devobj, DevicePropertyHardwareID, err, dummy);
+	if (!hwid_wstr) {
 		return err;
 	}
 
+	UNICODE_STRING hwid{};
+	RtlInitUnicodeString(&hwid, hwid_wstr);
 	TraceDbg("%!USTR!", &hwid);
 
 	const wchar_t* v[] = { HWID_ROOT, HWID_VHCI, HWID_VHUB };
-
-	for (auto i: v) {
+	
+	for (err = STATUS_INVALID_PARAMETER; auto i: v) {
 		UNICODE_STRING s{};
 		RtlInitUnicodeString(&s, i);
 		if (RtlEqualUnicodeString(&s, &hwid, TRUE)) {
-			return STATUS_SUCCESS;
+			err = STATUS_SUCCESS;
+			break;
 		}
 	}
 
-	return STATUS_INVALID_PARAMETER;
+	ExFreePoolWithTag(hwid_wstr, USBIP_VHCI_POOL_TAG);
+	return err;
 }
 
 PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
