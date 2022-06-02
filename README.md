@@ -11,23 +11,30 @@
 ## Requirements
 - Windows 10 x64, version 2004 and later ([NTDDI_WIN10_VB](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable))
 
-## Differences with parent [project](https://github.com/cezanne/usbip-win)
-- x86 build is not supported
+## Key features
+- x64 build only
+- Server (stub driver) is absent
+- Client (vhci driver) is the goal of the project
+- [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
+- [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
+  - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app
+  - This implies low latency and high throughput
+- [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented in both directions (send/receive)
+  - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
+  - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data directly from URB transfer buffer
+  - [WskReceiveEvent](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive_event) buffers are directly copied to URB transfer buffer
+
+## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
+- x86 build is removed
 - Server (stub driver) is removed
 - UDE client driver is removed, VHCI driver is superseded it
-- Client (VHCI driver)
+- Client (vhci driver)
   - Significantly refactored and improved
   - The core of the driver was rewritten from scratch
-  - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
-  - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
-    - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app (usbip_xfer.exe or attacher.exe)
-    - This means low latencies and high throughput
-    - [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented in both directions (send/receive)
-      - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
-      - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data directly from URB transfer buffer
-      - [WskReceiveEvent](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive_event) buffers are directly copied to URB transfer buffer
-- InnoSetup installer is used for installation of the driver and userspace stuff
+  - attacher.exe (usbip_xfer.exe) is no longer used
 - C++ 20 is used for all projects
+- Visual Studio 2022 is used
+- InnoSetup installer is used for installation of the driver and userspace stuff
 
 ## Devices that work (list is incomplete)
   - USB 2.0/3.X flash drives
