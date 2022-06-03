@@ -94,7 +94,7 @@ SOCKET *for_each(
 enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
 const char *ReceiveEventFlags(char *buf, size_t len, ULONG Flags);
 
-WSK_DATA_INDICATION *tail(_In_ WSK_DATA_INDICATION *head);
+WSK_DATA_INDICATION *tail(_In_ WSK_DATA_INDICATION *di);
 
 size_t size(_In_ const WSK_DATA_INDICATION *di);
 

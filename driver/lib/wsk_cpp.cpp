@@ -615,17 +615,21 @@ size_t wsk::size(_In_ const WSK_DATA_INDICATION *di)
 {
         size_t total = 0;
 
-        for (auto i = di; i; i = i->Next) {
-                total += i->Buffer.Length;
+        for ( ; di; di = di->Next) {
+                total += di->Buffer.Length;
         }
 
         return total;
 }
 
-WSK_DATA_INDICATION* wsk::tail(_In_ WSK_DATA_INDICATION *head)
+WSK_DATA_INDICATION* wsk::tail(_In_ WSK_DATA_INDICATION *di)
 {
-        auto i = head;
-        for ( ; i && i->Next; i = i->Next);
-        return i;
+        for ( ; di; di = di->Next) {
+                if (!di->Next) {
+                       break;
+                }
+        }
+
+        return di;
 }
 

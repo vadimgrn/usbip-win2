@@ -74,12 +74,11 @@ private:
 
         void do_unprepare();
         void unprepare_nonpaged() {} // no "undo" operation is required for MmBuildMdlForNonPagedPool
-        bool nonpaged_prepared() const { return m_mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL; }
 };
 
 
-MDL *get_tail(_In_ MDL *head);
-inline auto get_tail(_In_ const Mdl &head) { return get_tail(head.get()); }
+MDL *tail(_In_ MDL *head);
+inline auto tail(_In_ const Mdl &head) { return tail(head.get()); }
 
 size_t size(_In_ const MDL *head);
 inline auto size(_In_ const Mdl &head) { return size(head.get()); }

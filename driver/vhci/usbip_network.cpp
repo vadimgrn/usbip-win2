@@ -171,8 +171,8 @@ NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ const URB &urb)
         if (!r->TransferBufferLength) {
                 NT_ASSERT(!mdl);
         } else if (auto buf = use_mdl ? nullptr : r->TransferBuffer) {
-                mdl = Mdl(memory::nonpaged, buf, r->TransferBufferLength);
-                err = mdl.prepare_nonpaged();
+                mdl = Mdl(memory::paged, buf, r->TransferBufferLength); // FIXME: unknown if it is paged or not
+                err = mdl.prepare_paged(IoReadAccess);
         } else if (auto m = r->TransferBufferMDL) {
                 mdl = Mdl(m);
                 err = mdl.size() >= r->TransferBufferLength ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;

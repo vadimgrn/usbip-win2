@@ -61,8 +61,7 @@ NTSTATUS usbip::Mdl::lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION O
 
         __try {
                 MmProbeAndLockPages(m_mdl, AccessMode, Operation);
-        } __except (EXCEPTION_EXECUTE_HANDLER) {
-        }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
 
         return locked() ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
@@ -94,13 +93,7 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
                 return STATUS_INVALID_DEVICE_REQUEST;
         }
 
-        if (nonpaged_prepared()) {
-                return STATUS_ALREADY_COMPLETE;
-        }
-
         MmBuildMdlForNonPagedPool(m_mdl);
-        NT_ASSERT(nonpaged_prepared());
-
         return STATUS_SUCCESS;
 }
 
@@ -143,7 +136,7 @@ size_t usbip::size(_In_ const MDL *head)
         return total;
 }
 
-MDL *usbip::get_tail(_In_ MDL *head)
+MDL *usbip::tail(_In_ MDL *head)
 {
         auto tail = head;
         for ( ; tail && tail->Next; tail = tail->Next);
