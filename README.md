@@ -1,9 +1,10 @@
 ![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")
 
 # USB/IP Client for Windows
+- Vhci driver is the goal of this project
 - **Is fully implemented**
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USBIP server at least for kernels 4.19 - 5.13
+- Works with Linux USBIP server at least for kernels 4.19 - 5.15
 - **Is not ready for production use**, can cause BSOD or hang
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows so far
@@ -12,9 +13,6 @@
 - Windows 10 x64, version 2004 and later ([NTDDI_WIN10_VB](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable))
 
 ## Key features
-- x64 build only
-- Server (stub driver) is absent
-- Client (vhci driver) is the goal of the project
 - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app
@@ -59,9 +57,9 @@
 - x86 platform is not supported
 
 ### Build Tools
-- The latest Microsoft Visual Studio Community 2022
+- The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
 - SDK for Windows 11, version 22H2 (10.0.22621.0)
-- WDK for Windows 11, version 22H2 (10.0.22621.0)
+- [WDK for Windows 11](https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk), version 22H2 (10.0.22621.0)
 - InnoSetup
 
 ### Install InnoSetup

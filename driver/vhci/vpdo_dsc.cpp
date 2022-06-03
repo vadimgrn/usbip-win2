@@ -64,7 +64,7 @@ void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_ST
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIPTOR_REQUEST &r, [[maybe_unused]] ULONG &size)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIPTOR_REQUEST &r, ULONG &size)
 {
 	PAGED_CODE();
 
@@ -89,31 +89,20 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIP
 		break;
 	}
 
-	return STATUS_NOT_IMPLEMENTED; // FIXME
-
-/*
 	if (!dsc_data) {
-		return STATUS_NOT_IMPLEMENTED;
+		return STATUS_NOT_IMPLEMENTED; // get_descriptor_from_node_connection(*vpdo, irp, r);
 	}
 
-	ULONG outlen = sizeof(r) + dsc_len;
+	TraceUrb("size %Iu, dsc_len %lu, sizeof(r) %Iu", size, dsc_len, sizeof(r));
 
-	if (size < sizeof(r)) {
-		size = outlen;
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	auto ncopy = size < outlen ? size - sizeof(r) : outlen;
+	auto ncopy = min(size, dsc_len);
 	if (ncopy) {
 		RtlCopyMemory(r.Data, dsc_data, ncopy);
 	}
 
-	if (ncopy == outlen) {
-		size = outlen;
-	}
-
-	return STATUS_SUCCESS;
-*/
+	auto err = size < ncopy ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
+	size = ncopy;
+	return err;
 }
 
 /*

@@ -125,20 +125,19 @@ void usbip::Mdl::do_unprepare()
         paged() ? unlock() : unprepare_nonpaged();
 }
 
-size_t usbip::size(_In_ const MDL *head)
+size_t usbip::size(_In_ const MDL *mdl)
 {
         size_t total = 0;
 
-        for (auto cur = head; cur; cur = cur->Next) {
-                total += MmGetMdlByteCount(cur);
+        for ( ; mdl; mdl = mdl->Next) {
+                total += MmGetMdlByteCount(mdl);
         }
 
         return total;
 }
 
-MDL *usbip::tail(_In_ MDL *head)
+MDL *usbip::tail(_In_ MDL *mdl)
 {
-        auto tail = head;
-        for ( ; tail && tail->Next; tail = tail->Next);
-        return tail;
+        for ( ; mdl && mdl->Next; mdl = mdl->Next);
+        return mdl;
 }

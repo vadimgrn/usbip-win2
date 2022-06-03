@@ -624,12 +624,6 @@ size_t wsk::size(_In_ const WSK_DATA_INDICATION *di)
 
 WSK_DATA_INDICATION* wsk::tail(_In_ WSK_DATA_INDICATION *di)
 {
-        for ( ; di; di = di->Next) {
-                if (!di->Next) {
-                       break;
-                }
-        }
-
+        for ( ; di && di->Next; di = di->Next);
         return di;
 }
-

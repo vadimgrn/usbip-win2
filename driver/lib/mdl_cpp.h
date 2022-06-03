@@ -77,11 +77,11 @@ private:
 };
 
 
-MDL *tail(_In_ MDL *head);
-inline auto tail(_In_ const Mdl &head) { return tail(head.get()); }
+MDL *tail(_In_ MDL *mdl);
+inline auto tail(_In_ const Mdl &mdl) { return tail(mdl.get()); }
 
-size_t size(_In_ const MDL *head);
-inline auto size(_In_ const Mdl &head) { return size(head.get()); }
+size_t size(_In_ const MDL *mdl);
+inline auto size(_In_ const Mdl &mdl) { return size(mdl.get()); }
 
 inline auto& operator +=(_Inout_ Mdl &left, _Inout_ Mdl &right)
 { 
