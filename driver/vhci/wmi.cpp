@@ -11,7 +11,6 @@
 namespace
 {
 
-const wchar_t MOFRESOURCENAME[] = L"USBIPVhciWMI";
 enum { WMI_USBIP_BUS_DRIVER_INFORMATION };
 
 WMIGUIDREGINFO USBIPBusWmiGuidList[] = 
@@ -144,7 +143,7 @@ NTSTATUS vhci_QueryWmiRegInfo(
 	*RegFlags = WMIREG_FLAG_INSTANCE_PDO;
 	*RegistryPath = &Globals.RegistryPath;
 	*Pdo = vdev->pdo;
-	RtlInitUnicodeString(MofResourceName, MOFRESOURCENAME);
+	RtlInitUnicodeString(MofResourceName, L"USBIPVhciWMI");
 
 	return STATUS_SUCCESS;
 }

@@ -20,7 +20,7 @@ namespace
 auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
 {
 	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
-	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
+	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
 
 	if (str) {
 		[[maybe_unused]] auto err = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
@@ -90,26 +90,19 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIP
 	}
 
 	if (!dsc_data) {
-		return STATUS_NOT_IMPLEMENTED; // send_to_server(vpdo, irp);
+		return STATUS_NOT_IMPLEMENTED; // get_descriptor_from_node_connection(*vpdo, irp, r);
 	}
 
-	ULONG outlen = sizeof(r) + dsc_len;
+	TraceUrb("size %Iu, dsc_len %lu, sizeof(r) %Iu", size, dsc_len, sizeof(r));
 
-	if (size < sizeof(r)) {
-		size = outlen;
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	auto ncopy = size < outlen ? size - sizeof(r) : outlen;
+	auto ncopy = min(size, dsc_len);
 	if (ncopy) {
 		RtlCopyMemory(r.Data, dsc_data, ncopy);
 	}
 
-	if (ncopy == outlen) {
-		size = outlen;
-	}
-
-	return STATUS_SUCCESS;
+	auto err = size < ncopy ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
+	size = ncopy;
+	return err;
 }
 
 /*

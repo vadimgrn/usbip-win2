@@ -99,8 +99,7 @@ PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_D
 	}
 
 	if (auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex)) {
-		auto st = vpdo_get_dsc_from_nodeconn(vpdo, irp, r, outlen);
-		return st;
+		return vpdo_get_dsc_from_nodeconn(vpdo, irp, r, outlen);
 	}
 
 	return STATUS_NO_SUCH_DEVICE;

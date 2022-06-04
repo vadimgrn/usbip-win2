@@ -928,38 +928,6 @@ NTSTATUS usb_get_port_status(ULONG &status)
 }
 
 /*
- * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> req_fetch_dsc -> submit_urbr -> vhci_read
- */
-PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp)
-{
-        PAGED_CODE();
-
-        auto &r = *reinterpret_cast<const USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer);
-
-        auto irpstack = IoGetCurrentIrpStackLocation(irp);
-        auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // length of r.Data[]
-
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
-
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, data_sz)) {
-                return err;
-        }
-
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
-        pkt->wValue.W = r.SetupPacket.wValue;
-        pkt->wIndex.W = r.SetupPacket.wIndex;
-        pkt->wLength = r.SetupPacket.wLength;
-
-        char buf[USB_SETUP_PKT_STR_BUFBZ];
-        TraceUrb("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
-
-        return send(vpdo, irp, hdr);
-}
-
-/*
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd.
  */
 PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
@@ -1022,6 +990,36 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         }
 }
 
+/*
+ * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> get_descriptor_from_node_connection
+ */
+PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r)
+{
+        PAGED_CODE();
+
+        auto irpstack = IoGetCurrentIrpStackLocation(irp);
+        auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // length of r.Data[]
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
+
+        usbip_header hdr{};
+        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, data_sz)) {
+                return err;
+        }
+
+        auto pkt = get_submit_setup(&hdr);
+        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
+        pkt->wValue.W = r.SetupPacket.wValue;
+        pkt->wIndex.W = r.SetupPacket.wIndex;
+        pkt->wLength = r.SetupPacket.wLength;
+
+        char buf[USB_SETUP_PKT_STR_BUFBZ];
+        TraceUrb("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
+
+        return send(vpdo, irp, hdr);
+}
+
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
         NT_ASSERT(!irp->IoStatus.Information);
@@ -1057,9 +1055,6 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
 		status = setup_topology_address(vpdo, *(USB_TOPOLOGY_ADDRESS*)irpstack->Parameters.Others.Argument1);
 		break;
-        case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-                status = get_descriptor_from_node_connection(*vpdo, irp);
-                break;
         default:
 		Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
 	}
