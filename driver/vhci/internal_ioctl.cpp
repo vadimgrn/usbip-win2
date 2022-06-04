@@ -76,7 +76,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         }
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
-                vhub_unplug_vpdo(&vpdo);
+                // vhub_unplug_vpdo(&vpdo);
         }
 
         free(ctx);
@@ -141,7 +141,7 @@ auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr,
         if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
                 NT_VERIFY(dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
                 if (err == STATUS_FILE_FORCED_CLOSED) {
-                        vhub_unplug_vpdo(&vpdo);
+                        // vhub_unplug_vpdo(&vpdo);
                 }
                 return err;
         }
@@ -991,14 +991,17 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 }
 
 /*
- * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> get_descriptor_from_node_connection
+ * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> me
  */
 PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r)
 {
         PAGED_CODE();
 
         auto irpstack = IoGetCurrentIrpStackLocation(irp);
-        auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // length of r.Data[]
+        auto outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+
+        NT_ASSERT(outlen > sizeof(r));
+        auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
@@ -1013,9 +1016,7 @@ PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp
         pkt->wValue.W = r.SetupPacket.wValue;
         pkt->wIndex.W = r.SetupPacket.wIndex;
         pkt->wLength = r.SetupPacket.wLength;
-
-        char buf[USB_SETUP_PKT_STR_BUFBZ];
-        TraceUrb("ConnectionIndex %lu, %s", r.ConnectionIndex, usb_setup_pkt_str(buf, sizeof(buf), &r.SetupPacket));
+        NT_ASSERT(data_sz >= pkt->wLength);
 
         return send(vpdo, irp, hdr);
 }

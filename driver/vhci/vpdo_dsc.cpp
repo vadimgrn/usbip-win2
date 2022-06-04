@@ -64,45 +64,49 @@ void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_ST
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP*, USB_DESCRIPTOR_REQUEST &r, ULONG &size)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
 	auto setup = (USB_DEFAULT_PIPE_SETUP_PACKET*)&r.SetupPacket;
 	static_assert(sizeof(*setup) == sizeof(r.SetupPacket));
 
-	void *dsc_data = nullptr;
-	ULONG dsc_len = 0;
+	auto cfg = vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
+	auto idx = setup->wValue.LowByte;
+
+	void *dsc_data{};
+	USHORT dsc_len = 0;
 
 	switch (setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		dsc_data = is_valid_dsc(&vpdo->descriptor) ? &vpdo->descriptor : nullptr;
-		if (dsc_data) {
+		if (is_valid_dsc(&vpdo->descriptor)) {
+			dsc_data = &vpdo->descriptor;
 			dsc_len = vpdo->descriptor.bLength;
 		}
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		dsc_data = vpdo->actconfig;
-		if (dsc_data) {
+		if (cfg > 0 && cfg - 1 == idx) { // FIXME: can be wrong assumption
+			dsc_data = vpdo->actconfig;
 			dsc_len = vpdo->actconfig->wTotalLength;
+		} else {
+			TraceDbg("bConfigurationValue(%d) - 1 != setup->wValue.LowByte(%d)", cfg, idx);
 		}
 		break;
 	}
 
 	if (!dsc_data) {
-		return STATUS_NOT_IMPLEMENTED; // get_descriptor_from_node_connection(*vpdo, irp, r);
+		return get_descriptor_from_node_connection(*vpdo, irp, r);
 	}
 
-	TraceUrb("size %Iu, dsc_len %lu, sizeof(r) %Iu", size, dsc_len, sizeof(r));
+	NT_ASSERT(outlen > sizeof(r));
+	auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
 
-	auto ncopy = min(size, dsc_len);
-	if (ncopy) {
-		RtlCopyMemory(r.Data, dsc_data, ncopy);
-	}
+	auto n = min(data_sz, dsc_len);
+	RtlCopyMemory(r.Data, dsc_data, n);
+	outlen = sizeof(r) + n;
 
-	auto err = size < ncopy ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
-	size = ncopy;
-	return err;
+	TraceDbg("%lu bytes copied", n);
+	return STATUS_SUCCESS;
 }
 
 /*

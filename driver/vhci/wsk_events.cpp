@@ -459,22 +459,27 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, USB_DESCRIPTOR_REQUEST &r)
 {
         auto irpstack = IoGetCurrentIrpStackLocation(irp);
-        auto data_sz = irpstack->Parameters.DeviceIoControl.OutputBufferLength; // r.Data[]
+	auto outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
+
+	NT_ASSERT(outlen > sizeof(r));
+	auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
 
         auto actual_length = hdr.u.ret_submit.actual_length;
+	data_sz = actual_length > 0 ? min(ULONG(actual_length), data_sz) : 0;
 
-        if (!(actual_length >= 0 && (ULONG)actual_length <= data_sz)) {
-                Trace(TRACE_LEVEL_ERROR, "OutputBufferLength %lu, actual_length(%d)", data_sz, actual_length);
-                return STATUS_INVALID_PARAMETER;
-        }
-
-	if (auto err = wsk_data_copy(vpdo, r.Data, 0, actual_length)) {
+	if (auto err = wsk_data_copy(vpdo, r.Data, 0, data_sz)) {
 		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy %!STATUS!", err);
 		return err;
 	}
 
-	TraceUrb("irp %04x <- ConnectionIndex %lu, OutputBufferLength %lu, actual_length %d, Data[%!BIN!]", 
-		  ptr4log(irp), r.ConnectionIndex, data_sz, actual_length, WppBinary(r.Data, (USHORT)actual_length));
+	TraceUrb("irp %04x <- ConnectionIndex %lu, size %lu, %!BIN!", 
+		  ptr4log(irp), r.ConnectionIndex, data_sz, WppBinary(r.Data, USHORT(data_sz)));
+
+	irp->IoStatus.Information = sizeof(r) + data_sz;
+
+	if (data_sz < ULONG(actual_length)) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
 
 	auto err = to_windows_status(hdr.u.ret_submit.status);
         return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
@@ -491,6 +496,25 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
         }
 
         return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+inline void WorkItem(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
+{
+	auto irp = static_cast<IRP*>(Context);
+	auto &st = irp->IoStatus;
+
+	TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st.Status, st.Information);
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+
+	IoFreeWorkItem(IoWorkItem);
+}
+
+inline void complete_safe(vpdo_dev_t &vpdo, IRP *irp)
+{
+	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
+		IoQueueWorkItemEx(wi, WorkItem, DelayedWorkQueue, irp);
+	}
 }
 
 void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
@@ -511,7 +535,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
         case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
                 st = get_descriptor_from_node_connection(vpdo, irp, hdr, 
 			*static_cast<USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer));
-                break;
+		break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
         }

@@ -93,8 +93,13 @@ PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_D
 {
 	PAGED_CODE();
 
-	if (inlen < sizeof(r)) {
-		outlen = sizeof(r);
+	UCHAR type = r.SetupPacket.wValue >> 8;
+	UCHAR idx  = r.SetupPacket.wValue & 0xFF;
+
+	TraceDbg("ConnectionIndex %lu, %!usb_descriptor_type!, index %d; inlen %lu, outlen %lu", 
+		  r.ConnectionIndex, type, idx, inlen, outlen);
+
+	if (!(inlen >= sizeof(r) && outlen > sizeof(r))) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
