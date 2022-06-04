@@ -266,7 +266,7 @@ PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBuffer
         }
 
         char buf[DBG_USBIP_HDR_BUFSZ];
-        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, true));
 
         byteswap_header(hdr, swap_dir::host2net);
 
@@ -281,7 +281,7 @@ PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, USHORT TransferBuffer
         }
 
         byteswap_header(hdr, swap_dir::net2host);
-        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr));
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, true));
 
         auto &b = hdr.base;
         if (!(b.command == USBIP_RET_SUBMIT && extract_num(b.seqnum) == vpdo.seqnum)) {

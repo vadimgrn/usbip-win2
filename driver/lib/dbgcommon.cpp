@@ -6,10 +6,34 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
+namespace
+{
+
 constexpr auto bmrequest_dir_str(BM_REQUEST_TYPE r)
 {
 	return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
 }
+
+void print_cmd_submit(char *buf, size_t len, const usbip_header_cmd_submit *cmd, bool setup)
+{
+	auto st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
+					"cmd_submit: flags %#x, length %d, start_frame %d, isoc[%d], interval %d%s",
+					cmd->transfer_flags, cmd->transfer_buffer_length, cmd->start_frame, 
+					cmd->number_of_packets, cmd->interval, setup ? ", " : "");
+
+	if (!st && setup) {
+		usb_setup_pkt_str(buf, len, cmd->setup);
+	}
+}
+
+void print_ret_submit(char *buf, size_t len, const usbip_header_ret_submit *cmd)
+{
+	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, start_frame %d, isoc[%d], error_count %d", 
+			   cmd->status, cmd->actual_length, cmd->start_frame, cmd->number_of_packets, cmd->error_count);
+}
+
+} // namespace
+
 
 const char *bmrequest_type_str(BM_REQUEST_TYPE r)
 {
@@ -50,130 +74,130 @@ const char *brequest_str(UCHAR bRequest)
 
 const char *dbg_usbd_status(USBD_STATUS status)
 {
-        switch (status) {
-        case USBD_STATUS_SUCCESS: 
-                return "SUCCESS";
-        case USBD_STATUS_PORT_OPERATION_PENDING:
-                return "PORT_OPERATION_PENDING";
-        case USBD_STATUS_PENDING:
-                return "PENDING";
-        case USBD_STATUS_CRC:
-                return "CRC";
-        case USBD_STATUS_BTSTUFF:
-                return "BTSTUFF";
-        case USBD_STATUS_DATA_TOGGLE_MISMATCH:
-                return "DATA_TOGGLE_MISMATCH";
-        case USBD_STATUS_STALL_PID:
-                return "STALL_PID";
-        case USBD_STATUS_DEV_NOT_RESPONDING:
-                return "DEV_NOT_RESPONDING";
-        case USBD_STATUS_PID_CHECK_FAILURE:
-                return "PID_CHECK_FAILURE";
-        case USBD_STATUS_UNEXPECTED_PID:
-                return "UNEXPECTED_PID";
-        case USBD_STATUS_DATA_OVERRUN:
-                return "DATA_OVERRUN";
-        case USBD_STATUS_DATA_UNDERRUN:
-                return "DATA_UNDERRUN";
-        case USBD_STATUS_BUFFER_OVERRUN:
-                return "BUFFER_OVERRUN";
-        case USBD_STATUS_BUFFER_UNDERRUN:
-                return "BUFFER_UNDERRUN";
-        case USBD_STATUS_NOT_ACCESSED:
-                return "NOT_ACCESSED";
-        case USBD_STATUS_FIFO:
-                return "FIFO";
-        case USBD_STATUS_XACT_ERROR:
-                return "XACT_ERROR";
-        case USBD_STATUS_BABBLE_DETECTED:
-                return "BABBLE_DETECTED";
-        case USBD_STATUS_DATA_BUFFER_ERROR:
-                return "DATA_BUFFER_ERROR";
-        case USBD_STATUS_NO_PING_RESPONSE:
-                return "NO_PING_RESPONSE";
-        case USBD_STATUS_INVALID_STREAM_TYPE:
-                return "INVALID_STREAM_TYPE";
-        case USBD_STATUS_INVALID_STREAM_ID:
-                return "INVALID_STREAM_ID";
-        case USBD_STATUS_ENDPOINT_HALTED:
-                return "ENDPOINT_HALTED";
-        case USBD_STATUS_INVALID_URB_FUNCTION:
-                return "INVALID_URB_FUNCTION";
-        case USBD_STATUS_INVALID_PARAMETER:
-                return "INVALID_PARAMETER";
-        case USBD_STATUS_ERROR_BUSY:
-                return "ERROR_BUSY";
-        case USBD_STATUS_INVALID_PIPE_HANDLE:
-                return "INVALID_PIPE_HANDLE";
-        case USBD_STATUS_NO_BANDWIDTH:
-                return "NO_BANDWIDTH";
-        case USBD_STATUS_INTERNAL_HC_ERROR:
-                return "INTERNAL_HC_ERROR";
-        case USBD_STATUS_ERROR_SHORT_TRANSFER:
-                return "ERROR_SHORT_TRANSFER";
-        case USBD_STATUS_BAD_START_FRAME:
-                return "BAD_START_FRAME";
-        case USBD_STATUS_ISOCH_REQUEST_FAILED:
-                return "ISOCH_REQUEST_FAILED";
-        case USBD_STATUS_FRAME_CONTROL_OWNED:
-                return "FRAME_CONTROL_OWNED";
-        case USBD_STATUS_FRAME_CONTROL_NOT_OWNED:
-                return "FRAME_CONTROL_NOT_OWNED";
-        case USBD_STATUS_NOT_SUPPORTED:
-                return "NOT_SUPPORTED";
-        case USBD_STATUS_INAVLID_CONFIGURATION_DESCRIPTOR:
-                return "INAVLID_CONFIGURATION_DESCRIPTOR";
-        case USBD_STATUS_INSUFFICIENT_RESOURCES:
-                return "INSUFFICIENT_RESOURCES";
-        case USBD_STATUS_SET_CONFIG_FAILED:
-                return "SET_CONFIG_FAILED";
-        case USBD_STATUS_BUFFER_TOO_SMALL:
-                return "BUFFER_TOO_SMALL";
-        case USBD_STATUS_INTERFACE_NOT_FOUND:
-                return "INTERFACE_NOT_FOUND";
-        case USBD_STATUS_INAVLID_PIPE_FLAGS:
-                return "INAVLID_PIPE_FLAGS";
-        case USBD_STATUS_TIMEOUT:
-                return "TIMEOUT";
-        case USBD_STATUS_DEVICE_GONE:
-                return "DEVICE_GONE";
-        case USBD_STATUS_STATUS_NOT_MAPPED:
-                return "STATUS_NOT_MAPPED";
-        case USBD_STATUS_HUB_INTERNAL_ERROR:
-                return "HUB_INTERNAL_ERROR";
-        case USBD_STATUS_CANCELED:
-                return "CANCELED";
-        case USBD_STATUS_ISO_NOT_ACCESSED_BY_HW:
-                return "ISO_NOT_ACCESSED_BY_HW";
-        case USBD_STATUS_ISO_TD_ERROR:
-                return "ISO_TD_ERROR";
-        case USBD_STATUS_ISO_NA_LATE_USBPORT:
-                return "ISO_NA_LATE_USBPORT";
-        case USBD_STATUS_ISO_NOT_ACCESSED_LATE:
-                return "ISO_NOT_ACCESSED_LATE";
-        case USBD_STATUS_BAD_DESCRIPTOR:
-                return "BAD_DESCRIPTOR";
-        case USBD_STATUS_BAD_DESCRIPTOR_BLEN:
-                return "BAD_DESCRIPTOR_BLEN";
-        case USBD_STATUS_BAD_DESCRIPTOR_TYPE:
-                return "BAD_DESCRIPTOR_TYPE";
-        case USBD_STATUS_BAD_INTERFACE_DESCRIPTOR:
-                return "BAD_INTERFACE_DESCRIPTOR";
-        case USBD_STATUS_BAD_ENDPOINT_DESCRIPTOR:
-                return "BAD_ENDPOINT_DESCRIPTOR";
-        case USBD_STATUS_BAD_INTERFACE_ASSOC_DESCRIPTOR:
-                return "BAD_INTERFACE_ASSOC_DESCRIPTOR";
-        case USBD_STATUS_BAD_CONFIG_DESC_LENGTH:
-                return "BAD_CONFIG_DESC_LENGTH";
-        case USBD_STATUS_BAD_NUMBER_OF_INTERFACES:
-                return "BAD_NUMBER_OF_INTERFACES";
-        case USBD_STATUS_BAD_NUMBER_OF_ENDPOINTS:
-                return "BAD_NUMBER_OF_ENDPOINTS";
-        case USBD_STATUS_BAD_ENDPOINT_ADDRESS:
-                return "BAD_ENDPOINT_ADDRESS";
-        }
+	switch (status) {
+	case USBD_STATUS_SUCCESS: 
+		return "SUCCESS";
+	case USBD_STATUS_PORT_OPERATION_PENDING:
+		return "PORT_OPERATION_PENDING";
+	case USBD_STATUS_PENDING:
+		return "PENDING";
+	case USBD_STATUS_CRC:
+		return "CRC";
+	case USBD_STATUS_BTSTUFF:
+		return "BTSTUFF";
+	case USBD_STATUS_DATA_TOGGLE_MISMATCH:
+		return "DATA_TOGGLE_MISMATCH";
+	case USBD_STATUS_STALL_PID:
+		return "STALL_PID";
+	case USBD_STATUS_DEV_NOT_RESPONDING:
+		return "DEV_NOT_RESPONDING";
+	case USBD_STATUS_PID_CHECK_FAILURE:
+		return "PID_CHECK_FAILURE";
+	case USBD_STATUS_UNEXPECTED_PID:
+		return "UNEXPECTED_PID";
+	case USBD_STATUS_DATA_OVERRUN:
+		return "DATA_OVERRUN";
+	case USBD_STATUS_DATA_UNDERRUN:
+		return "DATA_UNDERRUN";
+	case USBD_STATUS_BUFFER_OVERRUN:
+		return "BUFFER_OVERRUN";
+	case USBD_STATUS_BUFFER_UNDERRUN:
+		return "BUFFER_UNDERRUN";
+	case USBD_STATUS_NOT_ACCESSED:
+		return "NOT_ACCESSED";
+	case USBD_STATUS_FIFO:
+		return "FIFO";
+	case USBD_STATUS_XACT_ERROR:
+		return "XACT_ERROR";
+	case USBD_STATUS_BABBLE_DETECTED:
+		return "BABBLE_DETECTED";
+	case USBD_STATUS_DATA_BUFFER_ERROR:
+		return "DATA_BUFFER_ERROR";
+	case USBD_STATUS_NO_PING_RESPONSE:
+		return "NO_PING_RESPONSE";
+	case USBD_STATUS_INVALID_STREAM_TYPE:
+		return "INVALID_STREAM_TYPE";
+	case USBD_STATUS_INVALID_STREAM_ID:
+		return "INVALID_STREAM_ID";
+	case USBD_STATUS_ENDPOINT_HALTED:
+		return "ENDPOINT_HALTED";
+	case USBD_STATUS_INVALID_URB_FUNCTION:
+		return "INVALID_URB_FUNCTION";
+	case USBD_STATUS_INVALID_PARAMETER:
+		return "INVALID_PARAMETER";
+	case USBD_STATUS_ERROR_BUSY:
+		return "ERROR_BUSY";
+	case USBD_STATUS_INVALID_PIPE_HANDLE:
+		return "INVALID_PIPE_HANDLE";
+	case USBD_STATUS_NO_BANDWIDTH:
+		return "NO_BANDWIDTH";
+	case USBD_STATUS_INTERNAL_HC_ERROR:
+		return "INTERNAL_HC_ERROR";
+	case USBD_STATUS_ERROR_SHORT_TRANSFER:
+		return "ERROR_SHORT_TRANSFER";
+	case USBD_STATUS_BAD_START_FRAME:
+		return "BAD_START_FRAME";
+	case USBD_STATUS_ISOCH_REQUEST_FAILED:
+		return "ISOCH_REQUEST_FAILED";
+	case USBD_STATUS_FRAME_CONTROL_OWNED:
+		return "FRAME_CONTROL_OWNED";
+	case USBD_STATUS_FRAME_CONTROL_NOT_OWNED:
+		return "FRAME_CONTROL_NOT_OWNED";
+	case USBD_STATUS_NOT_SUPPORTED:
+		return "NOT_SUPPORTED";
+	case USBD_STATUS_INAVLID_CONFIGURATION_DESCRIPTOR:
+		return "INAVLID_CONFIGURATION_DESCRIPTOR";
+	case USBD_STATUS_INSUFFICIENT_RESOURCES:
+		return "INSUFFICIENT_RESOURCES";
+	case USBD_STATUS_SET_CONFIG_FAILED:
+		return "SET_CONFIG_FAILED";
+	case USBD_STATUS_BUFFER_TOO_SMALL:
+		return "BUFFER_TOO_SMALL";
+	case USBD_STATUS_INTERFACE_NOT_FOUND:
+		return "INTERFACE_NOT_FOUND";
+	case USBD_STATUS_INAVLID_PIPE_FLAGS:
+		return "INAVLID_PIPE_FLAGS";
+	case USBD_STATUS_TIMEOUT:
+		return "TIMEOUT";
+	case USBD_STATUS_DEVICE_GONE:
+		return "DEVICE_GONE";
+	case USBD_STATUS_STATUS_NOT_MAPPED:
+		return "STATUS_NOT_MAPPED";
+	case USBD_STATUS_HUB_INTERNAL_ERROR:
+		return "HUB_INTERNAL_ERROR";
+	case USBD_STATUS_CANCELED:
+		return "CANCELED";
+	case USBD_STATUS_ISO_NOT_ACCESSED_BY_HW:
+		return "ISO_NOT_ACCESSED_BY_HW";
+	case USBD_STATUS_ISO_TD_ERROR:
+		return "ISO_TD_ERROR";
+	case USBD_STATUS_ISO_NA_LATE_USBPORT:
+		return "ISO_NA_LATE_USBPORT";
+	case USBD_STATUS_ISO_NOT_ACCESSED_LATE:
+		return "ISO_NOT_ACCESSED_LATE";
+	case USBD_STATUS_BAD_DESCRIPTOR:
+		return "BAD_DESCRIPTOR";
+	case USBD_STATUS_BAD_DESCRIPTOR_BLEN:
+		return "BAD_DESCRIPTOR_BLEN";
+	case USBD_STATUS_BAD_DESCRIPTOR_TYPE:
+		return "BAD_DESCRIPTOR_TYPE";
+	case USBD_STATUS_BAD_INTERFACE_DESCRIPTOR:
+		return "BAD_INTERFACE_DESCRIPTOR";
+	case USBD_STATUS_BAD_ENDPOINT_DESCRIPTOR:
+		return "BAD_ENDPOINT_DESCRIPTOR";
+	case USBD_STATUS_BAD_INTERFACE_ASSOC_DESCRIPTOR:
+		return "BAD_INTERFACE_ASSOC_DESCRIPTOR";
+	case USBD_STATUS_BAD_CONFIG_DESC_LENGTH:
+		return "BAD_CONFIG_DESC_LENGTH";
+	case USBD_STATUS_BAD_NUMBER_OF_INTERFACES:
+		return "BAD_NUMBER_OF_INTERFACES";
+	case USBD_STATUS_BAD_NUMBER_OF_ENDPOINTS:
+		return "BAD_NUMBER_OF_ENDPOINTS";
+	case USBD_STATUS_BAD_ENDPOINT_ADDRESS:
+		return "BAD_ENDPOINT_ADDRESS";
+	}
 
-        return "USBD_STATUS_?";
+	return "USBD_STATUS_?";
 }
 
 const char *dbg_ioctl_code(ULONG ioctl_code)
@@ -230,101 +254,6 @@ const char *dbg_ioctl_code(ULONG ioctl_code)
 	}
 
 	return "IOCTL_?";
-}
-
-static void print_cmd_submit(char *buf, size_t len, const usbip_header_cmd_submit *cmd)
-{
-	auto st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
-			"cmd_submit: flags %#x, length %d, start_frame %d, isoc[%d], interval %d, ",
-			cmd->transfer_flags, 
-			cmd->transfer_buffer_length, 
-			cmd->start_frame, 
-			cmd->number_of_packets, 
-			cmd->interval);
-
-	if (!st) {
-		usb_setup_pkt_str(buf, len, cmd->setup);
-	}
-}
-
-static void print_ret_submit(char *buf, size_t len, const usbip_header_ret_submit *cmd)
-{
-	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, start_frame %d, isoc[%d], error_count %d", 
-					cmd->status,
-					cmd->actual_length,
-					cmd->start_frame,
-					cmd->number_of_packets,
-					cmd->error_count);
-}
-
-const char *dbg_usbip_hdr(char *buf, size_t len, const usbip_header *hdr)
-{
-	if (!hdr) {
-		return "usbip_header{null}";
-	}
-
-	auto result = buf;
-	auto base = &hdr->base;
-
-	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
-					base->seqnum, 
-					base->devid,			
-					base->direction == USBIP_DIR_OUT ? "out" : "in",
-					base->ep);
-
-	if (st != STATUS_SUCCESS) {
-		return "dbg_usbip_hdr error";
-	}
-
-	switch (base->command) {
-	case USBIP_CMD_SUBMIT:
-		print_cmd_submit(buf, len, &hdr->u.cmd_submit);
-		break;
-	case USBIP_RET_SUBMIT:
-		print_ret_submit(buf, len, &hdr->u.ret_submit);
-		break;
-	case USBIP_CMD_UNLINK:
-		RtlStringCbPrintfA(buf, len, "cmd_unlink: seqnum %u", hdr->u.cmd_unlink.seqnum);
-		break;
-	case USBIP_RET_UNLINK:
-		RtlStringCbPrintfA(buf, len, "ret_unlink: status %d", hdr->u.ret_unlink.status);
-		break;
-	default:
-		RtlStringCbPrintfA(buf, len, "command %u", base->command);
-	}
-
-	return result;
-}
-
-const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
-{
-	auto r  = static_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(packet);
-
-	NTSTATUS st = RtlStringCbPrintfA(buf, len, 
-			"{%s|%s|%s, %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
-			bmrequest_dir_str(r->bmRequestType),
-			bmrequest_type_str(r->bmRequestType),
-			bmrequest_recipient_str(r->bmRequestType),
-			brequest_str(r->bRequest),
-			r->bRequest,
-			r->wValue,
-			r->wIndex, 
-			r->wLength,
-			r->wLength);
-
-	return st != STATUS_INVALID_PARAMETER ? buf : "usb_setup_pkt_str invalid parameter";
-}
-
-const char* usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
-{
-	auto dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
-
-	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
-					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
-					TransferFlags & USBD_START_ISO_TRANSFER_ASAP ? "|ISO_ASAP" : "",
-					TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");
-
-	return st != STATUS_INVALID_PARAMETER ? buf : "usbd_transfer_flags invalid parameter";
 }
 
 const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
@@ -432,3 +361,74 @@ const char *urb_function_str(int function)
 
 	return function >= 0 && function < ARRAYSIZE(v) ? v[function] : "URB_FUNCTION_?";
 }
+
+const char *dbg_usbip_hdr(char *buf, size_t len, const usbip_header *hdr, bool setup_packet)
+{
+	if (!hdr) {
+		return "usbip_header{null}";
+	}
+
+	auto result = buf;
+	auto base = &hdr->base;
+
+	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
+					base->seqnum, 
+					base->devid,			
+					base->direction == USBIP_DIR_OUT ? "out" : "in",
+					base->ep);
+
+	if (st != STATUS_SUCCESS) {
+		return "dbg_usbip_hdr error";
+	}
+
+	switch (base->command) {
+	case USBIP_CMD_SUBMIT:
+		print_cmd_submit(buf, len, &hdr->u.cmd_submit, setup_packet);
+		break;
+	case USBIP_RET_SUBMIT:
+		print_ret_submit(buf, len, &hdr->u.ret_submit);
+		break;
+	case USBIP_CMD_UNLINK:
+		RtlStringCbPrintfA(buf, len, "cmd_unlink: seqnum %u", hdr->u.cmd_unlink.seqnum);
+		break;
+	case USBIP_RET_UNLINK:
+		RtlStringCbPrintfA(buf, len, "ret_unlink: status %d", hdr->u.ret_unlink.status);
+		break;
+	default:
+		RtlStringCbPrintfA(buf, len, "command %u", base->command);
+	}
+
+	return result;
+}
+
+const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
+{
+	auto r  = static_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(packet);
+
+	auto st = RtlStringCbPrintfA(buf, len, 
+					"{%s|%s|%s, %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
+					bmrequest_dir_str(r->bmRequestType),
+					bmrequest_type_str(r->bmRequestType),
+					bmrequest_recipient_str(r->bmRequestType),
+					brequest_str(r->bRequest),
+					r->bRequest,
+					r->wValue,
+					r->wIndex, 
+					r->wLength,
+					r->wLength);
+
+	return st != STATUS_INVALID_PARAMETER ? buf : "usb_setup_pkt_str invalid parameter";
+}
+
+const char* usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
+{
+	auto dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
+
+	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
+					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
+					TransferFlags & USBD_START_ISO_TRANSFER_ASAP ? "|ISO_ASAP" : "",
+					TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");
+
+	return st != STATUS_INVALID_PARAMETER ? buf : "usbd_transfer_flags invalid parameter";
+}
+

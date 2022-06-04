@@ -142,7 +142,7 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_op
 
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr));
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr, true));
         }
 
         byteswap_header(hdr, swap_dir::host2net);

@@ -111,7 +111,7 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                            ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr));
+                            ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, false));
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
