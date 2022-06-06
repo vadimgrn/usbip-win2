@@ -212,9 +212,11 @@ NTSTATUS setup_inst_id_or_serial(PWCHAR &result, bool&, vdev_t *vdev, IRP*, bool
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
+	auto SerialNumber = get_serial_number(*vpdo);
+
 	auto serial = vpdo->serial.Length ? vpdo->serial.Buffer :
-                        vpdo->SerialNumber ? vpdo->SerialNumber :
-                        L"";
+                      SerialNumber ? SerialNumber :
+                      L"";
 
 	auto status = *serial || want_serial ?
                         RtlStringCchCopyW(str, cch, serial) :

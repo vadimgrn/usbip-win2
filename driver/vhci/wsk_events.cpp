@@ -167,18 +167,9 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		return err;
 	}
 
-	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, %!BIN!", urb_function_str(r.Hdr.Function), dsc->bLength, 
-		  dsc->bDescriptorType, WppBinary(dsc, (USHORT)r.TransferBufferLength));
-
-	USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
-		         ((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
-
-	if (dsc_len > sizeof(*dsc) && dsc_len == r.TransferBufferLength) { // full descriptor
-		cache_descriptor(&vpdo, r, dsc);
-	} else {
-		TraceUrb("%s: skip caching of descriptor: TransferBufferLength(%lu), dsc_len(%d)", 
-			urb_function_str(r.Hdr.Function), r.TransferBufferLength, dsc_len);
-	}
+	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, Index %d, LangId %#x %!BIN!", 
+		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId, 
+		  WppBinary(dsc, (USHORT)r.TransferBufferLength));
 
 	return STATUS_SUCCESS;
 }

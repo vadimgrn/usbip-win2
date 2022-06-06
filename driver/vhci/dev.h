@@ -110,10 +110,7 @@ struct vpdo_dev_t : vdev_t
 	UCHAR bDeviceSubClass;
 	UCHAR bDeviceProtocol;
 
-	PWSTR Manufacturer; // for descriptor.iManufacturer
-	PWSTR Product; // for descriptor.iProduct
-	PWSTR SerialNumber; // for descriptor.iSerialNumber
-
+	USB_STRING_DESCRIPTOR *strings[24];
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 
 	UCHAR current_intf_num;
@@ -201,4 +198,21 @@ inline auto ph4log(USBD_PIPE_HANDLE handle)
 constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
         return (busnum << 16) | devnum;
+}
+
+PCWSTR get_string_descr(const vpdo_dev_t &vpdo, UCHAR index);
+
+inline auto get_manufacturer(const vpdo_dev_t &vpdo)
+{
+	return get_string_descr(vpdo, vpdo.descriptor.iManufacturer);
+}
+
+inline auto get_product(const vpdo_dev_t &vpdo)
+{
+	return get_string_descr(vpdo, vpdo.descriptor.iProduct);
+}
+
+inline auto get_serial_number(const vpdo_dev_t &vpdo)
+{
+	return get_string_descr(vpdo, vpdo.descriptor.iSerialNumber);
 }

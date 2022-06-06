@@ -210,6 +210,7 @@ PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 
 PAGEABLE void copy_str(LPCWSTR s, IO_STATUS_BLOCK &blk)
 {
+	PAGED_CODE();
 	if (auto str = libdrv_strdup(POOL_FLAG_PAGED, s)) {
 		blk.Information = reinterpret_cast<ULONG_PTR>(str);
 		blk.Status = STATUS_SUCCESS;
@@ -259,8 +260,8 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 		Status = STATUS_SUCCESS;
 	} else if (vdev->type == VDEV_VPDO && prop == DevicePropertyDeviceDescription) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
-		if (vpdo->Product) {
-			copy_str(vpdo->Product, irp->IoStatus);
+		if (auto prod = get_product(*vpdo)) {
+			copy_str(prod, irp->IoStatus);
 		}
 	}
 

@@ -9,57 +9,8 @@
 #include "usbdsc.h"
 #include "internal_ioctl.h"
 
-#include <ntstrsafe.h>
-
 namespace
 {
-
-/*
- * Calls from DISPATCH_LEVEL.
- */
-auto copy_wstring(const USB_STRING_DESCRIPTOR *sd, const char *what)
-{
-	UCHAR cch = (sd->bLength - sizeof(USB_COMMON_DESCRIPTOR))/sizeof(*sd->bString) + 1;
-	PWSTR str = (PWSTR)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cch*sizeof(*str), USBIP_VHCI_POOL_TAG);
-
-	if (str) {
-		[[maybe_unused]] auto err = RtlStringCchCopyNW(str, cch, sd->bString, cch - 1);
-		NT_ASSERT(!err);
-		Trace(TRACE_LEVEL_INFORMATION, "%s '%S'", what, str);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate memory");
-	}
-
-	return str;
-}
-
-/*
- * Calls from DISPATCH_LEVEL.
- */
-void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_STRING_DESCRIPTOR &sd, UCHAR Index)
-{
-	NT_ASSERT(Index);
-	NT_ASSERT(is_valid_dsc(&dd));
-
-	struct {
-		UCHAR idx;
-		PWSTR &str;
-		const char *name;
-	} v[] = {
-		{ dd.iManufacturer, vpdo->Manufacturer, "Manufacturer" },
-		{ dd.iProduct, vpdo->Product, "Product" },
-		{ dd.iSerialNumber, vpdo->SerialNumber, "SerialNumber" },
-	};
-
-	for (auto& [idx, str, name] : v) {
-		if (idx == Index) {
-			if (!str) {
-				str = copy_wstring(&sd, name);
-			}
-			break;
-		}
-	}
-} 
 
 PAGEABLE USB_COMMON_DESCRIPTOR *find_descriptor(USB_CONFIGURATION_DESCRIPTOR *cd, UCHAR type, UCHAR index)
 {
@@ -85,7 +36,7 @@ PAGEABLE USB_COMMON_DESCRIPTOR *find_descriptor(USB_CONFIGURATION_DESCRIPTOR *cd
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
+PAGEABLE NTSTATUS get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -93,31 +44,38 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 	static_assert(sizeof(*setup) == sizeof(r.SetupPacket));
 
 	auto cfg = vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
-	auto idx = setup->wValue.LowByte;
+	auto index = setup->wValue.LowByte;
+//	auto lang_id = setup->wIndex.W;
 
 	void *dsc_data{};
 	USHORT dsc_len = 0;
 
 	switch (auto type = setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
-		if (is_valid_dsc(&vpdo->descriptor)) {
-			dsc_data = &vpdo->descriptor;
-			dsc_len = vpdo->descriptor.bLength;
-		}
+		dsc_data = &vpdo->descriptor;
+		dsc_len = vpdo->descriptor.bLength;
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-		if (cfg > 0 && cfg - 1 == idx) { // FIXME: can be wrong assumption
+		if (cfg > 0 && cfg - 1 == index) { // FIXME: can be wrong assumption
 			dsc_data = vpdo->actconfig;
 			dsc_len = vpdo->actconfig->wTotalLength;
 		} else {
-			TraceDbg("bConfigurationValue(%d) - 1 != setup->wValue.LowByte(%d)", cfg, idx);
+			TraceDbg("bConfigurationValue(%d) - 1 != Index(%d)", cfg, index);
 		}
 		break;
-	case USB_STRING_DESCRIPTOR_TYPE:
+	case USB_STRING_DESCRIPTOR_TYPE: // lang_id is ignored
+		if (index < ARRAYSIZE(vpdo->strings)) {
+			if (auto d = vpdo->strings[index]) {
+				dsc_len = d->bLength;
+				dsc_data = d;
+				break;
+			}
+		}
+		[[fallthrough]];
 	case USB_INTERFACE_DESCRIPTOR_TYPE:
 	case USB_ENDPOINT_DESCRIPTOR_TYPE:
 		if (auto cd = vpdo->actconfig) {
-			if (auto d = find_descriptor(cd, type, setup->wValue.LowByte)) {
+			if (auto d = find_descriptor(cd, type, index)) {
 				dsc_len = d->bLength;
 				dsc_data = d;
 			}
@@ -138,28 +96,4 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 
 	TraceDbg("%lu bytes%!BIN!", cnt, WppBinary(dsc_data, (USHORT)cnt));
 	return STATUS_SUCCESS;
-}
-
-/*
- * Configuration descriptor will be saved on usb request select configuration.
- * Calls from DISPATCH_LEVEL.
- */
-void cache_descriptor(vpdo_dev_t *vpdo, const _URB_CONTROL_DESCRIPTOR_REQUEST &r, const USB_COMMON_DESCRIPTOR *dsc)
-{
-	NT_ASSERT(dsc->bLength > sizeof(*dsc));
-
-	if (dsc->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE) {
-		auto sd = reinterpret_cast<const USB_STRING_DESCRIPTOR*>(dsc);
-		if (r.Index && sd->bLength >= sizeof(*sd)) {
-			save_string(vpdo, vpdo->descriptor, *sd, r.Index);
-		}
-	} else if (dsc->bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE) {
-		auto dd = reinterpret_cast<const USB_DEVICE_DESCRIPTOR*>(dsc);
-		if (!is_valid_dsc(dd)) {
-			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized");
-		} else if (!RtlEqualMemory(&vpdo->descriptor, dd, sizeof(*dd))) {
-			Trace(TRACE_LEVEL_WARNING, "Device descriptor is not the same");
-			RtlCopyMemory(&vpdo->descriptor, dd, sizeof(*dd));
-		}
-	}
 }

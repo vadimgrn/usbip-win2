@@ -6,7 +6,8 @@
 #include <stdbool.h>
 
 bool is_valid_dsc(const USB_DEVICE_DESCRIPTOR *d);
-bool is_valid_cfg_dsc(const USB_CONFIGURATION_DESCRIPTOR *d);
+bool is_valid_dsc(const USB_CONFIGURATION_DESCRIPTOR *d);
+bool is_valid_dsc(const USB_STRING_DESCRIPTOR *d);
 
 inline auto dsc_next(USB_COMMON_DESCRIPTOR *d)
 {

@@ -13,7 +13,6 @@
 DEFINE_GUID(GUID_SD_USBIP_VHCI,
 	0x9d3039dd, 0xcca5, 0x4b4d, 0xb3, 0x3d, 0xe2, 0xdd, 0xc8, 0xa8, 0xc5, 0x2f);
 
-
 void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
 	ResultLength = 256;
@@ -148,3 +147,21 @@ seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in)
 		}
 	}
 }
+
+/*
+ * Zero string index means absense of a descriptor.
+ */
+PCWSTR get_string_descr(const vpdo_dev_t &vpdo, UCHAR index)
+{
+	PCWSTR str{};
+
+	if (index && index < ARRAYSIZE(vpdo.strings)) {
+		if (auto d = vpdo.strings[index]) {
+			str = d->bString;
+		}
+	}
+
+	return str;
+}
+
+

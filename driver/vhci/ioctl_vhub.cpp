@@ -89,22 +89,26 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_descriptor_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	UCHAR type = r.SetupPacket.wValue >> 8;
-	UCHAR idx  = r.SetupPacket.wValue & 0xFF;
+	auto &pkt = r.SetupPacket;
 
-	TraceDbg("ConnectionIndex %lu, %!usb_descriptor_type!, index %d; inlen %lu, outlen %lu", 
-		  r.ConnectionIndex, type, idx, inlen, outlen);
+	UCHAR type = pkt.wValue >> 8;
+	UCHAR idx  = pkt.wValue & 0xFF;
+
+	USHORT lang_id = pkt.wIndex;
+
+	TraceDbg("ConnectionIndex %lu, %!usb_descriptor_type!, index %d, lang_id %#x; inlen %lu, outlen %lu", 
+		  r.ConnectionIndex, type, idx, lang_id, inlen, outlen);
 
 	if (!(inlen >= sizeof(r) && outlen > sizeof(r))) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
 	if (auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex)) {
-		return vpdo_get_dsc_from_nodeconn(vpdo, r, outlen);
+		return get_descr_from_nodeconn(vpdo, r, outlen);
 	}
 
 	return STATUS_NO_SUCH_DEVICE;
@@ -262,7 +266,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buff
 		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descriptor_from_nodeconn(vhub, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
+		status = get_descr_from_nodeconn(vhub, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_HUB_INFORMATION_EX:
 		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), outlen);

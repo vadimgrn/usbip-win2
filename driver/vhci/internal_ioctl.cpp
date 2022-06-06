@@ -990,40 +990,6 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         }
 }
 
-/*
- * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> me
- * It's not used because of BSOD in wsk_events.cpp, didn't find the reason. 
- * May be IoCompleteRequest should be called on the same IRQL as vhci_ioctl, 
- * but actually is IRQL is DPL. The backtrace stack does not contain calls of this driver.
- */
-inline PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r)
-{
-        PAGED_CODE();
-
-        auto irpstack = IoGetCurrentIrpStackLocation(irp);
-        auto outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
-
-        NT_ASSERT(outlen > sizeof(r));
-        auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
-
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
-
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, data_sz)) {
-                return err;
-        }
-
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
-        pkt->wValue.W = r.SetupPacket.wValue;
-        pkt->wIndex.W = r.SetupPacket.wIndex;
-        pkt->wLength = r.SetupPacket.wLength;
-        NT_ASSERT(data_sz >= pkt->wLength);
-
-        return send(vpdo, irp, hdr);
-}
-
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
         NT_ASSERT(!irp->IoStatus.Information);

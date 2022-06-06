@@ -69,14 +69,12 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 {
 	PAGED_CODE();
 
-        PWSTR *v[] { &d.Manufacturer, &d.Product, &d.SerialNumber };
-
-        for (auto i: v) {
-                if (auto &ptr = *i) {
-                        ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
-                        ptr = nullptr;
-                }
-        }
+	for (auto &str: d.strings) {
+		if (str) {
+			ExFreePoolWithTag(str, USBIP_VHCI_POOL_TAG);
+			str = nullptr;
+		}
+	}
 
         libdrv_free(d.busid);
         d.busid = nullptr;
