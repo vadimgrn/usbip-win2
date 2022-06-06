@@ -992,8 +992,11 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 
 /*
  * vhci_ioctl -> vhci_ioctl_vhub -> get_descriptor_from_nodeconn -> vpdo_get_dsc_from_nodeconn -> me
+ * It's not used because of BSOD in wsk_events.cpp, didn't find the reason. 
+ * May be IoCompleteRequest should be called on the same IRQL as vhci_ioctl, 
+ * but actually is IRQL is DPL. The backtrace stack does not contain calls of this driver.
  */
-PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r)
+inline PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r)
 {
         PAGED_CODE();
 

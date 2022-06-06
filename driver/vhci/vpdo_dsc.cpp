@@ -61,10 +61,31 @@ void save_string(vpdo_dev_t *vpdo, const USB_DEVICE_DESCRIPTOR &dd, const USB_ST
 	}
 } 
 
+PAGEABLE USB_COMMON_DESCRIPTOR *find_descriptor(USB_CONFIGURATION_DESCRIPTOR *cd, UCHAR type, UCHAR index)
+{
+	PAGED_CODE();
+
+	USB_COMMON_DESCRIPTOR *from{};
+	auto end = reinterpret_cast<char*>(cd + cd->wTotalLength);
+
+	for (int i = 0; (char*)from < end; ++i) {
+		from = dsc_find_next(cd, from, type);
+		if (!from) {
+			break;
+		}
+		if (i == index) {
+			NT_ASSERT(from->bDescriptorType == type);
+			return from;
+		}
+	}
+
+	return nullptr;
+}
+
 } // namespace
 
 
-PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
+PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -77,7 +98,7 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 	void *dsc_data{};
 	USHORT dsc_len = 0;
 
-	switch (setup->wValue.HiByte) {
+	switch (auto type = setup->wValue.HiByte) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (is_valid_dsc(&vpdo->descriptor)) {
 			dsc_data = &vpdo->descriptor;
@@ -92,20 +113,30 @@ PAGEABLE NTSTATUS vpdo_get_dsc_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 			TraceDbg("bConfigurationValue(%d) - 1 != setup->wValue.LowByte(%d)", cfg, idx);
 		}
 		break;
+	case USB_STRING_DESCRIPTOR_TYPE:
+	case USB_INTERFACE_DESCRIPTOR_TYPE:
+	case USB_ENDPOINT_DESCRIPTOR_TYPE:
+		if (auto cd = vpdo->actconfig) {
+			if (auto d = find_descriptor(cd, type, setup->wValue.LowByte)) {
+				dsc_len = d->bLength;
+				dsc_data = d;
+			}
+		}
+		break;
 	}
 
 	if (!dsc_data) {
-		return get_descriptor_from_node_connection(*vpdo, irp, r);
+		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
 	NT_ASSERT(outlen > sizeof(r));
 	auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
 
-	auto n = min(data_sz, dsc_len);
-	RtlCopyMemory(r.Data, dsc_data, n);
-	outlen = sizeof(r) + n;
+	auto cnt = min(data_sz, dsc_len);
+	RtlCopyMemory(r.Data, dsc_data, cnt);
+	outlen = sizeof(r) + cnt;
 
-	TraceDbg("%lu bytes copied", n);
+	TraceDbg("%lu bytes%!BIN!", cnt, WppBinary(dsc_data, (USHORT)cnt));
 	return STATUS_SUCCESS;
 }
 

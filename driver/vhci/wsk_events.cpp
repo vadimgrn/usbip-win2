@@ -167,14 +167,11 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		return err;
 	}
 
-	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, %!BIN!", 
-		urb_function_str(r.Hdr.Function), 
-		dsc->bLength,
-		dsc->bDescriptorType,
-		WppBinary(dsc, (USHORT)r.TransferBufferLength));
+	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, %!BIN!", urb_function_str(r.Hdr.Function), dsc->bLength, 
+		  dsc->bDescriptorType, WppBinary(dsc, (USHORT)r.TransferBufferLength));
 
 	USHORT dsc_len = dsc->bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE ? 
-		((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
+		         ((USB_CONFIGURATION_DESCRIPTOR*)dsc)->wTotalLength : dsc->bLength;
 
 	if (dsc_len > sizeof(*dsc) && dsc_len == r.TransferBufferLength) { // full descriptor
 		cache_descriptor(&vpdo, r, dsc);
@@ -456,35 +453,6 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
         return err;
 }
 
-NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, USB_DESCRIPTOR_REQUEST &r)
-{
-        auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	auto outlen = irpstack->Parameters.DeviceIoControl.OutputBufferLength;
-
-	NT_ASSERT(outlen > sizeof(r));
-	auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
-
-        auto actual_length = hdr.u.ret_submit.actual_length;
-	data_sz = actual_length > 0 ? min(ULONG(actual_length), data_sz) : 0;
-
-	if (auto err = wsk_data_copy(vpdo, r.Data, 0, data_sz)) {
-		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy %!STATUS!", err);
-		return err;
-	}
-
-	TraceUrb("irp %04x <- ConnectionIndex %lu, size %lu, %!BIN!", 
-		  ptr4log(irp), r.ConnectionIndex, data_sz, WppBinary(r.Data, USHORT(data_sz)));
-
-	irp->IoStatus.Information = sizeof(r) + data_sz;
-
-	if (data_sz < ULONG(actual_length)) {
-		return STATUS_BUFFER_TOO_SMALL;
-	}
-
-	auto err = to_windows_status(hdr.u.ret_submit.status);
-        return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
-}
-
 NTSTATUS usb_reset_port(const usbip_header &hdr)
 {
         auto err = hdr.u.ret_submit.status;
@@ -532,10 +500,6 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
         case IOCTL_INTERNAL_USB_RESET_PORT:
                 st = usb_reset_port(hdr);
                 break;
-        case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-                st = get_descriptor_from_node_connection(vpdo, irp, hdr, 
-			*static_cast<USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer));
-		break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
         }
