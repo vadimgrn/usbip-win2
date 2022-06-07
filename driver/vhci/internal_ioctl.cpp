@@ -85,16 +85,15 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
 auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
 {
-        if (is_transfer_direction_out(&ctx->hdr)) { // TransferFlags can have wrong direction
-                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
-                        Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
-                        free(ctx);
-                        return err;
-                }
-                ctx->mdl_hdr.next(ctx->mdl_buf);
-        } else {
+        if (is_transfer_direction_in(&ctx->hdr)) { // TransferFlags can have wrong direction
                 NT_ASSERT(!ctx->mdl_buf);
+        } else if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
+                Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                free(ctx);
+                return err;
         }
+
+        ctx->mdl_hdr.next(ctx->mdl_buf);
 
         if (ctx->is_isoc) {
                 NT_ASSERT(ctx->mdl_isoc);
