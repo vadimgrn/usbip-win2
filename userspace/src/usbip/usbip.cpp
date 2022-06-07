@@ -57,7 +57,7 @@ const command cmds[] =
 	{ "version", usbip_version},
 	{ "attach", usbip_attach, "Attach a remote USB device",	usbip_attach_usage },
 	{ "detach", usbip_detach, "Detach a remote USB device", usbip_detach_usage },
-	{ "list", usbip_list, "List local USB devices", usbip_list_usage },
+	{ "list", usbip_list, "List remote USB devices", usbip_list_usage },
 	{ "port", usbip_port_show, "Show imported USB devices", usbip_port_usage },
         {}
 };
