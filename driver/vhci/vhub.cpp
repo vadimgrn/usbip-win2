@@ -246,9 +246,7 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
                 dev->status = SDEV_ST_USED;
 
                 auto& d = vpdo->descriptor;
-                NT_ASSERT(is_valid_dsc(&d));
-
-                dev->vendor = d.idVendor;
+		dev->vendor = d.idVendor;
 		dev->product = d.idProduct;
 		
                 dev->speed = vpdo->speed;

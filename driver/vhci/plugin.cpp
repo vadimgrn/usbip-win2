@@ -381,13 +381,13 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                         return err;
                 }
 
-                if (!is_valid_dsc(sd)) {
+                if (is_valid_dsc(sd)) {
+                        *reinterpret_cast<wchar_t*>((char*)sd + hdr.bLength) = L'\0';
+                        vpdo.strings[idx] = sd;
+                } else {
                         ExFreePoolWithTag(sd, USBIP_VHCI_POOL_TAG);
                         return ERR_GENERAL;
                 }
-
-                *reinterpret_cast<wchar_t*>((char*)sd + hdr.bLength) = L'\0';
-                vpdo.strings[idx] = sd;
 
                 if (idx) {
                         TraceDbg("Index %d, LangId %#x, '%!WSTR!'", idx, lang_id, sd->bString);

@@ -186,11 +186,8 @@ VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID BusContext, IN OUT PUSBD_VERSION_INFOR
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
-	auto &d = vpdo->descriptor;
-	NT_ASSERT(is_valid_dsc(&d));
-
 	inf->USBDI_Version = USBDI_VERSION;
-	inf->Supported_USB_Version = d.bcdUSB;
+	inf->Supported_USB_Version = vpdo->descriptor.bcdUSB;
 
 	*HcdCapabilities = 0; // see USB_HCD_CAPS_SUPPORTS_RT_THREADS
 
@@ -225,9 +222,7 @@ NTSTATUS QueryControllerType(
 	_Out_opt_ PUCHAR PciProgIf)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
-
 	auto &d = vpdo->descriptor;
-	NT_ASSERT(is_valid_dsc(&d));
 
 	if (HcdiOptionFlags) {
 		*HcdiOptionFlags = 0;

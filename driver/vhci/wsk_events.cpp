@@ -171,6 +171,16 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId, 
 		  WppBinary(dsc, (USHORT)r.TransferBufferLength));
 
+	if (r.DescriptorType == USB_DEVICE_DESCRIPTOR_TYPE) {
+		auto ok = r.TransferBufferLength == sizeof(vpdo.descriptor) && 
+			  RtlEqualMemory(dsc, &vpdo.descriptor, sizeof(vpdo.descriptor));
+
+		if (!ok) {
+			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not the same");
+//			vhub_unplug_vpdo(&vpdo);
+		}
+	}
+
 	return STATUS_SUCCESS;
 }
 

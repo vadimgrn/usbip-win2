@@ -69,10 +69,10 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 {
 	PAGED_CODE();
 
-	for (auto &str: d.strings) {
-		if (str) {
-			ExFreePoolWithTag(str, USBIP_VHCI_POOL_TAG);
-			str = nullptr;
+	for (auto &sd: d.strings) {
+		if (sd) {
+			ExFreePoolWithTag(sd, USBIP_VHCI_POOL_TAG);
+			sd = nullptr;
 		}
 	}
 

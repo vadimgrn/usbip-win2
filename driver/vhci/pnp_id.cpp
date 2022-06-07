@@ -88,9 +88,7 @@ auto is_composite(const vpdo_dev_t &vpdo)
 		 vpdo.bDeviceSubClass == 0x02 &&
 		 vpdo.bDeviceProtocol == 0x01); // IAD composite device
 
-	NT_ASSERT(is_valid_dsc(&vpdo.descriptor));
 	NT_ASSERT(vpdo.actconfig);
-
 	return ok && vpdo.descriptor.bNumConfigurations == 1 && vpdo.actconfig->bNumInterfaces > 1;
 }
 
@@ -116,10 +114,7 @@ NTSTATUS setup_device_id(PWCHAR &result, bool&, vdev_t *vdev, IRP*)
 
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
-
 		auto &d = vpdo->descriptor;
-		NT_ASSERT(is_valid_dsc(&d));
-
 		status = RtlStringCbPrintfW(id_dev, str_sz, str, d.idVendor, d.idProduct);
 	} else {
 		RtlCopyMemory(id_dev, str, str_sz);
@@ -153,10 +148,7 @@ NTSTATUS setup_hw_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 
 	if (subst_result) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
-		
 		auto &d = vpdo->descriptor;
-		NT_ASSERT(is_valid_dsc(&d));
-
 		status = RtlStringCbPrintfW(ids_hw, str_sz, str,
 						d.idVendor, d.idProduct, d.bcdDevice,
 						d.idVendor, d.idProduct);

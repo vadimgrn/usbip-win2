@@ -83,7 +83,7 @@ NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION *r)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	NTSTATUS status = setup_config(r, vpdo->speed);
+	auto status = setup_config(r, vpdo->speed);
 
 	if (NT_SUCCESS(status)) {
 		r->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)(0x100 | cd->bConfigurationValue);
@@ -140,11 +140,8 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 	if (!vpdo) {
 		outlen = sizeof(ci);
 		return STATUS_SUCCESS;
-	} else if (is_valid_dsc(&vpdo->descriptor)) {
-		RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Device descriptor is not initialized, ConnectionIndex %lu", ci.ConnectionIndex);
-		return STATUS_INVALID_PARAMETER;
+		RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
 	}
 
 	auto iface = vpdo->actconfig ? dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt) : nullptr;
