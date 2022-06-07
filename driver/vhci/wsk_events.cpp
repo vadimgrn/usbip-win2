@@ -12,7 +12,6 @@
 #include "dbgcommon.h"
 #include "urbtransfer.h"
 #include "vpdo.h"
-#include "vpdo_dsc.h"
 #include "wsk_data.h"
 #include "csq.h"
 #include "usbip_network.h"

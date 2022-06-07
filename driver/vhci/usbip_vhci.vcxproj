@@ -35,7 +35,6 @@
     <ClCompile Include="pnp_start.cpp" />
     <ClCompile Include="vhub.cpp" />
     <ClCompile Include="vpdo.cpp" />
-    <ClCompile Include="vpdo_dsc.cpp" />
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="power.cpp" />
@@ -75,7 +74,6 @@
     <ClInclude Include="proto.h" />
     <ClInclude Include="vhub.h" />
     <ClInclude Include="vpdo.h" />
-    <ClInclude Include="vpdo_dsc.h" />
     <ClInclude Include="wmi.h" />
     <ClInclude Include="wsk_data.h" />
     <ClInclude Include="wsk_events.h" />
