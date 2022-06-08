@@ -114,7 +114,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
 		st = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
-						outlen/sizeof(ioctl_usbip_vhci_imported_dev));
+			                    outlen/sizeof(ioctl_usbip_vhci_imported_dev));
 		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:
 		st = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), outlen);

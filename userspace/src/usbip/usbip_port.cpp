@@ -23,20 +23,26 @@
 namespace
 {
 
-int usbip_vhci_imported_device_dump(ioctl_usbip_vhci_imported_dev* idev)
+int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
 {
-        if (idev->status == VDEV_ST_NULL || idev->status == VDEV_ST_NOTASSIGNED) {
+        if (d.status == VDEV_ST_NULL || d.status == VDEV_ST_NOTASSIGNED) {
                 return 0;
         }
 
-        printf("Port %02d: <%s> at %s\n", idev->port, usbip_status_string(idev->status), usbip_speed_string(idev->speed));
+        printf("Port %02d: <%s> at %s\n", d.port, usbip_status_string(d.status), usbip_speed_string(d.speed));
 
-        auto product_name = usbip_names_get_product(get_ids(), idev->vendor, idev->product);
-
+        auto product_name = usbip_names_get_product(get_ids(), d.vendor, d.product);
         printf("       %s\n", product_name.c_str());
 
-        printf("       ?-? -> unknown host, remote port and remote busid\n");
-        printf("           -> remote bus/dev ???/???\n");
+        printf("%10s -> usbip://%s:%s/%s\n", " ", d.host, d.service, d.busid);
+        
+        USHORT bus = d.devid >> 16;
+        USHORT dev = d.devid & 0xFFFF;
+        printf("%10s -> remote bus/dev %03d/%03d\n", " ", bus, dev);
+
+        if (*d.serial) {
+                printf("%10s -> serial '%s'\n", " ", d.serial);
+        }
 
         return 0;
 }
@@ -70,7 +76,7 @@ int list_imported_devices(int port)
                         }
                         found = true;
                 }
-                usbip_vhci_imported_device_dump(&d);
+                usbip_vhci_imported_device_dump(d);
         }
 
         if (port > 0 && !found) {
@@ -104,9 +110,9 @@ int usbip_port_show(int argc, char *argv[])
 
 	while (true) {
 		auto opt = getopt_long(argc, argv, "p:", opts, nullptr);
-
-		if (opt == -1)
+		if (opt == -1) {
 			break;
+                }
 
 		switch (opt) {
 		case 'p':

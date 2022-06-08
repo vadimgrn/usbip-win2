@@ -8,6 +8,29 @@
 #include "ch11.h"
 
 #include <intrin.h>
+#include <ws2def.h>
+#include <ntstrsafe.h>
+
+namespace
+{
+
+static_assert(int(VHCI_PORTS_MAX) >= int(vhub_dev_t::NUM_PORTS));
+static_assert(sizeof(ioctl_usbip_vhci_plugin::service) == NI_MAXSERV);
+static_assert(sizeof(ioctl_usbip_vhci_plugin::host) == NI_MAXHOST);
+
+void to_ansi_str(char *dest, USHORT len, const UNICODE_STRING &src)
+{
+	ANSI_STRING s{ 0, USHORT(len - 1), dest };
+
+	if (auto err = RtlUnicodeStringToAnsiString(&s, &src, false)) {
+		Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringToAnsiString('%!USTR!') %!STATUS!", &src, err);
+	}
+
+	RtlZeroMemory(s.Buffer + s.Length, len - s.Length);
+}
+
+} // namespace
+
 
 PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 {
@@ -225,7 +248,6 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 	PAGED_CODE();
 
 	TraceMsg("cnt %Iu", cnt);
-
 	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -243,13 +265,22 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 		}
 
 		dev->port = vpdo->port;
+		RtlStringCbCopyA(dev->busid, sizeof(dev->busid), vpdo->busid);
+
+		to_ansi_str(dev->service, sizeof(dev->service), vpdo->service_name);
+		to_ansi_str(dev->host, sizeof(dev->host), vpdo->node_name);
+		to_ansi_str(dev->serial, sizeof(dev->serial), vpdo->serial);
+
                 dev->status = SDEV_ST_USED;
 
-                auto& d = vpdo->descriptor;
-		dev->vendor = d.idVendor;
-		dev->product = d.idProduct;
+                if (auto d = &vpdo->descriptor) {
+			dev->vendor = d->idVendor;
+			dev->product = d->idProduct;
+		}
 		
-                dev->speed = vpdo->speed;
+		dev->devid = vpdo->devid;
+		dev->speed = vpdo->speed;
+		
 		++dev;
 	}
 

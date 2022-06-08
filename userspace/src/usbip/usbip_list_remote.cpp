@@ -24,18 +24,19 @@
 #include "usbip.h"
 #include "dbgcode.h"
 
-static int get_exported_devices(const char *host, SOCKET sockfd)
+namespace
 {
-	uint16_t code = OP_REP_DEVLIST;
-	unsigned int i;
-	int	status;
-	int	rc;
 
-	rc = usbip_net_send_op_common(sockfd, OP_REQ_DEVLIST, 0);
+int get_exported_devices(const char *host, SOCKET sockfd)
+{
+	auto rc = usbip_net_send_op_common(sockfd, OP_REQ_DEVLIST, 0);
 	if (rc < 0) {
 		dbg("failed to send common header: %s", dbg_errcode(rc));
 		return ERR_NETWORK;
 	}
+
+	uint16_t code = OP_REP_DEVLIST;
+	int status = 0;
 
 	rc = usbip_net_recv_op_common(sockfd, &code, &status);
 	if (rc < 0) {
@@ -43,8 +44,8 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 		return rc;
 	}
 
-        op_devlist_reply reply{};
-        rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
+	op_devlist_reply reply{};
+	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
 	if (rc < 0) {
 		dbg("failed to recv devlist: %s", dbg_errcode(rc));
 		return rc;
@@ -53,7 +54,7 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 	PACK_OP_DEVLIST_REPLY(0, &reply);
 	dbg("exportable devices: %d\n", reply.ndev);
 
-	if (reply.ndev == 0) {
+	if (!reply.ndev) {
 		info("no exportable devices found on %s", host);
 		return 0;
 	}
@@ -62,26 +63,26 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 	printf("======================\n");
 	printf(" - %s\n", host);
 
-	for (i = 0; i < reply.ndev; i++) {
+	for (unsigned int i = 0; i < reply.ndev; ++i) {
 
-                usbip_usb_device udev{};
-                rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
+		usbip_usb_device udev{};
+		rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
 		if (rc < 0) {
 			dbg("failed to recv devlist: usbip_usb_device[%d]: %s", i, dbg_errcode(rc));
 			return ERR_NETWORK;
 		}
 		usbip_net_pack_usb_device(0, &udev);
-		
+
 		auto &ids = get_ids();
-                auto product_name = usbip_names_get_product(ids, udev.idVendor, udev.idProduct);
-                auto class_name = usbip_names_get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
+		auto product_name = usbip_names_get_product(ids, udev.idVendor, udev.idProduct);
+		auto class_name = usbip_names_get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
 
 		printf("%11s: %s\n", udev.busid, product_name.c_str());
 		printf("%11s: %s\n", "", udev.path);
 		printf("%11s: %s\n", "", class_name.c_str());
 
 		for (int j = 0; j < udev.bNumInterfaces; ++j) {
-                        usbip_usb_interface uintf{};
+			usbip_usb_interface uintf{};
 			rc = usbip_net_recv(sockfd, &uintf, sizeof(uintf));
 			if (rc < 0) {
 				dbg("failed to recv devlist: usbip_usb_intf[%d]: %s", j, dbg_errcode(rc));
@@ -100,8 +101,10 @@ static int get_exported_devices(const char *host, SOCKET sockfd)
 	return 0;
 }
 
-int
-list_exported_devices(const char *host)
+} // namespace
+
+
+int list_exported_devices(const char *host)
 {
 	auto sock = usbip_net_tcp_connect(host, usbip_port);
 	if (!sock) {

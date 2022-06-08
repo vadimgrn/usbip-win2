@@ -56,6 +56,19 @@ inline void log(const USB_CONFIGURATION_DESCRIPTOR &d)
                 d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
 }
 
+
+/*
+ * RtlFreeUnicodeString must be used to release memory.
+ * @see RtlUTF8StringToUnicodeString
+ */
+auto to_unicode_str(UNICODE_STRING &dst, const char *ansi)
+{
+        ANSI_STRING s;
+        RtlInitAnsiString(&s, ansi);
+
+        return RtlAnsiStringToUnicodeString(&dst, &s, true);
+}
+
 PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_DEVICE_DESCRIPTOR &dsc)
 {
         PAGED_CODE();
@@ -95,19 +108,19 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = strnew(vpdo.node_name, r.host)) {
+        if (auto err = to_unicode_str(vpdo.node_name, r.host)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.host, err);
                 return err;
         }
 
-        if (auto err = strnew(vpdo.service_name, r.service)) {
+        if (auto err = to_unicode_str(vpdo.service_name, r.service)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.service, err);
                 return err;
         }
 
         if (!*r.serial) {
                 RtlInitUnicodeString(&vpdo.serial, nullptr);
-        } else if (auto err = strnew(vpdo.serial, r.serial)) {
+        } else if (auto err = to_unicode_str(vpdo.serial, r.serial)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.serial, err);
                 return err;
         }

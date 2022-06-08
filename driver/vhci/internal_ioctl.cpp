@@ -32,7 +32,7 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
  * In general, you must not touch IRP that was put in Cancel-Safe Queue because it can be canceled at any moment.
  * You should remove IRP from the CSQ and then use it. BUT you can access IRP if you shure it is alive.
  *
- * To avoid copying of IRP's transfer buffer, it must not be completed until this handler will be called.
+ * To avoid copying of URB's transfer buffer, it must not be completed until this handler will be called.
  * This means that:
  * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete because WskSend can still access
  *   IRP transfer buffer.

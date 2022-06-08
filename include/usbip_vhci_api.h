@@ -62,7 +62,7 @@ DEFINE_GUID(USBIP_NOTIFY_DEVICE_ARRIVAL_EVENT,
 #define IOCTL_USBIP_VHCI_GET_PORTS_STATUS	USBIP_VHCI_IOCTL(0x2)
 #define IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES	USBIP_VHCI_IOCTL(0x3)
 
-enum { VHCI_PORTS_MAX = 127 };
+enum { VHCI_PORTS_MAX = 16 }; // see vhub_dev_t::NUM_PORTS
 
 struct ioctl_usbip_vhci_get_ports_status
 {
@@ -70,22 +70,22 @@ struct ioctl_usbip_vhci_get_ports_status
 	bool port_status[VHCI_PORTS_MAX];
 };
 
-struct ioctl_usbip_vhci_imported_dev 
-{
-        int port;
-        usbip_device_status status;
-        unsigned short vendor;
-        unsigned short product;
-        usb_device_speed speed;
-};
-
 struct ioctl_usbip_vhci_plugin
 {
         int port; // OUT, must be the first member; port# if > 0 else err_t
         char busid[USBIP_BUS_ID_SIZE];
-        char service[32];
-        char host[255];
+        char service[32]; // NI_MAXSERV
+        char host[1025];  // NI_MAXHOST in ws2def.h
         char serial[255];
+};
+
+struct ioctl_usbip_vhci_imported_dev : ioctl_usbip_vhci_plugin
+{
+        usbip_device_status status;
+        unsigned short vendor;
+        unsigned short product;
+        UINT32 devid;
+        usb_device_speed speed;
 };
 
 struct ioctl_usbip_vhci_unplug
