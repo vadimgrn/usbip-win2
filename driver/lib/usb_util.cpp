@@ -14,8 +14,7 @@
  *
  * <uapi/linux/usb/ch9.h>
  */
-enum usb_device_speed
-get_usb_speed(USHORT bcdUSB)
+usb_device_speed get_usb_speed(USHORT bcdUSB)
 {
 	switch (bcdUSB) {
 	case 0x0100:

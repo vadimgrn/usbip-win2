@@ -97,10 +97,6 @@ const char *ReceiveEventFlags(char *buf, size_t len, ULONG Flags);
 WSK_DATA_INDICATION *tail(_In_ WSK_DATA_INDICATION *di);
 
 size_t size(_In_ const WSK_DATA_INDICATION *di);
-
-inline auto size(_In_ const WSK_DATA_INDICATION &di)
-{
-        return size(&di);
-}
+inline auto size(_In_ const WSK_DATA_INDICATION &di) { return size(&di); }
 
 } // namespace wsk

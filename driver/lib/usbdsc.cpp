@@ -42,7 +42,7 @@ void *dsc_for_each_endpoint(
 	dsc_for_each_ep_fn *func,
 	void *data)
 {
-	USB_COMMON_DESCRIPTOR *cur = (USB_COMMON_DESCRIPTOR*)dsc_intf;
+	auto cur = (USB_COMMON_DESCRIPTOR*)dsc_intf;
 
 	for (int i = 0; i < dsc_intf->bNumEndpoints; ++i) {
 

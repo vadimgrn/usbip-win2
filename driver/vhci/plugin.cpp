@@ -316,7 +316,7 @@ PAGEABLE auto read_device_descr(vpdo_dev_t &vpdo)
                 return err;
         }
 
-        return is_valid_dsc(&vpdo.descriptor) ? ERR_NONE : ERR_GENERAL;
+        return is_valid_dsc(vpdo.descriptor) ? ERR_NONE : ERR_GENERAL;
 }
 
 PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo, usbip::memory pool, USB_CONFIGURATION_DESCRIPTOR *cd, USHORT len)
@@ -363,7 +363,7 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                         break; // invalid string index, EPIPE
                 }
 
-                if (!is_valid_dsc(&hdr)) {
+                if (!is_valid_dsc(hdr)) {
                         return ERR_GENERAL;
                 }
                
