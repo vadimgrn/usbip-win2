@@ -1,11 +1,10 @@
 ![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")
 
 # USB/IP Client for Windows
-- Vhci driver is the goal of this project
 - **Is fully implemented**
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USBIP server at least for kernels 4.19 - 5.15
-- **Is not ready for production use**, can cause BSOD or hang
+- Works with Linux USB/IP server at least for kernels 4.19 - 5.15
+- **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows so far
 
@@ -13,6 +12,7 @@
 - Windows 10 x64, version 2004 and later ([NTDDI_WIN10_VB](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable))
 
 ## Key features
+- VHCI driver is a USB/IP client
 - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app
@@ -26,7 +26,7 @@
 - x86 build is removed
 - Server (stub driver) is removed
 - UDE client driver is removed, VHCI driver is superseded it
-- Client (vhci driver)
+- Client (VHCI driver)
   - Significantly refactored and improved
   - The core of the driver was rewritten from scratch
   - attacher.exe (usbip_xfer.exe) is no longer used
@@ -53,7 +53,7 @@
 ## Build
 
 ### Notes
-- Build is tested on Windows 11, projects are configured for Win10 target by default
+- Build is tested on Windows 11, projects are configured for Windows 10 v.2004 target by default
 - x86 platform is not supported
 
 ### Build Tools
@@ -74,7 +74,7 @@
 - Build the solution
 - All output files are created under x64/{Debug,Release} folders.
 
-## Setup USBIP server on Ubuntu Linux
+## Setup USB/IP server on Ubuntu Linux
 - Install required packages
 ```
 apt install linux-tools-generic linux-cloud-tools-generic
@@ -96,7 +96,7 @@ usbip: info: bind device on busid 3-2: complete
 ```
 - Your device 3-2 now can be used by usbip client
 
-## Setup USBIP on Windows
+## Setup USB/IP on Windows
 
 ### Enable Windows Test Signing Mode
 - `bcdedit.exe /set testsigning on`
@@ -133,7 +133,7 @@ port 1 is successfully detached
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
 
-## Obtaining USBIP logs on Windows
+## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
@@ -180,7 +180,7 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
 !wmitrace.logdump usbip-vhci
 ```
 
-## Obtaining USBIP log on Linux
+## Obtaining USB/IP log on Linux
 ```
 sudo killall usbipd
 sudo modprobe -r usbip-host usbip-vudc vhci-hcd usbip-core
@@ -189,3 +189,15 @@ sudo modprobe -a usbip-host usbip-vudc vhci-hcd
 sudo usbipd -D
 dmesg --follow | tee ~/usbip.log
 ```
+
+## Testing the driver
+- [Driver Verifier](https://docs.microsoft.com/en-us/windows-hardware/drivers/devtest/driver-verifier) is used for testing
+- Run verifier.exe as Administrator
+- Enable testing
+  - verifier /rc 1 2 4 5 6 9 12 18 10 15 20 24 26 35 /driver usbip_vhci.sys
+- Query settings
+  - verifier /querysettings
+- Query driver statistics
+  - verifier /query
+- Disable testing
+  - verifier /reset
