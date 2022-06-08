@@ -43,7 +43,7 @@ _IRQL_requires_same_
 _Function_class_(allocate_function_ex)
 void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {
-        NT_ASSERT(PoolType == NonPagedPool);
+        NT_ASSERT(PoolType == NonPagedPoolNx);
         NT_ASSERT(Tag == AllocTag);
 
         auto ctx = (send_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, NumberOfBytes, Tag);
@@ -77,7 +77,7 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
 NTSTATUS init_send_context_list()
 {
         return ExInitializeLookasideListEx(&send_context_list, allocate_function_ex, free_function_ex, 
-                                            NonPagedPool, 0, sizeof(send_context), AllocTag, 0);
+                                            NonPagedPoolNx, 0, sizeof(send_context), AllocTag, 0);
 }
 
 /*
