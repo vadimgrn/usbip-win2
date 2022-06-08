@@ -59,20 +59,6 @@ enum
         USBIP_BUS_ID_SIZE = 32 
 };
 
-/*
-* <uapi/linux/usb/ch9.h>
-*/
-enum usb_device_speed 
-{
-        USB_SPEED_UNKNOWN,			/* enumerating */
-        USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */
-        USB_SPEED_HIGH,				/* usb 2.0 */
-        USB_SPEED_WIRELESS,			/* wireless (usb 2.5) */
-        USB_SPEED_SUPER,			/* usb 3.0 */
-        USB_SPEED_SUPER_PLUS			/* usb 3.1 */
-};
-
-
 #ifdef __cplusplus
 
 /*

@@ -9,6 +9,8 @@
 #endif
 
 #include <usbspec.h>
+
+#include "ch9.h"
 #include "usbip_api_consts.h"
 #include "usbip_proto.h"
 //

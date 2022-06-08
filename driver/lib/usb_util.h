@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "usbip_api_consts.h"
+#include "ch9.h"
 #include "usbip_proto.h"
 
 #include <ntdef.h>

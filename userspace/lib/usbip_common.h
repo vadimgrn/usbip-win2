@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "ch9.h"
 #include "usbip_api_consts.h"
 #include "usbip_proto.h"
 #include "usb_ids.h"
