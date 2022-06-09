@@ -19,6 +19,7 @@
 namespace
 {
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
         TraceMsg("irp %04x %!STATUS!", ptr4log(irp), status);
@@ -40,6 +41,7 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
  * 3.CompleteCanceledIrp and WskReceiveEvent are mutually exclusive because IRP was dequeued from the CSQ.
  * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceiveEvent.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
         auto ctx = static_cast<send_context*>(Context);
@@ -81,6 +83,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         return StopCompletion;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
 {
         if (is_transfer_direction_in(&ctx->hdr)) { // TransferFlags can have wrong direction
@@ -127,9 +130,12 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
  * I/O Manager can issue IoCancelIrp only when a driver returned STATUS_PENDING from its dispatch routine.
  * This means during the execution of dispatch routine IRP can't be canceled.
  */
-auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
+_IRQL_requires_(LOW_LEVEL)
+PAGEABLE auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
         _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ USBD_PIPE_HANDLE hpipe = USBD_PIPE_HANDLE())
 {
+        PAGED_CODE();
+        
         auto seqnum = hdr.base.seqnum;
         set_context(irp, seqnum, ST_SEND_COMPLETE, hpipe);
 
@@ -147,9 +153,9 @@ auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr,
 }
 
 /*
- * PAGED_CODE() fails.
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 {
         ULONG length = 0;
@@ -207,6 +213,7 @@ NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
  *      <linux>/drivers/usb/core/message.c, usb_clear_halt
  */
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -272,6 +279,7 @@ NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return st;
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR recipient)
 {
         PAGED_CODE();
@@ -297,26 +305,31 @@ PAGEABLE NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &ur
         return send(vpdo, irp, hdr, &urb);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_status_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_status_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_status_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_status_from_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_OTHER);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR type, UCHAR recipient)
 {
         PAGED_CODE();
@@ -350,46 +363,55 @@ PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &
         return send(vpdo, irp, hdr, &urb);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS vendor_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS vendor_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS vendor_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS vendor_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS class_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS class_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS class_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS class_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
 {
         PAGED_CODE();
@@ -418,36 +440,43 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &ur
         return send(vpdo, irp, hdr, &urb);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
 {
         PAGED_CODE();
@@ -473,46 +502,55 @@ PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, 
         return send(vpdo, irp, hdr);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -538,6 +576,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -578,6 +617,7 @@ NTSTATUS get_current_frame_number(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_(LOW_LEVEL)
 NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -614,9 +654,9 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 /*
- * PAGED_CODE() fails.
  * The USB bus driver processes this URB at DISPATCH_LEVEL.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbBulkOrInterruptTransfer;
@@ -655,9 +695,9 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 /*
- * PAGED_CODE() fails.
  * USBD_START_ISO_TRANSFER_ASAP is appended because URB_GET_CURRENT_FRAME_NUMBER is not implemented.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbIsochronousTransfer;
@@ -716,6 +756,7 @@ NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_NOT_SUPPORTED;
 }
 
+_IRQL_requires_(LOW_LEVEL)
 NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -738,6 +779,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr, &urb);
 }
 
+_IRQL_requires_(LOW_LEVEL)
 NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -893,9 +935,7 @@ urb_function_t* const urb_functions[] =
 	get_isoch_pipe_transfer_path_delays // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
-/*
- * PAGED_CODE() fails.
- */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
 	auto func = urb.UrbHeader.Function;
@@ -927,6 +967,7 @@ NTSTATUS usb_get_port_status(ULONG &status)
 /*
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd.
  */
+_IRQL_requires_(LOW_LEVEL)
 PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 {
         PAGED_CODE();
@@ -966,8 +1007,11 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  * For that reason the cancellation logic is simplified and list of unlinked IRPs is not used.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
+_IRQL_requires_(LOW_LEVEL)
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
+        PAGED_CODE();
+
         auto seqnum = get_seqnum(irp);
         TraceMsg("irp %04x, seqnum %u", ptr4log(irp), seqnum);
 
@@ -987,6 +1031,7 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         }
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 //      NT_ASSERT(!irp->IoStatus.Information); // can fail

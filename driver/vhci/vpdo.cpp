@@ -56,9 +56,7 @@ PAGEABLE auto copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 } // namespace
 
 
-/*
- * Calls from DISPATCH_LEVEL.
- */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION *r)
 {
 	if (vpdo->actconfig) {
@@ -95,9 +93,7 @@ NTSTATUS vpdo_select_config(vpdo_dev_t *vpdo, _URB_SELECT_CONFIGURATION *r)
 	return status;
 }
 
-/*
- * Calls from DISPATCH_LEVEL.
- */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE *r)
 {
 	if (!vpdo->actconfig) {

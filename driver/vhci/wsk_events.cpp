@@ -24,6 +24,7 @@ namespace
 /*
  * URB must have TransferBuffer* members.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_urb_buffer(_In_ URB &urb)
 {
 	auto func = urb.UrbHeader.Function;
@@ -50,6 +51,7 @@ auto get_urb_buffer(_In_ URB &urb)
 /*
  * Actual TransferBufferLength must already be set.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 {
 	auto &r = *AsUrbTransfer(&urb);
@@ -69,6 +71,7 @@ auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 	return err;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto assign(ULONG &TransferBufferLength, int actual_length)
 {
 	bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
@@ -77,6 +80,7 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
 	return ok ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
 	auto r = AsUrbTransfer(&urb);
@@ -101,6 +105,7 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 /*
  * EP0 stall is not an error, control endpoint cannot stall. 
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_configuration(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
 	auto err = urb.UrbHeader.Status;
@@ -122,6 +127,7 @@ NTSTATUS urb_select_configuration(vpdo_dev_t &vpdo, URB &urb, const usbip_header
  *
  * See: drivers/usb/core/message.c, usb_set_interface, usb_clear_halt. 
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_interface(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
 	auto err = urb.UrbHeader.Status;
@@ -142,6 +148,7 @@ NTSTATUS urb_select_interface(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
  * A request can read descriptor header or full descriptor to obtain its real size.
  * F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
 	auto &r = urb.UrbControlDescriptorRequest;
@@ -197,6 +204,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
  * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto copy_isoc_data(
 	_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf, 
 	_Inout_ vpdo_dev_t &src_buf, _In_ ULONG src_len, 
@@ -276,6 +284,7 @@ auto copy_isoc_data(
 /*
  * Layout: usbip_header, transfer buffer(IN only), usbip_iso_packet_descriptor[].
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
 	auto &res = hdr.u.ret_submit;
@@ -433,6 +442,7 @@ urb_function_t* const urb_functions[] =
  * If response from a server has data (actual_length > 0), URB function MUST copy it to URB 
  * even if UrbHeader.Status != USBD_STATUS_SUCCESS.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
         {
@@ -453,6 +463,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
         return err;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_reset_port(const usbip_header &hdr)
 {
         auto err = hdr.u.ret_submit.status;
@@ -478,6 +489,7 @@ inline void WorkItem(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_W
 	IoFreeWorkItem(IoWorkItem);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void complete_safe(vpdo_dev_t &vpdo, IRP *irp)
 {
 	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
@@ -485,6 +497,7 @@ inline void complete_safe(vpdo_dev_t &vpdo, IRP *irp)
 	}
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 {
         auto irpstack = IoGetCurrentIrpStackLocation(irp);
@@ -522,6 +535,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
  * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 {
 	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
@@ -537,12 +551,14 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	}
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void invalidate(_Inout_ usbip_header &hdr)
 {
 	static_assert(!is_valid_seqnum(0));
 	hdr.base.seqnum = 0;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 {
 	auto &base = hdr.base;
@@ -576,6 +592,7 @@ auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 	return 0;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void receive_event(_Inout_ vpdo_dev_t &vpdo)
 {
 	auto &hdr = vpdo.wsk_data_hdr;
@@ -624,6 +641,7 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 /*
  * if DataIndication is NULL, the socket is no longer functional and must be closed ASAP.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags, 
 	_In_opt_ WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T* /*BytesAccepted*/)
 {
