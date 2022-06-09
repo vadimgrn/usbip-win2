@@ -176,7 +176,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 
 		if (!ok) {
 			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not the same");
-//			vhub_unplug_vpdo(&vpdo);
+			vhub_unplug_vpdo(&vpdo);
 		}
 	}
 
@@ -617,7 +617,7 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 	auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
 	TraceMsg("vpdo %04x, Flags %#x", ptr4log(vpdo), Flags);
 
-//	vhub_unplug_vpdo(vpdo);
+	vhub_unplug_vpdo(vpdo);
 	return STATUS_SUCCESS;
 }
 
@@ -640,7 +640,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 		wsk_data_push(*vpdo, DataIndication, BytesIndicated);
 		receive_event(*vpdo);
 	} else {
-//		vhub_unplug_vpdo(vpdo);
+		vhub_unplug_vpdo(vpdo);
 		st = STATUS_SUCCESS;
 	}
 
