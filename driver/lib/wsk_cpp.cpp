@@ -104,7 +104,8 @@ NTSTATUS SOCKET_ASYNC_CONTEXT::wait_for_completion(_Inout_ NTSTATUS &status)
         return status;
 }
 
-_Use_decl_annotations_
+_Function_class_(RTL_RUN_ONCE_INIT_FN)
+_IRQL_requires_same_
 ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, [[maybe_unused]] _Inout_opt_ PVOID* Context)
 {
         NT_ASSERT(!Context);

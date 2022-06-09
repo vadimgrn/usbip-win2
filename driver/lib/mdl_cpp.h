@@ -80,8 +80,8 @@ private:
 MDL *tail(_In_ MDL *mdl);
 inline auto tail(_In_ const Mdl &mdl) { return tail(mdl.get()); }
 
-size_t size(_In_ const MDL *mdl);
-inline auto size(_In_ const Mdl &mdl) { return size(mdl.get()); }
+size_t size(_In_ MDL *mdl);
+inline auto size(_In_ Mdl &mdl) { return size(mdl.get()); }
 
 inline auto& operator +=(_Inout_ Mdl &left, _Inout_ Mdl &right)
 { 

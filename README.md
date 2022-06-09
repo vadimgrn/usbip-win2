@@ -201,3 +201,4 @@ dmesg --follow | tee ~/usbip.log
   - verifier /query
 - Disable testing
   - verifier /reset
+- if you are going to run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip_vhci projects
