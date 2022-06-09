@@ -22,7 +22,7 @@ namespace
 auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
         TraceMsg("irp %04x %!STATUS!", ptr4log(irp), status);
-        NT_ASSERT(!irp->IoStatus.Information);
+//      NT_ASSERT(!irp->IoStatus.Information); // can fail
         return CompleteRequest(irp, status);
 }
 
@@ -989,7 +989,7 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
-        NT_ASSERT(!irp->IoStatus.Information);
+//      NT_ASSERT(!irp->IoStatus.Information); // can fail
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
