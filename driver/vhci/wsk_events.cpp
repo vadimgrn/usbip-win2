@@ -224,7 +224,7 @@ auto copy_isoc_data(
 	ULONG src_offset = 0; // from src_buf
 	auto dd = r.IsoPacket;
 
-	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++sd, ++dd) {
+	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++dd, src_offset += sd++->actual_length) {
 
 		dd->Status = sd->status ? to_windows_status_isoch(sd->status) : USBD_STATUS_SUCCESS;
 
@@ -270,7 +270,6 @@ auto copy_isoc_data(
 		}
 
 		dd->Length = sd->actual_length;
-		src_offset += sd->actual_length;
 	}
 
 	bool ok = src_offset == src_len;
