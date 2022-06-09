@@ -13,8 +13,8 @@
 #include <cstdio>
 #include <string>
 
-extern int usbip_use_stderr;
-extern int usbip_use_debug ;
+extern bool usbip_use_stderr;
+extern bool usbip_use_debug;
 
 extern const char *usbip_progname;
 

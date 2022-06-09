@@ -8,8 +8,8 @@
 
 #include <format>
 
-int usbip_use_stderr;
-int usbip_use_debug;
+bool usbip_use_stderr;
+bool usbip_use_debug;
 const char* usbip_progname;
 
 #define DBG_UDEV_INTEGER(name)\

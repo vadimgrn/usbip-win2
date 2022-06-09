@@ -28,6 +28,8 @@
 #include "resource.h"
 #include "usb_ids.h"
 
+#include <string>
+
 namespace
 {
 
@@ -59,14 +61,13 @@ const command cmds[] =
 	{ "detach", usbip_detach, "Detach a remote USB device", usbip_detach_usage },
 	{ "list", usbip_list, "List remote USB devices", usbip_list_usage },
 	{ "port", usbip_port_show, "Show imported USB devices", usbip_port_usage },
-        {}
 };
 
 int usbip_help(int argc, char *argv[])
 {
 	if (argc > 1) {
 		for (auto &c: cmds)
-			if (strcmp(c.name, argv[1]) == 0) {
+			if (std::string_view(c.name) == argv[1]) {
 				if (c.usage) {
 					c.usage();
                                 } else {
@@ -128,23 +129,21 @@ int main(int argc, char *argv[])
 		{}
 	};
 
-	char *cmd{};
 	int opt{};
-	int rc = 1;
+	int rc = EXIT_FAILURE;
 
 	usbip_progname = "usbip";
-	usbip_use_stderr = 1;
+	usbip_use_stderr = true;
 
-	opterr = 0;
-	while (true) {
+	for (opterr = 0; ; ) {
 		opt = getopt_long(argc, argv, "+dt:", opts, nullptr);
-
-		if (opt == -1)
+		if (opt == -1) {
 			break;
+		}
 
 		switch (opt) {
 		case 'd':
-			usbip_use_debug = 1;
+			usbip_use_debug = true;
 			break;
 		case 't':
 			usbip_setup_port_number(optarg);
@@ -154,7 +153,7 @@ int main(int argc, char *argv[])
 			[[fallthrough]];
 		default:
 			usbip_usage();
-			return 1;
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -164,20 +163,17 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	cmd = argv[optind];
-	if (cmd) {
+	if (auto cmd = argv[optind]) {
 		for (auto &c: cmds)
-			if (!strcmp(c.name, cmd)) {
+			if (std::string_view(c.name) == cmd) {
 				argc -= optind;
 				argv += optind;
 				optind = 0;
 				return run_command(&c, argc, argv);
 			}
 		err("invalid command: %s", cmd);
-	} else {
-		/* empty command */
-		usbip_help(0, nullptr);
 	}
 
+	usbip_help(0, nullptr);
 	return rc;
 }
