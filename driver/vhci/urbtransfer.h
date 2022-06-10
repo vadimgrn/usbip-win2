@@ -22,3 +22,5 @@ struct UrbTransfer
 
 inline auto AsUrbTransfer(URB *urb) { return reinterpret_cast<UrbTransfer*>(urb); }
 inline auto AsUrbTransfer(const URB *urb) { return reinterpret_cast<const UrbTransfer*>(urb); }
+
+bool has_transfer_buffer(_In_ const URB &urb);
