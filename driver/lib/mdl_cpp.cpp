@@ -8,7 +8,7 @@
 * @see reactos\ntoskrnl\io\iomgr\iomdl.c
 */
 usbip::Mdl::Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
-        m_type(pool == memory::nonpaged ? 1 : 2),
+        m_type(pool == memory::nonpaged ? mdl_type::nonpaged : mdl_type::paged),
         m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr))
 {
 }
@@ -31,14 +31,14 @@ auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 
 MDL* usbip::Mdl::release()
 {
-        m_type = 0;
+        m_type = mdl_type::nonmanaged;
 
         auto m = m_mdl;
         m_mdl = nullptr;
         return m;
 }
 
-void usbip::Mdl::reset(_In_ MDL *mdl, _In_ int type)
+void usbip::Mdl::reset(_In_ MDL *mdl, _In_ mdl_type type)
 {
         if (m_mdl && managed()) {
                 NT_ASSERT(m_mdl != mdl);

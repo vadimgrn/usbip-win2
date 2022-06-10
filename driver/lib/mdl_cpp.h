@@ -9,6 +9,7 @@
 namespace usbip
 {
 
+enum class mdl_type { nonmanaged, nonpaged, paged };
 enum class memory { nonpaged, paged, stack = paged };
 
 /*
@@ -21,8 +22,9 @@ class Mdl
 {
         enum { DEF_ACCESS_MODE = KernelMode };
 public:
-        explicit Mdl(_In_ MDL *m = nullptr) : m_mdl(m) {}
+        Mdl(_In_ MDL *m = nullptr, _In_ mdl_type type = mdl_type::nonmanaged) : m_type(type), m_mdl(m) {}
         Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
+
         ~Mdl() { reset(); }
 
         Mdl(const Mdl&) = delete;
@@ -32,16 +34,17 @@ public:
         Mdl& operator =(Mdl&& m);
 
         MDL *release();
-        void reset() { reset(nullptr, 0); }
+        void reset() { reset(nullptr, mdl_type::nonmanaged); }
 
         explicit operator bool() const { return m_mdl; }
         auto operator !() const { return !m_mdl; }
 
         auto get() const { return m_mdl; }
 
-        bool managed() const { return m_type; }
-        auto nonpaged() const { return m_type == 1; }
-        auto paged() const { return m_type == 2; }
+        auto type() const { return m_type; }
+        bool managed() const { return m_type != mdl_type::nonmanaged; }
+        auto nonpaged() const { return m_type == mdl_type::nonpaged; }
+        auto paged() const { return m_type == mdl_type::paged; }
 
         auto addr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : nullptr; }
         auto offset() const { return m_mdl ? MmGetMdlByteOffset(m_mdl) : 0; }
@@ -63,10 +66,10 @@ public:
         }
 
 private:
-        int m_type = 0;
+        mdl_type m_type = mdl_type::nonmanaged;
         MDL *m_mdl{};
 
-        void reset(_In_ MDL *mdl, _In_ int type);
+        void reset(_In_ MDL *mdl, _In_ mdl_type type);
 
         NTSTATUS lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation);
         bool locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }
