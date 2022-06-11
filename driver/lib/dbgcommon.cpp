@@ -9,7 +9,7 @@
 namespace
 {
 
-constexpr auto bmrequest_dir_str(BM_REQUEST_TYPE r)
+constexpr auto bmrequest_dir(BM_REQUEST_TYPE r)
 {
 	return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
 }
@@ -35,18 +35,18 @@ void print_ret_submit(char *buf, size_t len, const usbip_header_ret_submit *cmd)
 } // namespace
 
 
-const char *bmrequest_type_str(BM_REQUEST_TYPE r)
+const char *request_type(UCHAR type)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
-	NT_ASSERT(r.s.Type < ARRAYSIZE(v));
-	return v[r.s.Type];
+	NT_ASSERT(type < ARRAYSIZE(v));
+	return v[type];
 }
 
-const char *bmrequest_recipient_str(BM_REQUEST_TYPE r)
+const char *recipient(UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
-	NT_ASSERT(r.s.Recipient < ARRAYSIZE(v));
-	return v[r.s.Recipient];
+	NT_ASSERT(recipient < ARRAYSIZE(v));
+	return v[recipient];
 }
 
 const char *brequest_str(UCHAR bRequest)
@@ -407,9 +407,9 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 
 	auto st = RtlStringCbPrintfA(buf, len, 
 					"{%s|%s|%s, %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
-					bmrequest_dir_str(r->bmRequestType),
-					bmrequest_type_str(r->bmRequestType),
-					bmrequest_recipient_str(r->bmRequestType),
+					bmrequest_dir(r->bmRequestType),
+					bmrequest_type(r->bmRequestType),
+					bmrequest_recipient(r->bmRequestType),
 					brequest_str(r->bRequest),
 					r->bRequest,
 					r->wValue,

@@ -5,8 +5,11 @@
 
 struct usbip_header;
 
-const char *bmrequest_type_str(BM_REQUEST_TYPE r);
-const char *bmrequest_recipient_str(BM_REQUEST_TYPE r);
+const char *request_type(UCHAR type);
+inline auto bmrequest_type(BM_REQUEST_TYPE r) { return request_type(r.s.Type); }
+
+const char *recipient(UCHAR recipient);
+inline auto bmrequest_recipient(BM_REQUEST_TYPE r) { return recipient(r.s.Recipient); }
 
 const char *brequest_str(UCHAR bRequest);
 

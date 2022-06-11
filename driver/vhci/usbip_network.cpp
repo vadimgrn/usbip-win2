@@ -92,7 +92,7 @@ auto set_write_mdl_buffer(_Inout_ IRP *irp, _Inout_ URB &urb)
         r.TransferBufferMDL = mdl.release();
         flags |= F_FREE_MDL;
 
-        TraceDbg("irp %04x: TransferBufferMDL(%04x) alloc", ptr4log(irp), ptr4log(r.TransferBufferMDL));
+        TraceDbg("irp %04x: TransferBufferMDL %04x", ptr4log(irp), ptr4log(r.TransferBufferMDL));
         return STATUS_SUCCESS;
 }
 
@@ -232,7 +232,7 @@ void usbip::free_transfer_buffer_mdl(_Inout_ IRP *irp)
         NT_ASSERT(has_transfer_buffer(*urb));
         auto &r = *AsUrbTransfer(urb);
 
-        TraceDbg("irp %04x: TransferBufferMDL(%04x) free", ptr4log(irp), ptr4log(r.TransferBufferMDL));
+        TraceDbg("irp %04x: TransferBufferMDL %04x", ptr4log(irp), ptr4log(r.TransferBufferMDL));
         NT_ASSERT(r.TransferBuffer && r.TransferBufferMDL);
 
         usbip::Mdl(r.TransferBufferMDL, usbip::mdl_type::paged); // unlock pages and release MDL

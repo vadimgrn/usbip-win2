@@ -812,8 +812,8 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbOSFeatureDescriptorRequest;
 
-	TraceUrb("irp %04x -> TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
-                ptr4log(irp), r.TransferBufferLength, r.Recipient, r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
+	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
+                ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
 
         const ULONG TransferFlags = USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK | USBD_DEFAULT_PIPE_TRANSFER;
 
@@ -824,9 +824,9 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         auto pkt = get_submit_setup(&hdr);
         pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_VENDOR | r.Recipient;
-        pkt->bRequest = 4; // bMS_VendorCode from string descriptor 0xEE
-        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.MS_PageIndex, r.InterfaceNumber);
-        pkt->wIndex.W =  r.MS_FeatureDescriptorIndex;
+        pkt->bRequest = r.MS_PageIndex; // bMS_VendorCode from string descriptor 0xEE
+        pkt->wValue.W = r.MS_FeatureDescriptorIndex;
+        pkt->wIndex.W = r.InterfaceNumber;
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
         return send(vpdo, irp, hdr, &urb);

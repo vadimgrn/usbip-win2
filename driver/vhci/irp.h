@@ -45,8 +45,7 @@ inline auto& get_seqnum(IRP *irp)
 	return *reinterpret_cast<seqnum_t*>(ptr);
 }
 
-enum { F_IRQL_MASK = 0xF, F_FREE_MDL };
-static_assert(F_IRQL_MASK == HIGH_LEVEL);
+enum { F_IRQL_MASK = HIGH_LEVEL, F_FREE_MDL };
 
 inline auto& get_flags(IRP *irp)
 {

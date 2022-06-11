@@ -404,7 +404,7 @@ urb_function_t* const urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
 
-	urb_function_unexpected, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+	urb_function_generic, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
 
 	nullptr, // URB_FUNCTION_RESERVE_0X002B
 	nullptr, // URB_FUNCTION_RESERVE_0X002C
