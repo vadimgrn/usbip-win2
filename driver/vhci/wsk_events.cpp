@@ -472,35 +472,64 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-inline void WorkItem(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
+void WorkItem(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
 {
-	auto irp = static_cast<IRP*>(Context);
-	auto &st = irp->IoStatus;
+	auto &vpdo = *static_cast<vpdo_dev_t*>(Context);
 
-	TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st.Status, st.Information);
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	while (auto irp = complete_dequeue(vpdo)) {
+
+		usbip::free_transfer_buffer_mdl(irp);
+
+		auto &st = irp->IoStatus;
+		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st.Status, st.Information);
+
+		IoCompleteRequest(irp, IO_NO_INCREMENT);
+	}
 
 	IoFreeWorkItem(IoWorkItem);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline void complete_safe(vpdo_dev_t &vpdo, IRP *irp)
+auto complete_later(vpdo_dev_t &vpdo)
 {
 	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
-		IoQueueWorkItemEx(wi, WorkItem, DelayedWorkQueue, irp);
+		auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
+		IoQueueWorkItemEx(wi, WorkItem, QueueType, &vpdo);
+		return true;
 	}
+
+	return false;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp)
+{
+	auto irql = get_flags(irp) & F_IRQL_MASK;
+
+	if (KeGetCurrentIrql() > irql) {
+		if (complete_enqueue(vpdo, irp) || complete_later(vpdo)) { // list was not empty or has enqueued
+			return;
+		}
+		NT_VERIFY(complete_dequeue(vpdo) == irp);
+	}
+
+	usbip::free_transfer_buffer_mdl(irp);
+
+	auto &st = irp->IoStatus.Status;
+	TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
+
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 {
-        auto irpstack = IoGetCurrentIrpStackLocation(irp);
-        auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
+	auto &st = irp->IoStatus.Status;
+	st = STATUS_INVALID_PARAMETER;
 
-        auto &st = irp->IoStatus.Status;
-        st = STATUS_INVALID_PARAMETER;
+	auto stack = IoGetCurrentIrpStackLocation(irp);
 
-        switch (ioctl_code) {
+        switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
         case IOCTL_INTERNAL_USB_SUBMIT_URB:
                 st = usb_submit_urb(vpdo, *(URB*)URB_FROM_IRP(irp), hdr);
                 break;
@@ -508,16 +537,14 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
                 st = usb_reset_port(hdr);
                 break;
         default:
-                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
         }
 
 	auto old_status = InterlockedCompareExchange(get_status(irp), ST_RECV_COMPLETE, ST_NONE);
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		usbip::free_transfer_buffer_mdl(irp);
-		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
+		complete_ret_submit(vpdo, irp);
 	}
 }
 
