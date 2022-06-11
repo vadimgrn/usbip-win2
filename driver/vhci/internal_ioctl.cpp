@@ -24,6 +24,8 @@ auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
         TraceMsg("irp %04x %!STATUS!", ptr4log(irp), status);
 //      NT_ASSERT(!irp->IoStatus.Information); // can fail
+
+        usbip::free_transfer_buffer_mdl(irp);
         return CompleteRequest(irp, status);
 }
 
@@ -60,6 +62,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
+                        usbip::free_transfer_buffer_mdl(irp);
                         TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix",
                                   ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
                         IoCompleteRequest(irp, IO_NO_INCREMENT);
@@ -88,7 +91,7 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
 {
         if (is_transfer_direction_in(&ctx->hdr)) { // TransferFlags can have wrong direction
                 NT_ASSERT(!ctx->mdl_buf);
-        } else if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, transfer_buffer)) {
+        } else if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, IoReadAccess, transfer_buffer)) {
                 Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
                 free(ctx);
                 return err;
@@ -132,7 +135,7 @@ auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
  */
 _IRQL_requires_(LOW_LEVEL)
 PAGEABLE auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
-        _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ USBD_PIPE_HANDLE hpipe = USBD_PIPE_HANDLE())
+        _Inout_opt_ URB *transfer_buffer = nullptr, _In_ USBD_PIPE_HANDLE hpipe = USBD_PIPE_HANDLE())
 {
         PAGED_CODE();
         
@@ -141,7 +144,7 @@ PAGEABLE auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_hea
 
         enqueue_irp(vpdo, irp);
 
-        if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
+        if (auto err = usbip::send_cmd(vpdo.sock, irp, hdr, transfer_buffer)) {
                 NT_VERIFY(dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
                 if (err == STATUS_FILE_FORCED_CLOSED) {
                         vhub_unplug_vpdo(&vpdo);
@@ -805,14 +808,28 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr, &urb);
 }
 
-NTSTATUS get_ms_feature_descriptor(vpdo_dev_t&, IRP *irp, URB &urb)
+NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbOSFeatureDescriptorRequest;
 
 	TraceUrb("irp %04x -> TransferBufferLength %lu, Recipient %d, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
                 ptr4log(irp), r.TransferBufferLength, r.Recipient, r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
 
-	return STATUS_NOT_SUPPORTED;
+        const ULONG TransferFlags = USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK | USBD_DEFAULT_PIPE_TRANSFER;
+
+        usbip_header hdr{};
+        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+                return err;
+        }
+
+        auto pkt = get_submit_setup(&hdr);
+        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_VENDOR | r.Recipient;
+        pkt->bRequest = 4; // bMS_VendorCode from string descriptor 0xEE
+        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.MS_PageIndex, r.InterfaceNumber);
+        pkt->wIndex.W =  r.MS_FeatureDescriptorIndex;
+        pkt->wLength = (USHORT)r.TransferBufferLength;
+
+        return send(vpdo, irp, hdr, &urb);
 }
 
 /*
@@ -1018,7 +1035,7 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         if (auto sock = vpdo.sock) {
                 usbip_header hdr{};
                 set_cmd_unlink_usbip_header(vpdo, hdr, seqnum);
-                if (auto err = usbip::send_cmd(sock, hdr)) {
+                if (auto err = usbip::send_cmd(sock, irp, hdr)) {
                         Trace(TRACE_LEVEL_ERROR, "send_cmd %!STATUS!", err);
                 }
         }

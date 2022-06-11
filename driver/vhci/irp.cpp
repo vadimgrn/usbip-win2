@@ -3,6 +3,7 @@
 #include "irp.tmh"
 
 #include "dev.h"
+#include "usbip_network.h"
 
 namespace
 {
@@ -70,9 +71,25 @@ NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 void complete_canceled_irp(IRP *irp)
 {
 	TraceMsg("%04x", ptr4log(irp));
+	usbip::free_transfer_buffer_mdl(irp);
 
 	irp->IoStatus.Status = STATUS_CANCELLED;
 	irp->IoStatus.Information = 0;
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
+}
+
+void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, USBD_PIPE_HANDLE hpipe)
+{
+	auto &flags = get_flags(irp);
+
+	auto irql = KeGetCurrentIrql();
+	flags = irql;
+
+	NT_ASSERT((flags & F_IRQL_MASK) == irql);
+	NT_ASSERT(!(flags & F_FREE_MDL));
+
+	get_seqnum(irp) = seqnum;
+	*get_status(irp) = status;
+	get_pipe_handle(irp) = hpipe;
 }

@@ -1,7 +1,10 @@
 #pragma once
 
 #include "pageable.h"
+#include "usbip_proto.h"
+
 #include <wdm.h>
+#include <usb.h>
 
 struct vpdo_dev_t;
 
@@ -25,4 +28,39 @@ inline auto list_entry(IRP *irp)
 inline auto get_irp(LIST_ENTRY *entry)
 {
 	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
+}
+
+enum irp_status_t { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED };
+void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, USBD_PIPE_HANDLE hpipe);
+
+/*
+ * IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
+ * Drivers that use these routines to queue IRPs must leave that member unused.
+ */
+inline auto& get_seqnum(IRP *irp)
+{
+	auto ptr = irp->Tail.Overlay.DriverContext;
+	static_assert(sizeof(*ptr) == 2*sizeof(seqnum_t));
+
+	return *reinterpret_cast<seqnum_t*>(ptr);
+}
+
+enum { F_IRQL_MASK = 0xF, F_FREE_MDL };
+static_assert(F_IRQL_MASK == HIGH_LEVEL);
+
+inline auto& get_flags(IRP *irp)
+{
+	static_assert(sizeof(UINT32) == sizeof(seqnum_t));
+	auto v = reinterpret_cast<UINT32*>(irp->Tail.Overlay.DriverContext);
+	return v[1];
+}
+
+inline auto get_status(IRP *irp)
+{
+	return reinterpret_cast<LONG*>(irp->Tail.Overlay.DriverContext + 1);
+}
+
+inline auto& get_pipe_handle(IRP *irp)
+{
+	return *static_cast<USBD_PIPE_HANDLE*>(irp->Tail.Overlay.DriverContext + 2);
 }

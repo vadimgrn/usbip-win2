@@ -14,6 +14,7 @@
 #include "vpdo.h"
 #include "wsk_data.h"
 #include "csq.h"
+#include "irp.h"
 #include "usbip_network.h"
 #include "send_context.h"
 #include "vhub.h"
@@ -27,25 +28,18 @@ namespace
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_urb_buffer(_In_ URB &urb)
 {
-	auto func = urb.UrbHeader.Function;
-
-	bool mdl = func == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ||
-		   func == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
-
 	auto &r = *AsUrbTransfer(&urb);
-
-	if (!mdl && r.TransferBuffer) {
-		return r.TransferBuffer;
+	
+	if (auto mdl = r.TransferBufferMDL) {
+		auto buf = MmGetSystemAddressForMdlSafe(mdl, NormalPagePriority | MdlMappingNoExecute);
+		if (!buf) {
+			Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
+		}
+		return buf;
 	}
 
-	NT_ASSERT(r.TransferBufferMDL);
-
-	auto buf = MmGetSystemAddressForMdlSafe(r.TransferBufferMDL, NormalPagePriority | MdlMappingNoExecute);
-	if (!buf) {
-		Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
-	}
-
-	return buf;
+	NT_ASSERT(r.TransferBuffer);
+	return r.TransferBuffer;
 }
 
 /*
@@ -94,6 +88,7 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 	bool log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
 
 	void *buf{};
+
 	err = copy_to_transfer_buffer(buf, vpdo, urb);
 	if (!err && log) {
 		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r->TransferBufferLength));
@@ -520,6 +515,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
+		usbip::free_transfer_buffer_mdl(irp);
 		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
