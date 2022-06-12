@@ -162,7 +162,7 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
 
 ## Debugging BSOD
 - Enable kernel memory dump
-  - Open "System Properties" dialog bog
+  - Open "System Properties" dialog box
   - Select "Advanced" tab
   - Click on "Settings" in "Startup and Recovery"
   - "System failure", "Write debugging information", pick "Automatic Memory Dump" or "Kernel Memory Dump"
@@ -194,11 +194,19 @@ dmesg --follow | tee ~/usbip.log
 - [Driver Verifier](https://docs.microsoft.com/en-us/windows-hardware/drivers/devtest/driver-verifier) is used for testing
 - Run verifier.exe as Administrator
 - Enable testing
-  - verifier /rc 1 2 4 5 6 9 12 18 10 15 20 24 26 35 /driver usbip_vhci.sys
+```
+verifier /rc 1 2 4 5 6 9 12 18 10 15 20 24 26 35 /driver usbip_vhci.sys
+```
 - Query settings
-  - verifier /querysettings
+```
+verifier /querysettings
+```
 - Query driver statistics
-  - verifier /query
+```
+verifier /query
+```
 - Disable testing
-  - verifier /reset
+```
+verifier /reset
+```
 - if you are going to run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip_vhci projects

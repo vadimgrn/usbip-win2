@@ -172,6 +172,12 @@ bool complete_enqueue(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp)
 
 IRP *complete_dequeue(_Inout_ vpdo_dev_t &vpdo)
 {
-	auto entry = ExInterlockedRemoveHeadList(&vpdo.complete, &vpdo.complete_lock);
-	return entry ? get_irp(entry) : nullptr;
+	IRP *irp{};
+
+	if (auto entry = ExInterlockedRemoveHeadList(&vpdo.complete, &vpdo.complete_lock)) {
+		InitializeListHead(entry);
+		irp = get_irp(entry);  
+	}
+
+	return irp;
 }

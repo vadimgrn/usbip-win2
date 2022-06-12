@@ -40,6 +40,7 @@
     <ClCompile Include="power.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="wmi.cpp" />
+    <ClCompile Include="workitem.cpp" />
     <ClCompile Include="wsk_data.cpp" />
     <ClCompile Include="wsk_events.cpp" />
   </ItemGroup>
@@ -76,6 +77,7 @@
     <ClInclude Include="vhub.h" />
     <ClInclude Include="vpdo.h" />
     <ClInclude Include="wmi.h" />
+    <ClInclude Include="workitem.h" />
     <ClInclude Include="wsk_data.h" />
     <ClInclude Include="wsk_events.h" />
   </ItemGroup>

@@ -13,6 +13,7 @@
 #include "wsk_cpp.h"
 #include "wsk_data.h"
 #include "send_context.h"
+#include "workitem.h"
 
 const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
@@ -164,6 +165,7 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 
 	if (!InterlockedDecrement(&VpdoCount)) {
 		ExFlushLookasideListEx(&send_context_list);
+		ExFlushLookasideListEx(&workitem_list);
 	}
 }
 

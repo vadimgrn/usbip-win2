@@ -8,6 +8,7 @@
 #include "vhub.h"
 #include "wsk_cpp.h"
 #include "send_context.h"
+#include "workitem.h"
 
 #include <ntstrsafe.h>
 
@@ -16,7 +17,7 @@ GLOBALS Globals;
 namespace
 {
 
-enum { INIT_SEND_CTX_LIST = 1 }; // bits
+enum { INIT_SEND_CTX_LIST = 1, INIT_WORKITEM_LIST = 2 }; // bits
 unsigned int g_init_flags;
 
 PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
@@ -58,7 +59,11 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 		ExDeleteLookasideListEx(&send_context_list);
 	}
 
-        if (auto buf = Globals.RegistryPath.Buffer) {
+	if (g_init_flags & INIT_WORKITEM_LIST) {
+		ExDeleteLookasideListEx(&workitem_list);
+	}
+	
+	if (auto buf = Globals.RegistryPath.Buffer) {
 	        ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
         }
 
@@ -155,6 +160,25 @@ PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
         return STATUS_SUCCESS;
 }
 
+auto init_ctx_lists()
+{
+	if (auto err = init_send_context_list()) {
+		Trace(TRACE_LEVEL_CRITICAL, "init_send_context_list %!STATUS!", err);
+		return err;
+	} else {
+		g_init_flags |= INIT_SEND_CTX_LIST;
+	}
+
+	if (auto err = init_workitem_list()) {
+		Trace(TRACE_LEVEL_CRITICAL, "init_workitem_list %!STATUS!", err);
+		return err;
+	} else {
+		g_init_flags |= INIT_WORKITEM_LIST;
+	}
+
+	return STATUS_SUCCESS;
+}
+
 } // namespace
 
 
@@ -182,12 +206,9 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 
 	TraceMsg("%p", drvobj);
 
-	if (auto err = init_send_context_list()) {
-		Trace(TRACE_LEVEL_CRITICAL, "init_send_context_list %!STATUS!", err);
+	if (auto err = init_ctx_lists()) {
 		DriverUnload(drvobj);
 		return err;
-	} else {
-		g_init_flags |= INIT_SEND_CTX_LIST;
 	}
 
         if (auto err = wsk::initialize()) {

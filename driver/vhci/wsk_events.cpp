@@ -18,6 +18,8 @@
 #include "usbip_network.h"
 #include "send_context.h"
 #include "vhub.h"
+#include "internal_ioctl.h"
+#include "workitem.h"
 
 namespace
 {
@@ -471,58 +473,46 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
         return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
+_Function_class_(IO_WORKITEM_ROUTINE_EX)
 _IRQL_requires_(PASSIVE_LEVEL)
-void WorkItem(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
+_IRQL_requires_same_
+void work_item(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
 {
+	free(IoWorkItem);
 	auto &vpdo = *static_cast<vpdo_dev_t*>(Context);
 
 	while (auto irp = complete_dequeue(vpdo)) {
-
-		usbip::free_transfer_buffer_mdl(irp);
-
-		auto &st = irp->IoStatus;
-		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st.Status, st.Information);
-
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
+		complete_internal_ioctl(irp, __func__);
 	}
-
-	IoFreeWorkItem(IoWorkItem);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto complete_later(vpdo_dev_t &vpdo)
+void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp, _In_ bool dispatch_level)
 {
-	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
-		auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-		IoQueueWorkItemEx(wi, WorkItem, QueueType, &vpdo);
-		return true;
-	}
+	int cur_irql = dispatch_level ?  DISPATCH_LEVEL : LOW_LEVEL;
+	int irp_irql = get_flags(irp) & F_IRQL_MASK;
 
-	return false;
-}
+	if (cur_irql > irp_irql) {
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp)
-{
-	auto irql = get_flags(irp) & F_IRQL_MASK;
-
-	if (KeGetCurrentIrql() > irql) {
-		if (complete_enqueue(vpdo, irp) || complete_later(vpdo)) { // list was not empty or has enqueued
+		if (complete_enqueue(vpdo, irp)) { // list was not empty
 			return;
 		}
-		NT_VERIFY(complete_dequeue(vpdo) == irp);
+
+		if (auto wi = alloc_workitem(vpdo.Self)) {
+			const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
+			IoQueueWorkItemEx(wi, work_item, QueueType, &vpdo);
+			return;
+		}
+
+		Trace(TRACE_LEVEL_WARNING, "alloc_workitem error");
+		NT_VERIFY(complete_dequeue(vpdo) ==  irp);
 	}
 
-	usbip::free_transfer_buffer_mdl(irp);
-
-	auto &st = irp->IoStatus.Status;
-	TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
-
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	complete_internal_ioctl(irp, __func__);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
+void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, _In_ bool dispatch_level)
 {
 	auto &st = irp->IoStatus.Status;
 	st = STATUS_INVALID_PARAMETER;
@@ -544,7 +534,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		complete_ret_submit(vpdo, irp);
+		complete_ret_submit(vpdo, irp, dispatch_level);
 	}
 }
 
@@ -558,7 +548,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
+void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr, _In_ bool dispatch_level)
 {
 	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
 
@@ -569,7 +559,7 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	}
 
 	if (irp) {
-		ret_submit(vpdo, irp, hdr);
+		ret_submit(vpdo, irp, hdr, dispatch_level);
 	}
 }
 
@@ -615,7 +605,7 @@ auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void receive_event(_Inout_ vpdo_dev_t &vpdo)
+void receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ bool dispatch_level)
 {
 	auto &hdr = vpdo.wsk_data_hdr;
 
@@ -639,7 +629,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 			break;
 		}
 
-		ret_command(vpdo, hdr);
+		ret_command(vpdo, hdr, dispatch_level);
 
 		if (payload_size) {
 			NT_VERIFY(!wsk_data_consume(vpdo, payload_size));
@@ -678,7 +668,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 
 	if (DataIndication) {
 		wsk_data_push(*vpdo, DataIndication, BytesIndicated);
-		receive_event(*vpdo);
+		receive_event(*vpdo, Flags & WSK_FLAG_AT_DISPATCH_LEVEL);
 	} else {
 		vhub_unplug_vpdo(vpdo);
 		st = STATUS_SUCCESS;

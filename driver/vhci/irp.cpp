@@ -70,12 +70,12 @@ NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 
 void complete_canceled_irp(IRP *irp)
 {
-	TraceMsg("%04x", ptr4log(irp));
 	usbip::free_transfer_buffer_mdl(irp);
 
 	irp->IoStatus.Status = STATUS_CANCELLED;
 	irp->IoStatus.Information = 0;
 
+	TraceMsg("%04x", ptr4log(irp));
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
 
