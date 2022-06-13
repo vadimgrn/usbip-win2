@@ -81,3 +81,10 @@ bool is_valid_dsc(const USB_STRING_DESCRIPTOR *d)
 	return  d->bLength >= sizeof(*d) &&
 		d->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE;
 }
+
+bool is_valid_dsc(const USB_OS_STRING_DESCRIPTOR &d)
+{
+	return  d.bLength == sizeof(d) && 
+		d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && 
+		RtlEqualMemory(d.Signature, L"MSFT100", sizeof(d.Signature));
+}

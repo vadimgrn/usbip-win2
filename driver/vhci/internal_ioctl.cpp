@@ -22,12 +22,9 @@ namespace
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
 {
+//      NT_ASSERT(!irp->IoStatus.Information); // can fail
         usbip::free_transfer_buffer_mdl(irp);
-
-        auto info = irp->IoStatus.Information;
-//      NT_ASSERT(!info); // can fail
-        TraceMsg("irp %04x, %!STATUS!, Information %Iu(%#Ix)", ptr4log(irp), status, info, info);
-
+        TraceMsg("irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), status, irp->IoStatus.Information);
         return CompleteRequest(irp, status);
 }
 
@@ -807,9 +804,15 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr, &urb);
 }
 
+/*
+ * @see https://github.com/libusb/libusb/blob/master/examples/xusb.c, read_ms_winsub_feature_descriptors
+ */
+_IRQL_requires_(LOW_LEVEL)
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-	auto &r = urb.UrbOSFeatureDescriptorRequest;
+        PAGED_CODE();
+
+        auto &r = urb.UrbOSFeatureDescriptorRequest;
 
 	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
                 ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
@@ -823,9 +826,9 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         auto pkt = get_submit_setup(&hdr);
         pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_VENDOR | r.Recipient;
-        pkt->bRequest = r.MS_PageIndex; // bMS_VendorCode from string descriptor 0xEE
-        pkt->wValue.W = r.MS_FeatureDescriptorIndex;
-        pkt->wIndex.W = r.InterfaceNumber;
+        pkt->bRequest = vpdo.MS_VendorCode;
+        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.InterfaceNumber, r.MS_PageIndex);
+        pkt->wIndex.W = r.MS_FeatureDescriptorIndex;
         pkt->wLength = (USHORT)r.TransferBufferLength;
 
         return send(vpdo, irp, hdr, &urb);
@@ -1013,9 +1016,7 @@ void complete_internal_ioctl(IRP *irp, const char *caller)
 
         auto &st = irp->IoStatus;
 //      NT_ASSERT(!st.Information); // can fail
-
-        TraceMsg("%s: irp %04x, %!STATUS!, Information %Iu(%#Ix)", 
-                  caller, ptr4log(irp), st.Status, st.Information, st.Information);
+        TraceMsg("%s: irp %04x, %!STATUS!, Information %#Ix", caller, ptr4log(irp), st.Status, st.Information);
 
         IoCompleteRequest(irp, IO_NO_INCREMENT);
 }

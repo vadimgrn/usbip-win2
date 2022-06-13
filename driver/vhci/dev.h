@@ -110,6 +110,7 @@ struct vpdo_dev_t : vdev_t
 	UCHAR bDeviceSubClass;
 	UCHAR bDeviceProtocol;
 
+	UCHAR MS_VendorCode; // member of USB_OS_STRING_DESCRIPTOR
 	USB_STRING_DESCRIPTOR *strings[24];
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 

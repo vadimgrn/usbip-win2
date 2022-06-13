@@ -246,7 +246,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 		prop = DevicePropertyLocationInformation;
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: %!DEVICE_TEXT_TYPE!", vdev->type, type);
+		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: unknown DeviceTextType %d, LocaleId %#x", vdev->type, type, r.LocaleId);
 		return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
 	}
 
@@ -267,9 +267,8 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 		copy_str(prop_str, irp->IoStatus);
 	}
 	
-	Trace(Status ? TRACE_LEVEL_ERROR : TRACE_LEVEL_INFORMATION, 
-		"%!vdev_type_t!: %!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!", 
-		vdev->type, r.DeviceTextType, r.LocaleId, reinterpret_cast<wchar_t*>(Information), Status);
+	TraceMsg("%!vdev_type_t!: %!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!", 
+		  vdev->type, r.DeviceTextType, r.LocaleId, reinterpret_cast<wchar_t*>(Information), Status);
 
 	return CompleteRequestIoStatus(irp);
 }

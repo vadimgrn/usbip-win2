@@ -366,10 +366,32 @@ PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
+{
+        PAGED_CODE();
+
+        USB_OS_STRING_DESCRIPTOR d;
+        if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, MS_OS_DESC_STRING_IDX, 0, 
+                                  usbip::memory::stack, &d, sizeof(d))) {
+                return;
+        }
+
+        UNICODE_STRING sig{ sizeof(d.Signature), sizeof(d.Signature), d.Signature };
+
+        TraceDbg("bLength %d, %!usb_descriptor_type!, Signature '%!USTR!', MS_VendorCode %#x, Pad %d", 
+                  d.bLength, d.bDescriptorType, &sig, d.MS_VendorCode, d.Pad);
+
+        if (is_valid_dsc(d)) {
+                vpdo.MS_VendorCode = d.MS_VendorCode;
+        }
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
+        read_os_string_descriptor(vpdo);
         USHORT lang_id = 0;
 
         for (UCHAR idx = 0; idx < ARRAYSIZE(vpdo.strings); ++idx) {

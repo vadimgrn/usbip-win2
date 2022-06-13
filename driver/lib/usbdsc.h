@@ -3,11 +3,20 @@
 #include <ntddk.h>
 #include <usbdi.h>
 
-#include <stdbool.h>
+enum : UCHAR { MS_OS_DESC_STRING_IDX = 0xEE };
+
+struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
+{
+	WCHAR Signature[7]; // MSFT100
+	UCHAR MS_VendorCode;
+	UCHAR Pad;
+};
+static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
 bool is_valid_dsc(const USB_DEVICE_DESCRIPTOR *d);
 bool is_valid_dsc(const USB_CONFIGURATION_DESCRIPTOR *d);
 bool is_valid_dsc(const USB_STRING_DESCRIPTOR *d);
+bool is_valid_dsc(const USB_OS_STRING_DESCRIPTOR &d);
 
 inline auto is_valid_dsc(const USB_DEVICE_DESCRIPTOR &d) { return is_valid_dsc(&d);  }
 inline auto is_valid_dsc(const USB_CONFIGURATION_DESCRIPTOR &d) { return is_valid_dsc(&d);  }
