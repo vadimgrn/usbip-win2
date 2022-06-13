@@ -18,7 +18,7 @@
 	L"&REV_" VHUB_REV
 
 
-extern LONG VpdoCount;
+inline LONG VpdoCount;
 
 PAGEABLE void set_state(vdev_t &vdev, pnp_state state);
 

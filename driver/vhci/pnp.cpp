@@ -16,8 +16,6 @@
 
 #include <wdmguid.h>
 
-LONG VpdoCount;
-
 namespace
 {
 

@@ -160,17 +160,17 @@ PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
         return STATUS_SUCCESS;
 }
 
-auto init_ctx_lists()
+PAGEABLE auto init_lookaside_lists()
 {
+	PAGED_CODE();
+
 	if (auto err = init_send_context_list()) {
-		Trace(TRACE_LEVEL_CRITICAL, "init_send_context_list %!STATUS!", err);
 		return err;
 	} else {
 		g_init_flags |= INIT_SEND_CTX_LIST;
 	}
 
 	if (auto err = init_workitem_list()) {
-		Trace(TRACE_LEVEL_CRITICAL, "init_workitem_list %!STATUS!", err);
 		return err;
 	} else {
 		g_init_flags |= INIT_WORKITEM_LIST;
@@ -206,7 +206,8 @@ PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *R
 
 	TraceMsg("%p", drvobj);
 
-	if (auto err = init_ctx_lists()) {
+	if (auto err = init_lookaside_lists()) {
+		Trace(TRACE_LEVEL_CRITICAL, "init_lookaside_lists %!STATUS!", err);
 		DriverUnload(drvobj);
 		return err;
 	}

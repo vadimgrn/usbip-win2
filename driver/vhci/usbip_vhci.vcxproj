@@ -40,7 +40,6 @@
     <ClCompile Include="power.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="wmi.cpp" />
-    <ClCompile Include="workitem.cpp" />
     <ClCompile Include="wsk_data.cpp" />
     <ClCompile Include="wsk_events.cpp" />
   </ItemGroup>

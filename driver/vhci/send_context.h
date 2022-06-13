@@ -9,7 +9,7 @@
 
 struct vpdo_dev_t;
 
-extern LOOKASIDE_LIST_EX send_context_list;
+inline LOOKASIDE_LIST_EX send_context_list;
 NTSTATUS init_send_context_list();
 
 struct send_context

@@ -473,6 +473,11 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
         return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
+/*
+ * There is a race condition between code after complete_dequeue and complete_enqueue in complete_ret_submit.
+ * As a result newly enqueued work_item can be executed before this one, you will see reordering of IRPs completion.
+ * If this happen in real life, something must be changed here.
+ */
 _Function_class_(IO_WORKITEM_ROUTINE_EX)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -493,7 +498,6 @@ void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp, _In_ bool dispatch_level)
 	int irp_irql = get_flags(irp) & F_IRQL_MASK;
 
 	if (cur_irql > irp_irql) {
-
 		if (complete_enqueue(vpdo, irp)) { // list was not empty
 			return;
 		}
@@ -505,7 +509,7 @@ void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp, _In_ bool dispatch_level)
 		}
 
 		Trace(TRACE_LEVEL_WARNING, "alloc_workitem error");
-		NT_VERIFY(complete_dequeue(vpdo) ==  irp);
+		NT_VERIFY(complete_dequeue(vpdo) == irp);
 	}
 
 	complete_internal_ioctl(irp, __func__);

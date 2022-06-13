@@ -8,8 +8,6 @@
 
 #include "dev.h"
 
-LOOKASIDE_LIST_EX send_context_list;
-
 namespace
 {
 
