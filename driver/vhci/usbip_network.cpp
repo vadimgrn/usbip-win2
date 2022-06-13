@@ -71,7 +71,7 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_h
  * URBs that are issued on DISPATCH_LEVEL have buffers from nonpaged pool.
  * TransferBufferLength can be zero.
  */ 
-auto set_write_mdl_buffer(_Inout_ IRP *irp, _Inout_ URB &urb)
+auto set_transfer_buffer_mdl(_Inout_ IRP *irp, _Inout_ URB &urb)
 {
         auto &r = *AsUrbTransfer(&urb);
 
@@ -150,7 +150,7 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ IRP *irp, _Inout_ usbip_head
 {
         usbip::Mdl mdl_hdr(memory::stack, &hdr, sizeof(hdr));
 
-        if (auto err = mdl_hdr.prepare(IoReadAccess)) {
+        if (auto err = mdl_hdr.prepare_paged(IoReadAccess)) {
                 Trace(TRACE_LEVEL_ERROR, "Prepare usbip_header %!STATUS!", err);
                 return err;
         }
@@ -160,7 +160,7 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ IRP *irp, _Inout_ usbip_head
         if (transfer_buffer) {
                 auto &urb = *transfer_buffer;
                 auto out = is_transfer_direction_out(&hdr);  // TransferFlags can have wrong direction
-                if (auto err = out ? make_transfer_buffer_mdl(buf_out, IoReadAccess, urb) : set_write_mdl_buffer(irp, urb)) {
+                if (auto err = out ? make_transfer_buffer_mdl(buf_out, IoReadAccess, urb) : set_transfer_buffer_mdl(irp, urb)) {
                         Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl(%s) %!STATUS!", out ? "OUT" : "IN", err);
                         return err;
                 }
@@ -235,6 +235,20 @@ void usbip::free_transfer_buffer_mdl(_Inout_ IRP *irp)
         TraceDbg("irp %04x: TransferBufferMDL %04x", ptr4log(irp), ptr4log(r.TransferBufferMDL));
         NT_ASSERT(r.TransferBuffer && r.TransferBufferMDL);
 
-        usbip::Mdl(r.TransferBufferMDL, usbip::mdl_type::paged); // unlock pages and release MDL
+        Mdl(r.TransferBufferMDL, mdl_type::paged); // unlock pages and release MDL
         r.TransferBufferMDL = nullptr;
+}
+
+/*
+ * NT_ASSERT(!irp->IoStatus.Information); // can fail
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::free_mdl_and_complete(_Inout_ IRP *irp, _In_ const char *caller)
+{
+        free_transfer_buffer_mdl(irp);
+
+        auto &st = irp->IoStatus;
+        TraceDbg("%s irp %04x, %!STATUS!, Information %#Ix", caller ? caller : "", ptr4log(irp), st.Status, st.Information);
+
+        IoCompleteRequest(irp, IO_NO_INCREMENT);
 }

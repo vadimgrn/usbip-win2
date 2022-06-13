@@ -151,7 +151,7 @@ seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in)
 /*
  * Zero string index means absense of a descriptor.
  */
-PCWSTR get_string_descr(const vpdo_dev_t &vpdo, UCHAR index)
+PCWSTR get_string_descr_str(const vpdo_dev_t &vpdo, UCHAR index)
 {
 	if (index && index < ARRAYSIZE(vpdo.strings)) {
 		if (auto d = vpdo.strings[index]) {

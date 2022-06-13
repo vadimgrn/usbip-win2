@@ -204,21 +204,21 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
         return (busnum << 16) | devnum;
 }
 
-PCWSTR get_string_descr(const vpdo_dev_t &vpdo, UCHAR index);
+PCWSTR get_string_descr_str(const vpdo_dev_t &vpdo, UCHAR index);
 
 inline auto get_manufacturer(const vpdo_dev_t &vpdo)
 {
-	return get_string_descr(vpdo, vpdo.descriptor.iManufacturer);
+	return get_string_descr_str(vpdo, vpdo.descriptor.iManufacturer);
 }
 
 inline auto get_product(const vpdo_dev_t &vpdo)
 {
-	return get_string_descr(vpdo, vpdo.descriptor.iProduct);
+	return get_string_descr_str(vpdo, vpdo.descriptor.iProduct);
 }
 
 inline auto get_serial_number(const vpdo_dev_t &vpdo)
 {
-	return get_string_descr(vpdo, vpdo.descriptor.iSerialNumber);
+	return get_string_descr_str(vpdo, vpdo.descriptor.iSerialNumber);
 }
 
 bool complete_enqueue(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);

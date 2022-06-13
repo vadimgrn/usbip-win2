@@ -19,15 +19,6 @@
 namespace
 {
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto complete_internal_ioctl(IRP *irp, NTSTATUS status)
-{
-//      NT_ASSERT(!irp->IoStatus.Information); // can fail
-        usbip::free_transfer_buffer_mdl(irp);
-        TraceMsg("irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), status, irp->IoStatus.Information);
-        return CompleteRequest(irp, status);
-}
-
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  * 
@@ -61,7 +52,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        complete_internal_ioctl(irp, __func__);
+                        usbip::free_mdl_and_complete(irp);
                         break;
                 case ST_IRP_CANCELED:
                         complete_canceled_irp(irp);
@@ -69,7 +60,8 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                 }
         } else if (auto victim = dequeue_irp(vpdo, seqnum)) {
                 NT_ASSERT(victim == irp);
-                complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
+                victim->IoStatus.Status = STATUS_UNSUCCESSFUL;
+                usbip::free_mdl_and_complete(victim);
         } else if (old_status == ST_IRP_CANCELED) {
               complete_canceled_irp(irp);
         }
@@ -1006,20 +998,15 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
         return send(vpdo, irp, hdr);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto complete_internal_ioctl(_Inout_ IRP *irp, _In_ NTSTATUS status)
+{
+        TraceDbg("irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), status, irp->IoStatus.Information);
+        return CompleteRequest(irp, status);
+}
+
 } // namespace
 
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void complete_internal_ioctl(IRP *irp, const char *caller)
-{
-        usbip::free_transfer_buffer_mdl(irp);
-
-        auto &st = irp->IoStatus;
-//      NT_ASSERT(!st.Information); // can fail
-        TraceMsg("%s: irp %04x, %!STATUS!, Information %#Ix", caller, ptr4log(irp), st.Status, st.Information);
-
-        IoCompleteRequest(irp, IO_NO_INCREMENT);
-}
 
 /*
  * There is a race condition between IRP cancelation and RET_SUBMIT.
@@ -1062,11 +1049,12 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         }
 }
 
+/*
+ * NT_ASSERT(!irp->IoStatus.Information); // can fail
+ */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
-//      NT_ASSERT(!irp->IoStatus.Information); // can fail
-
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
@@ -1105,7 +1093,8 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	if (status == STATUS_PENDING) {
                 TraceDbg("Leave %!STATUS!, irp %04x", status, ptr4log(irp));
 	} else {
-		complete_internal_ioctl(irp, status);
+                irp->IoStatus.Status = status;
+                usbip::free_mdl_and_complete(irp);
 	}
 
 	return status;

@@ -25,4 +25,6 @@ NTSTATUS send_cmd(_In_ SOCKET *sock, _Inout_ IRP *irp, _Inout_ usbip_header &hdr
 NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Operation, _In_ const _URB &urb);
 void free_transfer_buffer_mdl(_Inout_ IRP *irp);
 
+void free_mdl_and_complete(_Inout_ IRP *irp, _In_opt_ const char *caller = nullptr);
+
 } // namespace usbip

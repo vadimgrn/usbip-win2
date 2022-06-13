@@ -16,12 +16,12 @@ size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len);
 
 struct WskDataCopyState
 {
-        _WSK_DATA_INDICATION *cur;
-        size_t offset;
-        bool next;
+        _WSK_DATA_INDICATION *cur{};
+        size_t offset{};
+        bool next{};
 };
 
 NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, 
-                       _Inout_ WskDataCopyState *consume = nullptr, size_t *actual = 0);
+                       _Inout_ WskDataCopyState *consume = nullptr, _Out_ size_t *actual = nullptr);
 
 

@@ -217,7 +217,7 @@ auto copy_isoc_data(
 
 	byteswap(sd, r.NumberOfPackets);
 
-	WskDataCopyState consume{};
+	WskDataCopyState consume;
 	ULONG src_offset = 0; // from src_buf
 	auto dd = r.IsoPacket;
 
@@ -487,7 +487,7 @@ void work_item(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITE
 	auto &vpdo = *static_cast<vpdo_dev_t*>(Context);
 
 	while (auto irp = complete_dequeue(vpdo)) {
-		complete_internal_ioctl(irp, __func__);
+		usbip::free_mdl_and_complete(irp, __func__);
 	}
 }
 
@@ -500,19 +500,17 @@ void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp, _In_ bool dispatch_level)
 	if (cur_irql > irp_irql) {
 		if (complete_enqueue(vpdo, irp)) { // list was not empty
 			return;
-		}
-
-		if (auto wi = alloc_workitem(vpdo.Self)) {
+ 		} else if (auto wi = alloc_workitem(vpdo.Self)) {
 			const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
 			IoQueueWorkItemEx(wi, work_item, QueueType, &vpdo);
 			return;
+		} else {
+			Trace(TRACE_LEVEL_WARNING, "alloc_workitem error");
+			NT_VERIFY(complete_dequeue(vpdo) == irp);
 		}
-
-		Trace(TRACE_LEVEL_WARNING, "alloc_workitem error");
-		NT_VERIFY(complete_dequeue(vpdo) == irp);
 	}
 
-	complete_internal_ioctl(irp, __func__);
+	usbip::free_mdl_and_complete(irp, __func__);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
