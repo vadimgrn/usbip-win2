@@ -8,34 +8,13 @@
 #include "pnp.h"
 #include "vpdo.h"
 #include "vhub.h"
+#include "internal_ioctl.h"
 
 namespace
 {
 
-_IRQL_requires_(LOW_LEVEL)
-PAGEABLE USB_COMMON_DESCRIPTOR *find_descriptor(USB_CONFIGURATION_DESCRIPTOR *cd, UCHAR type, UCHAR index)
-{
-	PAGED_CODE();
-
-	USB_COMMON_DESCRIPTOR *from{};
-	auto end = reinterpret_cast<char*>(cd + cd->wTotalLength);
-
-	for (int i = 0; (char*)from < end; ++i) {
-		from = dsc_find_next(cd, from, type);
-		if (!from) {
-			break;
-		}
-		if (i == index) {
-			NT_ASSERT(from->bDescriptorType == type);
-			return from;
-		}
-	}
-
-	return nullptr;
-}
-
-_IRQL_requires_(LOW_LEVEL)
-PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -44,7 +23,7 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 
 	auto cfg = vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
 	auto index = setup->wValue.LowByte;
-//	auto lang_id = setup->wIndex.W;
+//	auto lang_id = setup->wIndex.W; // for string descriptor
 
 	void *dsc_data{};
 	USHORT dsc_len = 0;
@@ -67,29 +46,19 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 			if (auto d = vpdo->strings[index]) {
 				dsc_len = d->bLength;
 				dsc_data = d;
-				break;
-			}
-		}
-		[[fallthrough]];
-	case USB_INTERFACE_DESCRIPTOR_TYPE:
-	case USB_ENDPOINT_DESCRIPTOR_TYPE:
-		if (auto cd = vpdo->actconfig) {
-			if (auto d = find_descriptor(cd, type, index)) {
-				dsc_len = d->bLength;
-				dsc_data = d;
 			}
 		}
 		break;
 	}
 
+	NT_ASSERT(outlen > sizeof(r));
+	auto TransferBufferLength = outlen - ULONG(sizeof(r)); // r.Data[]
+
 	if (!dsc_data) {
-		return STATUS_INSUFFICIENT_RESOURCES;
+		return get_descriptor_from_node_connection(*vpdo, irp, r, TransferBufferLength);
 	}
 
-	NT_ASSERT(outlen > sizeof(r));
-	auto data_sz = outlen - ULONG(sizeof(r)); // r.Data[]
-
-	auto cnt = min(data_sz, dsc_len);
+	auto cnt = min(dsc_len, TransferBufferLength);
 	RtlCopyMemory(r.Data, dsc_data, cnt);
 	outlen = sizeof(r) + cnt;
 
@@ -177,7 +146,7 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 }
 
 _IRQL_requires_(LOW_LEVEL)
-PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -196,7 +165,7 @@ PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUE
 	}
 
 	if (auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex)) {
-		return do_get_descr_from_nodeconn(vpdo, r, outlen);
+		return do_get_descr_from_nodeconn(vpdo, irp, r, outlen);
 	}
 
 	return STATUS_NO_SUCH_DEVICE;
@@ -341,7 +310,7 @@ PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONN
 
 
 _IRQL_requires_(LOW_LEVEL)
-PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -361,7 +330,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buff
 		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descr_from_nodeconn(vhub, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
+		status = get_descr_from_nodeconn(vhub, irp, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_HUB_INFORMATION_EX:
 		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), outlen);

@@ -473,6 +473,39 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
         return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, USB_DESCRIPTOR_REQUEST &r)
+{
+	auto &bytes_returned = irp->IoStatus.Information; // size of the data stored in the output buffer, see DeviceIoControl
+	bytes_returned = sizeof(r);
+
+	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto outlen = stack->Parameters.DeviceIoControl.OutputBufferLength;
+
+	NT_ASSERT(outlen > sizeof(r));
+	auto TransferBufferLength = outlen - ULONG(sizeof(r)); // r.Data[]
+
+	auto actual_length = hdr.u.ret_submit.actual_length;
+
+	if (!(actual_length >= 0 && static_cast<ULONG>(actual_length) <= TransferBufferLength)) {
+		Trace(TRACE_LEVEL_ERROR, "OutputBufferLength %lu, actual_length %d", outlen, actual_length);
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+	
+	if (auto err = wsk_data_copy(vpdo, r.Data, 0, actual_length)) {
+		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy %!STATUS!", err);
+		return err;
+	}
+
+	bytes_returned += actual_length;
+
+	TraceUrb("irp %04x <- ConnectionIndex %lu, %d bytes%!BIN!", ptr4log(irp), r.ConnectionIndex, actual_length,
+		  WppBinary(r.Data, USHORT(actual_length)));
+
+	auto err = to_windows_status(hdr.u.ret_submit.status);
+	return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+}
+
 /*
  * There is a race condition between code after complete_dequeue and complete_enqueue in complete_ret_submit.
  * As a result newly enqueued work_item can be executed before this one, you will see reordering of IRPs completion.
@@ -528,7 +561,11 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, _In_ bool d
         case IOCTL_INTERNAL_USB_RESET_PORT:
                 st = usb_reset_port(hdr);
                 break;
-        default:
+	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
+		st = get_descriptor_from_node_connection(vpdo, irp, hdr,
+			*static_cast<USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer));
+		break;
+	default:
                 Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
         }
 
