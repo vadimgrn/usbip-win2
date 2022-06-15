@@ -67,35 +67,6 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_h
         return STATUS_SUCCESS;
 }
 
-/*
- * URBs that are issued on DISPATCH_LEVEL have buffers from nonpaged pool.
- * TransferBufferLength can be zero.
- */ 
-auto set_transfer_buffer_mdl(_Inout_ IRP *irp, _Inout_ URB &urb)
-{
-        auto &r = *AsUrbTransfer(&urb);
-
-        auto &flags = get_flags(irp);
-        auto irql = flags & F_IRQL_MASK;
-
-        bool use_mdl = irql < DISPATCH_LEVEL && !r.TransferBufferMDL && r.TransferBuffer && r.TransferBufferLength;
-        if (!use_mdl) {
-                NT_ASSERT(!(flags & F_FREE_MDL));
-                return STATUS_SUCCESS;
-        }
-
-        usbip::Mdl mdl;
-        if (auto err = make_transfer_buffer_mdl(mdl, IoWriteAccess, urb)) {
-                return err;
-        }
-
-        r.TransferBufferMDL = mdl.release();
-        flags |= F_FREE_MDL;
-
-        TraceDbg("irp %04x: TransferBufferMDL %04x", ptr4log(irp), ptr4log(r.TransferBufferMDL));
-        return STATUS_SUCCESS;
-}
-
 } // namespace
 
 
@@ -146,7 +117,7 @@ err_t usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ 
         return ERR_NONE;
 }
 
-NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
+NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
 {
         usbip::Mdl mdl_hdr(memory::stack, &hdr, sizeof(hdr));
 
@@ -157,11 +128,9 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ IRP *irp, _Inout_ usbip_head
 
         usbip::Mdl buf_out;
 
-        if (transfer_buffer) {
-                auto &urb = *transfer_buffer;
-                auto out = is_transfer_direction_out(&hdr);  // TransferFlags can have wrong direction
-                if (auto err = out ? make_transfer_buffer_mdl(buf_out, IoReadAccess, urb) : set_transfer_buffer_mdl(irp, urb)) {
-                        Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl(%s) %!STATUS!", out ? "OUT" : "IN", err);
+        if (transfer_buffer && is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+                if (auto err = make_transfer_buffer_mdl(buf_out, IoReadAccess, *transfer_buffer)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
                         return err;
                 }
         }
@@ -214,41 +183,4 @@ NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Ope
         }
 
         return err;
-}
-
-void usbip::free_transfer_buffer_mdl(_Inout_ IRP *irp)
-{
-        auto &flags = get_flags(irp);
-
-        if (flags & F_FREE_MDL) {
-                flags &= ~F_FREE_MDL;
-        } else {
-                return;
-        }
-
-        NT_ASSERT(IoGetCurrentIrpStackLocation(irp)->Parameters.DeviceIoControl.IoControlCode == IOCTL_INTERNAL_USB_SUBMIT_URB);
-        auto urb = static_cast<URB*>(URB_FROM_IRP(irp));
-
-        NT_ASSERT(has_transfer_buffer(*urb));
-        auto &r = *AsUrbTransfer(urb);
-
-        TraceDbg("irp %04x: TransferBufferMDL %04x", ptr4log(irp), ptr4log(r.TransferBufferMDL));
-        NT_ASSERT(r.TransferBuffer && r.TransferBufferMDL);
-
-        Mdl(r.TransferBufferMDL, mdl_type::paged); // unlock pages and release MDL
-        r.TransferBufferMDL = nullptr;
-}
-
-/*
- * NT_ASSERT(!irp->IoStatus.Information); // can fail
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::free_mdl_and_complete(_Inout_ IRP *irp, _In_ const char *caller)
-{
-        free_transfer_buffer_mdl(irp);
-
-        auto &st = irp->IoStatus;
-        TraceDbg("%s irp %04x, %!STATUS!, Information %#Ix", caller ? caller : "", ptr4log(irp), st.Status, st.Information);
-
-        IoCompleteRequest(irp, IO_NO_INCREMENT);
 }

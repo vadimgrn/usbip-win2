@@ -129,9 +129,6 @@ struct vpdo_dev_t : vdev_t
 	_WSK_DATA_INDICATION* wsk_data_tail; // shortcut for wsk::tail(wsk_data)
 	usbip_header wsk_data_hdr; // valid if is_valid_seqnum(wsk_data_hdr.base.seqnum)
 
-	LIST_ENTRY complete;
-	KSPIN_LOCK complete_lock;
-
 	IO_CSQ irps_csq;
 	LIST_ENTRY irps;
 	KSPIN_LOCK irps_lock;
@@ -220,6 +217,3 @@ inline auto get_serial_number(const vpdo_dev_t &vpdo)
 {
 	return get_string_descr_str(vpdo, vpdo.descriptor.iSerialNumber);
 }
-
-bool complete_enqueue(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);
-IRP *complete_dequeue(_Inout_ vpdo_dev_t &vpdo);

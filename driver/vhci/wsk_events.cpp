@@ -506,53 +506,11 @@ NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, const u
 	return !err || err == EndpointStalled ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
-/*
- * There is a race condition between code after complete_dequeue and complete_enqueue in complete_ret_submit.
- * As a result newly enqueued work_item can be executed before this one, you will see reordering of IRPs completion.
- * If this happen in real life, something must be changed here.
- */
-_Function_class_(IO_WORKITEM_ROUTINE_EX)
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-void work_item(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
-{
-	free(IoWorkItem);
-	auto &vpdo = *static_cast<vpdo_dev_t*>(Context);
-
-	while (auto irp = complete_dequeue(vpdo)) {
-		usbip::free_mdl_and_complete(irp, __func__);
-	}
-}
-
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete_ret_submit(vpdo_dev_t &vpdo, IRP *irp, _In_ bool dispatch_level)
+void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 {
-	int cur_irql = dispatch_level ?  DISPATCH_LEVEL : LOW_LEVEL;
-	int irp_irql = get_flags(irp) & F_IRQL_MASK;
-
-	if (cur_irql > irp_irql) {
-		if (complete_enqueue(vpdo, irp)) { // list was not empty
-			return;
- 		} else if (auto wi = alloc_workitem(vpdo.Self)) {
-			const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-			IoQueueWorkItemEx(wi, work_item, QueueType, &vpdo);
-			return;
-		} else {
-			Trace(TRACE_LEVEL_WARNING, "alloc_workitem error");
-			NT_VERIFY(complete_dequeue(vpdo) == irp);
-		}
-	}
-
-	usbip::free_mdl_and_complete(irp, __func__);
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, _In_ bool dispatch_level)
-{
-	auto &st = irp->IoStatus.Status;
-	st = STATUS_INVALID_PARAMETER;
-
 	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto &st = irp->IoStatus.Status;
 
         switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
         case IOCTL_INTERNAL_USB_SUBMIT_URB:
@@ -566,14 +524,16 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, _In_ bool d
 			*static_cast<USB_DESCRIPTOR_REQUEST*>(irp->AssociatedIrp.SystemBuffer));
 		break;
 	default:
-                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
-        }
+		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
+		st = STATUS_INVALID_PARAMETER;
+	}
 
 	auto old_status = InterlockedCompareExchange(get_status(irp), ST_RECV_COMPLETE, ST_NONE);
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		complete_ret_submit(vpdo, irp, dispatch_level);
+		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
+		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 }
 
@@ -587,7 +547,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr, _In_ bool d
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr, _In_ bool dispatch_level)
+void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 {
 	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
 
@@ -598,7 +558,7 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr, _In_ bo
 	}
 
 	if (irp) {
-		ret_submit(vpdo, irp, hdr, dispatch_level);
+		ret_submit(vpdo, irp, hdr);
 	}
 }
 
@@ -644,7 +604,7 @@ auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ bool dispatch_level)
+void receive_event(_Inout_ vpdo_dev_t &vpdo)
 {
 	auto &hdr = vpdo.wsk_data_hdr;
 
@@ -668,7 +628,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo, _In_ bool dispatch_level)
 			break;
 		}
 
-		ret_command(vpdo, hdr, dispatch_level);
+		ret_command(vpdo, hdr);
 
 		if (payload_size) {
 			NT_VERIFY(!wsk_data_consume(vpdo, payload_size));
@@ -707,7 +667,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 
 	if (DataIndication) {
 		wsk_data_push(*vpdo, DataIndication, BytesIndicated);
-		receive_event(*vpdo, Flags & WSK_FLAG_AT_DISPATCH_LEVEL);
+		receive_event(*vpdo);
 	} else {
 		vhub_unplug_vpdo(vpdo);
 		st = STATUS_SUCCESS;

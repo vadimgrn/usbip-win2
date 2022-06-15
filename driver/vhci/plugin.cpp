@@ -182,9 +182,6 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
         vpdo->Self->Flags |= DO_POWER_PAGABLE | DO_DIRECT_IO;
         NT_ASSERT(!is_valid_seqnum(vpdo->wsk_data_hdr.base.seqnum)); // see wsk_events.cpp, get_header
 
-        InitializeListHead(&vpdo->complete);
-        KeInitializeSpinLock(&vpdo->complete_lock);
-
         if (init(*vpdo, r)) {
                 return make_error(ERR_GENERAL);
         }

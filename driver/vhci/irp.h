@@ -45,15 +45,6 @@ inline auto& get_seqnum(IRP *irp)
 	return *reinterpret_cast<seqnum_t*>(ptr);
 }
 
-enum { F_IRQL_MASK = HIGH_LEVEL, F_FREE_MDL };
-
-inline auto& get_flags(IRP *irp)
-{
-	static_assert(sizeof(UINT32) == sizeof(seqnum_t));
-	auto v = reinterpret_cast<UINT32*>(irp->Tail.Overlay.DriverContext);
-	return v[1];
-}
-
 inline auto get_status(IRP *irp)
 {
 	return reinterpret_cast<LONG*>(irp->Tail.Overlay.DriverContext + 1);
