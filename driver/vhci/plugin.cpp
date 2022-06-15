@@ -119,7 +119,7 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
         }
 
         if (!*r.serial) {
-                RtlInitUnicodeString(&vpdo.serial, nullptr);
+                // RtlInitUnicodeString(&vpdo.serial, nullptr);
         } else if (auto err = to_unicode_str(vpdo.serial, r.serial)) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error %!STATUS!", r.serial, err);
                 return err;
@@ -626,6 +626,7 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
 } // namespace
 
 
+_Kernel_clear_do_init_(yes)
 PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();

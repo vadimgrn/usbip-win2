@@ -65,7 +65,7 @@ Source: {#BuildDir + "package\usbip_vhci.sys"}; DestDir: "{tmp}";
 Source: {#BuildDir + "package\usbip_vhci.cat"}; DestDir: "{tmp}"; 
 
 #if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}/pdb";
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}";
 #endif
 
 

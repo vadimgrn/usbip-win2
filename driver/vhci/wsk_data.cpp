@@ -108,7 +108,7 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
  */
 NTSTATUS wsk_data_copy(
 	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, 
-	_Inout_ WskDataCopyState *consume, _Out_ size_t *actual)
+	_Inout_opt_ WskDataCopyState *consume, _Out_opt_ size_t *actual)
 {
 	if (actual) {
 		*actual = 0;

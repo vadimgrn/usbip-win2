@@ -27,7 +27,7 @@ NTSTATUS control_client(
 struct SOCKET;
 
 NTSTATUS socket(
-        _Out_ SOCKET* &sock,
+        _Outptr_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
         _In_ ULONG Protocol,
@@ -76,27 +76,27 @@ NTSTATUS set_keepalive(_In_ SOCKET *sock, int idle = 0, int cnt = 0, int intvl =
 //
 
 NTSTATUS getaddrinfo(
-        _Out_ ADDRINFOEXW* &Result,
+        _Outptr_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
         _In_opt_ ADDRINFOEXW *Hints);
 
-void free(_In_ ADDRINFOEXW *AddrInfo);
+void free(_In_opt_ ADDRINFOEXW *AddrInfo);
 
 //
 
-using addrinfo_f = NTSTATUS (SOCKET *sock, const ADDRINFOEXW &ai, void *ctx);
+using addrinfo_f = NTSTATUS (_In_ SOCKET *sock, _In_ const ADDRINFOEXW &ai, _Inout_opt_ void *ctx);
 
 SOCKET *for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
-        _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _In_opt_ void *ctx);
+        _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _Inout_opt_ void *ctx);
 
 enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
-const char *ReceiveEventFlags(char *buf, size_t len, ULONG Flags);
+const char *ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags);
 
-WSK_DATA_INDICATION *tail(_In_ WSK_DATA_INDICATION *di);
+WSK_DATA_INDICATION *tail(_In_opt_ WSK_DATA_INDICATION *di);
 
-size_t size(_In_ const WSK_DATA_INDICATION *di);
+size_t size(_In_opt_ const WSK_DATA_INDICATION *di);
 inline auto size(_In_ const WSK_DATA_INDICATION &di) { return size(&di); }
 
 } // namespace wsk

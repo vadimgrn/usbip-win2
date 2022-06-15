@@ -245,7 +245,7 @@ NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags,
 }
 
 NTSTATUS wsk::getaddrinfo(
-        _Out_ ADDRINFOEXW* &Result,
+        _Outptr_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
         _In_opt_ ADDRINFOEXW *Hints)
@@ -274,7 +274,7 @@ NTSTATUS wsk::getaddrinfo(
         return ctx.wait_for_completion(err);
 }
 
-void wsk::free(_In_ ADDRINFOEXW *AddrInfo)
+void wsk::free(_In_opt_ ADDRINFOEXW *AddrInfo)
 {
         if (AddrInfo) {
                 auto prov = GetProviderNPIOnce();
@@ -284,7 +284,7 @@ void wsk::free(_In_ ADDRINFOEXW *AddrInfo)
 }
 
 NTSTATUS wsk::socket(
-        _Out_ SOCKET* &sock,
+        _Outptr_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
         _In_ ULONG Protocol,
@@ -501,7 +501,7 @@ NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress)
 
 auto wsk::for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch,
-        _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _In_opt_ void *ctx) -> SOCKET*
+        _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _Inout_opt_ void *ctx) -> SOCKET*
 {
         for (auto ai = head; ai; ai = ai->ai_next) {
 
@@ -609,7 +609,7 @@ WSK_PROVIDER_NPI* wsk::GetProviderNPI()
         return GetProviderNPIOnce();
 }
 
-const char* wsk::ReceiveEventFlags(char *buf, size_t len, ULONG Flags)
+const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags)
 {
         auto st = RtlStringCbPrintfA(buf, len, "%s%s%s",
                                         Flags & WSK_FLAG_RELEASE_ASAP ? ":RELEASE_ASAP" : "",
@@ -619,7 +619,7 @@ const char* wsk::ReceiveEventFlags(char *buf, size_t len, ULONG Flags)
         return st != STATUS_INVALID_PARAMETER ? buf : "ReceiveEventFlags invalid parameter";
 }
 
-size_t wsk::size(_In_ const WSK_DATA_INDICATION *di)
+size_t wsk::size(_In_opt_ const WSK_DATA_INDICATION *di)
 {
         size_t total = 0;
 
@@ -630,7 +630,7 @@ size_t wsk::size(_In_ const WSK_DATA_INDICATION *di)
         return total;
 }
 
-WSK_DATA_INDICATION* wsk::tail(_In_ WSK_DATA_INDICATION *di)
+WSK_DATA_INDICATION* wsk::tail(_In_opt_ WSK_DATA_INDICATION *di)
 {
         for ( ; di && di->Next; di = di->Next);
         return di;

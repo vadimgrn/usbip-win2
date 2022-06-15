@@ -22,6 +22,6 @@ struct WskDataCopyState
 };
 
 NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, 
-                       _Inout_ WskDataCopyState *consume = nullptr, _Out_ size_t *actual = nullptr);
+                       _Inout_opt_ WskDataCopyState *consume = nullptr, _Out_opt_ size_t *actual = nullptr);
 
 
