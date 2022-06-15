@@ -14,7 +14,39 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
+PAGEABLE USB_COMMON_DESCRIPTOR *find_descriptor(USB_CONFIGURATION_DESCRIPTOR *cd, UCHAR type, UCHAR index)
+{
+	PAGED_CODE();
+
+	USB_COMMON_DESCRIPTOR *from{};
+	auto end = reinterpret_cast<char*>(cd + cd->wTotalLength);
+
+	for (int i = 0; (char*)from < end; ++i) {
+		from = dsc_find_next(cd, from, type);
+		if (!from) {
+			break;
+		}
+		if (i == index) {
+			NT_ASSERT(from->bDescriptorType == type);
+			return from;
+		}
+	}
+
+	return nullptr;
+}
+
+/*
+ * USB_REQUEST_GET_DESCRIPTOR must not be sent to a server.
+ * This IRP_MJ_DEVICE_CONTROL request can run concurrently with IRP_MJ_INTERNAL_DEVICE_CONTROL requests. 
+ * As a result it can modify the state of the device in the middle of the multi stage operation.
+ * For example, SCSI protocol (usb flash drives, etc.) issues three bulk requests: 
+ * control block 31 bytes, data ??? bytes, status block 13 bytes.
+ * Another request between any of these will break the state of the device and it will stop working.
+ * 
+ * FIXME: how to get not cached descriptors?
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -22,13 +54,15 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 	static_assert(sizeof(*setup) == sizeof(r.SetupPacket));
 
 	auto cfg = vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
+
+	auto type  = setup->wValue.HiByte;
 	auto index = setup->wValue.LowByte;
 //	auto lang_id = setup->wIndex.W; // for string descriptor
 
 	void *dsc_data{};
 	USHORT dsc_len = 0;
 
-	switch (auto type = setup->wValue.HiByte) {
+	switch (type) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		dsc_data = &vpdo->descriptor;
 		dsc_len = vpdo->descriptor.bLength;
@@ -49,13 +83,23 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, IRP *irp, USB_DES
 			}
 		}
 		break;
+	case USB_INTERFACE_DESCRIPTOR_TYPE:
+	case USB_ENDPOINT_DESCRIPTOR_TYPE:
+		if (auto cd = vpdo->actconfig) {
+			if (auto d = find_descriptor(cd, type, index)) {
+				dsc_len = d->bLength;
+				dsc_data = d;
+			}
+		}
+		break;
 	}
 
 	NT_ASSERT(outlen > sizeof(r));
 	auto TransferBufferLength = outlen - ULONG(sizeof(r)); // r.Data[]
 
 	if (!dsc_data) {
-		return get_descriptor_from_node_connection(*vpdo, irp, r, TransferBufferLength);
+		TraceDbg("Precached %!usb_descriptor_type! not found", type);
+		return STATUS_INSUFFICIENT_RESOURCES; // can't send USB_REQUEST_GET_DESCRIPTOR
 	}
 
 	auto cnt = min(dsc_len, TransferBufferLength);
@@ -145,8 +189,8 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 	return STATUS_SUCCESS;
 }
 
-_IRQL_requires_(LOW_LEVEL)
-PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -165,7 +209,7 @@ PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, IRP *irp, USB_DESCRI
 	}
 
 	if (auto vpdo = vhub_find_vpdo(vhub, r.ConnectionIndex)) {
-		return do_get_descr_from_nodeconn(vpdo, irp, r, outlen);
+		return do_get_descr_from_nodeconn(vpdo, r, outlen);
 	}
 
 	return STATUS_NO_SUCH_DEVICE;
@@ -310,7 +354,7 @@ PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONN
 
 
 _IRQL_requires_(LOW_LEVEL)
-PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -330,7 +374,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(vhub_dev_t *vhub, IRP *irp, ULONG ioctl_code, 
 		status = get_nodeconn_info_ex_v2(vhub, *reinterpret_cast<USB_NODE_CONNECTION_INFORMATION_EX_V2*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_DESCRIPTOR_FROM_NODE_CONNECTION:
-		status = get_descr_from_nodeconn(vhub, irp, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
+		status = get_descr_from_nodeconn(vhub, *static_cast<USB_DESCRIPTOR_REQUEST*>(buffer), inlen, outlen);
 		break;
 	case IOCTL_USB_GET_HUB_INFORMATION_EX:
 		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), outlen);

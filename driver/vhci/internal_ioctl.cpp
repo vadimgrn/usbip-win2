@@ -1008,31 +1008,6 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 
 } // namespace
 
-/*
- * vhci_ioctl -> vhci_ioctl_vhub -> get_descr_from_nodeconn -> do_get_descr_from_nodeconn -> this.
- */
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_descriptor_from_node_connection(vpdo_dev_t &vpdo, IRP *irp, USB_DESCRIPTOR_REQUEST &r, ULONG TransferBufferLength)
-{
-        PAGED_CODE();
-
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
-
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, TransferBufferLength)) {
-                return err;
-        }
-
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
-        pkt->wValue.W = r.SetupPacket.wValue;
-        pkt->wIndex.W = r.SetupPacket.wIndex;
-        pkt->wLength = r.SetupPacket.wLength;
-        NT_ASSERT(pkt->wLength <= TransferBufferLength);
-
-        return send(vpdo, irp, hdr);
-}
 
 /*
  * There is a race condition between IRP cancelation and RET_SUBMIT.
