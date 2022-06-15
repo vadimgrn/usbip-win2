@@ -644,9 +644,6 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr, &urb, r.PipeHandle);
 }
 
-/*
- * The USB bus driver processes this URB at DISPATCH_LEVEL.
- */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {

@@ -80,7 +80,7 @@ void SOCKET_ASYNC_CONTEXT::dtor()
 void SOCKET_ASYNC_CONTEXT::reset()
 {
         NT_ASSERT(*this);
-        KeResetEvent(&m_completion_event);
+        KeClearEvent(&m_completion_event);
         IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
         set_completetion_routine();
 }
@@ -161,6 +161,7 @@ struct wsk::SOCKET
         };
 
         SOCKET_ASYNC_CONTEXT ctx;
+        FAST_MUTEX mutex;
 };
 
 
@@ -180,6 +181,7 @@ NTSTATUS alloc_socket(_Out_ wsk::SOCKET* &sock)
                 sock = nullptr;
         }
 
+        ExInitializeFastMutex(&sock->mutex);
         return err;
 }
 
@@ -207,17 +209,22 @@ auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, si
 
 }
 
+_IRQL_requires_max_(APC_LEVEL)
 auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, bool send)
 {
         auto &ctx = sock->ctx;
-        ctx.reset();
-
         auto f = send ? sock->Connection->WskSend : sock->Connection->WskReceive; 
+
+        ExAcquireFastMutex(&sock->mutex);
+
+        ctx.reset();
 
         auto err = f(sock->Self, buffer, flags, ctx.irp());
         ctx.wait_for_completion(err);
 
         actual = err ? 0 : ctx.irp()->IoStatus.Information;
+
+        ExReleaseFastMutex(&sock->mutex);
         return err;
 }
 
