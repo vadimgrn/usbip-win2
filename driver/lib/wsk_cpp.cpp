@@ -14,7 +14,7 @@
 namespace
 {
 
-const ULONG WSK_POOL_TAG = 'AKSW';
+const ULONG WSK_POOL_TAG = 'KSWV';
 
 const WSK_CLIENT_DISPATCH g_WskDispatch{ MAKE_WSK_VERSION(1, 0) };
 WSK_REGISTRATION g_WskRegistration;
@@ -23,17 +23,17 @@ enum { F_REGISTER, F_CAPTURE };
 LONG g_init_flags;
 
 
-class SOCKET_ASYNC_CONTEXT
+class socket_async_context
 {
 public:
-        SOCKET_ASYNC_CONTEXT() { ctor(); } // works for allocations on stack only
-        ~SOCKET_ASYNC_CONTEXT() { dtor(); }
+        socket_async_context() { ctor(); } // works for allocations on stack only
+        ~socket_async_context() { dtor(); }
 
         NTSTATUS ctor(); // use if an object is allocated on heap, f.e. by ExAllocatePool2
         void dtor();
 
-        SOCKET_ASYNC_CONTEXT(const SOCKET_ASYNC_CONTEXT&) = delete;
-        SOCKET_ASYNC_CONTEXT& operator=(const SOCKET_ASYNC_CONTEXT&) = delete;
+        socket_async_context(const socket_async_context &) = delete;
+        socket_async_context& operator=(const socket_async_context&) = delete;
 
         explicit operator bool() const { return m_irp; }
         auto operator !() const { return !m_irp; }
@@ -55,11 +55,11 @@ private:
         }
 };
 
-NTSTATUS SOCKET_ASYNC_CONTEXT::ctor()
+NTSTATUS socket_async_context::ctor()
 {
         NT_ASSERT(!*this);
 
-        m_irp = IoAllocateIrp(1, false);
+        m_irp = IoAllocateIrp(1, false); // will be allocated from lookaside list
         if (!m_irp) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -70,14 +70,14 @@ NTSTATUS SOCKET_ASYNC_CONTEXT::ctor()
         return STATUS_SUCCESS;
 }
 
-void SOCKET_ASYNC_CONTEXT::dtor()
+void socket_async_context::dtor()
 {
         if (auto ptr = (IRP*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr)) {
                 IoFreeIrp(ptr);
         }
 }
 
-void SOCKET_ASYNC_CONTEXT::reset()
+void socket_async_context::reset()
 {
         NT_ASSERT(*this);
         KeClearEvent(&m_completion_event);
@@ -85,14 +85,14 @@ void SOCKET_ASYNC_CONTEXT::reset()
         set_completetion_routine();
 }
 
-NTSTATUS SOCKET_ASYNC_CONTEXT::completion(
+NTSTATUS socket_async_context::completion(
         _In_ PDEVICE_OBJECT, _In_ PIRP, _In_reads_opt_(_Inexpressible_("varies")) PVOID Context)
 {
         KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
         return StopCompletion;
 }
 
-NTSTATUS SOCKET_ASYNC_CONTEXT::wait_for_completion(_Inout_ NTSTATUS &status)
+NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
 {
         NT_ASSERT(*this);
 
@@ -159,36 +159,20 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_CONNECTION_DISPATCH *Connection;
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
-
-        SOCKET_ASYNC_CONTEXT ctx;
-        FAST_MUTEX mutex;
 };
 
 
 namespace
 {
 
-NTSTATUS alloc_socket(_Out_ wsk::SOCKET* &sock)
+inline auto alloc_socket()
 {
-        sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*sock), WSK_POOL_TAG);
-        if (!sock) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        auto err = sock->ctx.ctor();
-        if (err) {
-                ExFreePoolWithTag(sock, WSK_POOL_TAG);
-                sock = nullptr;
-        }
-
-        ExInitializeFastMutex(&sock->mutex);
-        return err;
+        return (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(wsk::SOCKET), WSK_POOL_TAG);
 }
 
 void free(_In_ wsk::SOCKET *sock)
 {
         if (sock) {
-                sock->ctx.dtor();
                 ExFreePoolWithTag(sock, WSK_POOL_TAG);
         }
 }
@@ -212,19 +196,17 @@ auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, si
 _IRQL_requires_max_(APC_LEVEL)
 auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, bool send)
 {
-        auto &ctx = sock->ctx;
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         auto f = send ? sock->Connection->WskSend : sock->Connection->WskReceive; 
-
-        ExAcquireFastMutex(&sock->mutex);
-
-        ctx.reset();
 
         auto err = f(sock->Self, buffer, flags, ctx.irp());
         ctx.wait_for_completion(err);
 
         actual = err ? 0 : ctx.irp()->IoStatus.Information;
-
-        ExReleaseFastMutex(&sock->mutex);
         return err;
 }
 
@@ -275,7 +257,7 @@ NTSTATUS wsk::getaddrinfo(
                 return STATUS_UNSUCCESSFUL;
         }
 
-        SOCKET_ASYNC_CONTEXT ctx;
+        socket_async_context ctx;
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -302,7 +284,7 @@ void wsk::free(_In_ ADDRINFOEXW *AddrInfo)
 }
 
 NTSTATUS wsk::socket(
-        _Out_ SOCKET* &Result,
+        _Out_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
         _In_ ULONG Protocol,
@@ -310,7 +292,6 @@ NTSTATUS wsk::socket(
         _In_opt_ void *SocketContext, 
         _In_opt_ const void *Dispatch)
 {
-        auto &sock = Result;
         sock = nullptr;
 
         auto prov = GetProviderNPIOnce();
@@ -318,11 +299,17 @@ NTSTATUS wsk::socket(
                 return STATUS_UNSUCCESSFUL;
         }
 
-        if (auto err = alloc_socket(sock)) {
-                return err;
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto irp = sock->ctx.irp();
+        sock = alloc_socket();
+        if (!sock) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        auto irp = ctx.irp();
 
         auto err = prov->Dispatch->WskSocket(prov->Client, AddressFamily, SocketType, Protocol, Flags, SocketContext, Dispatch,
                                                 nullptr, // OwningProcess
@@ -330,7 +317,7 @@ NTSTATUS wsk::socket(
                                                 nullptr, // SecurityDescriptor
                                                 irp);
 
-        sock->ctx.wait_for_completion(err);
+        ctx.wait_for_completion(err);
                 
         if (!err) {
                 sock->Self = (WSK_SOCKET*)irp->IoStatus.Information;
@@ -368,7 +355,7 @@ NTSTATUS wsk::control_client(
                         OutputSize, OutputBuffer, OutputSizeReturned, nullptr);
         }
 
-        SOCKET_ASYNC_CONTEXT ctx;
+        socket_async_context ctx;
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -396,9 +383,9 @@ NTSTATUS wsk::control(
         _In_ bool use_irp,
         _Out_opt_ SIZE_T *OutputSizeReturnedIrp)
 {
-        auto &ctx = sock->ctx;
-        if (use_irp) {
-                ctx.reset();
+        socket_async_context ctx;
+        if (!ctx && use_irp) {
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
         auto err = sock->Basic->WskControlSocket(sock->Self, RequestType, ControlCode, Level, 
@@ -440,10 +427,13 @@ NTSTATUS wsk::close(_In_ SOCKET *sock)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        sock->ctx.reset();
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
-        auto err = sock->Basic->WskCloseSocket(sock->Self, sock->ctx.irp());
-        sock->ctx.wait_for_completion(err);
+        auto err = sock->Basic->WskCloseSocket(sock->Self, ctx.irp());
+        ctx.wait_for_completion(err);
 
         ::free(sock);
         return err;
@@ -451,8 +441,10 @@ NTSTATUS wsk::close(_In_ SOCKET *sock)
 
 NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
 {
-        auto &ctx = sock->ctx;
-        ctx.reset();
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         auto err = sock->Connection->WskBind(sock->Self, LocalAddress, 0, ctx.irp());
         return ctx.wait_for_completion(err);
@@ -460,8 +452,10 @@ NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
 
 NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
 {
-        auto &ctx = sock->ctx;
-        ctx.reset();
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         auto err = sock->Connection->WskConnect(sock->Self, RemoteAddress, 0, ctx.irp());
         return ctx.wait_for_completion(err);
@@ -469,8 +463,10 @@ NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
 
 NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_ ULONG flags)
 {
-        auto &ctx = sock->ctx;
-        ctx.reset();
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         auto err = sock->Connection->WskDisconnect(sock->Self, buffer, flags, ctx.irp());
         return ctx.wait_for_completion(err);
@@ -483,8 +479,10 @@ NTSTATUS wsk::release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndicatio
 
 NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress)
 {
-        auto &ctx = sock->ctx;
-        ctx.reset();
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         auto err = sock->Connection->WskGetLocalAddress(sock->Self, LocalAddress, ctx.irp());
         return ctx.wait_for_completion(err);
@@ -492,8 +490,10 @@ NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress)
 
 NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress)
 {
-        auto &ctx = sock->ctx;
-        ctx.reset();
+        socket_async_context ctx;
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         auto err = sock->Connection->WskGetRemoteAddress(sock->Self, RemoteAddress, ctx.irp());
         return ctx.wait_for_completion(err);

@@ -27,7 +27,7 @@ NTSTATUS control_client(
 struct SOCKET;
 
 NTSTATUS socket(
-        _Out_ SOCKET* &Result,
+        _Out_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
         _In_ ULONG Protocol,
