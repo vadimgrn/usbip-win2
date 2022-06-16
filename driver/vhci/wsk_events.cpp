@@ -19,7 +19,6 @@
 #include "send_context.h"
 #include "vhub.h"
 #include "internal_ioctl.h"
-#include "workitem.h"
 
 namespace
 {

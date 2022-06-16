@@ -76,7 +76,6 @@
     <ClInclude Include="vhub.h" />
     <ClInclude Include="vpdo.h" />
     <ClInclude Include="wmi.h" />
-    <ClInclude Include="workitem.h" />
     <ClInclude Include="wsk_data.h" />
     <ClInclude Include="wsk_events.h" />
   </ItemGroup>
