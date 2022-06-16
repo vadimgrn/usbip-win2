@@ -72,6 +72,11 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
 } // namespace
 
 
+/*
+ * LOOKASIDE_LIST_EX.L.Depth is zero if Driver Verifier is enabled.
+ * For this reason ExFreeToLookasideListEx always calls L.FreeEx instead of InterlockedPushEntrySList.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS init_send_context_list()
 {
         return ExInitializeLookasideListEx(&send_context_list, allocate_function_ex, free_function_ex, 
@@ -82,6 +87,7 @@ NTSTATUS init_send_context_list()
  * If use ExFreeToLookasideListEx in case of error, next ExAllocateFromLookasideListEx will return the same pointer.
  * free_function_ex is used instead in hope that next object in the LookasideList may have required buffer.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
 {
         auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
@@ -124,7 +130,8 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
         return ctx;
 }
 
-void free(_In_ send_context *ctx, _In_ bool reuse)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void free(_In_opt_ send_context *ctx, _In_ bool reuse)
 {
         if (!ctx) {
                 return;

@@ -10,6 +10,8 @@
 struct vpdo_dev_t;
 
 inline LOOKASIDE_LIST_EX send_context_list;
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS init_send_context_list();
 
 struct send_context
@@ -33,9 +35,13 @@ static_assert(sizeof(usbip_header) == 48);
 static_assert(sizeof(usbip::Mdl) == 16);
 static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0);
-void free(_In_ send_context *ctx, _In_ bool reuse = true);
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void free(_In_opt_ send_context *ctx, _In_ bool reuse = true);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto number_of_packets(_In_ const send_context &ctx)
 {
         return ctx.mdl_isoc.size()/sizeof(*ctx.isoc);

@@ -14,7 +14,7 @@
 namespace
 {
 
-enum { INIT_SEND_CTX_LIST = 1 }; // bits
+_Enum_is_bitflag_ enum { INIT_SEND_CTX_LIST = 1 };
 unsigned int g_init_flags;
 
 PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
