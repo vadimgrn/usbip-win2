@@ -44,6 +44,9 @@ PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
         return vhci_complete(devobj, Irp, __func__);
 }
 
+_Function_class_(DRIVER_UNLOAD)
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
@@ -179,7 +182,11 @@ PAGEABLE __drv_dispatchType(IRP_MJ_PNP) DRIVER_DISPATCH vhci_pnp;
 PAGEABLE __drv_dispatchType(IRP_MJ_SYSTEM_CONTROL) DRIVER_DISPATCH vhci_system_control;
 	 __drv_dispatchType(IRP_MJ_POWER) DRIVER_DISPATCH vhci_power;
 
-PAGEABLE NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
+_Function_class_(DRIVER_INITIALIZE)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+__declspec(code_seg("INIT"))
+NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
 

@@ -388,9 +388,7 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
-        read_os_string_descriptor(vpdo);
         USHORT lang_id = 0;
-
         for (UCHAR idx = 0; idx < ARRAYSIZE(vpdo.strings); ++idx) {
 
                 USB_STRING_DESCRIPTOR hdr;
@@ -476,6 +474,7 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
                 return ERR_GENERAL;
         }
         
+        read_os_string_descriptor(vpdo);
         return read_string_descriptors(vpdo);
 }
 
@@ -626,7 +625,9 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
 } // namespace
 
 
-_Kernel_clear_do_init_(yes)
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_When_(return>=0, _Kernel_clear_do_init_(yes))
 PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
