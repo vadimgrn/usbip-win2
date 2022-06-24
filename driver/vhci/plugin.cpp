@@ -248,7 +248,7 @@ PAGEABLE auto recv_rep_import(vpdo_dev_t &vpdo, usbip::memory pool, op_import_re
 }
 
 PAGEABLE auto init_req_get_descr(
-        usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, USHORT TransferBufferLength)
+        _Out_ usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, USHORT TransferBufferLength)
 {
         PAGED_CODE();
 
@@ -268,7 +268,7 @@ PAGEABLE auto init_req_get_descr(
         return true;
 }
 
-PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, USHORT TransferBufferLength)
+PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, _Inout_ USHORT &TransferBufferLength)
 {
         PAGED_CODE();
 
@@ -301,11 +301,20 @@ PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT l
         }
 
         auto &ret = hdr.u.ret_submit;
-        return !ret.status && ret.actual_length == TransferBufferLength ? ERR_NONE : ERR_GENERAL;
+        auto actual_length = static_cast<USHORT>(ret.actual_length);
+
+        if (actual_length <= TransferBufferLength) {
+                TransferBufferLength = actual_length;
+        } else {
+                TransferBufferLength = 0;
+                return ERR_GENERAL;
+        }
+
+        return ret.status ? ERR_GENERAL : ERR_NONE;
 }
 
 PAGEABLE auto read_descr(
-        vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, usbip::memory pool, void *dest, USHORT len)
+        vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, usbip::memory pool, _Out_ void *dest, _Inout_ USHORT &len)
 {
         PAGED_CODE();
 
@@ -324,15 +333,18 @@ PAGEABLE auto read_descr(
 PAGEABLE auto read_device_descr(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
+        
+        USHORT len = sizeof(vpdo.descriptor);
 
-        if (auto err = read_descr(vpdo, USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, usbip::memory::nonpaged, &vpdo.descriptor, sizeof(vpdo.descriptor))) {
+        if (auto err = read_descr(vpdo, USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, usbip::memory::nonpaged, &vpdo.descriptor, len)) {
                 return err;
         }
 
-        return is_valid_dsc(vpdo.descriptor) ? ERR_NONE : ERR_GENERAL;
+        return len == sizeof(vpdo.descriptor) && is_valid(vpdo.descriptor) ? ERR_NONE : ERR_GENERAL;
 }
 
-PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo, usbip::memory pool, USB_CONFIGURATION_DESCRIPTOR *cd, USHORT len)
+PAGEABLE auto read_config_descr(
+        _Inout_ vpdo_dev_t &vpdo, _In_ usbip::memory pool, _Out_ USB_CONFIGURATION_DESCRIPTOR *cd, _Inout_ USHORT &len)
 {
         PAGED_CODE();
         NT_ASSERT(len >= sizeof(*cd));
@@ -341,7 +353,7 @@ PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo, usbip::memory pool, USB_CONFIG
                 return err;
         }
 
-        return is_valid_dsc(cd) ? ERR_NONE : ERR_GENERAL;
+        return len >= sizeof(*cd) && is_valid(*cd) ? ERR_NONE : ERR_GENERAL;
 }
 
 PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
@@ -349,17 +361,28 @@ PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
         PAGED_CODE();
 
         USB_CONFIGURATION_DESCRIPTOR cd{};
-        if (auto err = read_config_descr(vpdo, usbip::memory::stack, &cd, sizeof(cd))) {
+        USHORT len = sizeof(cd);
+
+        if (auto err = read_config_descr(vpdo, usbip::memory::stack, &cd, len)) {
                 return err;
         }
 
         log(cd);
+        len = cd.wTotalLength;
+
         NT_ASSERT(!vpdo.actconfig);
+        vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, 
+                                                                        len, USBIP_VHCI_POOL_TAG);
 
-        vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(
-                POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, cd.wTotalLength, USBIP_VHCI_POOL_TAG);
+        if (!vpdo.actconfig) {
+                return ERR_GENERAL;
+        }
 
-        return vpdo.actconfig ? read_config_descr(vpdo, usbip::memory::nonpaged, vpdo.actconfig, cd.wTotalLength) : ERR_GENERAL;
+        if (auto err = read_config_descr(vpdo, usbip::memory::nonpaged, vpdo.actconfig, len)) {
+                return err;
+        }
+
+        return len == cd.wTotalLength ? ERR_NONE : ERR_GENERAL;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -368,8 +391,13 @@ PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
         PAGED_CODE();
 
         USB_OS_STRING_DESCRIPTOR d;
-        if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, MS_OS_DESC_STRING_IDX, 0, 
-                                  usbip::memory::stack, &d, sizeof(d))) {
+        USHORT len = sizeof(d);
+
+        if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, MS_OS_STRING_DESC_INDEX, 0, usbip::memory::stack, &d, len)) {
+                return;
+        }
+
+        if (len != sizeof(d)) {
                 return;
         }
 
@@ -378,7 +406,7 @@ PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
         TraceDbg("bLength %d, %!usb_descriptor_type!, Signature '%!USTR!', MS_VendorCode %#x, Pad %d", 
                   d.bLength, d.bDescriptorType, &sig, d.MS_VendorCode, d.Pad);
 
-        if (is_valid_dsc(d)) {
+        if (is_valid(d)) {
                 vpdo.MS_VendorCode = d.MS_VendorCode;
         }
 }
@@ -389,33 +417,40 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
         PAGED_CODE();
 
         USHORT lang_id = 0;
+
         for (UCHAR idx = 0; idx < ARRAYSIZE(vpdo.strings); ++idx) {
 
                 USB_STRING_DESCRIPTOR hdr;
-                if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::stack, &hdr, sizeof(hdr))) {
+                USHORT len = sizeof(hdr);
+
+                if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::stack, &hdr, len)) {
                         break; // invalid string index, EPIPE
                 }
 
-                if (!is_valid_dsc(hdr)) {
+                if (!(len >= sizeof(USB_COMMON_DESCRIPTOR) && is_valid(hdr))) { // string length can be zero
+                        Trace(TRACE_LEVEL_ERROR, "USB_STRING_DESCRIPTOR expected, length %d", len);
                         return ERR_GENERAL;
                 }
                
-                auto len = hdr.bLength + sizeof(*hdr.bString);
+                len = hdr.bLength;
+                auto sz = len + sizeof(*hdr.bString);
 
-                auto sd = (USB_STRING_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, len, USBIP_VHCI_POOL_TAG);
+                auto sd = (USB_STRING_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, sz, USBIP_VHCI_POOL_TAG);
                 if (!sd) {
+                        Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
                         return ERR_GENERAL;
                 }
 
-                if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::nonpaged, sd, hdr.bLength)) {
+                if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::nonpaged, sd, len)) {
                         ExFreePoolWithTag(sd, USBIP_VHCI_POOL_TAG);
                         return err;
                 }
 
-                if (is_valid_dsc(sd)) {
-                        *reinterpret_cast<wchar_t*>((char*)sd + hdr.bLength) = L'\0';
+                if (len == hdr.bLength && is_valid(*sd) && sd->bLength == len) {
+                        *reinterpret_cast<wchar_t*>((char*)sd + sd->bLength) = L'\0';
                         vpdo.strings[idx] = sd;
                 } else {
+                        Trace(TRACE_LEVEL_ERROR, "length %d", len);
                         ExFreePoolWithTag(sd, USBIP_VHCI_POOL_TAG);
                         return ERR_GENERAL;
                 }

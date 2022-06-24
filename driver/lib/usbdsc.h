@@ -3,7 +3,7 @@
 #include <ntddk.h>
 #include <usbdi.h>
 
-enum : UCHAR { MS_OS_DESC_STRING_IDX = 0xEE };
+enum : UCHAR { MS_OS_STRING_DESC_INDEX = 0xEE };
 
 struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 {
@@ -13,14 +13,11 @@ struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 };
 static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
-bool is_valid_dsc(const USB_DEVICE_DESCRIPTOR *d);
-bool is_valid_dsc(const USB_CONFIGURATION_DESCRIPTOR *d);
-bool is_valid_dsc(const USB_STRING_DESCRIPTOR *d);
-bool is_valid_dsc(const USB_OS_STRING_DESCRIPTOR &d);
-
-inline auto is_valid_dsc(const USB_DEVICE_DESCRIPTOR &d) { return is_valid_dsc(&d);  }
-inline auto is_valid_dsc(const USB_CONFIGURATION_DESCRIPTOR &d) { return is_valid_dsc(&d);  }
-inline auto is_valid_dsc(const USB_STRING_DESCRIPTOR &d) { return is_valid_dsc(&d);  }
+constexpr auto is_valid(const USB_COMMON_DESCRIPTOR &d) { return d.bLength >= sizeof(d); }
+bool is_valid(const USB_DEVICE_DESCRIPTOR &d);
+bool is_valid(const USB_CONFIGURATION_DESCRIPTOR &d);
+bool is_valid(const USB_STRING_DESCRIPTOR &d);
+bool is_valid(const USB_OS_STRING_DESCRIPTOR &d);
 
 inline auto dsc_next(USB_COMMON_DESCRIPTOR *d)
 {
@@ -45,3 +42,10 @@ void *dsc_for_each_endpoint(
 
 USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num, UCHAR alt_setting);
 int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num);
+
+inline auto get_string(USB_STRING_DESCRIPTOR &d)
+{
+	USHORT len = d.bLength - sizeof(USB_COMMON_DESCRIPTOR);
+	UNICODE_STRING s{ len, len, d.bString };
+	return s;
+}
