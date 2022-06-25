@@ -53,8 +53,9 @@
 ## Build
 
 ### Notes
-- Build is tested on Windows 11, projects are configured for Windows 10 v.2004 target by default
+- Driver is configured for Windows 10 v.2004 target
 - x86 platform is not supported
+- Build is tested on Windows 11
 
 ### Build Tools
 - The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
@@ -195,7 +196,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 9 12 18 10 15 20 24 26 35 /driver usbip_vhci.sys
+verifier /rc 1 2 4 5 6 8 9 12 18 10 14 15 20 24 26 35 /driver usbip_vhci.sys
 ```
 - Query settings
 ```

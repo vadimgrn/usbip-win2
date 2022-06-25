@@ -51,7 +51,6 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
         auto &vpdo = *ctx->vpdo;
         auto irp = ctx->irp;
-        auto seqnum = get_seqnum(irp); // ctx->hdr.base.seqnum is in network byte order
 
         auto &st = wsk_irp->IoStatus;
         auto old_status = InterlockedCompareExchange(get_status(irp), ST_SEND_COMPLETE, ST_NONE);
@@ -70,7 +69,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                         complete_canceled_irp(irp);
                         break;
                 }
-        } else if (auto victim = dequeue_irp(vpdo, seqnum)) {
+        } else if (auto victim = dequeue_irp(vpdo, get_seqnum(irp))) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == irp);
                 complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == ST_IRP_CANCELED) {
@@ -86,7 +85,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto async_send(_Inout_opt_ const URB &transfer_buffer, _In_ send_context *ctx)
+auto async_send(_Inout_ const URB &transfer_buffer, _In_ send_context *ctx)
 {
         if (is_transfer_direction_in(&ctx->hdr)) { // TransferFlags can have wrong direction
                 NT_ASSERT(!ctx->mdl_buf);

@@ -84,6 +84,7 @@ PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_DEVICE_DESCR
                 dev.bNumConfigurations == dsc.bNumConfigurations;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_CONFIGURATION_DESCRIPTOR &cd)
 {
         PAGED_CODE();
@@ -92,12 +93,14 @@ PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_CONFIGURATIO
                 dev.bNumInterfaces == cd.bNumInterfaces;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto is_configured(const usbip_usb_device &d)
 {
         PAGED_CODE();
         return d.bConfigurationValue && d.bNumInterfaces;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto init(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
@@ -134,6 +137,7 @@ PAGEABLE auto init(vpdo_dev_t &vpdo, const ioctl_usbip_vhci_plugin &r)
  * USB class, subclass and protocol numbers should be setup before importing.
  * Because windows vhci driver builds a device compatible id with those numbers.
  */
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
@@ -161,6 +165,7 @@ PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 	return true;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
@@ -197,6 +202,7 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
 /*
  * @see <linux>/tools/usb/usbip/src/usbipd.c, recv_request_import
  */
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto send_req_import(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -217,6 +223,7 @@ PAGEABLE auto send_req_import(vpdo_dev_t &vpdo)
         return send(vpdo.sock, usbip::memory::stack, &req, sizeof(req));
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto recv_rep_import(vpdo_dev_t &vpdo, usbip::memory pool, op_import_reply &reply)
 {
         PAGED_CODE();
@@ -247,6 +254,7 @@ PAGEABLE auto recv_rep_import(vpdo_dev_t &vpdo, usbip::memory pool, op_import_re
         return make_error(ERR_NONE);
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto init_req_get_descr(
         _Out_ usbip_header &hdr, vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, USHORT TransferBufferLength)
 {
@@ -268,6 +276,7 @@ PAGEABLE auto init_req_get_descr(
         return true;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, _Inout_ USHORT &TransferBufferLength)
 {
         PAGED_CODE();
@@ -313,6 +322,7 @@ PAGEABLE auto read_descr_hdr(vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT l
         return ret.status ? ERR_GENERAL : ERR_NONE;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto read_descr(
         vpdo_dev_t &vpdo, UCHAR type, UCHAR index, USHORT lang_id, usbip::memory pool, _Out_ void *dest, _Inout_ USHORT &len)
 {
@@ -330,6 +340,7 @@ PAGEABLE auto read_descr(
         return ERR_NONE;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto read_device_descr(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -343,6 +354,7 @@ PAGEABLE auto read_device_descr(vpdo_dev_t &vpdo)
         return len == sizeof(vpdo.descriptor) && is_valid(vpdo.descriptor) ? ERR_NONE : ERR_GENERAL;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto read_config_descr(
         _Inout_ vpdo_dev_t &vpdo, _In_ usbip::memory pool, _Out_ USB_CONFIGURATION_DESCRIPTOR *cd, _Inout_ USHORT &len)
 {
@@ -356,6 +368,7 @@ PAGEABLE auto read_config_descr(
         return len >= sizeof(*cd) && is_valid(*cd) ? ERR_NONE : ERR_GENERAL;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -431,8 +444,13 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                         Trace(TRACE_LEVEL_ERROR, "USB_STRING_DESCRIPTOR expected, length %d", len);
                         return ERR_GENERAL;
                 }
-               
+
                 len = hdr.bLength;
+                if (len == sizeof(USB_COMMON_DESCRIPTOR)) {
+                        Trace(TRACE_LEVEL_WARNING, "Index %d, skip empty string", idx);
+                        continue;
+                }
+
                 auto sz = len + sizeof(*hdr.bString);
 
                 auto sd = (USB_STRING_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, sz, USBIP_VHCI_POOL_TAG);
@@ -466,6 +484,7 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
         return ERR_NONE;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE void init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
 {
         PAGED_CODE();
@@ -477,6 +496,7 @@ PAGEABLE void init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
         vpdo.bDeviceProtocol = d.bDeviceProtocol;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
 {
         PAGED_CODE();
@@ -495,6 +515,10 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
         }
 
         if (auto err = read_config_descr(vpdo)) {
+                if (auto &ptr = vpdo.actconfig) {
+                        ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
+                        ptr = nullptr;
+                }
                 return err;
         }
 
@@ -513,8 +537,10 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
         return read_string_descriptors(vpdo);
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto make_event_mask()
 {
+        PAGED_CODE();
         ULONG mask = 0;
 
         for (auto evt: WskEvents) {
@@ -524,6 +550,7 @@ PAGEABLE auto make_event_mask()
         return mask;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -558,6 +585,7 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
         return make_error(ERR_NONE);
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -574,6 +602,7 @@ PAGEABLE auto getaddrinfo(ADDRINFOEXW* &result, vpdo_dev_t &vpdo)
 /*
  * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
  */
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto set_options(wsk::SOCKET *sock)
 {
         PAGED_CODE();
@@ -614,6 +643,7 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
         return ok ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
 {
         PAGED_CODE();
@@ -638,6 +668,7 @@ PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
         return err;
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto connect(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
