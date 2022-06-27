@@ -160,7 +160,7 @@ NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID BusContext, _Out_opt_ ULONG *Curren
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
 	*CurrentUsbFrame = get_current_frame_number(*vpdo);
-	TraceMsg("CurrentUsbFrame -> %lu", *CurrentUsbFrame);
+//	TraceDbg("CurrentUsbFrame -> %lu", *CurrentUsbFrame); // too often
 
 	return STATUS_SUCCESS;
 }
@@ -177,7 +177,7 @@ NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID BusContext, _Out_opt_ ULONG *
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
 	*HighSpeedFrameCounter = get_current_frame_number(*vpdo) << 3;
-	TraceMsg("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter);
+//	TraceDbg("HighSpeedFrameCounter -> %lu", *HighSpeedFrameCounter); // too often
 
 	return STATUS_SUCCESS;
 }

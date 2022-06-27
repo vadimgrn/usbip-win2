@@ -131,7 +131,7 @@ auto async_send(_Inout_ const URB &transfer_buffer, _In_ send_context *ctx)
  * I/O Manager can issue IoCancelIrp only when a driver returned STATUS_PENDING from its dispatch routine.
  * This means during the execution of dispatch routine IRP can't be canceled.
  */
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
         _Inout_opt_ URB *transfer_buffer = nullptr, _In_ USBD_PIPE_HANDLE hpipe = USBD_PIPE_HANDLE())
 {
@@ -214,7 +214,7 @@ NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
  *      <linux>/drivers/usb/core/message.c, usb_clear_halt
  */
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -280,7 +280,7 @@ NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return st;
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR recipient)
 {
         PAGED_CODE();
@@ -306,31 +306,31 @@ PAGEABLE NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &ur
         return send(vpdo, irp, hdr, &urb);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_status_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_status_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_status_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_status_from_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR type, UCHAR recipient)
 {
         PAGED_CODE();
@@ -364,55 +364,55 @@ PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &
         return send(vpdo, irp, hdr, &urb);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vendor_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vendor_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vendor_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vendor_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS class_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS class_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS class_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS class_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
 {
         PAGED_CODE();
@@ -441,43 +441,43 @@ PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &ur
         return send(vpdo, irp, hdr, &urb);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
 {
         PAGED_CODE();
@@ -503,55 +503,55 @@ PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, 
         return send(vpdo, irp, hdr);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS set_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS clear_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -577,7 +577,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -618,7 +618,7 @@ NTSTATUS get_current_frame_number(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_SUCCESS;
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -754,7 +754,7 @@ NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_NOT_SUPPORTED;
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -777,7 +777,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return send(vpdo, irp, hdr, &urb);
 }
 
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -806,7 +806,7 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 /*
  * @see https://github.com/libusb/libusb/blob/master/examples/xusb.c, read_ms_winsub_feature_descriptors
  */
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         PAGED_CODE();
@@ -985,7 +985,7 @@ NTSTATUS usb_get_port_status(ULONG &status)
 /*
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd.
  */
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 {
         PAGED_CODE();
@@ -1025,7 +1025,7 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  * For that reason the cancellation logic is simplified and list of unlinked IRPs is not used.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
-_IRQL_requires_(LOW_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
         PAGED_CODE();
