@@ -29,11 +29,13 @@ const LPCWSTR vdev_desc[VDEV_SIZE] =
 	L"usbip-win VPDO"
 };
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
 {
 	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -43,6 +45,7 @@ PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -57,6 +60,7 @@ PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -66,6 +70,7 @@ PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -79,6 +84,7 @@ PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -91,6 +97,7 @@ PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -100,6 +107,7 @@ PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_success(vdev, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 {
 	PAGED_CODE();
@@ -117,6 +125,7 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
 	return CompleteRequest(irp, st);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -124,6 +133,7 @@ PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 	return CompleteRequestIoStatus(irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -131,6 +141,7 @@ PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 	return CompleteRequestIoStatus(irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -145,6 +156,7 @@ PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 * for this IRP must wait until the device has been ejected before
 * completing the IRP.
 */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -158,6 +170,7 @@ PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 	return CompleteRequestIoStatus(irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -165,6 +178,7 @@ PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 	return CompleteRequestIoStatus(irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -175,12 +189,13 @@ PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 }
 
 /*
-* OPTIONAL for bus drivers.
-* This bus drivers any of the bus's descendants
-* (child device, child of a child device, etc.) do not
-* contain a memory file namely paging file, dump file,
-* or hibernation file. So we  fail this Irp.
-*/
+ * OPTIONAL for bus drivers.
+ * This bus drivers any of the bus's descendants
+ * (child device, child of a child device, etc.) do not
+ * contain a memory file namely paging file, dump file,
+ * or hibernation file. So we  fail this Irp.
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -188,6 +203,7 @@ PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 	return CompleteRequest(irp, STATUS_UNSUCCESSFUL);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -196,9 +212,10 @@ PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 }
 
 /*
-* This request notifies bus drivers that a device object exists and
-* that it has been fully enumerated by the plug and play manager.
-*/
+ * This request notifies bus drivers that a device object exists and
+ * that it has been fully enumerated by the plug and play manager.
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -206,6 +223,7 @@ PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 	return CompleteRequest(irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void copy_str(LPCWSTR s, IO_STATUS_BLOCK &blk)
 {
 	PAGED_CODE();
@@ -221,6 +239,7 @@ PAGEABLE void copy_str(LPCWSTR s, IO_STATUS_BLOCK &blk)
  * If a bus driver returns information in response to this IRP, 
  * it allocates a NULL-terminated Unicode string from paged memory. 
  */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -312,6 +331,7 @@ pnpmn_func_t* const pnpmn_functions[] =
 } // namespace
 
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void set_state(vdev_t &vdev, pnp_state state)
 {
 	PAGED_CODE();
@@ -319,6 +339,8 @@ PAGEABLE void set_state(vdev_t &vdev, pnp_state state)
 	vdev.PnPState = state;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 {
 	PAGED_CODE();

@@ -407,6 +407,7 @@ NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INT
  * If a bus driver does not export the requested interface and therefore does not handle this IRP
  * for a child PDO, the bus driver leaves Irp->IoStatus.Status as is and completes the IRP.
  */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -428,6 +429,6 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 		irp->IoStatus.Information = 0;
 	}
 
-	TraceMsg("%!GUID! -> %!STATUS!", qi.InterfaceType, status);
+	TraceMsg("%!GUID!, Size %d, Version %#x -> %!STATUS!", qi.InterfaceType, qi.Size, qi.Version, status);
 	return CompleteRequest(irp, status);
 }
