@@ -574,7 +574,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 
 		if (auto n = get_header(hdr, vpdo)) {
 			if (n > 0) {
-				NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
+				NT_VERIFY(!wsk_data_release(vpdo, sizeof(hdr)));
 			}
 			avail = 0; // invalidate header and break the loop
 			continue;
@@ -584,7 +584,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 		auto payload_size = get_payload_size(hdr);
 		
 		if (avail >= payload_size) {
-			NT_VERIFY(!wsk_data_consume(vpdo, sizeof(hdr)));
+			NT_VERIFY(!wsk_data_release(vpdo, sizeof(hdr)));
 		} else {
 //			TraceWSK("Available %Iu < payload %Iu", avail, payload_size); // too often
 			break;
@@ -593,7 +593,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 		ret_command(vpdo, hdr);
 
 		if (payload_size) {
-			NT_VERIFY(!wsk_data_consume(vpdo, payload_size));
+			NT_VERIFY(!wsk_data_release(vpdo, payload_size));
 			avail -= payload_size;
 		}
 	}

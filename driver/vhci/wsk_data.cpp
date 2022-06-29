@@ -41,7 +41,7 @@ void wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndic
  * Return STATUS_PENDING from WskDisconnectEvent, this function always releases WSK_DATA_INDICATION youself.
  * @return bytes left to consume
  */
-size_t wsk_data_consume(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
+size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 {
 	auto &offset = vpdo.wsk_data_offset;
 
