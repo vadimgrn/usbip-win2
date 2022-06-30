@@ -622,7 +622,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 
 	{
 		char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
-		TraceDbg("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
+		TraceWSK("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
 	}
 
 	auto st = STATUS_PENDING;
@@ -635,6 +635,6 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 		st = STATUS_SUCCESS;
 	}
 
-	TraceDbg("Exit %!STATUS!", st);
+	TraceWSK("Exit %!STATUS!", st);
 	return st;
 }
