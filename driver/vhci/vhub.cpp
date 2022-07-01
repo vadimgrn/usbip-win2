@@ -14,7 +14,6 @@
 namespace
 {
 
-static_assert(int(VHCI_PORTS_MAX) >= int(vhub_dev_t::NUM_PORTS));
 static_assert(sizeof(ioctl_usbip_vhci_plugin::service) == NI_MAXSERV);
 static_assert(sizeof(ioctl_usbip_vhci_plugin::host) == NI_MAXHOST);
 
@@ -214,30 +213,17 @@ PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
 	ExReleaseFastMutex(&vhub->Mutex);
 }
 
-PAGEABLE NTSTATUS vhub_get_ports_status(vhub_dev_t *vhub, ioctl_usbip_vhci_get_ports_status &st, ULONG &outlen)
+PAGEABLE NTSTATUS vhub_get_num_ports(vhub_dev_t *vhub, ioctl_usbip_vhci_get_num_ports &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	if (outlen != sizeof(st)) {
-		outlen = sizeof(st);
+	if (outlen != sizeof(r)) {
+		outlen = sizeof(r);
 		STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	st.n_max_ports = vhub->NUM_PORTS;
-
-	int acquired = 0;
-
-	ExAcquireFastMutex(&vhub->Mutex);
-
-	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
-		bool busy = vhub->vpdo[i];
-		st.port_status[i] = busy;
-		acquired += busy;
-	}
-
-	ExReleaseFastMutex(&vhub->Mutex);
-
-	TraceMsg("Acquired ports %d/%d", acquired, vhub->NUM_PORTS);
+	r.num_ports = vhub->NUM_PORTS;
+	TraceMsg("Number of ports %d", r.num_ports);
 	return STATUS_SUCCESS;
 }
 

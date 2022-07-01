@@ -59,15 +59,12 @@ DEFINE_GUID(USBIP_NOTIFY_DEVICE_ARRIVAL_EVENT,
 #define IOCTL_USBIP_VHCI_PLUGIN_HARDWARE	USBIP_VHCI_IOCTL(0x0)
 #define IOCTL_USBIP_VHCI_UNPLUG_HARDWARE	USBIP_VHCI_IOCTL(0x1)
 // used by usbip_vhci.c
-#define IOCTL_USBIP_VHCI_GET_PORTS_STATUS	USBIP_VHCI_IOCTL(0x2)
+#define IOCTL_USBIP_VHCI_GET_NUM_PORTS	        USBIP_VHCI_IOCTL(0x2)
 #define IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES	USBIP_VHCI_IOCTL(0x3)
 
-enum { VHCI_PORTS_MAX = 16 }; // see vhub_dev_t::NUM_PORTS
-
-struct ioctl_usbip_vhci_get_ports_status
+struct ioctl_usbip_vhci_get_num_ports
 {
-	int n_max_ports; // number of ports
-	bool port_status[VHCI_PORTS_MAX];
+	int num_ports;
 };
 
 struct ioctl_usbip_vhci_plugin

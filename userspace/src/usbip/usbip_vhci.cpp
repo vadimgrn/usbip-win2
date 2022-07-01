@@ -35,24 +35,24 @@ auto get_vhci_devpath()
         return path;
 }
 
-int usbip_vhci_get_ports_status(HANDLE hdev, ioctl_usbip_vhci_get_ports_status &st)
+auto usbip_vhci_get_num_ports(HANDLE hdev, ioctl_usbip_vhci_get_num_ports &r)
 {
         DWORD len = 0;
 
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_PORTS_STATUS, nullptr, 0, &st, sizeof(st), &len, nullptr)) {
-                if (len == sizeof(st)) {
-                        return 0;
+        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_NUM_PORTS, nullptr, 0, &r, sizeof(r), &len, nullptr)) {
+                if (len == sizeof(r)) {
+                        return ERR_NONE;
                 }
         }
 
         return ERR_GENERAL;
 }
 
-int get_n_max_ports(HANDLE hdev)
+int get_num_ports(HANDLE hdev)
 {
-        ioctl_usbip_vhci_get_ports_status st;
-        auto err = usbip_vhci_get_ports_status(hdev, st);
-        return err < 0 ? err : st.n_max_ports;
+        ioctl_usbip_vhci_get_num_ports r;
+        auto err = usbip_vhci_get_num_ports(hdev, r);
+        return err < 0 ? err : r.num_ports;
 }
 
 } // namespace
@@ -79,13 +79,13 @@ std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE h
 {
         std::vector<ioctl_usbip_vhci_imported_dev> idevs;
 
-        auto n_max_ports = get_n_max_ports(hdev);
-        if (n_max_ports < 0) {
-                dbg("failed to get the number of used ports: %s", dbg_errcode(n_max_ports));
+        auto cnt = get_num_ports(hdev);
+        if (cnt < 0) {
+                dbg("failed to get the number of used ports: %s", dbg_errcode(cnt));
                 return idevs;
         }
 
-        idevs.resize(n_max_ports + 1);
+        idevs.resize(cnt + 1);
         auto idevs_bytes = DWORD(idevs.size()*sizeof(idevs[0]));
 
         if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, idevs.data(), idevs_bytes, nullptr, nullptr)) {
