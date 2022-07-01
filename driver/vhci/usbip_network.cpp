@@ -18,7 +18,8 @@
 namespace
 {
 
-auto assign(ULONG &TransferBufferLength, int actual_length)
+_IRQL_requires_(PASSIVE_LEVEL)
+auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
 {
         bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
         TransferBufferLength = ok ? actual_length : 0;
@@ -26,19 +27,8 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
         return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
 }
 
-UINT32 get_request(UINT32 response)
-{
-        switch (static_cast<usbip_request_type>(response)) {
-        case USBIP_RET_SUBMIT:
-                return USBIP_CMD_SUBMIT;
-        case USBIP_RET_UNLINK:
-                return USBIP_CMD_UNLINK;
-        default:
-                return 0;
-        }
-}
-
-auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
+_IRQL_requires_(PASSIVE_LEVEL)
+auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
 {
         auto &base = hdr.base;
         NT_ASSERT(base.command == USBIP_RET_SUBMIT);
@@ -70,7 +60,8 @@ auto recv_ret_submit(_In_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_h
 } // namespace
 
 
-NTSTATUS usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
+_IRQL_requires_(PASSIVE_LEVEL)
+NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
         Mdl mdl(pool, data, len);
         if (auto err = mdl.prepare(IoReadAccess)) {
@@ -81,7 +72,8 @@ NTSTATUS usbip::send(SOCKET *sock, memory pool, void *data, ULONG len)
         return send(sock, &buf, WSK_FLAG_NODELAY);
 }
 
-NTSTATUS usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
+_IRQL_requires_(PASSIVE_LEVEL)
+NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len)
 {
         Mdl mdl(pool, data, len);
         if (auto err = mdl.prepare(IoWriteAccess)) {
@@ -92,7 +84,8 @@ NTSTATUS usbip::recv(SOCKET *sock, memory pool, void *data, ULONG len)
         return receive(sock, &buf);
 }
 
-err_t usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
+_IRQL_requires_(PASSIVE_LEVEL)
+err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
 {
         op_common r;
 
@@ -117,25 +110,26 @@ err_t usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ 
         return ERR_NONE;
 }
 
-NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
+_IRQL_requires_(PASSIVE_LEVEL)
+NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
 {
         usbip::Mdl mdl_hdr(memory::stack, &hdr, sizeof(hdr));
 
         if (auto err = mdl_hdr.prepare_paged(IoReadAccess)) {
-                Trace(TRACE_LEVEL_ERROR, "Prepare usbip_header %!STATUS!", err);
+                Trace(TRACE_LEVEL_ERROR, "prepare_paged %!STATUS!", err);
                 return err;
         }
 
-        usbip::Mdl buf_out;
+        usbip::Mdl mdl_buf;
 
         if (transfer_buffer && is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(buf_out, IoReadAccess, *transfer_buffer)) {
-                        Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                if (auto err = make_transfer_buffer_mdl(mdl_buf, IoReadAccess, *transfer_buffer)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                         return err;
                 }
+                mdl_hdr.next(mdl_buf);
         }
 
-        mdl_hdr.next(buf_out);
         WSK_BUF buf{ mdl_hdr.get(), 0, get_total_size(hdr) };
 
         NT_ASSERT(buf.Length >= mdl_hdr.size());
@@ -160,6 +154,7 @@ NTSTATUS usbip::send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_op
  * URB must have TransferBuffer* members.
  * TransferBuffer && TransferBufferMDL can be both not NULL for bulk/int at least.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Operation, _In_ const URB &urb)
 {
         auto err = STATUS_SUCCESS;
@@ -171,7 +166,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Ope
                 mdl = Mdl(m);
                 err = mdl.size() >= r->TransferBufferLength ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
         } else if (auto buf = r->TransferBuffer) {
-                mdl = Mdl(memory::paged, buf, r->TransferBufferLength); // FIXME: unknown if it is paged or not
+                mdl = Mdl(memory::paged, buf, r->TransferBufferLength); // unknown it is paged or not
                 err = mdl.prepare_paged(Operation);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");

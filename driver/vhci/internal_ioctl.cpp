@@ -90,7 +90,7 @@ auto async_send(_Inout_ const URB &transfer_buffer, _In_ send_context *ctx)
         if (is_transfer_direction_in(&ctx->hdr)) { // TransferFlags can have wrong direction
                 NT_ASSERT(!ctx->mdl_buf);
         } else if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, IoReadAccess, transfer_buffer)) {
-                Trace(TRACE_LEVEL_ERROR, "make_buffer_mdl %!STATUS!", err);
+                Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                 free(ctx);
                 return err;
         }

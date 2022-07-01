@@ -16,12 +16,19 @@ namespace usbip
 
 using wsk::SOCKET;
 
-NTSTATUS send(SOCKET *sock, memory pool, void *data, ULONG len);
-NTSTATUS recv(SOCKET *sock, memory pool, void *data, ULONG len);
+_IRQL_requires_(PASSIVE_LEVEL)
+NTSTATUS send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
 
-err_t recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status);
-NTSTATUS send_cmd(_In_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ _URB *transfer_buffer = nullptr);
+_IRQL_requires_(PASSIVE_LEVEL)
+NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len);
 
+_IRQL_requires_(PASSIVE_LEVEL)
+err_t recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status);
+
+_IRQL_requires_(PASSIVE_LEVEL)
+NTSTATUS send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ _URB *transfer_buffer = nullptr);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Operation, _In_ const _URB &urb);
 
 } // namespace usbip
