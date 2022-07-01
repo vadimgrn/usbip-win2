@@ -93,7 +93,7 @@ int usbip_help(int argc, char *argv[])
 int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
 {
 	FileVersion v;
-	printf("usbip (%s)\n", v.GetFileVersion().c_str());
+	printf("%s\n", v.GetFileVersion().c_str());
 	return 0;
 }
 
