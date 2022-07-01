@@ -101,7 +101,6 @@
     <ClCompile Include="file_ver.cpp" />
     <ClCompile Include="usbip_common.cpp" />
     <ClCompile Include="getopt.c" />
-    <ClCompile Include="getopt_long.c" />
     <ClCompile Include="usbip_proto_op.cpp" />
     <ClCompile Include="usbip_setupdi.cpp" />
     <ClCompile Include="usbip_util.cpp" />
