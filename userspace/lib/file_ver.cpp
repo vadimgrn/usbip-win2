@@ -49,16 +49,16 @@ void *FileVersion::VerQueryValue(const std::string &val, UINT &buf_sz) const
         return buf;
 }
 
-std::string FileVersion::VerQueryValue(const std::string &val) const
+std::string_view FileVersion::VerQueryValue(const char *val) const
 {
-        std::string res;
+        std::string_view res;
         auto s = "\\StringFileInfo\\" + GetTranslation() + '\\' + val;
 
         UINT buf_sz;
         auto buf = VerQueryValue(s, buf_sz);
 
         if (buf && buf_sz) {
-                res.assign((char*)buf, buf_sz);
+                res = std::string_view(static_cast<const char*>(buf), buf_sz);
         }
 
         return res;
@@ -131,7 +131,7 @@ std::string FileVersion::GetTranslation(bool original) const
         UINT buf_sz;
         auto buf = VerQueryValue("\\VarFileInfo\\Translation", buf_sz);
 
-        if (buf && buf_sz > 0) {
+        if (buf && buf_sz) {
                 auto dw = *reinterpret_cast<DWORD*>(buf); // first always must present
                 assert(buf_sz == sizeof(dw));
                 s = MakeTransl(dw);

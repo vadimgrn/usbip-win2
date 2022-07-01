@@ -93,7 +93,8 @@ int usbip_help(int argc, char *argv[])
 int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
 {
 	FileVersion v;
-	printf("%s\n", v.GetFileVersion().c_str());
+	std::string s(v.GetFileVersion());
+	printf("%s\n", s.c_str());
 	return 0;
 }
 
