@@ -327,11 +327,13 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 /*
  * Nothing to handle.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_success(vpdo_dev_t&, URB&, const usbip_header&)
 {
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_unexpected(vpdo_dev_t&, URB &urb, const usbip_header&)
 {
 	auto func = urb.UrbHeader.Function;
@@ -602,6 +604,7 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 } // namespace
 
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
