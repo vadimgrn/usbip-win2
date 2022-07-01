@@ -20,7 +20,7 @@ inline auto check_wsk_data_offset(_In_ const WSK_DATA_INDICATION *di, _In_ size_
 } // namespace
 
 
-void wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndication, _In_ size_t BytesIndicated)
+void wsk_data_append(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataIndication, _In_ size_t BytesIndicated)
 {
 	NT_ASSERT(DataIndication);
 	NT_ASSERT(wsk::size(DataIndication) == BytesIndicated);

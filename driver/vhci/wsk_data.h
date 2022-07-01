@@ -11,7 +11,7 @@ struct _WSK_DATA_INDICATION;
 
 size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo);
 
-void wsk_data_push(_Inout_ vpdo_dev_t &vpdo, _In_ _WSK_DATA_INDICATION *DataIndication, _In_ size_t BytesIndicated);
+void wsk_data_append(_Inout_ vpdo_dev_t &vpdo, _In_ _WSK_DATA_INDICATION *DataIndication, _In_ size_t BytesIndicated);
 size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len);
 
 struct WskDataCopyState

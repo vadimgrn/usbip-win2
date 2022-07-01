@@ -631,7 +631,7 @@ NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 	auto st = STATUS_PENDING;
 
 	if (DataIndication) {
-		wsk_data_push(*vpdo, DataIndication, BytesIndicated);
+		wsk_data_append(*vpdo, DataIndication, BytesIndicated);
 		receive_event(*vpdo);
 	} else {
 		vhub_unplug_vpdo(vpdo);
