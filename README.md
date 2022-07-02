@@ -61,11 +61,7 @@
 - The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
 - SDK for Windows 11, version 22H2 (10.0.22621.0)
 - [WDK for Windows 11](https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk), version 22H2 (10.0.22621.0)
-- InnoSetup
-
-### Install InnoSetup
-- Install the latest release of [InnoSetup](https://jrsoftware.org/isdl.php#stable)
-- Append path to InnoSetup compiler ISCC.exe to PATH environment variable
+- InnoSetup 6.2 or later
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`

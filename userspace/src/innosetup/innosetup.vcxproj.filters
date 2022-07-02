@@ -18,5 +18,6 @@
     <None Include="setup.iss">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

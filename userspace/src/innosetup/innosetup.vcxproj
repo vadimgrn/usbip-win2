@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\..\packages\Tools.InnoSetup.6.2.1\build\Tools.InnoSetup.props" Condition="Exists('..\..\..\packages\Tools.InnoSetup.6.2.1\build\Tools.InnoSetup.props')" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -40,19 +41,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <NMakeBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\usbip-win2-*-$(Configuration).exe</NMakeCleanCommandLine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <NMakeBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>iscc /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\usbip-win2-*-$(Configuration).exe</NMakeCleanCommandLine>
@@ -60,6 +61,7 @@
   <ItemDefinitionGroup>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="packages.config" />
     <None Include="setup.iss" />
   </ItemGroup>
   <ItemGroup>
@@ -77,6 +79,11 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\..\packages\Tools.InnoSetup.6.2.1\build\Tools.InnoSetup.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\..\packages\Tools.InnoSetup.6.2.1\build\Tools.InnoSetup.props'))" />
+  </Target>
 </Project>
