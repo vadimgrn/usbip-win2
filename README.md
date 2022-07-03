@@ -6,10 +6,11 @@
 - Works with Linux USB/IP server at least for kernels 4.19 - 5.15
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
-- There is no "official" USB/IP client for Windows so far
+- There is no "official" USB/IP client for Windows
 
 ## Requirements
 - Windows 10 x64, version 2004 and later ([NTDDI_WIN10_VB](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable))
+- Server must support USB/IP protocol v.1.1.1
 
 ## Key features
 - VHCI driver is a USB/IP client
@@ -49,13 +50,15 @@
   - Peripherals
     - Microsoft Wired Keyboard 600 (model 1576)
     - Primax Electronics 0Y357C PMX-MMOCZUL [Dell Laser Mouse]
+  - Misc. devices
+    - AUCTOPUS I-65, HD audio and video conference speaker pole
 
 ## Build
 
 ### Notes
 - Driver is configured for Windows 10 v.2004 target
 - x86 platform is not supported
-- Build is tested on Windows 11
+- Build is tested on the latest Windows 11 Pro
 
 ### Build Tools
 - The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
@@ -193,10 +196,6 @@ dmesg --follow | tee ~/usbip.log
 - Enable testing
 ```
 verifier /rc 1 2 4 5 6 8 9 12 18 10 14 15 20 24 26 35 /driver usbip_vhci.sys
-```
-- Query settings
-```
-verifier /querysettings
 ```
 - Query driver statistics
 ```
