@@ -19,6 +19,7 @@ const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 namespace
 {
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 {
 	PAGED_CODE();
@@ -35,6 +36,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object %p", vhci.Self);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
@@ -52,6 +54,7 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 	}
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void free_usb_dev_interface(UNICODE_STRING &symlink_name)
 {
         PAGED_CODE();
@@ -65,6 +68,7 @@ PAGEABLE void free_usb_dev_interface(UNICODE_STRING &symlink_name)
         RtlFreeUnicodeString(&symlink_name);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void free_strings(vpdo_dev_t &d)
 {
 	PAGED_CODE();
@@ -89,6 +93,7 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 /*
  * The socket is closed, there is no concurrency with send_complete from internal _ioctl.cpp
  */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
@@ -103,6 +108,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
         }
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
@@ -119,6 +125,7 @@ PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
 	}
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -146,12 +153,13 @@ PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 	vpdo.sock = nullptr;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 	TraceMsg("%p, port %d", &vpdo, vpdo.port);
 
-        close_socket(vpdo);
+	close_socket(vpdo);
 	cancel_pending_irps(vpdo);
 
 	vhub_detach_vpdo(&vpdo);
@@ -170,6 +178,7 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 } // namespace
 
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void destroy_device(vdev_t *vdev)
 {
 	PAGED_CODE();
@@ -195,6 +204,8 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 		to_vdev(vdev->pdo)->fdo = nullptr;
 	}
 
+	KeWaitForSingleObject(&vdev->intf_ref_event, Executive, KernelMode, false, nullptr);
+
 	switch (vdev->type) {
 	case VDEV_VHCI:
 		destroy_vhci(*(vhci_dev_t*)vdev);
@@ -215,6 +226,7 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 	IoDeleteDevice(vdev->Self);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();

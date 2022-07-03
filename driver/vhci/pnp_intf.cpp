@@ -5,11 +5,7 @@
 #include "pnp_intf.tmh"
 
 #include "vhci.h"
-#include "usbip_proto.h"
 #include "irp.h"
-#include "strutil.h"
-#include "ch9.h"
-#include "usbdsc.h"
 
 #include <ntstrsafe.h>
 #include <wdmguid.h>
@@ -20,12 +16,36 @@
 namespace
 {
 
-void InterfaceReference(__in PVOID /*Context*/) {}
-void InterfaceDereference(__in PVOID /*Context*/) {}
+_IRQL_requires_same_
+void InterfaceReference(__in PVOID Context) 
+{
+	auto &vdev = *static_cast<vdev_t*>(Context);
+
+	auto n = InterlockedIncrement(&vdev.intf_ref_cnt);
+	TraceDbg("%04x, %!vdev_type_t!, %ld", ptr4log(&vdev), vdev.type, n);
+
+	if (n == 1) {
+		KeClearEvent(&vdev.intf_ref_event);
+	}
+}
+
+_IRQL_requires_same_
+void InterfaceDereference(__in PVOID Context) 
+{
+	auto &vdev = *static_cast<vdev_t*>(Context);
+
+	auto n = InterlockedDecrement(&vdev.intf_ref_cnt);
+	TraceDbg("%04x, %!vdev_type_t!, %ld", ptr4log(&vdev), vdev.type, n);
+
+	if (!n) { // last reference has dropped
+		KeSetEvent(&vdev.intf_ref_event, IO_NO_INCREMENT, false);
+	}
+}
 
 /*
  * If return zero, QueryBusTime() will be called again and again.
  */
+_IRQL_requires_max_(HIGH_LEVEL)
 inline auto get_current_frame_number(const vpdo_dev_t &vpdo)
 {
 	return vpdo.current_frame_number ? vpdo.current_frame_number : 100;
@@ -34,6 +54,7 @@ inline auto get_current_frame_number(const vpdo_dev_t &vpdo)
 /*
  * @return true if device is operating at high speed
  */
+_IRQL_requires_max_(HIGH_LEVEL)
 BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(__in PVOID Context)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(Context);
@@ -44,6 +65,7 @@ BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(__in PVOID Context)
 /*
  * @return kilobits per second
  */
+_IRQL_requires_max_(HIGH_LEVEL)
 auto bus_bandwidth(usb_device_speed speed)
 {
 	enum 
@@ -83,6 +105,7 @@ auto bus_bandwidth(usb_device_speed speed)
 	return val;
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 auto setControllerName(vpdo_dev_t *vpdo, USB_BUS_INFORMATION_LEVEL_1 &r, 
 			ULONG BusInformationBufferLength, ULONG &BusInformationActualLength)
 {
@@ -104,6 +127,7 @@ auto setControllerName(vpdo_dev_t *vpdo, USB_BUS_INFORMATION_LEVEL_1 &r,
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 NTSTATUS USB_BUSIFFN QueryBusInformation(
 	IN PVOID BusContext, 
 	IN ULONG Level, 
@@ -146,6 +170,7 @@ NTSTATUS USB_BUSIFFN QueryBusInformation(
 	return st;
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
 {
 	TraceMsg("Not supported");
@@ -155,6 +180,7 @@ NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(IN PVOID, IN URB*)
 /*
  * @return the current 32-bit USB frame number
  */
+_IRQL_requires_max_(HIGH_LEVEL)
 NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID BusContext, _Out_opt_ ULONG *CurrentUsbFrame)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
@@ -172,6 +198,7 @@ NTSTATUS USB_BUSIFFN QueryBusTime(_In_ PVOID BusContext, _Out_opt_ ULONG *Curren
  * The lowest 3 bits of the returned micro-frame value will contain the current 125us
  * micro-frame, while the upper 29 bits will contain the current 1ms USB frame number.
  */
+_IRQL_requires_max_(HIGH_LEVEL)
 NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID BusContext, _Out_opt_ ULONG *HighSpeedFrameCounter)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
@@ -182,6 +209,7 @@ NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ PVOID BusContext, _Out_opt_ ULONG *
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID BusContext, IN OUT PUSBD_VERSION_INFORMATION inf, IN OUT PULONG HcdCapabilities)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
@@ -195,6 +223,7 @@ VOID USB_BUSIFFN GetUSBDIVersion(IN PVOID BusContext, IN OUT PUSBD_VERSION_INFOR
 		  inf->USBDI_Version, inf->Supported_USB_Version, *HcdCapabilities);
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 UCHAR getPciProgIf(USHORT idProduct)
 {
 	enum hci_type_t { OHCI, UHCI, EHCI };
@@ -211,6 +240,7 @@ UCHAR getPciProgIf(USHORT idProduct)
 	}
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 NTSTATUS QueryControllerType(
 	_In_opt_ PVOID BusContext,
 	_Out_opt_ PULONG HcdiOptionFlags,
@@ -265,12 +295,14 @@ NTSTATUS QueryControllerType(
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(HIGH_LEVEL)
 NTSTATUS USB_BUSIFFN EnumLogEntry(_In_ PVOID /*BusContext*/, _In_ ULONG DriverTag, _In_ ULONG EnumTag, _In_ ULONG P1, _In_ ULONG P2)
 {
 	TraceMsg("DriverTag %lu, EnumTag %lu, P1 %lu, P2 %lu -> not supported", DriverTag, EnumTag, P1, P2);
 	return STATUS_NOT_SUPPORTED;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT version, INTERFACE *intf)
 {
 	PAGED_CODE();
@@ -306,21 +338,23 @@ PAGEABLE NTSTATUS query_interface_usbdi(vpdo_dev_t *vpdo, USHORT size, USHORT ve
 	case USB_BUSIF_USBDI_VERSION_0:
 		r.Size = size;
 		r.Version = version;
-		//
 		r.BusContext = vpdo;
 		r.InterfaceReference = InterfaceReference;
 		r.InterfaceDereference = InterfaceDereference;
-		//
+		// the following functions must be callable at high IRQL, (ie higher than DISPATCH_LEVEL)
 		r.GetUSBDIVersion = GetUSBDIVersion;
 		r.QueryBusTime = QueryBusTime;
 		r.SubmitIsoOutUrb = SubmitIsoOutUrb;
 		r.QueryBusInformation = QueryBusInformation;
 	}
 
+	InterfaceReference(r.BusContext);
+
 	Trace(TRACE_LEVEL_VERBOSE, "%!usb_busif_usbdi_version!", version);
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS query_interface_usbcam(USHORT size, USHORT version, INTERFACE* intf)
 {
 	PAGED_CODE();
@@ -348,7 +382,7 @@ NTSTATUS GetLocationString(
 	PZZWSTR *LocationStrings)
 {
 	auto vdev = static_cast<vdev_t*>(Context);
-	NTSTATUS st = STATUS_SUCCESS;
+	auto st = STATUS_SUCCESS;
 
 	WCHAR buf[32];
 	size_t remaining = 0;
@@ -358,10 +392,10 @@ NTSTATUS GetLocationString(
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
 		st = RtlStringCchPrintfExW(buf, ARRAYSIZE(buf), nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL,
-			L"%s(%d)", devcodes[vdev->type], vpdo->port);
+			                   L"%s(%d)", devcodes[vdev->type], vpdo->port);
 	} else {
 		st = RtlStringCchCopyExW(buf, ARRAYSIZE(buf), devcodes[vdev->type],
-			nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL);
+			                 nullptr, &remaining, STRSAFE_FILL_BEHIND_NULL);
 	}
 
 	if (!(st == STATUS_SUCCESS && remaining >= 2)) { // string ends with L"\0\0"
@@ -382,8 +416,11 @@ NTSTATUS GetLocationString(
 	return STATUS_INSUFFICIENT_RESOURCES;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INTERFACE *intf)
 {
+	PAGED_CODE();
+
 	auto &r = *reinterpret_cast<PNP_LOCATION_INTERFACE*>(intf);
 	if (size != sizeof(r)) {
 		Trace(TRACE_LEVEL_ERROR, "Size %d != %Iu, version %d", size, sizeof(r), version);
@@ -391,16 +428,18 @@ NTSTATUS query_interface_location(vdev_t *vdev, USHORT size, USHORT version, INT
 	}
 
 	r.Size = sizeof(r);
-	r.Version = 1;
+//	r.Version = 1;
 	r.Context = vdev;
 	r.InterfaceReference = InterfaceReference;
 	r.InterfaceDereference = InterfaceDereference;
 	r.GetLocationString = GetLocationString;
 
+	InterfaceReference(r.Context);
 	return STATUS_SUCCESS;
 }
 
 } // namespace
+
 
 /*
  * On success, a bus driver sets Irp->IoStatus.Information to zero.
@@ -425,10 +464,12 @@ PAGEABLE NTSTATUS pnp_query_interface(vdev_t *vdev, IRP *irp)
 		status = query_interface_usbdi((vpdo_dev_t*)vdev, qi.Size, qi.Version, qi.Interface);
 	}
 
-	if (status == STATUS_SUCCESS) {
+	if (NT_SUCCESS(status)) {
 		irp->IoStatus.Information = 0;
 	}
 
-	TraceMsg("%!GUID!, Size %d, Version %#x -> %!STATUS!", qi.InterfaceType, qi.Size, qi.Version, status);
+	TraceMsg("%!vdev_type_t!: %!GUID!, Size %d, Version %#x -> %!STATUS!", 
+		  vdev->type, qi.InterfaceType, qi.Size, qi.Version, status);
+
 	return CompleteRequest(irp, status);
 }

@@ -91,6 +91,11 @@ PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 
 	devobj->Flags |= DO_POWER_PAGABLE | DO_BUFFERED_IO;
 
+	if (auto evt = &vdev->intf_ref_event) {
+		KeInitializeEvent(evt, NotificationEvent, false);
+		KeSetEvent(evt, IO_NO_INCREMENT, false);
+	}
+
 	return devobj;
 }
 

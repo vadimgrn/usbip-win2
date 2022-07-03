@@ -9,7 +9,8 @@
 namespace
 {
 
-ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
 {
 	NT_ASSERT(PipeHandle);
 
@@ -19,7 +20,7 @@ ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
 		return TransferFlags;
 	}
 
-	Trace(TRACE_LEVEL_VERBOSE, "Fix direction in TransferFlags(%#Ix), PipeHandle(%#Ix)", TransferFlags, (uintptr_t)PipeHandle);
+	TraceDbg("Fix direction in TransferFlags(%#Ix), PipeHandle(%#Ix)", TransferFlags, (uintptr_t)PipeHandle);
 
 	const ULONG in_flags = USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
@@ -35,12 +36,14 @@ ULONG fix_transfer_flags(ULONG TransferFlags, USBD_PIPE_HANDLE PipeHandle)
 
 } // namespace
 
+
 /*
  * Direction in TransferFlags can be invalid for bulk transfer at least.
  * Always use direction from PipeHandle if URB has one.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS set_cmd_submit_usbip_header(
-	vpdo_dev_t &vpdo, usbip_header &hdr, USBD_PIPE_HANDLE PipeHandle, ULONG TransferFlags, ULONG TransferBufferLength)
+	_In_ vpdo_dev_t &vpdo, _Out_ usbip_header &hdr, _In_ USBD_PIPE_HANDLE PipeHandle, ULONG TransferFlags, _In_ ULONG TransferBufferLength)
 {
 	bool ep0 = TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
 	if (ep0 == !!PipeHandle) {
@@ -76,7 +79,8 @@ NTSTATUS set_cmd_submit_usbip_header(
 	return STATUS_SUCCESS;
 }
 
-void set_cmd_unlink_usbip_header(vpdo_dev_t &vpdo, usbip_header &hdr, seqnum_t seqnum_unlink)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void set_cmd_unlink_usbip_header(_In_ vpdo_dev_t &vpdo, _Out_ usbip_header &hdr, _In_ seqnum_t seqnum_unlink)
 {
 	auto &r = hdr.base;
 
