@@ -39,6 +39,7 @@ void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTA
 	return nullptr;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	PAGED_CODE();

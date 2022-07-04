@@ -13,7 +13,7 @@ PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);
 
 NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status = STATUS_SUCCESS);
 
-inline auto CompleteRequestIoStatus(IRP *irp)
+inline auto CompleteRequestAsIs(IRP *irp)
 {
 	return CompleteRequest(irp, irp->IoStatus.Status);
 }

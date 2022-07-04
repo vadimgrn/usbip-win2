@@ -230,19 +230,25 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	if (vdev->PnPState == pnp_state::Removed) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: already removed", vdev->type);
+		TraceMsg("Already removed");
 		return CompleteRequest(irp);
 	}
 
-	auto devobj_lower = vdev->devobj_lower;
+	if (vdev->type == VDEV_VPDO) {
+		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
+	}
 
 	set_state(*vdev, pnp_state::Removed);
+
+	auto fdo = is_fdo(vdev->type);
+	auto devobj_lower = vdev->devobj_lower;
+
 	destroy_device(vdev);
 
-	if (is_fdo(vdev->type)) {
+	if (fdo) { // see irp_pass_down_or_complete
 		irp->IoStatus.Status = STATUS_SUCCESS;
 		return irp_pass_down(devobj_lower, irp);
 	} else {

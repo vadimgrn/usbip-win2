@@ -141,7 +141,7 @@ extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __i
 	auto vhci = to_vhci_or_null(devobj);
 	if (!vhci) { // vpdo just complete the request with the current status
 		Trace(TRACE_LEVEL_INFORMATION, "Skip %!sysctrl!", irpstack->MinorFunction);
-		return CompleteRequestIoStatus(irp);
+		return CompleteRequestAsIs(irp);
 	}
 
 	Trace(TRACE_LEVEL_INFORMATION, "%!sysctrl!", irpstack->MinorFunction);

@@ -22,7 +22,7 @@ void InterfaceReference(__in PVOID Context)
 	auto &vdev = *static_cast<vdev_t*>(Context);
 
 	auto n = InterlockedIncrement(&vdev.intf_ref_cnt);
-	TraceDbg("%04x, %!vdev_type_t!, %ld", ptr4log(&vdev), vdev.type, n);
+	TraceDbg("%!vdev_type_t!(%04x) -> %ld", vdev.type, ptr4log(&vdev), n);
 
 	if (n == 1) {
 		KeClearEvent(&vdev.intf_ref_event);
@@ -30,12 +30,12 @@ void InterfaceReference(__in PVOID Context)
 }
 
 _IRQL_requires_same_
-void InterfaceDereference(__in PVOID Context) 
+void InterfaceDereference(__in PVOID Context)
 {
 	auto &vdev = *static_cast<vdev_t*>(Context);
 
 	auto n = InterlockedDecrement(&vdev.intf_ref_cnt);
-	TraceDbg("%04x, %!vdev_type_t!, %ld", ptr4log(&vdev), vdev.type, n);
+	TraceDbg("%!vdev_type_t!(%04x) -> %ld", vdev.type, ptr4log(&vdev), n);
 
 	if (!n) { // last reference has dropped
 		KeSetEvent(&vdev.intf_ref_event, IO_NO_INCREMENT, false);

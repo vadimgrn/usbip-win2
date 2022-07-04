@@ -97,7 +97,7 @@ NTSTATUS
 		irp->IoStatus.Status = status;
 	}
 
-	return CompleteRequestIoStatus(irp);
+	return CompleteRequestAsIs(irp);
 }
 
 } // namespace

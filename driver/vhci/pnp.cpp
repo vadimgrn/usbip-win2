@@ -19,7 +19,7 @@
 namespace
 {
 
-const LPCWSTR vdev_desc[VDEV_SIZE] = 
+const LPCWSTR vdev_desc[] = 
 {
 	L"usbip-win ROOT", 
 	L"usbip-win CPDO", 
@@ -28,9 +28,10 @@ const LPCWSTR vdev_desc[VDEV_SIZE] =
 	L"usbip-win VHUB", 
 	L"usbip-win VPDO"
 };
+static_assert(ARRAYSIZE(vdev_desc) == VDEV_SIZE);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto irp_pass_down_or_success(vdev_t *vdev, IRP *irp)
+PAGEABLE auto irp_pass_down_or_complete(vdev_t *vdev, IRP *irp)
 {
 	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
 }
@@ -39,84 +40,92 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	set_state(*vdev, pnp_state::StopPending);
-	return irp_pass_down_or_success(vdev, irp);
+	return irp_pass_down_or_complete(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_cancel_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	if (vdev->PnPState == pnp_state::StopPending) {
-		// We did receive a query-stop, so restore.
 		set_previous_pnp_state(*vdev);
-		NT_ASSERT(vdev->PnPState == pnp_state::Started);
 	}
 
-	return irp_pass_down_or_success(vdev, irp);
+	return irp_pass_down_or_complete(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	set_state(*vdev, pnp_state::Stopped);
-	return irp_pass_down_or_success(vdev, irp);
+	return irp_pass_down_or_complete(vdev, irp);
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto device_can_be_removed(_In_ vdev_t *vdev)
+{
+	PAGED_CODE();
+	LARGE_INTEGER timeout{};
+	return !KeWaitForSingleObject(&vdev->intf_ref_event, Executive, KernelMode, false, &timeout);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
-	if (vdev->type == VDEV_VPDO) {
-		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
+	if (device_can_be_removed(vdev)) {
+		set_state(*vdev, pnp_state::RemovePending);
+		return irp_pass_down_or_complete(vdev, irp);
+	} else {
+		TraceMsg("Can't be removed, intf_ref_cnt %ld", vdev->intf_ref_cnt);
+		return CompleteRequest(irp, STATUS_UNSUCCESSFUL);
 	}
-
-	set_state(*vdev, pnp_state::RemovePending);
-	return irp_pass_down_or_success(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_cancel_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	if (vdev->PnPState == pnp_state::RemovePending) {
 		set_previous_pnp_state(*vdev);
 	}
 
-	return irp_pass_down_or_success(vdev, irp);
+	return irp_pass_down_or_complete(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_surprise_removal(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	set_state(*vdev, pnp_state::SurpriseRemovePending);
-	return irp_pass_down_or_success(vdev, irp);
+	return irp_pass_down_or_complete(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t*, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	PNP_BUS_INFORMATION *bi = (PNP_BUS_INFORMATION*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(*bi), USBIP_VHCI_POOL_TAG);
 	if (bi) {
 		bi->BusTypeGuid = GUID_BUS_TYPE_USB;
 		bi->LegacyBusType = PNPBus;
-		bi->BusNumber = 10; // arbitrary
+		bi->BusNumber = 1; // arbitrary
 	}
 
 	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(bi);
@@ -129,24 +138,32 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_0x0E(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
-	return CompleteRequestIoStatus(irp);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
-	return CompleteRequestIoStatus(irp);
+
+	NT_ASSERT(irp->IoStatus.Status == STATUS_NOT_SUPPORTED);
+	NT_ASSERT(!irp->IoStatus.Information);
+
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
-	return CompleteRequestIoStatus(irp);
+
+	NT_ASSERT(irp->IoStatus.Status == STATUS_NOT_SUPPORTED);
+	NT_ASSERT(!irp->IoStatus.Information);
+
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
 }
 
 /*
@@ -160,55 +177,59 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
 		return CompleteRequest(irp);
 	}
 
-	return CompleteRequestIoStatus(irp);
+	return CompleteRequestAsIs(irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_set_lock(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
-	return CompleteRequestIoStatus(irp);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_pnp_device_state(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
 
-	irp->IoStatus.Information = 0;
+	auto &st = reinterpret_cast<PNP_DEVICE_STATE&>(irp->IoStatus.Information);
+
+	if (vdev->PnPState == pnp_state::Removed) {
+		st |= PNP_DEVICE_REMOVED;
+	}
+
+	TraceMsg("%!vdev_type_t!(%04x): %#lx", vdev->type, ptr4log(vdev), st);
 	return CompleteRequest(irp);
 }
 
-/*
- * OPTIONAL for bus drivers.
- * This bus drivers any of the bus's descendants
- * (child device, child of a child device, etc.) do not
- * contain a memory file namely paging file, dump file,
- * or hibernation file. So we  fail this Irp.
- */
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
-	return CompleteRequest(irp, STATUS_UNSUCCESSFUL);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+
+	if (auto r = reinterpret_cast<IO_RESOURCE_REQUIREMENTS_LIST*>(irp->IoStatus.Information)) {
+		TraceDbg("ListSize %lu, InterfaceType %d, BusNumber %lu, SlotNumber %lu, AlternativeLists %lu", 
+			  r->ListSize, r->InterfaceType, r->BusNumber, r->SlotNumber, r->AlternativeLists);
+	}
+
+	return irp_pass_down_or_complete(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_legacy_bus_information(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
-	return CompleteRequestIoStatus(irp);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
 }
 
 /*
@@ -219,7 +240,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_device_enumerated(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%p", vdev);
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 	return CompleteRequest(irp);
 }
 
@@ -289,7 +310,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 	TraceMsg("%!vdev_type_t!: %!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!", 
 		  vdev->type, r.DeviceTextType, r.LocaleId, reinterpret_cast<wchar_t*>(Information), Status);
 
-	return CompleteRequestIoStatus(irp);
+	return CompleteRequestAsIs(irp);
 }
 
 using pnpmn_func_t = NTSTATUS(vdev_t*, IRP*);
@@ -350,7 +371,7 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 
 	TraceDbg("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
-	NTSTATUS status = STATUS_SUCCESS;
+	auto status = STATUS_SUCCESS;
 
 	if (vdev->PnPState == pnp_state::Removed) { // the driver should not pass the IRP down to the next lower driver
 		status = CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
@@ -358,7 +379,7 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 		status = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
 	} else {
 		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
-		status = CompleteRequestIoStatus(irp);
+		status = CompleteRequestAsIs(irp);
 	}
 
 	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);

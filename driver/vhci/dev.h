@@ -71,7 +71,7 @@ struct vdev_t
 	DEVICE_OBJECT *pdo;
 	DEVICE_OBJECT *devobj_lower;
 
-	LONG intf_ref_cnt; // see _PNP_LOCATION_INTERFACE.InterfaceReference/InterfaceDereference
+	LONG intf_ref_cnt; // see _INTERFACE.InterfaceReference/InterfaceDereference
 	KEVENT intf_ref_event;
 };
 
