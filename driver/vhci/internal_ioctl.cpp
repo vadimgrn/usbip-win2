@@ -117,13 +117,15 @@ auto async_send(_Inout_ const URB &transfer_buffer, _In_ send_context *ctx)
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
-        IoSetCompletionRoutine(ctx->wsk_irp, send_complete, ctx, true, true, true);
+        auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
+
+        IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
         enqueue_irp(*ctx->vpdo, ctx->irp);
 
-        auto err = send(ctx->vpdo->sock, &buf, WSK_FLAG_NODELAY, ctx->wsk_irp);
+        auto err = send(ctx->vpdo->sock, &buf, WSK_FLAG_NODELAY, wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
-        TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(ctx->wsk_irp), err);
+        TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(wsk_irp), err);
         return STATUS_PENDING;
 }
 

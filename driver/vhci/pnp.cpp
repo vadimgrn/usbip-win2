@@ -367,19 +367,20 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 	PAGED_CODE();
 
 	auto vdev = to_vdev(devobj);
-	auto irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto vdev_type = vdev->type;
 
-	TraceDbg("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
+	TraceDbg("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev_type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
 	NTSTATUS st{};
 
 	if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
-		st = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
+		st = pnpmn_functions[irpstack->MinorFunction](vdev, irp); // vdev can be destroyed after this
 	} else {
-		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
+		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev_type, irpstack->MinorFunction);
 		st = CompleteRequestAsIs(irp);
 	}
 
-	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
+	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev_type, st);
 	return st;
 }
