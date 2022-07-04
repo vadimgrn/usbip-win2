@@ -232,26 +232,22 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
-	if (vdev->PnPState == pnp_state::Removed) {
-		TraceMsg("Already removed");
-		return CompleteRequest(irp);
-	}
-
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
 	}
 
-	set_state(*vdev, pnp_state::Removed);
-
-	auto fdo = is_fdo(vdev->type);
-	auto devobj_lower = vdev->devobj_lower;
-
-	destroy_device(vdev);
-
-	if (fdo) { // see irp_pass_down_or_complete
-		irp->IoStatus.Status = STATUS_SUCCESS;
-		return irp_pass_down(devobj_lower, irp);
+	if (vdev->PnPState != pnp_state::Removed) {
+		set_state(*vdev, pnp_state::Removed);
 	} else {
+		TraceMsg("%!vdev_type_t!(%04x) already removed", vdev->type, ptr4log(vdev));
 		return CompleteRequest(irp);
 	}
+
+	POWER_STATE ps{ .DeviceState = PowerDeviceD3 };
+	vdev->DevicePowerState = ps.DeviceState;
+	PoSetPowerState(vdev->Self, DevicePowerState, ps);
+
+	auto st = irp_pass_down_or_complete(vdev, irp);
+	destroy_device(vdev);
+	return st;
 }

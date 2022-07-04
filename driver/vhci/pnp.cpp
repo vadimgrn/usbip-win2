@@ -31,12 +31,6 @@ const LPCWSTR vdev_desc[] =
 static_assert(ARRAYSIZE(vdev_desc) == VDEV_SIZE);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto irp_pass_down_or_complete(vdev_t *vdev, IRP *irp)
-{
-	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -353,6 +347,12 @@ pnpmn_func_t* const pnpmn_functions[] =
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp)
+{
+	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void set_state(vdev_t &vdev, pnp_state state)
 {
 	PAGED_CODE();
@@ -371,17 +371,15 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp)
 
 	TraceDbg("%!vdev_type_t!: enter irql %!irql!, %!pnpmn!", vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
 
-	auto status = STATUS_SUCCESS;
+	NTSTATUS st{};
 
-	if (vdev->PnPState == pnp_state::Removed) { // the driver should not pass the IRP down to the next lower driver
-		status = CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
-	} else if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
-		status = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
+	if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
+		st = pnpmn_functions[irpstack->MinorFunction](vdev, irp);
 	} else {
 		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", vdev->type, irpstack->MinorFunction);
-		status = CompleteRequestAsIs(irp);
+		st = CompleteRequestAsIs(irp);
 	}
 
-	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, status);
-	return status;
+	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
+	return st;
 }

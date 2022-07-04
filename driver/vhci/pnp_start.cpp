@@ -105,7 +105,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 		}
 	}
 
-	NTSTATUS status = STATUS_SUCCESS;
+	auto status = STATUS_SUCCESS;
 
 	switch (vdev->type) {
 	case VDEV_VHCI:
@@ -120,11 +120,10 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 	}
 
 	if (NT_SUCCESS(status)) {
-		vdev->DevicePowerState = PowerDeviceD0;
 		set_state(*vdev, pnp_state::Started);
 
-		POWER_STATE ps;
-		ps.DeviceState = PowerDeviceD0;
+		POWER_STATE ps{ .DeviceState = PowerDeviceD0 };
+		vdev->DevicePowerState = ps.DeviceState;
 		PoSetPowerState(vdev->Self, DevicePowerState, ps);
 
 		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! started", vdev->type);
