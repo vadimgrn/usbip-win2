@@ -71,7 +71,7 @@ PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo)
 
 	ExReleaseFastMutex(&vhub->Mutex);
 
-	TraceMsg("%p, port %d", vpdo, vpdo->port);
+	TraceMsg("%04x, port %d", ptr4log(vpdo), vpdo->port);
 	return vpdo->port;
 }
 
@@ -79,7 +79,7 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
 
-	TraceMsg("%p, port %d", vpdo, vpdo->port);
+	TraceMsg("%04x, port %d", ptr4log(vpdo), vpdo->port);
 
 	if (!vpdo->port) { // was not attached
 		return;
@@ -190,7 +190,7 @@ NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 		return STATUS_OPERATION_IN_PROGRESS;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "Unplugging device %p on port %d", vpdo, vpdo->port);
+	Trace(TRACE_LEVEL_INFORMATION, "Unplugging device %04x on port %d", ptr4log(vpdo), vpdo->port);
 
 	auto vhub = vhub_from_vpdo(vpdo);
 	IoInvalidateDeviceRelations(vhub->pdo, BusRelations);

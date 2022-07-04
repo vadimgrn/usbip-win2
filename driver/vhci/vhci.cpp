@@ -51,7 +51,7 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
 
-	TraceMsg("%p", drvobj);
+	TraceMsg("%04x", ptr4log(drvobj));
 
         wsk::shutdown();
 
@@ -198,7 +198,7 @@ NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPa
                 return st;
 	}
 
-	TraceMsg("%p", drvobj);
+	TraceMsg("%04x", ptr4log(drvobj));
 
 	if (auto err = init_lookaside_lists()) {
 		Trace(TRACE_LEVEL_CRITICAL, "init_lookaside_lists %!STATUS!", err);

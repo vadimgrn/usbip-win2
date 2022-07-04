@@ -24,7 +24,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
-	TraceMsg("%p", &vhci);
+	TraceMsg("%04x", ptr4log(&vhci));
 
         IoSetDeviceInterfaceState(&vhci.DevIntfVhci, FALSE);
 	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, FALSE);
@@ -33,7 +33,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 	// Inform WMI to remove this DeviceObject from its list of providers.
 	dereg_wmi(&vhci);
 
-	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object %p", vhci.Self);
+	Trace(TRACE_LEVEL_INFORMATION, "Invalidating vhci device object %04x", ptr4log(vhci.Self));
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -41,7 +41,7 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	TraceMsg("%p", &vhub);
+	TraceMsg("%04x", ptr4log(&vhub));
 
 	IoSetDeviceInterfaceState(&vhub.DevIntfRootHub, FALSE);
 	RtlFreeUnicodeString(&vhub.DevIntfRootHub);
@@ -99,7 +99,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 	NT_ASSERT(!vpdo.sock);
 
-	TraceMsg("%p", &vpdo);
+	TraceMsg("%04x", ptr4log(&vpdo));
 
 	if (is_initialized(vpdo.irps_csq)) {
                 while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, nullptr)) {
@@ -157,7 +157,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
-	TraceMsg("%p, port %d", &vpdo, vpdo.port);
+	TraceMsg("%04x, port %d", ptr4log(&vpdo), vpdo.port);
 
 	close_socket(vpdo);
 	cancel_pending_irps(vpdo);
@@ -187,7 +187,7 @@ PAGEABLE void destroy_device(vdev_t *vdev)
                 return;
         }
 
-	TraceMsg("%!vdev_type_t! %p", vdev->type, vdev);
+	TraceMsg("%!vdev_type_t! %04x", vdev->type, ptr4log(vdev));
 
 	if (vdev->child_pdo) {
 		vdev->child_pdo->parent = nullptr;

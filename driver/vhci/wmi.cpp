@@ -177,7 +177,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
-	TraceDbg("%p", vhci);
+	TraceDbg("%04x", ptr4log(vhci));
 
 	vhci->WmiLibInfo.GuidCount = ARRAYSIZE(USBIPBusWmiGuidList);
 	vhci->WmiLibInfo.GuidList = USBIPBusWmiGuidList;
@@ -199,6 +199,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS dereg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
-	TraceDbg("%p", vhci);
+	TraceDbg("%04x", ptr4log(vhci));
 	return IoWMIRegistrationControl(vhci->Self, WMIREG_ACTION_DEREGISTER);
 }

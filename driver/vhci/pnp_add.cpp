@@ -106,7 +106,7 @@ PAGEABLE auto add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev
 {
 	PAGED_CODE();
 
-	Trace(TRACE_LEVEL_INFORMATION, "pdo %p, %!vdev_type_t!", pdo, type);
+	Trace(TRACE_LEVEL_INFORMATION, "pdo %04x, %!vdev_type_t!", ptr4log(pdo), type);
 
 	auto devobj = vdev_create(drvobj, type);
 	if (!devobj) {
@@ -146,7 +146,7 @@ PAGEABLE auto add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev
                 break;
 	}
 
-        Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!(%p) -> %!STATUS!", type, vdev, err);
+        Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!(%04x) -> %!STATUS!", type, ptr4log(vdev), err);
 
         if (err) {
                 destroy_device(vdev);
