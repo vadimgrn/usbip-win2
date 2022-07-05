@@ -3,11 +3,16 @@
 #include "trace.h"
 #include "vhci.tmh"
 
+#include "power.h"
 #include "pnp.h"
+#include "pnp_add.h"
 #include "irp.h"
+#include "wmi.h"
 #include "vhub.h"
+#include "ioctl.h"
 #include "wsk_cpp.h"
 #include "send_context.h"
+#include "internal_ioctl.h"
 
 #include <ntstrsafe.h>
 
@@ -17,6 +22,9 @@ namespace
 _Enum_is_bitflag_ enum { INIT_SEND_CTX_LIST = 1 };
 unsigned int g_init_flags;
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
 PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
 {
 	PAGED_CODE();
@@ -34,14 +42,22 @@ PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const cha
 	return CompleteRequest(Irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_CREATE)
 PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-        return vhci_complete(devobj, Irp, __func__);
+	return vhci_complete(devobj, Irp, __func__);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_CLOSE)
 PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 {
-        return vhci_complete(devobj, Irp, __func__);
+	return vhci_complete(devobj, Irp, __func__);
 }
 
 _Function_class_(DRIVER_UNLOAD)
@@ -69,6 +85,8 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 /*
 * Set only if such value does not exist.
 */
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
 {
 	PAGED_CODE();
@@ -98,6 +116,8 @@ PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
 *
 * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
 */
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
@@ -134,6 +154,8 @@ PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 	return err;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
 {
         PAGED_CODE();
@@ -156,6 +178,8 @@ PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGEABLE auto init_lookaside_lists()
 {
 	PAGED_CODE();
@@ -172,21 +196,11 @@ PAGEABLE auto init_lookaside_lists()
 } // namespace
 
 
-extern "C" {
-
-PAGEABLE DRIVER_ADD_DEVICE vhci_add_device;
-	
-PAGEABLE __drv_dispatchType(IRP_MJ_DEVICE_CONTROL) DRIVER_DISPATCH vhci_ioctl;
-PAGEABLE __drv_dispatchType(IRP_MJ_INTERNAL_DEVICE_CONTROL) DRIVER_DISPATCH vhci_internal_ioctl;
-PAGEABLE __drv_dispatchType(IRP_MJ_PNP) DRIVER_DISPATCH vhci_pnp;
-PAGEABLE __drv_dispatchType(IRP_MJ_SYSTEM_CONTROL) DRIVER_DISPATCH vhci_system_control;
-	 __drv_dispatchType(IRP_MJ_POWER) DRIVER_DISPATCH vhci_power;
-
 _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 __declspec(code_seg("INIT"))
-NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
+extern "C" NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
 
@@ -230,5 +244,3 @@ NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPa
 
 	return STATUS_SUCCESS;
 }
-
-} // extern "C"

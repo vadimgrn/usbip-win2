@@ -51,7 +51,10 @@
     <ClInclude Include="..\..\include\usbip_proto.h" />
     <ClInclude Include="csq.h" />
     <ClInclude Include="internal_ioctl.h" />
+    <ClInclude Include="ioctl.h" />
     <ClInclude Include="pageable.h" />
+    <ClInclude Include="pnp_add.h" />
+    <ClInclude Include="power.h" />
     <ClInclude Include="send_context.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="usbip_network.h" />

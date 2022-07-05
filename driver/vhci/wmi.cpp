@@ -5,6 +5,7 @@
 #include "vhci.h"
 #include "usbip_vhci_api.h"
 #include "irp.h"
+#include "dev.h"
 
 #include <wmistr.h>
 
@@ -131,6 +132,9 @@ NTSTATUS QueryWmiRegInfo(
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_SYSTEM_CONTROL)
 extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();

@@ -1,11 +1,16 @@
-#include "dbgcommon.h"
+#include "ioctl.h"
 #include "trace.h"
 #include "ioctl.tmh"
 
 #include "irp.h"
 #include "ioctl_vhci.h"
 #include "ioctl_vhub.h"
+#include "dbgcommon.h"
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_DEVICE_CONTROL)
 extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	PAGED_CODE();

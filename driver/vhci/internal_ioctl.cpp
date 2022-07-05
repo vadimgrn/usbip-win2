@@ -1,5 +1,4 @@
 #include "internal_ioctl.h"
-#include "dev.h"
 #include "trace.h"
 #include "internal_ioctl.tmh"
 
@@ -1055,6 +1054,8 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
  * NT_ASSERT(!irp->IoStatus.Information); // can fail
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_INTERNAL_DEVICE_CONTROL)
 extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
 {
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);

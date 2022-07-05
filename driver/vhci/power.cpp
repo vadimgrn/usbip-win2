@@ -1,4 +1,4 @@
-#include <wdm.h>
+#include "power.h"
 #include "trace.h"
 #include "power.tmh"
 
@@ -20,14 +20,10 @@ void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const char *
 	}
 }
 
-NTSTATUS
-	vhci_power_vhci(vhci_dev_t * vhci, PIRP irp, PIO_STACK_LOCATION irpstack)
+NTSTATUS vhci_power_vhci(vhci_dev_t *vhci, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
-	POWER_STATE		powerState;
-	POWER_STATE_TYPE	powerType;
-
-	powerType = irpstack->Parameters.Power.Type;
-	powerState = irpstack->Parameters.Power.State;
+	auto powerType = irpstack->Parameters.Power.Type;
+	auto powerState = irpstack->Parameters.Power.State;
 
 	// If the device is not stated yet, just pass it down.
 	if (vhci->PnPState == pnp_state::NotStarted) {
@@ -41,15 +37,12 @@ NTSTATUS
 	return irp_pass_down(vhci->devobj_lower, irp);
 }
 
-NTSTATUS
-	vhci_power_vdev(vdev_t * vdev, PIRP irp, PIO_STACK_LOCATION irpstack)
+NTSTATUS vhci_power_vdev(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
-	POWER_STATE		powerState;
-	POWER_STATE_TYPE	powerType;
-	NTSTATUS		status;
+	NTSTATUS status{};
 
-	powerType = irpstack->Parameters.Power.Type;
-	powerState = irpstack->Parameters.Power.State;
+	auto powerType = irpstack->Parameters.Power.Type;
+	auto powerState = irpstack->Parameters.Power.State;
 
 	switch (irpstack->MinorFunction) {
 	case IRP_MN_SET_POWER:
@@ -103,6 +96,10 @@ NTSTATUS
 } // namespace
 
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_POWER)
 extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	auto vdev = to_vdev(devobj);

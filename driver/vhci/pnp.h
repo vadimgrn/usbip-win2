@@ -30,3 +30,9 @@ inline void set_previous_pnp_state(vdev_t &vdev)
 {
 	vdev.PnPState = vdev.PreviousPnPState;
 }
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_Function_class_(DRIVER_DISPATCH)
+_Dispatch_type_(IRP_MJ_PNP)
+extern "C" PAGEABLE NTSTATUS vhci_pnp(__in PDEVICE_OBJECT devobj, __in IRP *irp);
