@@ -21,9 +21,6 @@
 inline LONG VpdoCount;
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp);
-
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void set_state(vdev_t &vdev, pnp_state state);
 
 inline void set_previous_pnp_state(vdev_t &vdev)

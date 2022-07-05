@@ -10,7 +10,6 @@
 #include "pnp_cap.h"
 #include "pnp_start.h"
 #include "pnp_remove.h"
-#include "pnp_resources.h"
 #include "vhub.h"
 #include "strutil.h"
 
@@ -29,6 +28,8 @@ const LPCWSTR vdev_desc[] =
 	L"usbip-win VPDO"
 };
 static_assert(ARRAYSIZE(vdev_desc) == VDEV_SIZE);
+
+constexpr auto BusNumber() { return 1UL; } // arbitrary
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_stop_device(vdev_t *vdev, IRP *irp)
@@ -119,7 +120,7 @@ PAGEABLE NTSTATUS pnp_query_bus_information(vdev_t *vdev, IRP *irp)
 	if (bi) {
 		bi->BusTypeGuid = GUID_BUS_TYPE_USB;
 		bi->LegacyBusType = PNPBus;
-		bi->BusNumber = 1; // arbitrary
+		bi->BusNumber = BusNumber();
 	}
 
 	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(bi);
@@ -140,10 +141,6 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGEABLE NTSTATUS pnp_read_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-
-	NT_ASSERT(irp->IoStatus.Status == STATUS_NOT_SUPPORTED);
-	NT_ASSERT(!irp->IoStatus.Information);
-
 	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 	return CompleteRequestAsIs(irp);
 }
@@ -152,21 +149,14 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGEABLE NTSTATUS pnp_write_config(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-
-	NT_ASSERT(irp->IoStatus.Status == STATUS_NOT_SUPPORTED);
-	NT_ASSERT(!irp->IoStatus.Information);
-
 	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 	return CompleteRequestAsIs(irp);
 }
 
 /*
-* For the device to be ejected, the device must be in the D3
-* device power state (off) and must be unlocked
-* (if the device supports locking). Any driver that returns success
-* for this IRP must wait until the device has been ejected before
-* completing the IRP.
-*/
+ * For the device to be ejected, the device must be in the D3 device power state (off) and must be unlocked
+ * (if the device supports locking).
+ */
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 {
@@ -175,6 +165,7 @@ PAGEABLE NTSTATUS pnp_eject(vdev_t *vdev, IRP *irp)
 
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
+		irp->IoStatus.Information = 0;
 		return CompleteRequest(irp);
 	}
 
@@ -208,14 +199,14 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_device_usage_notification(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
 
-	if (auto r = reinterpret_cast<IO_RESOURCE_REQUIREMENTS_LIST*>(irp->IoStatus.Information)) {
-		TraceDbg("ListSize %lu, InterfaceType %d, BusNumber %lu, SlotNumber %lu, AlternativeLists %lu", 
-			  r->ListSize, r->InterfaceType, r->BusNumber, r->SlotNumber, r->AlternativeLists);
-	}
+	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto &r = stack->Parameters.UsageNotification;
 
-	return irp_pass_down_or_complete(vdev, irp);
+	TraceMsg("%!vdev_type_t!(%04x): InPath(%!BOOLEAN!), %!DEVICE_USAGE_NOTIFICATION_TYPE!", 
+		  vdev->type, ptr4log(vdev), r.InPath, r.Type);
+
+	return r.InPath ? CompleteRequest(irp, STATUS_NOT_SUPPORTED) : irp_pass_down_or_complete(vdev, irp);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -284,7 +275,7 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 		return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
 	}
 
-	NTSTATUS err;
+	NTSTATUS err{};
 	ULONG dummy;
 
 	if (auto str = GetDeviceProperty(vdev->Self, prop, err, dummy)) {
@@ -303,6 +294,47 @@ PAGEABLE NTSTATUS pnp_query_device_text(vdev_t *vdev, IRP *irp)
 	
 	TraceMsg("%!vdev_type_t!: %!DEVICE_TEXT_TYPE!, LCID %#lx -> '%!WSTR!', %!STATUS!", 
 		  vdev->type, r.DeviceTextType, r.LocaleId, reinterpret_cast<wchar_t*>(Information), Status);
+
+	return CompleteRequestAsIs(irp);
+}
+
+/*
+ * If a device requires no hardware resources, the device's parent bus driver completes the IRP
+ * without modifying Irp->IoStatus.Status or Irp->IoStatus.Information. 
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS pnp_query_resources(vdev_t * vdev, PIRP irp)
+{
+	PAGED_CODE();
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
+}
+
+/*
+ * If a device requires no hardware resources, the device's bus driver completes the IRP
+ * without modifying Irp->IoStatus.Status or Irp->IoStatus.Information. 
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS pnp_query_resource_requirements(vdev_t *vdev, IRP *irp)
+{
+	PAGED_CODE();
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+	return CompleteRequestAsIs(irp);
+}
+
+/*
+ * The pointer is NULL if the device consumes no hardware resources.
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS pnp_filter_resource_requirements(vdev_t * vdev, PIRP irp)
+{
+	PAGED_CODE();
+	TraceMsg("%!vdev_type_t!(%04x)", vdev->type, ptr4log(vdev));
+
+	if (auto r = reinterpret_cast<IO_RESOURCE_REQUIREMENTS_LIST*>(irp->IoStatus.Information)) {
+		TraceMsg("ListSize %lu, InterfaceType %d, BusNumber %lu, SlotNumber %lu, AlternativeLists %lu", 
+			  r->ListSize, r->InterfaceType, r->BusNumber, r->SlotNumber, r->AlternativeLists);
+	}
 
 	return CompleteRequestAsIs(irp);
 }
@@ -345,12 +377,6 @@ pnpmn_func_t* const pnpmn_functions[] =
 
 } // namespace
 
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp)
-{
-	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
-}
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void set_state(vdev_t &vdev, pnp_state state)

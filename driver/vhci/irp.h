@@ -6,10 +6,14 @@
 #include <wdm.h>
 #include <usb.h>
 
+struct vdev_t;
 struct vpdo_dev_t;
 
 PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp);
 PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp);
 
 NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status = STATUS_SUCCESS);
 

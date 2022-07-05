@@ -31,7 +31,6 @@
     <ClCompile Include="pnp_intf.cpp" />
     <ClCompile Include="pnp_relations.cpp" />
     <ClCompile Include="pnp_remove.cpp" />
-    <ClCompile Include="pnp_resources.cpp" />
     <ClCompile Include="pnp_start.cpp" />
     <ClCompile Include="vhub.cpp" />
     <ClCompile Include="vpdo.cpp" />
@@ -73,7 +72,6 @@
     <ClInclude Include="pnp_intf.h" />
     <ClInclude Include="pnp_relations.h" />
     <ClInclude Include="pnp_remove.h" />
-    <ClInclude Include="pnp_resources.h" />
     <ClInclude Include="pnp_start.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="vhub.h" />

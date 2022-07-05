@@ -32,6 +32,12 @@ PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp)
 	return IoCallDriver(devobj, irp);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp)
+{
+	return is_fdo(vdev->type) ? irp_pass_down(vdev->devobj_lower, irp) : CompleteRequest(irp);
+}
+
 /*
  * Wait for lower drivers to be done with the Irp.
  * Important thing to note here is when you allocate the memory for an event in the stack 
