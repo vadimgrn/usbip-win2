@@ -182,6 +182,10 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/kernel %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <Optimization>MaxSpeed</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)wdmsec.lib;$(DDK_LIB_PATH)ntstrsafe.lib;$(DDK_LIB_PATH)usbd.lib;$(DDK_LIB_PATH)netio.lib;%(AdditionalDependencies)</AdditionalDependencies>
