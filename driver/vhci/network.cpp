@@ -4,7 +4,7 @@
 
 #include "network.h"
 #include "trace.h"
-#include "usbip_network.tmh"
+#include "network.tmh"
 
 #include "dev.h"
 #include "pdu.h"

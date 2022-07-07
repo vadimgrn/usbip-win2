@@ -1,4 +1,5 @@
 #include "pnp_cap.h"
+#include "dev.h"
 #include "trace.h"
 #include "pnp_cap.tmh"
 
@@ -7,28 +8,29 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_device_capabilities(DEVICE_OBJECT *devobj, DEVICE_CAPABILITIES *pcaps)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto get_device_capabilities(_In_ DEVICE_OBJECT *devobj, _Out_ DEVICE_CAPABILITIES &r)
 {
 	PAGED_CODE();
 
-	// Initialize the capabilities that we will send down
-	RtlZeroMemory(pcaps, sizeof(*pcaps));
-	pcaps->Size = sizeof(*pcaps);
-	pcaps->Version = 1;
-	pcaps->Address = (ULONG)-1;
-	pcaps->UINumber = (ULONG)-1;
+	RtlZeroMemory(&r, sizeof(r));
+
+	r.Size = sizeof(r);
+	r.Version = 1;
+
+	r.Address = ULONG(-1);
+	r.UINumber = ULONG(-1);
 
         KEVENT pnpEvent;
-        KeInitializeEvent(&pnpEvent, NotificationEvent, FALSE);
+        KeInitializeEvent(&pnpEvent, NotificationEvent, false);
 
-        IO_STATUS_BLOCK ioStatus{};
-        auto irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ioStatus);
+        IO_STATUS_BLOCK ios{};
+        auto irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ios);
 	if (!irp) {
-		Trace(TRACE_LEVEL_WARNING, "failed to create irp");
+		Trace(TRACE_LEVEL_ERROR, "IoBuildSynchronousFsdRequest error");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	// Pnp Irps all begin life as STATUS_NOT_SUPPORTED;
 	irp->IoStatus.Status = STATUS_NOT_SUPPORTED;
 	auto irpstack = IoGetNextIrpStackLocation(irp);
 
@@ -36,130 +38,100 @@ PAGEABLE NTSTATUS get_device_capabilities(DEVICE_OBJECT *devobj, DEVICE_CAPABILI
 	RtlZeroMemory(irpstack, sizeof(*irpstack));
 	irpstack->MajorFunction = IRP_MJ_PNP;
 	irpstack->MinorFunction = IRP_MN_QUERY_CAPABILITIES;
-	irpstack->Parameters.DeviceCapabilities.Capabilities = pcaps;
+	irpstack->Parameters.DeviceCapabilities.Capabilities = &r;
 
 	auto status = IoCallDriver(devobj, irp);
 	if (status == STATUS_PENDING) {
-		// Block until the irp comes back.
-		// Important thing to note here is when you allocate
-		// the memory for an event in the stack you must do a
-		// KernelMode wait instead of UserMode to prevent
-		// the stack from getting paged out.
-		KeWaitForSingleObject(&pnpEvent, Executive, KernelMode, FALSE, nullptr);
-		status = ioStatus.Status;
+		KeWaitForSingleObject(&pnpEvent, Executive, KernelMode, false, nullptr);
+		status = ios.Status;
 	}
 
 	return status;
 }
 
-PAGEABLE void setup_capabilities(PDEVICE_CAPABILITIES pcaps)
+/*
+ * The entries in the DeviceState array are based on the capabilities
+ * of the parent devnode. These entries signify the highest-powered
+ * state that the device can support for the corresponding system
+ * state. A driver can specify a lower (less-powered) state than the
+ * bus driver.  For eg: Suppose the USBIP bus controller supports
+ * D0, D2, and D3; and the USBIP Device supports D0, D1, D2, and D3.
+ * Following the above rule, the device cannot specify D1 as one of
+ * it's power state. A driver can make the rules more restrictive
+ * but cannot loosen them.
+ * Our device just supports D0 and D3.
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto pnp_query_cap(_Inout_ vpdo_dev_t &vpdo, _Inout_ DEVICE_CAPABILITIES &r)
 {
 	PAGED_CODE();
 
-	pcaps->LockSupported = FALSE;
-	pcaps->EjectSupported = FALSE;
-	pcaps->Removable = FALSE;
-	pcaps->DockDevice = FALSE;
-	pcaps->UniqueID = FALSE;
-	pcaps->SilentInstall = FALSE;
-	pcaps->SurpriseRemovalOK = FALSE;
-
-	pcaps->Address = 1;
-	pcaps->UINumber = 1;
-}
-
-PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t *vpdo, IO_STACK_LOCATION *irpstack)
-{
-	PAGED_CODE();
-
-	auto pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
-
-	// Set the capabilities.
-	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
-		Trace(TRACE_LEVEL_WARNING, "invalid device capabilities: version: %u, size: %u", pcaps->Version, pcaps->Size);
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	// Get the device capabilities of the root pdo
 	DEVICE_CAPABILITIES caps_parent{};
 
-	auto status = get_device_capabilities(vpdo->parent->parent->parent->devobj_lower, &caps_parent);
+	auto status = get_device_capabilities(vpdo.parent->parent->parent->devobj_lower, caps_parent);
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to get device capabilities from root device: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "Failed to get device capabilities from root device: %!STATUS!", status);
 		return status;
 	}
 
-	// The entries in the DeviceState array are based on the capabilities
-	// of the parent devnode. These entries signify the highest-powered
-	// state that the device can support for the corresponding system
-	// state. A driver can specify a lower (less-powered) state than the
-	// bus driver.  For eg: Suppose the USBIP bus controller supports
-	// D0, D2, and D3; and the USBIP Device supports D0, D1, D2, and D3.
-	// Following the above rule, the device cannot specify D1 as one of
-	// it's power state. A driver can make the rules more restrictive
-	// but cannot loosen them.
-	// First copy the parent's S to D state mapping
-	RtlCopyMemory(pcaps->DeviceState, caps_parent.DeviceState, (PowerSystemShutdown + 1) * sizeof(DEVICE_POWER_STATE));
+	RtlCopyMemory(r.DeviceState, caps_parent.DeviceState, sizeof(r.DeviceState));
 
-	// Adjust the caps to what your device supports.
-	// Our device just supports D0 and D3.
-	pcaps->DeviceState[PowerSystemWorking] = PowerDeviceD0;
+	r.DeviceState[PowerSystemWorking] = PowerDeviceD0;
 
-	if (pcaps->DeviceState[PowerSystemSleeping1] != PowerDeviceD0) {
-		pcaps->DeviceState[PowerSystemSleeping1] = PowerDeviceD1;
+	if (r.DeviceState[PowerSystemSleeping1] != PowerDeviceD0) {
+		r.DeviceState[PowerSystemSleeping1] = PowerDeviceD1;
 	}
 
-	if (pcaps->DeviceState[PowerSystemSleeping2] != PowerDeviceD0) {
-		pcaps->DeviceState[PowerSystemSleeping2] = PowerDeviceD3;
+	if (r.DeviceState[PowerSystemSleeping2] != PowerDeviceD0) {
+		r.DeviceState[PowerSystemSleeping2] = PowerDeviceD3;
 	}
 
-	if (pcaps->DeviceState[PowerSystemSleeping3] != PowerDeviceD0) {
-		pcaps->DeviceState[PowerSystemSleeping3] = PowerDeviceD3;
+	if (r.DeviceState[PowerSystemSleeping3] != PowerDeviceD0) {
+		r.DeviceState[PowerSystemSleeping3] = PowerDeviceD3;
 	}
 
 	// We can wake the system from D1
-	pcaps->DeviceWake = PowerDeviceD0;
+	r.DeviceWake = PowerDeviceD0;
 
 	// Specifies whether the device hardware supports the D1 and D2
 	// power state. Set these bits explicitly.
-	pcaps->DeviceD1 = FALSE; // Yes we can
-	pcaps->DeviceD2 = FALSE;
+	r.DeviceD1 = false; // Yes we can
+	r.DeviceD2 = false;
 
 	// Specifies whether the device can respond to an external wake
 	// signal while in the D0, D1, D2, and D3 state.
 	// Set these bits explicitly.
-	pcaps->WakeFromD0 = TRUE;
-	pcaps->WakeFromD1 = FALSE; //Yes we can
-	pcaps->WakeFromD2 = FALSE;
-	pcaps->WakeFromD3 = FALSE;
+	r.WakeFromD0 = true;
+	r.WakeFromD1 = false; // Yes we can
+	r.WakeFromD2 = false;
+	r.WakeFromD3 = false;
 
 	// We have no latencies
-	pcaps->D1Latency = 0;
-	pcaps->D2Latency = 0;
-	pcaps->D3Latency = 0;
+	r.D1Latency = 0;
+	r.D2Latency = 0;
+	r.D3Latency = 0;
 
-	// Ejection supported
-	pcaps->EjectSupported = FALSE;
+	r.EjectSupported = false;
 
 	// This flag specifies whether the device's hardware is disabled.
 	// The PnP Manager only checks this bit right after the device is
 	// enumerated. Once the device is started, this bit is ignored.
-	pcaps->HardwareDisabled = FALSE;
+	r.HardwareDisabled = false;
 
 	// Our simulated device can be physically removed.
-	pcaps->Removable = TRUE;
+	r.Removable = true;
 
-	// Setting it to TRUE prevents the warning dialog from appearing
+	// Setting it to true prevents the warning dialog from appearing
 	// whenever the device is surprise removed.
-	pcaps->SurpriseRemovalOK = TRUE;
+	r.SurpriseRemovalOK = true;
 
 	// If a custom instance id is used, assume that it is system-wide unique */
-	pcaps->UniqueID = vpdo->serial.Length || get_serial_number(*vpdo);
+	r.UniqueID = vpdo.serial.Length || get_serial_number(vpdo);
 
 	// Specify whether the Device Manager should suppress all
 	// installation pop-ups except required pop-ups such as
 	// "no compatible drivers found."
-	pcaps->SilentInstall = FALSE;
+	r.SilentInstall = false;
 
 	// Specifies an address indicating where the device is located
 	// on its underlying bus. The interpretation of this number is
@@ -167,33 +139,38 @@ PAGEABLE NTSTATUS pnp_query_cap_vpdo(vpdo_dev_t *vpdo, IO_STACK_LOCATION *irpsta
 	// does not support an address, the bus driver leaves this
 	// member at its default value of 0xFFFFFFFF. In this example
 	// the location address is same as instance id.
-	pcaps->Address = vpdo->port;
+	r.Address = vpdo.port;
 
 	// UINumber specifies a number associated with the device that can
 	// be displayed in the user interface.
-	pcaps->UINumber = vpdo->port;
+	r.UINumber = vpdo.port;
 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS pnp_query_cap(PIO_STACK_LOCATION irpstack)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto pnp_query_cap(_Inout_ DEVICE_CAPABILITIES &r)
 {
 	PAGED_CODE();
 
-	PDEVICE_CAPABILITIES pcaps = irpstack->Parameters.DeviceCapabilities.Capabilities;
+	r.LockSupported = false;
+	r.EjectSupported = false;
+	r.Removable = false;
+	r.DockDevice = false;
+	r.UniqueID = false;
+	r.SilentInstall = false;
+	r.SurpriseRemovalOK = false;
 
-	// Set the capabilities.
-	if (pcaps->Version != 1 || pcaps->Size < sizeof(DEVICE_CAPABILITIES)) {
-		Trace(TRACE_LEVEL_WARNING, "invalid device capabilities: version: %u, size: %u", pcaps->Version, pcaps->Size);
-		return STATUS_UNSUCCESSFUL;
-	}
-	setup_capabilities(pcaps);
+	r.Address = 1;
+	r.UINumber = 1;
+
 	return STATUS_SUCCESS;
 }
 
 } // namespace
 
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
@@ -202,11 +179,16 @@ PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp)
 		return irp_pass_down(vdev->devobj_lower, irp);
 	}
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto st = STATUS_INVALID_PARAMETER;
 
-	NTSTATUS status = vdev->type == VDEV_VPDO ?
-				pnp_query_cap_vpdo((vpdo_dev_t*)vdev, irpstack) :
-				pnp_query_cap(irpstack);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto &r = *irpstack->Parameters.DeviceCapabilities.Capabilities;
 
-	return CompleteRequest(irp, status);
+	if (r.Version == 1 && r.Size == sizeof(r)) {
+		st = vdev->type == VDEV_VPDO ? pnp_query_cap(*static_cast<vpdo_dev_t*>(vdev), r) : pnp_query_cap(r);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Version %d, Size %d", r.Version, r.Size);
+	}
+
+	return CompleteRequest(irp, st);
 }
