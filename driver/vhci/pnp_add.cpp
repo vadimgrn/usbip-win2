@@ -31,7 +31,7 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 	for (err = STATUS_INVALID_PARAMETER; auto i: v) {
 		UNICODE_STRING s{};
 		RtlInitUnicodeString(&s, i);
-		if (RtlEqualUnicodeString(&s, &hwid, TRUE)) {
+		if (RtlEqualUnicodeString(&s, &hwid, true)) {
 			err = STATUS_SUCCESS;
 			break;
 		}

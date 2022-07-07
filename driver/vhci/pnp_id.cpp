@@ -180,11 +180,11 @@ of a device instance ID.
 
 The UniqueID member of the DEVICE_CAPABILITIES structure for a device indicates
 if a bus-supplied instance ID is unique across the system, as follows:
-* If UniqueID is FALSE, the bus-supplied instance ID for a device is unique
+* If UniqueID is false, the bus-supplied instance ID for a device is unique
 only to the device's bus. The Plug and Play (PnP) manager modifies
 the bus-supplied instance ID, and combines it with the corresponding device ID,
 to create a device instance ID that is unique in the system.
-* If UniqueID is TRUE, the device instance ID, formed from the bus-supplied
+* If UniqueID is true, the device instance ID, formed from the bus-supplied
 device ID and instance ID, uniquely identifies a device in the system.
 
 An instance ID is persistent across system restarts.

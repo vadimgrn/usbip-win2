@@ -26,8 +26,8 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 
 	TraceMsg("%04x", ptr4log(&vhci));
 
-        IoSetDeviceInterfaceState(&vhci.DevIntfVhci, FALSE);
-	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, FALSE);
+        IoSetDeviceInterfaceState(&vhci.DevIntfVhci, false);
+	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, false);
 	RtlFreeUnicodeString(&vhci.DevIntfVhci);
 
 	// Inform WMI to remove this DeviceObject from its list of providers.
@@ -43,7 +43,7 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 
 	TraceMsg("%04x", ptr4log(&vhub));
 
-	IoSetDeviceInterfaceState(&vhub.DevIntfRootHub, FALSE);
+	IoSetDeviceInterfaceState(&vhub.DevIntfRootHub, false);
 	RtlFreeUnicodeString(&vhub.DevIntfRootHub);
 
 	// At this point, vhub should has no vpdo. With this assumption, there's no need to remove all vpdos.

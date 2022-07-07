@@ -168,8 +168,8 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 	r.UsbPortProperties.ul = 0;
 	r.UsbPortProperties.PortIsUserConnectable = true;
 	r.UsbPortProperties.PortIsDebugCapable = true;
-//	r.UsbPortProperties.PortHasMultipleCompanions = FALSE;
-//	r.UsbPortProperties.PortConnectorIsTypeC = FALSE;
+//	r.UsbPortProperties.PortHasMultipleCompanions = false;
+//	r.UsbPortProperties.PortConnectorIsTypeC = false;
 
 	r.CompanionIndex = 0;
 	r.CompanionPortNumber = 0;

@@ -53,7 +53,7 @@ PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp)
 	PAGED_CODE();
 
 	KEVENT evt;
-	KeInitializeEvent(&evt, NotificationEvent, FALSE);
+	KeInitializeEvent(&evt, NotificationEvent, false);
 
 	IoCopyCurrentIrpStackLocationToNext(irp);
 	IoSetCompletionRoutine(irp, irp_completion_routine, &evt, true, true, true);

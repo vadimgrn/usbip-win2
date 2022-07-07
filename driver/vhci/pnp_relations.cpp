@@ -1,4 +1,5 @@
 #include "pnp_relations.h"
+#include <wdm.h>
 #include "trace.h"
 #include "pnp_relations.tmh"
 
@@ -9,40 +10,43 @@
 namespace
 {
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)
 {
 	PAGED_CODE();
 
 	ObDereferenceObject(relations->Objects[idx]);
-	if (idx < relations->Count - 1)
+	if (idx < relations->Count - 1) {
 		RtlCopyMemory(relations->Objects + idx, relations->Objects + idx + 1, sizeof(PDEVICE_OBJECT) * (relations->Count - 1 - idx));
+	}
 }
 
-PAGEABLE BOOLEAN relations_has_devobj(PDEVICE_RELATIONS relations, PDEVICE_OBJECT devobj, BOOLEAN deref)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto relations_has_devobj(DEVICE_RELATIONS *relations, DEVICE_OBJECT *devobj, bool deref)
 {
 	PAGED_CODE();
 
-	ULONG	i;
-
-	for (i = 0; i < relations->Count; i++) {
+	for (ULONG i = 0; i < relations->Count; ++i) {
 		if (relations->Objects[i] == devobj) {
-			if (deref)
+			if (deref) {
 				relations_deref_devobj(relations, i);
-			return TRUE;
+			}
+			return true;
 		}
 	}
-	return FALSE;
+	return false;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t *vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
 
-	BOOLEAN	child_exist = TRUE;
+	bool child_exist = true;
 	auto relations = *pdev_relations;
 
 	if (!vdev->child_pdo || vdev->child_pdo->PnPState == pnp_state::Removed) {
-		child_exist = FALSE;
+		child_exist = false;
         }
 
 	if (!relations) {
@@ -90,8 +94,11 @@ PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t *vdev, PDEVICE_RELATIONS *pde
 	return STATUS_SUCCESS;
 }
 
-vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
 {
+	PAGED_CODE();
+
 	for (auto i: vhub->vpdo) {
 		if (i && i->Self == devobj) {
 			return i;
@@ -101,16 +108,21 @@ vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
 	return nullptr;
 }
 
-BOOLEAN is_in_dev_relations(PDEVICE_OBJECT devobjs[], ULONG n_counts, vpdo_dev_t * vpdo)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto is_in_dev_relations(DEVICE_OBJECT **dev, ULONG cnt, const vpdo_dev_t &vpdo)
 {
-	for (ULONG i = 0; i < n_counts; ++i) {
-		if (vpdo->Self == devobjs[i]) {
-			return TRUE;
+	PAGED_CODE();
+
+	for (ULONG i = 0; i < cnt; ++i) {
+		if (vpdo.Self == dev[i]) {
+			return true;
 		}
 	}
-	return FALSE;
+
+	return false;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
@@ -162,7 +174,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 			continue;
 		}
 
-		if (is_in_dev_relations(relations->Objects, n_news, vpdo)) {
+		if (is_in_dev_relations(relations->Objects, n_news, *vpdo)) {
 			continue;
 		}
 
@@ -187,6 +199,7 @@ PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pd
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE DEVICE_RELATIONS *get_self_dev_relation(vdev_t *vdev)
 {
 	PAGED_CODE();
@@ -207,6 +220,7 @@ PAGEABLE DEVICE_RELATIONS *get_self_dev_relation(vdev_t *vdev)
 	return dev_relations;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
@@ -222,6 +236,7 @@ PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relat
 	}
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
 {
 	PAGED_CODE();
@@ -241,15 +256,16 @@ PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *pdev_rel
 } // namespace
 
 
-PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t * vdev, PIRP irp)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
 
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
 
-	DEVICE_RELATIONS *dev_relations = (DEVICE_RELATIONS*)irp->IoStatus.Information;
-	NTSTATUS status = STATUS_SUCCESS;
+	auto dev_relations = (DEVICE_RELATIONS*)irp->IoStatus.Information;
+	NTSTATUS status{};
 
 	switch (irpstack->Parameters.QueryDeviceRelations.Type) {
 	case TargetDeviceRelation:
@@ -263,7 +279,6 @@ PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t * vdev, PIRP irp)
 		if (is_fdo(vdev->type)) {
 			return irp_pass_down(vdev->devobj_lower, irp);
 		}
-		status = STATUS_SUCCESS;
 		break;
 	default:
 		Trace(TRACE_LEVEL_INFORMATION, "skip: %!DEVICE_RELATION_TYPE!", irpstack->Parameters.QueryDeviceRelations.Type);

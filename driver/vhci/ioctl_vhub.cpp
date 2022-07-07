@@ -144,7 +144,7 @@ PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &nodeinfo
 		nodeinfo.u.MiParentInformation.NumberOfInterfaces = 1;
 	} else {
 		vhub_get_hub_descriptor(vhub, nodeinfo.u.HubInformation.HubDescriptor);
-		nodeinfo.u.HubInformation.HubIsBusPowered = FALSE;
+		nodeinfo.u.HubInformation.HubIsBusPowered = false;
 	}
 
 	return STATUS_SUCCESS;

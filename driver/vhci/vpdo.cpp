@@ -127,7 +127,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 	RtlZeroMemory(&ci.DeviceDescriptor, sizeof(ci.DeviceDescriptor));
 	ci.CurrentConfigurationValue = vpdo && vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
 	set_speed(ci, vpdo ? vpdo->speed : USB_SPEED_UNKNOWN, ex);
-	ci.DeviceIsHub = FALSE;
+	ci.DeviceIsHub = false;
 	ci.DeviceAddress = vpdo ? static_cast<USHORT>(vpdo->port) : 0;
 	ci.NumberOfOpenPipes = 0;
 	ci.ConnectionStatus = vpdo ? DeviceConnected : NoDeviceConnected;

@@ -46,7 +46,7 @@ PAGEABLE NTSTATUS start_vhub(vhub_dev_t *vhub)
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	status = IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, TRUE);
+	status = IoSetDeviceInterfaceState(&vhub->DevIntfRootHub, true);
 	if (NT_ERROR(status)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState(RootHub) %!STATUS!", status);
 		return STATUS_UNSUCCESSFUL;
@@ -54,15 +54,15 @@ PAGEABLE NTSTATUS start_vhub(vhub_dev_t *vhub)
 
 	auto vhci = static_cast<vhci_dev_t*>(vhub->parent);
 
-	status = IoSetDeviceInterfaceState(&vhci->DevIntfVhci, TRUE);
+	status = IoSetDeviceInterfaceState(&vhci->DevIntfVhci, true);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState(Vhci) %!STATUS!", status);
 		return status;
 	}
 	
-	status = IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, TRUE);
+	status = IoSetDeviceInterfaceState(&vhci->DevIntfUSBHC, true);
 	if (!NT_SUCCESS(status)) {
-		IoSetDeviceInterfaceState(&vhci->DevIntfVhci, FALSE);
+		IoSetDeviceInterfaceState(&vhci->DevIntfVhci, false);
 		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState(USBHC) %!STATUS!", status);
 		return status;
 	}
@@ -82,7 +82,7 @@ PAGEABLE auto start_vpdo(vpdo_dev_t *vpdo)
 		return err;
 	}
 
-	if (auto err = IoSetDeviceInterfaceState(iface, TRUE)) {
+	if (auto err = IoSetDeviceInterfaceState(iface, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetDeviceInterfaceState('%!USTR!') %!STATUS!", iface, err);
 		return err;
 	}

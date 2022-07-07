@@ -48,8 +48,8 @@ PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, _Inout_ ULONG 
 		break;
 	}
 
-	r.CanWakeup = FALSE;
-	r.IsPowered = FALSE;
+	r.CanWakeup = false;
+	r.IsPowered = false;
 
 	return STATUS_SUCCESS;
 }
