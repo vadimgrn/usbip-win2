@@ -7,7 +7,10 @@
 #include "ch9.h"
 #include "usbip_proto.h" 
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, usb_device_speed speed);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf_info, usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd);
 
 enum { 
@@ -15,7 +18,10 @@ enum {
 	SELECT_INTERFACE_STR_BUFSZ = SELECT_CONFIGURATION_STR_BUFSZ 
 };
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 const char *select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE *iface);
 
 /*

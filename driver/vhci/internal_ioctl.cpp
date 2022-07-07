@@ -10,7 +10,7 @@
 #include "usb_util.h"
 #include "urbtransfer.h"
 #include "usbd_helper.h"
-#include "usbip_network.h"
+#include "network.h"
 #include "pdu.h"
 #include "send_context.h"
 #include "vhub.h"

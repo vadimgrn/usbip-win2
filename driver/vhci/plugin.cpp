@@ -9,7 +9,7 @@
 #include "pnp_remove.h"
 #include "csq.h"
 #include "usbip_proto_op.h"
-#include "usbip_network.h"
+#include "network.h"
 #include "proto.h"
 #include "ch9.h"
 #include "dbgcommon.h"
@@ -735,6 +735,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)
 {
 	PAGED_CODE();

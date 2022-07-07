@@ -9,19 +9,22 @@
 struct vdev_t;
 struct vpdo_dev_t;
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp);
+
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp);
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status = STATUS_SUCCESS);
 
-inline auto CompleteRequestAsIs(IRP *irp)
-{
-	return CompleteRequest(irp, irp->IoStatus.Status);
-}
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS CompleteRequestAsIs(IRP *irp);
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void complete_canceled_irp(IRP *irp);
 
 inline auto list_entry(IRP *irp)

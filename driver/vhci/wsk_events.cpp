@@ -15,7 +15,7 @@
 #include "wsk_data.h"
 #include "csq.h"
 #include "irp.h"
-#include "usbip_network.h"
+#include "network.h"
 #include "send_context.h"
 #include "vhub.h"
 #include "internal_ioctl.h"

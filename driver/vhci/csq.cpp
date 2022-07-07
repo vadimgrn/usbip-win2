@@ -104,6 +104,7 @@ void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 } // namespace
 
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
@@ -120,11 +121,13 @@ PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
 				CompleteCanceledIrp);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp)
 {
 	IoCsqInsertIrp(&vpdo.irps_csq, irp, nullptr);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
 {
 	auto ctx = make_peek_context(seqnum);

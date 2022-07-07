@@ -12,6 +12,7 @@
 namespace
 {
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto next_interface(const USBD_INTERFACE_INFORMATION *iface, const void *cfg_end)
 {
 	const void *next = (char*)iface + iface->Length;
@@ -53,6 +54,7 @@ inline auto get_interface_number(USBD_INTERFACE_HANDLE handle)
 	return v[1]; 
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enum usb_device_speed speed)
 {
 	pipe->MaximumPacketSize = ep_desc->wMaxPacketSize;
@@ -82,18 +84,20 @@ struct init_ep_data
 	enum usb_device_speed speed;
 };
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 {
 	auto params = static_cast<init_ep_data*>(data);
-	USBD_PIPE_INFORMATION *pi = params->pi + i;
+	auto pi = params->pi + i;
 
 	set_pipe(pi, d, params->speed);
 	return false;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, int cnt, const void *cfg_end)
 {
-	NTSTATUS st = STATUS_SUCCESS;
+	auto st = STATUS_SUCCESS;
 
 	for (int i = 0; i < cnt && st == STATUS_SUCCESS; ++i, r = next_interface(r, cfg_end)) {
 
@@ -133,6 +137,7 @@ void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, 
 } // namespace
 
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd)
 {
 	NT_ASSERT(cfgd);
@@ -169,9 +174,8 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
  * An URB_FUNCTION_SELECT_CONFIGURATION URB consists of a _URB_SELECT_CONFIGURATION structure 
  * followed by a sequence of variable-length array of USBD_INTERFACE_INFORMATION structures, 
  * each element in the array for each unique interface number in the configuration. 
- *
- * Calls from DISPATCH_LEVEL.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed)
 {
 	auto cd = cfg->ConfigurationDescriptor;
@@ -189,14 +193,12 @@ NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed spee
 	return STATUS_SUCCESS;
 }
 
-/*
- * Calls from DISPATCH_LEVEL.
- */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg)
 {
 	auto cd = cfg->ConfigurationDescriptor;
 	if (!cd) {
-		NTSTATUS st = RtlStringCbPrintfA(buf, len, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
+		auto st = RtlStringCbPrintfA(buf, len, "ConfigurationHandle %#Ix, ConfigurationDescriptor NULL (unconfigured)", 
 							(uintptr_t)cfg->ConfigurationHandle);
 
 		return st != STATUS_INVALID_PARAMETER ? buf : "select_configuration_str invalid parameter";
@@ -227,11 +229,12 @@ const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CO
 	return result && *result ? result : "select_configuration_str error";
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 const char *select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE *iface)
 {
 	const char *result = buf;
-	NTSTATUS st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,  
-						"ConfigurationHandle %#Ix", (uintptr_t)iface->ConfigurationHandle);
+	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,  
+					"ConfigurationHandle %#Ix", (uintptr_t)iface->ConfigurationHandle);
 
 	if (st == STATUS_SUCCESS) {
 		interfaces_str(buf, len, &iface->Interface, 1, nullptr);

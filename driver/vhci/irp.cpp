@@ -12,10 +12,11 @@ namespace
  * set the event because we won't be waiting on it.
  * This optimization avoids grabbing the dispatcher lock and improves perf.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT, __in PIRP irp, __in PVOID Context)
 {
 	if (irp->PendingReturned) {
-		KeSetEvent((PKEVENT)Context, IO_NO_INCREMENT, FALSE);
+		KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
 	}
 
 	return StopCompletion;
@@ -24,6 +25,7 @@ NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT, __in PIRP irp, __in PVOID C
 } // namespace
 
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp)
 {
 	PAGED_CODE();
@@ -45,34 +47,44 @@ PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp)
  * 
  * See: IoForwardIrpSynchronously
  */
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp)
 {
 	PAGED_CODE();
 
-	KEVENT event;
-	KeInitializeEvent(&event, NotificationEvent, FALSE);
+	KEVENT evt;
+	KeInitializeEvent(&evt, NotificationEvent, FALSE);
 
 	IoCopyCurrentIrpStackLocationToNext(irp);
-	IoSetCompletionRoutine(irp, irp_completion_routine, &event, TRUE, TRUE, TRUE);
+	IoSetCompletionRoutine(irp, irp_completion_routine, &evt, true, true, true);
 
 	auto status = IoCallDriver(devobj, irp);
 
 	if (status == STATUS_PENDING) {
-		KeWaitForSingleObject(&event, Executive, KernelMode, FALSE, nullptr);
+		KeWaitForSingleObject(&evt, Executive, KernelMode, false, nullptr);
 		status = irp->IoStatus.Status;
 	}
 
 	return status;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status)
 {
-	NT_ASSERT(status != STATUS_PENDING);
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS CompleteRequestAsIs(IRP *irp)
+{
+	auto st = irp->IoStatus.Status;
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return st;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void complete_canceled_irp(IRP *irp)
 {
 	TraceMsg("%04x", ptr4log(irp));

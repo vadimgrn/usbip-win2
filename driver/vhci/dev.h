@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pageable.h"
+
 #include <ntddk.h>
 #include <wmilib.h>	// required for WMILIB_CONTEXT
 
@@ -148,8 +150,10 @@ struct vhub_dev_t : vdev_t
 	UNICODE_STRING DevIntfRootHub;
 };
 
-extern "C" PDEVICE_OBJECT vdev_create(PDRIVER_OBJECT drvobj, vdev_type_t type);
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE DEVICE_OBJECT *vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type);
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 void *GetDeviceProperty(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength);
 
 constexpr auto is_fdo(vdev_type_t type)
@@ -177,7 +181,7 @@ hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
 vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
-// first bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in);
 
 constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
@@ -204,18 +208,22 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
         return (busnum << 16) | devnum;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 PCWSTR get_string_descr_str(const vpdo_dev_t &vpdo, UCHAR index);
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_manufacturer(const vpdo_dev_t &vpdo)
 {
 	return get_string_descr_str(vpdo, vpdo.descriptor.iManufacturer);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_product(const vpdo_dev_t &vpdo)
 {
 	return get_string_descr_str(vpdo, vpdo.descriptor.iProduct);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_serial_number(const vpdo_dev_t &vpdo)
 {
 	return get_string_descr_str(vpdo, vpdo.descriptor.iSerialNumber);

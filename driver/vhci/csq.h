@@ -11,6 +11,8 @@
 #include <usb.h>
 
 struct vpdo_dev_t;
+
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo);
 
 inline bool is_initialized(const IO_CSQ &csq)
@@ -27,7 +29,10 @@ struct peek_context
 	bool use_seqnum;
 };
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
 
 constexpr auto make_peek_context(seqnum_t seqnum)

@@ -13,6 +13,7 @@
 DEFINE_GUID(GUID_SD_USBIP_VHCI,
 	0x9d3039dd, 0xcca5, 0x4b4d, 0xb3, 0x3d, 0xe2, 0xdd, 0xc8, 0xa8, 0xc5, 0x2f);
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength)
 {
 	ResultLength = 256;
@@ -40,7 +41,7 @@ void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTA
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE PDEVICE_OBJECT vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
+PAGEABLE DEVICE_OBJECT *vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -138,8 +139,10 @@ vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)
 }
 
 /*
+ * First bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN).
  * @see is_valid_seqnum
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in)
 {
 	static_assert(!USBIP_DIR_OUT);
@@ -157,6 +160,7 @@ seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in)
 /*
  * Zero string index means absense of a descriptor.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 PCWSTR get_string_descr_str(const vpdo_dev_t &vpdo, UCHAR index)
 {
 	if (index && index < ARRAYSIZE(vpdo.strings)) {
