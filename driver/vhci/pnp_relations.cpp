@@ -10,96 +10,37 @@
 namespace
 {
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void relations_deref_devobj(PDEVICE_RELATIONS relations, ULONG idx)
+constexpr auto SizeOf_DEVICE_RELATIONS(ULONG cnt)
 {
-	PAGED_CODE();
-
-	ObDereferenceObject(relations->Objects[idx]);
-	if (idx < relations->Count - 1) {
-		RtlCopyMemory(relations->Objects + idx, relations->Objects + idx + 1, sizeof(PDEVICE_OBJECT) * (relations->Count - 1 - idx));
-	}
+	return sizeof(DEVICE_RELATIONS) + (cnt ? --cnt*sizeof(*DEVICE_RELATIONS::Objects) : 0);
 }
 
+static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
+static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
+static_assert(SizeOf_DEVICE_RELATIONS(2)  > sizeof(DEVICE_RELATIONS));
+
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto relations_has_devobj(DEVICE_RELATIONS *relations, DEVICE_OBJECT *devobj, bool deref)
+PAGEABLE auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
+	NT_ASSERT(devobj);
 
-	for (ULONG i = 0; i < relations->Count; ++i) {
-		if (relations->Objects[i] == devobj) {
-			if (deref) {
-				relations_deref_devobj(relations, i);
-			}
+	for (ULONG i = 0; i < r.Count; ++i) {
+		if (r.Objects[i] == devobj) {
 			return true;
 		}
 	}
+
 	return false;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_bus_relations_1_child(vdev_t *vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE vpdo_dev_t *find_vpdo(_In_ const vhub_dev_t &vhub, _In_ const DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
+	NT_ASSERT(devobj);
 
-	bool child_exist = true;
-	auto relations = *pdev_relations;
-
-	if (!vdev->child_pdo || vdev->child_pdo->PnPState == pnp_state::Removed) {
-		child_exist = false;
-        }
-
-	if (!relations) {
-		relations = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(*relations), USBIP_VHCI_POOL_TAG);
-		if (!relations) {
-			Trace(TRACE_LEVEL_ERROR, "no relations will be reported: out of memory");
-			return STATUS_INSUFFICIENT_RESOURCES;
-		}
-		relations->Count = 0;
-	}
-	if (!child_exist) {
-		*pdev_relations = relations;
-		return STATUS_SUCCESS;
-	}
-
-	auto devobj_cpdo = vdev->child_pdo->Self;
-	if (!relations->Count) {
-		*pdev_relations = relations;
-		relations->Count = 1;
-		relations->Objects[0] = devobj_cpdo;
-		ObReferenceObject(devobj_cpdo);
-		return STATUS_SUCCESS;
-	}
-	if (relations_has_devobj(relations, devobj_cpdo, !child_exist)) {
-		*pdev_relations = relations;
-		return STATUS_SUCCESS;
-	}
-
-	// Need to allocate a new relations structure and add vhub to it
-	ULONG size = sizeof(*relations) + relations->Count*sizeof(*relations->Objects);
-	auto relations_new = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED, size, USBIP_VHCI_POOL_TAG);
-	if (!relations_new) {
-		Trace(TRACE_LEVEL_ERROR, "old relations will be used: out of memory");
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	RtlCopyMemory(relations_new->Objects, relations->Objects, sizeof(*relations->Objects)*relations->Count);
-	relations_new->Count = relations->Count + 1;
-	relations_new->Objects[relations->Count] = devobj_cpdo;
-	ObReferenceObject(devobj_cpdo);
-
-	ExFreePoolWithTag(relations, USBIP_VHCI_POOL_TAG);
-	*pdev_relations = relations_new;
-
-	return STATUS_SUCCESS;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
-{
-	PAGED_CODE();
-
-	for (auto i: vhub->vpdo) {
+	for (auto i: vhub.vpdo) {
 		if (i && i->Self == devobj) {
 			return i;
 		}
@@ -109,170 +50,172 @@ PAGEABLE vpdo_dev_t *find_managed_vpdo(vhub_dev_t *vhub, DEVICE_OBJECT *devobj)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto is_in_dev_relations(DEVICE_OBJECT **dev, ULONG cnt, const vpdo_dev_t &vpdo)
+PAGEABLE auto get_bus_new_relations_1_child(_In_ vdev_t &vdev, _Inout_ DEVICE_RELATIONS* &r)
 {
 	PAGED_CODE();
 
-	for (ULONG i = 0; i < cnt; ++i) {
-		if (vpdo.Self == dev[i]) {
-			return true;
+	if (!r) {
+		r = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, sizeof(*r), USBIP_VHCI_POOL_TAG);
+		if (r) {
+			r->Count = 0;
+		} else {
+			Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sizeof(*r));
+			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 	}
 
-	return false;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_bus_relations_vhub(vhub_dev_t *vhub, PDEVICE_RELATIONS *pdev_relations)
-{
-	PAGED_CODE();
-
-	auto relations_old = *pdev_relations;
-
-	ULONG n_olds = 0;
-	ULONG n_news = 0;
-
-	ExAcquireFastMutex(&vhub->Mutex);
-
-	if (relations_old) {
-		n_olds = relations_old->Count;
-	}
-	
-	int total = 0;
-	int plugged = 0;
-	for (auto i: vhub->vpdo) { 
-		if (i) {
-			plugged += !i->unplugged;
-			++total;
-		}
+	if (!vdev.child_pdo || vdev.child_pdo->PnPState == pnp_state::Removed) {
+		return STATUS_SUCCESS;
 	}
 
-	// Need to allocate a new relations structure and add our vpdos to it
-	ULONG length = sizeof(DEVICE_RELATIONS) + (plugged + n_olds - 1) * sizeof(PDEVICE_OBJECT);
+	auto devobj_cpdo = vdev.child_pdo->Self;
 
-	auto relations = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, length, USBIP_VHCI_POOL_TAG);
-	if (!relations) {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", length);
-		ExReleaseFastMutex(&vhub->Mutex);
+	if (!r->Count) {
+		r->Count = 1;
+		*r->Objects = devobj_cpdo;
+		ObReferenceObject(devobj_cpdo);
+		return STATUS_SUCCESS;
+ 	} else if (contains(*r, devobj_cpdo)) {
+		return STATUS_SUCCESS;
+	}
+
+	auto new_cnt = r->Count + 1;
+	auto size = SizeOf_DEVICE_RELATIONS(new_cnt);
+
+	auto new_r = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, size, USBIP_VHCI_POOL_TAG);
+	if (!new_r) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", size);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	for (ULONG i = 0; i < n_olds; ++i) {
-		auto devobj = relations_old->Objects[i];
-		auto vpdo = find_managed_vpdo(vhub, devobj);
-		if (vpdo && vpdo->unplugged) {
-			ObDereferenceObject(devobj);
-		} else {
-			relations->Objects[n_news] = devobj;
-			++n_news;
-		}
-	}
+	new_r->Count = new_cnt;
+	RtlCopyMemory(new_r->Objects, r->Objects, r->Count*sizeof(*r->Objects));
+	new_r->Objects[r->Count] = devobj_cpdo; // last element
+	ObReferenceObject(devobj_cpdo);
 
-	for (auto vpdo: vhub->vpdo) {
+	ExFreePool(r);
+	r = new_r;
 
-		if (!vpdo) {
-			continue;
-		}
-
-		if (is_in_dev_relations(relations->Objects, n_news, *vpdo)) {
-			continue;
-		}
-
-		if (!vpdo->unplugged) {
-			relations->Objects[n_news++] = vpdo->Self;
-			ObReferenceObject(vpdo->Self);
-		}
-	}
-
-	relations->Count = n_news;
-
-	Trace(TRACE_LEVEL_INFORMATION, "vhub vpdos: total %d, plugged %d; bus relations: old %lu, new %lu", 
-					total, plugged, n_olds, n_news);
-
-	if (relations_old) {
-		ExFreePool(relations_old);
-	}
-
-	ExReleaseFastMutex(&vhub->Mutex);
-
-	*pdev_relations = relations;
 	return STATUS_SUCCESS;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE DEVICE_RELATIONS *get_self_dev_relation(vdev_t *vdev)
+PAGEABLE auto get_bus_new_relations(_In_ vhub_dev_t &vhub, _Inout_ DEVICE_RELATIONS* &r)
 {
 	PAGED_CODE();
 
-	auto dev_relations = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, sizeof(DEVICE_RELATIONS), USBIP_VHCI_POOL_TAG);
-	if (!dev_relations) {
-		return nullptr;
-        }
+	auto r_cnt = r ? r->Count : 0;
+	int plugged = 0;
 
-	// There is only one vpdo in the structure
-	// for this relation type. The PnP Manager removes
-	// the reference to the vpdo when the driver or application
-	// un-registers for notification on the device.
-	dev_relations->Count = 1;
-	dev_relations->Objects[0] = vdev->Self;
-	ObReferenceObject(vdev->Self);
+	ExAcquireFastMutex(&vhub.Mutex);
 
-	return dev_relations;
+	for (auto i: vhub.vpdo) { 
+		if (i && !i->unplugged) {
+			++plugged;
+		}
+	}
+
+	auto new_cnt = r_cnt + plugged;
+	auto size = SizeOf_DEVICE_RELATIONS(new_cnt);
+
+	auto new_r = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, size, USBIP_VHCI_POOL_TAG);
+
+	if (new_r) {
+		new_r->Count = 0;
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", size);
+		ExReleaseFastMutex(&vhub.Mutex);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	for (ULONG i = 0; i < r_cnt; ++i) {
+		auto devobj = r->Objects[i];
+		auto vpdo = find_vpdo(vhub, devobj);
+
+		if (vpdo && vpdo->unplugged) {
+			ObDereferenceObject(devobj);
+		} else {
+			new_r->Objects[new_r->Count++] = devobj;
+		}
+	}
+
+	for (auto vpdo: vhub.vpdo) {
+		if (vpdo && !(vpdo->unplugged || contains(*new_r, vpdo->Self))) {
+			new_r->Objects[new_r->Count++] = vpdo->Self;
+			ObReferenceObject(vpdo->Self);
+		}
+	}
+
+	ExReleaseFastMutex(&vhub.Mutex);
+
+	if (r) {
+		ExFreePool(r);
+	}
+
+	r = new_r;
+
+	TraceMsg("Count: old %lu, new %lu, allocated %lu", r_cnt, new_r->Count, new_cnt);
+	NT_ASSERT(new_r->Count <= new_cnt);
+
+	return STATUS_SUCCESS;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_bus_relations(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE auto get_bus_new_relations(_In_ vdev_t &vdev, _Inout_ DEVICE_RELATIONS* &r)
 {
 	PAGED_CODE();
 
-	switch (vdev->type) {
+	switch (vdev.type) {
 	case VDEV_ROOT:
 	case VDEV_VHCI:
-		return get_bus_relations_1_child(vdev, pdev_relations);
+		return get_bus_new_relations_1_child(vdev, r);
 	case VDEV_VHUB:
-		return get_bus_relations_vhub((vhub_dev_t *)vdev, pdev_relations);
+		return get_bus_new_relations(static_cast<vhub_dev_t&>(vdev), r);
 	default:
 		return STATUS_NOT_SUPPORTED;
 	}
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_target_relation(vdev_t * vdev, PDEVICE_RELATIONS *pdev_relations)
+PAGEABLE auto get_target_relation(_In_ vdev_t &vdev, _Inout_ DEVICE_RELATIONS* &r)
 {
 	PAGED_CODE();
 
-	if (vdev->type != VDEV_VPDO)
+	if (vdev.type != VDEV_VPDO) {
 		return STATUS_NOT_SUPPORTED;
-
-	if (*pdev_relations) {
-		// Only vpdo can handle this request. Somebody above
-		// is not playing by rule.
-		NT_ASSERT(!"Someone above is handling TagerDeviceRelation");
 	}
-	*pdev_relations = get_self_dev_relation(vdev);
-	return STATUS_SUCCESS;
+
+	NT_ASSERT(!r); // only vpdo can handle this request
+	r = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, sizeof(*r), USBIP_VHCI_POOL_TAG);
+
+	if (r) {
+		r->Count = 1;
+		*r->Objects = vdev.Self;
+		ObReferenceObject(vdev.Self);
+	}
+
+	return r ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 } // namespace
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t *vdev, IRP *irp)
+PAGEABLE NTSTATUS pnp_query_device_relations(_In_ vdev_t *vdev, _Inout_ IRP *irp)
 {
 	PAGED_CODE();
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: %!DEVICE_RELATION_TYPE!", vdev->type, irpstack->Parameters.QueryDeviceRelations.Type);
+	auto &r = reinterpret_cast<DEVICE_RELATIONS*&>(irp->IoStatus.Information);
 
-	auto dev_relations = (DEVICE_RELATIONS*)irp->IoStatus.Information;
-	NTSTATUS status{};
+	NTSTATUS st{};
 
-	switch (irpstack->Parameters.QueryDeviceRelations.Type) {
+	switch (auto type = irpstack->Parameters.QueryDeviceRelations.Type) {
 	case TargetDeviceRelation:
-		status = get_target_relation(vdev, &dev_relations);
+		st = get_target_relation(*vdev, r);
 		break;
 	case BusRelations:
-		status = get_bus_relations(vdev, &dev_relations);
+		st = get_bus_new_relations(*vdev, r);
 		break;
 	case RemovalRelations:
 	case EjectionRelations:
@@ -281,13 +224,9 @@ PAGEABLE NTSTATUS pnp_query_device_relations(vdev_t *vdev, IRP *irp)
 		}
 		break;
 	default:
-		Trace(TRACE_LEVEL_INFORMATION, "skip: %!DEVICE_RELATION_TYPE!", irpstack->Parameters.QueryDeviceRelations.Type);
-		status = irp->IoStatus.Status;
+		TraceDbg("%!vdev_type_t!: skip %!DEVICE_RELATION_TYPE!", vdev->type, type);
+		st = irp->IoStatus.Status;
 	}
 
-	if (NT_SUCCESS(status)) {
-		irp->IoStatus.Information = (ULONG_PTR)dev_relations;
-	}
-
-	return CompleteRequest(irp, status);
+	return CompleteRequest(irp, st);
 }
