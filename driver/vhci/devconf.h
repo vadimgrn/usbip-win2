@@ -1,6 +1,5 @@
 #pragma once
 
-#include <ntdef.h> 
 #include <wdm.h>
 #include <usbdi.h>
 

@@ -1,4 +1,5 @@
 #include "pnp_start.h"
+#include <wdm.h>
 #include "trace.h"
 #include "pnp_start.tmh"
 
@@ -12,15 +13,17 @@
 namespace
 {
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 {
 	PAGED_CODE();
 
-	NTSTATUS status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, nullptr, &vhci->DevIntfVhci);
+	auto status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, nullptr, &vhci->DevIntfVhci);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to register vhci device interface: %!STATUS!", status);
 		return status;
 	}
+
 	status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HOST_CONTROLLER, nullptr, &vhci->DevIntfUSBHC);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "failed to register USB Host controller device interface: %!STATUS!", status);
@@ -36,6 +39,7 @@ PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
 	return status;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS start_vhub(vhub_dev_t *vhub)
 {
 	PAGED_CODE();
@@ -70,6 +74,7 @@ PAGEABLE NTSTATUS start_vhub(vhub_dev_t *vhub)
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto start_vpdo(vpdo_dev_t *vpdo)
 {
 	PAGED_CODE();
@@ -94,6 +99,7 @@ PAGEABLE auto start_vpdo(vpdo_dev_t *vpdo)
 } // namespace
 
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();

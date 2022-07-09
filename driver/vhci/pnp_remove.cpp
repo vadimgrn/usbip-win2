@@ -1,4 +1,5 @@
 #include "pnp_remove.h"
+#include <wdm.h>
 #include "trace.h"
 #include "pnp_remove.tmh"
 

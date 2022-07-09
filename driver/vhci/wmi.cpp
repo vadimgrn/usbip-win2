@@ -183,14 +183,16 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	PAGED_CODE();
 	TraceDbg("%04x", ptr4log(vhci));
 
-	vhci->WmiLibInfo.GuidCount = ARRAYSIZE(USBIPBusWmiGuidList);
-	vhci->WmiLibInfo.GuidList = USBIPBusWmiGuidList;
-	vhci->WmiLibInfo.QueryWmiRegInfo = QueryWmiRegInfo;
-	vhci->WmiLibInfo.QueryWmiDataBlock = QueryWmiDataBlock;
-	vhci->WmiLibInfo.SetWmiDataBlock = SetWmiDataBlock;
-	vhci->WmiLibInfo.SetWmiDataItem = SetWmiDataItem;
-	vhci->WmiLibInfo.ExecuteWmiMethod = nullptr;
-	vhci->WmiLibInfo.WmiFunctionControl = nullptr;
+	auto &r = vhci->WmiLibInfo;
+
+	r.GuidCount = ARRAYSIZE(USBIPBusWmiGuidList);
+	r.GuidList = USBIPBusWmiGuidList;
+	r.QueryWmiRegInfo = QueryWmiRegInfo;
+	r.QueryWmiDataBlock = QueryWmiDataBlock;
+	r.SetWmiDataBlock = SetWmiDataBlock;
+	r.SetWmiDataItem = SetWmiDataItem;
+	r.ExecuteWmiMethod = nullptr;
+	r.WmiFunctionControl = nullptr;
 
 	auto status = IoWMIRegistrationControl(vhci->Self, WMIREG_ACTION_REGISTER);
 	vhci->StdUSBIPBusData.ErrorCount = 0;

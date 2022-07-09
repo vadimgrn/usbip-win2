@@ -1,4 +1,5 @@
 #include "pnp_id.h"
+#include <wdm.h>
 #include "trace.h"
 #include "pnp_id.tmh"
 

@@ -1,8 +1,9 @@
 #pragma once
 
 #include "pageable.h"
-#include "dev.h"
+#include <ntdef.h>
 
-#include <usbuser.h>
+struct vhci_dev_t;
+struct _USBUSER_REQUEST_HEADER;
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t * vhci, USBUSER_REQUEST_HEADER *hdr, ULONG &outlen);
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, _USBUSER_REQUEST_HEADER *hdr, ULONG &outlen);

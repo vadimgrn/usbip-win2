@@ -1,7 +1,7 @@
 #pragma once
 
-#include <wdm.h>
 #include "pageable.h"
+#include <ntdef.h>
 
 struct _IRP;
 struct vdev_t;

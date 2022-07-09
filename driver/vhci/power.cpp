@@ -8,6 +8,7 @@
 namespace
 {
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const char *caller)
 {
 	switch (type) {
@@ -20,6 +21,7 @@ void log_set_power(POWER_STATE_TYPE type, const POWER_STATE *state, const char *
 	}
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS vhci_power_vhci(vhci_dev_t *vhci, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
 	auto powerType = irpstack->Parameters.Power.Type;
@@ -37,6 +39,7 @@ NTSTATUS vhci_power_vhci(vhci_dev_t *vhci, IRP *irp, IO_STACK_LOCATION *irpstack
 	return irp_pass_down(vhci->devobj_lower, irp);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS vhci_power_vdev(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
 {
 	NTSTATUS status{};
@@ -51,18 +54,15 @@ NTSTATUS vhci_power_vdev(vdev_t *vdev, IRP *irp, IO_STACK_LOCATION *irpstack)
 		case DevicePowerState:
 			PoSetPowerState(vdev->Self, powerType, powerState);
 			vdev->DevicePowerState = powerState.DeviceState;
-			status = STATUS_SUCCESS;
 			break;
 		case SystemPowerState:
 			vdev->SystemPowerState = powerState.SystemState;
-			status = STATUS_SUCCESS;
 			break;
 		default:
 			status = STATUS_NOT_SUPPORTED;
 		}
 		break;
 	case IRP_MN_QUERY_POWER:
-		status = STATUS_SUCCESS;
 		break;
 	case IRP_MN_WAIT_WAKE:
 		// We cannot support wait-wake because we are root-enumerated
@@ -103,7 +103,7 @@ _Dispatch_type_(IRP_MJ_POWER)
 extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	auto vdev = to_vdev(devobj);
-	IO_STACK_LOCATION *irpstack = IoGetCurrentIrpStackLocation(irp);
+	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
 	TraceDbg("%!vdev_type_t!: irql %!irql!, %!powermn!", 
 		 vdev->type, KeGetCurrentIrql(), irpstack->MinorFunction);
@@ -114,9 +114,9 @@ extern "C" NTSTATUS vhci_power(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 		return CompleteRequest(irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	NTSTATUS st = vdev->type == VDEV_VHCI ?
-			vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
-			vhci_power_vdev(vdev, irp, irpstack);
+	auto st = vdev->type == VDEV_VHCI ?
+		  vhci_power_vhci((vhci_dev_t*)vdev, irp, irpstack) :
+		  vhci_power_vdev(vdev, irp, irpstack);
 
 	TraceDbg("%!vdev_type_t!: leave %!STATUS!", vdev->type, st);
 	return st;

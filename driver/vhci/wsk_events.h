@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <wdm.h>
+#include <ntdef.h>
 
 struct vpdo_dev_t;
 struct _WSK_DATA_INDICATION;

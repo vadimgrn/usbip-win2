@@ -3,6 +3,7 @@
  */
 
 #include "wsk_events.h"
+#include <wdm.h>
 #include "trace.h"
 #include "wsk_events.tmh"
 

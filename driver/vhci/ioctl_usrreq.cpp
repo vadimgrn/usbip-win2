@@ -1,9 +1,9 @@
 #include "ioctl_usrreq.h"
+#include "ioctl_vhci.h"
 #include "trace.h"
 #include "ioctl_usrreq.tmh"
 
-#include "dev.h"
-#include "ioctl_vhci.h"
+#include <usbuser.h>
 
 namespace
 {

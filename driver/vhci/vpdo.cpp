@@ -1,13 +1,15 @@
 #include "vpdo.h"
+#include "dev.h"
 #include "trace.h"
 #include "vpdo.tmh"
 
-#include "vhci.h"
 #include "usbdsc.h"
+#include "vhci.h"
 
 namespace
 {
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto to_dev_speed(usb_device_speed speed)
 {
 	PAGED_CODE();
@@ -28,6 +30,7 @@ PAGEABLE auto to_dev_speed(usb_device_speed speed)
 	}
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE void set_speed(USB_NODE_CONNECTION_INFORMATION_EX &ci, usb_device_speed speed, bool ex)
 {
 	PAGED_CODE();
@@ -41,6 +44,7 @@ PAGEABLE void set_speed(USB_NODE_CONNECTION_INFORMATION_EX &ci, usb_device_speed
 	}
 }
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE auto copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
 {
 	PAGED_CODE();
@@ -118,6 +122,7 @@ NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE *r)
 /*
  * vpdo is NULL if device is not plugged into the port.
  */
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_INFORMATION_EX &ci, ULONG &outlen, bool ex)
 {
 	PAGED_CODE();
@@ -146,7 +151,7 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 	}
 
 	ULONG len = sizeof(ci) - sizeof(*ci.PipeList) + ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
-	NTSTATUS status = STATUS_SUCCESS;
+	auto status = STATUS_SUCCESS;
 
 	if (outlen < len) {
 		status = STATUS_BUFFER_TOO_SMALL;
