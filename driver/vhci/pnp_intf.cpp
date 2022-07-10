@@ -151,7 +151,7 @@ NTSTATUS USB_BUSIFFN QueryBusInformation(
 	auto vpdo = static_cast<vpdo_dev_t*>(BusContext);
 
 	*BusInformationActualLength = *BusInformationBufferLength;
-	NTSTATUS st = STATUS_SUCCESS;
+	auto st = STATUS_SUCCESS;
 
 	switch (Level) {
 	case 1:

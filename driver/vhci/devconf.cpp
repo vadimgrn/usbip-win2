@@ -55,7 +55,7 @@ inline auto get_interface_number(USBD_INTERFACE_HANDLE handle)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enum usb_device_speed speed)
+void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, usb_device_speed speed)
 {
 	pipe->MaximumPacketSize = ep_desc->wMaxPacketSize;
 
@@ -81,7 +81,7 @@ void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, enu
 struct init_ep_data
 {
 	USBD_PIPE_INFORMATION *pi;
-	enum usb_device_speed speed;
+	usb_device_speed speed;
 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -138,7 +138,7 @@ void interfaces_str(char *buf, size_t len, const USBD_INTERFACE_INFORMATION *r, 
 
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd)
+NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, usb_device_speed speed, USB_CONFIGURATION_DESCRIPTOR *cfgd)
 {
 	NT_ASSERT(cfgd);
 
@@ -176,7 +176,7 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, enum usb_device_speed spee
  * each element in the array for each unique interface number in the configuration. 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, enum usb_device_speed speed)
+NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, usb_device_speed speed)
 {
 	auto cd = cfg->ConfigurationDescriptor;
 	NT_ASSERT(cd);

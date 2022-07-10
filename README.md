@@ -139,23 +139,21 @@ port 1 is successfully detached
 - These tools are included in the Windows Driver Kit (WDK)
 - Use this tracing GUID for vhci driver
   - `8b56380d-5174-4b15-b6f4-4c47008801a4`
-- Install debug build which installs .pdb files, release build doesn't have them
+- Install debug build which has .pdb files
 - Start a log session for vhci driver
 ```
-@echo off
 set NAME=usbip-vhci
 tracelog.exe -stop %NAME%
+tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\tmfs
 tracelog.exe -start %NAME% -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x3F -level 5
 ```
+- Reproduce the issue
 - Stop the log session and get plain text log
 ```
-@echo off
 set NAME=usbip-vhci
-set TMFS=%TEMP%\tmfs
-set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
+set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:
 tracelog.exe -stop %NAME%
-tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TMFS%
-tracefmt.exe -nosummary -p %TMFS% -o %NAME%.txt %NAME%.etl
+tracefmt.exe -nosummary -p %TEMP%\tmfs -o %NAME%.txt %NAME%.etl
 rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
 ```
 

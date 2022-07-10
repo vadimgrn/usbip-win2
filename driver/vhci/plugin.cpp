@@ -451,7 +451,7 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                         continue;
                 }
 
-                auto sz = len + sizeof(*hdr.bString);
+                auto sz = len + sizeof(*hdr.bString); // + L'\0'
 
                 auto sd = (USB_STRING_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, sz, USBIP_VHCI_POOL_TAG);
                 if (!sd) {
@@ -459,7 +459,9 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                         return ERR_GENERAL;
                 }
 
-                if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::nonpaged, sd, len)) {
+                if (len <= sizeof(hdr)) {
+                        RtlCopyMemory(sd, &hdr, len);
+                } else if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::nonpaged, sd, len)) {
                         ExFreePoolWithTag(sd, USBIP_VHCI_POOL_TAG);
                         return err;
                 }
@@ -474,9 +476,9 @@ PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                 }
 
                 if (idx) {
-                        TraceDbg("Index %d, LangId %#x, '%!WSTR!'", idx, lang_id, sd->bString);
+                        TraceMsg("Index %d, LangId %#x, '%!WSTR!'", idx, lang_id, sd->bString);
                 } else {
-                        TraceDbg("List of supported languages%!BIN!", WppBinary(sd, sd->bLength));
+                        TraceMsg("List of supported languages%!BIN!", WppBinary(sd, sd->bLength));
                         lang_id = *hdr.bString; // Supported Language Code Zero, f.e. 0x0409 English - United States
                 }
         }
@@ -533,8 +535,12 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
                 return ERR_GENERAL;
         }
         
+        if (auto err = read_string_descriptors(vpdo)) {
+                return err;
+        }
+
         read_os_string_descriptor(vpdo);
-        return read_string_descriptors(vpdo);
+        return ERR_NONE;
 }
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
