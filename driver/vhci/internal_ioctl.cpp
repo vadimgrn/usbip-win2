@@ -58,10 +58,14 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                   KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information, old_status);
 
         if (NT_SUCCESS(st.Status)) { // request has sent
+                auto stat = ((URB*)URB_FROM_IRP(irp))->UrbHeader.Status;
+
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", 
-                                  ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
+                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s", 
+                                  ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information,
+                                  (stat ? get_usbd_status(stat) : " "));
+
                         IoCompleteRequest(irp, IO_NO_INCREMENT);
                         break;
                 case ST_IRP_CANCELED:
@@ -230,7 +234,7 @@ PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, UR
 
         auto pkt = get_submit_setup(&hdr);
         pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
-        pkt->bRequest = USB_REQUEST_CLEAR_FEATURE;
+        pkt->bRequest = USB_REQUEST_CLEAR_FEATURE; // USB_REQ_CLEAR_FEATURE
         pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
         pkt->wIndex.W = get_endpoint_address(r.PipeHandle);
 
@@ -984,7 +988,8 @@ NTSTATUS usb_get_port_status(ULONG &status)
 }
 
 /*
- * See: <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd.
+ * @see <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd
+ * @see <linux>/drivers/usb/usbip/vhci_hcd.c, vhci_hub_control
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
@@ -1002,6 +1007,9 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
         pkt->bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
         pkt->bRequest = USB_REQUEST_SET_FEATURE;
         pkt->wValue.W = USB_PORT_FEAT_RESET;
+
+        NT_ASSERT(vpdo.port >= 1);
+        pkt->wIndex.W = static_cast<USHORT>(vpdo.port); // meaningless for a server which ignores it
 
         return send(vpdo, irp, hdr);
 }

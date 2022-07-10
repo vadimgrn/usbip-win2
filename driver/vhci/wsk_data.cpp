@@ -38,7 +38,7 @@ void wsk_data_append(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataInd
 }
 
 /*
- * Return STATUS_PENDING from WskDisconnectEvent, this function always releases WSK_DATA_INDICATION youself.
+ * Return STATUS_PENDING from WskReceiveEvent, this function always releases WSK_DATA_INDICATION youself.
  * @return bytes left to consume
  */
 size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)

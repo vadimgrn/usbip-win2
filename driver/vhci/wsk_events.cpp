@@ -82,18 +82,18 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 	auto r = AsUrbTransfer(&urb);
 	auto err = assign(r->TransferBufferLength, hdr.u.ret_submit.actual_length);
 
-	if (err || is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+	if (err || !r->TransferBufferLength || is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
 		return err;
 	}
 
 	auto func = urb.UrbHeader.Function;
-	bool log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
+	auto log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
 
 	void *buf{};
-
 	err = copy_to_transfer_buffer(buf, vpdo, urb);
+
 	if (!err && log) {
-		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, (USHORT)r->TransferBufferLength));
+		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, USHORT(r->TransferBufferLength)));
 	}
 
 	return err;
@@ -108,7 +108,7 @@ NTSTATUS urb_select_configuration(vpdo_dev_t &vpdo, URB &urb, const usbip_header
 	auto err = urb.UrbHeader.Status;
 
 	if (err == EndpointStalled) {
-		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", dbg_usbd_status(err), hdr.u.ret_submit.status);
+		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", get_usbd_status(err), hdr.u.ret_submit.status);
 		err = USBD_STATUS_SUCCESS;
 	}
 
@@ -132,7 +132,7 @@ NTSTATUS urb_select_interface(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 	if (err == EndpointStalled) {
 		auto ifnum = urb.UrbSelectInterface.Interface.InterfaceNumber;
 		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d, InterfaceNumber %d, num_altsetting %d", 
-			dbg_usbd_status(err), hdr.u.ret_submit.status, ifnum,
+			get_usbd_status(err), hdr.u.ret_submit.status, ifnum,
 			get_intf_num_altsetting(vpdo.actconfig, ifnum));
 
 		err = USBD_STATUS_SUCCESS;
@@ -172,7 +172,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 
 	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, Index %d, LangId %#x %!BIN!", 
 		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId, 
-		  WppBinary(dsc, (USHORT)r.TransferBufferLength));
+		  WppBinary(dsc, USHORT(r.TransferBufferLength)));
 
 	if (r.DescriptorType == USB_DEVICE_DESCRIPTOR_TYPE) {
 		auto ok = r.TransferBufferLength == sizeof(vpdo.descriptor) && 
@@ -455,7 +455,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 
         if (err && !urb.UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err)
                 urb.UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
-                Trace(TRACE_LEVEL_VERBOSE, "Set USBD_STATUS=%s because return is %!STATUS!", dbg_usbd_status(urb.UrbHeader.Status), err);
+                Trace(TRACE_LEVEL_VERBOSE, "Set USBD_STATUS=%s because return is %!STATUS!", get_usbd_status(urb.UrbHeader.Status), err);
         }
 
         return err;
@@ -468,7 +468,7 @@ NTSTATUS usb_reset_port(const usbip_header &hdr)
         auto win_err = to_windows_status(err);
 
         if (win_err == EndpointStalled) { // control pipe stall is not an error, see urb_select_interface
-                Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", dbg_usbd_status(win_err), err);
+                Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", get_usbd_status(win_err), err);
                 err = 0;
         }
 
@@ -480,10 +480,12 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 {
 	auto stack = IoGetCurrentIrpStackLocation(irp);
 	auto &st = irp->IoStatus.Status;
+	URB *urb{};
 
         switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
         case IOCTL_INTERNAL_USB_SUBMIT_URB:
-                st = usb_submit_urb(vpdo, *(URB*)URB_FROM_IRP(irp), hdr);
+		urb = (URB*)URB_FROM_IRP(irp);
+		st = usb_submit_urb(vpdo, *urb, hdr);
                 break;
         case IOCTL_INTERNAL_USB_RESET_PORT:
                 st = usb_reset_port(hdr);
@@ -497,7 +499,12 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
+		auto stat = urb ? urb->UrbHeader.Status : USBD_STATUS_SUCCESS;
+
+		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s", 
+			  ptr4log(irp), st, irp->IoStatus.Information, 
+			  (stat ? get_usbd_status(stat) : " "));
+
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 }

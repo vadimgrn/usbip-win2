@@ -51,7 +51,7 @@
     - Microsoft Wired Keyboard 600 (model 1576)
     - Primax Electronics 0Y357C PMX-MMOCZUL [Dell Laser Mouse]
   - Misc. devices
-    - AUCTOPUS I-65, HD audio and video conference speaker pole
+    - AUCTOPUS I-65 HD audio and video conference speaker pole
 
 ## Build
 
@@ -139,7 +139,7 @@ port 1 is successfully detached
 - These tools are included in the Windows Driver Kit (WDK)
 - Use this tracing GUID for vhci driver
   - `8b56380d-5174-4b15-b6f4-4c47008801a4`
-- Install debug build which has .pdb files
+- Install Debug build
 - Start a log session for vhci driver
 ```
 set NAME=usbip-vhci

@@ -72,7 +72,7 @@ const char *brequest_str(UCHAR bRequest)
 	return "USB_REQUEST_?";
 }
 
-const char *dbg_usbd_status(USBD_STATUS status)
+const char *get_usbd_status(USBD_STATUS status)
 {
 	switch (status) {
 	case USBD_STATUS_SUCCESS: 

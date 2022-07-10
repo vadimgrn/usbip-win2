@@ -13,7 +13,7 @@ inline auto bmrequest_recipient(BM_REQUEST_TYPE r) { return recipient(r.s.Recipi
 
 const char *brequest_str(UCHAR bRequest);
 
-const char *dbg_usbd_status(USBD_STATUS status);
+const char *get_usbd_status(USBD_STATUS status);
 const char *dbg_ioctl_code(ULONG ioctl_code);
 
 const char *usbd_pipe_type_str(USBD_PIPE_TYPE t);
