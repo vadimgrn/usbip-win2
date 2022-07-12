@@ -21,6 +21,9 @@
 namespace
 {
 
+const WSK_CLIENT_CONNECTION_DISPATCH g_dispatch{ WskReceiveEvent, WskDisconnectEvent };
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void log(const usbip_usb_device &d)
 {
         Trace(TRACE_LEVEL_VERBOSE, "usbip_usb_device(path '%s', busid %s, busnum %d, devnum %d, %!usb_device_speed!,"
@@ -32,6 +35,7 @@ inline void log(const usbip_usb_device &d)
                 d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void log(const USB_DEVICE_DESCRIPTOR &d)
 {
         Trace(TRACE_LEVEL_VERBOSE,
@@ -47,6 +51,7 @@ inline void log(const USB_DEVICE_DESCRIPTOR &d)
                 d.bNumConfigurations);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void log(const USB_CONFIGURATION_DESCRIPTOR &d)
 {
         Trace(TRACE_LEVEL_VERBOSE,
@@ -69,6 +74,7 @@ auto to_unicode_str(UNICODE_STRING &dst, const char *ansi)
         return RtlAnsiStringToUnicodeString(&dst, &s, true);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto is_same_device(const usbip_usb_device &dev, const USB_DEVICE_DESCRIPTOR &dsc)
 {
         PAGED_CODE();
@@ -674,7 +680,7 @@ PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
         return err;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto connect(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -685,10 +691,8 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
                 return make_error(ERR_NETWORK);
         }
 
-        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ WskReceiveEvent, WskDisconnectEvent };
-
         NT_ASSERT(!vpdo.sock);
-        vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &dispatch, ai, try_connect, nullptr);
+        vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &g_dispatch, ai, try_connect, nullptr);
 
         wsk::free(ai);
         return make_error(vpdo.sock ? ERR_NONE : ERR_NETWORK);
