@@ -16,7 +16,7 @@ NTSTATUS initialize();
 _IRQL_requires_(PASSIVE_LEVEL)
 void shutdown(); 
 
-_IRQL_requires_max_(APC_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 WSK_PROVIDER_NPI *GetProviderNPI();
 
 _IRQL_requires_max_(APC_LEVEL)

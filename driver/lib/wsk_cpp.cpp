@@ -25,7 +25,10 @@ public:
         socket_async_context() { ctor(); } // works for allocations on stack only
         ~socket_async_context() { dtor(); }
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)        
         NTSTATUS ctor(); // use if an object is allocated on heap, f.e. by ExAllocatePool2
+        
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void dtor();
 
         socket_async_context(const socket_async_context &) = delete;
@@ -39,20 +42,24 @@ public:
         _IRQL_requires_max_(APC_LEVEL)
         NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void reset();
 
 private:
         IRP *m_irp{};
         KEVENT m_completion_event;
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)                      
         static NTSTATUS completion(_In_ PDEVICE_OBJECT, _In_ PIRP, _In_reads_opt_(_Inexpressible_("varies")) PVOID Context);
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void set_completetion_routine()
         {
                 IoSetCompletionRoutine(m_irp, completion, &m_completion_event, true, true, true);
         }
 };
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS socket_async_context::ctor()
 {
         NT_ASSERT(!*this);
@@ -68,6 +75,7 @@ NTSTATUS socket_async_context::ctor()
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void socket_async_context::dtor()
 {
         if (auto ptr = (IRP*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr)) {
@@ -75,10 +83,15 @@ void socket_async_context::dtor()
         }
 }
 
+/*
+ * KeClearEvent(&m_completion_event);
+ * SynchronizationEvent is also called an autoreset or autoclearing event.
+ * The kernel automatically resets the event to the not-signaled state each time a wait is satisfied.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void socket_async_context::reset()
 {
         NT_ASSERT(*this);
-        KeClearEvent(&m_completion_event);
         IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
         set_completetion_routine();
 }
@@ -106,7 +119,8 @@ NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
 }
 
 _Function_class_(RTL_RUN_ONCE_INIT_FN)
-_IRQL_requires_max_(APC_LEVEL)
+_When_(Parameter, _IRQL_requires_(PASSIVE_LEVEL))
+_When_(!Parameter, _IRQL_requires_max_(DISPATCH_LEVEL))
 _IRQL_requires_same_
 ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, [[maybe_unused]] _Inout_opt_ PVOID* Context)
 {
@@ -123,8 +137,9 @@ ULONG NTAPI ProviderNpiInit(_Inout_ PRTL_RUN_ONCE, _Inout_opt_ PVOID Parameter, 
         return ok;
 }
 
-_IRQL_requires_max_(APC_LEVEL)
-WSK_PROVIDER_NPI *GetProviderNPIOnce(bool testonly = false)
+_When_(!testonly, _IRQL_requires_(PASSIVE_LEVEL))
+_When_(testonly, _IRQL_requires_max_(APC_LEVEL))
+auto GetProviderNPIOnce(bool testonly = false)
 {
         PAGED_CODE();
 
@@ -138,10 +153,11 @@ WSK_PROVIDER_NPI *GetProviderNPIOnce(bool testonly = false)
         return prov.Client ? &prov : nullptr;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 void ReleaseProviderNPIOnce()
 {
         PAGED_CODE();
+
         if (GetProviderNPIOnce(true) && InterlockedBitTestAndReset(&g_init_flags, F_CAPTURE)) {
                 WskReleaseProviderNPI(&g_WskRegistration);
         }
@@ -151,6 +167,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 void deinitialize()
 {
         PAGED_CODE();
+
         if (InterlockedBitTestAndReset(&g_init_flags, F_REGISTER)) {
                 WskDeregister(&g_WskRegistration);
         }
@@ -382,7 +399,7 @@ NTSTATUS wsk::control_client(
 
         if (!use_irp) {
                 return WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer, 
-                        OutputSize, OutputBuffer, OutputSizeReturned, nullptr);
+                                        OutputSize, OutputBuffer, OutputSizeReturned, nullptr);
         }
 
         socket_async_context ctx;
@@ -391,7 +408,7 @@ NTSTATUS wsk::control_client(
         }
 
         auto err = WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer,
-                OutputSize, OutputBuffer, OutputSizeReturned, ctx.irp());
+                                    OutputSize, OutputBuffer, OutputSizeReturned, ctx.irp());
 
         if (!ctx.wait_for_completion(err) && OutputSizeReturned) {
                 *OutputSizeReturned = ctx.irp()->IoStatus.Information;
@@ -676,7 +693,7 @@ void wsk::shutdown()
         deinitialize();
 }
 
-_IRQL_requires_max_(APC_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 WSK_PROVIDER_NPI* wsk::GetProviderNPI()
 {
         PAGED_CODE();
