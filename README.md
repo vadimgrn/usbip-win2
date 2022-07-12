@@ -144,7 +144,7 @@ port 1 is successfully detached
 ```
 set NAME=usbip-vhci
 tracelog.exe -stop %NAME%
-tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\tmfs
+tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
 tracelog.exe -start %NAME% -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x3F -level 5
 ```
 - Reproduce the issue
@@ -153,7 +153,7 @@ tracelog.exe -start %NAME% -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%
 set NAME=usbip-vhci
 set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:
 tracelog.exe -stop %NAME%
-tracefmt.exe -nosummary -p %TEMP%\tmfs -o %NAME%.txt %NAME%.etl
+tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%.txt %NAME%.etl
 rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
 ```
 
@@ -172,7 +172,7 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
   - Run following commands and copy the output
 ```
 !analyze -v
-!wmitrace.searchpath %TEMP%\tmfs
+!wmitrace.searchpath %TEMP%\usbip-vhci
 !wmitrace.setprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wmitrace.logdump usbip-vhci
 ```
