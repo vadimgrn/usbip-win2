@@ -163,7 +163,7 @@ seqnum_t next_seqnum(vpdo_dev_t &vpdo, bool dir_in)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 PCWSTR get_string_descr_str(const vpdo_dev_t &vpdo, UCHAR index)
 {
-	if (index && index < ARRAYSIZE(vpdo.strings)) {
+	if (index && index < vpdo.strings_cnt) {
 		if (auto d = vpdo.strings[index]) {
 			return d->bString;
 		}

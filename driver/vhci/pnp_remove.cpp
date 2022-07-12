@@ -70,16 +70,28 @@ PAGEABLE void free_usb_dev_interface(UNICODE_STRING &symlink_name)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void free_strings(vpdo_dev_t &d)
+PAGEABLE void free_string_descriptors(_Inout_ vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
-	for (auto &sd: d.strings) {
-		if (sd) {
+	for (int i = 0; i < vpdo.strings_cnt; ++i) {
+		if (auto sd = vpdo.strings[i]) {
 			ExFreePoolWithTag(sd, USBIP_VHCI_POOL_TAG);
-			sd = nullptr;
 		}
 	}
+
+	vpdo.strings_cnt = 0;
+
+	if (auto &ptr = vpdo.strings) {
+		ExFreePoolWithTag(ptr, USBIP_VHCI_POOL_TAG);
+		ptr = nullptr;
+	}
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void free_strings(vpdo_dev_t &d)
+{
+	PAGED_CODE();
 
         libdrv_free(d.busid);
         d.busid = nullptr;
@@ -164,7 +176,9 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 	cancel_pending_irps(vpdo);
 
 	vhub_detach_vpdo(&vpdo);
+
 	free_strings(vpdo);
+	free_string_descriptors(vpdo);
 
 	if (vpdo.actconfig) {
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);

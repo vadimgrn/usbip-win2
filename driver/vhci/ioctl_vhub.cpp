@@ -76,7 +76,7 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 		}
 		break;
 	case USB_STRING_DESCRIPTOR_TYPE: // lang_id is ignored
-		if (index < ARRAYSIZE(vpdo->strings)) {
+		if (index < vpdo->strings_cnt) {
 			if (auto d = vpdo->strings[index]) {
 				dsc_len = d->bLength;
 				dsc_data = d;
