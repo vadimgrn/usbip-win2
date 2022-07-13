@@ -36,7 +36,7 @@ static_assert(sizeof(usbip::Mdl) == 16);
 static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-send_context *alloc_send_context(_In_ ULONG NumberOfPackets = 0);
+send_context *alloc_send_context(_In_ ULONG NumberOfPackets);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void free(_In_opt_ send_context *ctx, _In_ bool reuse = true);

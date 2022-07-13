@@ -94,6 +94,7 @@ void ReleaseLock(_In_ IO_CSQ *csq, _In_ KIRQL Irql)
 	KeReleaseSpinLock(&vpdo->irps_lock, Irql);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 {
 	TraceMsg("%04x", ptr4log(irp));

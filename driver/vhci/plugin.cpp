@@ -274,12 +274,12 @@ PAGEABLE auto init_req_get_descr(
                 return false;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt->bRequest = USB_REQUEST_GET_DESCRIPTOR;
-        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(type, index);
-        pkt->wIndex.W = lang_id; // Zero or Language ID for string descriptor
-        pkt->wLength = TransferBufferLength;
+        auto &pkt = get_submit_setup(hdr);
+        pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt.bRequest = USB_REQUEST_GET_DESCRIPTOR;
+        pkt.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(type, index);
+        pkt.wIndex.W = lang_id; // Zero or Language ID for string descriptor
+        pkt.wLength = TransferBufferLength;
 
         return true;
 }

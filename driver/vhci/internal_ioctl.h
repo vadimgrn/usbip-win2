@@ -3,6 +3,8 @@
 #include <wdm.h>
 
 struct vpdo_dev_t;
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

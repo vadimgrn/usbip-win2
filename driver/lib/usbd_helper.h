@@ -31,26 +31,26 @@ inline bool IsTransferDirectionOut(ULONG TransferFlags)
 	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
 }
 
-inline bool is_transfer_dir_in(const _URB_CONTROL_TRANSFER *r)
+inline bool is_transfer_dir_in(const _URB_CONTROL_TRANSFER &r)
 {
-	auto pkt = (USB_DEFAULT_PIPE_SETUP_PACKET*)r->SetupPacket;
+	auto &pkt = *reinterpret_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(r.SetupPacket);
 
-	static_assert(USB_DIR_IN, "assert");
-	return pkt->bmRequestType.B & USB_DIR_IN; // C: bmRequestType.Dir, C++: bmRequestType.s.Dir
+	static_assert(USB_DIR_IN);
+	return pkt.bmRequestType.B & USB_DIR_IN; // C: bmRequestType.Dir, C++: bmRequestType.s.Dir
 }
 
-inline bool is_transfer_dir_out(const _URB_CONTROL_TRANSFER *r)
+inline bool is_transfer_dir_out(const _URB_CONTROL_TRANSFER &r)
 {
-	static_assert(!USB_DIR_OUT, "assert");
+	static_assert(!USB_DIR_OUT);
 	return !is_transfer_dir_in(r);
 }
 
-inline bool is_transfer_direction_in(const usbip_header *h)
+inline bool is_transfer_direction_in(const usbip_header &h)
 {
-	return h->base.direction == USBIP_DIR_IN;
+	return h.base.direction == USBIP_DIR_IN;
 }
 
-inline bool is_transfer_direction_out(const usbip_header *h)
+inline bool is_transfer_direction_out(const usbip_header &h)
 {
-	return h->base.direction == USBIP_DIR_OUT;
+	return h.base.direction == USBIP_DIR_OUT;
 }

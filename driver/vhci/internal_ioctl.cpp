@@ -87,18 +87,30 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         return StopCompletion;
 }
 
+
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto async_send(_Inout_ const URB &transfer_buffer, _In_ send_context *ctx)
+inline auto check_context(_In_ IRP *irp)
 {
-        if (is_transfer_direction_in(&ctx->hdr)) { // TransferFlags can have wrong direction
-                NT_ASSERT(!ctx->mdl_buf);
-        } else if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, IoReadAccess, transfer_buffer)) {
-                Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
-                free(ctx);
-                return err;
+        NT_ASSERT(irp);
+        auto seqnum = get_seqnum(irp);
+        return is_valid_seqnum(seqnum) && *get_status(irp) == ST_NONE;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullptr)
+{
+        NT_ASSERT(check_context(ctx->irp)); // set_context was called
+        NT_ASSERT(!ctx->mdl_buf);
+
+        if (transfer_buffer && is_transfer_direction_out(ctx->hdr)) { // TransferFlags can have wrong direction
+                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, IoReadAccess, *transfer_buffer)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
+                        free(ctx);
+                        return err;
+                }
         }
 
-        ctx->mdl_hdr.next(ctx->mdl_buf);
+        ctx->mdl_hdr.next(ctx->mdl_buf); // always replace tie from previous call
 
         if (ctx->is_isoc) {
                 NT_ASSERT(ctx->mdl_isoc);
@@ -132,30 +144,16 @@ auto async_send(_Inout_ const URB &transfer_buffer, _In_ send_context *ctx)
         return STATUS_PENDING;
 }
 
-/*
- * I/O Manager can issue IoCancelIrp only when a driver returned STATUS_PENDING from its dispatch routine.
- * This means during the execution of dispatch routine IRP can't be canceled.
- */
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto send(_Inout_ vpdo_dev_t &vpdo, _Inout_ IRP *irp, _Inout_ usbip_header &hdr, 
-        _Inout_opt_ URB *transfer_buffer = nullptr, _In_ USBD_PIPE_HANDLE hpipe = USBD_PIPE_HANDLE())
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto alloc_send_context(_In_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ ULONG NumberOfPackets = 0)
 {
-        PAGED_CODE();
-        
-        auto seqnum = hdr.base.seqnum;
-        set_context(irp, seqnum, ST_SEND_COMPLETE, hpipe);
-
-        enqueue_irp(vpdo, irp);
-
-        if (auto err = usbip::send_cmd(vpdo.sock, hdr, transfer_buffer)) {
-                NT_VERIFY(dequeue_irp(vpdo, seqnum)); // hdr.base.seqnum is in network byte order
-                if (err == STATUS_FILE_FORCED_CLOSED) {
-                        vhub_unplug_vpdo(&vpdo);
-                }
-                return err;
+        auto ctx = ::alloc_send_context(NumberOfPackets);
+        if (ctx) {
+                ctx->vpdo = &vpdo;
+                ctx->irp = irp;
         }
 
-        return STATUS_PENDING;
+        return ctx;
 }
 
 /*
@@ -188,6 +186,7 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
 {
 	TraceUrb("PipeHandle %#Ix", ph4log(PipeHandle));
@@ -219,26 +218,31 @@ NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
  *      <linux>/drivers/usb/core/message.c, usb_clear_halt
  */
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbPipeRequest;
+
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
-        pkt->bRequest = USB_REQUEST_CLEAR_FEATURE; // USB_REQ_CLEAR_FEATURE
-        pkt->wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
-        pkt->wIndex.W = get_endpoint_address(r.PipeHandle);
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
+        pkt.bRequest = USB_REQUEST_CLEAR_FEATURE; // USB_REQ_CLEAR_FEATURE
+        pkt.wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
+        pkt.wIndex.W = get_endpoint_address(r.PipeHandle);
 
-        return send(vpdo, irp, hdr);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx);
 }
 
 /*
@@ -254,6 +258,7 @@ PAGEABLE NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, UR
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
  * <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbPipeRequest;
@@ -285,61 +290,63 @@ NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         return st;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR recipient)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR recipient)
 {
-        PAGED_CODE();
-
-        auto &r = urb.UrbControlGetStatusRequest;
+        auto& r = urb.UrbControlGetStatusRequest;
 
         TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
                 ptr4log(irp), urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | recipient;
-        pkt->bRequest = USB_REQUEST_GET_STATUS;
-        pkt->wIndex.W = r.Index;
-        pkt->wLength = (USHORT)r.TransferBufferLength; // must be 2
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | recipient;
+        pkt.bRequest = USB_REQUEST_GET_STATUS;
+        pkt.wIndex.W = r.Index;
+        pkt.wLength = USHORT(r.TransferBufferLength); // must be 2
 
-        return send(vpdo, irp, hdr, &urb);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx, &urb);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_status_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_status_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_status_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_status_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_status_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_status_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_status_from_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_status_from_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR type, UCHAR recipient)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR type, UCHAR recipient)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbControlVendorClassRequest;
 
         {
@@ -349,263 +356,285 @@ PAGEABLE NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &
                         r.TransferBufferLength, brequest_str(r.Request), r.Request, r.Value, r.Index);
         }
 
-        usbip_header hdr{};
-        auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, r.TransferFlags | USBD_DEFAULT_PIPE_TRANSFER, 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, r.TransferFlags | USBD_DEFAULT_PIPE_TRANSFER, 
                                                r.TransferBufferLength);
 
         if (err) {
+                free(ctx);
                 return err;
         }
 
-        bool dir_out = is_transfer_direction_out(&hdr); // TransferFlags can have wrong direction
+        bool dir_out = is_transfer_direction_out(ctx->hdr); // TransferFlags can have wrong direction
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = UCHAR((dir_out ? USB_DIR_OUT : USB_DIR_IN) | type | recipient);
-        pkt->bRequest = r.Request;
-        pkt->wValue.W = r.Value;
-        pkt->wIndex.W = r.Index;
-        pkt->wLength = (USHORT)r.TransferBufferLength;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = UCHAR((dir_out ? USB_DIR_OUT : USB_DIR_IN) | type | recipient);
+        pkt.bRequest = r.Request;
+        pkt.wValue.W = r.Value;
+        pkt.wIndex.W = r.Index;
+        pkt.wLength = USHORT(r.TransferBufferLength);
 
-        return send(vpdo, irp, hdr, &urb);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx, &urb);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vendor_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS vendor_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vendor_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS vendor_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vendor_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS vendor_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vendor_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS vendor_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS class_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS class_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS class_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS class_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS class_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS class_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS class_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS class_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbControlDescriptorRequest;
 
         TraceUrb("%s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
                 urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
                 r.Index, r.DescriptorType, r.LanguageId);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | 
                 (dir_in ? USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = UCHAR((dir_in ? USB_DIR_IN : USB_DIR_OUT) | USB_TYPE_STANDARD | recipient);
-        pkt->bRequest = dir_in ? USB_REQUEST_GET_DESCRIPTOR : USB_REQUEST_SET_DESCRIPTOR;
-        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.DescriptorType, r.Index);
-        pkt->wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
-        pkt->wLength = (USHORT)r.TransferBufferLength;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = UCHAR((dir_in ? USB_DIR_IN : USB_DIR_OUT) | USB_TYPE_STANDARD | recipient);
+        pkt.bRequest = dir_in ? USB_REQUEST_GET_DESCRIPTOR : USB_REQUEST_SET_DESCRIPTOR;
+        pkt.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.DescriptorType, r.Index);
+        pkt.wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
+        pkt.wLength = (USHORT)r.TransferBufferLength;
 
-        return send(vpdo, irp, hdr, &urb);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx, &urb);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_descriptor_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_descriptor_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_descriptor_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_descriptor_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_descriptor_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_descriptor_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_descriptor_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_descriptor_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbControlFeatureRequest;
 
         TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx", 
                 ptr4log(irp), urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | recipient;
-        pkt->bRequest = bRequest;
-        pkt->wValue.W = r.FeatureSelector;
-        pkt->wIndex.W = r.Index;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | recipient;
+        pkt.bRequest = bRequest;
+        pkt.wValue.W = r.FeatureSelector;
+        pkt.wIndex.W = r.Index;
 
-        return send(vpdo, irp, hdr);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS set_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS clear_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS clear_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS clear_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS clear_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS clear_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS clear_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS clear_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS clear_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbSelectConfiguration;
         auto cd = r.ConfigurationDescriptor; // nullptr if unconfigured
 
         UCHAR value = cd ? cd->bConfigurationValue : 0;
         TraceUrb("bConfigurationValue %d", value);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt->bRequest = USB_REQUEST_SET_CONFIGURATION;
-        pkt->wValue.W = value;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt.bRequest = USB_REQUEST_SET_CONFIGURATION;
+        pkt.wValue.W = value;
 
-        return send(vpdo, irp, hdr);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbSelectInterface;
         auto &iface = r.Interface;
 
         TraceUrb("InterfaceNumber %d, AlternateSetting %d", iface.InterfaceNumber, iface.AlternateSetting);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
-        pkt->bRequest = USB_REQUEST_SET_INTERFACE;
-        pkt->wValue.W = iface.AlternateSetting;
-        pkt->wIndex.W = iface.InterfaceNumber;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
+        pkt.bRequest = USB_REQUEST_SET_INTERFACE;
+        pkt.wValue.W = iface.AlternateSetting;
+        pkt.wIndex.W = iface.InterfaceNumber;
 
-        return send(vpdo, irp, hdr);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx);
 }
 
 /*
@@ -614,6 +643,7 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * 
  * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number. 
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS get_current_frame_number(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	urb.UrbGetCurrentFrameNumber.FrameNumber = 0; // FIXME: get usb_get_current_frame_number() on Linux server
@@ -623,11 +653,9 @@ NTSTATUS get_current_frame_number(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_SUCCESS;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
@@ -643,20 +671,27 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
                 return err;
         }
 
-        if (is_transfer_direction_out(&hdr) != is_transfer_dir_out(&urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
+        if (is_transfer_direction_out(ctx->hdr) != is_transfer_dir_out(urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
                 Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
+                free(ctx);
                 return STATUS_INVALID_PARAMETER;
         }
 
-        static_assert(sizeof(hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
-        RtlCopyMemory(hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(hdr.u.cmd_submit.setup));
+        static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
+        RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
 
-        return send(vpdo, irp, hdr, &urb, r.PipeHandle);
+        set_context(irp, ctx->hdr.base.seqnum, r.PipeHandle);
+        return send(ctx, &urb);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -680,21 +715,18 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto ctx = alloc_send_context();
+        auto ctx = alloc_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
-
-        ctx->vpdo = &vpdo;
-        ctx->irp = irp;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
                 free(ctx);
                 return err;
         }
 
-        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, r.PipeHandle);
-        return async_send(urb, ctx);
+        set_context(irp, ctx->hdr.base.seqnum, r.PipeHandle);
+        return send(ctx, &urb);
 }
 
 /*
@@ -725,13 +757,10 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto ctx = alloc_send_context(r.NumberOfPackets);
+        auto ctx = alloc_send_context(vpdo, irp, r.NumberOfPackets);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
-
-        ctx->vpdo = &vpdo;
-        ctx->irp = irp;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, 
                                                  r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
@@ -747,10 +776,11 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         ctx->hdr.u.cmd_submit.start_frame = r.StartFrame;
         ctx->hdr.u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
-        set_context(irp, ctx->hdr.base.seqnum, ST_NONE, r.PipeHandle);
-        return async_send(urb, ctx);
+        set_context(irp, ctx->hdr.base.seqnum, r.PipeHandle);
+        return send(ctx, &urb);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	TraceUrb("irp %04x: %s not supported", ptr4log(irp), urb_function_str(urb.UrbHeader.Function));
@@ -759,88 +789,101 @@ NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_NOT_SUPPORTED;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-        
         auto &r = urb.UrbControlGetConfigurationRequest;
         TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1)", ptr4log(irp), r.TransferBufferLength);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt->bRequest = USB_REQUEST_GET_CONFIGURATION;
-        pkt->wLength = (USHORT)r.TransferBufferLength; // must be 1
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt.bRequest = USB_REQUEST_GET_CONFIGURATION;
+        pkt.wLength = USHORT(r.TransferBufferLength); // must be 1
 
-        return send(vpdo, irp, hdr, &urb);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx, &urb);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-        
         auto &r = urb.UrbControlGetInterfaceRequest;
 
         TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1), Interface %hu",
                 ptr4log(irp), r.TransferBufferLength, r.Interface);
 
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
-        pkt->bRequest = USB_REQUEST_GET_INTERFACE;
-        pkt->wIndex.W = r.Interface;
-        pkt->wLength = (USHORT)r.TransferBufferLength; // must be 1
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
+        pkt.bRequest = USB_REQUEST_GET_INTERFACE;
+        pkt.wIndex.W = r.Interface;
+        pkt.wLength = USHORT(r.TransferBufferLength); // must be 1
 
-        return send(vpdo, irp, hdr, &urb);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx, &urb);
 }
 
 /*
  * @see https://github.com/libusb/libusb/blob/master/examples/xusb.c, read_ms_winsub_feature_descriptors
  */
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-        PAGED_CODE();
-
         auto &r = urb.UrbOSFeatureDescriptorRequest;
 
 	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
-                ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
+                  ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
+
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         const ULONG TransferFlags = USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK | USBD_DEFAULT_PIPE_TRANSFER;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_DIR_IN | USB_TYPE_VENDOR | r.Recipient;
-        pkt->bRequest = vpdo.MS_VendorCode;
-        pkt->wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.InterfaceNumber, r.MS_PageIndex);
-        pkt->wIndex.W = r.MS_FeatureDescriptorIndex;
-        pkt->wLength = (USHORT)r.TransferBufferLength;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_VENDOR | r.Recipient;
+        pkt.bRequest = vpdo.MS_VendorCode;
+        pkt.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.InterfaceNumber, r.MS_PageIndex);
+        pkt.wIndex.W = r.MS_FeatureDescriptorIndex;
+        pkt.wLength = (USHORT)r.TransferBufferLength;
 
-        return send(vpdo, irp, hdr, &urb);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx, &urb);
 }
 
 /*
  * See: <kernel>/drivers/usb/core/message.c, usb_set_isoch_delay.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbGetIsochPipeTransferPathDelays;
@@ -853,12 +896,13 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t&, IRP *irp, URB &urb)
 	return STATUS_NOT_SUPPORTED;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS open_static_streams(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbOpenStaticStreams;
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, NumberOfStreams %lu, StreamInfoVersion %hu, StreamInfoSize %hu",
-                ptr4log(irp), ph4log(r.PipeHandle), r.NumberOfStreams, r.StreamInfoVersion, r.StreamInfoSize);
+                  ptr4log(irp), ph4log(r.PipeHandle), r.NumberOfStreams, r.StreamInfoVersion, r.StreamInfoSize);
 
 	return STATUS_NOT_SUPPORTED;
 }
@@ -971,6 +1015,7 @@ NTSTATUS usb_submit_urb(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 	return STATUS_INVALID_PARAMETER;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto setup_topology_address(vpdo_dev_t *vpdo, USB_TOPOLOGY_ADDRESS &r)
 {
 	r.RootHubPortNumber = static_cast<USHORT>(vpdo->port);
@@ -980,6 +1025,7 @@ auto setup_topology_address(vpdo_dev_t *vpdo, USB_TOPOLOGY_ADDRESS &r)
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_get_port_status(ULONG &status)
 {
 	status = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
@@ -991,27 +1037,31 @@ NTSTATUS usb_get_port_status(ULONG &status)
  * @see <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd
  * @see <linux>/drivers/usb/usbip/vhci_hcd.c, vhci_hub_control
  */
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 {
-        PAGED_CODE();
+        auto ctx = alloc_send_context(vpdo, irp);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        usbip_header hdr{};
-        if (auto err = set_cmd_submit_usbip_header(vpdo, hdr, EP0, TransferFlags)) {
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
+                free(ctx);
                 return err;
         }
 
-        auto pkt = get_submit_setup(&hdr);
-        pkt->bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
-        pkt->bRequest = USB_REQUEST_SET_FEATURE;
-        pkt->wValue.W = USB_PORT_FEAT_RESET;
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
+        pkt.bRequest = USB_REQUEST_SET_FEATURE;
+        pkt.wValue.W = USB_PORT_FEAT_RESET;
 
         NT_ASSERT(vpdo.port >= 1);
-        pkt->wIndex.W = static_cast<USHORT>(vpdo.port); // meaningless for a server which ignores it
+        pkt.wIndex.W = static_cast<USHORT>(vpdo.port); // meaningless for a server which ignores it
 
-        return send(vpdo, irp, hdr);
+        set_context(irp, ctx->hdr.base.seqnum);
+        return send(ctx);
 }
 
 } // namespace
@@ -1034,20 +1084,18 @@ PAGEABLE NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  * For that reason the cancellation logic is simplified and list of unlinked IRPs is not used.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 {
-        PAGED_CODE();
-
         auto seqnum = get_seqnum(irp);
         TraceMsg("irp %04x, seqnum %u", ptr4log(irp), seqnum);
 
-        if (auto sock = vpdo.sock) {
-                usbip_header hdr{};
-                set_cmd_unlink_usbip_header(vpdo, hdr, seqnum);
-                if (auto err = usbip::send_cmd(sock, hdr)) {
-                        Trace(TRACE_LEVEL_ERROR, "send_cmd %!STATUS!", err);
-                }
+        if (auto ctx = alloc_send_context(vpdo, irp)) {
+                set_cmd_unlink_usbip_header(vpdo, ctx->hdr, seqnum);
+                set_context(irp, ctx->hdr.base.seqnum);
+                send(ctx); // ignore error
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "irp %04x, seqnum %u, alloc_send_context error", ptr4log(irp), seqnum);
         }
 
         auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);

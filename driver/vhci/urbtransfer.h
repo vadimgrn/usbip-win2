@@ -5,7 +5,7 @@
 #pragma once
 
 #include <stddef.h>
-#include <ntdef.h>
+#include <wdm.h>
 #include <usb.h>
 
 struct UrbTransfer
@@ -20,7 +20,17 @@ struct UrbTransfer
 	decltype(type::TransferBufferMDL) TransferBufferMDL;
 };
 
-inline auto AsUrbTransfer(URB *urb) { return reinterpret_cast<UrbTransfer*>(urb); }
-inline auto AsUrbTransfer(const URB *urb) { return reinterpret_cast<const UrbTransfer*>(urb); }
 
 bool has_transfer_buffer(_In_ const URB &urb);
+
+inline auto& AsUrbTransfer(_In_ URB &urb) 
+{ 
+	NT_ASSERT(has_transfer_buffer(urb));
+	return reinterpret_cast<UrbTransfer&>(urb); 
+}
+
+inline auto& AsUrbTransfer(_In_ const URB &urb) 
+{ 
+	NT_ASSERT(has_transfer_buffer(urb));
+	return reinterpret_cast<const UrbTransfer&>(urb); 
+}

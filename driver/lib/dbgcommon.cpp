@@ -202,7 +202,7 @@ const char *get_usbd_status(USBD_STATUS status)
 
 const char *dbg_ioctl_code(ULONG ioctl_code)
 {
-	static_assert(sizeof(ioctl_code) == sizeof(IOCTL_USBIP_VHCI_PLUGIN_HARDWARE), "assert");
+	static_assert(sizeof(ioctl_code) == sizeof(IOCTL_USBIP_VHCI_PLUGIN_HARDWARE));
 
 	switch (ioctl_code) {
 	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE: return "USBIP_VHCI_PLUGIN_HARDWARE";

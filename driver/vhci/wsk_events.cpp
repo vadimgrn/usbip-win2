@@ -30,7 +30,7 @@ namespace
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_urb_buffer(_In_ URB &urb)
 {
-	auto &r = *AsUrbTransfer(&urb);
+	auto &r = AsUrbTransfer(urb);
 	
 	if (auto mdl = r.TransferBufferMDL) {
 		auto buf = MmGetSystemAddressForMdlSafe(mdl, NormalPagePriority | MdlMappingNoExecute);
@@ -50,7 +50,7 @@ auto get_urb_buffer(_In_ URB &urb)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 {
-	auto &r = *AsUrbTransfer(&urb);
+	auto &r = AsUrbTransfer(urb);
 
 	buf = get_urb_buffer(urb);
 	if (!buf) {
@@ -79,10 +79,10 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 {
-	auto r = AsUrbTransfer(&urb);
-	auto err = assign(r->TransferBufferLength, hdr.u.ret_submit.actual_length);
+	auto &r = AsUrbTransfer(urb);
+	auto err = assign(r.TransferBufferLength, hdr.u.ret_submit.actual_length);
 
-	if (err || !r->TransferBufferLength || is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+	if (err || !r.TransferBufferLength || is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
 		return err;
 	}
 
@@ -93,7 +93,7 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 	err = copy_to_transfer_buffer(buf, vpdo, urb);
 
 	if (!err && log) {
-		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, USHORT(r->TransferBufferLength)));
+		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, USHORT(r.TransferBufferLength)));
 	}
 
 	return err;
@@ -154,7 +154,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		return err;
 	}
 
-	if (is_transfer_direction_out(&hdr)) { // TransferFlags can have wrong direction
+	if (is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
 		return STATUS_SUCCESS;
 	}
 
@@ -309,7 +309,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 
 	vpdo.current_frame_number = res.start_frame;
 
-	auto dir_in = is_transfer_direction_in(&hdr); // TransferFlags can have wrong direction
+	auto dir_in = is_transfer_direction_in(hdr); // TransferFlags can have wrong direction
 
 	auto dst_buf = dir_in ? (char*)get_urb_buffer(urb) : nullptr;
 	if (!dst_buf && dir_in) {

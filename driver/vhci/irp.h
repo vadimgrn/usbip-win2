@@ -38,12 +38,15 @@ inline auto get_irp(LIST_ENTRY *entry)
 }
 
 enum irp_status_t { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED };
-void set_context(IRP *irp, seqnum_t seqnum, irp_status_t status, USBD_PIPE_HANDLE hpipe);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void set_context(_In_ IRP *irp, _In_ seqnum_t seqnum, _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE());
 
 /*
  * IoCsqXxx routines use the DriverContext[3] member of the IRP to hold IRP context information. 
  * Drivers that use these routines to queue IRPs must leave that member unused.
  */
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_seqnum(IRP *irp)
 {
 	auto ptr = irp->Tail.Overlay.DriverContext;
@@ -52,11 +55,13 @@ inline auto& get_seqnum(IRP *irp)
 	return *reinterpret_cast<seqnum_t*>(ptr);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_status(IRP *irp)
 {
 	return reinterpret_cast<LONG*>(irp->Tail.Overlay.DriverContext + 1);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_pipe_handle(IRP *irp)
 {
 	return *static_cast<USBD_PIPE_HANDLE*>(irp->Tail.Overlay.DriverContext + 2);
