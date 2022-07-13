@@ -94,11 +94,3 @@ void complete_canceled_irp(IRP *irp)
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 }
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void set_context(_In_ IRP *irp, _In_ seqnum_t seqnum, _In_ USBD_PIPE_HANDLE handle)
-{
-	get_seqnum(irp) = seqnum;
-	*get_status(irp) = ST_NONE;
-	get_pipe_handle(irp) = handle;
-}

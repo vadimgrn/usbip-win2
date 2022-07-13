@@ -49,15 +49,17 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         NT_ASSERT(ctx->wsk_irp == wsk_irp);
 
         auto &vpdo = *ctx->vpdo;
-        auto irp = ctx->irp;
+        auto irp = ctx->irp; // nullptr for send_cmd_unlink
 
+        auto old_status = irp ? InterlockedCompareExchange(get_status(irp), ST_SEND_COMPLETE, ST_NONE) : ST_IRP_NULL;
         auto &st = wsk_irp->IoStatus;
-        auto old_status = InterlockedCompareExchange(get_status(irp), ST_SEND_COMPLETE, ST_NONE);
 
         TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!", 
                   KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information, old_status);
 
-        if (NT_SUCCESS(st.Status)) { // request has sent
+        if (!irp) {
+                // nothing to do
+        } else if (NT_SUCCESS(st.Status)) { // request has sent
                 auto stat = ((URB*)URB_FROM_IRP(irp))->UrbHeader.Status;
 
                 switch (old_status) {
@@ -87,19 +89,16 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         return StopCompletion;
 }
 
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto check_context(_In_ IRP *irp)
-{
-        NT_ASSERT(irp);
-        auto seqnum = get_seqnum(irp);
-        return is_valid_seqnum(seqnum) && *get_status(irp) == ST_NONE;
-}
-
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullptr)
 {
-        NT_ASSERT(check_context(ctx->irp)); // set_context was called
+        if (auto irp = ctx->irp) {
+                auto seqnum = ctx->hdr.base.seqnum;
+                NT_ASSERT(is_valid_seqnum(seqnum));
+                get_seqnum(irp) = seqnum;
+                *get_status(irp) = ST_NONE;
+        }
+
         NT_ASSERT(!ctx->mdl_buf);
 
         if (transfer_buffer && is_transfer_direction_out(ctx->hdr)) { // TransferFlags can have wrong direction
@@ -133,9 +132,11 @@ auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullp
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
-
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
-        enqueue_irp(*ctx->vpdo, ctx->irp);
+
+        if (auto irp = ctx->irp) {
+                enqueue_irp(*ctx->vpdo, irp);
+        }
 
         auto err = send(ctx->vpdo->sock, &buf, WSK_FLAG_NODELAY, wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
@@ -145,9 +146,16 @@ auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullp
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto alloc_send_context(_In_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ ULONG NumberOfPackets = 0)
+auto new_send_context(
+        _In_ vpdo_dev_t &vpdo, _In_opt_ IRP *irp, 
+        _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE(), 
+        _In_ ULONG NumberOfPackets = 0)
 {
-        auto ctx = ::alloc_send_context(NumberOfPackets);
+        if (irp) {
+                get_pipe_handle(irp) = handle;
+        }
+
+        auto ctx = alloc_send_context(NumberOfPackets);
         if (ctx) {
                 ctx->vpdo = &vpdo;
                 ctx->irp = irp;
@@ -223,7 +231,7 @@ NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbPipeRequest;
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -241,7 +249,6 @@ NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
         pkt.wIndex.W = get_endpoint_address(r.PipeHandle);
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx);
 }
 
@@ -298,7 +305,7 @@ NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR 
         TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
                 ptr4log(irp), urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -316,7 +323,6 @@ NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR 
         pkt.wIndex.W = r.Index;
         pkt.wLength = USHORT(r.TransferBufferLength); // must be 2
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx, &urb);
 }
 
@@ -356,7 +362,7 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
                         r.TransferBufferLength, brequest_str(r.Request), r.Request, r.Value, r.Index);
         }
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -378,7 +384,6 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
         pkt.wIndex.W = r.Index;
         pkt.wLength = USHORT(r.TransferBufferLength);
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx, &urb);
 }
 
@@ -439,7 +444,7 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
                 urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
                 r.Index, r.DescriptorType, r.LanguageId);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -459,7 +464,6 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
         pkt.wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
         pkt.wLength = (USHORT)r.TransferBufferLength;
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx, &urb);
 }
 
@@ -507,7 +511,7 @@ NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRe
         TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx", 
                 ptr4log(irp), urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -525,7 +529,6 @@ NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRe
         pkt.wValue.W = r.FeatureSelector;
         pkt.wIndex.W = r.Index;
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx);
 }
 
@@ -586,7 +589,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         UCHAR value = cd ? cd->bConfigurationValue : 0;
         TraceUrb("bConfigurationValue %d", value);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -603,7 +606,6 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.bRequest = USB_REQUEST_SET_CONFIGURATION;
         pkt.wValue.W = value;
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx);
 }
 
@@ -615,7 +617,7 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         TraceUrb("InterfaceNumber %d, AlternateSetting %d", iface.InterfaceNumber, iface.AlternateSetting);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -633,7 +635,6 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.wValue.W = iface.AlternateSetting;
         pkt.wIndex.W = iface.InterfaceNumber;
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx);
 }
 
@@ -671,7 +672,7 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp, r.PipeHandle);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -690,7 +691,6 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
 
-        set_context(irp, ctx->hdr.base.seqnum, r.PipeHandle);
         return send(ctx, &urb);
 }
 
@@ -715,7 +715,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp, r.PipeHandle);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -725,7 +725,6 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return err;
         }
 
-        set_context(irp, ctx->hdr.base.seqnum, r.PipeHandle);
         return send(ctx, &urb);
 }
 
@@ -757,7 +756,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto ctx = alloc_send_context(vpdo, irp, r.NumberOfPackets);
+        auto ctx = new_send_context(vpdo, irp, r.PipeHandle, r.NumberOfPackets);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -776,7 +775,6 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         ctx->hdr.u.cmd_submit.start_frame = r.StartFrame;
         ctx->hdr.u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
-        set_context(irp, ctx->hdr.base.seqnum, r.PipeHandle);
         return send(ctx, &urb);
 }
 
@@ -795,7 +793,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         auto &r = urb.UrbControlGetConfigurationRequest;
         TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1)", ptr4log(irp), r.TransferBufferLength);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -812,7 +810,6 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.bRequest = USB_REQUEST_GET_CONFIGURATION;
         pkt.wLength = USHORT(r.TransferBufferLength); // must be 1
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx, &urb);
 }
 
@@ -824,7 +821,7 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1), Interface %hu",
                 ptr4log(irp), r.TransferBufferLength, r.Interface);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -842,7 +839,6 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.wIndex.W = r.Interface;
         pkt.wLength = USHORT(r.TransferBufferLength); // must be 1
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx, &urb);
 }
 
@@ -857,7 +853,7 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
                   ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
 
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -876,7 +872,6 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.wIndex.W = r.MS_FeatureDescriptorIndex;
         pkt.wLength = (USHORT)r.TransferBufferLength;
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx, &urb);
 }
 
@@ -1040,7 +1035,7 @@ NTSTATUS usb_get_port_status(ULONG &status)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
 {
-        auto ctx = alloc_send_context(vpdo, irp);
+        auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -1060,7 +1055,6 @@ NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
         NT_ASSERT(vpdo.port >= 1);
         pkt.wIndex.W = static_cast<USHORT>(vpdo.port); // meaningless for a server which ignores it
 
-        set_context(irp, ctx->hdr.base.seqnum);
         return send(ctx);
 }
 
@@ -1090,12 +1084,11 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         auto seqnum = get_seqnum(irp);
         TraceMsg("irp %04x, seqnum %u", ptr4log(irp), seqnum);
 
-        if (auto ctx = alloc_send_context(vpdo, irp)) {
+        if (auto ctx = new_send_context(vpdo, nullptr)) {
                 set_cmd_unlink_usbip_header(vpdo, ctx->hdr, seqnum);
-                set_context(irp, ctx->hdr.base.seqnum);
                 send(ctx); // ignore error
         } else {
-                Trace(TRACE_LEVEL_ERROR, "irp %04x, seqnum %u, alloc_send_context error", ptr4log(irp), seqnum);
+                Trace(TRACE_LEVEL_ERROR, "irp %04x, seqnum %u, new_send_context error", ptr4log(irp), seqnum);
         }
 
         auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);
