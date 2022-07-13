@@ -90,51 +90,59 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullptr)
+auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ send_context &ctx, _Inout_opt_ const URB *transfer_buffer)
 {
-        if (auto irp = ctx->irp) {
-                auto seqnum = ctx->hdr.base.seqnum;
-                NT_ASSERT(is_valid_seqnum(seqnum));
-                get_seqnum(irp) = seqnum;
-                *get_status(irp) = ST_NONE;
-        }
+        NT_ASSERT(!ctx.mdl_buf);
 
-        NT_ASSERT(!ctx->mdl_buf);
-
-        if (transfer_buffer && is_transfer_direction_out(ctx->hdr)) { // TransferFlags can have wrong direction
-                if (auto err = usbip::make_transfer_buffer_mdl(ctx->mdl_buf, IoReadAccess, *transfer_buffer)) {
+        if (transfer_buffer && is_transfer_direction_out(ctx.hdr)) { // TransferFlags can have wrong direction
+                if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoReadAccess, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
-                        free(ctx);
                         return err;
                 }
         }
 
-        ctx->mdl_hdr.next(ctx->mdl_buf); // always replace tie from previous call
+        ctx.mdl_hdr.next(ctx.mdl_buf); // always replace tie from previous call
 
-        if (ctx->is_isoc) {
-                NT_ASSERT(ctx->mdl_isoc);
-                auto &tail = ctx->mdl_buf ? ctx->mdl_buf : ctx->mdl_hdr;
-                tail.next(ctx->mdl_isoc);
-                byteswap(ctx->isoc, number_of_packets(*ctx));
+        if (ctx.is_isoc) {
+                NT_ASSERT(ctx.mdl_isoc);
+                auto &tail = ctx.mdl_buf ? ctx.mdl_buf : ctx.mdl_hdr;
+                tail.next(ctx.mdl_isoc);
+                byteswap(ctx.isoc, number_of_packets(ctx));
         }
 
-        WSK_BUF buf{ ctx->mdl_hdr.get(), 0, get_total_size(ctx->hdr) };
+        buf.Mdl = ctx.mdl_hdr.get();
+        NT_ASSERT(!buf.Offset);
+        buf.Length = get_total_size(ctx.hdr);
 
-        NT_ASSERT(buf.Length >= ctx->mdl_hdr.size());
-        NT_ASSERT(buf.Length <= size(ctx->mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
+        NT_ASSERT(buf.Length >= ctx.mdl_hdr.size());
+        NT_ASSERT(buf.Length <= size(ctx.mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
 
-        {
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullptr)
+{
+        WSK_BUF buf{};
+
+        if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
+                free(ctx);
+                return err;
+        } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
                             ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, false));
         }
 
+        auto seqnum = ctx->hdr.base.seqnum;
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
 
         if (auto irp = ctx->irp) {
+                get_seqnum(irp) = seqnum;
+                *get_status(irp) = ST_NONE;
                 enqueue_irp(*ctx->vpdo, irp);
         }
 
@@ -147,7 +155,7 @@ auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullp
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto new_send_context(
-        _In_ vpdo_dev_t &vpdo, _In_opt_ IRP *irp, 
+        _In_ vpdo_dev_t &vpdo, _Inout_opt_ IRP *irp, 
         _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE(), 
         _In_ ULONG NumberOfPackets = 0)
 {

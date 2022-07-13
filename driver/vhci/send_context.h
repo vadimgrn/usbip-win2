@@ -17,7 +17,7 @@ NTSTATUS init_send_context_list();
 struct send_context
 {
         vpdo_dev_t *vpdo;
-        IRP *irp;
+        IRP *irp; // can be NULL, see send_cmd_unlink
         IRP *wsk_irp;
 
         usbip_header hdr;
