@@ -110,20 +110,14 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ send_context &ctx, _Inout_opt_ 
                 byteswap(ctx.isoc, number_of_packets(ctx));
         }
 
-        buf.Mdl = ctx.mdl_hdr.get();
-        NT_ASSERT(!buf.Offset);
-        buf.Length = get_total_size(ctx.hdr);
-
-        NT_ASSERT(buf.Length >= ctx.mdl_hdr.size());
-        NT_ASSERT(buf.Length <= size(ctx.mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
-
+        buf = usbip::make_wsk_buf(ctx.mdl_hdr, ctx.hdr);
         return STATUS_SUCCESS;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullptr)
+auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ bool log_setup = true)
 {
-        WSK_BUF buf{};
+        WSK_BUF buf;
 
         if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
                 free(ctx);
@@ -131,20 +125,19 @@ auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullp
         } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
-                            ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, false));
+                            ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
-        auto seqnum = ctx->hdr.base.seqnum;
+        if (auto irp = ctx->irp) {
+                get_seqnum(irp) = ctx->hdr.base.seqnum;
+                *get_status(irp) = ST_NONE;
+                enqueue_irp(*ctx->vpdo, irp);
+        }
+
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx, true, true, true);
-
-        if (auto irp = ctx->irp) {
-                get_seqnum(irp) = seqnum;
-                *get_status(irp) = ST_NONE;
-                enqueue_irp(*ctx->vpdo, irp);
-        }
 
         auto err = send(ctx->vpdo->sock, &buf, WSK_FLAG_NODELAY, wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
@@ -163,7 +156,7 @@ auto new_send_context(
                 get_pipe_handle(irp) = handle;
         }
 
-        auto ctx = alloc_send_context(NumberOfPackets);
+        auto ctx = vpdo.sock ? alloc_send_context(NumberOfPackets) : nullptr;
         if (ctx) {
                 ctx->vpdo = &vpdo;
                 ctx->irp = irp;
@@ -329,7 +322,7 @@ NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR 
         pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | recipient;
         pkt.bRequest = USB_REQUEST_GET_STATUS;
         pkt.wIndex.W = r.Index;
-        pkt.wLength = USHORT(r.TransferBufferLength); // must be 2
+        pkt.wLength = static_cast<USHORT>(r.TransferBufferLength); // must be 2
 
         return send(ctx, &urb);
 }
@@ -390,7 +383,7 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
         pkt.bRequest = r.Request;
         pkt.wValue.W = r.Value;
         pkt.wIndex.W = r.Index;
-        pkt.wLength = USHORT(r.TransferBufferLength);
+        pkt.wLength = static_cast<USHORT>(r.TransferBufferLength);
 
         return send(ctx, &urb);
 }
@@ -470,7 +463,7 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
         pkt.bRequest = dir_in ? USB_REQUEST_GET_DESCRIPTOR : USB_REQUEST_SET_DESCRIPTOR;
         pkt.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.DescriptorType, r.Index);
         pkt.wIndex.W = r.LanguageId; // relevant for USB_STRING_DESCRIPTOR_TYPE only
-        pkt.wLength = (USHORT)r.TransferBufferLength;
+        pkt.wLength = static_cast<USHORT>(r.TransferBufferLength);
 
         return send(ctx, &urb);
 }
@@ -653,10 +646,12 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number. 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS get_current_frame_number(vpdo_dev_t&, IRP *irp, URB &urb)
+NTSTATUS get_current_frame_number(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
-	urb.UrbGetCurrentFrameNumber.FrameNumber = 0; // FIXME: get usb_get_current_frame_number() on Linux server
-	TraceUrb("irp %04x: FrameNumber %lu", ptr4log(irp), urb.UrbGetCurrentFrameNumber.FrameNumber);
+        auto &num = urb.UrbGetCurrentFrameNumber.FrameNumber;
+        num = vpdo.current_frame_number;
+        
+        TraceUrb("irp %04x: FrameNumber %lu", ptr4log(irp), num);
 
 	urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
 	return STATUS_SUCCESS;
@@ -733,7 +728,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return err;
         }
 
-        return send(ctx, &urb);
+        return send(ctx, &urb, false);
 }
 
 /*
@@ -783,7 +778,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         ctx->hdr.u.cmd_submit.start_frame = r.StartFrame;
         ctx->hdr.u.cmd_submit.number_of_packets = r.NumberOfPackets;
 
-        return send(ctx, &urb);
+        return send(ctx, &urb, false);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -816,7 +811,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         auto &pkt = get_submit_setup(ctx->hdr);
         pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
         pkt.bRequest = USB_REQUEST_GET_CONFIGURATION;
-        pkt.wLength = USHORT(r.TransferBufferLength); // must be 1
+        pkt.wLength = static_cast<USHORT>(r.TransferBufferLength); // must be 1
 
         return send(ctx, &urb);
 }
@@ -845,7 +840,7 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
         pkt.bRequest = USB_REQUEST_GET_INTERFACE;
         pkt.wIndex.W = r.Interface;
-        pkt.wLength = USHORT(r.TransferBufferLength); // must be 1
+        pkt.wLength = static_cast<USHORT>(r.TransferBufferLength); // must be 1
 
         return send(ctx, &urb);
 }
@@ -878,7 +873,7 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         pkt.bRequest = vpdo.MS_VendorCode;
         pkt.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(r.InterfaceNumber, r.MS_PageIndex);
         pkt.wIndex.W = r.MS_FeatureDescriptorIndex;
-        pkt.wLength = (USHORT)r.TransferBufferLength;
+        pkt.wLength = static_cast<USHORT>(r.TransferBufferLength);
 
         return send(ctx, &urb);
 }
@@ -1121,19 +1116,17 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
         TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x", 
 		  KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
 
-        auto vpdo = to_vpdo_or_null(devobj);
-	if (!vpdo) {
-		Trace(TRACE_LEVEL_WARNING, "Internal ioctl is allowed for vpdo only");
-		return complete_internal_ioctl(irp, STATUS_INVALID_DEVICE_REQUEST);
-	} else if (vpdo->PnPState == pnp_state::Removed) {
-                return complete_internal_ioctl(irp, STATUS_NO_SUCH_DEVICE);
-        } else if (vpdo->unplugged) {
-		return complete_internal_ioctl(irp, STATUS_DEVICE_NOT_CONNECTED);
-	}
-
         auto status = STATUS_NOT_SUPPORTED;
+        auto vpdo = to_vpdo_or_null(devobj);
 
-	switch (ioctl_code) {
+        if (!vpdo) {
+		Trace(TRACE_LEVEL_WARNING, "Internal ioctl is allowed for vpdo only");
+		status = STATUS_INVALID_DEVICE_REQUEST;
+        } else if (vpdo->PnPState == pnp_state::Removed) {
+                status = STATUS_NO_SUCH_DEVICE;
+        } else if (vpdo->unplugged) {
+                status = STATUS_DEVICE_NOT_CONNECTED;
+        } else switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
 		status = usb_submit_urb(*vpdo, irp, *static_cast<URB*>(URB_FROM_IRP(irp)));
 		break;
@@ -1147,8 +1140,8 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		status = setup_topology_address(vpdo, *(USB_TOPOLOGY_ADDRESS*)irpstack->Parameters.Others.Argument1);
 		break;
         default:
-		Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
-	}
+                Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+        }
 
 	if (status == STATUS_PENDING) {
                 TraceDbg("Leave %!STATUS!, irp %04x", status, ptr4log(irp));

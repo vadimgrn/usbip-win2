@@ -125,7 +125,7 @@ void usbip::Mdl::do_unprepare()
         paged() ? unlock() : unprepare_nonpaged();
 }
 
-size_t usbip::size(_In_ MDL *mdl)
+size_t usbip::size(_In_ const MDL *mdl)
 {
         size_t total = 0;
 

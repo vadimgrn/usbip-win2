@@ -7,7 +7,6 @@
 #include "network.tmh"
 
 #include "dev.h"
-#include "pdu.h"
 #include "dbgcommon.h"
 #include "urbtransfer.h"
 #include "usbip_proto.h"
@@ -19,8 +18,9 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
+PAGEABLE auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
 {
+        PAGED_CODE();
         bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
         TransferBufferLength = ok ? actual_length : 0;
 
@@ -28,8 +28,10 @@ auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
+PAGEABLE auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
 {
+        PAGED_CODE();
+
         auto &base = hdr.base;
         NT_ASSERT(base.command == USBIP_RET_SUBMIT);
 
@@ -61,8 +63,10 @@ auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbi
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
+PAGEABLE NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
+        PAGED_CODE();
+
         Mdl mdl(pool, data, len);
         if (auto err = mdl.prepare(IoReadAccess)) {
                 return err;
@@ -73,8 +77,10 @@ NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _I
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len)
+PAGEABLE NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len)
 {
+        PAGED_CODE();
+
         Mdl mdl(pool, data, len);
         if (auto err = mdl.prepare(IoWriteAccess)) {
                 return err;
@@ -85,8 +91,9 @@ NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
+PAGEABLE err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
 {
+        PAGED_CODE();
         op_common r;
 
         if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
@@ -111,8 +118,10 @@ err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Ou
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
+PAGEABLE NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
 {
+        PAGED_CODE();
+
         usbip::Mdl mdl_hdr(memory::stack, &hdr, sizeof(hdr));
 
         if (auto err = mdl_hdr.prepare_paged(IoReadAccess)) {
@@ -130,10 +139,7 @@ NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout
                 mdl_hdr.next(mdl_buf);
         }
 
-        WSK_BUF buf{ mdl_hdr.get(), 0, get_total_size(hdr) };
-
-        NT_ASSERT(buf.Length >= mdl_hdr.size());
-        NT_ASSERT(buf.Length <= size(mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
+        auto buf = make_wsk_buf(mdl_hdr, hdr);
 
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
