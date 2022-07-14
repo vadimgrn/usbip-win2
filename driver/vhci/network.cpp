@@ -18,7 +18,7 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
+auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
 {
         PAGED_CODE();
         bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;

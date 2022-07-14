@@ -59,9 +59,6 @@ _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable);
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS resume_receive_event(_In_ SOCKET *sock);
-
-_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
 
 _IRQL_requires_max_(APC_LEVEL)

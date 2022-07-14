@@ -30,7 +30,7 @@ auto complete_internal_ioctl(_Inout_ IRP *irp, _In_ NTSTATUS status)
 
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
- * 
+ *
  * In general, you must not touch IRP that was put in Cancel-Safe Queue because it can be canceled at any moment.
  * You should remove IRP from the CSQ and then use it. BUT you can access IRP if you shure it is alive.
  *
@@ -54,7 +54,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         auto old_status = irp ? InterlockedCompareExchange(get_status(irp), ST_SEND_COMPLETE, ST_NONE) : ST_IRP_NULL;
         auto &st = wsk_irp->IoStatus;
 
-        TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!", 
+        TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!",
                   KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information, old_status);
 
         if (!irp) {
@@ -64,7 +64,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s", 
+                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s",
                                   ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information,
                                   (stat ? get_usbd_status(stat) : " "));
 
@@ -124,7 +124,7 @@ auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullp
                 return err;
         } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s", 
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s",
                             ptr4log(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
@@ -148,8 +148,8 @@ auto send(_In_ send_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullp
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto new_send_context(
-        _In_ vpdo_dev_t &vpdo, _Inout_opt_ IRP *irp, 
-        _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE(), 
+        _In_ vpdo_dev_t &vpdo, _Inout_opt_ IRP *irp,
+        _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE(),
         _In_ ULONG NumberOfPackets = 0)
 {
         if (irp) {
@@ -256,13 +256,13 @@ NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 /*
  * URB_FUNCTION_SYNC_CLEAR_STALL must issue USB_REQ_CLEAR_FEATURE, USB_ENDPOINT_HALT.
  * URB_FUNCTION_SYNC_RESET_PIPE must call usb_reset_endpoint.
- * 
+ *
  * Linux server catches control transfer USB_REQ_CLEAR_FEATURE/USB_ENDPOINT_HALT and calls usb_clear_halt.
  * There is no way to distinguish these two operations without modifications on server's side.
  * It can be implemented by passing extra parameter
- * a) wValue=1 to clear halt 
+ * a) wValue=1 to clear halt
  * b) wValue=2 to call usb_reset_endpoint
- * 
+ *
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
  * <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
  */
@@ -288,9 +288,9 @@ NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         TraceUrb("irp %04x -> %s: PipeHandle %#Ix(EndpointAddress %#02x, %!USBD_PIPE_TYPE!, Interval %d) -> %!STATUS!",
                 ptr4log(irp),
-                urb_function_str(r.Hdr.Function), 
-                ph4log(r.PipeHandle), 
-                get_endpoint_address(r.PipeHandle), 
+                urb_function_str(r.Hdr.Function),
+                ph4log(r.PipeHandle),
+                get_endpoint_address(r.PipeHandle),
                 get_endpoint_type(r.PipeHandle),
                 get_endpoint_interval(r.PipeHandle),
                 st);
@@ -303,7 +303,7 @@ NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR 
 {
         auto& r = urb.UrbControlGetStatusRequest;
 
-        TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd", 
+        TraceUrb("irp %04x -> %s: TransferBufferLength %lu (must be 2), Index %hd",
                 ptr4log(irp), urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.Index);
 
         auto ctx = new_send_context(vpdo, irp);
@@ -359,7 +359,7 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
         {
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
                 TraceUrb("irp %04x -> %s: %s, TransferBufferLength %lu, %s(%!#XBYTE!), Value %#hx, Index %#hx",
-                        ptr4log(irp), urb_function_str(r.Hdr.Function), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags), 
+                        ptr4log(irp), urb_function_str(r.Hdr.Function), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
                         r.TransferBufferLength, brequest_str(r.Request), r.Request, r.Value, r.Index);
         }
 
@@ -368,7 +368,7 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, r.TransferFlags | USBD_DEFAULT_PIPE_TRANSFER, 
+        auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, r.TransferFlags | USBD_DEFAULT_PIPE_TRANSFER,
                                                r.TransferBufferLength);
 
         if (err) {
@@ -442,7 +442,7 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
         auto &r = urb.UrbControlDescriptorRequest;
 
         TraceUrb("%s: TransferBufferLength %lu(%#lx), Index %#x, %!usb_descriptor_type!, LanguageId %#04hx",
-                urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength, 
+                urb_function_str(r.Hdr.Function), r.TransferBufferLength, r.TransferBufferLength,
                 r.Index, r.DescriptorType, r.LanguageId);
 
         auto ctx = new_send_context(vpdo, irp);
@@ -450,7 +450,7 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | 
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER |
                 (dir_in ? USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
@@ -509,7 +509,7 @@ NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRe
 {
         auto &r = urb.UrbControlFeatureRequest;
 
-        TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx", 
+        TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx",
                 ptr4log(irp), urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
         auto ctx = new_send_context(vpdo, irp);
@@ -642,15 +642,15 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 /*
  * Can't be implemented without server's support.
  * In any case the result will be irrelevant due to network latency.
- * 
- * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number. 
+ *
+ * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS get_current_frame_number(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &num = urb.UrbGetCurrentFrameNumber.FrameNumber;
         num = vpdo.current_frame_number;
-        
+
         TraceUrb("irp %04x: FrameNumber %lu", ptr4log(irp), num);
 
 	urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
@@ -743,11 +743,11 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
                 TraceUrb("irp %04x -> PipeHandle %#Ix, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
-                        ptr4log(irp), ph4log(r.PipeHandle),	
+                        ptr4log(irp), ph4log(r.PipeHandle),
                         usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
-                        r.TransferBufferLength, 
-                        r.StartFrame, 
-                        r.NumberOfPackets, 
+                        r.TransferBufferLength,
+                        r.StartFrame,
+                        r.NumberOfPackets,
                         r.ErrorCount,
                         func);
         }
@@ -764,7 +764,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, 
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle,
                                                  r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
                 free(ctx);
                 return err;
@@ -853,7 +853,7 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbOSFeatureDescriptorRequest;
 
-	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d", 
+	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d",
                   ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
 
         auto ctx = new_send_context(vpdo, irp);
@@ -887,8 +887,8 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t&, IRP *irp, URB &urb)
 	auto &r = urb.UrbGetIsochPipeTransferPathDelays;
 
 	TraceUrb("irp %04x -> PipeHandle %#Ix, MaximumSendPathDelayInMilliSeconds %lu, MaximumCompletionPathDelayInMilliSeconds %lu",
-                ptr4log(irp), ph4log(r.PipeHandle), 
-		r.MaximumSendPathDelayInMilliSeconds, 
+                ptr4log(irp), ph4log(r.PipeHandle),
+		r.MaximumSendPathDelayInMilliSeconds,
 		r.MaximumCompletionPathDelayInMilliSeconds);
 
 	return STATUS_NOT_SUPPORTED;
@@ -939,7 +939,7 @@ urb_function_t* const urb_functions[] =
         get_status_from_interface,
         get_status_from_endpoint,
 
-	nullptr, // URB_FUNCTION_RESERVED_0X0016          
+	nullptr, // URB_FUNCTION_RESERVED_0X0016
 
         vendor_device,
         vendor_interface,
@@ -967,7 +967,7 @@ urb_function_t* const urb_functions[] =
         get_configuration,
         get_interface,
 
-        get_descriptor_from_interface, 
+        get_descriptor_from_interface,
         set_descriptor_to_interface,
 
 	get_ms_feature_descriptor,
@@ -984,18 +984,18 @@ urb_function_t* const urb_functions[] =
         control_transfer, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
 	nullptr, // URB_FUNCTION_RESERVE_0X0033
-	nullptr, // URB_FUNCTION_RESERVE_0X0034                  
+	nullptr, // URB_FUNCTION_RESERVE_0X0034
 
 	open_static_streams,
 	pipe_request, // URB_FUNCTION_CLOSE_STATIC_STREAMS
-	
+
         bulk_or_interrupt_transfer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
         isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	nullptr, // 0x0039
-	nullptr, // 0x003A        
+	nullptr, // 0x003A
 	nullptr, // 0x003B
-	nullptr, // 0x003C        
+	nullptr, // 0x003C
 
 	get_isoch_pipe_transfer_path_delays // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
@@ -1027,7 +1027,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_get_port_status(ULONG &status)
 {
 	status = USBD_PORT_ENABLED | USBD_PORT_CONNECTED;
-	TraceUrb("-> PORT_ENABLED|PORT_CONNECTED"); 
+	TraceUrb("-> PORT_ENABLED|PORT_CONNECTED");
 	return STATUS_SUCCESS;
 }
 
@@ -1071,12 +1071,12 @@ NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  * 2.An upper driver cancels IRP.
  * 3.IRP is removed from CSQ, IO_CSQ_COMPLETE_CANCELED_IRP callback is called.
  * 4.The callback inserts IRP into a list of unlinked IRPs (this step is imaginary).
- * 
+ *
  * RET_SUBMIT can be received
  * a)Before #3 - normal case, IRP will be dequeued from CSQ.
  * b)Before #4 - IRP will not be found in CSQ and the list.
  * c)After #4 - IRP will be found in the list.
- * 
+ *
  * Case b) is unavoidable because CSQ library calls IO_CSQ_COMPLETE_CANCELED_IRP after releasing a lock.
  * For that reason the cancellation logic is simplified and list of unlinked IRPs is not used.
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
@@ -1113,10 +1113,10 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-        TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x", 
+        TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x",
 		  KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
 
-        auto status = STATUS_NOT_SUPPORTED;
+        NTSTATUS status{};
         auto vpdo = to_vpdo_or_null(devobj);
 
         if (!vpdo) {
@@ -1140,6 +1140,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		status = setup_topology_address(vpdo, *(USB_TOPOLOGY_ADDRESS*)irpstack->Parameters.Others.Argument1);
 		break;
         default:
+		status = STATUS_NOT_SUPPORTED;
                 Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
         }
 
