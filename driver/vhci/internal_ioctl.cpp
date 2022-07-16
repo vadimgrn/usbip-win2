@@ -60,15 +60,15 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (!irp) {
                 // nothing to do
         } else if (NT_SUCCESS(st.Status)) { // request has sent
-                auto stat = ((URB*)URB_FROM_IRP(irp))->UrbHeader.Status;
-
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s",
-                                  ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information,
-                                  (stat ? get_usbd_status(stat) : " "));
+                        if (auto stat = &static_cast<URB*>(URB_FROM_IRP(irp))->UrbHeader.Status) {
+                                TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s",
+                                          ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information,
+                                          (*stat ? get_usbd_status(*stat) : " "));
 
-                        IoCompleteRequest(irp, IO_NO_INCREMENT);
+                                IoCompleteRequest(irp, IO_NO_INCREMENT);
+                        }
                         break;
                 case ST_IRP_CANCELED:
                         complete_canceled_irp(irp);
@@ -853,8 +853,14 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbOSFeatureDescriptorRequest;
 
-	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, MS_FeatureDescriptorIndex %d",
-                  ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, r.MS_PageIndex, r.MS_FeatureDescriptorIndex);
+	TraceUrb("irp %04x -> TransferBufferLength %lu, %s, InterfaceNumber %d, MS_PageIndex %d, "
+                 "MS_FeatureDescriptorIndex %d, MS_VendorCode %#x",
+                  ptr4log(irp), r.TransferBufferLength, recipient(r.Recipient), r.InterfaceNumber, 
+                  r.MS_PageIndex, r.MS_FeatureDescriptorIndex, vpdo.MS_VendorCode);
+
+        if (!vpdo.MS_VendorCode) {
+                return STATUS_NOT_IMPLEMENTED;
+        }
 
         auto ctx = new_send_context(vpdo, irp);
         if (!ctx) {

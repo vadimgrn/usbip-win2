@@ -31,7 +31,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_urb_buffer(_In_ URB &urb)
 {
 	auto &r = AsUrbTransfer(urb);
-	
+
 	if (auto mdl = r.TransferBufferMDL) {
 		auto buf = MmGetSystemAddressForMdlSafe(mdl, NormalPagePriority | MdlMappingNoExecute);
 		if (!buf) {
@@ -100,7 +100,7 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 }
 
 /*
- * EP0 stall is not an error, control endpoint cannot stall. 
+ * EP0 stall is not an error, control endpoint cannot stall.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_configuration(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
@@ -117,12 +117,12 @@ NTSTATUS urb_select_configuration(vpdo_dev_t &vpdo, URB &urb, const usbip_header
 
 /*
  * usb_set_interface can return -EPIPE, especially if a device's interface has only one altsetting.
- * 
+ *
  * Note that control and isochronous endpoints don't halt, although control
  * endpoints report "protocol stall" (for unsupported requests) using the
  * same status code used to report a true stall.
  *
- * See: drivers/usb/core/message.c, usb_set_interface, usb_clear_halt. 
+ * See: drivers/usb/core/message.c, usb_set_interface, usb_clear_halt.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_interface(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
@@ -131,7 +131,7 @@ NTSTATUS urb_select_interface(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 
 	if (err == EndpointStalled) {
 		auto ifnum = urb.UrbSelectInterface.Interface.InterfaceNumber;
-		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d, InterfaceNumber %d, num_altsetting %d", 
+		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d, InterfaceNumber %d, num_altsetting %d",
 			get_usbd_status(err), hdr.u.ret_submit.status, ifnum,
 			get_intf_num_altsetting(vpdo.actconfig, ifnum));
 
@@ -170,12 +170,12 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		return err;
 	}
 
-	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, Index %d, LangId %#x %!BIN!", 
-		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId, 
+	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, Index %d, LangId %#x %!BIN!",
+		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId,
 		  WppBinary(dsc, USHORT(r.TransferBufferLength)));
 
 	if (r.DescriptorType == USB_DEVICE_DESCRIPTOR_TYPE) {
-		auto ok = r.TransferBufferLength == sizeof(vpdo.descriptor) && 
+		auto ok = r.TransferBufferLength == sizeof(vpdo.descriptor) &&
 			  RtlEqualMemory(dsc, &vpdo.descriptor, sizeof(vpdo.descriptor));
 
 		if (!ok) {
@@ -188,7 +188,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 }
 
 /*
- * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == src_len, 
+ * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == src_len,
  * src->offset is ignored for that reason.
  *
  * For isochronous packets: actual length is the sum of
@@ -197,14 +197,14 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
  * padding between the packets. To optimally use the
  * bandwidth the padding is not transmitted.
  *
- * See: 
+ * See:
  * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto copy_isoc_data(
-	_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf, 
-	_Inout_ vpdo_dev_t &src_buf, _In_ ULONG src_len, 
+	_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf,
+	_Inout_ vpdo_dev_t &src_buf, _In_ ULONG src_len,
 	_Out_ usbip_iso_packet_descriptor *sd, _In_ size_t sd_len)
 {
 	auto dir_out = !dst_buf;
@@ -217,7 +217,7 @@ auto copy_isoc_data(
 
 	byteswap(sd, r.NumberOfPackets);
 
-	WskDataCopyState consume;
+	WskDataCopyState state;
 	ULONG src_offset = 0; // from src_buf
 	auto dd = r.IsoPacket;
 
@@ -250,18 +250,18 @@ auto copy_isoc_data(
 		}
 
 		if (src_offset + sd->actual_length > src_len) {
-			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)", 
+			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)",
 				                  src_offset, sd->actual_length, src_len);
 			return STATUS_INVALID_PARAMETER;
 		}
 
 		if (dd->Offset + sd->actual_length > r.TransferBufferLength) {
-			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) + src.actual_length(%u) > r.TransferBufferLength(%lu)", 
+			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) + src.actual_length(%u) > r.TransferBufferLength(%lu)",
 				                  dd->Offset, sd->actual_length, r.TransferBufferLength);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length, &consume)) {
+		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length, &state)) {
 			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
 			return err;
 		}
@@ -341,7 +341,7 @@ NTSTATUS urb_function_unexpected(vpdo_dev_t&, URB &urb, const usbip_header&)
 	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) must never be called, internal logic error", urb_function_str(func), func);
 
 	return STATUS_INTERNAL_ERROR;
-}	
+}
 
 using urb_function_t = NTSTATUS(vpdo_dev_t&, URB&, const usbip_header&);
 
@@ -363,7 +363,7 @@ urb_function_t* const urb_functions[] =
 	urb_isoch_transfer,
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
-	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE 
+	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE
 
 	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
@@ -377,13 +377,13 @@ urb_function_t* const urb_functions[] =
 	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
 	urb_function_generic, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
 
-	nullptr, // URB_FUNCTION_RESERVED_0X0016          
+	nullptr, // URB_FUNCTION_RESERVED_0X0016
 
 	urb_function_generic, // URB_FUNCTION_VENDOR_DEVICE
 	urb_function_generic, // URB_FUNCTION_VENDOR_INTERFACE
 	urb_function_generic, // URB_FUNCTION_VENDOR_ENDPOINT
 
-	urb_function_generic, // URB_FUNCTION_CLASS_DEVICE 
+	urb_function_generic, // URB_FUNCTION_CLASS_DEVICE
 	urb_function_generic, // URB_FUNCTION_CLASS_INTERFACE
 	urb_function_generic, // URB_FUNCTION_CLASS_ENDPOINT
 
@@ -421,7 +421,7 @@ urb_function_t* const urb_functions[] =
 	urb_function_generic, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
 	nullptr, // URB_FUNCTION_RESERVE_0X0033
-	nullptr, // URB_FUNCTION_RESERVE_0X0034                  
+	nullptr, // URB_FUNCTION_RESERVE_0X0034
 
 	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
 	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
@@ -429,15 +429,15 @@ urb_function_t* const urb_functions[] =
 	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	nullptr, // 0x0039
-	nullptr, // 0x003A        
-	nullptr, // 0x003B        
-	nullptr, // 0x003C        
+	nullptr, // 0x003A
+	nullptr, // 0x003B
+	nullptr, // 0x003C
 
 	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
-	
+
 /*
- * If response from a server has data (actual_length > 0), URB function MUST copy it to URB 
+ * If response from a server has data (actual_length > 0), URB function MUST copy it to URB
  * even if UrbHeader.Status != USBD_STATUS_SUCCESS.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -501,8 +501,8 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	if (old_status == ST_SEND_COMPLETE) {
 		auto stat = urb ? urb->UrbHeader.Status : USBD_STATUS_SUCCESS;
 
-		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s", 
-			  ptr4log(irp), st, irp->IoStatus.Information, 
+		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s",
+			  ptr4log(irp), st, irp->IoStatus.Information,
 			  (stat ? get_usbd_status(stat) : " "));
 
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
@@ -515,7 +515,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
  *
  * USBIP_RET_UNLINK
  * 1) if UNLINK is successful, status is -ECONNRESET
- * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0 
+ * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -547,13 +547,13 @@ auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 	auto &base = hdr.base;
 
 	if (is_valid_seqnum(base.seqnum)) { // already read
-		return 0;
+		return true;
 	}
 
 	if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
 		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
-		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err); 
-		return -1;
+		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err);
+		return false;
 	}
 
 	byteswap_header(hdr, swap_dir::net2host);
@@ -562,17 +562,18 @@ auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
 
 	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
-		return 1;
+		return false;
 	}
 
-	if (is_valid_seqnum(base.seqnum)) {
+	auto ok = is_valid_seqnum(base.seqnum);
+
+	if (ok) {
 		base.direction = extract_dir(base.seqnum); // always zero in server response
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum");
-		return 1;
+		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum %u", base.seqnum);
 	}
 
-	return 0;
+	return ok;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -582,17 +583,15 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 
 	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); invalidate(hdr)) {
 
-		if (auto n = get_header(hdr, vpdo)) {
-			if (n > 0) {
-				NT_VERIFY(!wsk_data_release(vpdo, sizeof(hdr)));
-			}
+		if (!get_header(hdr, vpdo)) {
+			vhub_unplug_vpdo(&vpdo);
 			avail = 0; // invalidate header and break the loop
 			continue;
 		}
 
 		avail -= sizeof(hdr);
 		auto payload_size = get_payload_size(hdr);
-		
+
 		if (avail >= payload_size) {
 			NT_VERIFY(!wsk_data_release(vpdo, sizeof(hdr)));
 		} else {
@@ -606,6 +605,8 @@ void receive_event(_Inout_ vpdo_dev_t &vpdo)
 			NT_VERIFY(!wsk_data_release(vpdo, payload_size));
 			avail -= payload_size;
 		}
+
+		NT_ASSERT(avail == wsk_data_size(vpdo));
 	}
 }
 
@@ -626,7 +627,7 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
  * if DataIndication is NULL, the socket is no longer functional and must be closed ASAP.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags, 
+NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
 	_In_opt_ WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T* /*BytesAccepted*/)
 {
         auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);

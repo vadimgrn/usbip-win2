@@ -21,8 +21,6 @@
 namespace
 {
 
-const WSK_CLIENT_CONNECTION_DISPATCH g_dispatch{ WskReceiveEvent, WskDisconnectEvent };
-
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void log(const usbip_usb_device &d)
 {
@@ -729,8 +727,10 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
                 return make_error(ERR_NETWORK);
         }
 
+        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ WskReceiveEvent, WskDisconnectEvent };
+
         NT_ASSERT(!vpdo.sock);
-        vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &g_dispatch, ai, try_connect, nullptr);
+        vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &dispatch, ai, try_connect, nullptr);
 
         wsk::free(ai);
         return make_error(vpdo.sock ? ERR_NONE : ERR_NETWORK);

@@ -34,7 +34,7 @@ void wsk_data_append(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataInd
 	}
 
 	vpdo.wsk_data_tail = wsk::tail(DataIndication);
-	TraceWSK("DATA_INDICATION %04x, size %Iu", ptr4log(DataIndication), BytesIndicated);
+	TraceWSK("DataIndication %04x, BytesIndicated %Iu", ptr4log(DataIndication), BytesIndicated);
 }
 
 /*
@@ -57,7 +57,7 @@ size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 
 		const auto &buf = head->Buffer;
 
-		if (buf.Length > offset + len) {
+		if (offset + len < buf.Length) {
 			offset += len; // BBBBBBBBBBB - buffer
 			len = 0;       // O...OL...L  - offset, len
 			break;
@@ -72,26 +72,31 @@ size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	}
 
 	if (victim != head) {
-		if (prev) {
-			NT_ASSERT(prev->Next == head);
-			prev->Next = nullptr;
-		}
+		prev->Next = nullptr;
 
 		NT_ASSERT(victim_size == wsk::size(victim));
 		NT_ASSERT(victim_size + wsk::size(head) == old_size);
+		auto head_size = old_size - victim_size;
+
+		auto bytes_avail = head_size - offset;
+		NT_ASSERT(bytes_avail == wsk_data_size(vpdo));
 
 		if (auto err = release(vpdo.sock, victim)) {
-			Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION %04x release %!STATUS!", ptr4log(victim), err);
+			Trace(TRACE_LEVEL_ERROR, "release(%04x) %!STATUS!", ptr4log(victim), err);
 		} else {
-			TraceWSK("DATA_INDICATION %04x: %d buffers(%Iu bytes) released, %Iu bytes available from offset %Iu", 
-				  ptr4log(victim), victim_cnt, victim_size, old_size - victim_size, offset);
+			TraceWSK("Old head %04x -> %d nodes(%Iu bytes) released, "
+				 "new head %04x -> %Iu/%Iu bytes available from offset %Iu",
+				  ptr4log(victim), victim_cnt, victim_size, 
+				  ptr4log(head), bytes_avail, head_size, offset);
 		}
 	} else {
-		TraceWSK("DATA_INDICATION %04x: %Iu bytes available from offset %Iu", ptr4log(head), old_size - offset, offset);
+		auto bytes_avail = old_size - offset;
+		NT_ASSERT(bytes_avail == wsk_data_size(vpdo));
+		TraceWSK("Head %04x -> %Iu/%Iu bytes available from offset %Iu", ptr4log(head), bytes_avail, old_size, offset);
 	}
 
 	NT_ASSERT(check_wsk_data_offset(vpdo.wsk_data, vpdo.wsk_data_offset));
-	return len; 
+	return len;
 }
 
 size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
@@ -101,14 +106,14 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
 
 /*
  * Calls for each usbip_iso_packet_descriptor[] for isoc transfer, do not use logging.
- * 
+ *
  * @param offset to copy from, will be ignored for each next call if consume is used
- * @param consume resume copying from the last position, the same effect as if call wsk_data_consume after wsk_data_copy,
- *      but the internal state is saved in this parameter and wsk_data/wsk_data_offset are not affected
+ * @param state resume copying from the last position, the same effect as if call wsk_data_consume after wsk_data_copy,
+ *        but the internal state is saved in this parameter and wsk_data/wsk_data_offset are not affected
  */
 NTSTATUS wsk_data_copy(
-	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len, 
-	_Inout_opt_ WskDataCopyState *consume, _Out_opt_ size_t *actual)
+	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len,
+	_Inout_opt_ WskDataCopyState *state, _Out_opt_ size_t *actual)
 {
 	if (actual) {
 		*actual = 0;
@@ -116,12 +121,12 @@ NTSTATUS wsk_data_copy(
 
 	auto cur = vpdo.wsk_data;
 
-	if (consume && consume->next) {
-		if (!check_wsk_data_offset(consume->cur, consume->offset)) {
+	if (state && state->next) {
+		if (!check_wsk_data_offset(state->cur, state->offset)) {
 			return STATUS_INVALID_PARAMETER;
 		}
-		cur = consume->cur;
-		offset = consume->offset;
+		cur = state->cur;
+		offset = state->offset;
 	} else {
 		offset += vpdo.wsk_data_offset;
 	}
@@ -143,9 +148,9 @@ NTSTATUS wsk_data_copy(
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 
-		sysaddr += buf.Offset + offset;        
+		sysaddr += buf.Offset + offset;
 		auto remaining = buf.Length - offset;
-		
+
 		auto cnt = min(len, remaining);
 		RtlCopyMemory(dest, sysaddr, cnt);
 
@@ -163,11 +168,11 @@ NTSTATUS wsk_data_copy(
 		}
 	}
 
-	if (consume) {
-		consume->cur = cur;
-		consume->offset = offset;
-		consume->next = true;
+	if (state) {
+		state->cur = cur;
+		state->offset = offset;
+		state->next = true;
 	}
-	
+
 	return len ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
 }
