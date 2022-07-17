@@ -151,24 +151,24 @@ PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 
         auto use_intf = vpdo.actconfig->bNumInterfaces == 1 && !(vpdo.bDeviceClass || vpdo.bDeviceSubClass || vpdo.bDeviceProtocol);
         if (!use_intf) {
-                return true;
+                return ERR_NONE;
         }
 
 	auto d = dsc_find_next_intf(vpdo.actconfig, nullptr);
 	if (!d) {
 		Trace(TRACE_LEVEL_ERROR, "Interface descriptor not found");
-		return false;
+		return ERR_GENERAL;
 	}
 
 	vpdo.bDeviceClass = d->bInterfaceClass;
 	vpdo.bDeviceSubClass = d->bInterfaceSubClass;
 	vpdo.bDeviceProtocol = d->bInterfaceProtocol;
 
-	Trace(TRACE_LEVEL_INFORMATION, "Set Class(%#02x)/SubClass(%#02x)/Protocol(%#02x) from bInterfaceNumber %d, bAlternateSetting %d",
-					vpdo.bDeviceClass, vpdo.bDeviceSubClass, vpdo.bDeviceProtocol,
-					d->bInterfaceNumber, d->bAlternateSetting);
+	TraceDbg("Set Class(%#02x)/SubClass(%#02x)/Protocol(%#02x) from bInterfaceNumber %d, bAlternateSetting %d",
+		  vpdo.bDeviceClass, vpdo.bDeviceSubClass, vpdo.bDeviceProtocol,
+		  d->bInterfaceNumber, d->bAlternateSetting);
 
-	return true;
+	return ERR_NONE;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -405,7 +405,7 @@ PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
+inline PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
@@ -431,7 +431,7 @@ PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE auto realloc_string_descriptors(_Inout_ vpdo_dev_t &vpdo, _In_ int cnt)
+inline PAGEABLE auto realloc_string_descriptors(_Inout_ vpdo_dev_t &vpdo, _In_ int cnt)
 {
         PAGED_CODE();
 
@@ -457,7 +457,7 @@ PAGEABLE auto realloc_string_descriptors(_Inout_ vpdo_dev_t &vpdo, _In_ int cnt)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
+inline PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
         NT_ASSERT(!vpdo.strings_cnt);
@@ -540,6 +540,14 @@ PAGEABLE void init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
         vpdo.bDeviceProtocol = d.bDeviceProtocol;
 }
 
+/*
+        if (auto err = read_string_descriptors(vpdo)) {
+                return err;
+        }
+
+        read_os_string_descriptor(vpdo);
+        return ERR_NONE;
+*/
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
 {
@@ -573,16 +581,7 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
                 return ERR_GENERAL;
         }
 
-        if (!set_class_subclass_proto(vpdo)) {
-                return ERR_GENERAL;
-        }
-        
-        if (auto err = read_string_descriptors(vpdo)) {
-                return err;
-        }
-
-        read_os_string_descriptor(vpdo);
-        return ERR_NONE;
+        return set_class_subclass_proto(vpdo);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
