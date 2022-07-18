@@ -60,7 +60,7 @@ public:
         NTSTATUS prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode = DEF_ACCESS_MODE);
         void unprepare();
 
-        auto sysaddr(_In_ ULONG Priority = NormalPagePriority | MdlMappingNoExecute)
+        auto sysaddr(_In_ ULONG Priority = LowPagePriority | MdlMappingNoExecute)
         { 
                 return m_mdl ? MmGetSystemAddressForMdlSafe(m_mdl, Priority) : nullptr; 
         }

@@ -62,13 +62,10 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         } else if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
                 case ST_RECV_COMPLETE:
-                        if (auto stat = &static_cast<URB*>(URB_FROM_IRP(irp))->UrbHeader.Status) {
-                                TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s",
-                                          ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information,
-                                          (*stat ? get_usbd_status(*stat) : " "));
+                        TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix",
+                                  ptr4log(irp), irp->IoStatus.Status, irp->IoStatus.Information);
 
-                                IoCompleteRequest(irp, IO_NO_INCREMENT);
-                        }
+                        IoCompleteRequest(irp, IO_NO_INCREMENT);
                         break;
                 case ST_IRP_CANCELED:
                         complete_canceled_irp(irp);

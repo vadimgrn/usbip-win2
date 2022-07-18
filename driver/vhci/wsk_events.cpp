@@ -33,7 +33,7 @@ auto get_urb_buffer(_In_ URB &urb)
 	auto &r = AsUrbTransfer(urb);
 
 	if (auto mdl = r.TransferBufferMDL) {
-		auto buf = MmGetSystemAddressForMdlSafe(mdl, NormalPagePriority | MdlMappingNoExecute);
+		auto buf = MmGetSystemAddressForMdlSafe(mdl, LowPagePriority | MdlMappingNoExecute);
 		if (!buf) {
 			Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
 		}
@@ -70,7 +70,7 @@ auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto assign(ULONG &TransferBufferLength, int actual_length)
 {
-	bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
+	bool ok = actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength;
 	TransferBufferLength = ok ? actual_length : 0;
 
 	return ok ? STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
@@ -217,7 +217,6 @@ auto copy_isoc_data(
 
 	byteswap(sd, r.NumberOfPackets);
 
-	WskDataCopyState state;
 	ULONG src_offset = 0; // from src_buf
 	auto dd = r.IsoPacket;
 
@@ -261,7 +260,7 @@ auto copy_isoc_data(
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length, &state)) {
+		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length)) {
 			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
 			return err;
 		}
@@ -297,12 +296,12 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 		r.StartFrame = res.start_frame;
 	}
 
-	if (!(cnt >= 0 && (ULONG)cnt == r.NumberOfPackets)) {
+	if (!(cnt >= 0 && ULONG(cnt) == r.NumberOfPackets)) {
 		Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r.NumberOfPackets);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (!(res.actual_length >= 0 && (ULONG)res.actual_length <= r.TransferBufferLength)) {
+	if (!(res.actual_length >= 0 && ULONG(res.actual_length) <= r.TransferBufferLength)) {
 		Trace(TRACE_LEVEL_ERROR, "actual_length(%d) > TransferBufferLength(%lu)", res.actual_length, r.TransferBufferLength);
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -480,12 +479,12 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 {
 	auto stack = IoGetCurrentIrpStackLocation(irp);
 	auto &st = irp->IoStatus.Status;
-	URB *urb{};
 
         switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
         case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		urb = (URB*)URB_FROM_IRP(irp);
-		st = usb_submit_urb(vpdo, *urb, hdr);
+		if (auto urb = static_cast<URB*>(URB_FROM_IRP(irp))) {
+			st = usb_submit_urb(vpdo, *urb, hdr);
+		}
                 break;
         case IOCTL_INTERNAL_USB_RESET_PORT:
                 st = usb_reset_port(hdr);
@@ -499,12 +498,7 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		auto stat = urb ? urb->UrbHeader.Status : USBD_STATUS_SUCCESS;
-
-		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix %s",
-			  ptr4log(irp), st, irp->IoStatus.Information,
-			  (stat ? get_usbd_status(stat) : " "));
-
+		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 }

@@ -34,7 +34,7 @@ void wsk_data_append(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataInd
 	}
 
 	vpdo.wsk_data_tail = wsk::tail(DataIndication);
-	TraceWSK("DataIndication %04x, BytesIndicated %Iu", ptr4log(DataIndication), BytesIndicated);
+	TraceWSK("%04x, %Iu bytes", ptr4log(DataIndication), BytesIndicated);
 }
 
 /*
@@ -83,12 +83,13 @@ size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 
 		if (auto err = release(vpdo.sock, victim)) {
 			Trace(TRACE_LEVEL_ERROR, "release(%04x) %!STATUS!", ptr4log(victim), err);
+		} else if (head) {
+			TraceWSK("Head %04x released -> %d nodes(%Iu bytes), new head %04x -> %Iu/%Iu bytes available from offset %Iu",
+				      ptr4log(victim), victim_cnt, victim_size, ptr4log(head), bytes_avail, head_size, offset);
 		} else {
-			TraceWSK("Old head %04x -> %d nodes(%Iu bytes) released, "
-				 "new head %04x -> %Iu/%Iu bytes available from offset %Iu",
-				  ptr4log(victim), victim_cnt, victim_size, 
-				  ptr4log(head), bytes_avail, head_size, offset);
+			TraceWSK("Head %04x released -> %d nodes(%Iu bytes)", ptr4log(victim), victim_cnt, victim_size);
 		}
+
 	} else {
 		auto bytes_avail = old_size - offset;
 		NT_ASSERT(bytes_avail == wsk_data_size(vpdo));
@@ -106,73 +107,67 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
 
 /*
  * Calls for each usbip_iso_packet_descriptor[] for isoc transfer, do not use logging.
- *
- * @param offset to copy from, will be ignored for each next call if consume is used
- * @param state resume copying from the last position, the same effect as if call wsk_data_consume after wsk_data_copy,
- *        but the internal state is saved in this parameter and wsk_data/wsk_data_offset are not affected
  */
 NTSTATUS wsk_data_copy(
-	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t len,
-	_Inout_opt_ WskDataCopyState *state, _Out_opt_ size_t *actual)
+	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t length, _Out_opt_ size_t *actual)
 {
 	if (actual) {
 		*actual = 0;
 	}
 
-	auto cur = vpdo.wsk_data;
+	offset += vpdo.wsk_data_offset;
 
-	if (state && state->next) {
-		if (!check_wsk_data_offset(state->cur, state->offset)) {
-			return STATUS_INVALID_PARAMETER;
-		}
-		cur = state->cur;
-		offset = state->offset;
-	} else {
-		offset += vpdo.wsk_data_offset;
-	}
+	for (auto di = vpdo.wsk_data; di && length; di = di->Next) {
 
-	for ( ; cur && len; cur = cur->Next) {
+		auto &buf = di->Buffer;
+		auto chain_length = buf.Length; 
 
-		const auto &buf = cur->Buffer;
-
-		if (offset >= buf.Length) {
-			offset -= buf.Length;
+		if (offset >= chain_length) {
+			offset -= chain_length;
 			continue;
 		}
 
-		const ULONG priority = NormalPagePriority | MdlMappingNoWrite | MdlMappingNoExecute;
+		auto first_offset = buf.Offset; // within first MDL of the chain
 
-		auto sysaddr = (char*)MmGetSystemAddressForMdlSafe(buf.Mdl, priority);
-		if (!sysaddr) {
-			Trace(TRACE_LEVEL_ERROR, "DATA_INDICATION %04x: MmGetSystemAddressForMdlSafe error", ptr4log(cur));
-			return STATUS_INSUFFICIENT_RESOURCES;
-		}
+		for (auto mdl = buf.Mdl; mdl && chain_length && length; mdl = mdl->Next, first_offset = 0) { 
 
-		sysaddr += buf.Offset + offset;
-		auto remaining = buf.Length - offset;
+			auto mdl_size = MmGetMdlByteCount(mdl);
+			auto avail = min(mdl_size - first_offset, chain_length);
 
-		auto cnt = min(len, remaining);
-		RtlCopyMemory(dest, sysaddr, cnt);
+			if (offset >= avail) {
+				offset -= avail;
+				chain_length -= avail;
+				continue;
+			}
 
-		dest = static_cast<char*>(dest) + cnt;
-		len -= cnt;
-		if (actual) {
-			*actual += cnt;
-		}
+			auto remaining = avail - offset;
+			auto cnt = min(remaining, length);
 
-		if (cnt < remaining) { // BBBBBBBBBB - buffer
-			offset += cnt; // OOOOL...L  - offset, len
-			break;
-		} else {               // BBBBBBBBBB - buffer
-			offset = 0;    // OOOOOOOOOL...L - max offset, len
-		}
-	}
+			const ULONG priority = LowPagePriority | MdlMappingNoWrite | MdlMappingNoExecute;
 
-	if (state) {
-		state->cur = cur;
-		state->offset = offset;
-		state->next = true;
-	}
+			auto src = (char*)MmGetSystemAddressForMdlSafe(mdl, priority);
+			if (!src) {
+				Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
+				return STATUS_INSUFFICIENT_RESOURCES; 
+			}
 
-	return len ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
+			RtlCopyMemory(dest, src + first_offset + offset, cnt); 
+
+			reinterpret_cast<char*&>(dest) += cnt;
+			length -= cnt;
+			if (actual) {
+				*actual += cnt;
+			}
+
+			chain_length -= offset + cnt;
+
+			if (cnt < remaining) {
+				offset += cnt;
+			} else {
+				offset = 0;
+			}
+		} 
+	} 
+
+	return length ? STATUS_BUFFER_TOO_SMALL : STATUS_SUCCESS;
 }
