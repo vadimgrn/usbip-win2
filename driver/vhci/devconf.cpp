@@ -55,43 +55,50 @@ inline auto get_interface_number(USBD_INTERFACE_HANDLE handle)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void set_pipe(USBD_PIPE_INFORMATION *pipe, USB_ENDPOINT_DESCRIPTOR *ep_desc, usb_device_speed speed)
+void set_pipe(_Out_ USBD_PIPE_INFORMATION &pipe, _In_ const USB_ENDPOINT_DESCRIPTOR &epd, _In_ usb_device_speed speed)
 {
-	pipe->MaximumPacketSize = ep_desc->wMaxPacketSize;
+	pipe.MaximumPacketSize = epd.wMaxPacketSize;
 
 	/* From usb_submit_urb in linux */
-	if (pipe->PipeType == UsbdPipeTypeIsochronous && speed == USB_SPEED_HIGH) {
-		USHORT	mult = 1 + ((pipe->MaximumPacketSize >> 11) & 0x03);
-		pipe->MaximumPacketSize &= 0x7ff;
-		pipe->MaximumPacketSize *= mult;
+	if (pipe.PipeType == UsbdPipeTypeIsochronous && speed == USB_SPEED_HIGH) {
+		USHORT	mult = 1 + ((pipe.MaximumPacketSize >> 11) & 0x03);
+		pipe.MaximumPacketSize &= 0x7ff;
+		pipe.MaximumPacketSize *= mult;
 	}
 
-	pipe->EndpointAddress = ep_desc->bEndpointAddress;
-	pipe->Interval = ep_desc->bInterval;
-	pipe->PipeType = static_cast<USBD_PIPE_TYPE>(ep_desc->bmAttributes & USB_ENDPOINT_TYPE_MASK);
+	pipe.EndpointAddress = epd.bEndpointAddress;
+	pipe.Interval = epd.bInterval;
+	pipe.PipeType = static_cast<USBD_PIPE_TYPE>(epd.bmAttributes & USB_ENDPOINT_TYPE_MASK);
 
-	pipe->PipeHandle = make_pipe_handle(ep_desc->bEndpointAddress, pipe->PipeType, ep_desc->bInterval);
-	NT_ASSERT(pipe->PipeHandle);
-	NT_ASSERT(is_endpoint_direction_in(pipe->PipeHandle) == (bool)USBD_PIPE_DIRECTION_IN(pipe));
+	pipe.PipeHandle = make_pipe_handle(epd.bEndpointAddress, pipe.PipeType, epd.bInterval);
+	NT_ASSERT(pipe.PipeHandle);
+	NT_ASSERT(is_endpoint_direction_in(pipe.PipeHandle) == (bool)USBD_PIPE_DIRECTION_IN(&pipe));
 
-	pipe->MaximumTransferSize = 0; // is not used and does not contain valid data
-	pipe->PipeFlags = 0; // USBD_PF_CHANGE_MAX_PACKET if override MaximumPacketSize
+	pipe.MaximumTransferSize = 0; // is not used and does not contain valid data
+	pipe.PipeFlags = 0; // USBD_PF_CHANGE_MAX_PACKET if override MaximumPacketSize
 }
 
 struct init_ep_data
 {
-	USBD_PIPE_INFORMATION *pi;
+	USBD_INTERFACE_INFORMATION &iface;
 	usb_device_speed speed;
 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-bool init_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
+_Function_class_(for_each_ep_fn)
+NTSTATUS init_ep(int i, const USB_ENDPOINT_DESCRIPTOR &epd, void *data)
 {
-	auto params = static_cast<init_ep_data*>(data);
-	auto pi = params->pi + i;
-
-	set_pipe(pi, d, params->speed);
-	return false;
+	auto &r = *static_cast<init_ep_data*>(data);
+	auto cnt = r.iface.NumberOfPipes;
+	
+	if (ULONG(i) < cnt) {
+		auto &pipe = r.iface.Pipes[i];
+		set_pipe(pipe, epd, r.speed);
+		return STATUS_SUCCESS;
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Endpoint index %d, NumberOfPipes %lu", i, cnt);
+		return STATUS_INVALID_PARAMETER;
+	}
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -163,11 +170,9 @@ NTSTATUS setup_intf(USBD_INTERFACE_INFORMATION *intf, usb_device_speed speed, US
 	NT_ASSERT(intf->InterfaceHandle);
 
 	intf->NumberOfPipes = ifd->bNumEndpoints;
+	init_ep_data data{ *intf, speed };
 
-	init_ep_data data{ intf->Pipes, speed };
-	dsc_for_each_endpoint(cfgd, ifd, init_ep, &data);
-
-	return STATUS_SUCCESS;
+	return for_each_endpoint(cfgd, ifd, init_ep, &data);
 }
 
 /*

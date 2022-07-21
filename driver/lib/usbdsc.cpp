@@ -36,28 +36,24 @@ int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_n
 	return cnt;
 }
 
-void *dsc_for_each_endpoint(
-	USB_CONFIGURATION_DESCRIPTOR *dsc_conf,
-	USB_INTERFACE_DESCRIPTOR *dsc_intf,
-	dsc_for_each_ep_fn *func,
-	void *data)
+NTSTATUS for_each_endpoint(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn &func, void *data)
 {
-	auto cur = (USB_COMMON_DESCRIPTOR*)dsc_intf;
+	auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(iface);
 
-	for (int i = 0; i < dsc_intf->bNumEndpoints; ++i) {
+	for (int i = 0; i < iface->bNumEndpoints; ++i) {
 
-		cur = dsc_find_next(dsc_conf, cur, USB_ENDPOINT_DESCRIPTOR_TYPE);
+		cur = dsc_find_next(cfg, cur, USB_ENDPOINT_DESCRIPTOR_TYPE);
 		if (!cur) {
-			NT_ASSERT(!"endpoint expected");
-			break;
+			NT_ASSERT(!"Endpoint not found");
+			return STATUS_NO_MORE_MATCHES;
 		}
 
-		if (func(i, (USB_ENDPOINT_DESCRIPTOR*)cur, data)) {
-			return cur;
+		if (auto err = func(i, *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur), data)) {
+			return err;
 		}
 	}
 
-	return nullptr;
+	return STATUS_SUCCESS;
 }
 
 bool is_valid(const USB_DEVICE_DESCRIPTOR &d)

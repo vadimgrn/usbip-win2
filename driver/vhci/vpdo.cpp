@@ -9,7 +9,7 @@
 namespace
 {
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto to_dev_speed(usb_device_speed speed)
 {
 	PAGED_CODE();
@@ -30,7 +30,7 @@ PAGEABLE auto to_dev_speed(usb_device_speed speed)
 	}
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void set_speed(USB_NODE_CONNECTION_INFORMATION_EX &ci, usb_device_speed speed, bool ex)
 {
 	PAGED_CODE();
@@ -44,17 +44,23 @@ PAGEABLE void set_speed(USB_NODE_CONNECTION_INFORMATION_EX &ci, usb_device_speed
 	}
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE auto copy_ep(int i, USB_ENDPOINT_DESCRIPTOR *d, void *data)
+_IRQL_requires_(PASSIVE_LEVEL)
+_Function_class_(for_each_ep_fn)
+PAGEABLE NTSTATUS copy_endpoint(int i, const USB_ENDPOINT_DESCRIPTOR &d, void *data)
 {
 	PAGED_CODE();
 
-	auto pi = static_cast<USB_PIPE_INFO*>(data) + i;
+	auto &r = *static_cast<USB_NODE_CONNECTION_INFORMATION_EX*>(data);
 
-	RtlCopyMemory(&pi->EndpointDescriptor, d, sizeof(*d));
-	pi->ScheduleOffset = 0; // TODO
-
-	return false;
+	if (ULONG(i) < r.NumberOfOpenPipes) {
+		auto &p = r.PipeList[i];
+		RtlCopyMemory(&p.EndpointDescriptor, &d, sizeof(d));
+		p.ScheduleOffset = 0; // FIXME: TODO
+		return STATUS_SUCCESS;
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Endpoint index %d, NumberOfOpenPipes %lu, ", i, r.NumberOfOpenPipes);
+		return STATUS_INVALID_PARAMETER;
+	}
 }
 
 } // namespace
@@ -122,12 +128,16 @@ NTSTATUS vpdo_select_interface(vpdo_dev_t *vpdo, _URB_SELECT_INTERFACE *r)
 /*
  * vpdo is NULL if device is not plugged into the port.
  */
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_INFORMATION_EX &ci, ULONG &outlen, bool ex)
 {
 	PAGED_CODE();
 
-	TraceMsg("ConnectionIndex %lu", ci.ConnectionIndex); // input parameter
+	TraceMsg("ConnectionIndex %lu, vpdo %04x", ci.ConnectionIndex, ptr4log(vpdo)); // input parameter
+
+	NT_ASSERT(outlen >= sizeof(ci));
+	auto old_outlen = outlen;
+	outlen = sizeof(ci);
 
 	RtlZeroMemory(&ci.DeviceDescriptor, sizeof(ci.DeviceDescriptor));
 	ci.CurrentConfigurationValue = vpdo && vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
@@ -136,29 +146,36 @@ PAGEABLE NTSTATUS vpdo_get_nodeconn_info(vpdo_dev_t *vpdo, USB_NODE_CONNECTION_I
 	ci.DeviceAddress = vpdo ? static_cast<USHORT>(vpdo->port) : 0;
 	ci.NumberOfOpenPipes = 0;
 	ci.ConnectionStatus = vpdo ? DeviceConnected : NoDeviceConnected;
-	RtlIsZeroMemory(ci.PipeList, sizeof(*ci.PipeList));
 
 	if (!vpdo) {
-		outlen = sizeof(ci);
 		return STATUS_SUCCESS;
-	} else {
-		RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
 	}
+
+	RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
 
 	auto iface = vpdo->actconfig ? dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt) : nullptr;
 	if (iface) {
 		ci.NumberOfOpenPipes = iface->bNumEndpoints;
 	}
 
-	ULONG len = sizeof(ci) - sizeof(*ci.PipeList) + ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
-	auto status = STATUS_SUCCESS;
-
-	if (outlen < len) {
-		status = STATUS_BUFFER_TOO_SMALL;
-	} else if (ci.NumberOfOpenPipes > 0) {
-		dsc_for_each_endpoint(vpdo->actconfig, iface, copy_ep, ci.PipeList);
+	if (old_outlen == outlen) { // header only requested
+		return STATUS_SUCCESS;
 	}
 
-	outlen = max(len, sizeof(ci));
-	return status;
+	ULONG pipes_sz = ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
+	ULONG full_sz = outlen + pipes_sz;
+
+	outlen = full_sz;
+
+	if (old_outlen < full_sz) {
+		Trace(TRACE_LEVEL_ERROR, "NumberOfOpenPipes %lu, outlen %lu < %lu", ci.NumberOfOpenPipes, old_outlen, full_sz);
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	if (ci.NumberOfOpenPipes) {
+		RtlZeroMemory(ci.PipeList, pipes_sz);
+		return for_each_endpoint(vpdo->actconfig, iface, copy_endpoint, &ci);
+	}
+
+	return STATUS_SUCCESS;
 }
