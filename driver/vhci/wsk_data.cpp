@@ -39,9 +39,9 @@ void wsk_data_append(_Inout_ vpdo_dev_t &vpdo, _In_ WSK_DATA_INDICATION *DataInd
 
 /*
  * Return STATUS_PENDING from WskReceiveEvent, this function always releases WSK_DATA_INDICATION youself.
- * @return bytes left to consume
+ * @return bytes left to release
  */
-size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
+size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t length)
 {
 	auto &offset = vpdo.wsk_data_offset;
 
@@ -53,18 +53,18 @@ size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	int victim_cnt = 0;
 
 	WSK_DATA_INDICATION *prev{};
-	for ( ; head && len; prev = head, head = head->Next) {
+	for ( ; head && length; prev = head, head = head->Next) {
 
 		const auto &buf = head->Buffer;
 
-		if (offset + len < buf.Length) {
-			offset += len; // BBBBBBBBBBB - buffer
-			len = 0;       // O...OL...L  - offset, len
+		if (offset + length < buf.Length) {
+			offset += length; // BBBBBBBBBBB - buffer
+			length = 0;       // O...OL...L  - offset, length
 			break;
 		}
 
 		auto remaining = buf.Length - offset; // BBBBBBBBBB - buffer
-		len -= remaining;                     // OOOOOOOOOL...L - max offset, len
+		length -= remaining;                     // OOOOOOOOOL...L - max offset, length
 		offset = 0;
 
 		victim_size += buf.Length;
@@ -97,7 +97,7 @@ size_t wsk_data_release(_Inout_ vpdo_dev_t &vpdo, _In_ size_t len)
 	}
 
 	NT_ASSERT(check_wsk_data_offset(vpdo.wsk_data, vpdo.wsk_data_offset));
-	return len;
+	return length;
 }
 
 size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
@@ -108,13 +108,8 @@ size_t wsk_data_size(_In_ const vpdo_dev_t &vpdo)
 /*
  * Calls for each usbip_iso_packet_descriptor[] for isoc transfer, do not use logging.
  */
-NTSTATUS wsk_data_copy(
-	_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t length, _Out_opt_ size_t *actual)
+NTSTATUS wsk_data_copy(_In_ const vpdo_dev_t &vpdo, _Out_ void *dest, _In_ size_t offset, _In_ size_t length)
 {
-	if (actual) {
-		*actual = 0;
-	}
-
 	offset += vpdo.wsk_data_offset;
 
 	for (auto di = vpdo.wsk_data; di && length; di = di->Next) {
@@ -155,9 +150,6 @@ NTSTATUS wsk_data_copy(
 
 			reinterpret_cast<char*&>(dest) += cnt;
 			length -= cnt;
-			if (actual) {
-				*actual += cnt;
-			}
 
 			chain_length -= offset + cnt;
 
