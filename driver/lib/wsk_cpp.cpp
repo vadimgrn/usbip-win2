@@ -98,9 +98,12 @@ void socket_async_context::reset()
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS socket_async_context::completion(
-        _In_ PDEVICE_OBJECT, _In_ PIRP, _In_reads_opt_(_Inexpressible_("varies")) PVOID Context)
+        _In_ PDEVICE_OBJECT, _In_ PIRP irp, _In_reads_opt_(_Inexpressible_("varies")) PVOID Context)
 {
-        KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
+        if (irp->PendingReturned) {
+                KeSetEvent(static_cast<KEVENT*>(Context), IO_NETWORK_INCREMENT, false);
+        }
+
         return StopCompletion;
 }
 
