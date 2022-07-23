@@ -856,7 +856,8 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                   r.MS_PageIndex, r.MS_FeatureDescriptorIndex, vpdo.MS_VendorCode);
 
         if (!vpdo.MS_VendorCode) {
-                return STATUS_NOT_IMPLEMENTED;
+                urb.UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED;
+                return STATUS_SUCCESS;
         }
 
         auto ctx = new_send_context(vpdo, irp);

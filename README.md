@@ -18,10 +18,10 @@
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app
   - This implies low latency and high throughput, absence of frequent context switching and a lot of syscalls
-- [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented in both directions (send/receive)
+- [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented for send and one extra copy for receive
   - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
   - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data directly from URB transfer buffer
-  - [WskReceiveEvent](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive_event) buffers are directly copied to URB transfer buffer
+  - [WskReceiveEvent](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive_event) buffers are copied to URB transfer buffer
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - x86 build is removed

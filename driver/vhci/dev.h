@@ -116,10 +116,7 @@ struct vpdo_dev_t : vdev_t
 	UCHAR bDeviceProtocol;
 
 	UCHAR MS_VendorCode; // member of USB_OS_STRING_DESCRIPTOR
-
-	enum { STRINGS_CNT_MAX = MAXUCHAR + 1 };
-	USB_STRING_DESCRIPTOR* *strings; // array of pointers
-	int strings_cnt;
+	USB_STRING_DESCRIPTOR* strings[32]; // max size is MAXUCHAR + 1
 
 	USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 

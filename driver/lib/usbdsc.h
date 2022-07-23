@@ -44,3 +44,8 @@ inline auto get_string(USB_STRING_DESCRIPTOR &d)
 	UNICODE_STRING s{ len, len, d.bString };
 	return s;
 }
+
+inline void terminate_by_zero(_Inout_ USB_STRING_DESCRIPTOR &d)
+{
+	*reinterpret_cast<wchar_t*>((char*)&d + d.bLength) = L'\0';
+}

@@ -19,6 +19,7 @@
 #include "network.h"
 #include "send_context.h"
 #include "vhub.h"
+#include "vhci.h"
 #include "internal_ioctl.h"
 
 namespace
@@ -141,6 +142,51 @@ NTSTATUS urb_select_interface(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 	return err ? STATUS_UNSUCCESSFUL : vpdo_select_interface(&vpdo, &urb.UrbSelectInterface);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void cache_string_descriptor(
+	_Inout_ vpdo_dev_t& vpdo, _In_ UCHAR index, _In_ USHORT lang_id, _In_ const USB_STRING_DESCRIPTOR &src)
+{
+	if (src.bLength == sizeof(USB_COMMON_DESCRIPTOR)) {
+		TraceDbg("Skip empty string, index %d", index);
+		return;
+	}
+
+	if (index >= ARRAYSIZE(vpdo.strings)) {
+		TraceMsg("Can't save index %d in strings[%d]", index, ARRAYSIZE(vpdo.strings));
+		return;
+	}
+
+	auto &dest = vpdo.strings[index];
+	if (dest) {
+		USHORT sz = src.bLength - sizeof(USB_COMMON_DESCRIPTOR);
+		UNICODE_STRING str{ sz, sz, const_cast<WCHAR*>(src.bString) };
+		if (index) {
+			TraceDbg("strings[%d] -> '%!WSTR!', ignoring '%!USTR!'", index, dest->bString, &str);
+		} else {
+			TraceDbg("Ignoring list of supported languages");
+		}
+		return;
+	}
+	
+	auto sz = src.bLength + sizeof(*src.bString); // + L'\0'
+
+	auto sd = (USB_STRING_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, sz, USBIP_VHCI_POOL_TAG);
+	if (!sd) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
+		return;
+	}
+
+	RtlCopyMemory(sd, &src, src.bLength);
+	terminate_by_zero(*sd);
+	dest = sd;
+
+	if (index) {
+		TraceMsg("Index %d, LangId %#x, '%!WSTR!'", index, lang_id, dest->bString);
+	} else {
+		TraceMsg("List of supported languages%!BIN!", WppBinary(dest, dest->bLength));
+	}
+}
+
 /*
  * A request can read descriptor header or full descriptor to obtain its real size.
  * F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
@@ -161,7 +207,7 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 	const USB_COMMON_DESCRIPTOR *dsc{};
 
 	if (r.TransferBufferLength < sizeof(*dsc)) {
-		Trace(TRACE_LEVEL_ERROR, "usb descriptor's header expected: TransferBufferLength(%lu)", r.TransferBufferLength);
+		Trace(TRACE_LEVEL_ERROR, "Descriptor header expected, TransferBufferLength(%lu)", r.TransferBufferLength);
 		r.TransferBufferLength = 0;
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
@@ -174,14 +220,25 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId,
 		  WppBinary(dsc, USHORT(r.TransferBufferLength)));
 
-	if (r.DescriptorType == USB_DEVICE_DESCRIPTOR_TYPE) {
-		auto ok = r.TransferBufferLength == sizeof(vpdo.descriptor) &&
-			  RtlEqualMemory(dsc, &vpdo.descriptor, sizeof(vpdo.descriptor));
-
-		if (!ok) {
+	switch (r.DescriptorType) {
+	case USB_STRING_DESCRIPTOR_TYPE:
+		if (dsc->bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && dsc->bLength == r.TransferBufferLength) {
+			auto &sd = *reinterpret_cast<const USB_STRING_DESCRIPTOR*>(dsc);
+			auto &osd = *reinterpret_cast<const USB_OS_STRING_DESCRIPTOR*>(dsc);
+			if (is_valid(osd)) {
+				TraceMsg("MS_VendorCode %#x", osd.MS_VendorCode);
+				vpdo.MS_VendorCode = osd.MS_VendorCode;
+			} else if (is_valid(sd)) {
+				cache_string_descriptor(vpdo, r.Index, r.LanguageId, sd);
+			}
+		}
+		break;
+	case USB_DEVICE_DESCRIPTOR_TYPE:
+		if (!(r.TransferBufferLength == sizeof(vpdo.descriptor) && RtlEqualMemory(dsc, &vpdo.descriptor, sizeof(vpdo.descriptor)))) {
 			Trace(TRACE_LEVEL_ERROR, "Device descriptor is not the same");
 			vhub_unplug_vpdo(&vpdo);
 		}
+		break;
 	}
 
 	return STATUS_SUCCESS;

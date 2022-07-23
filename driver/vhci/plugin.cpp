@@ -59,7 +59,6 @@ inline void log(const USB_CONFIGURATION_DESCRIPTOR &d)
                 d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
 }
 
-
 /*
  * RtlFreeUnicodeString must be used to release memory.
  * @see RtlUTF8StringToUnicodeString
@@ -404,81 +403,36 @@ PAGEABLE auto read_config_descr(vpdo_dev_t &vpdo)
         return len == cd.wTotalLength ? ERR_NONE : ERR_GENERAL;
 }
 
+/*
+ * A device should return EPIPE on attempt to read string descriptor with invalid index.
+ * But some devices return EPROTO and fail all requests after that with this error.
+ * For this reason read existing strings only. 
+ * String index 0 should return a list of supported languages (always exists?).
+ */
 _IRQL_requires_(PASSIVE_LEVEL)
-inline PAGEABLE void read_os_string_descriptor(vpdo_dev_t &vpdo)
+PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
 
-        USB_OS_STRING_DESCRIPTOR d;
-        USHORT len = sizeof(d);
+        auto &dd = vpdo.descriptor;
 
-        if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, MS_OS_STRING_DESC_INDEX, 0, usbip::memory::stack, &d, len)) {
-                return;
-        }
+        UCHAR indexes[] { 0, dd.iManufacturer, dd.iProduct, dd.iSerialNumber, 
+                          vpdo.actconfig ? vpdo.actconfig->iConfiguration : UCHAR(0) };
 
-        if (len != sizeof(d)) {
-                return;
-        }
+        for (USHORT lang_id = 0; auto &idx: indexes) {
 
-        UNICODE_STRING sig{ sizeof(d.Signature), sizeof(d.Signature), d.Signature };
-
-        TraceDbg("bLength %d, %!usb_descriptor_type!, Signature '%!USTR!', MS_VendorCode %#x, Pad %d", 
-                  d.bLength, d.bDescriptorType, &sig, d.MS_VendorCode, d.Pad);
-
-        if (is_valid(d)) {
-                vpdo.MS_VendorCode = d.MS_VendorCode;
-        }
-}
-
-_IRQL_requires_max_(APC_LEVEL)
-inline PAGEABLE auto realloc_string_descriptors(_Inout_ vpdo_dev_t &vpdo, _In_ int cnt)
-{
-        PAGED_CODE();
-
-        NT_ASSERT(cnt > vpdo.strings_cnt);
-        NT_ASSERT(cnt <= vpdo.STRINGS_CNT_MAX);
-
-        auto len = cnt*sizeof(*vpdo.strings);
-
-        auto dest = (USB_STRING_DESCRIPTOR**)ExAllocatePool2(POOL_FLAG_NON_PAGED, len, USBIP_VHCI_POOL_TAG);
-        if (!dest) {
-                Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", len);
-                return ERR_GENERAL;
-        }
-
-        if (auto src = vpdo.strings) {
-                NT_ASSERT(vpdo.strings_cnt);
-                RtlCopyMemory(dest, src, vpdo.strings_cnt*sizeof(*vpdo.strings));
-                ExFreePoolWithTag(src, USBIP_VHCI_POOL_TAG);
-        }
-
-        vpdo.strings = dest;
-        return ERR_NONE;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-inline PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
-{
-        PAGED_CODE();
-        NT_ASSERT(!vpdo.strings_cnt);
-
-        int alloc_cnt = 0;
-        USHORT lang_id = 0;
-
-        for (UCHAR idx = 0; idx < vpdo.STRINGS_CNT_MAX; ++idx, ++vpdo.strings_cnt) {
-
-                if (idx >= alloc_cnt) {
-                        alloc_cnt = alloc_cnt ? 2*alloc_cnt : 8;
-                        if (auto err = realloc_string_descriptors(vpdo, alloc_cnt)) {
-                                return err;
-                        }
+                if (!idx && lang_id) {
+                        continue;
+                } else if (idx >= ARRAYSIZE(vpdo.strings)) {
+                        TraceMsg("Can't save index %d in strings[%d]", idx, ARRAYSIZE(vpdo.strings));
+                        continue;
                 }
 
                 USB_STRING_DESCRIPTOR hdr;
                 USHORT len = sizeof(hdr);
 
                 if (auto err = read_descr(vpdo, USB_STRING_DESCRIPTOR_TYPE, idx, lang_id, usbip::memory::stack, &hdr, len)) {
-                        break; // invalid string index, EPIPE
+                        break; // EPIPE?
                 }
 
                 if (!(len >= sizeof(USB_COMMON_DESCRIPTOR) && is_valid(hdr))) { // string length can be zero
@@ -488,7 +442,7 @@ inline PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
 
                 len = hdr.bLength;
                 if (len == sizeof(USB_COMMON_DESCRIPTOR)) {
-                        Trace(TRACE_LEVEL_WARNING, "Index %d, skip empty string", idx);
+                        TraceDbg("Index %d, skip empty string", idx);
                         continue;
                 }
 
@@ -508,7 +462,7 @@ inline PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                 }
 
                 if (len == hdr.bLength && is_valid(*sd) && sd->bLength == len) {
-                        *reinterpret_cast<wchar_t*>((char*)sd + sd->bLength) = L'\0';
+                        terminate_by_zero(*sd);
                         NT_ASSERT(!vpdo.strings[idx]);
                         vpdo.strings[idx] = sd;
                 } else {
@@ -521,7 +475,7 @@ inline PAGEABLE auto read_string_descriptors(vpdo_dev_t &vpdo)
                         TraceMsg("Index %d, LangId %#x, '%!WSTR!'", idx, lang_id, sd->bString);
                 } else {
                         TraceMsg("List of supported languages%!BIN!", WppBinary(sd, sd->bLength));
-                        lang_id = *hdr.bString; // Supported Language Code Zero, f.e. 0x0409 English - United States
+                        lang_id = *sd->bString; // Supported Language Code Zero, f.e. 0x0409 English - United States
                 }
         }
 
@@ -540,14 +494,6 @@ PAGEABLE void init(vpdo_dev_t &vpdo, const USB_DEVICE_DESCRIPTOR &d)
         vpdo.bDeviceProtocol = d.bDeviceProtocol;
 }
 
-/*
-        if (auto err = read_string_descriptors(vpdo)) {
-                return err;
-        }
-
-        read_os_string_descriptor(vpdo);
-        return ERR_NONE;
-*/
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
 {
@@ -579,6 +525,10 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
         if (is_configured(udev) && !is_same_device(udev, *vpdo.actconfig)) {
                 Trace(TRACE_LEVEL_ERROR, "USB_CONFIGURATION_DESCRIPTOR mismatches op_import_reply.udev");
                 return ERR_GENERAL;
+        }
+
+        if (auto err = read_string_descriptors(vpdo)) {
+                return err;
         }
 
         return set_class_subclass_proto(vpdo);
