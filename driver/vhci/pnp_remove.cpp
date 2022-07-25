@@ -178,10 +178,6 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
                 vpdo.actconfig = nullptr;
 	}
-
-	if (!InterlockedDecrement(&VpdoCount)) {
-		ExFlushLookasideListEx(&send_context_list);
-	}
 }
 
 } // namespace

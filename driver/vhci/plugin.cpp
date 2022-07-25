@@ -181,8 +181,6 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
                 return make_error(ERR_GENERAL);
         }
 
-        InterlockedIncrement(&VpdoCount);
-
         vpdo = to_vpdo_or_null(devobj);
         vpdo->parent = vhub_from_vhci(vhci);
 

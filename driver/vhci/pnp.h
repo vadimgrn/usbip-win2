@@ -18,8 +18,6 @@
 	L"&REV_" VHUB_REV
 
 
-inline LONG VpdoCount;
-
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void set_state(vdev_t &vdev, pnp_state state);
 
