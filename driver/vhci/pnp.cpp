@@ -64,12 +64,9 @@ PAGEABLE NTSTATUS pnp_stop_device(vdev_t *vdev, IRP *irp)
 	return irp_pass_down_or_complete(vdev, irp);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto device_can_be_removed(_In_ vdev_t *vdev)
+inline auto device_can_be_removed(_In_ vdev_t *vdev)
 {
-	PAGED_CODE();
-	LARGE_INTEGER timeout{};
-	return !KeWaitForSingleObject(&vdev->intf_ref_event, Executive, KernelMode, false, &timeout);
+	return !const_cast<volatile LONG&>(vdev->intf_ref_cnt);
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)

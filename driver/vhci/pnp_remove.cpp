@@ -213,7 +213,9 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 		to_vdev(vdev->pdo)->fdo = nullptr;
 	}
 
-	KeWaitForSingleObject(&vdev->intf_ref_event, Executive, KernelMode, false, nullptr);
+	if (auto n = vdev->intf_ref_cnt) {
+		Trace(TRACE_LEVEL_WARNING, "Interface reference count %ld", n);
+	}
 
 	switch (vdev->type) {
 	case VDEV_VHCI:

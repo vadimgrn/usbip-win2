@@ -158,7 +158,7 @@ void cache_string_descriptor(
 
 	auto &dest = vpdo.strings[index];
 	if (dest) {
-		USHORT sz = src.bLength - sizeof(USB_COMMON_DESCRIPTOR);
+		USHORT sz = src.bLength - offsetof(USB_STRING_DESCRIPTOR, bString);
 		UNICODE_STRING str{ sz, sz, const_cast<WCHAR*>(src.bString) };
 		if (index) {
 			TraceDbg("strings[%d] -> '%!WSTR!', ignoring '%!USTR!'", index, dest->bString, &str);
