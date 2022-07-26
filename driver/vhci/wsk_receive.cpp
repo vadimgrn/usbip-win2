@@ -589,6 +589,51 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	}
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS recv_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+{
+	auto ctx = static_cast<send_context*>(Context);
+	NT_ASSERT(ctx->wsk_irp == wsk_irp);
+
+	auto &vpdo = *ctx->vpdo;
+	auto &st = wsk_irp->IoStatus;
+
+	TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu",
+		  KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information);
+
+	if (NT_SUCCESS(st.Status)) {
+		NT_ASSERT(st.Information == ctx->mdl_hdr.size());
+		if (auto hdr = (usbip_header*)ctx->mdl_hdr.sysaddr()) {
+			byteswap_header(*hdr, swap_dir::net2host);
+		}
+
+	} else if (st.Status == STATUS_FILE_FORCED_CLOSED) {
+		vhub_unplug_vpdo(&vpdo);
+	}
+
+	free(ctx);
+	return StopCompletion;
+}
+
+_Function_class_(IO_WORKITEM_ROUTINE_EX)
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+void work_item(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
+{
+	IoFreeWorkItem(IoWorkItem);
+	auto &ctx = *static_cast<send_context*>(Context);
+
+	auto wsk_irp = ctx.wsk_irp; // do not access ctx or wsk_irp after send
+	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, ctx.mdl_hdr.size() };
+
+	IoSetCompletionRoutine(wsk_irp, recv_complete, &ctx, true, true, true);
+
+	auto err = send(ctx.vpdo->sock, &buf, WSK_FLAG_WAITALL, wsk_irp);
+	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
+
+	TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(wsk_irp), err);
+}
+
 } // namespace
 
 
@@ -603,7 +648,22 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS sched_read_usbip_header(_Inout_ vpdo_dev_t&)
+NTSTATUS sched_read_usbip_header(_Inout_ vpdo_dev_t &vpdo)
 {
-	return STATUS_NOT_IMPLEMENTED;
+	auto ctx = alloc_send_context(0);
+	if (!ctx) {
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	ctx->vpdo = &vpdo;
+	ctx->irp = nullptr;
+
+	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
+		const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
+		IoQueueWorkItemEx(wi, work_item, QueueType, ctx);
+		return STATUS_SUCCESS;
+	} else {
+		free(ctx);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
 }

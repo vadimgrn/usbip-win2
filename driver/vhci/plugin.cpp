@@ -699,6 +699,12 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
                 return STATUS_SUCCESS;
         }
 
+        if (auto err = sched_read_usbip_header(*vpdo)) {
+                error = make_error(ERR_GENERAL);
+                destroy_device(vpdo);
+                return err;
+        }
+
         if (vhub_attach_vpdo(vpdo)) {
                 r.port = vpdo->port;
         } else {
