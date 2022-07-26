@@ -15,7 +15,7 @@
 #include "dbgcommon.h"
 #include "pdu.h"
 #include "strutil.h"
-#include "wsk_events.h"
+#include "wsk_receive.h"
 #include "pnp.h"
 
 namespace
@@ -188,7 +188,6 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
         vpdo->SystemPowerState = PowerSystemWorking;
 
         vpdo->Self->Flags |= DO_POWER_PAGABLE | DO_DIRECT_IO;
-        NT_ASSERT(!is_valid_seqnum(vpdo->wsk_data_hdr.base.seqnum)); // see wsk_events.cpp, get_header
 
         if (init(*vpdo, r)) {
                 return make_error(ERR_GENERAL);
@@ -533,19 +532,6 @@ PAGEABLE auto fetch_descriptors(vpdo_dev_t &vpdo, const usbip_usb_device &udev)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto make_event_mask()
-{
-        PAGED_CODE();
-        ULONG mask = 0;
-
-        for (auto evt: WskEvents) {
-                mask |= evt;
-        }
-
-        return mask;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -570,9 +556,7 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
                 return make_error(err);
         }
 
-        auto event_mask = make_event_mask();
-
-        if (auto err = event_callback_control(vpdo.sock, event_mask, false)) {
+        if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_DISCONNECT, false)) {
                 Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }
@@ -674,7 +658,7 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
                 return make_error(ERR_NETWORK);
         }
 
-        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ WskReceiveEvent, WskDisconnectEvent };
+        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ nullptr, WskDisconnectEvent };
 
         NT_ASSERT(!vpdo.sock);
         vpdo.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &vpdo, &dispatch, ai, try_connect, nullptr);

@@ -8,8 +8,6 @@
 #include "devconf.h"
 #include "usbdsc.h"
 
-struct _WSK_DATA_INDICATION;
-
 namespace wsk
 {
         struct SOCKET;
@@ -128,11 +126,6 @@ struct vpdo_dev_t : vdev_t
 	seqnum_t seqnum; // @see next_seqnum
 	
 	wsk::SOCKET *sock;
-
-	_WSK_DATA_INDICATION* wsk_data;
-	size_t wsk_data_offset; // less than wsk_data->Buffer.Length
-	_WSK_DATA_INDICATION* wsk_data_tail; // shortcut for wsk::tail(wsk_data)
-	usbip_header wsk_data_hdr; // valid if is_valid_seqnum(wsk_data_hdr.base.seqnum)
 
 	IO_CSQ irps_csq;
 	LIST_ENTRY irps;

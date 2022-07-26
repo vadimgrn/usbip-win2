@@ -39,8 +39,7 @@
     <ClCompile Include="power.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="wmi.cpp" />
-    <ClCompile Include="wsk_data.cpp" />
-    <ClCompile Include="wsk_events.cpp" />
+    <ClCompile Include="wsk_receive.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\ch9.h" />
@@ -76,8 +75,7 @@
     <ClInclude Include="vhub.h" />
     <ClInclude Include="vpdo.h" />
     <ClInclude Include="wmi.h" />
-    <ClInclude Include="wsk_data.h" />
-    <ClInclude Include="wsk_events.h" />
+    <ClInclude Include="wsk_receive.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip_vhci.inf" />

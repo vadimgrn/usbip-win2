@@ -12,10 +12,7 @@
 #include "strutil.h"
 #include "csq.h"
 #include "wsk_cpp.h"
-#include "wsk_data.h"
 #include "send_context.h"
-
-const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
 namespace
 {
@@ -116,23 +113,6 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void release_wsk_data(vpdo_dev_t &vpdo)
-{
-	PAGED_CODE();
-
-	vpdo.wsk_data_offset = 0;
-	vpdo.wsk_data_tail = nullptr;
-	RtlZeroMemory(&vpdo.wsk_data_hdr, sizeof(vpdo.wsk_data_hdr));
-
-	if (auto &di = vpdo.wsk_data) {
-		if (auto err = release(vpdo.sock, di)) {
-			Trace(TRACE_LEVEL_ERROR, "release %!STATUS!", err);
-		}
-		di = nullptr;
-	}
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 {
         PAGED_CODE();
@@ -141,17 +121,13 @@ PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 		return;
 	}
 		
+	if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_DISABLE | WSK_EVENT_DISCONNECT, true)) {
+		Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+	}
+
 	if (auto err = disconnect(vpdo.sock)) {
                 Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
         }
-
-	for (auto evt: WskEvents) {
-		if (auto err = event_callback_control(vpdo.sock, WSK_EVENT_DISABLE | evt, true)) {
-			Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, err);
-		}
-	}
-
-	release_wsk_data(vpdo);
 
 	if (auto err = close(vpdo.sock)) {
                 Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);

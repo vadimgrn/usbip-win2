@@ -2,10 +2,10 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "wsk_events.h"
+#include "wsk_receive.h"
 #include <wdm.h>
 #include "trace.h"
-#include "wsk_events.tmh"
+#include "wsk_receive.tmh"
 
 #include "pdu.h"
 #include "dev.h"
@@ -13,7 +13,6 @@
 #include "dbgcommon.h"
 #include "urbtransfer.h"
 #include "vpdo.h"
-#include "wsk_data.h"
 #include "csq.h"
 #include "irp.h"
 #include "network.h"
@@ -24,6 +23,11 @@
 
 namespace
 {
+
+inline auto wsk_data_copy(_In_ const vpdo_dev_t&, _Out_ void*, _In_ size_t, _In_ size_t)
+{
+	return STATUS_NOT_IMPLEMENTED;
+}
 
 /*
  * URB must have TransferBuffer* members.
@@ -585,82 +589,6 @@ void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
 	}
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void invalidate(_Inout_ usbip_header &hdr)
-{
-	static_assert(!is_valid_seqnum(0));
-	hdr.base.seqnum = 0;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_header(_Inout_ usbip_header &hdr, _Inout_ vpdo_dev_t &vpdo)
-{
-	auto &base = hdr.base;
-
-	if (is_valid_seqnum(base.seqnum)) { // already read
-		return true;
-	}
-
-	if (auto err = wsk_data_copy(vpdo, &hdr, 0, sizeof(hdr))) {
-		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
-		Trace(TRACE_LEVEL_ERROR, "Copy header %!STATUS!", err);
-		return false;
-	}
-
-	byteswap_header(hdr, swap_dir::net2host);
-
-	auto cmd = static_cast<usbip_request_type>(base.command);
-
-	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
-		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
-		return false;
-	}
-
-	auto ok = is_valid_seqnum(base.seqnum);
-
-	if (ok) {
-		base.direction = extract_dir(base.seqnum); // always zero in server response
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum %u", base.seqnum);
-	}
-
-	return ok;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void receive_event(_Inout_ vpdo_dev_t &vpdo)
-{
-	auto &hdr = vpdo.wsk_data_hdr;
-
-	for (auto avail = wsk_data_size(vpdo); avail >= sizeof(hdr); invalidate(hdr)) {
-
-		if (!get_header(hdr, vpdo)) {
-			vhub_unplug_vpdo(&vpdo);
-			avail = 0; // invalidate header and break the loop
-			continue;
-		}
-
-		avail -= sizeof(hdr);
-		auto payload_size = get_payload_size(hdr);
-
-		if (avail >= payload_size) {
-			NT_VERIFY(!wsk_data_release(vpdo, sizeof(hdr)));
-		} else {
-//			TraceWSK("Available %Iu < payload %Iu", avail, payload_size); // too often
-			break;
-		}
-
-		ret_command(vpdo, hdr);
-
-		if (payload_size) {
-			NT_VERIFY(!wsk_data_release(vpdo, payload_size));
-			avail -= payload_size;
-		}
-
-		NT_ASSERT(avail == wsk_data_size(vpdo));
-	}
-}
-
 } // namespace
 
 
@@ -672,32 +600,4 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 
 	vhub_unplug_vpdo(vpdo);
 	return STATUS_SUCCESS;
-}
-
-/*
- * if DataIndication is NULL, the socket is no longer functional and must be closed ASAP.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS WskReceiveEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags,
-	_In_opt_ WSK_DATA_INDICATION *DataIndication, _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T* /*BytesAccepted*/)
-{
-        auto vpdo = static_cast<vpdo_dev_t*>(SocketContext);
-
-	{
-		char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
-		TraceWSK("Enter [%s]", wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
-	}
-
-	auto st = STATUS_PENDING;
-
-	if (DataIndication) {
-		wsk_data_append(*vpdo, DataIndication, BytesIndicated);
-		receive_event(*vpdo);
-	} else {
-		vhub_unplug_vpdo(vpdo);
-		st = STATUS_SUCCESS;
-	}
-
-	TraceWSK("Exit %!STATUS!", st);
-	return st;
 }
