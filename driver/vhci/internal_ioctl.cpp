@@ -153,7 +153,7 @@ auto new_send_context(
                 get_pipe_handle(irp) = handle;
         }
 
-        auto ctx = vpdo.sock ? alloc_send_context(NumberOfPackets) : nullptr;
+        auto ctx = alloc_send_context(NumberOfPackets);
         if (ctx) {
                 ctx->vpdo = &vpdo;
                 ctx->irp = irp;
@@ -1091,7 +1091,9 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         auto seqnum = get_seqnum(irp);
         TraceMsg("irp %04x, seqnum %u", ptr4log(irp), seqnum);
 
-        if (auto ctx = new_send_context(vpdo, nullptr)) {
+        if (!vpdo.sock) {
+                TraceDbg("Socket is closed");
+        } else if (auto ctx = new_send_context(vpdo, nullptr)) {
                 set_cmd_unlink_usbip_header(vpdo, ctx->hdr, seqnum);
                 send(ctx); // ignore error
         } else {

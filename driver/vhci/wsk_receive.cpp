@@ -601,3 +601,9 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 	vhub_unplug_vpdo(vpdo);
 	return STATUS_SUCCESS;
 }
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS sched_read_usbip_header(_Inout_ vpdo_dev_t&)
+{
+	return STATUS_NOT_IMPLEMENTED;
+}

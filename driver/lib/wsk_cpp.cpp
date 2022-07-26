@@ -243,6 +243,7 @@ _IRQL_requires_max_(APC_LEVEL)
 auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, _In_ bool send)
 {
         PAGED_CODE();
+        NT_ASSERT(sock);
 
         socket_async_context ctx;
         if (!ctx) {
@@ -266,7 +267,15 @@ auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SI
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
+        NT_ASSERT(sock);
         return sock->Connection->WskSend(sock->Self, buffer, flags, irp);
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
+{
+        NT_ASSERT(sock);
+        return sock->Connection->WskReceive(sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)

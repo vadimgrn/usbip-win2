@@ -80,6 +80,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
 
 _IRQL_requires_max_(APC_LEVEL)
