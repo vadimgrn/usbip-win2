@@ -131,6 +131,15 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+void reuse(_In_opt_ send_context *ctx)
+{
+        if (ctx) {
+                ctx->mdl_buf.reset();
+                IoReuseIrp(ctx->wsk_irp, STATUS_UNSUCCESSFUL);
+        }
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void free(_In_opt_ send_context *ctx, _In_ bool reuse)
 {
         if (!ctx) {
@@ -138,8 +147,7 @@ void free(_In_opt_ send_context *ctx, _In_ bool reuse)
         }
 
         if (reuse) {
-                ctx->mdl_buf.reset();
-                IoReuseIrp(ctx->wsk_irp, STATUS_UNSUCCESSFUL);
+                ::reuse(ctx);
         }
 
         ExFreeToLookasideListEx(&send_context_list, ctx);

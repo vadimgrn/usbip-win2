@@ -24,54 +24,6 @@
 namespace
 {
 
-inline auto wsk_data_copy(_In_ const vpdo_dev_t&, _Out_ void*, _In_ size_t, _In_ size_t)
-{
-	return STATUS_NOT_IMPLEMENTED;
-}
-
-/*
- * URB must have TransferBuffer* members.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_urb_buffer(_In_ URB &urb)
-{
-	auto &r = AsUrbTransfer(urb);
-
-	if (auto mdl = r.TransferBufferMDL) {
-		auto buf = MmGetSystemAddressForMdlSafe(mdl, LowPagePriority | MdlMappingNoExecute);
-		if (!buf) {
-			Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe failed");
-		}
-		return buf;
-	}
-
-	NT_ASSERT(r.TransferBuffer);
-	return r.TransferBuffer;
-}
-
-/*
- * Actual TransferBufferLength must already be set.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto copy_to_transfer_buffer(_Out_ void* &buf, vpdo_dev_t &vpdo, URB &urb)
-{
-	auto &r = AsUrbTransfer(urb);
-
-	buf = get_urb_buffer(urb);
-	if (!buf) {
-		r.TransferBufferLength = 0;
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	auto err = wsk_data_copy(vpdo, buf, 0, r.TransferBufferLength);
-	if (err) {
-		NT_ASSERT(err != STATUS_BUFFER_TOO_SMALL);
-		buf = nullptr;
-	}
-
-	return err;
-}
-
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto assign(ULONG &TransferBufferLength, int actual_length)
 {
@@ -82,7 +34,7 @@ auto assign(ULONG &TransferBufferLength, int actual_length)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
+NTSTATUS urb_function_generic(vpdo_dev_t&, URB &urb, const usbip_header &hdr)
 {
 	auto &r = AsUrbTransfer(urb);
 	auto err = assign(r.TransferBufferLength, hdr.u.ret_submit.actual_length);
@@ -91,15 +43,12 @@ NTSTATUS urb_function_generic(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hd
 		return err;
 	}
 
-	auto func = urb.UrbHeader.Function;
-	auto log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
+//	auto func = urb.UrbHeader.Function;
+//	auto log = func == URB_FUNCTION_CONTROL_TRANSFER || func == URB_FUNCTION_CONTROL_TRANSFER_EX; // don't expose sensitive data
 
-	void *buf{};
-	err = copy_to_transfer_buffer(buf, vpdo, urb);
-
-	if (!err && log) {
-		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, USHORT(r.TransferBufferLength)));
-	}
+//	if (!err && log) {
+//		TraceUrb("%s(%#04x): %!BIN!", urb_function_str(func), func, WppBinary(buf, USHORT(r.TransferBufferLength)));
+//	}
 
 	return err;
 }
@@ -216,9 +165,9 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	if (auto err = copy_to_transfer_buffer((void*&)dsc, vpdo, urb)) {
-		return err;
-	}
+//	if (auto err = copy_to_transfer_buffer((void*&)dsc, vpdo, urb)) {
+//		return err;
+//	}
 
 	TraceUrb("%s: bLength %d, %!usb_descriptor_type!, Index %d, LangId %#x %!BIN!",
 		  urb_function_str(r.Hdr.Function), dsc->bLength, dsc->bDescriptorType, r.Index, r.LanguageId,
@@ -265,16 +214,16 @@ NTSTATUS urb_control_descriptor_request(vpdo_dev_t &vpdo, URB &urb, const usbip_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto copy_isoc_data(
 	_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf,
-	_Inout_ vpdo_dev_t &src_buf, _In_ ULONG src_len,
-	_Out_ usbip_iso_packet_descriptor *sd, _In_ size_t sd_len)
+	_Inout_ vpdo_dev_t &/*src_buf*/, _In_ ULONG src_len,
+	_Out_ usbip_iso_packet_descriptor *sd, _In_ size_t /*sd_len*/)
 {
 	auto dir_out = !dst_buf;
-	auto sd_offset = dir_out ? 0 : src_len;
+//	auto sd_offset = dir_out ? 0 : src_len;
 
-	if (auto err = wsk_data_copy(src_buf, sd, sd_offset, sd_len)) {
-		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy usbip_iso_packet_descriptor[%lu] %!STATUS!", r.NumberOfPackets, err);
-		return err;
-	}
+//	if (auto err = wsk_data_copy(src_buf, sd, sd_offset, sd_len)) {
+//		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy usbip_iso_packet_descriptor[%lu] %!STATUS!", r.NumberOfPackets, err);
+//		return err;
+//	}
 
 	byteswap(sd, r.NumberOfPackets);
 
@@ -321,10 +270,10 @@ auto copy_isoc_data(
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length)) {
-			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
-			return err;
-		}
+//		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length)) {
+//			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
+//			return err;
+//		}
 
 		dd->Length = sd->actual_length;
 	}
@@ -369,17 +318,17 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 
 	vpdo.current_frame_number = res.start_frame;
 
-	auto dir_in = is_transfer_direction_in(hdr); // TransferFlags can have wrong direction
+//	auto dir_in = is_transfer_direction_in(hdr); // TransferFlags can have wrong direction
 
-	auto dst_buf = dir_in ? (char*)get_urb_buffer(urb) : nullptr;
-	if (!dst_buf && dir_in) {
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
+//	auto dst_buf = dir_in ? (char*)get_urb_buffer(urb) : nullptr;
+//	if (!dst_buf && dir_in) {
+//		return STATUS_INSUFFICIENT_RESOURCES;
+//	}
 
 	if (auto ctx = alloc_send_context(r.NumberOfPackets)) {
-		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc, ctx->mdl_isoc.size());
-		free(ctx, false);
-		return err;
+//		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc, ctx->mdl_isoc.size());
+//		free(ctx, false);
+		return STATUS_NOT_IMPLEMENTED;
 	} else {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -564,33 +513,31 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 	}
 }
 
-/*
- * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
- * @see send_cmd_unlink
- *
- * USBIP_RET_UNLINK
- * 1) if UNLINK is successful, status is -ECONNRESET
- * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0
- * See: <kernel>/Documentation/usb/usbip_protocol.rst
- */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void ret_command(_Inout_ vpdo_dev_t &vpdo, _In_ const usbip_header &hdr)
+auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ send_context &ctx, _In_ const URB &urb, _In_ size_t length)
 {
-	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
+	reuse(&ctx);
 
-	{
-		char buf[DBG_USBIP_HDR_BUFSZ];
-		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
-			    ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
+	if (is_transfer_direction_in(ctx.hdr)) { // TransferFlags can have wrong direction
+		if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoWriteAccess, urb)) {
+			Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
+			return err;
+		}
 	}
 
-	if (irp) {
-		ret_submit(vpdo, irp, hdr);
-	}
+	ctx.mdl_buf.next(ctx.is_isoc ? ctx.mdl_isoc.get() : nullptr);
+//	byteswap(ctx.isoc, number_of_packets(ctx));
+
+	buf.Mdl = ctx.mdl_buf.get();
+	buf.Offset = 0;
+	buf.Length = length;
+	NT_ASSERT(buf.Length <= usbip::size(buf.Mdl));
+
+	return STATUS_SUCCESS;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS recv_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+NTSTATUS on_read_payload(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
 	auto ctx = static_cast<send_context*>(Context);
 	NT_ASSERT(ctx->wsk_irp == wsk_irp);
@@ -602,11 +549,108 @@ NTSTATUS recv_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 		  KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information);
 
 	if (NT_SUCCESS(st.Status)) {
-		NT_ASSERT(st.Information == ctx->mdl_hdr.size());
-		if (auto hdr = (usbip_header*)ctx->mdl_hdr.sysaddr()) {
-			byteswap_header(*hdr, swap_dir::net2host);
-		}
+		ret_submit(*ctx->vpdo, ctx->irp, ctx->hdr);
+		sched_read_usbip_header(*ctx->vpdo);
+	} else if (st.Status == STATUS_FILE_FORCED_CLOSED) {
+		vhub_unplug_vpdo(&vpdo);
+	}
 
+	free(ctx);
+	return StopCompletion;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void read_payload(_Inout_ send_context &ctx, _In_ size_t length)
+{
+	auto &urb = *static_cast<URB*>(URB_FROM_IRP(ctx.irp));
+
+	WSK_BUF buf{};
+	if (auto err = prepare_wsk_buf(buf, ctx, urb, length)) {
+		Trace(TRACE_LEVEL_ERROR, "prepare_wsk_buf %!STATUS!", err);
+		return;
+	}
+
+	auto wsk_irp = ctx.wsk_irp; // do not access ctx or wsk_irp after send
+	IoSetCompletionRoutine(wsk_irp, on_read_payload, &ctx, true, true, true);
+
+	auto err = receive(ctx.vpdo->sock, &buf, WSK_FLAG_WAITALL, wsk_irp);
+	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
+
+	TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(wsk_irp), err);
+}
+
+/*
+ * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
+ * @see send_cmd_unlink
+ *
+ * USBIP_RET_UNLINK
+ * 1) if UNLINK is successful, status is -ECONNRESET
+ * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0
+ * See: <kernel>/Documentation/usb/usbip_protocol.rst
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void ret_command(_Inout_ vpdo_dev_t &vpdo, _Inout_ send_context &ctx)
+{
+	auto &hdr = ctx.hdr;
+	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
+
+	{
+		char buf[DBG_USBIP_HDR_BUFSZ];
+		TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x <- %Iu%s",
+			    ptr4log(irp), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
+	}
+
+	if (!irp) {
+		// done
+	} else if (auto sz = get_payload_size(hdr)) {
+		ctx.irp = irp;
+		read_payload(ctx, sz);
+	} else {
+		ret_submit(vpdo, irp, hdr);
+	}
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto validate_header(_Inout_ usbip_header &hdr)
+{
+	auto &base = hdr.base;
+	auto cmd = static_cast<usbip_request_type>(base.command);
+
+	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
+		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
+		return false;
+	}
+
+	auto ok = is_valid_seqnum(base.seqnum);
+
+	if (ok) {
+		base.direction = extract_dir(base.seqnum); // always zero in server response
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum %u", base.seqnum);
+	}
+
+	return ok;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS on_read_usbip_header(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+{
+	auto ctx = static_cast<send_context*>(Context);
+	NT_ASSERT(ctx->wsk_irp == wsk_irp);
+
+	auto &vpdo = *ctx->vpdo;
+	auto &st = wsk_irp->IoStatus;
+
+	TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu",
+		  KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information);
+
+	if (NT_SUCCESS(st.Status)) {
+		auto &hdr = ctx->hdr;
+		NT_ASSERT(st.Information == sizeof(hdr));
+		byteswap_header(hdr, swap_dir::net2host);
+		if (validate_header(hdr)) {
+			ret_command(vpdo, *ctx);
+		}
 	} else if (st.Status == STATUS_FILE_FORCED_CLOSED) {
 		vhub_unplug_vpdo(&vpdo);
 	}
@@ -618,17 +662,19 @@ NTSTATUS recv_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 _Function_class_(IO_WORKITEM_ROUTINE_EX)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-void work_item(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
+void do_read_usbip_header(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
 {
 	IoFreeWorkItem(IoWorkItem);
+
 	auto &ctx = *static_cast<send_context*>(Context);
 
-	auto wsk_irp = ctx.wsk_irp; // do not access ctx or wsk_irp after send
+	ctx.mdl_hdr.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, ctx.mdl_hdr.size() };
 
-	IoSetCompletionRoutine(wsk_irp, recv_complete, &ctx, true, true, true);
+	auto wsk_irp = ctx.wsk_irp; // do not access ctx or wsk_irp after send
+	IoSetCompletionRoutine(wsk_irp, on_read_usbip_header, &ctx, true, true, true);
 
-	auto err = send(ctx.vpdo->sock, &buf, WSK_FLAG_WAITALL, wsk_irp);
+	auto err = receive(ctx.vpdo->sock, &buf, WSK_FLAG_WAITALL, wsk_irp);
 	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
 	TraceWSK("wsk irp %04x, %!STATUS!", ptr4log(wsk_irp), err);
@@ -660,7 +706,7 @@ NTSTATUS sched_read_usbip_header(_Inout_ vpdo_dev_t &vpdo)
 
 	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
 		const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-		IoQueueWorkItemEx(wi, work_item, QueueType, ctx);
+		IoQueueWorkItemEx(wi, do_read_usbip_header, QueueType, ctx);
 		return STATUS_SUCCESS;
 	} else {
 		free(ctx);

@@ -39,6 +39,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 send_context *alloc_send_context(_In_ ULONG NumberOfPackets);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+void reuse(_In_opt_ send_context *ctx);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void free(_In_opt_ send_context *ctx, _In_ bool reuse = true);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
