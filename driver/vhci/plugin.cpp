@@ -699,12 +699,6 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
                 return STATUS_SUCCESS;
         }
 
-        if (auto err = sched_read_usbip_header(*vpdo)) {
-                error = make_error(ERR_GENERAL);
-                destroy_device(vpdo);
-                return err;
-        }
-
         if (vhub_attach_vpdo(vpdo)) {
                 r.port = vpdo->port;
         } else {
@@ -712,6 +706,12 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
                 Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");
                 destroy_device(vpdo);
                 return STATUS_SUCCESS;
+        }
+
+        if (auto err = sched_read_usbip_header(vpdo, nullptr)) {
+                error = make_error(ERR_GENERAL);
+                destroy_device(vpdo);
+                return err;
         }
 
         vpdo->Self->Flags &= ~DO_DEVICE_INITIALIZING; // must be the last step in initialization

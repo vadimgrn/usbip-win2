@@ -91,43 +91,59 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets)
 {
         auto ctx = (wsk_context*)ExAllocateFromLookasideListEx(&wsk_context_list);
-        if (!(ctx && bool(ctx->is_isoc = NumberOfPackets))) { // assignment
-                return ctx;
-        }
-        
-        ULONG isoc_len = NumberOfPackets*sizeof(*ctx->isoc);
 
-        if (ctx->isoc_alloc_cnt < NumberOfPackets) {
-                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, AllocTag);
-                if (!isoc) {
-                        Trace(TRACE_LEVEL_ERROR, "Can't allocate usbip_iso_packet_descriptor[%lu]", NumberOfPackets);
-                        free_function_ex(ctx, &wsk_context_list);
-                        return nullptr;
-                }
-
-                if (ctx->isoc) {
-                        ExFreePoolWithTag(ctx->isoc, AllocTag);
-                }
-
-                ctx->isoc = isoc;
-                ctx->isoc_alloc_cnt = NumberOfPackets;
-
-                ctx->mdl_isoc.reset();
-        }
-
-        if (ctx->mdl_isoc.size() != isoc_len) {
-                ctx->mdl_isoc = usbip::Mdl(usbip::memory::nonpaged, ctx->isoc, isoc_len);
-
-                if (auto err = ctx->mdl_isoc.prepare_nonpaged()) {
-                        Trace(TRACE_LEVEL_ERROR, "prepare_nonpaged %!STATUS!", err);
-                        free_function_ex(ctx, &wsk_context_list);
-                        return nullptr;
-                }
-
-                NT_ASSERT(number_of_packets(*ctx) == NumberOfPackets);
+        if (!ctx) {
+                Trace(TRACE_LEVEL_ERROR, "ExAllocateFromLookasideListEx error");
+        } else if (auto err = prepare_isoc(*ctx, NumberOfPackets)) {
+                Trace(TRACE_LEVEL_ERROR, "prepare_isoc(NumberOfPackets %lu) %!STATUS!", NumberOfPackets, err);
+                free_function_ex(ctx, &wsk_context_list);
+                ctx = nullptr;
         }
 
         return ctx;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
+{
+        if (!(ctx.is_isoc = NumberOfPackets)) { // assignment
+                return STATUS_SUCCESS;
+        }
+
+        ULONG isoc_len = NumberOfPackets*sizeof(*ctx.isoc);
+
+        if (ctx.isoc_alloc_cnt < NumberOfPackets) {
+                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, AllocTag);
+                if (!isoc) {
+                        return STATUS_INSUFFICIENT_RESOURCES;
+                }
+
+                if (ctx.isoc) {
+                        ExFreePoolWithTag(ctx.isoc, AllocTag);
+                }
+
+                ctx.isoc = isoc;
+                ctx.isoc_alloc_cnt = NumberOfPackets;
+
+                ctx.mdl_isoc.reset();
+        }
+
+        if (ctx.mdl_isoc.size() != isoc_len) {
+                ctx.mdl_isoc = usbip::Mdl(usbip::memory::nonpaged, ctx.isoc, isoc_len);
+                if (auto err = ctx.mdl_isoc.prepare_nonpaged()) {
+                        return err;
+                }
+                NT_ASSERT(number_of_packets(ctx) == NumberOfPackets);
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void reuse(_In_ wsk_context &ctx)
+{
+        ctx.mdl_buf.reset();
+        IoReuseIrp(ctx.wsk_irp, STATUS_UNSUCCESSFUL);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -138,8 +154,12 @@ void free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
         }
 
         if (reuse) {
-                ctx->mdl_buf.reset();
-                IoReuseIrp(ctx->wsk_irp, STATUS_UNSUCCESSFUL);
+                ::reuse(*ctx);
+        }
+
+        if (auto &wi = ctx->workitem) {
+                IoFreeWorkItem(wi);
+                wi = nullptr;
         }
 
         ExFreeToLookasideListEx(&wsk_context_list, ctx);

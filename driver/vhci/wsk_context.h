@@ -7,6 +7,7 @@
 #include "usbip_proto.h"
 #include "mdl_cpp.h"
 
+struct _IO_WORKITEM;
 struct vpdo_dev_t;
 
 inline LOOKASIDE_LIST_EX wsk_context_list;
@@ -17,8 +18,10 @@ NTSTATUS init_wsk_context_list();
 struct wsk_context
 {
         vpdo_dev_t *vpdo;
-        IRP *irp; // can be NULL, see send_cmd_unlink
         IRP *wsk_irp;
+
+        IRP *irp; // can be NULL, see send_cmd_unlink
+        _IO_WORKITEM *workitem;
 
         usbip_header hdr;
 
@@ -32,7 +35,13 @@ struct wsk_context
 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets = 0);
+wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void reuse(_In_ wsk_context &ctx);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void free(_In_opt_ wsk_context *ctx, _In_ bool reuse = true);

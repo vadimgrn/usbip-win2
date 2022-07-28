@@ -44,4 +44,7 @@ inline auto make_wsk_buf(_In_ const Mdl &mdl_hdr, _In_ const usbip_header &hdr)
         return buf;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length);
+
 } // namespace usbip

@@ -18,16 +18,6 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-auto assign(_Out_ ULONG &TransferBufferLength, _In_ int actual_length)
-{
-        PAGED_CODE();
-        bool ok = actual_length >= 0 && (ULONG)actual_length <= TransferBufferLength;
-        TransferBufferLength = ok ? actual_length : 0;
-
-        return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
 {
         PAGED_CODE();
@@ -41,7 +31,7 @@ PAGEABLE auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _In
                 auto &ret = hdr.u.ret_submit;
                 urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
-                auto err = assign(tr.TransferBufferLength, ret.actual_length);
+                auto err = usbip::assign(tr.TransferBufferLength, ret.actual_length);
                 if (err || base.direction == USBIP_DIR_OUT || !tr.TransferBufferLength) { 
                         return err;
                 }
@@ -184,4 +174,15 @@ NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Ope
         }
 
         return err;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
+{
+        if (actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength) {
+                TransferBufferLength = actual_length;
+                return STATUS_SUCCESS;
+        }
+
+        return STATUS_INVALID_BUFFER_SIZE;
 }
