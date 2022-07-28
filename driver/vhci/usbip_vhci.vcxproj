@@ -13,7 +13,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\userspace\lib\usbip_proto_op.cpp" />
     <ClCompile Include="csq.cpp" />
-    <ClCompile Include="send_context.cpp" />
+    <ClCompile Include="wsk_context.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="vhci.cpp" />
@@ -52,7 +52,7 @@
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="pnp_add.h" />
     <ClInclude Include="power.h" />
-    <ClInclude Include="send_context.h" />
+    <ClInclude Include="wsk_context.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="vhci.h" />

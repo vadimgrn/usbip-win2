@@ -11,7 +11,7 @@
 #include "vhub.h"
 #include "ioctl.h"
 #include "wsk_cpp.h"
-#include "send_context.h"
+#include "wsk_context.h"
 #include "internal_ioctl.h"
 
 #include <ntstrsafe.h>
@@ -19,7 +19,7 @@
 namespace
 {
 
-_Enum_is_bitflag_ enum { INIT_SEND_CTX_LIST = 1 };
+_Enum_is_bitflag_ enum { INIT_WSK_CTX_LIST = 1 };
 unsigned int g_init_flags;
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -71,8 +71,8 @@ PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
 
         wsk::shutdown();
 
-	if (g_init_flags & INIT_SEND_CTX_LIST) {
-		ExDeleteLookasideListEx(&send_context_list);
+	if (g_init_flags & INIT_WSK_CTX_LIST) {
+		ExDeleteLookasideListEx(&wsk_context_list);
 	}
 
 	if (auto buf = Globals.RegistryPath.Buffer) {
@@ -184,10 +184,10 @@ PAGEABLE auto init_lookaside_lists()
 {
 	PAGED_CODE();
 
-	if (auto err = init_send_context_list()) {
+	if (auto err = init_wsk_context_list()) {
 		return err;
 	} else {
-		g_init_flags |= INIT_SEND_CTX_LIST;
+		g_init_flags |= INIT_WSK_CTX_LIST;
 	}
 
 	return STATUS_SUCCESS;

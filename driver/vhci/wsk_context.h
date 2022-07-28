@@ -9,12 +9,12 @@
 
 struct vpdo_dev_t;
 
-inline LOOKASIDE_LIST_EX send_context_list;
+inline LOOKASIDE_LIST_EX wsk_context_list;
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS init_send_context_list();
+NTSTATUS init_wsk_context_list();
 
-struct send_context
+struct wsk_context
 {
         vpdo_dev_t *vpdo;
         IRP *irp; // can be NULL, see send_cmd_unlink
@@ -23,7 +23,7 @@ struct send_context
         usbip_header hdr;
 
         usbip::Mdl mdl_hdr;
-        usbip::Mdl mdl_buf;
+        usbip::Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer
         usbip::Mdl mdl_isoc;
 
         usbip_iso_packet_descriptor *isoc;
@@ -31,21 +31,14 @@ struct send_context
         bool is_isoc;
 };
 
-static_assert(sizeof(usbip_header) == 48);
-static_assert(sizeof(usbip::Mdl) == 16);
-static_assert(sizeof(usbip_iso_packet_descriptor) == 16);
+_IRQL_requires_max_(DISPATCH_LEVEL)
+wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets = 0);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-send_context *alloc_send_context(_In_ ULONG NumberOfPackets);
+void free(_In_opt_ wsk_context *ctx, _In_ bool reuse = true);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void reuse(_In_opt_ send_context *ctx);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_opt_ send_context *ctx, _In_ bool reuse = true);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto number_of_packets(_In_ const send_context &ctx)
+inline auto number_of_packets(_In_ const wsk_context &ctx)
 {
         return ctx.mdl_isoc.size()/sizeof(*ctx.isoc);
 }

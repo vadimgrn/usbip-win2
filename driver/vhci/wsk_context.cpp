@@ -2,9 +2,9 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "send_context.h"
+#include "wsk_context.h"
 #include "trace.h"
-#include "send_context.tmh"
+#include "wsk_context.tmh"
 
 #include "dev.h"
 
@@ -17,7 +17,7 @@ _IRQL_requires_same_
 _Function_class_(free_function_ex)
 void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_LIST_EX*)
 {
-        auto ctx = static_cast<send_context*>(Buffer);
+        auto ctx = static_cast<wsk_context*>(Buffer);
         NT_ASSERT(ctx);
 
         TraceWSK("%04x, isoc[%Iu]", ptr4log(ctx), ctx->isoc_alloc_cnt);
@@ -44,7 +44,7 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
         NT_ASSERT(PoolType == NonPagedPoolNx);
         NT_ASSERT(Tag == AllocTag);
 
-        auto ctx = (send_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, NumberOfBytes, Tag);
+        auto ctx = (wsk_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, NumberOfBytes, Tag);
         if (!ctx) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", NumberOfBytes);
                 return nullptr;
@@ -77,10 +77,10 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
  * For this reason ExFreeToLookasideListEx always calls L.FreeEx instead of InterlockedPushEntrySList.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS init_send_context_list()
+NTSTATUS init_wsk_context_list()
 {
-        return ExInitializeLookasideListEx(&send_context_list, allocate_function_ex, free_function_ex, 
-                                            NonPagedPoolNx, 0, sizeof(send_context), AllocTag, 0);
+        return ExInitializeLookasideListEx(&wsk_context_list, allocate_function_ex, free_function_ex, 
+                                            NonPagedPoolNx, 0, sizeof(wsk_context), AllocTag, 0);
 }
 
 /*
@@ -88,9 +88,9 @@ NTSTATUS init_send_context_list()
  * free_function_ex is used instead in hope that next object in the LookasideList may have required buffer.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
+wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets)
 {
-        auto ctx = (send_context*)ExAllocateFromLookasideListEx(&send_context_list);
+        auto ctx = (wsk_context*)ExAllocateFromLookasideListEx(&wsk_context_list);
         if (!(ctx && bool(ctx->is_isoc = NumberOfPackets))) { // assignment
                 return ctx;
         }
@@ -101,7 +101,7 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
                 auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, AllocTag);
                 if (!isoc) {
                         Trace(TRACE_LEVEL_ERROR, "Can't allocate usbip_iso_packet_descriptor[%lu]", NumberOfPackets);
-                        free_function_ex(ctx, &send_context_list);
+                        free_function_ex(ctx, &wsk_context_list);
                         return nullptr;
                 }
 
@@ -119,8 +119,8 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
                 ctx->mdl_isoc = usbip::Mdl(usbip::memory::nonpaged, ctx->isoc, isoc_len);
 
                 if (auto err = ctx->mdl_isoc.prepare_nonpaged()) {
-                        Trace(TRACE_LEVEL_ERROR, "mdl_isoc %!STATUS!", err);
-                        free_function_ex(ctx, &send_context_list);
+                        Trace(TRACE_LEVEL_ERROR, "prepare_nonpaged %!STATUS!", err);
+                        free_function_ex(ctx, &wsk_context_list);
                         return nullptr;
                 }
 
@@ -131,24 +131,16 @@ send_context *alloc_send_context(_In_ ULONG NumberOfPackets)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void reuse(_In_opt_ send_context *ctx)
-{
-        if (ctx) {
-                ctx->mdl_buf.reset();
-                IoReuseIrp(ctx->wsk_irp, STATUS_UNSUCCESSFUL);
-        }
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_opt_ send_context *ctx, _In_ bool reuse)
+void free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
 {
         if (!ctx) {
                 return;
         }
 
         if (reuse) {
-                ::reuse(ctx);
+                ctx->mdl_buf.reset();
+                IoReuseIrp(ctx->wsk_irp, STATUS_UNSUCCESSFUL);
         }
 
-        ExFreeToLookasideListEx(&send_context_list, ctx);
+        ExFreeToLookasideListEx(&wsk_context_list, ctx);
 }

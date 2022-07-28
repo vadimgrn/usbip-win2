@@ -16,7 +16,7 @@
 #include "csq.h"
 #include "irp.h"
 #include "network.h"
-#include "send_context.h"
+#include "wsk_context.h"
 #include "vhub.h"
 #include "vhci.h"
 #include "internal_ioctl.h"
@@ -325,7 +325,7 @@ NTSTATUS urb_isoch_transfer(vpdo_dev_t &vpdo, URB &urb, const usbip_header &hdr)
 //		return STATUS_INSUFFICIENT_RESOURCES;
 //	}
 
-	if (auto ctx = alloc_send_context(r.NumberOfPackets)) {
+	if (auto ctx = alloc_wsk_context(r.NumberOfPackets)) {
 //		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc, ctx->mdl_isoc.size());
 //		free(ctx, false);
 		return STATUS_NOT_IMPLEMENTED;
@@ -514,10 +514,8 @@ void ret_submit(vpdo_dev_t &vpdo, IRP *irp, const usbip_header &hdr)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ send_context &ctx, _In_ const URB &urb, _In_ size_t length)
+auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _In_ const URB &urb, _In_ size_t length)
 {
-	reuse(&ctx);
-
 	if (is_transfer_direction_in(ctx.hdr)) { // TransferFlags can have wrong direction
 		if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoWriteAccess, urb)) {
 			Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
@@ -539,7 +537,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ send_context &ctx, _In_ const U
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_read_payload(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-	auto ctx = static_cast<send_context*>(Context);
+	auto ctx = static_cast<wsk_context*>(Context);
 	NT_ASSERT(ctx->wsk_irp == wsk_irp);
 
 	auto &vpdo = *ctx->vpdo;
@@ -560,7 +558,7 @@ NTSTATUS on_read_payload(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void read_payload(_Inout_ send_context &ctx, _In_ size_t length)
+void read_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	auto &urb = *static_cast<URB*>(URB_FROM_IRP(ctx.irp));
 
@@ -589,7 +587,7 @@ void read_payload(_Inout_ send_context &ctx, _In_ size_t length)
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void ret_command(_Inout_ vpdo_dev_t &vpdo, _Inout_ send_context &ctx)
+void ret_command(_Inout_ vpdo_dev_t &vpdo, _Inout_ wsk_context &ctx)
 {
 	auto &hdr = ctx.hdr;
 	auto irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(vpdo, hdr.base.seqnum) : nullptr;
@@ -635,7 +633,7 @@ auto validate_header(_Inout_ usbip_header &hdr)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_read_usbip_header(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-	auto ctx = static_cast<send_context*>(Context);
+	auto ctx = static_cast<wsk_context*>(Context);
 	NT_ASSERT(ctx->wsk_irp == wsk_irp);
 
 	auto &vpdo = *ctx->vpdo;
@@ -662,11 +660,11 @@ NTSTATUS on_read_usbip_header(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_
 _Function_class_(IO_WORKITEM_ROUTINE_EX)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-void do_read_usbip_header(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
+void read_usbip_header(_In_ PVOID /*IoObject*/, _In_opt_ PVOID Context, _In_ PIO_WORKITEM IoWorkItem)
 {
 	IoFreeWorkItem(IoWorkItem);
 
-	auto &ctx = *static_cast<send_context*>(Context);
+	auto &ctx = *static_cast<wsk_context*>(Context);
 
 	ctx.mdl_hdr.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, ctx.mdl_hdr.size() };
@@ -696,7 +694,7 @@ NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS sched_read_usbip_header(_Inout_ vpdo_dev_t &vpdo)
 {
-	auto ctx = alloc_send_context(0);
+	auto ctx = alloc_wsk_context(0);
 	if (!ctx) {
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -706,7 +704,7 @@ NTSTATUS sched_read_usbip_header(_Inout_ vpdo_dev_t &vpdo)
 
 	if (auto wi = IoAllocateWorkItem(vpdo.Self)) {
 		const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-		IoQueueWorkItemEx(wi, do_read_usbip_header, QueueType, ctx);
+		IoQueueWorkItemEx(wi, read_usbip_header, QueueType, ctx);
 		return STATUS_SUCCESS;
 	} else {
 		free(ctx);

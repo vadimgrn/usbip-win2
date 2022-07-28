@@ -12,7 +12,6 @@
 #include "strutil.h"
 #include "csq.h"
 #include "wsk_cpp.h"
-#include "send_context.h"
 
 namespace
 {
