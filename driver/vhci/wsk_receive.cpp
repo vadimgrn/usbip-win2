@@ -713,16 +713,9 @@ NTSTATUS sched_read_usbip_header(_In_opt_ vpdo_dev_t *vpdo, _In_opt_ wsk_context
 	}
 
 	ctx->irp = nullptr;
-	auto &wi = ctx->workitem;
-
-	if (!(wi || bool(wi = IoAllocateWorkItem(vpdo->Self)))) {
-		free(ctx, false);
-		Trace(TRACE_LEVEL_ERROR, "IoAllocateWorkItem error");
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
 
 	const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-	IoQueueWorkItem(wi, read_usbip_header, QueueType, ctx);
+	IoQueueWorkItem(vpdo->workitem, read_usbip_header, QueueType, ctx);
 
 	return STATUS_SUCCESS;
 }

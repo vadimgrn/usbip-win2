@@ -125,6 +125,7 @@ struct vpdo_dev_t : vdev_t
 	
 	seqnum_t seqnum; // @see next_seqnum
 	
+	_IO_WORKITEM *workitem;
 	wsk::SOCKET *sock;
 
 	IO_CSQ irps_csq;

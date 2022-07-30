@@ -149,6 +149,11 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 	free_strings(vpdo);
 	free_string_descriptors(vpdo);
 
+	if (auto &wi = vpdo.workitem) {
+		IoFreeWorkItem(wi);
+		wi = nullptr;
+	}
+
 	if (vpdo.actconfig) {
 		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
                 vpdo.actconfig = nullptr;

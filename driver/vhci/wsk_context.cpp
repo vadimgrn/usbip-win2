@@ -139,13 +139,9 @@ NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void reuse(_In_ wsk_context &ctx)
-{
-        ctx.mdl_buf.reset();
-        IoReuseIrp(ctx.wsk_irp, STATUS_UNSUCCESSFUL);
-}
-
+/*
+ * alloc_wsk_context set ctx->is_isoc, it's safe do not clear it.
+ */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
 {
@@ -153,13 +149,12 @@ void free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
                 return;
         }
 
+        ctx->vpdo = nullptr;
+        ctx->irp = nullptr;
+        ctx->mdl_buf.reset();
+
         if (reuse) {
                 ::reuse(*ctx);
-        }
-
-        if (auto &wi = ctx->workitem) {
-                IoFreeWorkItem(wi);
-                wi = nullptr;
         }
 
         ExFreeToLookasideListEx(&wsk_context_list, ctx);

@@ -189,6 +189,11 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
 
         vpdo->Self->Flags |= DO_POWER_PAGABLE | DO_DIRECT_IO;
 
+        if (!(vpdo->workitem = IoAllocateWorkItem(vpdo->Self))) {
+                Trace(TRACE_LEVEL_ERROR, "IoAllocateWorkItem error");
+                return make_error(ERR_GENERAL);
+        }
+
         if (init(*vpdo, r)) {
                 return make_error(ERR_GENERAL);
         }
