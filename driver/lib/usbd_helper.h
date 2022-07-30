@@ -54,3 +54,11 @@ inline bool is_transfer_direction_out(const usbip_header &h)
 {
 	return h.base.direction == USBIP_DIR_OUT;
 }
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto is_isoch(_In_ const URB &urb)
+{
+	auto f = urb.UrbHeader.Function;
+	return  f == URB_FUNCTION_ISOCH_TRANSFER || 
+		f == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
+}
