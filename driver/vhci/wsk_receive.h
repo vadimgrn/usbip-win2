@@ -13,4 +13,4 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS sched_read_usbip_header(_In_opt_ vpdo_dev_t *vpdo, _In_opt_ wsk_context *ctx);
+void sched_receive_usbip_header(_In_ wsk_context *ctx);

@@ -1,4 +1,5 @@
 #include "pnp_remove.h"
+#include "pnp_remove.h"
 #include <wdm.h>
 #include "trace.h"
 #include "pnp_remove.tmh"
@@ -94,7 +95,7 @@ PAGEABLE void free_strings(vpdo_dev_t &d)
 }
 
 /*
- * The socket is closed, there is no concurrency with send_complete from internal _ioctl.cpp
+ * The socket is closed, there is no concurrency with send_complete from internal_ioctl.cpp
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)

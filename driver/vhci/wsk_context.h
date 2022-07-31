@@ -16,14 +16,23 @@ NTSTATUS init_wsk_context_list();
 
 struct wsk_context
 {
+        // transient data
+
         vpdo_dev_t *vpdo;
-        IRP *wsk_irp;
         IRP *irp; // can be NULL, see send_cmd_unlink
+
+        using received_fn = NTSTATUS (wsk_context&);
+        received_fn *received;
+        size_t receive_size;
+
+        usbip::Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer
+
+        // preallocated data
+
+        IRP *wsk_irp;
 
         usbip::Mdl mdl_hdr;
         usbip_header hdr;
-
-        usbip::Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer
 
         usbip::Mdl mdl_isoc;
         usbip_iso_packet_descriptor *isoc;

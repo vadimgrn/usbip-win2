@@ -15,6 +15,7 @@
 #include "dbgcommon.h"
 #include "pdu.h"
 #include "strutil.h"
+#include "wsk_context.h"
 #include "wsk_receive.h"
 #include "pnp.h"
 
@@ -713,10 +714,13 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
                 return STATUS_SUCCESS;
         }
 
-        if (auto err = sched_read_usbip_header(vpdo, nullptr)) {
+        if (auto ctx = alloc_wsk_context(0)) {
+                ctx->vpdo = vpdo;
+                sched_receive_usbip_header(ctx);
+        } else {
                 error = make_error(ERR_GENERAL);
                 destroy_device(vpdo);
-                return err;
+                return STATUS_SUCCESS;
         }
 
         vpdo->Self->Flags &= ~DO_DEVICE_INITIALIZING; // must be the last step in initialization
