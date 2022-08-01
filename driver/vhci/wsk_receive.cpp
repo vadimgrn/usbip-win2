@@ -499,34 +499,58 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_ URB &
 	}
 
 	auto &tr = AsUrbTransfer(urb);
-	auto &ret = get_ret_submit(ctx);
-
-	if (auto err = usbip::assign(tr.TransferBufferLength, ret.actual_length)) {
-		return err;
+	if (!tr.TransferBufferLength) {
+		Trace(TRACE_LEVEL_ERROR, "Can't receive payload %Iu if TransferBufferLength is zero", length);
+		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoWriteAccess, urb)) {
+	auto dir_out = is_transfer_direction_out(ctx.hdr); // TransferFlags can have wrong direction
+	auto &ret = get_ret_submit(ctx);
+	auto cnt = ret.number_of_packets;
+
+	if (cnt) { // may be urb.UrbIsochronousTransfer
+		if (auto err = usbip::check(tr.TransferBufferLength, ret.actual_length)) {
+			Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d)", 
+				tr.TransferBufferLength, ret.actual_length);
+			return err;
+		}
+	} else {
+		auto err = usbip::assign(tr.TransferBufferLength, ret.actual_length);
+		if (err || dir_out) {
+			Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
+				tr.TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
+			return err;
+		}
+	}
+
+	if (dir_out) {
+		NT_ASSERT(cnt);
+		NT_ASSERT(!ctx.mdl_buf);
+	} if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoWriteAccess, urb)) {
 		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
 		return err;
 	}
 
-	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) {
+	if (auto err = prepare_isoc(ctx, cnt)) {
 		return err;
 	}
 
-	auto tail = ctx.is_isoc ? ctx.mdl_isoc.get() : nullptr;
-	auto head = ctx.mdl_buf ? ctx.mdl_buf.get() : tail;
+	MDL *head{};
 
-	if (head) {
-		head->Next = head != tail ? tail : nullptr;
-		NT_ASSERT(!tail->Next);
-	} else {
-		return STATUS_INVALID_BUFFER_SIZE;
+	if (!cnt) {
+		head = ctx.mdl_buf.get();
+		NT_ASSERT(!ctx.mdl_buf.next());
+	} else if (auto &hdr = ctx.mdl_buf) { // isoch in
+		head = hdr.get();
+		hdr.next(ctx.mdl_isoc);
+	} else { // isoch out
+		head = ctx.mdl_isoc.get();
 	}
 
 	buf.Mdl = head;
 	buf.Offset = 0;
 	buf.Length = length;
+	NT_ASSERT(buf.Length <= usbip::size(buf.Mdl));
 
 	return STATUS_SUCCESS;
 }
@@ -683,6 +707,8 @@ auto ret_command(_Inout_ wsk_context &ctx)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto validate_header(_Inout_ usbip_header &hdr)
 {
+	byteswap_header(hdr, swap_dir::net2host);
+
 	auto &base = hdr.base;
 	auto cmd = static_cast<usbip_request_type>(base.command);
 
@@ -715,7 +741,6 @@ void receive_usbip_header(_In_ DEVICE_OBJECT*, _In_opt_ void *Context)
 
 	auto received = [] (auto &ctx)
 	{
-		byteswap_header(ctx.hdr, swap_dir::net2host);
 		return validate_header(ctx.hdr) ? ret_command(ctx) : STATUS_INVALID_PARAMETER;
 	};
 

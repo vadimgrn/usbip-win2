@@ -45,6 +45,13 @@ inline auto make_wsk_buf(_In_ const Mdl &mdl_hdr, _In_ const usbip_header &hdr)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
+{
+        return  actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength ? 
+                STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length);
 
 } // namespace usbip

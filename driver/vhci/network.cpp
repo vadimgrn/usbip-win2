@@ -179,10 +179,10 @@ NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Ope
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
 {
-        if (actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength) {
+        auto err = check(TransferBufferLength, actual_length);
+        if (!err) {
                 TransferBufferLength = actual_length;
-                return STATUS_SUCCESS;
         }
-
-        return STATUS_INVALID_BUFFER_SIZE;
+        return err;
 }
+
