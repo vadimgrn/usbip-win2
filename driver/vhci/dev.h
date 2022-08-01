@@ -8,6 +8,8 @@
 #include "devconf.h"
 #include "usbdsc.h"
 
+struct wsk_context;
+
 namespace wsk
 {
         struct SOCKET;
@@ -125,8 +127,12 @@ struct vpdo_dev_t : vdev_t
 	
 	seqnum_t seqnum; // @see next_seqnum
 	
-	_IO_WORKITEM *workitem;
 	wsk::SOCKET *sock;
+	_IO_WORKITEM *workitem;
+
+	using received_fn = NTSTATUS (wsk_context&);
+	received_fn *received;
+	size_t receive_size;
 
 	IO_CSQ irps_csq;
 	LIST_ENTRY irps;

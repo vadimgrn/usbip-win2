@@ -551,19 +551,20 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
 	auto &ctx = *static_cast<wsk_context*>(Context);
+	auto vpdo = ctx.vpdo;
 
 	auto &st = wsk_irp->IoStatus;
+	NT_ASSERT(st.Status != STATUS_PENDING);
 	TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu", ptr4log(wsk_irp), st.Status, st.Information);
 
-	NT_ASSERT(st.Status != STATUS_PENDING);
-	auto err = NT_SUCCESS(st.Status) && st.Information == ctx.receive_size ? ctx.received(ctx) : STATUS_UNSUCCESSFUL;
+	auto err = NT_SUCCESS(st.Status) && st.Information == vpdo->receive_size ? vpdo->received(ctx) : STATUS_UNSUCCESSFUL;
 
 	if (!err) {
 		sched_receive_usbip_header(&ctx);
 	} else if (err != STATUS_PENDING) {
-		TraceMsg("Unplugging vpdo %04x after %!STATUS!", ptr4log(ctx.vpdo), err);
-		vhub_unplug_vpdo(ctx.vpdo);
-		free(&ctx);
+		TraceMsg("Unplugging vpdo %04x after %!STATUS!", ptr4log(vpdo), err);
+		vhub_unplug_vpdo(vpdo);
+		free(&ctx, true);
 	}
 
 	return StopCompletion;
@@ -571,13 +572,15 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void receive(_In_ WSK_BUF &buf, _In_ wsk_context::received_fn received, _In_ wsk_context &ctx)
+void receive(_In_ WSK_BUF &buf, _In_ vpdo_dev_t::received_fn received, _In_ wsk_context &ctx)
 {
-	NT_ASSERT(received);
-	ctx.received = received;
-
+	auto &vpdo = *ctx.vpdo;
+	
 	NT_ASSERT(buf.Length);
-	ctx.receive_size = buf.Length;
+	vpdo.receive_size = buf.Length;
+
+	NT_ASSERT(received);
+	vpdo.received = received;
 
 	reuse(ctx);
 

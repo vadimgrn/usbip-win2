@@ -21,10 +21,6 @@ struct wsk_context
         vpdo_dev_t *vpdo;
         IRP *irp; // can be NULL, see send_cmd_unlink
 
-        using received_fn = NTSTATUS (wsk_context&);
-        received_fn *received;
-        size_t receive_size;
-
         usbip::Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer
 
         // preallocated data
@@ -47,7 +43,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_opt_ wsk_context *ctx, _In_ bool reuse = true);
+void free(_In_opt_ wsk_context *ctx, _In_ bool reuse);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void reuse(_In_ wsk_context &ctx)

@@ -152,10 +152,6 @@ void free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
 
         ctx->vpdo = nullptr;
         ctx->irp = nullptr;
-
-        ctx->received = nullptr;
-        ctx->receive_size = 0;
-
         ctx->mdl_buf.reset();
 
         if (reuse) {

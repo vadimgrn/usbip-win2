@@ -82,7 +82,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                 vhub_unplug_vpdo(&vpdo);
         }
 
-        free(ctx);
+        free(ctx, true);
         return StopCompletion;
 }
 
@@ -117,7 +117,7 @@ auto send(_In_ wsk_context *ctx, _Inout_opt_ const URB *transfer_buffer = nullpt
         WSK_BUF buf;
 
         if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
@@ -237,7 +237,7 @@ NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -311,7 +311,7 @@ NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -369,7 +369,7 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
                                                r.TransferBufferLength);
 
         if (err) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -451,7 +451,7 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
                 (dir_in ? USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT);
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -517,7 +517,7 @@ NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRe
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -595,7 +595,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -623,7 +623,7 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -678,13 +678,13 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         }
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
         if (is_transfer_direction_out(ctx->hdr) != is_transfer_dir_out(urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
                 Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
-                free(ctx);
+                free(ctx, false);
                 return STATUS_INVALID_PARAMETER;
         }
 
@@ -721,7 +721,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         }
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -763,12 +763,12 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle,
                                                  r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
         if (auto err = repack(ctx->isoc, r)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -801,7 +801,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -829,7 +829,7 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -868,7 +868,7 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
         const ULONG TransferFlags = USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK | USBD_DEFAULT_PIPE_TRANSFER;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags, r.TransferBufferLength)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
@@ -1050,7 +1050,7 @@ NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
         if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
-                free(ctx);
+                free(ctx, false);
                 return err;
         }
 
