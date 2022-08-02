@@ -183,6 +183,7 @@ NTSTATUS usbip::assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_leng
         if (!err) {
                 TransferBufferLength = actual_length;
         }
+
         return err;
 }
 

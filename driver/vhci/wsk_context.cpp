@@ -136,7 +136,6 @@ NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
                 NT_ASSERT(number_of_packets(ctx) == NumberOfPackets);
         }
 
-        NT_ASSERT(!ctx.mdl_isoc.next());
         return STATUS_SUCCESS;
 }
 

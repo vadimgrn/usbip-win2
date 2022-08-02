@@ -17,20 +17,20 @@ void byteswap(usbip_header_basic &r)
         static_assert(sizeof(*v[0]) == sizeof(unsigned long));
 
         for (auto val: v) {
-		*val = _byteswap_ulong(*val); // RtlUlongByteSwap
+		*val = RtlUlongByteSwap(*val); // _byteswap_ulong
 	}
 }
 
 void byteswap(usbip_header_cmd_submit &r) 
 {
 	static_assert(sizeof(r.transfer_flags) == sizeof(unsigned long));
-	r.transfer_flags = _byteswap_ulong(r.transfer_flags);
+	r.transfer_flags = RtlUlongByteSwap(r.transfer_flags);
 
         INT32 *v[] {&r.transfer_buffer_length, &r.start_frame, &r.number_of_packets, &r.interval};
         static_assert(sizeof(*v[0]) == sizeof(unsigned long));
 
 	for (auto val: v) {
-		*val = _byteswap_ulong(*val);
+		*val = RtlUlongByteSwap(*val);
 	}
 }
 
@@ -40,20 +40,20 @@ void byteswap(usbip_header_ret_submit &r)
         static_assert(sizeof(*v[0]) == sizeof(unsigned long));
 
 	for (auto val: v) {
-		*val = _byteswap_ulong(*val);
+		*val = RtlUlongByteSwap(*val);
 	}
 }
 
 inline void byteswap(usbip_header_cmd_unlink &r) 
 {
 	static_assert(sizeof(r.seqnum) == sizeof(unsigned long));
-	r.seqnum = _byteswap_ulong(r.seqnum);
+	r.seqnum = RtlUlongByteSwap(r.seqnum);
 }
 
 inline void byteswap(usbip_header_ret_unlink &r) 
 {
 	static_assert(sizeof(r.status) == sizeof(unsigned long));
-	r.status = _byteswap_ulong(r.status);
+	r.status = RtlUlongByteSwap(r.status);
 }
 
 } // namespace
@@ -93,7 +93,7 @@ void byteswap(usbip_iso_packet_descriptor *d, size_t cnt)
 		static_assert(sizeof(*v[0]) == sizeof(unsigned long));
 
 		for (auto val: v) {
-			*val = _byteswap_ulong(*val);
+			*val = RtlUlongByteSwap(*val);
 		}
 	}
 }

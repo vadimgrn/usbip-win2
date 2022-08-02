@@ -188,25 +188,22 @@ NTSTATUS urb_control_descriptor_request(_In_ wsk_context &ctx, _Inout_ URB &urb)
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto copy_isoc_data(
-	_Inout_ _URB_ISOCH_TRANSFER &r, _Out_ char *dst_buf,
-	_Inout_ vpdo_dev_t &/*src_buf*/, _In_ ULONG src_len,
-	_Out_ usbip_iso_packet_descriptor *sd, _In_ size_t /*sd_len*/)
+auto copy_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buf, _In_ ULONG len, 
+	            _Inout_ usbip_iso_packet_descriptor *sd)
 {
-	auto dir_out = !dst_buf;
-//	auto sd_offset = dir_out ? 0 : src_len;
+	auto dir_out = !buf;
+	auto sd_offset = len;
 
-//	if (auto err = wsk_data_copy(src_buf, sd, sd_offset, sd_len)) {
-//		Trace(TRACE_LEVEL_ERROR, "wsk_data_copy usbip_iso_packet_descriptor[%lu] %!STATUS!", r.NumberOfPackets, err);
-//		return err;
-//	}
+	auto cnt = r.NumberOfPackets;
+	NT_ASSERT(cnt);
 
-	byteswap(sd, r.NumberOfPackets);
+	byteswap(sd, cnt);
 
-	ULONG src_offset = 0; // from src_buf
-	auto dd = r.IsoPacket;
+	--cnt;
+	auto dd = r.IsoPacket + cnt;
+	sd += cnt;
 
-	for (ULONG i = 0; i < r.NumberOfPackets; ++i, ++dd, src_offset += sd++->actual_length) {
+	for (auto i = r.NumberOfPackets; i--; --sd, --dd) {
 
 		dd->Status = sd->status ? to_windows_status_isoch(sd->status) : USBD_STATUS_SUCCESS;
 
@@ -229,37 +226,48 @@ auto copy_isoc_data(
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src_offset > dd->Offset) {// source buffer has no gaps
-			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) > dst.Offset(%lu)", src_offset, dd->Offset);
+		if (sd_offset >= sd->actual_length) {
+			sd_offset -= sd->actual_length;
+		} else {
+			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) >= actual_length(%u)", sd_offset, sd->actual_length);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (src_offset + sd->actual_length > src_len) {
-			Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) + src->actual_length(%u) > src_len(%lu)",
-				                  src_offset, sd->actual_length, src_len);
+		if (sd_offset == dd->Offset) { // buffer is filled without gaps from the beginning
+			dd->Length = sd->actual_length;
+			sd_offset = 0;
+			break;
+		}
+
+		if (sd_offset > dd->Offset) {// source buffer has no gaps
+			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) > dst.Offset(%lu)", sd_offset, dd->Offset);
+			return STATUS_INVALID_PARAMETER;
+		}
+
+		if (sd_offset + sd->actual_length > len) {
+			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) + actual_length(%u) > len(%lu)", 
+				sd_offset, sd->actual_length, len);
 			return STATUS_INVALID_PARAMETER;
 		}
 
 		if (dd->Offset + sd->actual_length > r.TransferBufferLength) {
 			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) + src.actual_length(%u) > r.TransferBufferLength(%lu)",
-				                  dd->Offset, sd->actual_length, r.TransferBufferLength);
+				dd->Offset, sd->actual_length, r.TransferBufferLength);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-//		if (auto err = wsk_data_copy(src_buf, dst_buf + dd->Offset, src_offset, sd->actual_length)) {
-//			Trace(TRACE_LEVEL_ERROR, "wsk_data_copy buffer[%lu] %!STATUS!", i, err);
-//			return err;
-//		}
+		NT_ASSERT(dd->Offset > sd_offset);
+		RtlMoveMemory(buf + dd->Offset, buf + sd_offset, sd->actual_length);
 
 		dd->Length = sd->actual_length;
 	}
 
-	bool ok = src_offset == src_len;
-	if (!ok) {
-		Trace(TRACE_LEVEL_ERROR, "src_offset(%lu) != src_len(%lu)", src_offset, src_len);
+	auto err = sd_offset ? STATUS_INVALID_PARAMETER : STATUS_SUCCESS;
+	if (err) {
+		Trace(TRACE_LEVEL_ERROR, "sd_offset %lu must be zero", sd_offset);
 	}
 
-	return ok ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
+	return err;
 }
 
 /*
@@ -282,32 +290,49 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		r.StartFrame = ret.start_frame;
 	}
 
-	if (!(cnt >= 0 && ULONG(cnt) == r.NumberOfPackets)) {
+	ctx.vpdo->current_frame_number = ret.start_frame;
+
+	if (cnt >= 0 && ULONG(cnt) == r.NumberOfPackets) {
+		NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
+	} else {
 		Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r.NumberOfPackets);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	ctx.vpdo->current_frame_number = ret.start_frame;
-
-//	auto dir_in = is_transfer_direction_in(hdr); // TransferFlags can have wrong direction
-
-//	auto dst_buf = dir_in ? (char*)get_urb_buffer(urb) : nullptr;
-//	if (!dst_buf && dir_in) {
-//		return STATUS_INSUFFICIENT_RESOURCES;
-//	}
-
-	if (auto ct = alloc_wsk_context(r.NumberOfPackets)) {
-//		auto err = copy_isoc_data(r, dst_buf, vpdo, res.actual_length, ctx->isoc, ctx->mdl_isoc.size());
-//		free(ctx, false);
-		return STATUS_NOT_IMPLEMENTED;
-	} else {
-		return STATUS_INSUFFICIENT_RESOURCES;
+	if (!cnt) [[unlikely]] {
+		return STATUS_SUCCESS;
 	}
+
+	char *buf{};
+
+	if (is_transfer_direction_in(ctx.hdr)) {
+		buf = static_cast<char*>(ctx.mdl_buf.sysaddr());
+		if (!buf) {
+			Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
+			return STATUS_INSUFFICIENT_RESOURCES;
+		}
+	}
+	
+	return copy_isoc_data(r, buf, ret.actual_length, ctx.isoc);
 }
 
-/*
- * Nothing to handle.
- */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
+{
+	auto &ret = get_ret_submit(ctx);
+	auto &tr = AsUrbTransfer(urb);
+
+	auto err = STATUS_SUCCESS;
+
+	if (get_payload_size(ctx.hdr)) { // see ret_command
+		NT_ASSERT(tr.TransferBufferLength == ULONG(ret.actual_length)); // was already set in prepare_wsk_buf
+	} else { // DIR_OUT or !actual_length
+		err = usbip::assign(tr.TransferBufferLength, ret.actual_length);
+	}
+
+	return err;
+}
+
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_success(_In_ wsk_context&, _Inout_ URB&)
 {
@@ -338,8 +363,8 @@ urb_function_t* const urb_functions[] =
 	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
 	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
 
-	urb_function_success, // URB_FUNCTION_CONTROL_TRANSFER
-	urb_function_success, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
+	urb_with_transfer_buffer, // URB_FUNCTION_CONTROL_TRANSFER
+	urb_with_transfer_buffer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
 	urb_isoch_transfer,
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
@@ -353,28 +378,28 @@ urb_function_t* const urb_functions[] =
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
 
-	urb_function_success, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
-	urb_function_success, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
-	urb_function_success, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
 
 	nullptr, // URB_FUNCTION_RESERVED_0X0016
 
-	urb_function_success, // URB_FUNCTION_VENDOR_DEVICE
-	urb_function_success, // URB_FUNCTION_VENDOR_INTERFACE
-	urb_function_success, // URB_FUNCTION_VENDOR_ENDPOINT
+	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_DEVICE
+	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_INTERFACE
+	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_ENDPOINT
 
-	urb_function_success, // URB_FUNCTION_CLASS_DEVICE
-	urb_function_success, // URB_FUNCTION_CLASS_INTERFACE
-	urb_function_success, // URB_FUNCTION_CLASS_ENDPOINT
+	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_DEVICE
+	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_INTERFACE
+	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_ENDPOINT
 
 	nullptr, // URB_FUNCTION_RESERVE_0X001D
 
 	urb_function_success, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL, urb_pipe_request
 
-	urb_function_success, // URB_FUNCTION_CLASS_OTHER
-	urb_function_success, // URB_FUNCTION_VENDOR_OTHER
+	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_OTHER
+	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_OTHER
 
-	urb_function_success, // URB_FUNCTION_GET_STATUS_FROM_OTHER
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_OTHER
 
 	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
 	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
@@ -382,13 +407,13 @@ urb_function_t* const urb_functions[] =
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
 
-	urb_function_success, // URB_FUNCTION_GET_CONFIGURATION
-	urb_function_success, // URB_FUNCTION_GET_INTERFACE
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_CONFIGURATION
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_INTERFACE
 
 	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
 	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
 
-	urb_function_success, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
+	urb_with_transfer_buffer, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
 
 	nullptr, // URB_FUNCTION_RESERVE_0X002B
 	nullptr, // URB_FUNCTION_RESERVE_0X002C
@@ -398,14 +423,14 @@ urb_function_t* const urb_functions[] =
 
 	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
 	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
-	urb_function_success, // URB_FUNCTION_CONTROL_TRANSFER_EX
+	urb_with_transfer_buffer, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
 	nullptr, // URB_FUNCTION_RESERVE_0X0033
 	nullptr, // URB_FUNCTION_RESERVE_0X0034
 
 	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
 	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
-	urb_function_success, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
+	urb_with_transfer_buffer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
 	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
 
 	nullptr, // 0x0039
@@ -456,8 +481,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto ret_submit(_Inout_ wsk_context &ctx)
 {
 	auto irp = ctx.irp;
-	auto &st = irp->IoStatus.Status;
+	NT_ASSERT(irp);
+
 	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto &st = irp->IoStatus.Status;
 
         switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
         case IOCTL_INTERNAL_USB_SUBMIT_URB:
@@ -482,6 +509,26 @@ auto ret_submit(_Inout_ wsk_context &ctx)
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+WSK_BUF make_buf(_In_ size_t length, _In_ wsk_context &ctx, _In_ bool isoch)
+{
+	MDL *mdl{};
+
+	if (!isoch) {
+		mdl = ctx.mdl_buf.get();
+	} else if (auto &hdr = ctx.mdl_buf) { // isoch in
+		mdl = hdr.get();
+		hdr.next(ctx.mdl_isoc);
+	} else { // isoch out
+		mdl = ctx.mdl_isoc.get();
+	}
+
+	NT_ASSERT(mdl);
+	NT_ASSERT(length <= usbip::size(mdl));
+
+	return {mdl, 0, length};
+}
+
 /*
  * If response from a server has data (actual_length > 0), URB function MUST copy it to URB
  * even if UrbHeader.Status != USBD_STATUS_SUCCESS.
@@ -499,32 +546,27 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_ URB &
 	}
 
 	auto &tr = AsUrbTransfer(urb);
-	if (!tr.TransferBufferLength) {
-		Trace(TRACE_LEVEL_ERROR, "Can't receive payload %Iu if TransferBufferLength is zero", length);
-		return STATUS_BUFFER_TOO_SMALL;
-	}
 
-	auto dir_out = is_transfer_direction_out(ctx.hdr); // TransferFlags can have wrong direction
 	auto &ret = get_ret_submit(ctx);
 	auto cnt = ret.number_of_packets;
 
-	if (cnt) { // may be urb.UrbIsochronousTransfer
-		if (auto err = usbip::check(tr.TransferBufferLength, ret.actual_length)) {
-			Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d)", 
-				tr.TransferBufferLength, ret.actual_length);
-			return err;
-		}
-	} else {
-		auto err = usbip::assign(tr.TransferBufferLength, ret.actual_length);
-		if (err || dir_out) {
-			Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
-				tr.TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
-			return err;
-		}
+	auto dir_out = is_transfer_direction_out(ctx.hdr); // TransferFlags can have wrong direction
+	bool fail{};
+
+	if (cnt) { // urb.UrbIsochronousTransfer
+		fail = usbip::check(tr.TransferBufferLength, ret.actual_length);
+	} else { // actual_length MUST be assigned
+		fail = usbip::assign(tr.TransferBufferLength, ret.actual_length) || dir_out;
+	}
+
+	if (fail || !tr.TransferBufferLength) {
+		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
+			tr.TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
+		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
 	if (dir_out) {
-		NT_ASSERT(cnt);
+		NT_ASSERT(cnt); // isoch
 		NT_ASSERT(!ctx.mdl_buf);
 	} if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoWriteAccess, urb)) {
 		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
@@ -535,23 +577,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_ URB &
 		return err;
 	}
 
-	MDL *head{};
-
-	if (!cnt) {
-		head = ctx.mdl_buf.get();
-		NT_ASSERT(!ctx.mdl_buf.next());
-	} else if (auto &hdr = ctx.mdl_buf) { // isoch in
-		head = hdr.get();
-		hdr.next(ctx.mdl_isoc);
-	} else { // isoch out
-		head = ctx.mdl_isoc.get();
-	}
-
-	buf.Mdl = head;
-	buf.Offset = 0;
-	buf.Length = length;
-	NT_ASSERT(buf.Length <= usbip::size(buf.Mdl));
-
+	buf = make_buf(length, ctx, cnt);
 	return STATUS_SUCCESS;
 }
 
@@ -649,7 +675,6 @@ auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 		return err;
 	}
 
-	ctx.mdl_buf.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_buf.get(), 0, length };
 
 	receive(buf, free_payload, ctx);
@@ -657,7 +682,7 @@ auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto read_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
+auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	auto urb = get_urb(ctx.irp);
 	if (!urb) {
@@ -697,11 +722,11 @@ auto ret_command(_Inout_ wsk_context &ctx)
 	}
 
 	if (auto sz = get_payload_size(hdr)) {
-		auto f = ctx.irp ? read_payload : drain_payload;
+		auto f = ctx.irp ? recv_payload : drain_payload;
 		return f(ctx, sz);
 	}
 
-	return ret_submit(ctx);
+	return ctx.irp ? ret_submit(ctx) : STATUS_SUCCESS;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
