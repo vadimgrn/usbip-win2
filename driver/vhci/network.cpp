@@ -14,51 +14,13 @@
 #include "usbd_helper.h"
 #include "irp.h"
 
-namespace
-{
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto recv_ret_submit(_Inout_ usbip::SOCKET *sock, _Inout_ URB &urb, _Inout_ usbip_header &hdr, _Inout_ usbip::Mdl &mdl_buf)
-{
-        PAGED_CODE();
-
-        auto &base = hdr.base;
-        NT_ASSERT(base.command == USBIP_RET_SUBMIT);
-
-        auto &tr = AsUrbTransfer(urb);
-
-        {
-                auto &ret = hdr.u.ret_submit;
-                urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-
-                auto err = usbip::assign(tr.TransferBufferLength, ret.actual_length);
-                if (err || base.direction == USBIP_DIR_OUT || !tr.TransferBufferLength) { 
-                        return err;
-                }
-        }
-
-        NT_ASSERT(mdl_buf.size() >= tr.TransferBufferLength);
-        WSK_BUF buf{ mdl_buf.get(), 0, tr.TransferBufferLength };
-
-        if (auto err = receive(sock, &buf)) {
-                Trace(TRACE_LEVEL_ERROR, "Receive buffer[%Iu] %!STATUS!", buf.Length, err);
-                return err;
-        }
-
-        TraceDbg("[%Iu]%!BIN!", buf.Length, WppBinary(mdl_buf.sysaddr(LowPagePriority), static_cast<USHORT>(buf.Length)));
-        return STATUS_SUCCESS;
-}
-
-} // namespace
-
-
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
 
-        Mdl mdl(pool, data, len);
-        if (auto err = mdl.prepare(IoReadAccess)) {
+        Mdl mdl(data, len);
+        if (auto err = pool == memory::nonpaged ? mdl.prepare_nonpaged() : mdl.prepare_paged(IoReadAccess)) {
                 return err;
         }
 
@@ -71,8 +33,8 @@ PAGEABLE NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void
 {
         PAGED_CODE();
 
-        Mdl mdl(pool, data, len);
-        if (auto err = mdl.prepare(IoWriteAccess)) {
+        Mdl mdl(data, len);
+        if (auto err = pool == memory::nonpaged ? mdl.prepare_nonpaged() : mdl.prepare_paged(IoWriteAccess)) {
                 return err;
         }
 
@@ -112,7 +74,7 @@ PAGEABLE NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hd
 {
         PAGED_CODE();
 
-        usbip::Mdl mdl_hdr(memory::stack, &hdr, sizeof(hdr));
+        usbip::Mdl mdl_hdr(&hdr, sizeof(hdr));
 
         if (auto err = mdl_hdr.prepare_paged(IoReadAccess)) {
                 Trace(TRACE_LEVEL_ERROR, "prepare_paged %!STATUS!", err);
@@ -122,14 +84,15 @@ PAGEABLE NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hd
         usbip::Mdl mdl_buf;
 
         if (transfer_buffer && is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(mdl_buf, IoReadAccess, *transfer_buffer)) {
+                if (auto err = make_transfer_buffer_mdl(mdl_buf, URB_BUF_LEN, false, IoReadAccess, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                         return err;
                 }
                 mdl_hdr.next(mdl_buf);
         }
 
-        auto buf = make_wsk_buf(mdl_hdr, hdr);
+        WSK_BUF buf{ mdl_hdr.get(), 0, get_total_size(hdr) };
+        NT_ASSERT(verify(buf, false));
 
         {
                 char str[DBG_USBIP_HDR_BUFSZ];
@@ -149,41 +112,68 @@ PAGEABLE NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hd
 /*
  * URB must have TransferBuffer* members.
  * TransferBuffer && TransferBufferMDL can be both not NULL for bulk/int at least.
+ * 
+ * TransferBufferMDL can be a chain and have size greater than mdl_size. 
+ * If attach tail to this MDL (as for isoch transfer), new MDL must be used 
+ * to describe a buffer with required mdl_size.
+ * 
+ * If use MmBuildMdlForNonPagedPool for TransferBuffer, DRIVER_VERIFIER_DETECTED_VIOLATION (c4) will happen sooner or later,
+ * Arg1: 0000000000000140, Non-locked MDL constructed from either pageable or tradable memory.
+ * 
+ * @param mdl_size pass URB_BUF_LEN to use TransferBufferLength, real value must not be greater than TransferBufferLength
+ * @param mdl_chain tail will be attached to this mdl
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Operation, _In_ const URB &urb)
+NTSTATUS usbip::make_transfer_buffer_mdl(
+        _Out_ Mdl &mdl, _In_ ULONG mdl_size, _In_ bool mdl_chain, _In_ LOCK_OPERATION Operation, _In_ const URB& urb)
 {
-        auto err = STATUS_SUCCESS;
+        NT_ASSERT(!mdl);
         auto &r = AsUrbTransfer(urb);
 
-        if (!r.TransferBufferLength) {
-                NT_ASSERT(!mdl);
-        } else if (auto m = r.TransferBufferMDL) {
-                mdl = Mdl(m);
-                err = mdl.size() >= r.TransferBufferLength ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
-        } else if (auto buf = r.TransferBuffer) {
-                mdl = Mdl(memory::paged, buf, r.TransferBufferLength); // unknown it is paged or not
-                err = mdl.prepare_paged(Operation);
+        if (mdl_size == URB_BUF_LEN) {
+                mdl_size = r.TransferBufferLength;
+        } else if (mdl_size > r.TransferBufferLength) {
+                return STATUS_INVALID_PARAMETER;
+        }
+        
+        if (!mdl_size) {
+                return STATUS_SUCCESS;
+        }
+
+        auto make = [&mdl, mdl_size, Operation] (auto buf, auto probe_and_lock)
+        {
+                mdl = Mdl(buf, mdl_size);
+                auto err = probe_and_lock ? mdl.prepare_paged(Operation) : mdl.prepare_nonpaged();
+                if (err) {
+                        mdl.reset();
+                }
+                return err;
+        };
+
+        if (auto head = r.TransferBufferMDL) { // locked-down
+
+                auto len = size(head); // can be a chain
+
+                if (len < r.TransferBufferLength) { // must describe full buffer
+                        return STATUS_BUFFER_TOO_SMALL;
+                } else if (len == mdl_size || (len > mdl_size && !mdl_chain)) { // WSK_BUF.Length will cut extra length
+                        NT_VERIFY(mdl = Mdl(head));
+                        return STATUS_SUCCESS;
+                } else if (!head->Next) { // build partial MDL
+                        mdl = Mdl(head, 0, mdl_size);
+                        return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+                } else { // IoBuildPartialMdl doesn't treat SourceMdl as a chain and can't be used
+                        auto err = STATUS_INSUFFICIENT_RESOURCES; // MmGetMdlVirtualAddress(head) -> MmProbeAndLockPages fails
+                        if (auto buf = MmGetSystemAddressForMdlSafe(head, LowPagePriority | MdlMappingNoExecute)) {
+                                err = make(buf, false);
+                        }
+                        return err;
+                }
+
+        } else if (auto buf = r.TransferBuffer) { // could be allocated from paged pool
+                return make(buf, true); // false -> DRIVER_VERIFIER_DETECTED_VIOLATION
         } else {
                 Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
-                err = STATUS_INVALID_PARAMETER;
+                return STATUS_INVALID_PARAMETER;
         }
-
-        if (err) {
-                mdl.reset();
-        }
-
-        return err;
 }
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
-{
-        auto err = check(TransferBufferLength, actual_length);
-        if (!err) {
-                TransferBufferLength = actual_length;
-        }
-
-        return err;
-}
-

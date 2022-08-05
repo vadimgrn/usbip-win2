@@ -25,7 +25,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS CompleteRequestAsIs(IRP *irp);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete_canceled_irp(IRP *irp);
+void complete_as_canceled(IRP *irp);
 
 inline auto list_entry(IRP *irp)
 {

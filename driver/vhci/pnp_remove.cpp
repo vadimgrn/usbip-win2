@@ -107,7 +107,7 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 
 	if (is_initialized(vpdo.irps_csq)) {
                 while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, nullptr)) {
-                        complete_canceled_irp(irp);
+			complete_as_canceled(irp);
                 }
         }
 }

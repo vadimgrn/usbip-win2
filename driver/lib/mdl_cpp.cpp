@@ -7,14 +7,30 @@
 /*
 * @see reactos\ntoskrnl\io\iomgr\iomdl.c
 */
-usbip::Mdl::Mdl(_In_ memory pool, _In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
-        m_type(pool == memory::nonpaged ? mdl_type::nonpaged : mdl_type::paged),
+usbip::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
         m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr))
 {
 }
 
+/*
+ * Impossible to build partial MDL for a chain, only for THIS SourceMdl.
+ */
+usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) :
+        Mdl(nullptr, Length)
+{
+        NT_ASSERT(!SourceMdl->Next);
+        NT_ASSERT(Offset + Length <= MmGetMdlByteCount(SourceMdl)); // usbip::size(SourceMdl)
+
+        if (m_mdl) {
+                NT_ASSERT(!partial());
+                auto addr = (char*)MmGetMdlVirtualAddress(SourceMdl) + Offset;
+                IoBuildPartialMdl(SourceMdl, m_mdl, addr, Length);
+                NT_ASSERT(partial());
+        }
+}
+
 usbip::Mdl::Mdl(Mdl&& m) :
-        m_type(m.m_type),
+        m_tail(m.m_tail),
         m_mdl(m.release())
 {
 }
@@ -22,8 +38,8 @@ usbip::Mdl::Mdl(Mdl&& m) :
 auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 {
         if (m_mdl != m.m_mdl) {
-                auto type = m.m_type;
-                reset(m.release(), type);
+                auto tail = m.m_tail;
+                reset(m.release(), tail);
         }
 
         return *this;
@@ -31,49 +47,40 @@ auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 
 MDL* usbip::Mdl::release()
 {
-        m_type = mdl_type::nonmanaged;
+        m_tail = nullptr;
 
         auto m = m_mdl;
         m_mdl = nullptr;
         return m;
 }
 
-void usbip::Mdl::reset(_In_ MDL *mdl, _In_ mdl_type type)
+void usbip::Mdl::reset(_In_ MDL *mdl, _In_ MDL *tail)
 {
-        if (m_mdl && managed()) {
-                NT_ASSERT(m_mdl != mdl);
-                do_unprepare();
-                IoFreeMdl(m_mdl);
+        if (m_mdl) {
+                if (managed()) {
+                        NT_ASSERT(m_mdl != mdl);
+                        do_unprepare(false);
+                        IoFreeMdl(m_mdl); // calls MmPrepareMdlForReuse
+                } else if (m_tail->Next) {
+                        m_tail->Next = nullptr;
+                }
         }
 
-        m_type = type;
+        m_tail = tail;
         m_mdl = mdl;
 }
 
-NTSTATUS usbip::Mdl::lock(_In_ KPROCESSOR_MODE AccessMode, _In_ LOCK_OPERATION Operation)
+NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
 {
-        NT_ASSERT(m_mdl);
-        NT_ASSERT(paged());
-
         if (locked()) { // may not lock again until unlock() is called
                 return STATUS_ALREADY_COMPLETE;
         }
 
         __try {
-                MmProbeAndLockPages(m_mdl, AccessMode, Operation);
+                MmProbeAndLockPages(m_mdl, KernelMode, Operation);
         } __except (EXCEPTION_EXECUTE_HANDLER) {}
 
-        return locked() ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
-}
-
-void usbip::Mdl::unlock() 
-{ 
-        NT_ASSERT(m_mdl);
-        NT_ASSERT(paged());
-
-        if (locked()) {
-                MmUnlockPages(m_mdl); 
-        }
+        return locked() ? STATUS_SUCCESS : STATUS_LOCK_NOT_GRANTED;
 }
 
 void usbip::Mdl::next(_In_ MDL *m)
@@ -89,40 +96,63 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (!nonpaged()) {
+        if (nonmanaged()) {
                 return STATUS_INVALID_DEVICE_REQUEST;
         }
 
+        if (nonpaged()) {
+                return STATUS_ALREADY_COMPLETE;
+        }
+
         MmBuildMdlForNonPagedPool(m_mdl);
+        NT_ASSERT(nonpaged());
+
         return STATUS_SUCCESS;
 }
 
-NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode)
+NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
 {
-        return !m_mdl ? STATUS_INSUFFICIENT_RESOURCES :
-                paged() ? lock(AccessMode, Operation) : 
-                STATUS_INVALID_DEVICE_REQUEST;
-}
-
-NTSTATUS usbip::Mdl::prepare(_In_ LOCK_OPERATION Operation, _In_ KPROCESSOR_MODE AccessMode)
-{
-        if (m_mdl && managed()) {
-                return paged() ? prepare_paged(Operation, AccessMode) : prepare_nonpaged();
+        if (!m_mdl) {
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        return STATUS_INVALID_DEVICE_REQUEST;
+        if (nonmanaged()) {
+                return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        return lock(Operation);
 }
 
 void usbip::Mdl::unprepare()
 {
         if (m_mdl && managed()) {
-                do_unprepare();
+                do_unprepare(true);
         }
 }
 
-void usbip::Mdl::do_unprepare()
+/*
+ * nonpaged() and partial() can be set both.
+ */
+void usbip::Mdl::do_unprepare(_In_ bool reuse_partial)
 {
-        paged() ? unlock() : unprepare_nonpaged();
+        if (locked()) {
+                NT_ASSERT(!nonpaged());
+                NT_ASSERT(!partial());
+                MmUnlockPages(m_mdl);
+                NT_ASSERT(!locked());
+        } else if (partial()) {
+                NT_ASSERT(!locked());
+                if (reuse_partial) {
+                        MmPrepareMdlForReuse(m_mdl); // it's safe to call several times
+                }
+        } else if (nonpaged()) { // no "undo" operation is required for MmBuildMdlForNonPagedPool
+                NT_ASSERT(!locked());
+        }
+}
+
+void* usbip::Mdl::sysaddr(_In_ ULONG Priority)
+{ 
+        return m_mdl ? MmGetSystemAddressForMdlSafe(m_mdl, Priority) : nullptr; 
 }
 
 size_t usbip::size(_In_ const MDL *mdl)

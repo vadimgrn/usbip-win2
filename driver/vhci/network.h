@@ -30,27 +30,21 @@ PAGEABLE err_t recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ _URB *transfer_buffer = nullptr);
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ LOCK_OPERATION Operation, _In_ const _URB &urb);
+enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto make_wsk_buf(_In_ const Mdl &mdl_hdr, _In_ const usbip_header &hdr)
+NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ ULONG mdl_size, _In_ bool mdl_chain, _In_ LOCK_OPERATION Operation, 
+                                  _In_ const _URB& urb);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto verify(_In_ const WSK_BUF &buf, _In_ bool exact)
 {
-        WSK_BUF buf{ mdl_hdr.get(), 0, get_total_size(hdr) };
+	if (buf.Offset || !buf.Length) {
+		return false;
+	}
 
-        NT_ASSERT(buf.Length >= mdl_hdr.size());
-        NT_ASSERT(buf.Length <= size(mdl_hdr)); // MDL for TransferBuffer can be larger than TransferBufferLength
-
-        return buf;
+	auto sz = size(buf.Mdl);
+	return exact ? buf.Length == sz : buf.Length <= sz;
 }
-
-constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
-{
-        return  actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength ? 
-                STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length);
 
 } // namespace usbip

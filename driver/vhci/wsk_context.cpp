@@ -50,7 +50,7 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
                 return nullptr;
         }
 
-        ctx->mdl_hdr = usbip::Mdl(usbip::memory::nonpaged, &ctx->hdr, sizeof(ctx->hdr));
+        ctx->mdl_hdr = usbip::Mdl(&ctx->hdr, sizeof(ctx->hdr));
 
         if (auto err = ctx->mdl_hdr.prepare_nonpaged()) {
                 Trace(TRACE_LEVEL_ERROR, "mdl_hdr %!STATUS!", err);
@@ -129,7 +129,7 @@ NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         }
 
         if (ctx.mdl_isoc.size() != isoc_len) {
-                ctx.mdl_isoc = usbip::Mdl(usbip::memory::nonpaged, ctx.isoc, isoc_len);
+                ctx.mdl_isoc = usbip::Mdl(ctx.isoc, isoc_len);
                 if (auto err = ctx.mdl_isoc.prepare_nonpaged()) {
                         return err;
                 }

@@ -41,6 +41,8 @@ auto complete_internal_ioctl(_Inout_ IRP *irp, _In_ NTSTATUS status)
  * 2.WskReceiveEvent must not complete IRP if it was called before send_complete because it modifies *get_status(irp).
  * 3.CompleteCanceledIrp and WskReceiveEvent are mutually exclusive because IRP was dequeued from the CSQ.
  * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceiveEvent.
+ * 
+ * @see wsk_receive.cpp, complete 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
@@ -68,14 +70,14 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                         IoCompleteRequest(irp, IO_NO_INCREMENT);
                         break;
                 case ST_IRP_CANCELED:
-                        complete_canceled_irp(irp);
+                        complete_as_canceled(irp);
                         break;
                 }
         } else if (auto victim = dequeue_irp(vpdo, get_seqnum(irp))) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == irp);
                 complete_internal_ioctl(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == ST_IRP_CANCELED) {
-                complete_canceled_irp(irp);
+                complete_as_canceled(irp);
         }
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
@@ -92,7 +94,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
         NT_ASSERT(!ctx.mdl_buf);
 
         if (transfer_buffer && is_transfer_direction_out(ctx.hdr)) { // TransferFlags can have wrong direction
-                if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoReadAccess, *transfer_buffer)) {
+                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, usbip::URB_BUF_LEN, ctx.is_isoc, IoReadAccess, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                         return err;
                 }
@@ -102,12 +104,16 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
 
         if (ctx.is_isoc) {
                 NT_ASSERT(ctx.mdl_isoc);
-                auto &tail = ctx.mdl_buf ? ctx.mdl_buf : ctx.mdl_hdr;
-                tail.next(ctx.mdl_isoc);
                 byteswap(ctx.isoc, number_of_packets(ctx));
+                auto t = tail(ctx.mdl_hdr); // ctx.mdl_buf can be a chain
+                t->Next = ctx.mdl_isoc.get();
         }
 
-        buf = usbip::make_wsk_buf(ctx.mdl_hdr, ctx.hdr);
+        buf.Mdl = ctx.mdl_hdr.get();
+        buf.Offset = 0;
+        buf.Length = get_total_size(ctx.hdr);
+
+        NT_ASSERT(usbip::verify(buf, ctx.is_isoc));
         return STATUS_SUCCESS;
 }
 
@@ -1104,7 +1110,7 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
         NT_ASSERT(old_status != ST_RECV_COMPLETE);
 
         if (old_status == ST_SEND_COMPLETE) {
-                complete_canceled_irp(irp);
+                complete_as_canceled(irp);
         }
 }
 

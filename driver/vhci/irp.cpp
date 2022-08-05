@@ -85,7 +85,7 @@ NTSTATUS CompleteRequestAsIs(IRP *irp)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete_canceled_irp(IRP *irp)
+void complete_as_canceled(IRP *irp)
 {
 	TraceMsg("%04x", ptr4log(irp));
 

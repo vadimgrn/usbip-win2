@@ -24,6 +24,20 @@
 namespace
 {
 
+constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
+{
+	return  actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength ? 
+		STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
+{
+	auto err = check(TransferBufferLength, actual_length);
+	TransferBufferLength = err ? 0 : actual_length;
+	return err;
+}
+
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 {
@@ -137,7 +151,7 @@ NTSTATUS urb_control_descriptor_request(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		return STATUS_SUCCESS;
 	}
 
-	dsc = (USB_COMMON_DESCRIPTOR*)ctx.mdl_buf.sysaddr();
+	dsc = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr());
 	if (!dsc) {
 		Trace(TRACE_LEVEL_WARNING, "MmGetSystemAddressForMdlSafe error, can't cache descriptor");
 		return STATUS_SUCCESS;
@@ -174,7 +188,7 @@ NTSTATUS urb_control_descriptor_request(_In_ wsk_context &ctx, _Inout_ URB &urb)
 }
 
 /*
- * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == src_len,
+ * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == actual_length,
  * src->offset is ignored for that reason.
  *
  * For isochronous packets: actual length is the sum of
@@ -188,22 +202,16 @@ NTSTATUS urb_control_descriptor_request(_In_ wsk_context &ctx, _Inout_ URB &urb)
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto copy_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buf, _In_ ULONG len, 
-	            _Inout_ usbip_iso_packet_descriptor *sd)
+auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ ULONG length, 
+	            _In_ const usbip_iso_packet_descriptor *sd)
 {
-	auto dir_out = !buf;
-	auto sd_offset = len;
+	auto dir_out = !buffer;
+	auto sd_offset = length;
 
-	auto cnt = r.NumberOfPackets;
-	NT_ASSERT(cnt);
+	auto dd = r.IsoPacket + r.NumberOfPackets - 1;
+	sd += r.NumberOfPackets - 1;
 
-	byteswap(sd, cnt);
-
-	--cnt;
-	auto dd = r.IsoPacket + cnt;
-	sd += cnt;
-
-	for (auto i = r.NumberOfPackets; i--; --sd, --dd) {
+	for (auto i = r.NumberOfPackets; i; --i, --sd, --dd) { // set dd.Status and dd.Length
 
 		dd->Status = sd->status ? to_windows_status_isoch(sd->status) : USBD_STATUS_SUCCESS;
 
@@ -233,20 +241,14 @@ auto copy_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buf, _In_ ULON
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (sd_offset == dd->Offset) { // buffer is filled without gaps from the beginning
-			dd->Length = sd->actual_length;
-			sd_offset = 0;
-			break;
-		}
-
 		if (sd_offset > dd->Offset) {// source buffer has no gaps
 			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) > dst.Offset(%lu)", sd_offset, dd->Offset);
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (sd_offset + sd->actual_length > len) {
-			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) + actual_length(%u) > len(%lu)", 
-				sd_offset, sd->actual_length, len);
+		if (sd_offset + sd->actual_length > length) {
+			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) + actual_length(%u) > length(%lu)", 
+				sd_offset, sd->actual_length, length);
 			return STATUS_INVALID_PARAMETER;
 		}
 
@@ -256,22 +258,40 @@ auto copy_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buf, _In_ ULON
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		NT_ASSERT(dd->Offset > sd_offset);
-		RtlMoveMemory(buf + dd->Offset, buf + sd_offset, sd->actual_length);
+		if (dd->Offset > sd_offset) {
+			RtlMoveMemory(buffer + dd->Offset, buffer + sd_offset, sd->actual_length);
+		} else { // buffer is filled without gaps from the beginning
+			NT_ASSERT(dd->Offset == sd_offset);
+		}
 
 		dd->Length = sd->actual_length;
 	}
 
-	auto err = sd_offset ? STATUS_INVALID_PARAMETER : STATUS_SUCCESS;
-	if (err) {
-		Trace(TRACE_LEVEL_ERROR, "sd_offset %lu must be zero", sd_offset);
+	if (!dir_out && sd_offset) {
+		Trace(TRACE_LEVEL_ERROR, "SUM(actual_length) != actual_length(%lu), delta is %lu", length, sd_offset);
+		return STATUS_INVALID_PARAMETER; 
 	}
 
-	return err;
+	return STATUS_SUCCESS;
 }
 
 /*
- * Layout: usbip_header, transfer buffer(IN only), usbip_iso_packet_descriptor[].
+ * ctx.mdl_buf can't be used, it describes actual_length instead of TransferBufferLength.
+ * Try TransferBufferMDL first because it is locked-down and to obey URB_FUNCTION_XXX_USING_CHAINED_MDL.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
+{
+	if (auto buf = TransferBufferMDL) {
+		return MmGetSystemAddressForMdlSafe(buf, LowPagePriority | MdlMappingNoExecute);
+	}
+
+	NT_ASSERT(TransferBuffer); // make_transfer_buffer_mdl checks it before payload receive
+	return TransferBuffer;
+}
+
+/*
+ * Layout: transfer buffer(IN only), usbip_iso_packet_descriptor[].
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
@@ -294,26 +314,22 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
 	if (cnt >= 0 && ULONG(cnt) == r.NumberOfPackets) {
 		NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
+		byteswap(ctx.isoc, cnt);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r.NumberOfPackets);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	if (!cnt) [[unlikely]] {
-		return STATUS_SUCCESS;
-	}
-
 	char *buf{};
 
 	if (is_transfer_direction_in(ctx.hdr)) {
-		buf = static_cast<char*>(ctx.mdl_buf.sysaddr());
+		buf = (char*)get_transfer_buffer(r.TransferBuffer, r.TransferBufferMDL);
 		if (!buf) {
-			Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
 			return STATUS_INSUFFICIENT_RESOURCES;
 		}
 	}
 	
-	return copy_isoc_data(r, buf, ret.actual_length, ctx.isoc);
+	return fill_isoc_data(r, buf, ret.actual_length, ctx.isoc);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -322,15 +338,8 @@ NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 	auto &ret = get_ret_submit(ctx);
 	auto &tr = AsUrbTransfer(urb);
 
-	auto err = STATUS_SUCCESS;
-
-	if (get_payload_size(ctx.hdr)) { // see ret_command
-		NT_ASSERT(tr.TransferBufferLength == ULONG(ret.actual_length)); // was already set in prepare_wsk_buf
-	} else { // DIR_OUT or !actual_length
-		err = usbip::assign(tr.TransferBufferLength, ret.actual_length);
-	}
-
-	return err;
+	return  tr.TransferBufferLength == ULONG(ret.actual_length) ? STATUS_SUCCESS : // set by prepare_wsk_mdl
+		assign(tr.TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -477,56 +486,75 @@ NTSTATUS usb_reset_port(const usbip_header_ret_submit &ret)
         return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
 }
 
+/*
+ * @see internal_ioctl.cpp, send_complete 
+ */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto ret_submit(_Inout_ wsk_context &ctx)
+void recv_complete(_Inout_ IRP* &irp, _In_ NTSTATUS status)
 {
-	auto irp = ctx.irp;
 	NT_ASSERT(irp);
+	auto &st = irp->IoStatus;
 
-	auto stack = IoGetCurrentIrpStackLocation(irp);
-	auto &st = irp->IoStatus.Status;
-
-        switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
-        case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = usb_submit_urb(ctx, *static_cast<URB*>(URB_FROM_IRP(irp)));
-                break;
-        case IOCTL_INTERNAL_USB_RESET_PORT:
-                st = usb_reset_port(get_ret_submit(ctx));
-                break;
-	default:
-		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
-		st = STATUS_INVALID_PARAMETER;
+	st.Status = status;
+	if (status == STATUS_CANCELLED) { // see complete_as_canceled
+		st.Information = 0;	
 	}
 
 	auto old_status = InterlockedCompareExchange(get_status(irp), ST_RECV_COMPLETE, ST_NONE);
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {
-		TraceDbg("Complete irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st, irp->IoStatus.Information);
+		TraceDbg("irp %04x, %!STATUS!, Information %#Ix", ptr4log(irp), st.Status, st.Information);
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 	}
 
-	return STATUS_SUCCESS;
+	irp = nullptr;
+}
+
+enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(vpdo_dev_t::received_fn)
+NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
+{
+	auto &irp = ctx.irp;
+	NT_ASSERT(irp);
+
+	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto st = STATUS_INVALID_PARAMETER;
+
+        switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
+        case IOCTL_INTERNAL_USB_SUBMIT_URB:
+		st = usb_submit_urb(ctx, *static_cast<URB*>(URB_FROM_IRP(irp)));
+                break;
+        case IOCTL_INTERNAL_USB_RESET_PORT:
+		st = usb_reset_port(get_ret_submit(ctx));
+                break;
+	default:
+		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
+	}
+
+	recv_complete(irp, st);
+	return RECV_NEXT_USBIP_HDR;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WSK_BUF make_buf(_In_ size_t length, _In_ wsk_context &ctx, _In_ bool isoch)
+auto make_mdl_chain(_In_ wsk_context &ctx)
 {
-	MDL *mdl{};
+	MDL *head{};
 
-	if (!isoch) {
-		mdl = ctx.mdl_buf.get();
-	} else if (auto &hdr = ctx.mdl_buf) { // isoch in
-		mdl = hdr.get();
-		hdr.next(ctx.mdl_isoc);
-	} else { // isoch out
-		mdl = ctx.mdl_isoc.get();
+	if (!ctx.is_isoc) { // IN
+		head = ctx.mdl_buf.get();
+		NT_ASSERT(!head->Next);
+	} else if (auto &chain = ctx.mdl_buf) { // isoch IN
+		auto t = tail(chain);
+		t->Next = ctx.mdl_isoc.get();
+		head = chain.get();
+	} else { // isoch OUT or IN with zero actual_length
+		head = ctx.mdl_isoc.get();
 	}
 
-	NT_ASSERT(mdl);
-	NT_ASSERT(length <= usbip::size(mdl));
-
-	return {mdl, 0, length};
+	return head;
 }
 
 /*
@@ -535,9 +563,14 @@ WSK_BUF make_buf(_In_ size_t length, _In_ wsk_context &ctx, _In_ bool isoch)
  * 
  * Ensure that URB has TransferBuffer and its size is sufficient.
  * Do others checks when payload will be read.
+ * 
+ * recv_payload -> prepare_wsk_buf, there is payload to receive.
+ * Payload layout:
+ * a) DIR_IN: any type of transfer, <transfer_buffer> [usbip_iso_packet_descriptor...]
+ * b) DIR_OUT: ISOCH, <usbip_iso_packet_descriptor...>
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_ URB &urb, _In_ size_t length)
+auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb)
 {
 	if (!has_transfer_buffer(urb)) {
 		auto fn = urb.UrbHeader.Function;
@@ -546,17 +579,19 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_ URB &
 	}
 
 	auto &tr = AsUrbTransfer(urb);
-
 	auto &ret = get_ret_submit(ctx);
-	auto cnt = ret.number_of_packets;
+
+	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // set ctx.is_isoc
+		return err;
+	}
 
 	auto dir_out = is_transfer_direction_out(ctx.hdr); // TransferFlags can have wrong direction
 	bool fail{};
 
-	if (cnt) { // urb.UrbIsochronousTransfer
-		fail = usbip::check(tr.TransferBufferLength, ret.actual_length);
-	} else { // actual_length MUST be assigned
-		fail = usbip::assign(tr.TransferBufferLength, ret.actual_length) || dir_out;
+	if (ctx.is_isoc) { // always has payload
+		fail = check(tr.TransferBufferLength, ret.actual_length); // do not change buffer length
+	} else { // actual_length MUST be assigned, must not have payload for OUT
+		fail = assign(tr.TransferBufferLength, ret.actual_length) || dir_out; 
 	}
 
 	if (fail || !tr.TransferBufferLength) {
@@ -566,18 +601,14 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_ URB &
 	}
 
 	if (dir_out) {
-		NT_ASSERT(cnt); // isoch
+		NT_ASSERT(ctx.is_isoc);
 		NT_ASSERT(!ctx.mdl_buf);
-	} if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, IoWriteAccess, urb)) {
+	} else if (auto err = usbip::make_transfer_buffer_mdl(ctx.mdl_buf, ret.actual_length, ctx.is_isoc, IoWriteAccess, urb)) {
 		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
 		return err;
 	}
 
-	if (auto err = prepare_isoc(ctx, cnt)) {
-		return err;
-	}
-
-	buf = make_buf(length, ctx, cnt);
+	mdl = make_mdl_chain(ctx); // ret.actual_length can be zero for isoch in
 	return STATUS_SUCCESS;
 }
 
@@ -595,6 +626,27 @@ URB *get_urb(_In_ IRP *irp)
 	return nullptr;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto alloc_drain_buffer(_Inout_ wsk_context &ctx, _In_ size_t length)
+{  
+	auto &irp = ctx.irp;
+	NT_ASSERT(!irp);
+	return irp = (IRP*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, length, USBIP_VHCI_POOL_TAG); 
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(vpdo_dev_t::received_fn)
+NTSTATUS free_drain_buffer(_Inout_ wsk_context &ctx)
+{  
+	auto &irp = ctx.irp;
+	NT_ASSERT(irp);
+
+	ExFreePoolWithTag(irp, USBIP_VHCI_POOL_TAG);
+	irp = nullptr;
+
+	return RECV_NEXT_USBIP_HDR;
+};
+
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -604,28 +656,47 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto vpdo = ctx.vpdo;
 
 	auto &st = wsk_irp->IoStatus;
-	NT_ASSERT(st.Status != STATUS_PENDING);
 	TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu", ptr4log(wsk_irp), st.Status, st.Information);
 
-	auto err = NT_SUCCESS(st.Status) && st.Information == vpdo->receive_size ? vpdo->received(ctx) : STATUS_UNSUCCESSFUL;
+	auto ok = NT_SUCCESS(st.Status);
+	auto err = ok && st.Information == vpdo->receive_size ? vpdo->received(ctx) :
+		   ok ? STATUS_RECEIVE_PARTIAL : 
+		   st.Status; // has nonzero severity code
 
-	if (!err) {
+	switch (err) {
+	case RECV_NEXT_USBIP_HDR:
 		sched_receive_usbip_header(&ctx);
-	} else if (err != STATUS_PENDING) {
-		TraceMsg("Unplugging vpdo %04x after %!STATUS!", ptr4log(vpdo), err);
-		vhub_unplug_vpdo(vpdo);
-		free(&ctx, true);
+		[[fallthrough]];
+	case RECV_MORE_DATA_REQUIRED:
+		return StopCompletion;
+	}
+	
+	if (vpdo->received == free_drain_buffer) { // ctx.irp is a drain buffer
+		free_drain_buffer(ctx);
+	} else if (auto &irp = ctx.irp) {
+		NT_ASSERT(vpdo->received != ret_submit); // never fails
+		recv_complete(irp, STATUS_CANCELLED);
 	}
 
+	NT_ASSERT(!ctx.irp); // must be completed
+
+	TraceMsg("vpdo %04x: unplugging after %!STATUS!", ptr4log(vpdo), NT_SUCCESS(st.Status) ? err : st.Status);
+	vhub_unplug_vpdo(vpdo);
+
+	free(&ctx, true);
 	return StopCompletion;
 }
 
+/*
+ * @param received will be called if requested number of bytes are received without error
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void receive(_In_ WSK_BUF &buf, _In_ vpdo_dev_t::received_fn received, _In_ wsk_context &ctx)
 {
+	NT_ASSERT(usbip::verify(buf, ctx.is_isoc));
 	auto &vpdo = *ctx.vpdo;
-	
+
 	NT_ASSERT(buf.Length);
 	vpdo.receive_size = buf.Length;
 
@@ -644,60 +715,54 @@ void receive(_In_ WSK_BUF &buf, _In_ vpdo_dev_t::received_fn received, _In_ wsk_
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
+_Function_class_(vpdo_dev_t::received_fn)
+NTSTATUS drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	if (ULONG(length) != length) {
 		Trace(TRACE_LEVEL_ERROR, "Buffer size truncation: ULONG(%lu) != size_t(%Iu)", ULONG(length), length);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto free_payload = [] (auto &ctx)
-	{  
-		ExFreePoolWithTag(ctx.irp, USBIP_VHCI_POOL_TAG);
-		ctx.irp = nullptr;
-		return STATUS_SUCCESS;
-	};
-
-	NT_ASSERT(!ctx.irp);
-	ctx.irp = (IRP*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, length, USBIP_VHCI_POOL_TAG);
-
-	if (!ctx.irp) {
+	auto ptr = alloc_drain_buffer(ctx, length);
+	if (!ptr) {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", length);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	ctx.mdl_buf = usbip::Mdl(usbip::memory::nonpaged, ctx.irp, ULONG(length));
+	ctx.mdl_buf = usbip::Mdl(ptr, ULONG(length));
 	
 	if (auto err = ctx.mdl_buf.prepare_nonpaged()) {
-		NT_ASSERT(err != STATUS_PENDING);
+		NT_ASSERT(err != RECV_MORE_DATA_REQUIRED);
 		Trace(TRACE_LEVEL_ERROR, "prepare_nonpaged %!STATUS!", err);
-		free_payload(ctx);
+		free_drain_buffer(ctx);
 		return err;
 	}
 
 	WSK_BUF buf{ ctx.mdl_buf.get(), 0, length };
+	receive(buf, free_drain_buffer, ctx);
 
-	receive(buf, free_payload, ctx);
-	return STATUS_PENDING; // do not call sched_read_usbip_header
+	return RECV_MORE_DATA_REQUIRED;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
+_Function_class_(vpdo_dev_t::received_fn)
+NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	auto urb = get_urb(ctx.irp);
 	if (!urb) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	WSK_BUF buf;
-	if (auto err = prepare_wsk_buf(buf, ctx, *urb, length)) {
-		NT_ASSERT(err != STATUS_PENDING);
-		Trace(TRACE_LEVEL_ERROR, "prepare_wsk_buf %!STATUS!", err);
+	WSK_BUF buf{ .Length = length };
+
+	if (auto err = prepare_wsk_mdl(buf.Mdl, ctx, *urb)) {
+		NT_ASSERT(err != RECV_MORE_DATA_REQUIRED);
+		Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
 		return err;
 	}
 
 	receive(buf, ret_submit, ctx);
-	return STATUS_PENDING; // do not call sched_read_usbip_header
+	return RECV_MORE_DATA_REQUIRED;
 }
 
 /*
@@ -710,9 +775,10 @@ auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto ret_command(_Inout_ wsk_context &ctx)
+_Function_class_(vpdo_dev_t::received_fn)
+NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 {
-	auto &hdr = ctx.hdr;
+	auto &hdr = ctx.hdr; // IRP must be completed
 	ctx.irp = hdr.base.command == USBIP_RET_SUBMIT ? dequeue_irp(*ctx.vpdo, hdr.base.seqnum) : nullptr;
 
 	{
@@ -726,7 +792,11 @@ auto ret_command(_Inout_ wsk_context &ctx)
 		return f(ctx, sz);
 	}
 
-	return ctx.irp ? ret_submit(ctx) : STATUS_SUCCESS;
+	if (ctx.irp) {
+		ret_submit(ctx);
+	}
+
+	return RECV_NEXT_USBIP_HDR;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -759,7 +829,9 @@ _IRQL_requires_same_
 void receive_usbip_header(_In_ DEVICE_OBJECT*, _In_opt_ void *Context)
 {
 	auto &ctx = *static_cast<wsk_context*>(Context);
-	ctx.irp = nullptr;
+
+	NT_ASSERT(!ctx.irp); // must be completed and zeroed on every cycle
+	ctx.mdl_buf.reset();
 
 	ctx.mdl_hdr.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, sizeof(ctx.hdr) };
