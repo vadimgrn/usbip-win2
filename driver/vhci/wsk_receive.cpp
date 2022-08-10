@@ -7,8 +7,6 @@
 #include "trace.h"
 #include "wsk_receive.tmh"
 
-#include "pdu.h"
-#include "dev.h"
 #include "usbd_helper.h"
 #include "dbgcommon.h"
 #include "urbtransfer.h"
@@ -19,7 +17,6 @@
 #include "wsk_context.h"
 #include "vhub.h"
 #include "vhci.h"
-#include "internal_ioctl.h"
 
 namespace
 {
@@ -322,7 +319,7 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
 	char *buf{};
 
-	if (is_transfer_direction_in(ctx.hdr)) {
+	if (is_transfer_direction_in(ctx.hdr)) { // TransferFlags can have wrong direction
 		buf = (char*)get_transfer_buffer(r.TransferBuffer, r.TransferBufferMDL);
 		if (!buf) {
 			return STATUS_INSUFFICIENT_RESOURCES;
@@ -564,9 +561,9 @@ auto make_mdl_chain(_In_ wsk_context &ctx)
  * Ensure that URB has TransferBuffer and its size is sufficient.
  * Do others checks when payload will be read.
  * 
- * recv_payload -> prepare_wsk_buf, there is payload to receive.
+ * recv_payload -> prepare_wsk_mdl, there is payload to receive.
  * Payload layout:
- * a) DIR_IN: any type of transfer, <transfer_buffer> [usbip_iso_packet_descriptor...]
+ * a) DIR_IN: any type of transfer, [transfer_buffer] OR|AND [usbip_iso_packet_descriptor...]
  * b) DIR_OUT: ISOCH, <usbip_iso_packet_descriptor...>
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -581,7 +578,7 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 	auto &tr = AsUrbTransfer(urb);
 	auto &ret = get_ret_submit(ctx);
 
-	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // set ctx.is_isoc
+	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
 		return err;
 	}
 
@@ -608,7 +605,7 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 		return err;
 	}
 
-	mdl = make_mdl_chain(ctx); // ret.actual_length can be zero for isoch in
+	mdl = make_mdl_chain(ctx);
 	return STATUS_SUCCESS;
 }
 
@@ -659,6 +656,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu", ptr4log(wsk_irp), st.Status, st.Information);
 
 	auto ok = NT_SUCCESS(st.Status);
+
 	auto err = ok && st.Information == vpdo->receive_size ? vpdo->received(ctx) :
 		   ok ? STATUS_RECEIVE_PARTIAL : 
 		   st.Status; // has nonzero severity code
@@ -677,8 +675,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 		NT_ASSERT(vpdo->received != ret_submit); // never fails
 		recv_complete(irp, STATUS_CANCELLED);
 	}
-
-	NT_ASSERT(!ctx.irp); // must be completed
+	NT_ASSERT(!ctx.irp);
 
 	TraceMsg("vpdo %04x: unplugging after %!STATUS!", ptr4log(vpdo), NT_SUCCESS(st.Status) ? err : st.Status);
 	vhub_unplug_vpdo(vpdo);
@@ -697,8 +694,7 @@ void receive(_In_ WSK_BUF &buf, _In_ vpdo_dev_t::received_fn received, _In_ wsk_
 	NT_ASSERT(usbip::verify(buf, ctx.is_isoc));
 	auto &vpdo = *ctx.vpdo;
 
-	NT_ASSERT(buf.Length);
-	vpdo.receive_size = buf.Length;
+	vpdo.receive_size = buf.Length; // checked by verify()
 
 	NT_ASSERT(received);
 	vpdo.received = received;
@@ -723,13 +719,12 @@ NTSTATUS drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto ptr = alloc_drain_buffer(ctx, length);
-	if (!ptr) {
+	if (auto addr = alloc_drain_buffer(ctx, length)) {
+		ctx.mdl_buf = usbip::Mdl(addr, ULONG(length));
+	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", length);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
-
-	ctx.mdl_buf = usbip::Mdl(ptr, ULONG(length));
 	
 	if (auto err = ctx.mdl_buf.prepare_nonpaged()) {
 		NT_ASSERT(err != RECV_MORE_DATA_REQUIRED);

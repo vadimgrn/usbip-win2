@@ -38,9 +38,9 @@ auto complete_internal_ioctl(_Inout_ IRP *irp, _In_ NTSTATUS status)
  * This means that:
  * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete because WskSend can still access
  *   IRP transfer buffer.
- * 2.WskReceiveEvent must not complete IRP if it was called before send_complete because it modifies *get_status(irp).
- * 3.CompleteCanceledIrp and WskReceiveEvent are mutually exclusive because IRP was dequeued from the CSQ.
- * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceiveEvent.
+ * 2.WskReceive must not complete IRP if it was called before send_complete because it modifies *get_status(irp).
+ * 3.CompleteCanceledIrp and WskReceive are mutually exclusive because IRP was dequeued from the CSQ.
+ * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceive.
  * 
  * @see wsk_receive.cpp, complete 
  */

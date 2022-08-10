@@ -17,11 +17,11 @@
 - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app
-  - This implies low latency and high throughput, absence of frequent context switching and a lot of syscalls
-- [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of buffers is implemented for send and one extra copy for receive
+  - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls
+- [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of transfer buffers is implemented for network send and receive operations
   - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
-  - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data directly from URB transfer buffer
-  - [WskReceiveEvent](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive_event) buffers are copied to URB transfer buffer
+  - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data from URB transfer buffer
+  - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - x86 build is removed
@@ -77,9 +77,9 @@
 ## Setup USB/IP server on Ubuntu Linux
 - Install required packages
 ```
-apt install linux-tools-generic linux-cloud-tools-generic
-modprobe -a usbip-core usbip-host
-usbipd -D
+sudo apt install linux-tools-generic linux-cloud-tools-generic
+sudo modprobe -a usbip-core usbip-host
+sudo usbipd -D
 ```
 - List available USB devices
   - `usbip list -l`
@@ -90,7 +90,7 @@ usbipd -D
    AVerMedia Technologies, Inc. : unknown product (07ca:513b)
 ```
 - Bind desired USB device
-  - `usbip bind -b 3-2`
+  - `sudo usbip bind -b 3-2`
 ```
 usbip: info: bind device on busid 3-2: complete
 ```
@@ -140,21 +140,24 @@ port 1 is successfully detached
 - Use this tracing GUID for vhci driver
   - `8b56380d-5174-4b15-b6f4-4c47008801a4`
 - Install Debug build
-- Start a log session for vhci driver
+- Start a log session for vhci driver (copy commands to .bat file and run it)
 ```
+@echo off
 set NAME=usbip-vhci
 tracelog.exe -stop %NAME%
 tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
 tracelog.exe -start %NAME% -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x3F -level 5
 ```
 - Reproduce the issue
-- Stop the log session and get plain text log
+- Stop the log session and get plain text log (copy commands to .bat file and run it)
 ```
+@echo off
 set NAME=usbip-vhci
-set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:
+set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%.txt %NAME%.etl
 rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
+rem rm sed*
 ```
 
 ## Debugging BSOD
