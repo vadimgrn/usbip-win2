@@ -109,7 +109,7 @@ struct vpdo_dev_t : vdev_t
         USB_DEVICE_DESCRIPTOR descriptor;
 	usb_device_speed speed; // corresponding speed for descriptor.bcdUSB 
 
-	// use instead of corresponding members of device descriptor
+	// use for PnP requests instead of corresponding members of device descriptor
 	UCHAR bDeviceClass;
 	UCHAR bDeviceSubClass;
 	UCHAR bDeviceProtocol;

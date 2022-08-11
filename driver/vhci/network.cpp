@@ -150,30 +150,30 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
                 return err;
         };
 
-        if (auto head = r.TransferBufferMDL) { // locked-down
-
-                auto len = size(head); // can be a chain
-
-                if (len < r.TransferBufferLength) { // must describe full buffer
-                        return STATUS_BUFFER_TOO_SMALL;
-                } else if (len == mdl_size || (len > mdl_size && !mdl_chain)) { // WSK_BUF.Length will cut extra length
-                        NT_VERIFY(mdl = Mdl(head));
-                        return STATUS_SUCCESS;
-                } else if (!head->Next) { // build partial MDL
-                        mdl = Mdl(head, 0, mdl_size);
-                        return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
-                } else { // IoBuildPartialMdl doesn't treat SourceMdl as a chain and can't be used
-                        auto err = STATUS_INSUFFICIENT_RESOURCES; // MmGetMdlVirtualAddress(head) -> MmProbeAndLockPages fails
-                        if (auto buf = MmGetSystemAddressForMdlSafe(head, LowPagePriority | MdlMappingNoExecute)) {
-                                err = make(buf, false);
-                        }
-                        return err;
-                }
-
+        if (r.TransferBufferMDL) {
+                // preferable case because it is locked-down
         } else if (auto buf = r.TransferBuffer) { // could be allocated from paged pool
                 return make(buf, true); // false -> DRIVER_VERIFIER_DETECTED_VIOLATION
         } else {
                 Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
                 return STATUS_INVALID_PARAMETER;
+        }
+
+        auto head = r.TransferBufferMDL;
+        auto len = size(head); // can be a chain
+
+        if (len < r.TransferBufferLength) { // must describe full buffer
+                return STATUS_BUFFER_TOO_SMALL;
+        } else if (len == mdl_size || (len > mdl_size && !mdl_chain)) { // WSK_BUF.Length will cut extra length
+                NT_VERIFY(mdl = Mdl(head));
+                return STATUS_SUCCESS;
+        } else if (!head->Next) { // build partial MDL
+                mdl = Mdl(head, 0, mdl_size);
+                return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+        } else if (auto buf = MmGetSystemAddressForMdlSafe(head, LowPagePriority | MdlMappingNoExecute)) {
+                // IoBuildPartialMdl doesn't treat SourceMdl as a chain and can't be used
+                return make(buf, false); // if use MmGetMdlVirtualAddress(head) -> IRQL_NOT_LESS_OR_EQUAL
+        } else {
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 }

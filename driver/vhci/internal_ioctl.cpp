@@ -1128,39 +1128,39 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
         TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x",
 		  KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
 
-        NTSTATUS status{};
+        NTSTATUS st{};
         auto vpdo = to_vpdo_or_null(devobj);
 
         if (!vpdo) {
 		Trace(TRACE_LEVEL_WARNING, "Internal ioctl is allowed for vpdo only");
-		status = STATUS_INVALID_DEVICE_REQUEST;
+		st = STATUS_INVALID_DEVICE_REQUEST;
         } else if (vpdo->PnPState == pnp_state::Removed) {
-                status = STATUS_NO_SUCH_DEVICE;
+                st = STATUS_NO_SUCH_DEVICE;
         } else if (vpdo->unplugged) {
-                status = STATUS_DEVICE_NOT_CONNECTED;
+                st = STATUS_DEVICE_NOT_CONNECTED;
         } else switch (ioctl_code) {
 	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		status = usb_submit_urb(*vpdo, irp, *static_cast<URB*>(URB_FROM_IRP(irp)));
+		st = usb_submit_urb(*vpdo, irp, *static_cast<URB*>(URB_FROM_IRP(irp)));
 		break;
 	case IOCTL_INTERNAL_USB_GET_PORT_STATUS:
-		status = usb_get_port_status(*(ULONG*)irpstack->Parameters.Others.Argument1);
+		st = usb_get_port_status(*(ULONG*)irpstack->Parameters.Others.Argument1);
 		break;
 	case IOCTL_INTERNAL_USB_RESET_PORT:
-		status = usb_reset_port(*vpdo, irp);
+		st = usb_reset_port(*vpdo, irp);
 		break;
 	case IOCTL_INTERNAL_USB_GET_TOPOLOGY_ADDRESS:
-		status = setup_topology_address(vpdo, *(USB_TOPOLOGY_ADDRESS*)irpstack->Parameters.Others.Argument1);
+		st = setup_topology_address(vpdo, *(USB_TOPOLOGY_ADDRESS*)irpstack->Parameters.Others.Argument1);
 		break;
         default:
-		status = STATUS_NOT_SUPPORTED;
+		st = STATUS_NOT_SUPPORTED;
                 Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
         }
 
-	if (status == STATUS_PENDING) {
-                TraceDbg("Leave %!STATUS!, irp %04x", status, ptr4log(irp));
+	if (st == STATUS_PENDING) {
+                TraceDbg("Leave %!STATUS!, irp %04x", st, ptr4log(irp));
 	} else {
-                complete_internal_ioctl(irp, status);
+                complete_internal_ioctl(irp, st);
 	}
 
-	return status;
+	return st;
 }

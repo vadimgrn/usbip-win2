@@ -85,9 +85,9 @@ identifier (ID) of USB\COMPOSITE for the PDO.
 auto is_composite(const vpdo_dev_t &vpdo)
 {
 	bool ok = vpdo.bDeviceClass == USB_DEVICE_CLASS_RESERVED || // generic composite device
-		(vpdo.bDeviceClass == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
-		 vpdo.bDeviceSubClass == 0x02 &&
-		 vpdo.bDeviceProtocol == 0x01); // IAD composite device
+		 (vpdo.bDeviceClass == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
+		  vpdo.bDeviceSubClass == 0x02 &&
+		  vpdo.bDeviceProtocol == 0x01); // IAD composite device
 
 	NT_ASSERT(vpdo.actconfig);
 	return ok && vpdo.descriptor.bNumConfigurations == 1 && vpdo.actconfig->bNumInterfaces > 1;
