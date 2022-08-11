@@ -7,6 +7,7 @@
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows
+- [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
 
 ## Requirements
 - Windows 10 x64, version 2004 and later ([NTDDI_WIN10_VB](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable))
@@ -22,7 +23,8 @@
   - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
   - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data from URB transfer buffer
   - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
-
+- [System Worker Threads](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/system-worker-threads) are used to initiate receive operation
+  
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - x86 build is removed
 - Server (stub driver) is removed
@@ -34,24 +36,6 @@
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
 - InnoSetup installer is used for installation of the driver and userspace stuff
-
-## Devices that work (list is incomplete)
-  - USB 2.0/3.X flash drives
-  - Webcams
-    - AVerMedia PW513
-    - Builtin cam of Dell Alienware 17R3
-    - Guillemot Deluxe Optical Glass
-  - Headsets
-    - Microsoft LifeChat LX-6000
-    - Sennheiser ADAPT 160T USB-C II
-  - Audio devices
-    - C-Media Electronics CM102-A+/102S+ Audio Controller
-    - UGREEN External Stereo Sound Adapter (ALC4040)
-  - Peripherals
-    - Microsoft Wired Keyboard 600 (model 1576)
-    - Primax Electronics 0Y357C PMX-MMOCZUL [Dell Laser Mouse]
-  - Misc. devices
-    - AUCTOPUS I-65 HD audio and video conference speaker pole
 
 ## Build
 
