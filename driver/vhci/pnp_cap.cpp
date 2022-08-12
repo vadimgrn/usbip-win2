@@ -9,7 +9,7 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto get_device_capabilities(_In_ DEVICE_OBJECT *devobj, _Out_ DEVICE_CAPABILITIES &r)
+PAGEABLE auto get_device_capabilities(_Out_ DEVICE_CAPABILITIES &r, _In_ DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
 
@@ -25,7 +25,7 @@ PAGEABLE auto get_device_capabilities(_In_ DEVICE_OBJECT *devobj, _Out_ DEVICE_C
         KeInitializeEvent(&pnpEvent, NotificationEvent, false);
 
         IO_STATUS_BLOCK ios{};
-        auto irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ios);
+        auto irp = IoBuildSynchronousFsdRequest(IRP_MJ_PNP, devobj, nullptr, 0, nullptr, &pnpEvent, &ios); // must not call IoFreeIrp
 	if (!irp) {
 		Trace(TRACE_LEVEL_ERROR, "IoBuildSynchronousFsdRequest error");
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -62,89 +62,70 @@ PAGEABLE auto get_device_capabilities(_In_ DEVICE_OBJECT *devobj, _Out_ DEVICE_C
  * Our device just supports D0 and D3.
  */
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto set_state(_Inout_ DEVICE_POWER_STATE st[POWER_SYSTEM_MAXIMUM])
+{
+	PAGED_CODE();
+
+	st[PowerSystemWorking] = PowerDeviceD0;
+
+	if (st[PowerSystemSleeping1] != PowerDeviceD0) {
+		st[PowerSystemSleeping1] = PowerDeviceD1;
+	}
+
+	if (st[PowerSystemSleeping2] != PowerDeviceD0) {
+		st[PowerSystemSleeping2] = PowerDeviceD3;
+	}
+
+	if (st[PowerSystemSleeping3] != PowerDeviceD0) {
+		st[PowerSystemSleeping3] = PowerDeviceD3;
+	}
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto pnp_query_cap(_Inout_ vpdo_dev_t &vpdo, _Inout_ DEVICE_CAPABILITIES &r)
 {
 	PAGED_CODE();
 
 	DEVICE_CAPABILITIES caps_parent{};
 
-	auto status = get_device_capabilities(vpdo.parent->parent->parent->devobj_lower, caps_parent);
-	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "Failed to get device capabilities from root device: %!STATUS!", status);
-		return status;
+	if (auto err = get_device_capabilities(caps_parent, vpdo.parent->parent->parent->devobj_lower)) {
+		Trace(TRACE_LEVEL_ERROR, "Failed to get device capabilities from root device: %!STATUS!", err);
+		return err;
+	} else {
+		RtlCopyMemory(r.DeviceState, caps_parent.DeviceState, sizeof(r.DeviceState));
+		set_state(r.DeviceState);
 	}
 
-	RtlCopyMemory(r.DeviceState, caps_parent.DeviceState, sizeof(r.DeviceState));
-
-	r.DeviceState[PowerSystemWorking] = PowerDeviceD0;
-
-	if (r.DeviceState[PowerSystemSleeping1] != PowerDeviceD0) {
-		r.DeviceState[PowerSystemSleeping1] = PowerDeviceD1;
-	}
-
-	if (r.DeviceState[PowerSystemSleeping2] != PowerDeviceD0) {
-		r.DeviceState[PowerSystemSleeping2] = PowerDeviceD3;
-	}
-
-	if (r.DeviceState[PowerSystemSleeping3] != PowerDeviceD0) {
-		r.DeviceState[PowerSystemSleeping3] = PowerDeviceD3;
-	}
-
-	// We can wake the system from D1
-	r.DeviceWake = PowerDeviceD0;
-
-	// Specifies whether the device hardware supports the D1 and D2
-	// power state. Set these bits explicitly.
-	r.DeviceD1 = false; // Yes we can
-	r.DeviceD2 = false;
-
-	// Specifies whether the device can respond to an external wake
-	// signal while in the D0, D1, D2, and D3 state.
-	// Set these bits explicitly.
-	r.WakeFromD0 = true;
-	r.WakeFromD1 = false; // Yes we can
-	r.WakeFromD2 = false;
-	r.WakeFromD3 = false;
-
-	// We have no latencies
-	r.D1Latency = 0;
-	r.D2Latency = 0;
-	r.D3Latency = 0;
-
-	r.EjectSupported = false;
-
-	// This flag specifies whether the device's hardware is disabled.
-	// The PnP Manager only checks this bit right after the device is
-	// enumerated. Once the device is started, this bit is ignored.
-	r.HardwareDisabled = false;
-
-	// Our simulated device can be physically removed.
-	r.Removable = true;
-
-	// Setting it to true prevents the warning dialog from appearing
-	// whenever the device is surprise removed.
-	r.SurpriseRemovalOK = true;
+	r.LockSupported = false;
+	r.EjectSupported = false; // see IoRequestDeviceEject
+	r.Removable = true; // must be set
 
 	// If a custom instance id is used, assume that it is system-wide unique */
 	r.UniqueID = vpdo.serial.Length || get_serial_number(vpdo);
 
-	// Specify whether the Device Manager should suppress all
-	// installation pop-ups except required pop-ups such as
-	// "no compatible drivers found."
+//	r.RawDeviceOK = false;
 	r.SilentInstall = false;
+	r.SurpriseRemovalOK = false;
+	r.HardwareDisabled = false;
 
-	// Specifies an address indicating where the device is located
-	// on its underlying bus. The interpretation of this number is
-	// bus-specific. If the address is unknown or the bus driver
-	// does not support an address, the bus driver leaves this
-	// member at its default value of 0xFFFFFFFF. In this example
-	// the location address is same as instance id.
 	r.Address = vpdo.port;
-
-	// UINumber specifies a number associated with the device that can
-	// be displayed in the user interface.
 	r.UINumber = vpdo.port;
 
+	r.DeviceWake = PowerDeviceD0;
+
+	r.D1Latency = 0; // does not support D1 state
+	r.D2Latency = 0; // does not support D2 state
+	r.D3Latency = 1; // 100-microsecond units
+
+	r.DeviceD1 = false;
+	r.DeviceD2 = false;
+
+	r.WakeFromD0 = true;
+	r.WakeFromD1 = false;
+	r.WakeFromD2 = false;
+	r.WakeFromD3 = false;
+
+	TraceMsg("UniqueID %d, Address %#lx, UINumber %lu", r.UniqueID, r.Address, r.UINumber);
 	return STATUS_SUCCESS;
 }
 
@@ -164,6 +145,7 @@ PAGEABLE auto pnp_query_cap(_Inout_ DEVICE_CAPABILITIES &r)
 	r.Address = 1;
 	r.UINumber = 1;
 
+	TraceMsg("Address %#lx, UINumber %lu", r.Address, r.UINumber);
 	return STATUS_SUCCESS;
 }
 
@@ -174,6 +156,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_query_capabilities(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
+	TraceDbg("vdev %04x, %!vdev_type_t!", ptr4log(vdev), vdev->type);
 
 	if (is_fdo(vdev->type)) {
 		return irp_pass_down(vdev->devobj_lower, irp);

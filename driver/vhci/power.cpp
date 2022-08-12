@@ -27,7 +27,6 @@ NTSTATUS vhci_power_vhci(vhci_dev_t *vhci, IRP *irp, IO_STACK_LOCATION *irpstack
 	auto powerType = irpstack->Parameters.Power.Type;
 	auto powerState = irpstack->Parameters.Power.State;
 
-	// If the device is not stated yet, just pass it down.
 	if (vhci->PnPState == pnp_state::NotStarted) {
 		return irp_pass_down(vhci->devobj_lower, irp);
 	}

@@ -10,7 +10,7 @@ struct vdev_t;
 struct vpdo_dev_t;
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp);
+PAGEABLE NTSTATUS irp_pass_down(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);

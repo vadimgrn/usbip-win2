@@ -275,6 +275,9 @@ auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ U
 /*
  * ctx.mdl_buf can't be used, it describes actual_length instead of TransferBufferLength.
  * Try TransferBufferMDL first because it is locked-down and to obey URB_FUNCTION_XXX_USING_CHAINED_MDL.
+ * 
+ * If BSOD happen, this call should be used
+ * make_transfer_buffer_mdl(ctx.mdl_buf, usbip::URB_BUF_LEN, true, IoModifyAccess, urb)
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)

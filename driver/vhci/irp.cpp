@@ -7,13 +7,8 @@
 namespace
 {
 
-/*
- * If the lower driver didn't return STATUS_PENDING, we don't need to
- * set the event because we won't be waiting on it.
- * This optimization avoids grabbing the dispatcher lock and improves perf.
- */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT, __in PIRP irp, __in PVOID Context)
+NTSTATUS on_completion(_In_ PDEVICE_OBJECT, _In_ PIRP irp, _In_ PVOID Context)
 {
 	if (irp->PendingReturned) {
 		KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
@@ -26,10 +21,10 @@ NTSTATUS irp_completion_routine(__in PDEVICE_OBJECT, __in PIRP irp, __in PVOID C
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS irp_pass_down(DEVICE_OBJECT *devobj, IRP *irp)
+PAGEABLE NTSTATUS irp_pass_down(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	PAGED_CODE();
-	irp->IoStatus.Status = STATUS_SUCCESS;
+	irp->IoStatus.Status = STATUS_SUCCESS; // FIXME: do not touch it?
 	IoSkipCurrentIrpStackLocation(irp);
 	return IoCallDriver(devobj, irp);
 }
@@ -56,7 +51,7 @@ PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp)
 	KeInitializeEvent(&evt, NotificationEvent, false);
 
 	IoCopyCurrentIrpStackLocationToNext(irp);
-	IoSetCompletionRoutine(irp, irp_completion_routine, &evt, true, true, true);
+	IoSetCompletionRoutine(irp, on_completion, &evt, true, true, true);
 
 	auto status = IoCallDriver(devobj, irp);
 
