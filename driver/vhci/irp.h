@@ -49,7 +49,7 @@ inline auto& get_seqnum(IRP *irp)
 	auto ptr = irp->Tail.Overlay.DriverContext;
 	static_assert(sizeof(*ptr) == 2*sizeof(seqnum_t));
 
-	return *reinterpret_cast<seqnum_t*>(ptr);
+	return *reinterpret_cast<seqnum_t*>(ptr); // low word of DriverContext[0]
 }
 
 enum irp_status_t { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
@@ -58,12 +58,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_status(IRP *irp)
 {
 	NT_ASSERT(irp);
-	return reinterpret_cast<LONG*>(irp->Tail.Overlay.DriverContext + 1);
+	static_assert(sizeof(LONG) == sizeof(seqnum_t));
+	return reinterpret_cast<LONG*>(irp->Tail.Overlay.DriverContext) + 1; // high word of DriverContext[0]
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_pipe_handle(IRP *irp)
 {
 	NT_ASSERT(irp);
-	return *static_cast<USBD_PIPE_HANDLE*>(irp->Tail.Overlay.DriverContext + 2);
+	return *static_cast<USBD_PIPE_HANDLE*>(irp->Tail.Overlay.DriverContext + 1);
 }

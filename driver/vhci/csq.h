@@ -22,11 +22,11 @@ inline bool is_initialized(const IO_CSQ &csq)
 
 struct peek_context
 {
+	bool use_seqnum;
 	union {
 		seqnum_t seqnum;
 		USBD_PIPE_HANDLE handle;
 	};
-	bool use_seqnum;
 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -35,15 +35,13 @@ void enqueue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ IRP *irp);
 _IRQL_requires_max_(DISPATCH_LEVEL)
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
 
-constexpr auto make_peek_context(seqnum_t seqnum)
+constexpr peek_context make_peek_context(seqnum_t seqnum)
 {
-	return peek_context{{seqnum}, true};
+	return { .use_seqnum = true, .seqnum = seqnum };
 }
 
-inline auto make_peek_context(USBD_PIPE_HANDLE handle)
+constexpr peek_context make_peek_context(USBD_PIPE_HANDLE handle)
 {
 	NT_ASSERT(handle);
-	peek_context ctx{};
-	ctx.handle = handle;
-	return ctx;
+	return { .use_seqnum = false, .handle = handle };
 }

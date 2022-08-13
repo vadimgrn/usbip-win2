@@ -277,7 +277,7 @@ auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ U
  * Try TransferBufferMDL first because it is locked-down and to obey URB_FUNCTION_XXX_USING_CHAINED_MDL.
  * 
  * If BSOD happen, this call should be used
- * make_transfer_buffer_mdl(ctx.mdl_buf, usbip::URB_BUF_LEN, true, IoModifyAccess, urb)
+ * make_transfer_buffer_mdl(ctx.mdl_buf, usbip::URB_BUF_LEN, false, IoModifyAccess, urb)
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
@@ -490,7 +490,7 @@ NTSTATUS usb_reset_port(const usbip_header_ret_submit &ret)
  * @see internal_ioctl.cpp, send_complete 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void recv_complete(_Inout_ IRP* &irp, _In_ NTSTATUS status)
+void complete(_Inout_ IRP* &irp, _In_ NTSTATUS status)
 {
 	NT_ASSERT(irp);
 	auto &st = irp->IoStatus;
@@ -534,7 +534,7 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
 	}
 
-	recv_complete(irp, st);
+	complete(irp, st);
 	return RECV_NEXT_USBIP_HDR;
 }
 
@@ -676,7 +676,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 		free_drain_buffer(ctx);
 	} else if (auto &irp = ctx.irp) {
 		NT_ASSERT(vpdo->received != ret_submit); // never fails
-		recv_complete(irp, STATUS_CANCELLED);
+		complete(irp, STATUS_CANCELLED);
 	}
 	NT_ASSERT(!ctx.irp);
 
