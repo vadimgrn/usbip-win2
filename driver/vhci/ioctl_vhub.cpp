@@ -361,6 +361,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(_Inout_ vhub_dev_t *vhub, _In_ ULONG ioctl_cod
 	auto status = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (ioctl_code) {
+	static_assert(IOCTL_USB_GET_NODE_INFORMATION == IOCTL_USB_GET_ROOT_HUB_NAME);
 	case IOCTL_USB_GET_NODE_INFORMATION:
 		status = get_node_info(vhub, *static_cast<USB_NODE_INFORMATION*>(buffer), inlen, outlen);
 		break;
@@ -395,7 +396,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(_Inout_ vhub_dev_t *vhub, _In_ ULONG ioctl_cod
 		status = get_node_connection_attributes(vhub, *static_cast<USB_NODE_CONNECTION_ATTRIBUTES*>(buffer), inlen, outlen);
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", device_control_name(ioctl_code), ioctl_code);
 	}
 
 	return status;

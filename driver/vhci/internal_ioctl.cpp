@@ -1125,8 +1125,8 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-        TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x",
-		  KeGetCurrentIrql(), dbg_ioctl_code(ioctl_code), ioctl_code, ptr4log(irp));
+        TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x", KeGetCurrentIrql(), 
+                  internal_device_control_name(ioctl_code), ioctl_code, ptr4log(irp));
 
         NTSTATUS st{};
         auto vpdo = to_vpdo_or_null(devobj);
@@ -1153,7 +1153,7 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 		break;
         default:
 		st = STATUS_NOT_SUPPORTED;
-                Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+                Trace(TRACE_LEVEL_WARNING, "Unhandled %s(%#08lX)", internal_device_control_name(ioctl_code), ioctl_code);
         }
 
 	if (st == STATUS_PENDING) {

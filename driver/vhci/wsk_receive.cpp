@@ -531,7 +531,7 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 		st = usb_reset_port(get_ret_submit(ctx));
                 break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", dbg_ioctl_code(ioctl), ioctl);
+		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", internal_device_control_name(ioctl), ioctl);
 	}
 
 	complete(irp, st);
@@ -622,7 +622,7 @@ URB *get_urb(_In_ IRP *irp)
 		return static_cast<URB*>(URB_FROM_IRP(irp));
 	}
 
-	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB_SUBMIT_URB expected, got %s(%#x)", dbg_ioctl_code(ioctl), ioctl);
+	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB_SUBMIT_URB expected, got %s(%#x)", internal_device_control_name(ioctl), ioctl);
 	return nullptr;
 }
 

@@ -29,7 +29,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto outlen = ioc.OutputBufferLength;
 
 	TraceDbg("%!vdev_type_t! %s(%#08lX), inlen %lu, outlen %lu",
-		  vdev->type, dbg_ioctl_code(ioc.IoControlCode), ioc.IoControlCode, inlen, outlen);
+		  vdev->type, device_control_name(ioc.IoControlCode), ioc.IoControlCode, inlen, outlen);
 
 	auto buffer = irp->AssociatedIrp.SystemBuffer;
 	auto status = STATUS_INVALID_DEVICE_REQUEST;

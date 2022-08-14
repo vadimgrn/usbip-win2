@@ -127,7 +127,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 		st = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), outlen);
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", dbg_ioctl_code(ioctl_code), ioctl_code);
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", device_control_name(ioctl_code), ioctl_code);
 	}
 
 	return st;
