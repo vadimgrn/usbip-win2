@@ -106,7 +106,7 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 	RtlCopyMemory(r.Data, dsc_data, cnt);
 	outlen = sizeof(r) + cnt;
 
-	TraceDbg("%lu bytes%!BIN!", cnt, WppBinary(dsc_data, (USHORT)cnt));
+	TraceDbg("%lu bytes%!BIN!", cnt, WppBinary(dsc_data, USHORT(cnt)));
 	return STATUS_SUCCESS;
 }
 
@@ -130,21 +130,26 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &nodeinfo, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
-	outlen = sizeof(nodeinfo);
-
-	if (inlen != sizeof(nodeinfo)) {
+	if (!(inlen == sizeof(r) && outlen == sizeof(r))) {
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
-	if (nodeinfo.NodeType == UsbMIParent) {
-		nodeinfo.u.MiParentInformation.NumberOfInterfaces = 1;
-	} else {
-		vhub_get_hub_descriptor(vhub, nodeinfo.u.HubInformation.HubDescriptor);
-		nodeinfo.u.HubInformation.HubIsBusPowered = false;
+	switch (r.NodeType) {
+	case UsbHub: {
+		auto &h = r.u.HubInformation;
+		get_hub_descriptor(vhub, h.HubDescriptor);
+		h.HubIsBusPowered = false;
+		TraceMsg("UsbHub, bNumberOfPorts %d", h.HubDescriptor.bNumberOfPorts);
+	} break;
+	case UsbMIParent: {
+		auto &p = r.u.MiParentInformation;
+		p.NumberOfInterfaces = 1;
+		TraceMsg("UsbMIParent, NumberOfInterfaces %lu", p.NumberOfInterfaces);
+	} break;
 	}
 
 	return STATUS_SUCCESS;
@@ -201,7 +206,7 @@ PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUE
 
 	USHORT lang_id = pkt.wIndex;
 
-	TraceDbg("ConnectionIndex %lu, %!usb_descriptor_type!, index %d, lang_id %#x; inlen %lu, outlen %lu", 
+	TraceMsg("ConnectionIndex %lu, %!usb_descriptor_type!, index %d, lang_id %#x; inlen %lu, outlen %lu", 
 		  r.ConnectionIndex, type, idx, lang_id, inlen, outlen);
 
 	if (!(inlen >= sizeof(r) && outlen > sizeof(r))) {
@@ -361,7 +366,6 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(_Inout_ vhub_dev_t *vhub, _In_ ULONG ioctl_cod
 	auto status = STATUS_INVALID_DEVICE_REQUEST;
 
 	switch (ioctl_code) {
-	static_assert(IOCTL_USB_GET_NODE_INFORMATION == IOCTL_USB_GET_ROOT_HUB_NAME);
 	case IOCTL_USB_GET_NODE_INFORMATION:
 		status = get_node_info(vhub, *static_cast<USB_NODE_INFORMATION*>(buffer), inlen, outlen);
 		break;

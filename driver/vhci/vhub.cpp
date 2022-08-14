@@ -102,7 +102,7 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 /*
  * See: <linux>/drivers/usb/usbip/vhci_hcd.c, hub_descriptor
  */
-PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &d)
+PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t *vhub, _Out_ USB_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
@@ -123,7 +123,7 @@ PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_HUB_DESCRIPTOR &d)
 /*
 * See: <linux>/drivers/usb/usbip/vhci_hcd.c, ss_hub_descriptor
 */
-PAGEABLE void vhub_get_hub_descriptor(vhub_dev_t *vhub, USB_30_HUB_DESCRIPTOR &d)
+PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t *vhub, _Out_ USB_30_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
@@ -145,7 +145,7 @@ PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_
 	p.HubType = UsbRootHub; // Usb30Hub
 	p.HighestPortNumber = vhub->NUM_PORTS;
 
-	vhub_get_hub_descriptor(vhub, p.u.UsbHubDescriptor);
+	get_hub_descriptor(vhub, p.u.UsbHubDescriptor);
 	return STATUS_SUCCESS;
 }
 

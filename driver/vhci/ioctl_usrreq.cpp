@@ -144,7 +144,7 @@ PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, _Inout_
 	static_assert(sizeof(r.String) == sizeof(name.RootHubName));
 
 	auto vhub = vhub_from_vhci(vhci);
-	return vhub_get_roothub_name(vhub, name, len);
+	return get_roothub_name(vhub, name, len);
 }
 
 PAGEABLE auto get_device_count(const vhub_dev_t *vhub)

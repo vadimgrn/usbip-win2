@@ -3,6 +3,6 @@
 #include "pageable.h"
 #include "dev.h"
 
-PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG &outlen);
-PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, ULONG &outlen);
-PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen);
+PAGEABLE NTSTATUS get_hcd_driverkey_name(_In_ vhci_dev_t *vhci, _Out_ USB_HCD_DRIVERKEY_NAME &r, _Out_ ULONG &outlen);
+PAGEABLE NTSTATUS get_roothub_name(_In_ vhub_dev_t *vhub, _Out_ USB_ROOT_HUB_NAME &r, _Out_ ULONG &outlen);
+PAGEABLE NTSTATUS vhci_ioctl_vhci(_In_ vhci_dev_t *vhci, _In_ ULONG ioctl_code, void *buffer, _In_ ULONG inlen, _Out_ ULONG &outlen);

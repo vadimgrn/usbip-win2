@@ -35,31 +35,39 @@ PAGEABLE ULONG get_name_prefix_cch(const UNICODE_STRING &s)
 } // namespace
 
 
-PAGEABLE NTSTATUS vhub_get_roothub_name(vhub_dev_t *vhub, USB_ROOT_HUB_NAME &r, ULONG &outlen)
+/*
+ * On output USB_ROOT_HUB_NAME structure that contains the symbolic link name of the root hub. 
+ * The leading "\xxx\ " text is not included in the retrieved string.
+ */
+PAGEABLE NTSTATUS get_roothub_name(_In_ vhub_dev_t *vhub, _Out_ USB_ROOT_HUB_NAME &r, _Out_ ULONG &outlen)
 {
 	PAGED_CODE();
 
-	auto &str = vhub->DevIntfRootHub;
-
-	auto prefix_cch = get_name_prefix_cch(str);
-	if (!prefix_cch) {
-		Trace(TRACE_LEVEL_WARNING, "Prefix expected: DevIntfRootHub '%!USTR!'", &str);
-	}
-
-	ULONG str_sz = str.Length - prefix_cch*sizeof(*str.Buffer);
-	ULONG r_sz = sizeof(r) - sizeof(*r.RootHubName) + str_sz;
-
 	if (outlen < sizeof(r)) {
-		outlen = r_sz;
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	outlen = min(outlen, r_sz);
+	auto &src = vhub->DevIntfRootHub;
 
-	r.ActualLength = r_sz;
-	RtlStringCbCopyW(r.RootHubName, outlen - offsetof(USB_ROOT_HUB_NAME, RootHubName), str.Buffer + prefix_cch);
+	auto prefix_cch = get_name_prefix_cch(src);
+	if (!prefix_cch) {
+		Trace(TRACE_LEVEL_WARNING, "Prefix expected: DevIntfRootHub '%!USTR!'", &src);
+	}
+
+	auto src_start = src.Buffer + prefix_cch;
+	auto src_sz = src.Length - USHORT(prefix_cch*sizeof(*src.Buffer));
+
+	r.ActualLength = sizeof(r) + src_sz; // NULL terminated, do not subtract sizeof(RootHubName)
+	outlen = min(outlen, r.ActualLength);
+
+	auto dest_start = r.RootHubName;
+	USHORT dest_sz = USHORT(outlen) - offsetof(USB_ROOT_HUB_NAME, RootHubName);
+
+	RtlStringCbCopyNW(dest_start, dest_sz, src_start, src_sz);
 	
-	TraceMsg("ActualLength %lu, RootHubName '%S'", r.ActualLength, r.RootHubName);
+	UNICODE_STRING dest{ .Length = dest_sz, .MaximumLength = dest_sz, .Buffer = dest_start };
+	TraceMsg("ActualLength %lu, RootHubName '%!USTR!'", r.ActualLength, &dest);
+
 	return STATUS_SUCCESS;
 }
 
@@ -67,28 +75,32 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 {
 	PAGED_CODE();
 
-	NTSTATUS st{};
+	if (outlen < sizeof(r)) {
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	auto err = STATUS_SUCCESS;
 	ULONG prop_sz = 0;
 
-	auto prop = (PWSTR)GetDeviceProperty(vhci->child_pdo->Self, DevicePropertyDriverKeyName, st, prop_sz);
+	auto prop = (PWSTR)GetDeviceProperty(vhci->child_pdo->Self, DevicePropertyDriverKeyName, err, prop_sz); // NULL terminated
 	if (!prop) {
-		return st;
+		return err;
 	}
 
 	ULONG r_sz = sizeof(r) - sizeof(*r.DriverKeyName) + prop_sz;
+	outlen = min(outlen, r_sz);
 
-	if (outlen >= sizeof(r)) {
-		outlen = min(outlen, r_sz);
-		r.ActualLength = prop_sz;
-		RtlStringCbCopyW(r.DriverKeyName, outlen - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName), prop);
-		TraceMsg("ActualLength %lu, DriverKeyName '%S'", r.ActualLength, r.DriverKeyName);
-	} else {
-		outlen = r_sz;
-		st = STATUS_BUFFER_TOO_SMALL;
-	}
+	auto dest_start = r.DriverKeyName;
+	USHORT dest_sz = USHORT(outlen) - offsetof(USB_HCD_DRIVERKEY_NAME, DriverKeyName);
+
+	r.ActualLength = prop_sz;
+	RtlStringCbCopyNW(dest_start, dest_sz, prop, prop_sz);
+
+	UNICODE_STRING dest{ .Length = dest_sz, .MaximumLength = dest_sz, .Buffer = dest_start };
+	TraceMsg("ActualLength %lu, DriverKeyName '%!USTR!'", r.ActualLength, &dest);
 
 	ExFreePoolWithTag(prop, USBIP_VHCI_POOL_TAG);
-	return st;
+	return err;
 }
 
 PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
@@ -120,7 +132,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 		st = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		st = vhub_get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
+		st = get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
 		NT_ASSERT(inlen == outlen);
