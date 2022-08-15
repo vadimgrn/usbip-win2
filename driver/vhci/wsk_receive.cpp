@@ -500,7 +500,7 @@ void complete(_Inout_ IRP* &irp, _In_ NTSTATUS status)
 		st.Information = 0;	
 	}
 
-	auto old_status = InterlockedCompareExchange(get_status(irp), ST_RECV_COMPLETE, ST_NONE);
+	auto old_status = atomic_set_status(irp, ST_RECV_COMPLETE);
 	NT_ASSERT(old_status != ST_IRP_CANCELED);
 
 	if (old_status == ST_SEND_COMPLETE) {

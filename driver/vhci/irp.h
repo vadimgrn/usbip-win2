@@ -13,26 +13,26 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS irp_pass_down(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS irp_send_synchronously(DEVICE_OBJECT *devobj, IRP *irp);
+PAGEABLE NTSTATUS irp_send_synchronously(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS irp_pass_down_or_complete(vdev_t *vdev, IRP *irp);
+PAGEABLE NTSTATUS irp_pass_down_or_complete(_In_ vdev_t *vdev, _In_ IRP *irp);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS CompleteRequest(IRP *irp, NTSTATUS status = STATUS_SUCCESS);
+NTSTATUS CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status = STATUS_SUCCESS);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS CompleteRequestAsIs(IRP *irp);
+NTSTATUS CompleteRequestAsIs(_In_ IRP *irp);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete_as_canceled(IRP *irp);
+void complete_as_canceled(_In_ IRP *irp);
 
-inline auto list_entry(IRP *irp)
+inline auto list_entry(_In_ IRP *irp)
 {
 	return &irp->Tail.Overlay.ListEntry;
 }
 
-inline auto get_irp(LIST_ENTRY *entry)
+inline auto get_irp(_In_ LIST_ENTRY *entry)
 {
 	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
 }
@@ -42,7 +42,7 @@ inline auto get_irp(LIST_ENTRY *entry)
  * Drivers that use these routines to queue IRPs must leave that member unused.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto& get_seqnum(IRP *irp)
+inline auto& get_seqnum(_In_ IRP *irp)
 {
 	NT_ASSERT(irp);
 
@@ -55,7 +55,7 @@ inline auto& get_seqnum(IRP *irp)
 enum irp_status_t { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto get_status(IRP *irp)
+inline auto get_status(_In_ IRP *irp)
 {
 	NT_ASSERT(irp);
 	static_assert(sizeof(LONG) == sizeof(seqnum_t));
@@ -63,8 +63,16 @@ inline auto get_status(IRP *irp)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto& get_pipe_handle(IRP *irp)
+inline auto& get_pipe_handle(_In_ IRP *irp)
 {
 	NT_ASSERT(irp);
 	return *static_cast<USBD_PIPE_HANDLE*>(irp->Tail.Overlay.DriverContext + 1);
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto atomic_set_status(_In_ IRP *irp, _In_ irp_status_t status)
+{
+	NT_ASSERT(status != ST_NONE);
+	NT_ASSERT(status != ST_IRP_NULL);
+	return InterlockedCompareExchange(get_status(irp), status, ST_NONE);
 }

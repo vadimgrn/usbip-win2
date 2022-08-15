@@ -53,7 +53,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         auto &vpdo = *ctx->vpdo;
         auto irp = ctx->irp; // nullptr for send_cmd_unlink
 
-        auto old_status = irp ? InterlockedCompareExchange(get_status(irp), ST_SEND_COMPLETE, ST_NONE) : ST_IRP_NULL;
+        auto old_status = irp ? atomic_set_status(irp, ST_SEND_COMPLETE) : ST_IRP_NULL;
         auto &st = wsk_irp->IoStatus;
 
         TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!",
@@ -1106,7 +1106,7 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
                 Trace(TRACE_LEVEL_ERROR, "irp %04x, seqnum %u, new_wsk_context error", ptr4log(irp), seqnum);
         }
 
-        auto old_status = InterlockedCompareExchange(get_status(irp), ST_IRP_CANCELED, ST_NONE);
+        auto old_status = atomic_set_status(irp, ST_IRP_CANCELED);
         NT_ASSERT(old_status != ST_RECV_COMPLETE);
 
         if (old_status == ST_SEND_COMPLETE) {
