@@ -38,7 +38,7 @@ auto complete_internal_ioctl(_Inout_ IRP *irp, _In_ NTSTATUS status)
  * This means that:
  * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete because WskSend can still access
  *   IRP transfer buffer.
- * 2.WskReceive must not complete IRP if it was called before send_complete because it modifies *get_status(irp).
+ * 2.WskReceive must not complete IRP if it's called before send_complete because send_complete modifies get_status(irp).
  * 3.CompleteCanceledIrp and WskReceive are mutually exclusive because IRP was dequeued from the CSQ.
  * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceive.
  * 
@@ -48,7 +48,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
         auto ctx = static_cast<wsk_context*>(Context);
-        NT_ASSERT(ctx->wsk_irp == wsk_irp);
 
         auto &vpdo = *ctx->vpdo;
         auto irp = ctx->irp; // nullptr for send_cmd_unlink
@@ -207,9 +206,7 @@ NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto ctx = make_peek_context(PipeHandle);
-
-	while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx)) {
+	while (auto irp = dequeue_irp(vpdo, PipeHandle)) {
                 send_cmd_unlink(vpdo, irp);
 	}
 

@@ -10,8 +10,29 @@
 #include "irp.h"
 #include "internal_ioctl.h"
 
+
 namespace
 {
+
+struct peek_context
+{
+	bool use_seqnum;
+	union {
+		seqnum_t seqnum;
+		USBD_PIPE_HANDLE handle;
+	};
+};
+
+constexpr peek_context make_peek_context(_In_ seqnum_t seqnum)
+{
+	return { .use_seqnum = true, .seqnum = seqnum };
+}
+
+constexpr peek_context make_peek_context(_In_ USBD_PIPE_HANDLE handle)
+{
+	NT_ASSERT(handle);
+	return { .use_seqnum = false, .handle = handle };
+}
 
 inline auto to_vpdo(IO_CSQ *csq)
 {
@@ -106,7 +127,7 @@ void CompleteCanceledIrp(_In_ IO_CSQ *csq, _In_ IRP *irp)
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS init_queue(vpdo_dev_t &vpdo)
+PAGEABLE NTSTATUS init_queue(_Inout_ vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 
@@ -132,5 +153,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum)
 {
 	auto ctx = make_peek_context(seqnum);
+	return IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ USBD_PIPE_HANDLE handle)
+{
+	auto ctx = make_peek_context(handle);
 	return IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
 }

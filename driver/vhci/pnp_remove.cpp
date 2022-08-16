@@ -104,9 +104,9 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	NT_ASSERT(!vpdo.sock);
 
 	TraceMsg("%04x", ptr4log(&vpdo));
-
-	if (is_initialized(vpdo.irps_csq)) {
-                while (auto irp = IoCsqRemoveNextIrp(&vpdo.irps_csq, nullptr)) {
+	
+	if (auto &csq = vpdo.irps_csq; csq.CsqAcquireLock) { // is initialized?
+                while (auto irp = IoCsqRemoveNextIrp(&csq, nullptr)) {
 			complete_as_canceled(irp);
                 }
         }
