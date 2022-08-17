@@ -55,8 +55,8 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         auto old_status = irp ? atomic_set_status(irp, ST_SEND_COMPLETE) : ST_IRP_NULL;
         auto &st = wsk_irp->IoStatus;
 
-        TraceWSK("irql %!irql!, wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!",
-                  KeGetCurrentIrql(), ptr4log(wsk_irp), st.Status, st.Information, old_status);
+        TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!",
+                  ptr4log(wsk_irp), st.Status, st.Information, old_status);
 
         if (!irp) {
                 // nothing to do
@@ -1122,8 +1122,8 @@ extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *ir
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
 
-        TraceDbg("Enter irql %!irql!, %s(%#08lX), irp %04x", KeGetCurrentIrql(), 
-                  internal_device_control_name(ioctl_code), ioctl_code, ptr4log(irp));
+        TraceDbg("Enter: %s(%#08lX), irp %04x", internal_device_control_name(ioctl_code), 
+                  ioctl_code, ptr4log(irp));
 
         NTSTATUS st{};
         auto vpdo = to_vpdo_or_null(devobj);

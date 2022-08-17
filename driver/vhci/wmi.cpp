@@ -138,7 +138,7 @@ _Dispatch_type_(IRP_MJ_SYSTEM_CONTROL)
 extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp)
 {
 	PAGED_CODE();
-	TraceDbg("Enter irql %!irql!", KeGetCurrentIrql());
+	TraceDbg("Enter");
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 
@@ -181,7 +181,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
-	TraceDbg("%04x", ptr4log(vhci));
 
 	auto &r = vhci->WmiLibInfo;
 
@@ -197,7 +196,7 @@ PAGEABLE NTSTATUS reg_wmi(vhci_dev_t *vhci)
 	auto status = IoWMIRegistrationControl(vhci->Self, WMIREG_ACTION_REGISTER);
 	vhci->StdUSBIPBusData.ErrorCount = 0;
 
-	TraceDbg("irql %!irql!, %!STATUS!", KeGetCurrentIrql(), status);
+	TraceDbg("%!STATUS!", status);
 	return status;
 }
 

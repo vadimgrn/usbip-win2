@@ -764,7 +764,7 @@ NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 }
 
 /*
- * For RET_UNLINK irp was completed before CMD_UNLINK was issued.
+ * For RET_UNLINK irp was completed right after CMD_UNLINK was issued.
  * @see send_cmd_unlink
  *
  * USBIP_RET_UNLINK

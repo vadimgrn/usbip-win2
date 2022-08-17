@@ -36,7 +36,7 @@ PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const cha
 		return CompleteRequest(Irp, STATUS_NO_SUCH_DEVICE);
 	}
 
-	TraceMsg("%!vdev_type_t!: irql !%!irql!", vdev->type, KeGetCurrentIrql());
+	TraceMsg("%!vdev_type_t!", vdev->type);
 
 	Irp->IoStatus.Information = 0;
 	return CompleteRequest(Irp);

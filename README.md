@@ -14,10 +14,10 @@
 - Server must support USB/IP protocol v.1.1.1
 
 ## Key features
-- VHCI driver is a USB/IP client
+- WDM driver is a USB/IP client
 - [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
-  - The driver establishes TCP/IP connection with a server and handles data exchange without assistance of userspace app
+  - The driver establishes TCP/IP connection with a server and does data exchange
   - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls
 - [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of transfer buffers is implemented for network send and receive operations
   - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
@@ -144,7 +144,7 @@ rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_W
 rem rm sed*
 ```
 
-## Debugging BSOD
+## Debugging [BSOD](https://en.wikipedia.org/wiki/Blue_screen_of_death)
 - Enable kernel memory dump
   - Open "System Properties" dialog box
   - Select "Advanced" tab

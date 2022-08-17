@@ -179,7 +179,6 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PD
 		type = vhci ? VDEV_VHUB : VDEV_VHCI;
 	}
 
-	TraceMsg("irql %!irql!", KeGetCurrentIrql());
-
+	TraceMsg("%!vdev_type_t!", type);
 	return add_vdev(drvobj, pdo, type);
 }

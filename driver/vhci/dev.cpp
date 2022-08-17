@@ -31,6 +31,7 @@ void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTA
 			buf = alloc(ResultLength);
 			break;
 		default:
+			Trace(TRACE_LEVEL_ERROR, "IoGetDeviceProperty: DEVICE_REGISTRY_PROPERTY %d, %!STATUS!", prop, error);
 			ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
 			return nullptr;
 		}
