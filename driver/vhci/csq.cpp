@@ -162,3 +162,9 @@ IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ USBD_PIPE_HANDLE handle)
 	auto ctx = make_peek_context(handle);
 	return IoCsqRemoveNextIrp(&vpdo.irps_csq, &ctx);
 }
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo)
+{
+	return IoCsqRemoveNextIrp(&vpdo.irps_csq, nullptr);
+}

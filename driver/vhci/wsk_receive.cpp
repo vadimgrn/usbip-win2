@@ -450,6 +450,15 @@ urb_function_t* const urb_functions[] =
 	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
+/*
+if (urb.UrbHeader.Status == EndpointStalled && ctx.irp) {
+	if (auto handle = get_pipe_handle(ctx.irp)) { // except default control pipe
+		if (auto err = clear_endpoint_stall(*ctx.vpdo, handle, nullptr)) {
+			Trace(TRACE_LEVEL_ERROR, "clear_endpoint_stall %!STATUS!", err);
+		}
+	}
+}
+*/
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
@@ -465,8 +474,7 @@ NTSTATUS usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
         if (err && !urb.UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err)
                 urb.UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
-                Trace(TRACE_LEVEL_VERBOSE, "Set USBD_STATUS=%s because return is %!STATUS!", 
-			get_usbd_status(urb.UrbHeader.Status), err);
+                TraceDbg("Set USBD_STATUS=%s because return is %!STATUS!", get_usbd_status(urb.UrbHeader.Status), err);
         }
 
         return err;

@@ -31,14 +31,14 @@ enum {
 /*
  * Status can be from usb_submit_urb or urb->status, we cannot know its origin.
  * Meaning of some errors differs for usb_submit_urb and urb->status, we would prefer urb->status.
- * See: https://elixir.bootlin.com/linux/v4.11.12/source/Documentation/usb/error-codes.txt
+ * See: https://www.kernel.org/doc/Documentation/usb/error-codes.txt
  */
 USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
 {
 	switch (usbip_status >= 0 ? usbip_status : -usbip_status) {
 	case 0:
 		return USBD_STATUS_SUCCESS;
-	case EPIPE_LNX:
+	case EPIPE_LNX: // Endpoint stalled. For non-control endpoints, reset this status with usb_clear_halt()
 		return EndpointStalled;
 	case EREMOTEIO_LNX:
 		return USBD_STATUS_ERROR_SHORT_TRANSFER;

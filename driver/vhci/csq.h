@@ -23,3 +23,6 @@ IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ seqnum_t seqnum);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo, _In_ USBD_PIPE_HANDLE handle);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+IRP *dequeue_irp(_Inout_ vpdo_dev_t &vpdo);

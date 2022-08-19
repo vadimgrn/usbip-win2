@@ -6,6 +6,7 @@
 #define HWID_ROOT	L"USBIPWIN\\root"
 #define HWID_VHCI	L"USBIPWIN\\vhci"
 
+// @see usbip_vhci.inf
 #define VHUB_PREFIX	L"USB\\ROOT_HUB"
 #define VHUB_VID	L"1209"
 #define VHUB_PID	L"8250"

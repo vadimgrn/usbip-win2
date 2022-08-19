@@ -103,10 +103,10 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 	NT_ASSERT(!vpdo.sock);
 
-	TraceMsg("%04x", ptr4log(&vpdo));
+	TraceDbg("vpdo %04x", ptr4log(&vpdo));
 	
 	if (auto &csq = vpdo.irps_csq; csq.CsqAcquireLock) { // is initialized?
-                while (auto irp = IoCsqRemoveNextIrp(&csq, nullptr)) {
+                while (auto irp = dequeue_irp(vpdo)) {
 			complete_as_canceled(irp);
                 }
         }

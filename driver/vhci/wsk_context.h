@@ -21,7 +21,7 @@ struct wsk_context
         vpdo_dev_t *vpdo;
         IRP *irp; // can be NULL, see send_cmd_unlink
 
-        usbip::Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer
+        usbip::Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer(MDL)
 
         // preallocated data
 

@@ -18,6 +18,8 @@
 namespace
 {
 
+using urb_function_t = NTSTATUS (vpdo_dev_t&, IRP*, URB&);
+
 /*
  * NT_ASSERT(!irp->IoStatus.Information); // can fail
  */
@@ -36,10 +38,10 @@ auto complete_internal_ioctl(_Inout_ IRP *irp, _In_ NTSTATUS status)
  *
  * To avoid copying of URB's transfer buffer, it must not be completed until this handler will be called.
  * This means that:
- * 1.CompleteCanceledIrp must not complete IRP if it was called before send_complete because WskSend can still access
+ * 1.CompleteCanceledIrp must not complete IRP if it's called before send_complete because WskSend can still access
  *   IRP transfer buffer.
  * 2.WskReceive must not complete IRP if it's called before send_complete because send_complete modifies get_status(irp).
- * 3.CompleteCanceledIrp and WskReceive are mutually exclusive because IRP was dequeued from the CSQ.
+ * 3.CompleteCanceledIrp and WskReceive are mutually exclusive because IRP is dequeued from the CSQ.
  * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceive.
  * 
  * @see wsk_receive.cpp, complete 
@@ -198,13 +200,9 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
+NTSTATUS abort_pipe(_In_ vpdo_dev_t &vpdo, _In_ USBD_PIPE_HANDLE PipeHandle)
 {
 	TraceUrb("PipeHandle %#Ix", ph4log(PipeHandle));
-
-	if (!PipeHandle) {
-		return STATUS_INVALID_PARAMETER;
-	}
 
 	while (auto irp = dequeue_irp(vpdo, PipeHandle)) {
                 send_cmd_unlink(vpdo, irp);
@@ -226,34 +224,9 @@ NTSTATUS abort_pipe(vpdo_dev_t &vpdo, USBD_PIPE_HANDLE PipeHandle)
  *
  * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
  *      <linux>/drivers/usb/core/message.c, usb_clear_halt
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
-{
-        auto &r = urb.UrbPipeRequest;
-
-        auto ctx = new_wsk_context(vpdo, irp);
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-
-        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, EP0, TransferFlags)) {
-                free(ctx, false);
-                return err;
-        }
-
-        auto &pkt = get_submit_setup(ctx->hdr);
-        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
-        pkt.bRequest = USB_REQUEST_CLEAR_FEATURE; // USB_REQ_CLEAR_FEATURE
-        pkt.wValue.W = USB_FEATURE_ENDPOINT_STALL; // USB_ENDPOINT_HALT
-        pkt.wIndex.W = get_endpoint_address(r.PipeHandle);
-
-        return send(ctx);
-}
-
-/*
+ *
+ * ###
+ * 
  * URB_FUNCTION_SYNC_CLEAR_STALL must issue USB_REQ_CLEAR_FEATURE, USB_ENDPOINT_HALT.
  * URB_FUNCTION_SYNC_RESET_PIPE must call usb_reset_endpoint.
  *
@@ -263,13 +236,16 @@ NTSTATUS sync_reset_pipe_and_clear_stall(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * a) wValue=1 to clear halt
  * b) wValue=2 to call usb_reset_endpoint
  *
- * See: <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
- * <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
+ * @see <linux>/drivers/usb/usbip/stub_rx.c, is_clear_halt_cmd
+ * @see <linux>/drivers/usb/core/message.c, usb_clear_halt, usb_reset_endpoint
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
+_Function_class_(urb_function_t)
+NTSTATUS pipe_request(_In_ vpdo_dev_t &vpdo, _In_ IRP *irp, _In_ URB &urb)
 {
         auto &r = urb.UrbPipeRequest;
+        NT_ASSERT(r.PipeHandle);
+
         auto st = STATUS_NOT_SUPPORTED;
 
         switch (urb.UrbHeader.Function) {
@@ -277,7 +253,7 @@ NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 st = abort_pipe(vpdo, r.PipeHandle);
                 break;
         case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
-                st = sync_reset_pipe_and_clear_stall(vpdo, irp, urb);
+                st = clear_endpoint_stall(vpdo, r.PipeHandle, irp);
                 break;
         case URB_FUNCTION_SYNC_RESET_PIPE:
         case URB_FUNCTION_SYNC_CLEAR_STALL:
@@ -299,6 +275,7 @@ NTSTATUS pipe_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR recipient)
 {
         auto& r = urb.UrbControlGetStatusRequest;
@@ -328,30 +305,35 @@ NTSTATUS control_get_status_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR 
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_status_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_status_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_status_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_status_from_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_get_status_request(vpdo, irp, urb, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR type, UCHAR recipient)
 {
         auto &r = urb.UrbControlVendorClassRequest;
@@ -389,54 +371,63 @@ NTSTATUS control_vendor_class_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHA
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS vendor_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS vendor_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS vendor_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS vendor_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS class_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS class_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS class_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS class_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_vendor_class_request(vpdo, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool dir_in, UCHAR recipient)
 {
         auto &r = urb.UrbControlDescriptorRequest;
@@ -469,48 +460,55 @@ NTSTATUS control_descriptor_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, bool d
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_descriptor_from_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_descriptor_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_descriptor_from_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_descriptor_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_descriptor_from_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_descriptor_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_descriptor_request(vpdo, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRequest, UCHAR recipient)
 {
         auto &r = urb.UrbControlFeatureRequest;
 
         TraceUrb("irp %04x -> %s: FeatureSelector %#hx, Index %#hx",
-                ptr4log(irp), urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
+                  ptr4log(irp), urb_function_str(r.Hdr.Function), r.FeatureSelector, r.Index);
 
         auto ctx = new_wsk_context(vpdo, irp);
         if (!ctx) {
@@ -534,54 +532,63 @@ NTSTATUS control_feature_request(vpdo_dev_t &vpdo, IRP *irp, URB &urb, UCHAR bRe
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS set_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS clear_feature_to_device(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS clear_feature_to_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS clear_feature_to_endpoint(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS clear_feature_to_other(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         return control_feature_request(vpdo, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbSelectConfiguration;
@@ -611,6 +618,7 @@ NTSTATUS select_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbSelectInterface;
@@ -646,6 +654,7 @@ NTSTATUS select_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * See: <linux>//drivers/usb/core/usb.c, usb_get_current_frame_number.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_current_frame_number(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &num = urb.UrbGetCurrentFrameNumber.FrameNumber;
@@ -658,6 +667,7 @@ NTSTATUS get_current_frame_number(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
@@ -698,6 +708,7 @@ NTSTATUS control_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbBulkOrInterruptTransfer;
@@ -735,6 +746,7 @@ NTSTATUS bulk_or_interrupt_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * USBD_START_ISO_TRANSFER_ASAP is appended because URB_GET_CURRENT_FRAME_NUMBER is not implemented.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbIsochronousTransfer;
@@ -782,6 +794,7 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	TraceUrb("irp %04x: %s not supported", ptr4log(irp), urb_function_str(urb.UrbHeader.Function));
@@ -791,6 +804,7 @@ NTSTATUS function_deprecated(vpdo_dev_t&, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbControlGetConfigurationRequest;
@@ -817,6 +831,7 @@ NTSTATUS get_configuration(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbControlGetInterfaceRequest;
@@ -849,6 +864,7 @@ NTSTATUS get_interface(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * @see https://github.com/libusb/libusb/blob/master/examples/xusb.c, read_ms_winsub_feature_descriptors
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
 {
         auto &r = urb.UrbOSFeatureDescriptorRequest;
@@ -889,6 +905,7 @@ NTSTATUS get_ms_feature_descriptor(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
  * See: <kernel>/drivers/usb/core/message.c, usb_set_isoch_delay.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbGetIsochPipeTransferPathDelays;
@@ -902,6 +919,7 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(vpdo_dev_t&, IRP *irp, URB &urb)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS open_static_streams(vpdo_dev_t&, IRP *irp, URB &urb)
 {
 	auto &r = urb.UrbOpenStaticStreams;
@@ -911,8 +929,6 @@ NTSTATUS open_static_streams(vpdo_dev_t&, IRP *irp, URB &urb)
 
 	return STATUS_NOT_SUPPORTED;
 }
-
-using urb_function_t = NTSTATUS (vpdo_dev_t&, IRP*, URB&);
 
 urb_function_t* const urb_functions[] =
 {
@@ -1039,7 +1055,8 @@ NTSTATUS usb_get_port_status(ULONG &status)
 }
 
 /*
- * @see <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd
+ * Call usb_reset_device on Linux side - warn interface drivers and perform a USB port reset.
+ * @see <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd, tweak_reset_device_cmd
  * @see <linux>/drivers/usb/usbip/vhci_hcd.c, vhci_hub_control
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -1089,7 +1106,7 @@ NTSTATUS usb_reset_port(vpdo_dev_t &vpdo, IRP *irp)
  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
+void send_cmd_unlink(_In_ vpdo_dev_t &vpdo, _In_ IRP *irp)
 {
         auto seqnum = get_seqnum(irp);
         TraceMsg("irp %04x, seqnum %u", ptr4log(irp), seqnum);
@@ -1112,12 +1129,32 @@ void send_cmd_unlink(vpdo_dev_t &vpdo, IRP *irp)
 }
 
 /*
+ * @see <linux>/drivers/usb/core/message.c, usb_clear_halt
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS clear_endpoint_stall(_In_ vpdo_dev_t &vpdo, _In_ USBD_PIPE_HANDLE PipeHandle, _In_opt_ IRP *irp)
+{
+        TraceUrb("PipeHandle %#Ix", ph4log(PipeHandle));
+
+        URB urb {
+                .UrbControlFeatureRequest {
+                        .Hdr { .Length = sizeof(urb.UrbControlFeatureRequest),
+                               .Function = URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT },
+                        .FeatureSelector = USB_FEATURE_ENDPOINT_STALL, 
+                        .Index = get_endpoint_address(PipeHandle)
+                }
+        };
+
+        return clear_feature_to_endpoint(vpdo, irp, urb);
+}
+
+/*
  * NT_ASSERT(!irp->IoStatus.Information); // can fail
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(DRIVER_DISPATCH)
 _Dispatch_type_(IRP_MJ_INTERNAL_DEVICE_CONTROL)
-extern "C" NTSTATUS vhci_internal_ioctl(__in DEVICE_OBJECT *devobj, __in IRP *irp)
+extern "C" NTSTATUS vhci_internal_ioctl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
 	auto ioctl_code = irpstack->Parameters.DeviceIoControl.IoControlCode;
