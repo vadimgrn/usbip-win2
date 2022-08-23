@@ -15,4 +15,4 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _Function_class_(DRIVER_DISPATCH)
 _Dispatch_type_(IRP_MJ_SYSTEM_CONTROL)
-extern "C" PAGEABLE NTSTATUS vhci_system_control(__in PDEVICE_OBJECT devobj, __in PIRP irp);
+extern "C" PAGEABLE NTSTATUS vhci_system_control(_In_ PDEVICE_OBJECT devobj, _In_ PIRP irp);

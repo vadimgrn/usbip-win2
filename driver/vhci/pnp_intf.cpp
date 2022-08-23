@@ -17,7 +17,7 @@ namespace
 {
 
 _IRQL_requires_same_
-void InterfaceReference(__in PVOID Context) 
+void InterfaceReference(_In_ PVOID Context) 
 {
 	auto &vdev = *static_cast<vdev_t*>(Context);
 
@@ -26,7 +26,7 @@ void InterfaceReference(__in PVOID Context)
 }
 
 _IRQL_requires_same_
-void InterfaceDereference(__in PVOID Context)
+void InterfaceDereference(_In_ PVOID Context)
 {
 	auto &vdev = *static_cast<vdev_t*>(Context);
 
@@ -47,7 +47,7 @@ inline auto get_current_frame_number(const vpdo_dev_t &vpdo)
  * @return true if device is operating at high speed
  */
 _IRQL_requires_max_(HIGH_LEVEL)
-BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(__in PVOID Context)
+BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(_In_ PVOID Context)
 {
 	auto vpdo = static_cast<vpdo_dev_t*>(Context);
 	Trace(TRACE_LEVEL_VERBOSE, "%!usb_device_speed!", vpdo->speed);

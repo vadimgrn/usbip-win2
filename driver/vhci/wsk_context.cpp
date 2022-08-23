@@ -106,7 +106,8 @@ wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
 {
-        if (!(ctx.is_isoc = NumberOfPackets)) {
+        ctx.is_isoc = NumberOfPackets;
+        if (!ctx.is_isoc) {
                 return STATUS_SUCCESS;
         }
 

@@ -25,7 +25,7 @@ unsigned int g_init_flags;
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _Function_class_(DRIVER_DISPATCH)
-PAGEABLE auto vhci_complete(__in PDEVICE_OBJECT devobj, __in PIRP Irp, const char *what)
+PAGEABLE auto vhci_complete(_In_ PDEVICE_OBJECT devobj, _In_ PIRP Irp, const char *what)
 {
 	PAGED_CODE();
 
@@ -46,7 +46,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _Function_class_(DRIVER_DISPATCH)
 _Dispatch_type_(IRP_MJ_CREATE)
-PAGEABLE NTSTATUS vhci_create(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+PAGEABLE NTSTATUS vhci_create(_In_ PDEVICE_OBJECT devobj, _In_ PIRP Irp)
 {
 	return vhci_complete(devobj, Irp, __func__);
 }
@@ -55,7 +55,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _Function_class_(DRIVER_DISPATCH)
 _Dispatch_type_(IRP_MJ_CLOSE)
-PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
+PAGEABLE NTSTATUS vhci_close(_In_ PDEVICE_OBJECT devobj, _In_ PIRP Irp)
 {
 	return vhci_complete(devobj, Irp, __func__);
 }
@@ -63,7 +63,7 @@ PAGEABLE NTSTATUS vhci_close(__in PDEVICE_OBJECT devobj, __in PIRP Irp)
 _Function_class_(DRIVER_UNLOAD)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGEABLE void DriverUnload(__in DRIVER_OBJECT *drvobj)
+PAGEABLE void DriverUnload(_In_ DRIVER_OBJECT *drvobj)
 {
 	PAGED_CODE();
 
@@ -200,7 +200,7 @@ _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 __declspec(code_seg("INIT"))
-extern "C" NTSTATUS DriverEntry(__in DRIVER_OBJECT *drvobj, __in UNICODE_STRING *RegistryPath)
+extern "C" NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
 

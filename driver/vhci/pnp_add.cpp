@@ -102,7 +102,7 @@ PAGEABLE auto init(vhub_dev_t &vhub)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _When_(return>=0, _Kernel_clear_do_init_(yes))
-PAGEABLE auto add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev_type_t type)
+PAGEABLE auto add_vdev(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo, vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -163,7 +163,7 @@ PAGEABLE auto add_vdev(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo, vdev
 _Function_class_(DRIVER_ADD_DEVICE)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-extern "C" PAGEABLE NTSTATUS vhci_add_device(__in PDRIVER_OBJECT drvobj, __in PDEVICE_OBJECT pdo)
+extern "C" PAGEABLE NTSTATUS vhci_add_device(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo)
 {
 	PAGED_CODE();
 
