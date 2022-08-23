@@ -45,6 +45,11 @@ AppId={{#AppGUID}
 OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
 DisableWelcomePage=no
+WizardSmallImageFile=usbip-small.bmp
+WizardImageFile=usbip-logo.bmp
+WizardImageAlphaFormat=defined
+WizardImageStretch=no
+; UninstallDisplayIcon={app}\usbip.exe
 
 ; Windows 10 2004
 MinVersion=10.0.19041
