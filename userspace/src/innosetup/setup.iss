@@ -46,6 +46,9 @@ OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
 DisableWelcomePage=no
 
+; Windows 10 2004
+MinVersion=10.0.19041
+
 [Messages]
 WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
 

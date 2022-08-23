@@ -20,7 +20,7 @@
   - The driver establishes TCP/IP connection with a server and does data exchange
   - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls
 - [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of transfer buffers is implemented for network send and receive operations
-  - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
+  - [Memory Descriptor Lists](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) are used to send/receive multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
   - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data from URB transfer buffer
   - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
 - [System Worker Threads](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/system-worker-threads) are used to initiate receive operation
@@ -28,7 +28,7 @@
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - x86 build is removed
 - Server (stub driver) is removed
-- UDE client driver is removed, VHCI driver is superseded it
+- UDE client driver is removed, WDM driver is superseded it
 - Client (VHCI driver)
   - Significantly refactored and improved
   - The core of the driver was rewritten from scratch
