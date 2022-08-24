@@ -177,7 +177,7 @@ PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip
         PAGED_CODE();
         NT_ASSERT(!vpdo);
 
-        auto devobj = vdev_create(vhci->Self->DriverObject, VDEV_VPDO);
+        auto devobj = vdev_create(vhci->Self->DriverObject, vhci->version, VDEV_VPDO);
         if (!devobj) {
                 return make_error(ERR_GENERAL);
         }

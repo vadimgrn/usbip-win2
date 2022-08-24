@@ -84,11 +84,15 @@ Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\u
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\root"; WorkingDir: "{tmp}"; Flags: runhidden
+
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\root1"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\root2"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "remove ROOT\SYSTEM\0001"; RunOnceId: "DelClientRootDevice"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove ROOT\SYSTEM\0001"; RunOnceId: "DelClientRoot1"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove ROOT\SYSTEM\0002"; RunOnceId: "DelClientRoot2"; Flags: runhidden
+
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden

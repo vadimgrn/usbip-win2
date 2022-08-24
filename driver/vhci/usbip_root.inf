@@ -6,6 +6,7 @@
 [Version]
 Signature="$WINDOWS NT$"
 Class=System
+; GUID_DEVCLASS_SYSTEM
 ClassGuid={4D36E97D-E325-11CE-BFC1-08002BE10318}
 Provider="usbip-win2 project"
 CatalogFile=usbip_vhci.cat
@@ -15,7 +16,8 @@ PnpLockDown=1
 "usbip-win2"=Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-"usbip-win2 vhci root"=usbip_vhci_Device, USBIPWIN\root
+"usbip-win2 root1"=usbip_vhci_Device, USBIPWIN\root1
+"usbip-win2 root2"=usbip_vhci_Device, USBIPWIN\root2
 
 [DestinationDirs]
 DefaultDestDir = 12

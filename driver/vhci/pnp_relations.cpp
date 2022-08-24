@@ -206,16 +206,17 @@ PAGEABLE NTSTATUS pnp_query_device_relations(_In_ vdev_t *vdev, _Inout_ IRP *irp
 	PAGED_CODE();
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	auto &r = reinterpret_cast<DEVICE_RELATIONS*&>(irp->IoStatus.Information);
+	auto type = irpstack->Parameters.QueryDeviceRelations.Type;
 
+	auto r = reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information);
 	NTSTATUS st{};
 
-	switch (auto type = irpstack->Parameters.QueryDeviceRelations.Type) {
-	case TargetDeviceRelation:
-		st = get_target_relation(*vdev, r);
-		break;
+	switch (type) {
 	case BusRelations:
 		st = get_bus_new_relations(*vdev, r);
+		break;
+	case TargetDeviceRelation:
+		st = get_target_relation(*vdev, r);
 		break;
 	case RemovalRelations:
 	case EjectionRelations:
@@ -224,9 +225,11 @@ PAGEABLE NTSTATUS pnp_query_device_relations(_In_ vdev_t *vdev, _Inout_ IRP *irp
 		}
 		break;
 	default:
-		TraceDbg("%!vdev_type_t!: skip %!DEVICE_RELATION_TYPE!", vdev->type, type);
 		st = irp->IoStatus.Status;
 	}
 
+	TraceDbg("%!vdev_usb_t!, %!vdev_type_t!, %!_DEVICE_RELATION_TYPE! -> %!STATUS!", vdev->version, vdev->type, type, st);
+
+	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(r);
 	return CompleteRequest(irp, st);
 }

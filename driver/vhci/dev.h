@@ -33,44 +33,36 @@ enum class pnp_state
 struct USBIP_BUS_WMI_STD_DATA
 {
 	UINT32 ErrorCount;
-} ;
+};
+
+enum vdev_usb_t { VDEV_USB2, VDEV_USB3 };
 
 enum vdev_type_t
 {
-	VDEV_ROOT,
-	VDEV_CPDO,
-	VDEV_VHCI,
-	VDEV_HPDO,
-	VDEV_VHUB,
-	VDEV_VPDO,
+	VDEV_ROOT, VDEV_CPDO,
+	VDEV_VHCI, VDEV_HPDO,
+	VDEV_VHUB, VDEV_VPDO,
 	VDEV_SIZE // number of types
 };
 
-// A common header for the device extensions of the vhub and vpdo
 struct vdev_t 
 {
-	// A back pointer to the device object for which this is the extension
-	DEVICE_OBJECT *Self;
+	DEVICE_OBJECT *Self; // A back pointer to the device object for which this is the extension
 
+	vdev_usb_t version;
 	vdev_type_t type;
 
-	// We track the state of the device with every PnP Irp
-	// that affects the device through these two variables.
 	pnp_state PnPState;
 	pnp_state PreviousPnPState;
 
-	// Stores the current system power state
 	SYSTEM_POWER_STATE SystemPowerState;
-
-	// Stores current device power state
 	DEVICE_POWER_STATE DevicePowerState;
 
-	// root and vhci have cpdo and hpdo each
-	vdev_t *child_pdo;
+	vdev_t *child_pdo; // root and vhci have cpdo and hpdo each
 	vdev_t *parent;
 	vdev_t *fdo;
 
-	DEVICE_OBJECT *pdo;
+	DEVICE_OBJECT *pdo; // PhysicalDeviceObject
 	DEVICE_OBJECT *devobj_lower;
 
 	LONG intf_ref_cnt; // see _INTERFACE.InterfaceReference/InterfaceDereference
@@ -139,19 +131,20 @@ struct vpdo_dev_t : vdev_t
 	KSPIN_LOCK irps_lock;
 };
 
-// The device extension of the vhub.  From whence vpdo's are born.
+/*
+ * The device extension of the vhub. From whence vpdo's are born.
+ */
 struct vhub_dev_t : vdev_t
 {
-	FAST_MUTEX Mutex;
-
-	enum { NUM_PORTS = 8 }; // see USB_SS_MAXPORTS
-	vpdo_dev_t *vpdo[NUM_PORTS];
-
 	UNICODE_STRING DevIntfRootHub;
+
+	enum { NUM_PORTS = 15 };
+	vpdo_dev_t *vpdo[NUM_PORTS];
+	FAST_MUTEX Mutex;
 };
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE DEVICE_OBJECT *vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type);
+PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t version, _In_ vdev_type_t type);
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 void *GetDeviceProperty(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength);

@@ -14,48 +14,26 @@
 namespace
 {
 
-#define DEVID_VHCI	HWID_VHCI
+#define DEVID_EHCI	HWID_EHCI
+#define DEVID_XHCI	HWID_XHCI
+
 #define DEVID_VHUB	HWID_VHUB
+#define DEVID_VHUB30	HWID_VHUB30
 
 /*
 * The first hardware ID in the list should be the device ID, and
 * the remaining IDs should be listed in order of decreasing suitability.
 */
-#define HWIDS_VHCI	DEVID_VHCI L"\0"
+#define HWIDS_EHCI	DEVID_EHCI  L"\0"
+#define HWIDS_XHCI	DEVID_XHCI  L"\0"
 
 #define HWIDS_VHUB \
 	DEVID_VHUB L"\0" \
 	VHUB_PREFIX L"&VID_" VHUB_VID L"&PID_" VHUB_PID L"\0"
 
-// vdev_type_t is an index
-const LPCWSTR vdev_devids[] = 
-{
-	nullptr, DEVID_VHCI,
-	nullptr, DEVID_VHUB,
-	nullptr, L"USB\\VID_%04hx&PID_%04hx" // 21 chars after formatting
-};
-
-const size_t vdev_devid_size[] = 
-{
-	0, sizeof(DEVID_VHCI),
-	0, sizeof(DEVID_VHUB),
-	0, (21 + 1)*sizeof(WCHAR)
-};
-
-const LPCWSTR vdev_hwids[] = 
-{
-	nullptr, HWIDS_VHCI,
-	nullptr, HWIDS_VHUB,
-	nullptr, L"USB\\VID_%04hx&PID_%04hx&REV_%04hx;" // 31 chars after formatting
-	L"USB\\VID_%04hx&PID_%04hx;" // 22 chars after formatting
-};
-
-const size_t vdev_hwids_size[] = 
-{
-	0, sizeof(HWIDS_VHCI),
-	0, sizeof(HWIDS_VHUB),
-	0, (31 + 22 + 1)*sizeof(WCHAR)
-};
+#define HWIDS_VHUB30 \
+	DEVID_VHUB30 L"\0" \
+	VHUB30_PREFIX L"&VID_" VHUB30_VID L"&PID_" VHUB30_PID L"\0"
 
 void subst_char(wchar_t *s, wchar_t ch, wchar_t rep)
 {
@@ -98,20 +76,40 @@ auto is_composite(const vpdo_dev_t &vpdo)
  */
 NTSTATUS setup_device_id(PWCHAR &result, bool&, vdev_t *vdev, IRP*)
 {
-	NTSTATUS status = STATUS_SUCCESS;
+	const wchar_t vdpo_vid_pid[] = L"USB\\VID_%04hx&PID_%04hx";
+	const auto vdpo_vid_pid_sz = (ARRAYSIZE(vdpo_vid_pid) - 2)*sizeof(*vdpo_vid_pid); // %04hx -> 4 char output, diff 1 char
+	bool usb3 = vdev->version == VDEV_USB3;
 
-	auto str = vdev_devids[vdev->type];
+	const LPCWSTR devid[] =
+	{
+		nullptr, usb3 ? DEVID_XHCI : DEVID_EHCI,
+		nullptr, usb3 ? DEVID_VHUB30 : DEVID_VHUB,
+		nullptr, vdpo_vid_pid
+	};
+	static_assert(ARRAYSIZE(devid) == VDEV_SIZE);
+
+	const size_t devid_sz[] = 
+	{
+		0, usb3 ? sizeof(DEVID_XHCI) : sizeof(DEVID_EHCI),
+		0, usb3 ? sizeof(DEVID_VHUB30) : sizeof(DEVID_VHUB),
+		0, vdpo_vid_pid_sz
+	};
+	static_assert(ARRAYSIZE(devid_sz) == VDEV_SIZE);
+
+	auto str = devid[vdev->type];
 	if (!str) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	auto str_sz = vdev_devid_size[vdev->type];
+	auto str_sz = devid_sz[vdev->type];
 
 	auto id_dev = (PWCHAR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!id_dev) {
-		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: query device id: out of memory", vdev->type);
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", str_sz);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
+
+	NTSTATUS status{};
 
 	if (vdev->type == VDEV_VPDO) {
 		auto vpdo = reinterpret_cast<vpdo_dev_t*>(vdev);
@@ -130,21 +128,42 @@ NTSTATUS setup_device_id(PWCHAR &result, bool&, vdev_t *vdev, IRP*)
 
 NTSTATUS setup_hw_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 {
-	NTSTATUS status = STATUS_SUCCESS;
+	const wchar_t hwid_vpdo[] = L"USB\\VID_%04hx&PID_%04hx&REV_%04hx;"
+		                    L"USB\\VID_%04hx&PID_%04hx;";
 
-	LPCWSTR str = vdev_hwids[vdev->type];
+	const auto hwid_vpdo_sz = (ARRAYSIZE(hwid_vpdo) - 5)*sizeof(*hwid_vpdo); // %04hx -> 4 char output, diff 1 char
+	bool usb3 = vdev->version == VDEV_USB3;
+
+	const LPCWSTR hwid[] =
+	{
+		nullptr, usb3 ? HWIDS_XHCI  : HWIDS_EHCI,
+		nullptr, usb3 ? HWIDS_VHUB30 : HWIDS_VHUB,
+		nullptr, hwid_vpdo
+	};
+	static_assert(ARRAYSIZE(hwid) == VDEV_SIZE);
+
+	const size_t hwid_sz[] = 
+	{
+		0, usb3 ? sizeof(HWIDS_XHCI)  : sizeof(HWIDS_EHCI),
+		0, usb3 ? sizeof(HWIDS_VHUB30) : sizeof(HWIDS_VHUB),
+		0, hwid_vpdo_sz
+	};
+	static_assert(ARRAYSIZE(hwid_sz) == VDEV_SIZE);
+
+	auto str = hwid[vdev->type];
 	if (!str) {
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	auto str_sz = vdev_hwids_size[vdev->type];
+	auto str_sz = hwid_sz[vdev->type];
 
 	auto ids_hw = (PWCHAR)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, str_sz, USBIP_VHCI_POOL_TAG);
 	if (!ids_hw) {
-		Trace(TRACE_LEVEL_ERROR, "%!vdev_type_t!: query hw ids: out of memory", vdev->type);
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", str_sz);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
+	NTSTATUS status{};
 	subst_result = vdev->type == VDEV_VPDO;
 
 	if (subst_result) {
@@ -228,13 +247,13 @@ NTSTATUS setup_compat_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*
 		return STATUS_NOT_SUPPORTED;
 	}
 
-	const wchar_t fmt[] =
-		L"USB\\Class_%02hhx&SubClass_%02hhx&Prot_%02hhx;" // 33 chars after formatting
-		L"USB\\Class_%02hhx&SubClass_%02hhx;" // 25 chars after formatting
-		L"USB\\Class_%02hhx;"; // 13 chars after formatting
+	const wchar_t fmt[] = // %02hhx -> 2 char in output, diff 4 char
+		L"USB\\Class_%02hhx&SubClass_%02hhx&Prot_%02hhx;"
+		L"USB\\Class_%02hhx&SubClass_%02hhx;"
+		L"USB\\Class_%02hhx;";
 
 	const wchar_t comp[] = L"USB\\COMPOSITE\0";
-	const size_t max_wchars = 33 + 25 + 13 + ARRAYSIZE(comp);
+	const size_t max_wchars = ARRAYSIZE(fmt) - 6*(ARRAYSIZE("%02hhx") - ARRAYSIZE("XX")) - 1 + ARRAYSIZE(comp); // minus L'\0'
 
 	auto vpdo = (vpdo_dev_t*)vdev;
 
@@ -247,10 +266,10 @@ NTSTATUS setup_compat_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*
 	NTSTRSAFE_PWSTR dest_end = nullptr;
 	size_t remaining = 0;
 
-	NTSTATUS status = RtlStringCchPrintfExW(ids_compat, max_wchars, &dest_end, &remaining, 0, fmt,
-						vpdo->bDeviceClass, vpdo->bDeviceSubClass, vpdo->bDeviceProtocol,
-						vpdo->bDeviceClass, vpdo->bDeviceSubClass,
-						vpdo->bDeviceClass);
+	auto status = RtlStringCchPrintfExW(ids_compat, max_wchars, &dest_end, &remaining, 0, fmt,
+					    vpdo->bDeviceClass, vpdo->bDeviceSubClass, vpdo->bDeviceProtocol,
+					    vpdo->bDeviceClass, vpdo->bDeviceSubClass,
+					    vpdo->bDeviceClass);
 
 	if (status == STATUS_SUCCESS) {
 		result = ids_compat;
@@ -277,7 +296,7 @@ PAGEABLE NTSTATUS pnp_query_id(vdev_t *vdev, IRP *irp)
 	PAGED_CODE();
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	NTSTATUS status = STATUS_NOT_SUPPORTED;
+	auto status = STATUS_NOT_SUPPORTED;
 
         WCHAR *result{};
 	bool subst_result = false;
@@ -305,12 +324,12 @@ PAGEABLE NTSTATUS pnp_query_id(vdev_t *vdev, IRP *irp)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S", vdev->type, type, result);
+		TraceMsg("%!vdev_usb_t!, %!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S", vdev->version, vdev->type, type, result);
 		if (subst_result) {
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->type, type, status);
+		TraceMsg("%!vdev_usb_t!, %!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->version, vdev->type, type, status);
 		if (result) {
 			ExFreePoolWithTag(result, USBIP_VHCI_POOL_TAG);
 			result = nullptr;

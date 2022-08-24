@@ -1,9 +1,11 @@
-#include "pnp.h"
+#include "pnp_add.h"
 #include "trace.h"
 #include "pnp_add.tmh"
 
+#include "dev.h"
 #include "vhci.h"
 #include "csq.h"
+#include "pnp_id.h"
 #include "pnp_remove.h"
 
 #include <ntstrsafe.h>
@@ -11,7 +13,7 @@
 namespace
 {
 
-PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
+PAGEABLE auto get_usb_version(_Out_ vdev_usb_t &version, _In_ DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
 
@@ -24,30 +26,39 @@ PAGEABLE auto is_valid_vdev_hwid(DEVICE_OBJECT *devobj)
 
 	UNICODE_STRING hwid{};
 	RtlInitUnicodeString(&hwid, hwid_wstr);
-	TraceDbg("%!USTR!", &hwid);
 
-	const wchar_t* v[] = { HWID_ROOT, HWID_VHCI, HWID_VHUB };
-	
-	for (err = STATUS_INVALID_PARAMETER; auto i: v) {
+	const wchar_t* v[] { 
+		HWID_ROOT1, HWID_EHCI, HWID_VHUB,  // VDEV_USB2
+		HWID_ROOT2, HWID_XHCI, HWID_VHUB30 // VDEV_USB3
+	};
+
+	err = STATUS_INVALID_PARAMETER;
+
+	for (int i = 0; i < ARRAYSIZE(v); ++i) {
+
 		UNICODE_STRING s{};
-		RtlInitUnicodeString(&s, i);
+		RtlInitUnicodeString(&s, v[i]);
+
 		if (RtlEqualUnicodeString(&s, &hwid, true)) {
+			version = i > 2 ? VDEV_USB3 : VDEV_USB2;
 			err = STATUS_SUCCESS;
 			break;
 		}
 	}
 
+	TraceDbg("%04x %!USTR! -> %!STATUS!, %!vdev_usb_t!", ptr4log(devobj), &hwid, err, version);
+
 	ExFreePoolWithTag(hwid_wstr, USBIP_VHCI_POOL_TAG);
 	return err;
 }
 
-PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
+PAGEABLE vdev_t *get_vdev_from_driver(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
 	for (auto devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
 		auto vdev = to_vdev(devobj);
-		if (vdev->type == type) {
+		if (vdev->version == version && vdev->type == type) {
 			return vdev;
 		}
 	}
@@ -55,13 +66,13 @@ PAGEABLE vdev_t *get_vdev_from_driver(DRIVER_OBJECT *drvobj, vdev_type_t type)
 	return nullptr;
 }
 
-PAGEABLE vdev_t *create_child_pdo(vdev_t *vdev, vdev_type_t type)
+PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
-	Trace(TRACE_LEVEL_INFORMATION, "creating child %!vdev_type_t!", type);
+	TraceDbg("%!vdev_type_t!", type);
 
-	auto devobj = vdev_create(vdev->Self->DriverObject, type);
+	auto devobj = vdev_create(vdev->Self->DriverObject, vdev->version, type);
 	if (!devobj) {
 		return nullptr;
 	}
@@ -89,7 +100,7 @@ PAGEABLE auto init(vhci_dev_t &vhci)
         return STATUS_SUCCESS;
 }
 
-PAGEABLE auto init(vhub_dev_t &vhub)
+PAGEABLE auto init(_Inout_ vhub_dev_t &vhub)
 {
         PAGED_CODE();
 
@@ -102,19 +113,19 @@ PAGEABLE auto init(vhub_dev_t &vhub)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _When_(return>=0, _Kernel_clear_do_init_(yes))
-PAGEABLE auto add_vdev(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo, vdev_type_t type)
+PAGEABLE auto add_vdev(
+	_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *PhysicalDeviceObject, 
+	_In_ vdev_usb_t version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
-	Trace(TRACE_LEVEL_INFORMATION, "pdo %04x, %!vdev_type_t!", ptr4log(pdo), type);
-
-	auto devobj = vdev_create(drvobj, type);
+	auto devobj = vdev_create(DriverObject, version, type);
 	if (!devobj) {
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	auto vdev = to_vdev(devobj);
-	vdev->pdo = pdo;
+	vdev->pdo = PhysicalDeviceObject;
 
 	if (type != VDEV_ROOT) {
 		auto vdev_pdo = to_vdev(vdev->pdo);
@@ -122,10 +133,7 @@ PAGEABLE auto add_vdev(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo, vdev
 		vdev_pdo->fdo = vdev;
 	}
 
-	// Attach our vhub to the device stack. The return value of IoAttachDeviceToDeviceStack 
-        // is the top of the attachment chain. This is where all the IRPs should be routed.
-
-	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, pdo);
+	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, PhysicalDeviceObject);
 	if (!vdev->devobj_lower) {
 		Trace(TRACE_LEVEL_ERROR, "IoAttachDeviceToDeviceStack error");
 		IoDeleteDevice(devobj);
@@ -146,7 +154,7 @@ PAGEABLE auto add_vdev(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo, vdev
                 break;
 	}
 
-        Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t!(%04x) -> %!STATUS!", type, ptr4log(vdev), err);
+        TraceMsg("%!vdev_usb_t!, %!vdev_type_t!(%04x) -> %!STATUS!", version, type, ptr4log(vdev), err);
 
         if (err) {
                 destroy_device(vdev);
@@ -163,22 +171,23 @@ PAGEABLE auto add_vdev(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo, vdev
 _Function_class_(DRIVER_ADD_DEVICE)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-extern "C" PAGEABLE NTSTATUS vhci_add_device(_In_ PDRIVER_OBJECT drvobj, _In_ PDEVICE_OBJECT pdo)
+extern "C" PAGEABLE NTSTATUS vhci_add_device(_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *PhysicalDeviceObject)
 {
 	PAGED_CODE();
+	TraceDbg("PhysicalDeviceObject %04x", ptr4log(PhysicalDeviceObject));
+	
+	vdev_usb_t version{};
 
-	if (auto err = is_valid_vdev_hwid(pdo)) {
-		Trace(TRACE_LEVEL_ERROR, "Invalid hwid, %!STATUS!", err);
+	if (auto err = get_usb_version(version, PhysicalDeviceObject)) {
+		Trace(TRACE_LEVEL_ERROR, "Device not found by HWID, %!STATUS!", err);
 		return err;
 	}
 
 	auto type = VDEV_ROOT;
 
-	if (auto root = (root_dev_t*)get_vdev_from_driver(drvobj, VDEV_ROOT)) {
-		auto vhci = (vhci_dev_t*)get_vdev_from_driver(drvobj, VDEV_VHCI);
-		type = vhci ? VDEV_VHUB : VDEV_VHCI;
+	if (get_vdev_from_driver(DriverObject, version, type)) {
+		type = !get_vdev_from_driver(DriverObject, version, VDEV_VHCI) ? VDEV_VHCI : VDEV_VHUB;
 	}
 
-	TraceMsg("%!vdev_type_t!", type);
-	return add_vdev(drvobj, pdo, type);
+	return add_vdev(DriverObject, PhysicalDeviceObject, version, type);
 }

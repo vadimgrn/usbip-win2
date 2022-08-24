@@ -31,7 +31,7 @@ void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTA
 			buf = alloc(ResultLength);
 			break;
 		default:
-			Trace(TRACE_LEVEL_ERROR, "IoGetDeviceProperty: DEVICE_REGISTRY_PROPERTY %d, %!STATUS!", prop, error);
+			TraceDbg("%!DEVICE_REGISTRY_PROPERTY! %!STATUS!", prop, error);
 			ExFreePoolWithTag(buf, USBIP_VHCI_POOL_TAG);
 			return nullptr;
 		}
@@ -42,7 +42,7 @@ void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTA
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE DEVICE_OBJECT *vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
+PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -77,14 +77,15 @@ PAGEABLE DEVICE_OBJECT *vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
 	}
 
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "Failed to create vdev(%!vdev_type_t!): %!STATUS!", type, status);
+		Trace(TRACE_LEVEL_ERROR, "Failed to create vdev(%!vdev_usb_t!, %!vdev_type_t!): %!STATUS!", version, type, status);
 		return nullptr;
 	}
 
 	auto vdev = to_vdev(devobj);
-
         vdev->Self = devobj;
-        vdev->type = type;
+	
+	vdev->version = version;
+	vdev->type = type;
 
         NT_ASSERT(vdev->PnPState == pnp_state::NotStarted);
         NT_ASSERT(vdev->PreviousPnPState == pnp_state::NotStarted);
@@ -93,6 +94,8 @@ PAGEABLE DEVICE_OBJECT *vdev_create(DRIVER_OBJECT *drvobj, vdev_type_t type)
         NT_ASSERT(vdev->DevicePowerState == PowerDeviceUnspecified);
 
 	devobj->Flags |= DO_POWER_PAGABLE | DO_BUFFERED_IO;
+
+	TraceDbg("%!vdev_usb_t!, %!vdev_type_t! -> %04x", version, type, ptr4log(devobj));
 	return devobj;
 }
 
