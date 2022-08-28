@@ -127,7 +127,7 @@ int traverse_dev_info(HDEVINFO dev_info, walkfunc_t walker, void *ctx)
 } // namespace
 
 
-std::string get_id_hw(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
+std::string get_hwid(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
 {
 	return get_dev_property(dev_info, pdev_info_data, SPDRP_HARDWAREID);
 }

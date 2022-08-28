@@ -20,9 +20,18 @@
 // can send an ioctl to the bus driver.
 //
 
-DEFINE_GUID(GUID_DEVINTERFACE_VHCI_USBIP,
+enum class usbip_hci { usb2, usb3 };
+
+DEFINE_GUID(GUID_DEVINTERFACE_EHCI_USBIP,
         0xD35F7840, 0x6A0C, 0x11d2, 0xB8, 0x41, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71);
 
+DEFINE_GUID(GUID_DEVINTERFACE_XHCI_USBIP,
+        0xC1B20918, 0x5628, 0x42F8, 0xA6, 0xD4, 0xA9, 0x2C, 0x8C, 0xCE, 0xB1, 0x8F);
+
+constexpr auto& usbip_guid(usbip_hci version)
+{
+        return version == usbip_hci::usb3 ? GUID_DEVINTERFACE_XHCI_USBIP : GUID_DEVINTERFACE_EHCI_USBIP;
+}
 
 //
 // Define a Setup Class GUID for USBIP Class. This is same

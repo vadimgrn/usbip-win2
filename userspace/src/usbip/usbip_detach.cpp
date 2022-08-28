@@ -43,7 +43,7 @@ static int detach_port(const char* portstr)
 		return 1;
 	}
 	
-        auto hdev = usbip_vhci_driver_open();
+        auto hdev = usbip_vhci_driver_open(usbip_hci::usb2);
 	if (!hdev) {
 		err("vhci driver is not loaded");
 		return 2;

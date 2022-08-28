@@ -14,26 +14,27 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS start_vhci(vhci_dev_t * vhci)
+PAGEABLE NTSTATUS start_vhci(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
 
-	auto status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_VHCI_USBIP, nullptr, &vhci->DevIntfVhci);
+	auto &vhci_guid = vhci->version == VDEV_USB3 ? GUID_DEVINTERFACE_XHCI_USBIP : GUID_DEVINTERFACE_EHCI_USBIP;
+
+	auto status = IoRegisterDeviceInterface(vhci->pdo, &vhci_guid, nullptr, &vhci->DevIntfVhci);
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to register vhci device interface: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "Register vhci device interface %!STATUS!", status);
 		return status;
 	}
 
-	status = IoRegisterDeviceInterface(vhci->pdo, (LPGUID)&GUID_DEVINTERFACE_USB_HOST_CONTROLLER, nullptr, &vhci->DevIntfUSBHC);
+	status = IoRegisterDeviceInterface(vhci->pdo, &GUID_DEVINTERFACE_USB_HOST_CONTROLLER, nullptr, &vhci->DevIntfUSBHC);
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "failed to register USB Host controller device interface: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "Register USB Host controller device interface %!STATUS!", status);
 		return status;
 	}
 
-	// Register with WMI
 	status = reg_wmi(vhci);
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "reg_wmi failed: %!STATUS!", status);
+		Trace(TRACE_LEVEL_ERROR, "reg_wmi %!STATUS!", status);
 	}
 
 	return status;
@@ -132,7 +133,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 		vdev->DevicePowerState = ps.DeviceState;
 		PoSetPowerState(vdev->Self, DevicePowerState, ps);
 
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_type_t! started", vdev->type);
+		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_usb_t!, %!vdev_type_t! started", vdev->version, vdev->type);
 	}
 
 	return CompleteRequest(irp, status);

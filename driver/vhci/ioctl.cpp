@@ -28,8 +28,8 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 	auto inlen = ioc.InputBufferLength;
 	auto outlen = ioc.OutputBufferLength;
 
-	TraceDbg("%!vdev_type_t! %s(%#08lX), inlen %lu, outlen %lu",
-		  vdev->type, device_control_name(ioc.IoControlCode), ioc.IoControlCode, inlen, outlen);
+	TraceDbg("%!vdev_usb_t!, %!vdev_type_t! %s(%#08lX), inlen %lu, outlen %lu",
+		  vdev->version, vdev->type, device_control_name(ioc.IoControlCode), ioc.IoControlCode, inlen, outlen);
 
 	auto buffer = irp->AssociatedIrp.SystemBuffer;
 	auto status = STATUS_INVALID_DEVICE_REQUEST;
@@ -51,6 +51,6 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
                 CompleteRequest(irp, status);
 	}
 
-	TraceDbg("%!vdev_type_t! -> %!STATUS!, outlen %lu", vdev->type, status, outlen);
+	TraceDbg("%!vdev_usb_t!, %!vdev_type_t! -> %!STATUS!, outlen %lu", vdev->version, vdev->type, status, outlen);
 	return status;
 }

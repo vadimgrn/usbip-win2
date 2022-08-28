@@ -11,28 +11,29 @@
 namespace
 {
 
-int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, devno_t, void *ctx)
+struct Context
 {
-        auto id_hw = get_id_hw(dev_info, dev_info_data);
+        GUID guid;
+        std::string path;
+};
 
-        if (_stricmp(id_hw.c_str(), "usbipwin\\vhci")) { // usbip_vhci.inf
-                dbg("invalid hw id: %s", id_hw.c_str());
-                return 0;
+int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *context)
+{
+        auto &ctx = *reinterpret_cast<Context*>(context);
+
+        if (auto inf = get_intf_detail(dev_info, data, ctx.guid)) {
+                ctx.path = inf->DevicePath;
+                return true;
         }
 
-        if (auto inf = get_intf_detail(dev_info, dev_info_data, GUID_DEVINTERFACE_VHCI_USBIP)) {
-                *static_cast<std::string*>(ctx) = inf->DevicePath;
-                return 1;
-        }
-
-        return 0;
+        return false;
 }
 
-auto get_vhci_devpath()
+auto get_vhci_devpath(usbip_hci version)
 {
-        std::string path;
-        traverse_intfdevs(walker_devpath, GUID_DEVINTERFACE_VHCI_USBIP, &path);
-        return path;
+        Context r{ usbip_guid(version) };
+        traverse_intfdevs(walker_devpath, r.guid, &r);
+        return r.path;
 }
 
 auto usbip_vhci_get_num_ports(HANDLE hdev, ioctl_usbip_vhci_get_num_ports &r)
@@ -58,11 +59,11 @@ int get_num_ports(HANDLE hdev)
 } // namespace
 
 
-usbip::Handle usbip_vhci_driver_open()
+usbip::Handle usbip_vhci_driver_open(usbip_hci version)
 {
         usbip::Handle h;
 
-        auto devpath = get_vhci_devpath();
+        auto devpath = get_vhci_devpath(version);
         if (devpath.empty()) {
                 return h;
         }

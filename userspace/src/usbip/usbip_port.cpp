@@ -49,7 +49,7 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
 
 int list_imported_devices(int port)
 {
-        auto hdev = usbip_vhci_driver_open();
+        auto hdev = usbip_vhci_driver_open(usbip_hci::usb2);
         if (!hdev) {
                 err("failed to open vhci driver");
                 return 3;

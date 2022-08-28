@@ -69,7 +69,7 @@ auto import_device(const char *host, const char *busid, const char *serial)
                 return make_error(err);
         }
         
-        auto hdev = usbip_vhci_driver_open();
+        auto hdev = usbip_vhci_driver_open(usbip_hci::usb2);
         if (!hdev) {
                 dbg("failed to open vhci driver");
                 return make_error(ERR_DRIVER);
