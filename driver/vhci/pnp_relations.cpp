@@ -107,7 +107,7 @@ PAGEABLE auto get_bus_new_relations(_In_ vhub_dev_t &vhub, _Inout_ DEVICE_RELATI
 	auto r_cnt = r ? r->Count : 0;
 	int plugged = 0;
 
-	ExAcquireFastMutex(&vhub.Mutex);
+	ExAcquireFastMutex(&vhub.mutex);
 
 	for (auto i: vhub.vpdo) { 
 		if (i && !i->unplugged) {
@@ -124,7 +124,7 @@ PAGEABLE auto get_bus_new_relations(_In_ vhub_dev_t &vhub, _Inout_ DEVICE_RELATI
 		new_r->Count = 0;
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", size);
-		ExReleaseFastMutex(&vhub.Mutex);
+		ExReleaseFastMutex(&vhub.mutex);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
@@ -146,7 +146,7 @@ PAGEABLE auto get_bus_new_relations(_In_ vhub_dev_t &vhub, _Inout_ DEVICE_RELATI
 		}
 	}
 
-	ExReleaseFastMutex(&vhub.Mutex);
+	ExReleaseFastMutex(&vhub.mutex);
 
 	if (r) {
 		ExFreePool(r);

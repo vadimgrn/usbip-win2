@@ -62,20 +62,20 @@ auto init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const
         return ERR_NONE;
 }
 
-auto import_device(const char *host, const char *busid, const char *serial)
+auto import_device(vdev_usb_t version, const char *host, const char *busid, const char *serial)
 {
         ioctl_usbip_vhci_plugin r{};
         if (auto err = init(r, host, busid, serial)) {
                 return make_error(err);
         }
         
-        auto hdev = usbip_vhci_driver_open(usbip_hci::usb2);
+        auto hdev = usbip::vhci_driver_open(version);
         if (!hdev) {
                 dbg("failed to open vhci driver");
                 return make_error(ERR_DRIVER);
         }
 
-        if (!usbip_vhci_attach_device(hdev.get(), r)) {
+        if (!usbip::vhci_attach_device(hdev.get(), r)) {
                 return make_error(ERR_GENERAL);
         }
                
@@ -85,9 +85,9 @@ auto import_device(const char *host, const char *busid, const char *serial)
 /*
  * @see vhci/plugin.cpp, make_error
  */
-int attach_device(const char *host, const char *busid, const char *serial, bool terse)
+int attach_device(vdev_usb_t version, const char *host, const char *busid, const char *serial, bool terse)
 {
-        auto result = import_device(host, busid, serial);
+        auto result = import_device(version, host, busid, serial);
 
         if (int port = result & 0xFFFF) {
 
@@ -212,5 +212,5 @@ int usbip_attach(int argc, char *argv[])
 		return 1;
 	}
 
-	return attach_device(host, busid, serial, terse);
+	return attach_device(VDEV_USB2, host, busid, serial, terse);
 }

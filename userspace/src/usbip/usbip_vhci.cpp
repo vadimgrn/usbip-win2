@@ -13,7 +13,7 @@ namespace
 
 struct Context
 {
-        const GUID *guid;
+        GUID guid;
         std::string path;
 };
 
@@ -21,7 +21,7 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
 {
         auto &ctx = *reinterpret_cast<Context*>(context);
 
-        if (auto inf = get_intf_detail(dev_info, data, *ctx.guid)) {
+        if (auto inf = get_intf_detail(dev_info, data, ctx.guid)) {
                 ctx.path = inf->DevicePath;
                 return true;
         }
@@ -29,39 +29,19 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
         return false;
 }
 
-auto get_vhci_devpath(usbip_hci version)
+auto get_vhci_devpath(vdev_usb_t version)
 {
         Context r{ usbip_guid(version) };
-        traverse_intfdevs(walker_devpath, *r.guid, &r);
+        traverse_intfdevs(walker_devpath, r.guid, &r);
         return r.path;
-}
-
-auto usbip_vhci_get_num_ports(HANDLE hdev, ioctl_usbip_vhci_get_num_ports &r)
-{
-        DWORD len = 0;
-
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_NUM_PORTS, nullptr, 0, &r, sizeof(r), &len, nullptr)) {
-                if (len == sizeof(r)) {
-                        return ERR_NONE;
-                }
-        }
-
-        return ERR_GENERAL;
-}
-
-int get_num_ports(HANDLE hdev)
-{
-        ioctl_usbip_vhci_get_num_ports r;
-        auto err = usbip_vhci_get_num_ports(hdev, r);
-        return err < 0 ? err : r.num_ports;
 }
 
 } // namespace
 
 
-usbip::Handle usbip_vhci_driver_open(usbip_hci version)
+auto usbip::vhci_driver_open(vdev_usb_t version) -> Handle
 {
-        usbip::Handle h;
+        Handle h;
 
         auto devpath = get_vhci_devpath(version);
         if (devpath.empty()) {
@@ -76,28 +56,20 @@ usbip::Handle usbip_vhci_driver_open(usbip_hci version)
         return h;
 }
 
-std::vector<ioctl_usbip_vhci_imported_dev> usbip_vhci_get_imported_devs(HANDLE hdev)
+std::vector<ioctl_usbip_vhci_imported_dev> usbip::vhci_get_imported_devs(HANDLE hdev)
 {
-        std::vector<ioctl_usbip_vhci_imported_dev> idevs;
+        std::vector<ioctl_usbip_vhci_imported_dev> v(VHUB_NUM_PORTS + 1);
+        auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
-        auto cnt = get_num_ports(hdev);
-        if (cnt < 0) {
-                dbg("failed to get the number of used ports: %s", dbg_errcode(cnt));
-                return idevs;
-        }
-
-        idevs.resize(cnt + 1);
-        auto idevs_bytes = DWORD(idevs.size()*sizeof(idevs[0]));
-
-        if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, idevs.data(), idevs_bytes, nullptr, nullptr)) {
+        if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, nullptr, nullptr)) {
                 dbg("failed to get imported devices: 0x%lx", GetLastError());
-                idevs.clear();
+                v.clear();
         }
 
-        return idevs;
+        return v;
 }
 
-bool usbip_vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
+bool usbip::vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
 {
         auto ok = DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
         if (!ok) {
@@ -106,7 +78,7 @@ bool usbip_vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
         return ok;
 }
 
-int usbip_vhci_detach_device(HANDLE hdev, int port)
+int usbip::vhci_detach_device(HANDLE hdev, int port)
 {
         ioctl_usbip_vhci_unplug r{ port };
 

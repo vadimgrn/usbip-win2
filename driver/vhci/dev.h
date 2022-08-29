@@ -3,8 +3,9 @@
 #include "pageable.h"
 
 #include <ntddk.h>
-#include <wmilib.h>	// required for WMILIB_CONTEXT
+#include <wmilib.h>
 
+#include "usbip_vhci_api.h"
 #include "devconf.h"
 #include "usbdsc.h"
 
@@ -34,8 +35,6 @@ struct USBIP_BUS_WMI_STD_DATA
 {
 	UINT32 ErrorCount;
 };
-
-enum vdev_usb_t { VDEV_USB2, VDEV_USB3 };
 
 enum vdev_type_t
 {
@@ -138,9 +137,9 @@ struct vhub_dev_t : vdev_t
 {
 	UNICODE_STRING DevIntfRootHub;
 
-	enum { NUM_PORTS = 15 };
+	enum { NUM_PORTS = VHUB_NUM_PORTS };
 	vpdo_dev_t *vpdo[NUM_PORTS];
-	FAST_MUTEX Mutex;
+	FAST_MUTEX mutex;
 };
 
 _IRQL_requires_(PASSIVE_LEVEL)

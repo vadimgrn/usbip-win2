@@ -104,7 +104,7 @@ PAGEABLE auto init(_Inout_ vhub_dev_t &vhub)
 {
         PAGED_CODE();
 
-        ExInitializeFastMutex(&vhub.Mutex);
+        ExInitializeFastMutex(&vhub.mutex);
         RtlUnicodeStringInitEx(&vhub.DevIntfRootHub, nullptr, STRSAFE_IGNORE_NULLS);
 
         return STATUS_SUCCESS;

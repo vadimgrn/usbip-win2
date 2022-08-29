@@ -39,14 +39,14 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 		return nullptr;
 	}
 
-	ExAcquireFastMutex(&vhub->Mutex);
+	ExAcquireFastMutex(&vhub->mutex);
 
 	auto vpdo = vhub->vpdo[port - 1];
 	if (vpdo) {
 		NT_ASSERT(vpdo->port == port);
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
+	ExReleaseFastMutex(&vhub->mutex);
 	return vpdo;
 }
 
@@ -57,7 +57,7 @@ PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo)
 	NT_ASSERT(!vpdo->port);
 	auto vhub = vhub_from_vpdo(vpdo);
 
-	ExAcquireFastMutex(&vhub->Mutex);
+	ExAcquireFastMutex(&vhub->mutex);
 
 	for (int i = 0; i < vhub->NUM_PORTS; ++i) {
 		auto &ptr = vhub->vpdo[i];
@@ -69,7 +69,7 @@ PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo)
 		}
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
+	ExReleaseFastMutex(&vhub->mutex);
 
 	TraceMsg("%04x, port %d", ptr4log(vpdo), vpdo->port);
 	return vpdo->port;
@@ -88,13 +88,13 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 	NT_ASSERT(is_valid_port(vpdo->port));
 	auto vhub = vhub_from_vpdo(vpdo);
 
-	ExAcquireFastMutex(&vhub->Mutex);
+	ExAcquireFastMutex(&vhub->mutex);
 	{
 		auto i = vpdo->port - 1;
 		NT_ASSERT(vhub->vpdo[i] == vpdo);
 		vhub->vpdo[i] = nullptr;
 	}
-	ExReleaseFastMutex(&vhub->Mutex);
+	ExReleaseFastMutex(&vhub->mutex);
 
 	vpdo->port = 0;
 }
@@ -202,7 +202,7 @@ PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
 {
 	PAGED_CODE();
 
-	ExAcquireFastMutex(&vhub->Mutex);
+	ExAcquireFastMutex(&vhub->mutex);
 
 	for (auto i: vhub->vpdo) {
 		if (i) {
@@ -210,33 +210,19 @@ PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
 		}
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
-}
-
-PAGEABLE NTSTATUS vhub_get_num_ports(vhub_dev_t *vhub, ioctl_usbip_vhci_get_num_ports &r, ULONG &outlen)
-{
-	PAGED_CODE();
-
-	if (outlen != sizeof(r)) {
-		outlen = sizeof(r);
-		STATUS_INVALID_BUFFER_SIZE;
-	}
-
-	r.num_ports = vhub->NUM_PORTS;
-	TraceMsg("Number of ports %d", r.num_ports);
-	return STATUS_SUCCESS;
+	ExReleaseFastMutex(&vhub->mutex);
 }
 
 PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *dev, size_t cnt)
 {
 	PAGED_CODE();
 
-	TraceMsg("cnt %Iu", cnt);
+	TraceMsg("%!vdev_usb_t!, cnt %Iu", vhub->version, cnt);
 	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	ExAcquireFastMutex(&vhub->Mutex);
+	ExAcquireFastMutex(&vhub->mutex);
 
 	for (auto vpdo: vhub->vpdo) {
 
@@ -268,7 +254,7 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 		++dev;
 	}
 
-	ExReleaseFastMutex(&vhub->Mutex);
+	ExReleaseFastMutex(&vhub->mutex);
 
 	dev->port = 0; // end of mark
 	return STATUS_SUCCESS;

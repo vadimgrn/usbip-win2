@@ -18,7 +18,6 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_
 NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo);
 PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub);
 
-PAGEABLE NTSTATUS vhub_get_num_ports(vhub_dev_t *vhub, ioctl_usbip_vhci_get_num_ports &r, ULONG &outlen);
 PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, size_t cnt);
 
 constexpr auto is_valid_port(int port)

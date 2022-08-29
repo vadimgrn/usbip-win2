@@ -47,18 +47,45 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
         return 0;
 }
 
-int list_imported_devices(int port)
+auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int port)
 {
-        auto hdev = usbip_vhci_driver_open(usbip_hci::usb2);
-        if (!hdev) {
-                err("failed to open vhci driver");
-                return 3;
+        vdev_usb_t version[] {VDEV_USB2, VDEV_USB3};
+        static_assert(ARRAYSIZE(version) == VDEV_USB_CNT);
+        int cnt = VDEV_USB_CNT;
+
+        if (port > 0) {
+                *version = get_vdev_usb(port);
+                cnt = 1; 
         }
 
-        auto idevs = usbip_vhci_get_imported_devs(hdev.get());
-        if (idevs.empty()) {
-                err("failed to get attach information");
-                return 2;
+        for (int i = 0; i < cnt; ++i) {
+
+                auto hdev = usbip::vhci_driver_open(version[i]);
+                if (!hdev) {
+                        err("failed to open vhci driver");
+                        return 3;
+                }
+        
+                auto v = usbip::vhci_get_imported_devs(hdev.get());
+
+                if (!v.empty()) {
+                        devs.insert(devs.end(), v.begin(), v.end());
+                } else {
+                        err("failed to get attach information");
+                        return 2;
+                }
+        }
+
+        return 0;
+}
+
+int list_imported_devices(int port)
+{
+        std::vector<ioctl_usbip_vhci_imported_dev> devs;
+        devs.reserve(USBIP_TOTAL_PORTS + 2); // vhci_get_imported_devs -> last item is invalid
+
+        if (auto err = get_imported_devices(devs, port)) {
+                return err;
         }
 
         printf("Imported USB devices\n");
@@ -66,22 +93,24 @@ int list_imported_devices(int port)
 
         bool found{};
 
-        for (auto& d : idevs) {
+        for (auto rhport = get_rhport(port); auto& d: devs) {
+
                 if (!d.port) {
-                        break;
+                        continue;
                 }
+
                 if (port > 0) {
-                        if (port != d.port) {
+                        if (rhport != d.port) {
                                 continue;
                         }
                         found = true;
                 }
+
                 usbip_vhci_imported_device_dump(d);
         }
 
         if (port > 0 && !found) {
-                /* port check failed */
-                return 2;
+                return 2; // port check failed
         }
 
         return 0;
@@ -94,9 +123,9 @@ void usbip_port_usage()
 {
         const char msg[] =
 "usage: usbip port <args>\n"
-"    -p, --port=<port>      list only given port(for port checking)\n";
+"    -p, --port=<port>      list only given port (for port checking, [1..%d]), value below 1 means all ports\n";
 
-        printf(msg);
+        printf(msg, USBIP_TOTAL_PORTS);
 }
 
 int usbip_port_show(int argc, char *argv[])
@@ -128,6 +157,12 @@ int usbip_port_show(int argc, char *argv[])
 			return 1;
 		}
 	}
+
+        if (port > USBIP_TOTAL_PORTS) {
+                err("invalid port: %d", port);
+                usbip_port_usage();
+                return 1;
+        }
 
 	return list_imported_devices(port);
 }

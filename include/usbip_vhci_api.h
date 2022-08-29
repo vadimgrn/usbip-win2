@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <guiddef.h>
 
 #ifdef _NTDDK_
@@ -18,7 +14,26 @@ extern "C" {
 #include "usbip_api_consts.h"
 #include "usbip_proto.h"
 
-enum usbip_hci { usb2, usb3 };
+enum vdev_usb_t { VDEV_USB2, VDEV_USB3, VDEV_USB_CNT };
+enum { VHUB_NUM_PORTS = 15, USBIP_TOTAL_PORTS = int(VHUB_NUM_PORTS)*VDEV_USB_CNT };
+
+constexpr auto get_rhport(int port) // [1..USBIP_TOTAL_PORTS]
+{
+        return --port % VHUB_NUM_PORTS + 1;
+}
+static_assert(get_rhport(1) == 1);
+static_assert(get_rhport(VHUB_NUM_PORTS) == VHUB_NUM_PORTS);
+static_assert(get_rhport(VHUB_NUM_PORTS + 1) == 1);
+static_assert(get_rhport(2*VHUB_NUM_PORTS) == VHUB_NUM_PORTS);
+
+constexpr auto get_vdev_usb(int port) // [1..USBIP_TOTAL_PORTS]
+{
+        return vdev_usb_t(--port/VHUB_NUM_PORTS);
+}
+static_assert(get_vdev_usb(1) == VDEV_USB2);
+static_assert(get_vdev_usb(VHUB_NUM_PORTS) == VDEV_USB2);
+static_assert(get_vdev_usb(VHUB_NUM_PORTS + 1) == VDEV_USB3);
+static_assert(get_vdev_usb(2*VHUB_NUM_PORTS) == VDEV_USB3);
 
 DEFINE_GUID(GUID_DEVINTERFACE_EHCI_USBIP,
         0xD35F7840, 0x6A0C, 0x11d2, 0xB8, 0x41, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71);
@@ -26,9 +41,9 @@ DEFINE_GUID(GUID_DEVINTERFACE_EHCI_USBIP,
 DEFINE_GUID(GUID_DEVINTERFACE_XHCI_USBIP,
         0xC1B20918, 0x5628, 0x42F8, 0xA6, 0xD4, 0xA9, 0x2C, 0x8C, 0xCE, 0xB1, 0x8F);
 
-inline const GUID *usbip_guid(usbip_hci version)
+constexpr auto& usbip_guid(vdev_usb_t version)
 {
-        return version == usbip_hci::usb3 ? &GUID_DEVINTERFACE_XHCI_USBIP : &GUID_DEVINTERFACE_EHCI_USBIP;
+        return version == VDEV_USB3 ? GUID_DEVINTERFACE_XHCI_USBIP : GUID_DEVINTERFACE_EHCI_USBIP;
 }
 
 DEFINE_GUID(USBIP_BUS_WMI_STD_DATA_GUID, 
@@ -40,13 +55,7 @@ DEFINE_GUID(USBIP_BUS_WMI_STD_DATA_GUID,
 #define IOCTL_USBIP_VHCI_PLUGIN_HARDWARE	USBIP_VHCI_IOCTL(0)
 #define IOCTL_USBIP_VHCI_UNPLUG_HARDWARE	USBIP_VHCI_IOCTL(1)
 // used by usbip_vhci.c
-#define IOCTL_USBIP_VHCI_GET_NUM_PORTS	        USBIP_VHCI_IOCTL(2)
-#define IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES	USBIP_VHCI_IOCTL(3)
-
-struct ioctl_usbip_vhci_get_num_ports
-{
-	int num_ports;
-};
+#define IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES	USBIP_VHCI_IOCTL(2)
 
 struct ioctl_usbip_vhci_plugin
 {
@@ -70,7 +79,3 @@ struct ioctl_usbip_vhci_unplug
 {
         int port;
 };
-
-#ifdef __cplusplus
-}
-#endif
