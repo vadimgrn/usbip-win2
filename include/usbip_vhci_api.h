@@ -14,8 +14,10 @@
 #include "usbip_api_consts.h"
 #include "usbip_proto.h"
 
-enum vdev_usb_t { VDEV_USB2, VDEV_USB3, VDEV_USB_CNT };
-enum { VHUB_NUM_PORTS = 15, USBIP_TOTAL_PORTS = int(VHUB_NUM_PORTS)*VDEV_USB_CNT };
+enum vdev_usb_t { VDEV_USB2, VDEV_USB3 };
+inline const vdev_usb_t vdev_versions[] { VDEV_USB2, VDEV_USB3 };
+
+enum { VHUB_NUM_PORTS = 15, USBIP_TOTAL_PORTS = ARRAYSIZE(vdev_versions)*VHUB_NUM_PORTS };
 
 constexpr auto get_rhport(int port) // [1..USBIP_TOTAL_PORTS]
 {
@@ -24,7 +26,7 @@ constexpr auto get_rhport(int port) // [1..USBIP_TOTAL_PORTS]
 static_assert(get_rhport(1) == 1);
 static_assert(get_rhport(VHUB_NUM_PORTS) == VHUB_NUM_PORTS);
 static_assert(get_rhport(VHUB_NUM_PORTS + 1) == 1);
-static_assert(get_rhport(2*VHUB_NUM_PORTS) == VHUB_NUM_PORTS);
+static_assert(get_rhport(USBIP_TOTAL_PORTS) == VHUB_NUM_PORTS);
 
 constexpr auto get_vdev_usb(int port) // [1..USBIP_TOTAL_PORTS]
 {
@@ -33,7 +35,20 @@ constexpr auto get_vdev_usb(int port) // [1..USBIP_TOTAL_PORTS]
 static_assert(get_vdev_usb(1) == VDEV_USB2);
 static_assert(get_vdev_usb(VHUB_NUM_PORTS) == VDEV_USB2);
 static_assert(get_vdev_usb(VHUB_NUM_PORTS + 1) == VDEV_USB3);
-static_assert(get_vdev_usb(2*VHUB_NUM_PORTS) == VDEV_USB3);
+static_assert(get_vdev_usb(USBIP_TOTAL_PORTS) == VDEV_USB3);
+
+constexpr auto make_port(vdev_usb_t version, int port) // [1..VHUB_NUM_PORTS]
+{
+        return int(VHUB_NUM_PORTS)*version + port;
+}
+static_assert(make_port(VDEV_USB3, VHUB_NUM_PORTS) == USBIP_TOTAL_PORTS);
+
+static_assert(get_vdev_usb(make_port(VDEV_USB2, VHUB_NUM_PORTS)) == VDEV_USB2);
+static_assert(get_vdev_usb(make_port(VDEV_USB3, VHUB_NUM_PORTS)) == VDEV_USB3);
+
+static_assert(get_rhport(make_port(VDEV_USB2, VHUB_NUM_PORTS)) == VHUB_NUM_PORTS);
+static_assert(get_rhport(make_port(VDEV_USB3, VHUB_NUM_PORTS)) == VHUB_NUM_PORTS);
+
 
 DEFINE_GUID(GUID_DEVINTERFACE_EHCI_USBIP,
         0xD35F7840, 0x6A0C, 0x11d2, 0xB8, 0x41, 0x00, 0xC0, 0x4F, 0xAD, 0x51, 0x71);

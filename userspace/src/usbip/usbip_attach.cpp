@@ -82,17 +82,27 @@ auto import_device(vdev_usb_t version, const char *host, const char *busid, cons
         return r.port;
 }
 
+constexpr auto get_port(int result) { return result & 0xFFFF; }
+constexpr auto get_error(int result) { return result >> 16; }
+
 /*
  * @see vhci/plugin.cpp, make_error
  */
-int attach_device(vdev_usb_t version, const char *host, const char *busid, const char *serial, bool terse)
+int attach_device(const char *host, const char *busid, const char *serial, bool terse)
 {
-        auto result = import_device(version, host, busid, serial);
+        int result = 0;
 
-        if (int port = result & 0xFFFF) {
+        for (auto ver: vdev_versions) {
+                result = import_device(ver, host, busid, serial);
+                if (get_port(result) || get_error(result) != ERR_USB_VER) {
+                        break;
+                }
+        }
+
+        if (int port = get_port(result)) {
 
                 assert(port > 0);
-                assert(!(result >> 16));
+                assert(!get_error(result));
 
                 if (terse) {
                         printf("%d\n", port);
@@ -103,7 +113,7 @@ int attach_device(vdev_usb_t version, const char *host, const char *busid, const
                 return 0;
         }
 
-        result >>= 16;
+        result = get_error(result);
         assert(result);
 
         if (result > ST_OK) { // <linux>/tools/usb/usbip/libsrc/usbip_common.c, op_common_status_strings
@@ -212,5 +222,5 @@ int usbip_attach(int argc, char *argv[])
 		return 1;
 	}
 
-	return attach_device(VDEV_USB2, host, busid, serial, terse);
+	return attach_device(host, busid, serial, terse);
 }

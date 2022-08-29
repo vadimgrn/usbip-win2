@@ -43,9 +43,11 @@ static int detach_port(const char* portstr)
 		return 1;
 	}
 	
-        auto hdev = usbip::vhci_driver_open(VDEV_USB2);
+	auto version = get_vdev_usb(port);
+
+        auto hdev = usbip::vhci_driver_open(version);
 	if (!hdev) {
-		err("vhci driver is not loaded");
+		err("can't open vhci driver");
 		return 2;
 	}
 
@@ -77,7 +79,7 @@ static int detach_port(const char* portstr)
 
 int usbip_detach(int argc, char *argv[])
 {
-	const struct option opts[] = 
+	const option opts[] = 
         {
 		{ "port", required_argument, nullptr, 'p' },
 		{}

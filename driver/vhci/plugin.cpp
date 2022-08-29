@@ -60,6 +60,14 @@ inline void log(const USB_CONFIGURATION_DESCRIPTOR &d)
                 d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto check_usb_version(_In_ const vpdo_dev_t &vpdo, _In_ const usbip_usb_device &d)
+{
+        auto speed = static_cast<usb_device_speed>(d.speed);
+        auto version = speed >= USB_SPEED_SUPER ? VDEV_USB3 : VDEV_USB2;
+        return vpdo.version == version;
+}
+
 /*
  * RtlFreeUnicodeString must be used to release memory.
  * @see RtlUTF8StringToUnicodeString
@@ -556,6 +564,11 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
         auto &udev = reply.udev;
         log(udev);
 
+        if (!check_usb_version(vpdo, udev)) {
+                TraceDbg("Mismatch between %!vdev_usb_t! and %!usb_device_speed!", vpdo.version, udev.speed);
+                return make_error(ERR_USB_VER);
+        }
+
         vpdo.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
 
         if (auto err = fetch_descriptors(vpdo, udev)) {
@@ -706,7 +719,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
         }
 
         if (vhub_attach_vpdo(vpdo)) {
-                r.port = vpdo->port;
+                r.port = make_port(vpdo->version, vpdo->port);
         } else {
                 error = make_error(ERR_PORTFULL);
                 Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");

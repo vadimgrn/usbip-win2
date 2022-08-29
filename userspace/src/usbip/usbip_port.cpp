@@ -49,18 +49,19 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
 
 auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int port)
 {
-        vdev_usb_t version[] {VDEV_USB2, VDEV_USB3};
-        static_assert(ARRAYSIZE(version) == VDEV_USB_CNT);
-        int cnt = VDEV_USB_CNT;
+        vdev_usb_t versions[ARRAYSIZE(vdev_versions)];
+        int cnt = ARRAYSIZE(vdev_versions);
 
         if (port > 0) {
-                *version = get_vdev_usb(port);
+                *versions = get_vdev_usb(port);
                 cnt = 1; 
+        } else {
+                RtlCopyMemory(versions, vdev_versions, sizeof(versions));
         }
 
         for (int i = 0; i < cnt; ++i) {
 
-                auto hdev = usbip::vhci_driver_open(version[i]);
+                auto hdev = usbip::vhci_driver_open(versions[i]);
                 if (!hdev) {
                         err("failed to open vhci driver");
                         return 3;
