@@ -30,7 +30,7 @@ enum err_t
         ERR_NONE
 };
 
-static_assert(!ERR_NONE, "assert");
+static_assert(!ERR_NONE);
 
 enum usbip_device_status
 {
