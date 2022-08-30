@@ -22,27 +22,33 @@
 #include "usbip_common.h"
 #include "usbip_vhci.h"
 
-static const char usbip_detach_usage_string[] =
-	"usbip detach <args>\n"
-	"    -p, --port=<port>    "
-	" port the device is on\n";
 
 void usbip_detach_usage()
 {
-	printf("usage: %s", usbip_detach_usage_string);
+	auto &fmt = 
+"usage: usbip detach <args>\n"
+"    -p, --port=<port>    "
+" port the device is on, max %d, * or <= 0 - all ports\n";
+
+	printf(fmt, USBIP_TOTAL_PORTS);
 }
 
 static int detach_port(const char* portstr)
 {
         int port{};
 
-        if (*portstr == '*' && portstr[1] == '\0') {
+	if (!strcmp(portstr, "*")) {
                 port = -1;
         } else if (sscanf_s(portstr, "%d", &port) != 1) {
 		err("invalid port: %s", portstr);
 		return 1;
 	}
 	
+	if (port > USBIP_TOTAL_PORTS) {
+		err("invalid port %d, max is %d", port, USBIP_TOTAL_PORTS);
+		return 1;
+	}
+
 	auto version = get_vdev_usb(port);
 
         auto hdev = usbip::vhci_driver_open(version);

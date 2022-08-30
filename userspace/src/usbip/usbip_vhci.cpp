@@ -13,7 +13,7 @@ namespace
 
 struct Context
 {
-        GUID guid;
+        const GUID *guid;
         std::string path;
 };
 
@@ -21,7 +21,7 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
 {
         auto &ctx = *reinterpret_cast<Context*>(context);
 
-        if (auto inf = get_intf_detail(dev_info, data, ctx.guid)) {
+        if (auto inf = get_intf_detail(dev_info, data, *ctx.guid)) {
                 ctx.path = inf->DevicePath;
                 return true;
         }
@@ -31,8 +31,8 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
 
 auto get_vhci_devpath(vdev_usb_t version)
 {
-        Context r{ usbip_guid(version) };
-        traverse_intfdevs(walker_devpath, r.guid, &r);
+        Context r{ &usbip_guid(version) };
+        traverse_intfdevs(walker_devpath, *r.guid, &r);
         return r.path;
 }
 

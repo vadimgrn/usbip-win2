@@ -68,12 +68,17 @@ auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int 
                 }
         
                 auto v = usbip::vhci_get_imported_devs(hdev.get());
-
-                if (!v.empty()) {
-                        devs.insert(devs.end(), v.begin(), v.end());
-                } else {
+                if (v.empty()) {
                         err("failed to get attach information");
                         return 2;
+                }
+                
+                for (auto &d: v) {
+                        if (d.port) {
+                                devs.push_back(d);
+                        } else {
+                                break;
+                        }
                 }
         }
 
@@ -83,7 +88,7 @@ auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int 
 int list_imported_devices(int port)
 {
         std::vector<ioctl_usbip_vhci_imported_dev> devs;
-        devs.reserve(USBIP_TOTAL_PORTS + 2); // vhci_get_imported_devs -> last item is invalid
+        devs.reserve(USBIP_TOTAL_PORTS);
 
         if (auto err = get_imported_devices(devs, port)) {
                 return err;
@@ -96,9 +101,7 @@ int list_imported_devices(int port)
 
         for (auto rhport = get_rhport(port); auto& d: devs) {
 
-                if (!d.port) {
-                        continue;
-                }
+                assert(d.port);
 
                 if (port > 0) {
                         if (rhport != d.port) {
@@ -159,8 +162,8 @@ int usbip_port_show(int argc, char *argv[])
 		}
 	}
 
-        if (port > USBIP_TOTAL_PORTS) {
-                err("invalid port: %d", port);
+        if (!(port > 0 && port <= USBIP_TOTAL_PORTS)) {
+                err("invalid port %d, must be 1-%d", port, USBIP_TOTAL_PORTS);
                 usbip_port_usage();
                 return 1;
         }

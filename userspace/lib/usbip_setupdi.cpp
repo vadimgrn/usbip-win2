@@ -33,37 +33,6 @@ auto get_id_inst(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data)
 	return str;
 }
 
-std::string get_dev_property(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, DWORD prop)
-{
-	std::string str;
-
-	DWORD length;
-	if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, nullptr, 0, &length)) {
-		switch (auto err = GetLastError()) {
-		case ERROR_INVALID_DATA:
-			return str;
-		case ERROR_INSUFFICIENT_BUFFER:
-			break;
-		default:
-			dbg("failed to get device property: err: %x", err);
-			return str;
-		}
-	} else {
-		dbg("unexpected case");
-		return str;
-	}
-
-	auto val = std::make_unique_for_overwrite<BYTE[]>(length);
-	
-        if (!SetupDiGetDeviceRegistryProperty(dev_info, pdev_info_data, prop, nullptr, val.get(), length, nullptr)) {
-		dbg("failed to get device property: err: %x", GetLastError());
-		return str;
-	}
-
-	str.assign((char*)val.get(), length);
-        return str;
-}
-
 unsigned char get_devno_from_inst_id(unsigned char devno_map[], const std::string &id_inst)
 {
 	UCHAR devno = 0;
@@ -126,11 +95,6 @@ int traverse_dev_info(HDEVINFO dev_info, walkfunc_t walker, void *ctx)
 
 } // namespace
 
-
-std::string get_hwid(HDEVINFO dev_info, PSP_DEVINFO_DATA pdev_info_data)
-{
-	return get_dev_property(dev_info, pdev_info_data, SPDRP_HARDWAREID);
-}
 
 std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> get_intf_detail(HDEVINFO dev_info, SP_DEVINFO_DATA *pdev_info_data, const GUID &guid)
 {
