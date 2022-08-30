@@ -1,5 +1,9 @@
 #pragma once
 
+/*
+ * Declarations from <uapi/linux/usb/ch9.h>
+ */
+
 enum { 
 /*
  * USB directions
@@ -38,9 +42,6 @@ enum {
 	bcdUSB31 = 0x0310
 };
 
-/*
- * <uapi/linux/usb/ch9.h>
- */
 enum usb_device_speed {
         USB_SPEED_UNKNOWN,			/* enumerating */
         USB_SPEED_LOW, USB_SPEED_FULL,		/* usb 1.1 */

@@ -28,7 +28,7 @@ void usbip_detach_usage()
 	auto &fmt = 
 "usage: usbip detach <args>\n"
 "    -p, --port=<port>    "
-" port the device is on, max %d, * or <= 0 - all ports\n";
+" port the device is on, max %d, * or below 1 - all ports\n";
 
 	printf(fmt, USBIP_TOTAL_PORTS);
 }

@@ -35,7 +35,7 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
 
-	if (!is_valid_port(port)) {
+	if (!is_valid_rhport(port)) {
 		return nullptr;
 	}
 
@@ -64,7 +64,7 @@ PAGEABLE bool vhub_attach_vpdo(vpdo_dev_t *vpdo)
 		if (!ptr) {
 			ptr = vpdo;
 			vpdo->port = i + 1;
-			NT_ASSERT(is_valid_port(vpdo->port));
+			NT_ASSERT(is_valid_rhport(vpdo->port));
 			break;
 		}
 	}
@@ -85,7 +85,7 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 		return;
 	}
 
-	NT_ASSERT(is_valid_port(vpdo->port));
+	NT_ASSERT(is_valid_rhport(vpdo->port));
 	auto vhub = vhub_from_vpdo(vpdo);
 
 	ExAcquireFastMutex(&vhub->mutex);
@@ -153,7 +153,7 @@ PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNE
 {
 	PAGED_CODE();
 
-	if (!is_valid_port(r.ConnectionIndex)) {
+	if (!is_valid_rhport(r.ConnectionIndex)) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
@@ -217,6 +217,11 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 {
 	PAGED_CODE();
 
+	if (!vhub) {
+		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
+		return STATUS_NO_SUCH_DEVICE;
+	}
+
 	TraceMsg("%!vdev_usb_t!, cnt %Iu", vhub->version, cnt);
 	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;
@@ -234,7 +239,9 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 			break;
 		}
 
-		dev->port = vpdo->port;
+		dev->port = make_virt_port(vpdo->version, vpdo->port);
+		NT_ASSERT(is_valid_vport(dev->port));
+
 		RtlStringCbCopyA(dev->busid, sizeof(dev->busid), vpdo->busid);
 
 		to_ansi_str(dev->service, sizeof(dev->service), vpdo->service_name);

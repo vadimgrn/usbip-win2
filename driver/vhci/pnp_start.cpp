@@ -18,9 +18,9 @@ PAGEABLE NTSTATUS start_vhci(vhci_dev_t *vhci)
 {
 	PAGED_CODE();
 
-	auto &vhci_guid = vhci->version == VDEV_USB3 ? GUID_DEVINTERFACE_XHCI_USBIP : GUID_DEVINTERFACE_EHCI_USBIP;
+	auto &guid = vhci_guid(vhci->version);
 
-	auto status = IoRegisterDeviceInterface(vhci->pdo, &vhci_guid, nullptr, &vhci->DevIntfVhci);
+	auto status = IoRegisterDeviceInterface(vhci->pdo, &guid, nullptr, &vhci->DevIntfVhci);
 	if (!NT_SUCCESS(status)) {
 		Trace(TRACE_LEVEL_ERROR, "Register vhci device interface %!STATUS!", status);
 		return status;

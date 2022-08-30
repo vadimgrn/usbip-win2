@@ -719,7 +719,8 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
         }
 
         if (vhub_attach_vpdo(vpdo)) {
-                r.port = make_port(vpdo->version, vpdo->port);
+                r.port = make_virt_port(vpdo->version, vpdo->port);
+                NT_ASSERT(is_valid_vport(r.port));
         } else {
                 error = make_error(ERR_PORTFULL);
                 Trace(TRACE_LEVEL_ERROR, "Can't acquire free usb port");
@@ -743,11 +744,10 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vhci_unplug_vpdo(vhci_dev_t *vhci, int port)
+PAGEABLE NTSTATUS vhci_unplug_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
 
-	auto vhub = vhub_from_vhci(vhci);
 	if (!vhub) {
 		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
 		return STATUS_NO_SUCH_DEVICE;

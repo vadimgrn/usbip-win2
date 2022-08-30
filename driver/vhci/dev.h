@@ -155,6 +155,12 @@ constexpr auto is_fdo(vdev_type_t type)
 
 vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci);
 
+inline auto vhci_from_vhub(vhub_dev_t *vhub)
+{
+	NT_ASSERT(vhub);
+	return reinterpret_cast<vhci_dev_t*>(vhub->parent);
+}
+
 inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
 	NT_ASSERT(vpdo);

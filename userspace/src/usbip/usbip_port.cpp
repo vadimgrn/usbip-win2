@@ -125,11 +125,11 @@ int list_imported_devices(int port)
 
 void usbip_port_usage()
 {
-        const char msg[] =
+        const char fmt[] =
 "usage: usbip port <args>\n"
-"    -p, --port=<port>      list only given port (for port checking, [1..%d]), value below 1 means all ports\n";
+"    -p, --port=<port>      list only given port 1-%d for checking\n";
 
-        printf(msg, USBIP_TOTAL_PORTS);
+        printf(fmt, USBIP_TOTAL_PORTS);
 }
 
 int usbip_port_show(int argc, char *argv[])
@@ -162,8 +162,8 @@ int usbip_port_show(int argc, char *argv[])
 		}
 	}
 
-        if (!(port > 0 && port <= USBIP_TOTAL_PORTS)) {
-                err("invalid port %d, must be 1-%d", port, USBIP_TOTAL_PORTS);
+        if (port > USBIP_TOTAL_PORTS) {
+                err("invalid port: %d", port);
                 usbip_port_usage();
                 return 1;
         }

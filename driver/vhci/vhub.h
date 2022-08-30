@@ -19,8 +19,3 @@ NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo);
 PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub);
 
 PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *idevs, size_t cnt);
-
-constexpr auto is_valid_port(int port)
-{
-	return port > 0 && port <= vhub_dev_t::NUM_PORTS;
-}

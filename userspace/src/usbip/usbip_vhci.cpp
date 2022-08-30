@@ -31,7 +31,7 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
 
 auto get_vhci_devpath(vdev_usb_t version)
 {
-        Context r{ &usbip_guid(version) };
+        Context r{ &vhci_guid(version) };
         traverse_intfdevs(walker_devpath, *r.guid, &r);
         return r.path;
 }

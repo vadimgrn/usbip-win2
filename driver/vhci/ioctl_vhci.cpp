@@ -118,7 +118,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
 		outlen = 0;
 		st = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
-			vhci_unplug_vpdo(vhci, static_cast<ioctl_usbip_vhci_unplug*>(buffer)->port) :
+			vhci_unplug_vpdo(vhub_from_vhci(vhci), static_cast<ioctl_usbip_vhci_unplug*>(buffer)->port) :
 			STATUS_INVALID_BUFFER_SIZE;
 		break;
 	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
