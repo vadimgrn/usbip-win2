@@ -13,7 +13,7 @@
 namespace
 {
 
-PAGEABLE auto get_usb_version(_Out_ vdev_usb_t &version, _In_ DEVICE_OBJECT *devobj)
+PAGEABLE auto get_hci_version(_Out_ hci_version &version, _In_ DEVICE_OBJECT *devobj)
 {
 	PAGED_CODE();
 
@@ -28,8 +28,8 @@ PAGEABLE auto get_usb_version(_Out_ vdev_usb_t &version, _In_ DEVICE_OBJECT *dev
 	RtlInitUnicodeString(&hwid, hwid_wstr);
 
 	const wchar_t* v[] { 
-		HWID_ROOT1, HWID_EHCI, HWID_VHUB,  // VDEV_USB2
-		HWID_ROOT2, HWID_XHCI, HWID_VHUB30 // VDEV_USB3
+		HWID_ROOT1, HWID_EHCI, HWID_VHUB,  // HCI_USB2
+		HWID_ROOT2, HWID_XHCI, HWID_VHUB30 // HCI_USB3
 	};
 
 	err = STATUS_INVALID_PARAMETER;
@@ -40,19 +40,19 @@ PAGEABLE auto get_usb_version(_Out_ vdev_usb_t &version, _In_ DEVICE_OBJECT *dev
 		RtlInitUnicodeString(&s, v[i]);
 
 		if (RtlEqualUnicodeString(&s, &hwid, true)) {
-			version = i > 2 ? VDEV_USB3 : VDEV_USB2;
+			version = i > 2 ? HCI_USB3 : HCI_USB2;
 			err = STATUS_SUCCESS;
 			break;
 		}
 	}
 
-	TraceDbg("%04x %!USTR! -> %!STATUS!, %!vdev_usb_t!", ptr4log(devobj), &hwid, err, version);
+	TraceDbg("%04x %!USTR! -> %!STATUS!, %!hci_version!", ptr4log(devobj), &hwid, err, version);
 
 	ExFreePoolWithTag(hwid_wstr, USBIP_VHCI_POOL_TAG);
 	return err;
 }
 
-PAGEABLE vdev_t *get_vdev_from_driver(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t version, _In_ vdev_type_t type)
+PAGEABLE vdev_t *get_vdev_from_driver(_In_ DRIVER_OBJECT *drvobj, _In_ hci_version version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -70,8 +70,6 @@ PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
-	TraceDbg("%!vdev_type_t!", type);
-
 	auto devobj = vdev_create(vdev->Self->DriverObject, vdev->version, type);
 	if (!devobj) {
 		return nullptr;
@@ -85,7 +83,7 @@ PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ vdev_type_t type)
 	return vdev_child;
 }
 
-PAGEABLE auto init(vhci_dev_t &vhci)
+PAGEABLE auto init(_Inout_ vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
@@ -94,7 +92,7 @@ PAGEABLE auto init(vhci_dev_t &vhci)
                 return STATUS_UNSUCCESSFUL;
         }
 
-	RtlUnicodeStringInitEx(&vhci.DevIntfVhci, nullptr, STRSAFE_IGNORE_NULLS);
+	RtlUnicodeStringInitEx(&vhci.DevIntfVhci,  nullptr, STRSAFE_IGNORE_NULLS);
 	RtlUnicodeStringInitEx(&vhci.DevIntfUSBHC, nullptr, STRSAFE_IGNORE_NULLS);
 
         return STATUS_SUCCESS;
@@ -113,9 +111,8 @@ PAGEABLE auto init(_Inout_ vhub_dev_t &vhub)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _When_(return>=0, _Kernel_clear_do_init_(yes))
-PAGEABLE auto add_vdev(
-	_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *PhysicalDeviceObject, 
-	_In_ vdev_usb_t version, _In_ vdev_type_t type)
+PAGEABLE auto add_vdev(_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *PhysicalDeviceObject, 
+	_In_ hci_version version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -144,17 +141,17 @@ PAGEABLE auto add_vdev(
 
 	switch (type) {
 	case VDEV_ROOT:
-                vdev->child_pdo = create_child_pdo(vdev, VDEV_CPDO);
+		vdev->child_pdo = create_child_pdo(vdev, VDEV_CPDO);
 		break;
 	case VDEV_VHCI:
-		err = init(*reinterpret_cast<vhci_dev_t*>(vdev));
+		err = init(*static_cast<vhci_dev_t*>(vdev));
 		break;
 	case VDEV_VHUB:
-                err = init(*reinterpret_cast<vhub_dev_t*>(vdev));
+                err = init(*static_cast<vhub_dev_t*>(vdev));
                 break;
 	}
 
-        TraceMsg("%!vdev_usb_t!, %!vdev_type_t!(%04x) -> %!STATUS!", version, type, ptr4log(vdev), err);
+        TraceMsg("%!hci_version!, %!vdev_type_t! -> %!STATUS!, %04x", version, type, err, ptr4log(vdev));
 
         if (err) {
                 destroy_device(vdev);
@@ -176,9 +173,9 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(_In_ DRIVER_OBJECT *DriverObject, _
 	PAGED_CODE();
 	TraceDbg("PhysicalDeviceObject %04x", ptr4log(PhysicalDeviceObject));
 	
-	vdev_usb_t version{};
+	hci_version version;
 
-	if (auto err = get_usb_version(version, PhysicalDeviceObject)) {
+	if (auto err = get_hci_version(version, PhysicalDeviceObject)) {
 		Trace(TRACE_LEVEL_ERROR, "Device not found by HWID, %!STATUS!", err);
 		return err;
 	}

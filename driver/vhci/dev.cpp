@@ -42,7 +42,7 @@ void *GetDeviceProperty(DEVICE_OBJECT *obj, DEVICE_REGISTRY_PROPERTY prop, NTSTA
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t version, _In_ vdev_type_t type)
+PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ hci_version version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
@@ -55,11 +55,10 @@ PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t 
                 sizeof(vhub_dev_t),
                 sizeof(vpdo_dev_t)
         };
-
         static_assert(ARRAYSIZE(ext_sizes) == VDEV_SIZE);
+	auto extsize = ext_sizes[type];
 
 	DEVICE_OBJECT *devobj{};
-	auto extsize = ext_sizes[type];
 	NTSTATUS status{};
 
 	switch (type) {
@@ -77,7 +76,7 @@ PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t 
 	}
 
 	if (!NT_SUCCESS(status)) {
-		Trace(TRACE_LEVEL_ERROR, "Failed to create vdev(%!vdev_usb_t!, %!vdev_type_t!): %!STATUS!", version, type, status);
+		Trace(TRACE_LEVEL_ERROR, "Failed to create vdev(%!vdev_type_t!): %!STATUS!", type, status);
 		return nullptr;
 	}
 
@@ -95,7 +94,7 @@ PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t 
 
 	devobj->Flags |= DO_POWER_PAGABLE | DO_BUFFERED_IO;
 
-	TraceDbg("%!vdev_usb_t!, %!vdev_type_t! -> %04x", version, type, ptr4log(devobj));
+	TraceDbg("%04x %!hci_version!, %!vdev_type_t!", ptr4log(devobj), version, type);
 	return devobj;
 }
 
@@ -103,31 +102,13 @@ vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci)
 {	
 	NT_ASSERT(vhci);
 	auto child_pdo = vhci->child_pdo;
-	return child_pdo ? reinterpret_cast<vhub_dev_t*>(child_pdo->fdo) : nullptr;
-}
-
-cpdo_dev_t *to_cpdo_or_null(DEVICE_OBJECT *devobj)
-{
-	auto vdev = to_vdev(devobj);
-	return vdev->type == VDEV_CPDO ? static_cast<cpdo_dev_t*>(vdev) : nullptr;
+	return child_pdo ? static_cast<vhub_dev_t*>(child_pdo->fdo) : nullptr;
 }
 
 vhci_dev_t *to_vhci_or_null(DEVICE_OBJECT *devobj)
 {
 	auto vdev = to_vdev(devobj);
 	return vdev->type == VDEV_VHCI ? static_cast<vhci_dev_t*>(vdev) : nullptr;
-}
-
-hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj)
-{
-	auto vdev = to_vdev(devobj);
-	return vdev->type == VDEV_HPDO ? static_cast<hpdo_dev_t*>(vdev) : nullptr;
-}
-
-vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj)
-{
-	auto vdev = to_vdev(devobj);
-	return vdev->type == VDEV_VHUB ? static_cast<vhub_dev_t*>(vdev) : nullptr;
 }
 
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj)

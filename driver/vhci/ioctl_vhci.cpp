@@ -32,6 +32,36 @@ PAGEABLE ULONG get_name_prefix_cch(const UNICODE_STRING &s)
 	return 0;
 }
 
+PAGEABLE NTSTATUS ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
+{
+	PAGED_CODE();
+	NT_ASSERT(vhub);
+
+	auto st = STATUS_INVALID_DEVICE_REQUEST;
+
+	switch (ioctl_code) {
+	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
+		st = inlen == sizeof(ioctl_usbip_vhci_plugin) && outlen == sizeof(ioctl_usbip_vhci_plugin::port) ? 
+			plugin_vpdo(vhub, *static_cast<ioctl_usbip_vhci_plugin*>(buffer)) : STATUS_INVALID_BUFFER_SIZE;
+		break;
+	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
+		outlen = 0;
+		st = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
+			unplug_vpdo(vhub, static_cast<ioctl_usbip_vhci_unplug*>(buffer)->port) : STATUS_INVALID_BUFFER_SIZE;
+		break;
+	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
+		st = get_imported_devs(vhub, (ioctl_usbip_vhci_imported_dev*)buffer, outlen/sizeof(ioctl_usbip_vhci_imported_dev));
+		break;
+	case IOCTL_USB_GET_ROOT_HUB_NAME:
+		st = get_roothub_name(vhub, *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
+		break;
+	default:
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", device_control_name(ioctl_code), ioctl_code);
+	}
+
+	return st;
+}
+
 } // namespace
 
 
@@ -42,6 +72,7 @@ PAGEABLE ULONG get_name_prefix_cch(const UNICODE_STRING &s)
 PAGEABLE NTSTATUS get_roothub_name(_In_ vhub_dev_t *vhub, _Out_ USB_ROOT_HUB_NAME &r, _Out_ ULONG &outlen)
 {
 	PAGED_CODE();
+	NT_ASSERT(vhub);
 
 	if (outlen < sizeof(r)) {
 		return STATUS_BUFFER_TOO_SMALL;
@@ -107,36 +138,22 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 {
 	PAGED_CODE();
 
-	auto st = STATUS_INVALID_DEVICE_REQUEST;
+	auto st = STATUS_NO_SUCH_DEVICE;
 
 	switch (ioctl_code) {
-	case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
-		st = inlen == sizeof(ioctl_usbip_vhci_plugin) && outlen == sizeof(ioctl_usbip_vhci_plugin::port) ? 
-                        vhci_plugin_vpdo(vhci, *static_cast<ioctl_usbip_vhci_plugin*>(buffer)) : 
-                        STATUS_INVALID_BUFFER_SIZE;
-                break;
-	case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
-		outlen = 0;
-		st = inlen == sizeof(ioctl_usbip_vhci_unplug) ? 
-			vhci_unplug_vpdo(vhub_from_vhci(vhci), static_cast<ioctl_usbip_vhci_unplug*>(buffer)->port) :
-			STATUS_INVALID_BUFFER_SIZE;
-		break;
-	case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
-		st = vhub_get_imported_devs(vhub_from_vhci(vhci), (ioctl_usbip_vhci_imported_dev*)buffer, 
-			                    outlen/sizeof(ioctl_usbip_vhci_imported_dev));
-		break;
 	case IOCTL_GET_HCD_DRIVERKEY_NAME:
 		st = get_hcd_driverkey_name(vhci, *static_cast<USB_HCD_DRIVERKEY_NAME*>(buffer), outlen);
-		break;
-	case IOCTL_USB_GET_ROOT_HUB_NAME:
-		st = get_roothub_name(vhub_from_vhci(vhci), *static_cast<USB_ROOT_HUB_NAME*>(buffer), outlen);
 		break;
 	case IOCTL_USB_USER_REQUEST:
 		NT_ASSERT(inlen == outlen);
 		st = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), outlen);
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "Unhandled %s(%#08lX)", device_control_name(ioctl_code), ioctl_code);
+		if (auto vhub = vhub_from_vhci(vhci)) {
+			st = ioctl_vhub(vhub, ioctl_code, buffer, inlen, outlen);
+		} else {
+			TraceMsg("vhub has gone");
+		}
 	}
 
 	return st;

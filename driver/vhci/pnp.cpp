@@ -396,18 +396,17 @@ extern "C" PAGEABLE NTSTATUS vhci_pnp(_In_ PDEVICE_OBJECT devobj, _In_ IRP *irp)
 	auto dev_type = vdev->type;
 
 	auto irpstack = IoGetCurrentIrpStackLocation(irp);
-	TraceDbg("Enter: %!vdev_usb_t!, %!vdev_type_t!, %!pnpmn!", version, dev_type, irpstack->MinorFunction);
+	TraceDbg("Enter: %!hci_version!, %!vdev_type_t!, %!pnpmn!", version, dev_type, irpstack->MinorFunction);
 
 	NTSTATUS st{};
 
 	if (irpstack->MinorFunction < ARRAYSIZE(pnpmn_functions)) {
 		st = pnpmn_functions[irpstack->MinorFunction](vdev, irp); // vdev can be destroyed after this
 	} else {
-		Trace(TRACE_LEVEL_WARNING, "%!vdev_usb_t!, %!vdev_type_t!: unknown MinorFunction %!pnpmn!", 
-			                    version, dev_type, irpstack->MinorFunction);
+		Trace(TRACE_LEVEL_WARNING, "%!vdev_type_t!: unknown MinorFunction %!pnpmn!", dev_type, irpstack->MinorFunction);
 		st = CompleteRequestAsIs(irp);
 	}
 
-	TraceDbg("Leave: %!vdev_usb_t!, %!vdev_type_t!, %!STATUS!", version, dev_type, st);
+	TraceDbg("Leave: %!hci_version!, %!vdev_type_t!, %!STATUS!", version, dev_type, st);
 	return st;
 }

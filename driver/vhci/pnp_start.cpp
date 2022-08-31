@@ -133,7 +133,7 @@ PAGEABLE NTSTATUS pnp_start_device(vdev_t *vdev, IRP *irp)
 		vdev->DevicePowerState = ps.DeviceState;
 		PoSetPowerState(vdev->Self, DevicePowerState, ps);
 
-		Trace(TRACE_LEVEL_INFORMATION, "%!vdev_usb_t!, %!vdev_type_t! started", vdev->version, vdev->type);
+		Trace(TRACE_LEVEL_INFORMATION, "%!hci_version!, %!vdev_type_t! started", vdev->version, vdev->type);
 	}
 
 	return CompleteRequest(irp, status);

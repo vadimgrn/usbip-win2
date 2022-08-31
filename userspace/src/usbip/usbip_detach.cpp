@@ -49,7 +49,7 @@ static int detach_port(const char* portstr)
 		return 1;
 	}
 
-	auto version = get_vdev_usb(port);
+	auto version = get_hci_version(port);
 
         auto hdev = usbip::vhci_driver_open(version);
 	if (!hdev) {

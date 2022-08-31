@@ -213,16 +213,12 @@ PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
 	ExReleaseFastMutex(&vhub->mutex);
 }
 
-PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *dev, size_t cnt)
+PAGEABLE NTSTATUS get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *dev, size_t cnt)
 {
 	PAGED_CODE();
+	NT_ASSERT(vhub);
 
-	if (!vhub) {
-		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
-		return STATUS_NO_SUCH_DEVICE;
-	}
-
-	TraceMsg("%!vdev_usb_t!, cnt %Iu", vhub->version, cnt);
+	TraceMsg("%!hci_version!, cnt %Iu", vhub->version, cnt);
 	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;
 	}
@@ -239,7 +235,7 @@ PAGEABLE NTSTATUS vhub_get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_impo
 			break;
 		}
 
-		dev->port = make_virt_port(vpdo->version, vpdo->port);
+		dev->port = make_vport(vhub->version, vpdo->port);
 		NT_ASSERT(is_valid_vport(dev->port));
 
 		RtlStringCbCopyA(dev->busid, sizeof(dev->busid), vpdo->busid);

@@ -46,9 +46,9 @@ enum vdev_type_t
 
 struct vdev_t 
 {
-	DEVICE_OBJECT *Self; // A back pointer to the device object for which this is the extension
+	DEVICE_OBJECT *Self; // back pointer to the device object for which this is the extension
 
-	vdev_usb_t version;
+	hci_version version;
 	vdev_type_t type;
 
 	pnp_state PnPState;
@@ -143,7 +143,7 @@ struct vhub_dev_t : vdev_t
 };
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ vdev_usb_t version, _In_ vdev_type_t type);
+PAGEABLE DEVICE_OBJECT *vdev_create(_In_ DRIVER_OBJECT *drvobj, _In_ hci_version version, _In_ vdev_type_t type);
 
 _IRQL_requires_max_(PASSIVE_LEVEL)
 void *GetDeviceProperty(DEVICE_OBJECT *pdo, DEVICE_REGISTRY_PROPERTY prop, NTSTATUS &error, ULONG &ResultLength);
@@ -155,16 +155,16 @@ constexpr auto is_fdo(vdev_type_t type)
 
 vhub_dev_t *vhub_from_vhci(vhci_dev_t *vhci);
 
-inline auto vhci_from_vhub(vhub_dev_t *vhub)
-{
-	NT_ASSERT(vhub);
-	return reinterpret_cast<vhci_dev_t*>(vhub->parent);
-}
-
 inline auto vhub_from_vpdo(vpdo_dev_t *vpdo)
 {
 	NT_ASSERT(vpdo);
-	return reinterpret_cast<vhub_dev_t*>(vpdo->parent);
+	return static_cast<vhub_dev_t*>(vpdo->parent);
+}
+
+inline auto vhci_from_vhub(vhub_dev_t *vhub)
+{
+	NT_ASSERT(vhub);
+	return static_cast<vhci_dev_t*>(vhub->parent);
 }
 
 inline auto to_vdev(DEVICE_OBJECT *devobj)
@@ -173,10 +173,7 @@ inline auto to_vdev(DEVICE_OBJECT *devobj)
 	return static_cast<vdev_t*>(devobj->DeviceExtension); 
 }
 
-cpdo_dev_t *to_cpdo_or_null(DEVICE_OBJECT *devobj);
 vhci_dev_t *to_vhci_or_null(DEVICE_OBJECT *devobj);
-hpdo_dev_t *to_hpdo_or_null(DEVICE_OBJECT *devobj);
-vhub_dev_t *to_vhub_or_null(DEVICE_OBJECT *devobj);
 vpdo_dev_t *to_vpdo_or_null(DEVICE_OBJECT *devobj);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

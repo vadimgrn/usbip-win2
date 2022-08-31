@@ -61,11 +61,10 @@ inline void log(const USB_CONFIGURATION_DESCRIPTOR &d)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto check_usb_version(_In_ const vpdo_dev_t &vpdo, _In_ const usbip_usb_device &d)
+auto check_speed(_In_ hci_version version, _In_ usb_device_speed speed)
 {
-        auto speed = static_cast<usb_device_speed>(d.speed);
-        auto version = speed >= USB_SPEED_SUPER ? VDEV_USB3 : VDEV_USB2;
-        return vpdo.version == version;
+        auto dev_version = speed >= USB_SPEED_SUPER ? HCI_USB3 : HCI_USB2;
+        return dev_version == version;
 }
 
 /*
@@ -180,18 +179,18 @@ PAGEABLE auto set_class_subclass_proto(vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhci_dev_t *vhci, const ioctl_usbip_vhci_plugin &r)
+PAGEABLE auto create_vpdo(vpdo_dev_t* &vpdo, vhub_dev_t *vhub, const ioctl_usbip_vhci_plugin &r)
 {
         PAGED_CODE();
         NT_ASSERT(!vpdo);
 
-        auto devobj = vdev_create(vhci->Self->DriverObject, vhci->version, VDEV_VPDO);
+        auto devobj = vdev_create(vhub->Self->DriverObject, vhub->version, VDEV_VPDO);
         if (!devobj) {
                 return make_error(ERR_GENERAL);
         }
 
         vpdo = to_vpdo_or_null(devobj);
-        vpdo->parent = vhub_from_vhci(vhci);
+        vpdo->parent = vhub;
 
         vpdo->DevicePowerState = PowerDeviceD3;
         vpdo->SystemPowerState = PowerSystemWorking;
@@ -564,8 +563,8 @@ PAGEABLE auto import_remote_device(vpdo_dev_t &vpdo)
         auto &udev = reply.udev;
         log(udev);
 
-        if (!check_usb_version(vpdo, udev)) {
-                TraceDbg("Mismatch between %!vdev_usb_t! and %!usb_device_speed!", vpdo.version, udev.speed);
+        if (!check_speed(vpdo.version, static_cast<usb_device_speed>(udev.speed))) {
+                TraceDbg("Mismatch between %!hci_version! and %!usb_device_speed!", vpdo.version, udev.speed);
                 return make_error(ERR_USB_VER);
         }
 
@@ -692,15 +691,17 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _When_(return>=0, _Kernel_clear_do_init_(yes))
-PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
+PAGEABLE NTSTATUS plugin_vpdo(vhub_dev_t *vhub, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
+        NT_ASSERT(vhub);
+
         TraceMsg("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
         auto &error = r.port;
 
         vpdo_dev_t *vpdo{};
-        if (bool(error = create_vpdo(vpdo, vhci, r))) {
+        if (bool(error = create_vpdo(vpdo, vhub, r))) {
                 destroy_device(vpdo);
                 return STATUS_SUCCESS;
         }
@@ -719,7 +720,7 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
         }
 
         if (vhub_attach_vpdo(vpdo)) {
-                r.port = make_virt_port(vpdo->version, vpdo->port);
+                r.port = make_vport(vpdo->version, vpdo->port);
                 NT_ASSERT(is_valid_vport(r.port));
         } else {
                 error = make_error(ERR_PORTFULL);
@@ -738,20 +739,19 @@ PAGEABLE NTSTATUS vhci_plugin_vpdo(vhci_dev_t *vhci, ioctl_usbip_vhci_plugin &r)
         }
 
         vpdo->Self->Flags &= ~DO_DEVICE_INITIALIZING; // must be the last step in initialization
-        IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
+
+        if (auto vhci = vhci_from_vhub(vhub)) {
+                IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
+        }
 
         return STATUS_SUCCESS;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vhci_unplug_vpdo(vhub_dev_t *vhub, int port)
+PAGEABLE NTSTATUS unplug_vpdo(vhub_dev_t *vhub, int port)
 {
 	PAGED_CODE();
-
-	if (!vhub) {
-		Trace(TRACE_LEVEL_INFORMATION, "vhub has gone");
-		return STATUS_NO_SUCH_DEVICE;
-	}
+        NT_ASSERT(vhub);
 
 	if (port <= 0) {
 		Trace(TRACE_LEVEL_VERBOSE, "Plugging out all devices");

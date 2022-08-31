@@ -62,7 +62,7 @@ auto init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const
         return ERR_NONE;
 }
 
-auto import_device(vdev_usb_t version, const char *host, const char *busid, const char *serial)
+auto import_device(hci_version version, const char *host, const char *busid, const char *serial)
 {
         ioctl_usbip_vhci_plugin r{};
         if (auto err = init(r, host, busid, serial)) {
@@ -92,8 +92,8 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
 {
         int result = 0;
 
-        for (auto ver: vdev_versions) {
-                result = import_device(ver, host, busid, serial);
+        for (auto version: vhci_list) {
+                result = import_device(version, host, busid, serial);
                 if (get_port(result) || get_error(result) != ERR_USB_VER) {
                         break;
                 }

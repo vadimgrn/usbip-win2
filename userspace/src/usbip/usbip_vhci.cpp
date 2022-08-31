@@ -29,7 +29,7 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
         return false;
 }
 
-auto get_vhci_devpath(vdev_usb_t version)
+auto get_vhci_devpath(hci_version version)
 {
         Context r{ &vhci_guid(version) };
         traverse_intfdevs(walker_devpath, *r.guid, &r);
@@ -39,7 +39,7 @@ auto get_vhci_devpath(vdev_usb_t version)
 } // namespace
 
 
-auto usbip::vhci_driver_open(vdev_usb_t version) -> Handle
+auto usbip::vhci_driver_open(hci_version version) -> Handle
 {
         Handle h;
 

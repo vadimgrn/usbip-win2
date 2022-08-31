@@ -78,7 +78,7 @@ NTSTATUS setup_device_id(PWCHAR &result, bool&, vdev_t *vdev, IRP*)
 {
 	const wchar_t vdpo_vid_pid[] = L"USB\\VID_%04hx&PID_%04hx";
 	const auto vdpo_vid_pid_sz = (ARRAYSIZE(vdpo_vid_pid) - 2)*sizeof(*vdpo_vid_pid); // %04hx -> 4 char output, diff 1 char
-	bool usb3 = vdev->version == VDEV_USB3;
+	bool usb3 = vdev->version == HCI_USB3;
 
 	const LPCWSTR devid[] =
 	{
@@ -132,7 +132,7 @@ NTSTATUS setup_hw_ids(PWCHAR &result, bool &subst_result, vdev_t *vdev, IRP*)
 		                    L"USB\\VID_%04hx&PID_%04hx;";
 
 	const auto hwid_vpdo_sz = (ARRAYSIZE(hwid_vpdo) - 5)*sizeof(*hwid_vpdo); // %04hx -> 4 char output, diff 1 char
-	bool usb3 = vdev->version == VDEV_USB3;
+	bool usb3 = vdev->version == HCI_USB3;
 
 	const LPCWSTR hwid[] =
 	{
@@ -324,12 +324,12 @@ PAGEABLE NTSTATUS pnp_query_id(vdev_t *vdev, IRP *irp)
 	}
 
 	if (status == STATUS_SUCCESS) {
-		TraceMsg("%!vdev_usb_t!, %!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S", vdev->version, vdev->type, type, result);
+		TraceMsg("%!hci_version!, %!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %S", vdev->version, vdev->type, type, result);
 		if (subst_result) {
 			subst_char(result, L';', L'\0');
 		}
 	} else {
-		TraceMsg("%!vdev_usb_t!, %!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->version, vdev->type, type, status);
+		TraceMsg("%!hci_version!, %!vdev_type_t!: %!BUS_QUERY_ID_TYPE!: %!STATUS!", vdev->version, vdev->type, type, status);
 		if (result) {
 			ExFreePoolWithTag(result, USBIP_VHCI_POOL_TAG);
 			result = nullptr;

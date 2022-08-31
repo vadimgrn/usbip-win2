@@ -228,7 +228,7 @@ PAGEABLE NTSTATUS pnp_query_device_relations(_In_ vdev_t *vdev, _Inout_ IRP *irp
 		st = irp->IoStatus.Status;
 	}
 
-	TraceDbg("%!vdev_usb_t!, %!vdev_type_t!, %!_DEVICE_RELATION_TYPE! -> %!STATUS!", vdev->version, vdev->type, type, st);
+	TraceDbg("%!vdev_type_t!, %!_DEVICE_RELATION_TYPE! -> %!STATUS!", vdev->type, type, st);
 
 	irp->IoStatus.Information = reinterpret_cast<ULONG_PTR>(r);
 	return CompleteRequest(irp, st);

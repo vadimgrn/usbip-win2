@@ -49,14 +49,14 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
 
 auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int port)
 {
-        vdev_usb_t versions[ARRAYSIZE(vdev_versions)];
-        int cnt = ARRAYSIZE(vdev_versions);
+        hci_version versions[ARRAYSIZE(vhci_list)];
+        int cnt = ARRAYSIZE(versions);
 
         if (port > 0) {
-                *versions = get_vdev_usb(port);
+                *versions = get_hci_version(port);
                 cnt = 1; 
         } else {
-                RtlCopyMemory(versions, vdev_versions, sizeof(versions));
+                RtlCopyMemory(versions, vhci_list, sizeof(versions));
         }
 
         for (int i = 0; i < cnt; ++i) {

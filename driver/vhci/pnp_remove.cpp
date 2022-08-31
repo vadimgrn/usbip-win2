@@ -22,7 +22,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
-	TraceMsg("%04x %!vdev_usb_t!", ptr4log(&vhci), vhci.version);
+	TraceMsg("%04x %!hci_version!", ptr4log(&vhci), vhci.version);
 
         IoSetDeviceInterfaceState(&vhci.DevIntfVhci, false);
 	IoSetDeviceInterfaceState(&vhci.DevIntfUSBHC, false);
@@ -39,7 +39,7 @@ PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	TraceMsg("%04x %!vdev_usb_t!", ptr4log(&vhub), vhub.version);
+	TraceMsg("%!hci_version! %04x", vhub.version, ptr4log(&vhub));
 
 	IoSetDeviceInterfaceState(&vhub.DevIntfRootHub, false);
 	RtlFreeUnicodeString(&vhub.DevIntfRootHub);
@@ -103,8 +103,8 @@ PAGEABLE void cancel_pending_irps(vpdo_dev_t &vpdo)
 	PAGED_CODE();
 	NT_ASSERT(!vpdo.sock);
 
-	TraceDbg("vpdo %04x, %!vdev_usb_t!", ptr4log(&vpdo), vpdo.version);
-	
+	TraceMsg("%!hci_version! vpdo %04x", vpdo.version, ptr4log(&vpdo));
+
 	if (auto &csq = vpdo.irps_csq; csq.CsqAcquireLock) { // is initialized?
                 while (auto irp = dequeue_irp(vpdo)) {
 			complete_as_canceled(irp);
@@ -140,7 +140,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
-	TraceMsg("%04x, %!vdev_usb_t!, port %d", ptr4log(&vpdo), vpdo.version, vpdo.port);
+	TraceMsg("%!hci_version! %04x, port %d", vpdo.version, ptr4log(&vpdo), vpdo.port);
 
 	close_socket(vpdo);
 	cancel_pending_irps(vpdo);
@@ -173,7 +173,7 @@ PAGEABLE void destroy_device(vdev_t *vdev)
                 return;
         }
 
-	TraceMsg("%04x %!vdev_usb_t!, %!vdev_type_t!", ptr4log(vdev), vdev->version, vdev->type);
+	TraceMsg("%04x %!hci_version!, %!vdev_type_t!", ptr4log(vdev), vdev->version, vdev->type);
 
 	if (vdev->child_pdo) {
 		vdev->child_pdo->parent = nullptr;
@@ -218,7 +218,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 {
 	PAGED_CODE();
-	TraceMsg("%04x %!vdev_usb_t!, %!vdev_type_t!", ptr4log(vdev), vdev->version, vdev->type);
+	TraceMsg("%04x %!hci_version!, %!vdev_type_t!", ptr4log(vdev), vdev->version, vdev->type);
 
 	if (vdev->type == VDEV_VPDO) {
 		vhub_unplug_vpdo(static_cast<vpdo_dev_t*>(vdev));
@@ -227,7 +227,7 @@ PAGEABLE NTSTATUS pnp_remove_device(vdev_t *vdev, IRP *irp)
 	if (vdev->PnPState != pnp_state::Removed) {
 		set_state(*vdev, pnp_state::Removed);
 	} else {
-		TraceMsg("%04x %!vdev_usb_t!, %!vdev_type_t! -> already removed", ptr4log(vdev), vdev->version, vdev->type);
+		TraceMsg("%!vdev_type_t! %04x already removed", vdev->type, ptr4log(vdev));
 		return CompleteRequest(irp);
 	}
 
