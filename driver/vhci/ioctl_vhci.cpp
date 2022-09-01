@@ -100,7 +100,7 @@ PAGEABLE NTSTATUS get_roothub_name(_In_ vhub_dev_t &vhub, _Out_ USB_ROOT_HUB_NAM
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG &outlen)
+PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t &vhci, USB_HCD_DRIVERKEY_NAME &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -111,7 +111,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	auto err = STATUS_SUCCESS;
 	ULONG prop_sz = 0;
 
-	auto prop = (PWSTR)GetDeviceProperty(vhci->child_pdo->Self, DevicePropertyDriverKeyName, err, prop_sz); // NULL terminated
+	auto prop = (PWSTR)GetDeviceProperty(vhci.child_pdo->Self, DevicePropertyDriverKeyName, err, prop_sz); // NULL terminated
 	if (!prop) {
 		return err;
 	}
@@ -132,7 +132,7 @@ PAGEABLE NTSTATUS get_hcd_driverkey_name(vhci_dev_t *vhci, USB_HCD_DRIVERKEY_NAM
 	return err;
 }
 
-PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t &vhci, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -147,7 +147,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 		st = vhci_ioctl_user_request(vhci, static_cast<USBUSER_REQUEST_HEADER*>(buffer), outlen);
 		break;
 	default:
-		if (auto vhub = vhub_from_vhci(vhci)) {
+		if (auto vhub = vhub_from_vhci(&vhci)) {
 			st = ioctl_vhub(*vhub, ioctl_code, buffer, inlen, outlen);
 		} else {
 			TraceMsg("vhub has gone");

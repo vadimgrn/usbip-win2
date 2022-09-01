@@ -11,7 +11,6 @@
 #include "usbd_helper.h"
 #include "dbgcommon.h"
 #include "urbtransfer.h"
-#include "vpdo.h"
 #include "csq.h"
 #include "irp.h"
 #include "network.h"
@@ -44,6 +43,43 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	return hdr.u.ret_submit;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto select_config(_In_ vpdo_dev_t &vpdo, _Inout_ _URB_SELECT_CONFIGURATION *r)
+{
+	if (vpdo.actconfig) {
+		ExFreePoolWithTag(vpdo.actconfig, USBIP_VHCI_POOL_TAG);
+		vpdo.actconfig = nullptr;
+	}
+
+	auto cd = r->ConfigurationDescriptor;
+	if (!cd) {
+		Trace(TRACE_LEVEL_INFORMATION, "Going to unconfigured state");
+		vpdo.current_intf_num = 0;
+		vpdo.current_intf_alt = 0;
+		return STATUS_SUCCESS;
+	}
+
+	vpdo.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, cd->wTotalLength, USBIP_VHCI_POOL_TAG);
+
+	if (vpdo.actconfig) {
+		RtlCopyMemory(vpdo.actconfig, cd, cd->wTotalLength);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Failed to allocate wTotalLength %d", cd->wTotalLength);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	auto status = setup_config(r, vpdo.speed);
+
+	if (NT_SUCCESS(status)) {
+		r->ConfigurationHandle = (USBD_CONFIGURATION_HANDLE)(0x100 | cd->bConfigurationValue);
+
+		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+		Trace(TRACE_LEVEL_INFORMATION, "%s", select_configuration_str(buf, sizeof(buf), r));
+	}
+
+	return status;
+}
+
 /*
  * EP0 stall is not an error, control endpoint cannot stall.
  */
@@ -58,7 +94,29 @@ NTSTATUS urb_select_configuration(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		err = USBD_STATUS_SUCCESS;
 	}
 
-	return err ? STATUS_UNSUCCESSFUL : vpdo_select_config(ctx.vpdo, &urb.UrbSelectConfiguration);
+	return err ? STATUS_UNSUCCESSFUL : select_config(*ctx.vpdo, &urb.UrbSelectConfiguration);
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto select_interface(vpdo_dev_t &vpdo, _URB_SELECT_INTERFACE *r)
+{
+	if (!vpdo.actconfig) {
+		Trace(TRACE_LEVEL_ERROR, "Device is unconfigured");
+		return STATUS_INVALID_DEVICE_REQUEST;
+	}
+
+	auto &iface = r->Interface;
+	auto status = setup_intf(&iface, vpdo.speed, vpdo.actconfig);
+
+	if (NT_SUCCESS(status)) {
+		char buf[SELECT_INTERFACE_STR_BUFSZ];
+		Trace(TRACE_LEVEL_INFORMATION, "%s", select_interface_str(buf, sizeof(buf), r));
+
+		vpdo.current_intf_num = iface.InterfaceNumber;
+		vpdo.current_intf_alt = iface.AlternateSetting;
+	}
+
+	return status;
 }
 
 /*
@@ -73,7 +131,7 @@ NTSTATUS urb_select_configuration(_In_ wsk_context &ctx, _Inout_ URB &urb)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_interface(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
-	auto vpdo = ctx.vpdo;
+	auto &vpdo = *ctx.vpdo;
 	auto err = urb.UrbHeader.Status;
 
 	if (err == EndpointStalled) {
@@ -81,12 +139,12 @@ NTSTATUS urb_select_interface(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		auto ifnum = urb.UrbSelectInterface.Interface.InterfaceNumber;
 
 		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d, InterfaceNumber %d, num_altsetting %d",
-			get_usbd_status(err), ret.status, ifnum, get_intf_num_altsetting(vpdo->actconfig, ifnum));
+			get_usbd_status(err), ret.status, ifnum, get_intf_num_altsetting(vpdo.actconfig, ifnum));
 
 		err = USBD_STATUS_SUCCESS;
 	}
 
-	return err ? STATUS_UNSUCCESSFUL : vpdo_select_interface(vpdo, &urb.UrbSelectInterface);
+	return err ? STATUS_UNSUCCESSFUL : select_interface(vpdo, &urb.UrbSelectInterface);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

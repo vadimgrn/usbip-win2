@@ -36,7 +36,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 
 	switch (vdev->type) {
 	case VDEV_VHCI:
-		status = vhci_ioctl_vhci((vhci_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
+		status = vhci_ioctl_vhci(*(vhci_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
 		break;
 	case VDEV_VHUB:
 		status = vhci_ioctl_vhub(*(vhub_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);

@@ -33,7 +33,6 @@
     <ClCompile Include="pnp_remove.cpp" />
     <ClCompile Include="pnp_start.cpp" />
     <ClCompile Include="vhub.cpp" />
-    <ClCompile Include="vpdo.cpp" />
     <ClCompile Include="plugin.cpp" />
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="power.cpp" />
@@ -73,7 +72,6 @@
     <ClInclude Include="pnp_start.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="vhub.h" />
-    <ClInclude Include="vpdo.h" />
     <ClInclude Include="wmi.h" />
     <ClInclude Include="wsk_receive.h" />
   </ItemGroup>

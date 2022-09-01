@@ -7,7 +7,6 @@
 #include "ioctl_vhci.h"
 #include "vhci.h"
 #include "pnp.h"
-#include "vpdo.h"
 #include "vhub.h"
 #include "internal_ioctl.h"
 
@@ -47,7 +46,7 @@ PAGEABLE USB_COMMON_DESCRIPTOR *find_descriptor(USB_CONFIGURATION_DESCRIPTOR *cd
  * FIXME: how to get not cached descriptors?
  */
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_REQUEST &r, ULONG &outlen)
+PAGEABLE NTSTATUS do_get_descr_from_nodeconn(_In_ vpdo_dev_t *vpdo, _Inout_ USB_DESCRIPTOR_REQUEST &r, _Out_ ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -112,7 +111,117 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto get_nodeconn_info(vhub_dev_t &vhub, void *buffer, ULONG inlen, ULONG &outlen, bool ex)
+PAGEABLE auto to_dev_speed(_In_ usb_device_speed speed)
+{
+	PAGED_CODE();
+
+	switch (speed) {
+	case USB_SPEED_SUPER_PLUS:
+	case USB_SPEED_SUPER:
+		return UsbSuperSpeed;
+	case USB_SPEED_HIGH:
+	case USB_SPEED_WIRELESS:
+		return UsbHighSpeed;
+	case USB_SPEED_FULL:
+		return UsbFullSpeed;
+	case USB_SPEED_LOW:
+	case USB_SPEED_UNKNOWN:
+	default:
+		return UsbLowSpeed;
+	}
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void set_speed(_Inout_ USB_NODE_CONNECTION_INFORMATION_EX &ci, _In_ usb_device_speed speed, _In_ bool ex)
+{
+	PAGED_CODE();
+
+	if (ex) {
+		ci.Speed = static_cast<UCHAR>(to_dev_speed(speed));
+	} else {
+		auto &r = reinterpret_cast<USB_NODE_CONNECTION_INFORMATION&>(ci);
+		static_assert(sizeof(r) == sizeof(ci));
+		r.LowSpeed = speed == USB_SPEED_LOW;
+	}
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_Function_class_(for_each_ep_fn)
+PAGEABLE NTSTATUS copy_endpoint(_In_ int i, _In_ const USB_ENDPOINT_DESCRIPTOR &d, _In_ void *data)
+{
+	PAGED_CODE();
+
+	auto &r = *static_cast<USB_NODE_CONNECTION_INFORMATION_EX*>(data);
+
+	if (ULONG(i) < r.NumberOfOpenPipes) {
+		auto &p = r.PipeList[i];
+		RtlCopyMemory(&p.EndpointDescriptor, &d, sizeof(d));
+		p.ScheduleOffset = 0; // FIXME: TODO
+		return STATUS_SUCCESS;
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Endpoint index %d, NumberOfOpenPipes %lu, ", i, r.NumberOfOpenPipes);
+		return STATUS_INVALID_PARAMETER;
+	}
+}
+
+/*
+ * @param vpdo NULL if device is not plugged into the port
+ */
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS get_nodeconn_info(
+	_In_ vpdo_dev_t *vpdo, _Inout_ USB_NODE_CONNECTION_INFORMATION_EX &ci, _Out_ ULONG &outlen, _In_ bool ex)
+{
+	PAGED_CODE();
+
+	TraceMsg("ConnectionIndex %lu, vpdo %04x", ci.ConnectionIndex, ptr4log(vpdo)); // input parameter
+
+	NT_ASSERT(outlen >= sizeof(ci));
+	auto old_outlen = outlen;
+	outlen = sizeof(ci);
+
+	RtlZeroMemory(&ci.DeviceDescriptor, sizeof(ci.DeviceDescriptor));
+	ci.CurrentConfigurationValue = vpdo && vpdo->actconfig ? vpdo->actconfig->bConfigurationValue : 0;
+	set_speed(ci, vpdo ? vpdo->speed : USB_SPEED_UNKNOWN, ex);
+	ci.DeviceIsHub = false;
+	ci.DeviceAddress = vpdo ? static_cast<USHORT>(make_vport(vpdo->version, vpdo->port)) : 0;
+	ci.NumberOfOpenPipes = 0;
+	ci.ConnectionStatus = vpdo ? DeviceConnected : NoDeviceConnected;
+
+	if (!vpdo) {
+		return STATUS_SUCCESS;
+	}
+
+	RtlCopyMemory(&ci.DeviceDescriptor, &vpdo->descriptor, sizeof(ci.DeviceDescriptor));
+
+	auto iface = vpdo->actconfig ? dsc_find_intf(vpdo->actconfig, vpdo->current_intf_num, vpdo->current_intf_alt) : nullptr;
+	if (iface) {
+		ci.NumberOfOpenPipes = iface->bNumEndpoints;
+	}
+
+	if (old_outlen == outlen) { // header only requested
+		return STATUS_SUCCESS;
+	}
+
+	ULONG pipes_sz = ci.NumberOfOpenPipes*sizeof(*ci.PipeList);
+	ULONG full_sz = outlen + pipes_sz;
+
+	outlen = full_sz;
+
+	if (old_outlen < full_sz) {
+		Trace(TRACE_LEVEL_ERROR, "NumberOfOpenPipes %lu, outlen %lu < %lu", ci.NumberOfOpenPipes, old_outlen, full_sz);
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	if (ci.NumberOfOpenPipes) {
+		RtlZeroMemory(ci.PipeList, pipes_sz);
+		return for_each_endpoint(vpdo->actconfig, iface, copy_endpoint, &ci);
+	}
+
+	return STATUS_SUCCESS;
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto get_nodeconn_info(_In_ vhub_dev_t &vhub, _In_ void *buffer, _In_ ULONG inlen, _Out_ ULONG &outlen, _In_ bool ex)
 {
 	PAGED_CODE();
 
@@ -125,9 +234,58 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t &vhub, void *buffer, ULONG inlen, ULO
 	}
 
 	NT_ASSERT(ci.ConnectionIndex);
-	auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex); // can be NULL if port is empty
+	auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex); // NULL if port is empty
 
-	return vpdo_get_nodeconn_info(vpdo, ci, outlen, ex);
+	return get_nodeconn_info(vpdo, ci, outlen, ex);
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(
+	_In_ vhub_dev_t &vhub, _Out_ USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, _In_ ULONG inlen, _Out_ ULONG &outlen)
+{
+	PAGED_CODE();
+
+	if (!(inlen == sizeof(ci) && outlen == sizeof(ci))) {
+		outlen = sizeof(ci);
+		return STATUS_INVALID_BUFFER_SIZE;
+	}
+
+	if (ci.Length != sizeof(ci)) {
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	NT_ASSERT(ci.ConnectionIndex);
+	TraceMsg("ConnectionIndex %lu", ci.ConnectionIndex);
+
+	switch (vhub.version) { // retain protocols that are actually supported by the port
+	case HCI_USB3:
+		ci.SupportedUsbProtocols.Usb110 = 0;
+		ci.SupportedUsbProtocols.Usb200 = 0;
+		ci.SupportedUsbProtocols.Usb300 &= 1;
+		break;
+	case HCI_USB2:
+		ci.SupportedUsbProtocols.Usb110 &= 1;
+		ci.SupportedUsbProtocols.Usb200 &= 1;
+		ci.SupportedUsbProtocols.Usb300 = 0;
+		break;
+	}
+
+	if (auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex)) {
+		switch (vpdo->speed) {
+		case USB_SPEED_SUPER_PLUS:
+			ci.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher = true;
+			ci.Flags.DeviceIsSuperSpeedPlusCapableOrHigher = true;
+			break;
+		case USB_SPEED_SUPER:
+			ci.Flags.DeviceIsOperatingAtSuperSpeedOrHigher = true;
+			ci.Flags.DeviceIsSuperSpeedCapableOrHigher = true;
+			break;
+		}
+	} else {
+		ci.Flags.ul = 0;
+	}
+
+	return STATUS_SUCCESS;
 }
 
 /*
@@ -154,7 +312,7 @@ PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t &vhub, _Out_ USB_HUB_DESCRIPTOR
 /*
 * See: <linux>/drivers/usb/usbip/vhci_hcd.c, ss_hub_descriptor
 */
-PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t &vhub, _Out_ USB_30_HUB_DESCRIPTOR &d)
+inline PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t &vhub, _Out_ USB_30_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
@@ -170,7 +328,7 @@ PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t &vhub, _Out_ USB_30_HUB_DESCRIP
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_node_info(vhub_dev_t &vhub, USB_NODE_INFORMATION &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_node_info(_In_ vhub_dev_t &vhub, _Out_ USB_NODE_INFORMATION &r, _In_ ULONG inlen, _Out_ ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -183,52 +341,13 @@ PAGEABLE NTSTATUS get_node_info(vhub_dev_t &vhub, USB_NODE_INFORMATION &r, ULONG
 		auto &h = r.u.HubInformation;
 		get_hub_descriptor(vhub, h.HubDescriptor);
 		h.HubIsBusPowered = false;
-		TraceMsg("UsbHub, bNumberOfPorts %d", h.HubDescriptor.bNumberOfPorts);
+		TraceMsg("%!hci_version!, UsbHub, bNumberOfPorts %d", vhub.version, h.HubDescriptor.bNumberOfPorts);
 	} break;
 	case UsbMIParent: {
 		auto &p = r.u.MiParentInformation;
-		p.NumberOfInterfaces = 1;
-		TraceMsg("UsbMIParent, NumberOfInterfaces %lu", p.NumberOfInterfaces);
+		p.NumberOfInterfaces = 1; // FIXME
+		TraceMsg("%!hci_version!, UsbMIParent, NumberOfInterfaces %lu", vhub.version, p.NumberOfInterfaces);
 	} break;
-	}
-
-	return STATUS_SUCCESS;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t &vhub, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG inlen, ULONG &outlen)
-{
-	PAGED_CODE();
-	
-	if (!(inlen == sizeof(ci) && outlen == sizeof(ci))) {
-		outlen = sizeof(ci);
-		return STATUS_INVALID_BUFFER_SIZE;
-	}
-
-	if (ci.Length != sizeof(ci)) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
-	NT_ASSERT(ci.ConnectionIndex);
-	TraceMsg("ConnectionIndex %lu", ci.ConnectionIndex);
-
-	ci.SupportedUsbProtocols.ul = 0; // by the port
-	ci.SupportedUsbProtocols.Usb110 = true;
-	ci.SupportedUsbProtocols.Usb200 = true;
-	ci.SupportedUsbProtocols.Usb300 = true;
-
-	ci.Flags.ul = 0;
-
-	if (auto vpdo = vhub_find_vpdo(vhub, ci.ConnectionIndex)) {
-		switch (vpdo->speed) {
-		case USB_SPEED_SUPER_PLUS:
-			ci.Flags.DeviceIsOperatingAtSuperSpeedPlusOrHigher = true;
-			ci.Flags.DeviceIsSuperSpeedPlusCapableOrHigher = true;
-			[[fallthrough]];
-		case USB_SPEED_SUPER:
-			ci.Flags.DeviceIsOperatingAtSuperSpeedOrHigher = true;
-			ci.Flags.DeviceIsSuperSpeedCapableOrHigher = true;
-		}
 	}
 
 	return STATUS_SUCCESS;
@@ -273,13 +392,8 @@ PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t &vhub, USB_HUB_INFORMATION_E
 	return STATUS_INVALID_BUFFER_SIZE;
 }
 
-constexpr auto HubIsHighSpeedCapable()
-{
-	return false; // the hub is capable of running at high speed
-}
-
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_hub_capabilities(USB_HUB_CAPABILITIES &r, ULONG &outlen)
+PAGEABLE NTSTATUS get_hub_capabilities(vhub_dev_t &vhub, USB_HUB_CAPABILITIES &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -287,14 +401,14 @@ PAGEABLE NTSTATUS get_hub_capabilities(USB_HUB_CAPABILITIES &r, ULONG &outlen)
 	outlen = sizeof(r);
 
 	if (ok) {
-		r.HubIs2xCapable = HubIsHighSpeedCapable();
+		r.HubIs2xCapable = vhub.version == HCI_USB2;
 	}
 
 	return ok ? STATUS_SUCCESS : STATUS_BUFFER_TOO_SMALL;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG &outlen)
+PAGEABLE NTSTATUS get_hub_capabilities_ex(vhub_dev_t &vhub, USB_HUB_CAPABILITIES_EX &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -307,11 +421,12 @@ PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG &out
 	auto &f = r.CapabilityFlags;
 	f.ul = 0;
 
-	f.HubIsHighSpeedCapable = HubIsHighSpeedCapable();
-	f.HubIsHighSpeed = true;
+	auto usb2 = vhub.version == HCI_USB2;
+	f.HubIsHighSpeedCapable = usb2;
+	f.HubIsHighSpeed = usb2;
 
-	f.HubIsMultiTtCapable = true;
-	f.HubIsMultiTt = true;
+	f.HubIsMultiTtCapable = false;
+	f.HubIsMultiTt = false;
 
 	f.HubIsRoot = true;
 //	f.HubIsArmedWakeOnConnect = true; // the hub is armed to wake when a device is connected to the hub
@@ -425,10 +540,10 @@ PAGEABLE NTSTATUS vhci_ioctl_vhub(_Inout_ vhub_dev_t &vhub, _In_ ULONG ioctl_cod
 		status = get_hub_information_ex(vhub, *static_cast<USB_HUB_INFORMATION_EX*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_HUB_CAPABILITIES:
-		status = get_hub_capabilities(*static_cast<USB_HUB_CAPABILITIES*>(buffer), outlen);
+		status = get_hub_capabilities(vhub, *static_cast<USB_HUB_CAPABILITIES*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_HUB_CAPABILITIES_EX:
-		status = get_hub_capabilities_ex(*static_cast<USB_HUB_CAPABILITIES_EX*>(buffer), outlen);
+		status = get_hub_capabilities_ex(vhub, *static_cast<USB_HUB_CAPABILITIES_EX*>(buffer), outlen);
 		break;
 	case IOCTL_USB_GET_PORT_CONNECTOR_PROPERTIES:
 		status = get_port_connector_properties(vhub, *static_cast<USB_PORT_CONNECTOR_PROPERTIES*>(buffer), inlen, outlen);

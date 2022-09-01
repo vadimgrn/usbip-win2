@@ -8,7 +8,7 @@
 namespace
 {
 
-PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, _Inout_ ULONG &len)
+PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t&, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -54,7 +54,7 @@ PAGEABLE NTSTATUS get_power_state_map(vhci_dev_t*, void *request, _Inout_ ULONG 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_controller_info(vhci_dev_t*, void *request, _Inout_ ULONG &len)
+PAGEABLE NTSTATUS get_controller_info(vhci_dev_t&, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -77,7 +77,7 @@ PAGEABLE NTSTATUS get_controller_info(vhci_dev_t*, void *request, _Inout_ ULONG 
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, _Inout_ ULONG &len)
+PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t&, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -101,7 +101,7 @@ PAGEABLE NTSTATUS get_usb_driver_version(vhci_dev_t*, void *request, _Inout_ ULO
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, _Inout_ ULONG &len)
+PAGEABLE auto get_controller_driver_key(vhci_dev_t &vhci, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -115,7 +115,7 @@ PAGEABLE auto get_controller_driver_key(vhci_dev_t *vhci, void *request, _Inout_
 	return get_hcd_driverkey_name(vhci, name, len);
 }
 
-PAGEABLE auto pass_thru(vhci_dev_t*, void *request, _Inout_ ULONG &len)
+PAGEABLE auto pass_thru(vhci_dev_t&, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -132,7 +132,7 @@ PAGEABLE auto pass_thru(vhci_dev_t*, void *request, _Inout_ ULONG &len)
 	return STATUS_NOT_SUPPORTED;
 }
 
-PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, _Inout_ ULONG &len)
+PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t &vhci, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -143,15 +143,15 @@ PAGEABLE auto get_roothub_symbolic_name(vhci_dev_t *vhci, void *request, _Inout_
 	static_assert(sizeof(r.Length) == sizeof(name.ActualLength));
 	static_assert(sizeof(r.String) == sizeof(name.RootHubName));
 
-	auto vhub = vhub_from_vhci(vhci);
+	auto vhub = vhub_from_vhci(&vhci);
 	return get_roothub_name(*vhub, name, len);
 }
 
-PAGEABLE auto get_device_count(const vhub_dev_t *vhub)
+PAGEABLE auto get_device_count(const vhub_dev_t &vhub)
 {
 	int cnt = 0;
 
-	for (auto d: vhub->vpdo) {
+	for (auto d: vhub.vpdo) {
 		if (d) {
 			++cnt;
 		}
@@ -160,7 +160,7 @@ PAGEABLE auto get_device_count(const vhub_dev_t *vhub)
 	return cnt;
 }
 
-PAGEABLE auto get_bandwidth_information(vhci_dev_t *vhci, void *request, _Inout_ ULONG &len)
+PAGEABLE auto get_bandwidth_information(vhci_dev_t &vhci, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -175,8 +175,9 @@ PAGEABLE auto get_bandwidth_information(vhci_dev_t *vhci, void *request, _Inout_
 
 	RtlZeroMemory(&r, sizeof(r));
 
-	auto vhub = vhub_from_vhci(vhci);
-	r.DeviceCount = get_device_count(vhub);
+	if (auto vhub = vhub_from_vhci(&vhci)) {
+		r.DeviceCount = get_device_count(*vhub);
+	}
 
 	r.TotalBusBandwidth = 0; // FIXME
 
@@ -190,7 +191,7 @@ PAGEABLE auto GetCurrentSystemTime()
 	return CurrentTime;
 }
 
-PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, _Inout_ ULONG &len)
+PAGEABLE auto get_bus_statistics_0(vhci_dev_t &vhci, void *request, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -205,7 +206,7 @@ PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, _Inout_ ULON
 
 	RtlZeroMemory(&r, sizeof(r));
 
-	auto vhub = vhub_from_vhci(vhci);
+	auto &vhub = *vhub_from_vhci(&vhci);
 	r.DeviceCount = get_device_count(vhub);
 
 	r.CurrentSystemTime = GetCurrentSystemTime();
@@ -224,8 +225,8 @@ PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, _Inout_ ULON
 */
 	r.RootHubEnabled = true;
 
-	r.RootHubDevicePowerState = vhub->DevicePowerState != PowerDeviceUnspecified ?
-					static_cast<UCHAR>(vhub->DevicePowerState) - 1 : 0;
+	r.RootHubDevicePowerState = vhub.DevicePowerState != PowerDeviceUnspecified ?
+					static_cast<UCHAR>(vhub.DevicePowerState) - 1 : 0;
 
 //	r.Unused;
 //	r.NameIndex;
@@ -233,7 +234,7 @@ PAGEABLE auto get_bus_statistics_0(vhci_dev_t *vhci, void *request, _Inout_ ULON
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto get_usb2_hw_version(vhci_dev_t*, void *data, _Inout_ ULONG &len)
+PAGEABLE auto get_usb2_hw_version(vhci_dev_t&, void *data, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 	auto &r = *static_cast<USB_USB2HW_VERSION_PARAMETERS*>(data);
@@ -249,7 +250,7 @@ PAGEABLE auto get_usb2_hw_version(vhci_dev_t*, void *data, _Inout_ ULONG &len)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE auto usb_refresh_hct_reg(vhci_dev_t*, void *data, _Inout_ ULONG &len)
+PAGEABLE auto usb_refresh_hct_reg(vhci_dev_t&, void *data, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 
@@ -259,7 +260,7 @@ PAGEABLE auto usb_refresh_hct_reg(vhci_dev_t*, void *data, _Inout_ ULONG &len)
 	return err;
 }
 
-using request_t = NTSTATUS(vhci_dev_t*, void *buffer, _Inout_ ULONG &len);
+using request_t = NTSTATUS(vhci_dev_t&, void *buffer, _Inout_ ULONG &len);
 
 /*
  * The following APIS are enabled always
@@ -282,7 +283,7 @@ request_t* const requests[] =
 } // namespace
 
 
-PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t *vhci, USBUSER_REQUEST_HEADER *hdr, _Inout_ ULONG &len)
+PAGEABLE NTSTATUS vhci_ioctl_user_request(vhci_dev_t &vhci, USBUSER_REQUEST_HEADER *hdr, _Inout_ ULONG &len)
 {
 	PAGED_CODE();
 	TraceDbg("%!usbuser!, RequestBufferLength %lu", hdr->UsbUserRequest, hdr->RequestBufferLength);
