@@ -7,6 +7,7 @@
 #include "trace.h"
 #include "wsk_receive.tmh"
 
+#include "dev.h"
 #include "usbd_helper.h"
 #include "dbgcommon.h"
 #include "urbtransfer.h"

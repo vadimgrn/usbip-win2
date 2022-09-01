@@ -3,6 +3,7 @@
 #include "trace.h"
 #include "pnp_relations.tmh"
 
+#include "dev.h"
 #include "irp.h"
 #include "vhci.h"
 #include "vhub.h"

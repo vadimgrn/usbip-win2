@@ -2,6 +2,7 @@
 #include "trace.h"
 #include "internal_ioctl.tmh"
 
+#include "dev.h"
 #include "dbgcommon.h"
 #include "irp.h"
 #include "csq.h"
