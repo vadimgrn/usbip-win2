@@ -235,7 +235,7 @@ PAGEABLE NTSTATUS get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_
 			break;
 		}
 
-		dev->port = make_vport(vhub->version, vpdo->port);
+		dev->port = make_vport(vpdo->version, vpdo->port);
 		NT_ASSERT(is_valid_vport(dev->port));
 
 		RtlStringCbCopyA(dev->busid, sizeof(dev->busid), vpdo->busid);

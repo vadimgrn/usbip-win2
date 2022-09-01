@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
+ * Copyright (C) 2022 Vadym Hrynchyshyn
+ *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,6 +20,10 @@
 #include "usbip_vhci.h"
 #include "getopt.h"
 #include "usbip.h"
+
+#include <set>
+#include <sstream>
+#include <vector>
 
 namespace
 {
@@ -49,19 +54,17 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
 
 auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int port)
 {
-        hci_version versions[ARRAYSIZE(vhci_list)];
-        int cnt = ARRAYSIZE(versions);
+        std::vector<hci_version> versions;
 
         if (port > 0) {
-                *versions = get_hci_version(port);
-                cnt = 1; 
-        } else {
-                RtlCopyMemory(versions, vhci_list, sizeof(versions));
+                versions.push_back(get_hci_version(port));
+        } else for (auto ver: vhci_list) {
+                versions.push_back(ver);
         }
 
-        for (int i = 0; i < cnt; ++i) {
+        for (auto ver: versions) {
 
-                auto hdev = usbip::vhci_driver_open(versions[i]);
+                auto hdev = usbip::vhci_driver_open(ver);
                 if (!hdev) {
                         err("failed to open vhci driver");
                         return 3;
@@ -85,35 +88,33 @@ auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int 
         return 0;
 }
 
-int list_imported_devices(int port)
+int list_imported_devices(const std::set<int> &ports)
 {
         std::vector<ioctl_usbip_vhci_imported_dev> devs;
         devs.reserve(USBIP_TOTAL_PORTS);
 
-        if (auto err = get_imported_devices(devs, port)) {
-                return err;
+        {
+                auto port = ports.size() == 1 ? *ports.begin() : 0;
+                if (auto err = get_imported_devices(devs, port)) {
+                        return err;
+                }
         }
 
         printf("Imported USB devices\n");
         printf("====================\n");
 
-        bool found{};
+        bool found = false;
 
-        for (auto rhport = get_rhport(port); auto& d: devs) {
-
+        for (auto& d: devs) {
                 assert(d.port);
-
-                if (port > 0) {
-                        if (rhport != d.port) {
-                                continue;
-                        }
+                if (ports.empty() || ports.contains(d.port)) {
+                        usbip_vhci_imported_device_dump(d);
                         found = true;
                 }
 
-                usbip_vhci_imported_device_dump(d);
         }
 
-        if (port > 0 && !found) {
+        if (!(found || ports.empty())) {
                 return 2; // port check failed
         }
 
@@ -126,47 +127,29 @@ int list_imported_devices(int port)
 void usbip_port_usage()
 {
         const char fmt[] =
-"usage: usbip port <args>\n"
-"    -p, --port=<port>      list only given port 1-%d for checking\n";
+"usage: usbip port [portN...]\n"
+"    portN      list given port(s) for checking, valid range is 1-%d\n";
 
         printf(fmt, USBIP_TOTAL_PORTS);
 }
 
 int usbip_port_show(int argc, char *argv[])
 {
-	const option opts[] = {
-		{ "port", required_argument, nullptr, 'p' },
-		{}
-	};
+        std::set<int> ports;
 
-	int port = 0;
+        for (int i = 1; i < argc; ++i) {
 
-	while (true) {
-		auto opt = getopt_long(argc, argv, "p:", opts, nullptr);
-		if (opt == -1) {
-			break;
+                auto str = argv[i];
+                int port;
+
+                if ((std::istringstream(str) >> port) && is_valid_vport(port)) {
+                        ports.insert(port);
+                } else {
+                        err("invalid port: %s", str);
+                        usbip_port_usage();
+                        return 1;
                 }
-
-		switch (opt) {
-		case 'p':
-			if (sscanf_s(optarg, "%d", &port) != 1) {
-				err("invalid port: %s", optarg);
-				usbip_port_usage();
-				return 1;
-			}
-			break;
-		default:
-			err("invalid option: %c", opt);
-			usbip_port_usage();
-			return 1;
-		}
-	}
-
-        if (port > USBIP_TOTAL_PORTS) {
-                err("invalid port: %d", port);
-                usbip_port_usage();
-                return 1;
         }
 
-	return list_imported_devices(port);
+	return list_imported_devices(ports);
 }

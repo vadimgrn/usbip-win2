@@ -86,7 +86,7 @@ DEFINE_GUID(USBIP_BUS_WMI_STD_DATA_GUID,
 
 struct ioctl_usbip_vhci_plugin
 {
-        int port; // OUT, must be the first member; [1..USBIP_TOTAL_PORTS] or err_t if < 0
+        int port; // OUT, must be the first member; [1..USBIP_TOTAL_PORTS] in (port & 0xFFFF) or see make_error()
         char busid[USBIP_BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
