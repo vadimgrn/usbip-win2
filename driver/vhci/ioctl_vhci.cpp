@@ -32,10 +32,9 @@ PAGEABLE ULONG get_name_prefix_cch(const UNICODE_STRING &s)
 	return 0;
 }
 
-PAGEABLE NTSTATUS ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS ioctl_vhub(vhub_dev_t &vhub, ULONG ioctl_code, void *buffer, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
-	NT_ASSERT(vhub);
 
 	auto st = STATUS_INVALID_DEVICE_REQUEST;
 
@@ -69,16 +68,15 @@ PAGEABLE NTSTATUS ioctl_vhub(vhub_dev_t *vhub, ULONG ioctl_code, void *buffer, U
  * On output USB_ROOT_HUB_NAME structure that contains the symbolic link name of the root hub. 
  * The leading "\xxx\ " text is not included in the retrieved string.
  */
-PAGEABLE NTSTATUS get_roothub_name(_In_ vhub_dev_t *vhub, _Out_ USB_ROOT_HUB_NAME &r, _Out_ ULONG &outlen)
+PAGEABLE NTSTATUS get_roothub_name(_In_ vhub_dev_t &vhub, _Out_ USB_ROOT_HUB_NAME &r, _Out_ ULONG &outlen)
 {
 	PAGED_CODE();
-	NT_ASSERT(vhub);
 
 	if (outlen < sizeof(r)) {
 		return STATUS_BUFFER_TOO_SMALL;
 	}
 
-	auto &src = vhub->DevIntfRootHub;
+	auto &src = vhub.DevIntfRootHub;
 
 	auto prefix_cch = get_name_prefix_cch(src);
 	if (!prefix_cch) {
@@ -150,7 +148,7 @@ PAGEABLE NTSTATUS vhci_ioctl_vhci(vhci_dev_t *vhci, ULONG ioctl_code, void *buff
 		break;
 	default:
 		if (auto vhub = vhub_from_vhci(vhci)) {
-			st = ioctl_vhub(vhub, ioctl_code, buffer, inlen, outlen);
+			st = ioctl_vhub(*vhub, ioctl_code, buffer, inlen, outlen);
 		} else {
 			TraceMsg("vhub has gone");
 		}

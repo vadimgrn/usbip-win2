@@ -39,7 +39,7 @@ extern "C" PAGEABLE NTSTATUS vhci_ioctl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 		status = vhci_ioctl_vhci((vhci_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
 		break;
 	case VDEV_VHUB:
-		status = vhci_ioctl_vhub((vhub_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
+		status = vhci_ioctl_vhub(*(vhub_dev_t*)vdev, ioc.IoControlCode, buffer, inlen, outlen);
 		break;
 	default:
 		Trace(TRACE_LEVEL_WARNING, "ioctl for %!vdev_type_t! is not allowed", vdev->type);

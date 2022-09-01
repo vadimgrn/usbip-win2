@@ -31,7 +31,7 @@ void to_ansi_str(char *dest, USHORT len, const UNICODE_STRING &src)
 } // namespace
 
 
-PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
+PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t &vhub, int port)
 {
 	PAGED_CODE();
 
@@ -39,14 +39,14 @@ PAGEABLE vpdo_dev_t *vhub_find_vpdo(vhub_dev_t *vhub, int port)
 		return nullptr;
 	}
 
-	ExAcquireFastMutex(&vhub->mutex);
+	ExAcquireFastMutex(&vhub.mutex);
 
-	auto vpdo = vhub->vpdo[port - 1];
+	auto vpdo = vhub.vpdo[port - 1];
 	if (vpdo) {
 		NT_ASSERT(vpdo->port == port);
 	}
 
-	ExReleaseFastMutex(&vhub->mutex);
+	ExReleaseFastMutex(&vhub.mutex);
 	return vpdo;
 }
 
@@ -102,16 +102,16 @@ PAGEABLE void vhub_detach_vpdo(vpdo_dev_t *vpdo)
 /*
  * See: <linux>/drivers/usb/usbip/vhci_hcd.c, hub_descriptor
  */
-PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t *vhub, _Out_ USB_HUB_DESCRIPTOR &d)
+PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t &vhub, _Out_ USB_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
-	static_assert(vhub->NUM_PORTS <= USB_MAXCHILDREN);
-	constexpr auto width = vhub->NUM_PORTS/8 + 1;
+	static_assert(vhub.NUM_PORTS <= USB_MAXCHILDREN);
+	constexpr auto width = vhub.NUM_PORTS/8 + 1;
 
 	d.bDescriptorLength = USB_DT_HUB_NONVAR_SIZE + 2*width;
 	d.bDescriptorType = USB_20_HUB_DESCRIPTOR_TYPE; // USB_DT_HUB
-	d.bNumberOfPorts = vhub->NUM_PORTS; 
+	d.bNumberOfPorts = vhub.NUM_PORTS; 
 	d.wHubCharacteristics = HUB_CHAR_INDV_PORT_LPSM | HUB_CHAR_COMMON_OCPM;
 	d.bPowerOnToPowerGood = 0;
 	d.bHubControlCurrent = 0;
@@ -123,13 +123,13 @@ PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t *vhub, _Out_ USB_HUB_DESCRIPTOR
 /*
 * See: <linux>/drivers/usb/usbip/vhci_hcd.c, ss_hub_descriptor
 */
-PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t *vhub, _Out_ USB_30_HUB_DESCRIPTOR &d)
+PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t &vhub, _Out_ USB_30_HUB_DESCRIPTOR &d)
 {
 	PAGED_CODE();
 
 	d.bLength = USB_DT_SS_HUB_SIZE;
 	d.bDescriptorType = USB_30_HUB_DESCRIPTOR_TYPE; // USB_DT_SS_HUB
-	d.bNumberOfPorts = vhub->NUM_PORTS; 
+	d.bNumberOfPorts = vhub.NUM_PORTS; 
 	d.wHubCharacteristics = HUB_CHAR_INDV_PORT_LPSM | HUB_CHAR_COMMON_OCPM;
 	d.bPowerOnToPowerGood = 0;
 	d.bHubControlCurrent = 0;
@@ -138,18 +138,18 @@ PAGEABLE void get_hub_descriptor(_In_ vhub_dev_t *vhub, _Out_ USB_30_HUB_DESCRIP
 	d.DeviceRemovable = USHORT(-1); // Indicates whether a removable device is attached to each port
 }
 
-PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &p)
+PAGEABLE NTSTATUS vhub_get_information_ex(vhub_dev_t &vhub, USB_HUB_INFORMATION_EX &p)
 {
 	PAGED_CODE();
 
 	p.HubType = UsbRootHub; // Usb30Hub
-	p.HighestPortNumber = vhub->NUM_PORTS;
+	p.HighestPortNumber = vhub.NUM_PORTS;
 
 	get_hub_descriptor(vhub, p.u.UsbHubDescriptor);
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t*, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG &outlen)
+PAGEABLE NTSTATUS vhub_get_port_connector_properties(vhub_dev_t&, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -198,34 +198,33 @@ NTSTATUS vhub_unplug_vpdo(vpdo_dev_t *vpdo)
 	return STATUS_SUCCESS;
 }
 
-PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t *vhub)
+PAGEABLE void vhub_unplug_all_vpdo(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
-	ExAcquireFastMutex(&vhub->mutex);
+	ExAcquireFastMutex(&vhub.mutex);
 
-	for (auto i: vhub->vpdo) {
+	for (auto i: vhub.vpdo) {
 		if (i) {
 			vhub_unplug_vpdo(i);
 		}
 	}
 
-	ExReleaseFastMutex(&vhub->mutex);
+	ExReleaseFastMutex(&vhub.mutex);
 }
 
-PAGEABLE NTSTATUS get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_dev *dev, size_t cnt)
+PAGEABLE NTSTATUS get_imported_devs(vhub_dev_t &vhub, ioctl_usbip_vhci_imported_dev *dev, size_t cnt)
 {
 	PAGED_CODE();
-	NT_ASSERT(vhub);
+	TraceMsg("%!hci_version!, cnt %Iu", vhub.version, cnt);
 
-	TraceMsg("%!hci_version!, cnt %Iu", vhub->version, cnt);
 	if (!cnt) {
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	ExAcquireFastMutex(&vhub->mutex);
+	ExAcquireFastMutex(&vhub.mutex);
 
-	for (auto vpdo: vhub->vpdo) {
+	for (auto vpdo: vhub.vpdo) {
 
 		if (!vpdo) {
 			continue;
@@ -257,7 +256,7 @@ PAGEABLE NTSTATUS get_imported_devs(vhub_dev_t *vhub, ioctl_usbip_vhci_imported_
 		++dev;
 	}
 
-	ExReleaseFastMutex(&vhub->mutex);
+	ExReleaseFastMutex(&vhub.mutex);
 
 	dev->port = 0; // end of mark
 	return STATUS_SUCCESS;

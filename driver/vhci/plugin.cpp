@@ -691,17 +691,15 @@ PAGEABLE auto connect(vpdo_dev_t &vpdo)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 _When_(return>=0, _Kernel_clear_do_init_(yes))
-PAGEABLE NTSTATUS plugin_vpdo(vhub_dev_t *vhub, ioctl_usbip_vhci_plugin &r)
+PAGEABLE NTSTATUS plugin_vpdo(vhub_dev_t &vhub, ioctl_usbip_vhci_plugin &r)
 {
 	PAGED_CODE();
-        NT_ASSERT(vhub);
-
         TraceMsg("%s:%s, busid %s, serial '%s'", r.host, r.service, r.busid, *r.serial ? r.serial : "");
 
         auto &error = r.port;
 
         vpdo_dev_t *vpdo{};
-        if (bool(error = create_vpdo(vpdo, vhub, r))) {
+        if (bool(error = create_vpdo(vpdo, &vhub, r))) {
                 destroy_device(vpdo);
                 return STATUS_SUCCESS;
         }
@@ -740,7 +738,7 @@ PAGEABLE NTSTATUS plugin_vpdo(vhub_dev_t *vhub, ioctl_usbip_vhci_plugin &r)
 
         vpdo->Self->Flags &= ~DO_DEVICE_INITIALIZING; // must be the last step in initialization
 
-        if (auto vhci = vhci_from_vhub(vhub)) {
+        if (auto vhci = vhci_from_vhub(&vhub)) {
                 IoInvalidateDeviceRelations(vhci->pdo, BusRelations); // kick PnP system
         }
 
@@ -748,10 +746,9 @@ PAGEABLE NTSTATUS plugin_vpdo(vhub_dev_t *vhub, ioctl_usbip_vhci_plugin &r)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS unplug_vpdo(vhub_dev_t *vhub, int port)
+PAGEABLE NTSTATUS unplug_vpdo(vhub_dev_t &vhub, int port)
 {
 	PAGED_CODE();
-        NT_ASSERT(vhub);
 
 	if (port <= 0) {
 		Trace(TRACE_LEVEL_VERBOSE, "Plugging out all devices");

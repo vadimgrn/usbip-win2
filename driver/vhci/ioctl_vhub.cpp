@@ -111,7 +111,7 @@ PAGEABLE NTSTATUS do_get_descr_from_nodeconn(vpdo_dev_t *vpdo, USB_DESCRIPTOR_RE
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULONG &outlen, bool ex)
+PAGEABLE auto get_nodeconn_info(vhub_dev_t &vhub, void *buffer, ULONG inlen, ULONG &outlen, bool ex)
 {
 	PAGED_CODE();
 
@@ -130,7 +130,7 @@ PAGEABLE auto get_nodeconn_info(vhub_dev_t *vhub, void *buffer, ULONG inlen, ULO
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_node_info(vhub_dev_t &vhub, USB_NODE_INFORMATION &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -156,7 +156,7 @@ PAGEABLE NTSTATUS get_node_info(vhub_dev_t *vhub, USB_NODE_INFORMATION &r, ULONG
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t &vhub, USB_NODE_CONNECTION_INFORMATION_EX_V2 &ci, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 	
@@ -195,7 +195,7 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t &vhub, USB_DESCRIPTOR_REQUEST &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -221,7 +221,7 @@ PAGEABLE NTSTATUS get_descr_from_nodeconn(vhub_dev_t *vhub, USB_DESCRIPTOR_REQUE
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t *vhub, USB_HUB_INFORMATION_EX &r, ULONG &outlen)
+PAGEABLE NTSTATUS get_hub_information_ex(vhub_dev_t &vhub, USB_HUB_INFORMATION_EX &r, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -281,7 +281,7 @@ PAGEABLE NTSTATUS get_hub_capabilities_ex(USB_HUB_CAPABILITIES_EX &r, ULONG &out
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t &vhub, USB_PORT_CONNECTOR_PROPERTIES &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -294,7 +294,7 @@ PAGEABLE NTSTATUS get_port_connector_properties(vhub_dev_t *vhub, USB_PORT_CONNE
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_DRIVERKEY_NAME &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t &vhub, USB_NODE_CONNECTION_DRIVERKEY_NAME &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -335,7 +335,7 @@ PAGEABLE NTSTATUS get_node_driverkey_name(vhub_dev_t *vhub, USB_NODE_CONNECTION_
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONNECTION_ATTRIBUTES &r, ULONG inlen, ULONG &outlen)
+PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t &vhub, USB_NODE_CONNECTION_ATTRIBUTES &r, ULONG inlen, ULONG &outlen)
 {
 	PAGED_CODE();
 
@@ -359,7 +359,7 @@ PAGEABLE NTSTATUS get_node_connection_attributes(vhub_dev_t *vhub, USB_NODE_CONN
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS vhci_ioctl_vhub(_Inout_ vhub_dev_t *vhub, _In_ ULONG ioctl_code, _Inout_ void *buffer, _In_ ULONG inlen, _Inout_ ULONG &outlen)
+PAGEABLE NTSTATUS vhci_ioctl_vhub(_Inout_ vhub_dev_t &vhub, _In_ ULONG ioctl_code, _Inout_ void *buffer, _In_ ULONG inlen, _Inout_ ULONG &outlen)
 {
 	PAGED_CODE();
 

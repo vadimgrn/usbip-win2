@@ -48,7 +48,7 @@ struct vdev_t
 {
 	DEVICE_OBJECT *Self; // back pointer to the device object for which this is the extension
 
-	hci_version version;
+	hci_version version; // what usb drivers stack is used
 	vdev_type_t type;
 
 	pnp_state PnPState;
