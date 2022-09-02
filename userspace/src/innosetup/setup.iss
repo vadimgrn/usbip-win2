@@ -90,9 +90,7 @@ Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\
 
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "remove ROOT\SYSTEM\0001"; RunOnceId: "DelClientRoot1"; Flags: runhidden
-Filename: {app}\devnode.exe; Parameters: "remove ROOT\SYSTEM\0002"; RunOnceId: "DelClientRoot2"; Flags: runhidden
-
+Filename: {app}\devnode.exe; Parameters: "uninstall"; RunOnceId: "DelClientDevices"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
