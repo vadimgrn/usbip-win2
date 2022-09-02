@@ -1,7 +1,5 @@
 #pragma once
 
-#include <assert.h>
-
 enum op_status_t // op_common.status
 {
         ST_OK,
@@ -60,8 +58,6 @@ enum
         USBIP_BUS_ID_SIZE = 32 
 };
 
-#ifdef __cplusplus
-
 /*
  * err_t are negative, op_status_t are positive.
  */
@@ -72,5 +68,3 @@ constexpr auto make_error(err_t err, op_status_t status = ST_OK)
 }
 
 static_assert(!make_error(ERR_NONE));
-
-#endif // __cplusplus

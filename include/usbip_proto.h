@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <basetsd.h>
 
 /*
@@ -137,7 +133,3 @@ struct usbip_iso_packet_descriptor {
 };
 
 #include <POPPACK.H>
-
-#ifdef __cplusplus
-}
-#endif

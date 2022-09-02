@@ -255,18 +255,18 @@ PAGEABLE NTSTATUS get_nodeconn_info_ex_v2(
 	}
 
 	NT_ASSERT(ci.ConnectionIndex);
-	TraceMsg("ConnectionIndex %lu", ci.ConnectionIndex);
+	TraceMsg("%!hci_version!, ConnectionIndex %lu", vhub.version, ci.ConnectionIndex);
 
-	switch (vhub.version) { // retain protocols that are actually supported by the port
+	switch (vhub.version) {
 	case HCI_USB3:
-		ci.SupportedUsbProtocols.Usb110 = 0;
-		ci.SupportedUsbProtocols.Usb200 = 0;
-		ci.SupportedUsbProtocols.Usb300 &= 1;
+		ci.SupportedUsbProtocols.Usb110 = false;
+		ci.SupportedUsbProtocols.Usb200 = false;
+		ci.SupportedUsbProtocols.Usb300 = true;
 		break;
 	case HCI_USB2:
-		ci.SupportedUsbProtocols.Usb110 &= 1;
-		ci.SupportedUsbProtocols.Usb200 &= 1;
-		ci.SupportedUsbProtocols.Usb300 = 0;
+		ci.SupportedUsbProtocols.Usb110 = true;
+		ci.SupportedUsbProtocols.Usb200 = true;
+		ci.SupportedUsbProtocols.Usb300 = false;
 		break;
 	}
 

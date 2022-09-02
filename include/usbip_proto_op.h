@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "usbip_api_consts.h"
 #include <basetsd.h>
 
@@ -186,7 +182,3 @@ void usbip_net_pack_uint32_t(int pack, UINT32 *num);
 void usbip_net_pack_uint16_t(int pack, UINT16 *num);
 void usbip_net_pack_usb_device(int pack, struct usbip_usb_device *udev);
 void usbip_net_pack_usb_interface(int pack, struct usbip_usb_interface *uinf);
-
-#ifdef __cplusplus
-}
-#endif
