@@ -18,8 +18,8 @@ enum hci_version { HCI_USB2, HCI_USB3 };
 inline const hci_version vhci_list[] { HCI_USB2, HCI_USB3 };
 
 enum { 
-        VHUB_NUM_PORTS = 0xF, 
-        USBIP_TOTAL_PORTS = ARRAYSIZE(vhci_list)*VHUB_NUM_PORTS // max 127 devices on usb bus
+        VHUB_NUM_PORTS = 30, // see ch11.h, USB_MAXCHILDREN
+        USBIP_TOTAL_PORTS = ARRAYSIZE(vhci_list)*VHUB_NUM_PORTS
 };
 
 constexpr auto is_valid_rhport(int port) // root hub port
