@@ -4,9 +4,9 @@
 #include <initguid.h>
 
 #include "usbip_common.h"
-#include "usbip_setupdi.h"
 #include "dbgcode.h"
 #include "usbip_vhci.h"
+#include "usbip_setupdi.h"
 
 namespace
 {
@@ -17,11 +17,11 @@ struct Context
         std::string path;
 };
 
-int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *context)
+int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, usbip::devno_t, void *context)
 {
         auto &ctx = *reinterpret_cast<Context*>(context);
 
-        if (auto inf = get_intf_detail(dev_info, data, *ctx.guid)) {
+        if (auto inf = usbip::get_intf_detail(dev_info, data, *ctx.guid)) {
                 ctx.path = inf->DevicePath;
                 return true;
         }
@@ -32,7 +32,7 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, devno_t, void *cont
 auto get_vhci_devpath(hci_version version)
 {
         Context r{ &vhci_guid(version) };
-        traverse_intfdevs(walker_devpath, *r.guid, &r);
+        usbip::traverse_intfdevs(walker_devpath, *r.guid, &r);
         return r.path;
 }
 

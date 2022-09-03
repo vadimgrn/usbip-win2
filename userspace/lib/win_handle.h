@@ -10,10 +10,11 @@
 namespace usbip
 {
 
-using Handle = generic_handle<HANDLE, INVALID_HANDLE_VALUE>;
+struct HandleTag {};
+using Handle = generic_handle<HANDLE, HandleTag, INVALID_HANDLE_VALUE>;
 
 template<>
-inline void close_handle(Handle::type h) noexcept
+inline void close_handle(Handle::type h, Handle::tag_type) noexcept
 {
         [[maybe_unused]] auto ok = CloseHandle(h);
         assert(ok);

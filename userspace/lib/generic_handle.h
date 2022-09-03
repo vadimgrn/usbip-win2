@@ -6,15 +6,16 @@ namespace usbip
 /*
  * Full specialization of this function must be defined for each used handle type.
  */
-template<typename T>
-void close_handle(T) noexcept;
+template<typename Handle, typename Tag>
+void close_handle(Handle, Tag) noexcept;
 
 
-template<typename T, auto NullValue>
+template<typename Handle, typename Tag, auto NullValue>
 class generic_handle
 {
 public:
-        using type = T;
+        using type = Handle;
+        using tag_type = Tag;
         static constexpr auto null = NullValue;
 
         explicit generic_handle(type h = null) noexcept : m_handle(h) {}
@@ -32,7 +33,7 @@ public:
         }
 
         explicit operator bool() const noexcept { return m_handle != null; }
-        bool operator !() const noexcept { return m_handle == null; }
+        auto operator !() const noexcept { return m_handle == null; }
 
         auto get() const noexcept { return m_handle; }
 
@@ -50,7 +51,7 @@ public:
                 }
 
                 if (*this) {
-                        close_handle(m_handle);
+                        close_handle(m_handle, tag_type());
                 }
 
                 m_handle = h;

@@ -10,10 +10,11 @@
 namespace usbip
 {
 
-using Socket = generic_handle<SOCKET, INVALID_SOCKET>;
+struct SocketTag {};
+using Socket = generic_handle<SOCKET, SocketTag, INVALID_SOCKET>;
 
 template<>
-inline void close_handle(Socket::type s) noexcept
+inline void close_handle(Socket::type s, Socket::tag_type) noexcept
 {
         [[maybe_unused]] auto ok = !closesocket(s);
         assert(ok);

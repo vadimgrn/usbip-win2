@@ -18,6 +18,8 @@
 #include <Devpkey.h>
 #include "usbip_vhci_api.h"
 
+#include "usbip_setupdi.h"
+
 /*
 * See: devcon utility, cmd_install/cmd_remove.
 * https://github.com/microsoft/Windows-driver-samples/tree/master/setup/devcon
@@ -30,16 +32,11 @@ enum { EXIT_USAGE = EXIT_FAILURE + 1 };
 
 auto DiCreateDeviceInfoList(const GUID &ClassGUID) noexcept
 {
-        std::unique_ptr<void, decltype(SetupDiDestroyDeviceInfoList)&> ptr(nullptr, SetupDiDestroyDeviceInfoList);
-        auto handle = SetupDiCreateDeviceInfoList(&ClassGUID, nullptr);
-
-        if (handle != INVALID_HANDLE_VALUE) {
-                ptr.reset(handle);
-        } else {
+        usbip::hdevinfo h(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
+        if (!h) {
                 fprintf(stderr, "SetupDiCreateDeviceInfoList error %#lx\n", GetLastError());
         }
-
-        return ptr;
+        return h;
 }
 
 auto get_full_path(WCHAR *path, DWORD cch, LPCWSTR inf) noexcept
@@ -129,6 +126,7 @@ auto remove_devnode(_In_ LPCWSTR DeviceInstanceId) noexcept
         }
 
         SP_DEVINFO_DATA	dev_data{ sizeof(dev_data) };
+
         if (!SetupDiOpenDeviceInfo(dev_list.get(), DeviceInstanceId, nullptr, 0, &dev_data)) {
                 auto err = GetLastError();
                 fprintf(stderr, "SetupDiOpenDeviceInfo(DeviceInstanceId='%S') error %#lx\n", DeviceInstanceId, err);
@@ -187,28 +185,30 @@ auto get_parent_device(_In_ HDEVINFO devinfo)
         return parent;
 }
 
+auto get_root_instance_id(_In_ hci_version version)
+{
+        std::wstring inst_id;
+        auto &guid = vhci_guid(version);
+
+        if (auto h = usbip::GetClassDevsW(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE)) {
+                inst_id = get_parent_device(h.get()); // VHCI -> ROOT
+        } else {
+                printf("SetupDiGetClassDevs error %#lx\n", GetLastError());
+        }
+
+        return inst_id;
+}
+
 /*
  * @see devcon hwids "USBIPWIN\*"
  */
 auto uninstall()
 {
-        for (auto ver: vhci_list) {
-
-                auto &guid = vhci_guid(ver);
-                auto dev_info = SetupDiGetClassDevs(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
-
-                if (dev_info == INVALID_HANDLE_VALUE) {
-                        printf("SetupDiGetClassDevs error %#lx\n", GetLastError());
-                        continue;
-                }
-
-                std::unique_ptr<void, decltype(SetupDiDestroyDeviceInfoList)&> ptr(dev_info, SetupDiDestroyDeviceInfoList);
-
-                auto inst_id = get_parent_device(dev_info);
+        for (auto version: vhci_list) {
+                auto inst_id = get_root_instance_id(version);
                 if (!inst_id.empty()) {
-                        auto id = inst_id.c_str();
-                        printf("Removing '%S'\n", id);
-                        remove_devnode(id);
+                        printf("Removing %S\n", inst_id.c_str());
+                        remove_devnode(inst_id.c_str());
                 }
         }
 
