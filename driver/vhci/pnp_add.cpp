@@ -13,7 +13,7 @@
 namespace
 {
 
-PAGEABLE auto get_hci_version(_Out_ hci_version &version, _In_ DEVICE_OBJECT *devobj)
+PAGEABLE auto get_version_type(_In_ DEVICE_OBJECT *devobj, _Out_ hci_version &version, _Out_ vdev_type_t &type)
 {
 	PAGED_CODE();
 
@@ -27,43 +27,31 @@ PAGEABLE auto get_hci_version(_Out_ hci_version &version, _In_ DEVICE_OBJECT *de
 	UNICODE_STRING hwid{};
 	RtlInitUnicodeString(&hwid, hwid_wstr);
 
-	const wchar_t* v[] { 
+	const vdev_type_t types[] { VDEV_ROOT, VDEV_VHCI, VDEV_VHUB};
+	const wchar_t* ids[] { 
 		HWID_ROOT1, HWID_EHCI, HWID_VHUB,  // HCI_USB2
 		HWID_ROOT2, HWID_XHCI, HWID_VHUB30 // HCI_USB3
 	};
 
 	err = STATUS_INVALID_PARAMETER;
 
-	for (int i = 0; i < ARRAYSIZE(v); ++i) {
+	for (int i = 0; i < ARRAYSIZE(ids); ++i) {
 
 		UNICODE_STRING s{};
-		RtlInitUnicodeString(&s, v[i]);
+		RtlInitUnicodeString(&s, ids[i]);
 
 		if (RtlEqualUnicodeString(&s, &hwid, true)) {
-			version = i > 2 ? HCI_USB3 : HCI_USB2;
+			version = i >= ARRAYSIZE(types) ? HCI_USB3 : HCI_USB2;
+			type = types[i % ARRAYSIZE(types)];
 			err = STATUS_SUCCESS;
 			break;
 		}
 	}
 
-	TraceDbg("%04x %!USTR! -> %!STATUS!, %!hci_version!", ptr4log(devobj), &hwid, err, version);
+	TraceDbg("%04x %!USTR! -> %!STATUS!, %!hci_version!, %!vdev_type_t!", ptr4log(devobj), &hwid, err, version, type);
 
 	ExFreePoolWithTag(hwid_wstr, USBIP_VHCI_POOL_TAG);
 	return err;
-}
-
-PAGEABLE vdev_t *get_vdev_from_driver(_In_ DRIVER_OBJECT *drvobj, _In_ hci_version version, _In_ vdev_type_t type)
-{
-	PAGED_CODE();
-
-	for (auto devobj = drvobj->DeviceObject; devobj; devobj = devobj->NextDevice) {
-		auto vdev = to_vdev(devobj);
-		if (vdev->version == version && vdev->type == type) {
-			return vdev;
-		}
-	}
-
-	return nullptr;
 }
 
 PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ vdev_type_t type)
@@ -174,16 +162,11 @@ extern "C" PAGEABLE NTSTATUS vhci_add_device(_In_ DRIVER_OBJECT *DriverObject, _
 	TraceDbg("PhysicalDeviceObject %04x", ptr4log(PhysicalDeviceObject));
 	
 	hci_version version;
+	vdev_type_t type;
 
-	if (auto err = get_hci_version(version, PhysicalDeviceObject)) {
+	if (auto err = get_version_type(PhysicalDeviceObject, version, type)) {
 		Trace(TRACE_LEVEL_ERROR, "Device not found by HWID, %!STATUS!", err);
 		return err;
-	}
-
-	auto type = VDEV_ROOT;
-
-	if (get_vdev_from_driver(DriverObject, version, type)) {
-		type = !get_vdev_from_driver(DriverObject, version, VDEV_VHCI) ? VDEV_VHCI : VDEV_VHUB;
 	}
 
 	return add_vdev(DriverObject, PhysicalDeviceObject, version, type);
