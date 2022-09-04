@@ -16,8 +16,6 @@
         #error Use option /DExePath=path-to-exe
 #endif
 
-#define TestCert "USBIP Test"
-#define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
 #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 
 ; information from .exe GetVersionInfo
@@ -25,6 +23,13 @@
 #define AppVersion GetVersionNumbersString(ExePath)
 #define Copyright GetFileCopyright(ExePath)
 #define Company GetFileCompany(ExePath)
+
+#define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
+
+#define HWID1 "USBIPWIN\root1"
+#define HWID2 "USBIPWIN\root2"
+
+#define TestCert "USBIP Test"
 
 [Setup]
 AppName={#ProductName}
@@ -58,20 +63,17 @@ MinVersion=10.0.19041
 WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
 
 [Files]
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
-Source: {#SolutionDir + "driver\usbip_test.pfx"}; DestDir: "{tmp}"
 Source: {#SolutionDir + "userspace\src\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall
 Source: {#SolutionDir + "userspace\src\innosetup\UninsIS.dll"}; Flags: dontcopy
+Source: {#SolutionDir + "driver\usbip_test.pfx"}; DestDir: "{tmp}"
 
-Source: {#BuildDir + "devnode.exe"};  DestDir: "{app}";
-Source: {#BuildDir + "package\usbip_root.inf"}; DestDir: "{tmp}"; 
-Source: {#BuildDir + "package\usbip_vhci.inf"}; DestDir: "{tmp}"; 
-Source: {#BuildDir + "package\usbip_vhci.sys"}; DestDir: "{tmp}"; 
-Source: {#BuildDir + "package\usbip_vhci.cat"}; DestDir: "{tmp}"; 
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"
+Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"
 
 #if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}";
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb"
 #endif
 
 
@@ -85,12 +87,15 @@ Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublish
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
 
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\root1"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf USBIPWIN\root2"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID1}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID2}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "uninstall"; RunOnceId: "DelClientDevices"; Flags: runhidden
+; @see devcon hwids "USBIPWIN\*"
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID1} /subtree"; RunOnceId: "RemoveDevice1"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID2} /subtree"; RunOnceId: "RemoveDevice2"; Flags: runhidden
+
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden

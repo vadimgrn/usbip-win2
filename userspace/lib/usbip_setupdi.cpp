@@ -6,7 +6,7 @@
 namespace
 {
 
-auto get_id_inst(HDEVINFO devinfo, SP_DEVINFO_DATA *devinfo_data)
+auto GetDeviceInstanceId(HDEVINFO devinfo, SP_DEVINFO_DATA *devinfo_data)
 {
 	std::string id;
 	DWORD length;
@@ -75,7 +75,7 @@ int traverse_dev_info(HDEVINFO dev_info, usbip::walkfunc_t walker, void *ctx)
 			break;
 		}
 		
-		auto id_inst = get_id_inst(dev_info, &dev_info_data);
+		auto id_inst = GetDeviceInstanceId(dev_info, &dev_info_data);
 		if (id_inst.empty()) {
 			continue;
 		}

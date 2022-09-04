@@ -27,7 +27,7 @@ PAGEABLE auto get_version_type(_In_ DEVICE_OBJECT *devobj, _Out_ hci_version &ve
 	UNICODE_STRING hwid{};
 	RtlInitUnicodeString(&hwid, hwid_wstr);
 
-	const vdev_type_t types[] { VDEV_ROOT, VDEV_VHCI, VDEV_VHUB};
+	const vdev_type_t types[] { VDEV_ROOT, VDEV_VHCI, VDEV_VHUB };
 	const wchar_t* ids[] { 
 		HWID_ROOT1, HWID_EHCI, HWID_VHUB,  // HCI_USB2
 		HWID_ROOT2, HWID_XHCI, HWID_VHUB30 // HCI_USB3
