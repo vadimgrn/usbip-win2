@@ -26,8 +26,8 @@
 
 #define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
 
-#define HWID1 "USBIPWIN\root1"
-#define HWID2 "USBIPWIN\root2"
+#define HWID1 "USBIP\root1"
+#define HWID2 "USBIP\root2"
 
 #define TestCert "USBIP Test"
 
@@ -92,11 +92,11 @@ Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID2}"
 
 [UninstallRun]
 
-; @see devcon hwids "USBIPWIN\*"
+; @see devcon hwids "USBIP\*"
 Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID1} /subtree"; RunOnceId: "RemoveDevice1"; Flags: runhidden
 Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID2} /subtree"; RunOnceId: "RemoveDevice2"; Flags: runhidden
 
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip2_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden

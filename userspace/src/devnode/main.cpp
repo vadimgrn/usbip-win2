@@ -34,7 +34,7 @@ auto make_hwid_multiz(LPCWSTR hwid)
 
 /*
  * @param infpath must be an absolute path
- * @see devcon hwids "USBIPWIN\*"
+ * @see devcon hwids "USBIP\*"
  */
 auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
 {

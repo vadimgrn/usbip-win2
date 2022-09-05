@@ -6,11 +6,11 @@
 struct _IRP;
 struct vdev_t;
 
-#define HWID_ROOT1      L"USBIPWIN\\root1"
-#define HWID_ROOT2      L"USBIPWIN\\root2"
+#define HWID_ROOT1      L"USBIP\\root1"
+#define HWID_ROOT2      L"USBIP\\root2"
 
-#define HWID_EHCI       L"USBIPWIN\\ehci"
-#define HWID_XHCI       L"USBIPWIN\\xhci"
+#define HWID_EHCI       L"USBIP\\ehci"
+#define HWID_XHCI       L"USBIP\\xhci"
 
 // @see usbip_vhci.inf
 #define VHUB_PREFIX	L"USB\\ROOT_HUB"
