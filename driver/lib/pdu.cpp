@@ -3,7 +3,7 @@
  */
 
 #include "pdu.h"
-#include "usbip_proto.h"
+#include <usbip\proto.h>
 
 #include <intrin.h>
 #include <wdm.h>

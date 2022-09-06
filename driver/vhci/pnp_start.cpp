@@ -8,7 +8,7 @@
 #include "wmi.h"
 
 #include <initguid.h> // required for GUID definitions
-#include "usbip_vhci_api.h"
+#include <usbip\vhci.h>
 
 namespace
 {

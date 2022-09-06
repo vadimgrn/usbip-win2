@@ -5,7 +5,7 @@
 #pragma once
 
 #include "pageable.h"
-#include "usbip_proto.h"
+#include <usbip\proto.h>
 
 #include <wdm.h>
 #include <usb.h>

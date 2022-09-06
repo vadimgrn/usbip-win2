@@ -99,9 +99,9 @@
     <ClCompile Include="usbip_vhci.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\include\usbip_api_consts.h" />
-    <ClInclude Include="..\..\..\include\usbip_proto.h" />
-    <ClInclude Include="..\..\..\include\usbip_vhci_api.h" />
+    <ClInclude Include="..\..\..\include\usbip\consts.h" />
+    <ClInclude Include="..\..\..\include\usbip\proto.h" />
+    <ClInclude Include="..\..\..\include\usbip\vhci.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />
     <ClInclude Include="usbip_vhci.h" />

@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "usbip_vhci_api.h"
+#include <usbip\vhci.h>
 #include "win_handle.h"
 
 namespace usbip

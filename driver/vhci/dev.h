@@ -5,7 +5,7 @@
 #include <ntddk.h>
 #include <wmilib.h>
 
-#include "usbip_vhci_api.h"
+#include <usbip\vhci.h>
 #include "devconf.h"
 #include "usbdsc.h"
 

@@ -4,8 +4,8 @@
 #include "vhub.tmh"
 
 #include "dev.h"
-#include "usbip_vhci_api.h"
 #include "usbdsc.h"
+#include <usbip\vhci.h>
 
 #include <intrin.h>
 #include <ws2def.h>

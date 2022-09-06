@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "usbip_proto.h"
+#include <usbip\proto.h>
 #include "mdl_cpp.h"
 
 struct vpdo_dev_t;

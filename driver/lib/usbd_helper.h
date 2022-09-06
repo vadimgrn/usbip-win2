@@ -1,7 +1,7 @@
 #pragma once
 
-#include "usbip_proto.h"
-#include "ch9.h"
+#include <usbip\proto.h>
+#include <usbip\ch9.h>
 
 #include <stdbool.h>
 

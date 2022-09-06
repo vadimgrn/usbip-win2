@@ -3,7 +3,7 @@
 #include "devconf.tmh"
 
 #include "vhci.h"
-#include "usbip_vhci_api.h"
+#include <usbip\vhci.h>
 #include "usbdsc.h"
 #include "dbgcommon.h"
 

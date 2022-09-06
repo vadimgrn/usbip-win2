@@ -3,8 +3,8 @@
 #include <wdm.h>
 #include <usbdi.h>
 
-#include "ch9.h"
-#include "usbip_proto.h" 
+#include <usbip\ch9.h>
+#include <usbip\proto.h> 
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS setup_config(_URB_SELECT_CONFIGURATION *cfg, usb_device_speed speed);

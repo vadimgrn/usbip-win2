@@ -9,10 +9,11 @@
 #include "irp.h"
 #include "wmi.h"
 #include "vhub.h"
-#include "usbip_vhci_api.h"
 #include "strutil.h"
 #include "csq.h"
 #include "wsk_cpp.h"
+
+#include <usbip\vhci.h>
 
 namespace
 {

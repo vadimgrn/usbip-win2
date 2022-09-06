@@ -3,9 +3,9 @@
 #include "wmi.tmh"
 
 #include "vhci.h"
-#include "usbip_vhci_api.h"
 #include "irp.h"
 #include "dev.h"
+#include <usbip\vhci.h>
 
 #include <wmistr.h>
 

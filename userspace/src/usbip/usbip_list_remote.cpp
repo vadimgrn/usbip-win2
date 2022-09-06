@@ -20,9 +20,10 @@
 
 #include "usbip_common.h"
 #include "usbip_network.h"
-#include "usbip_proto_op.h"
 #include "usbip.h"
 #include "dbgcode.h"
+
+#include <usbip\proto_op.h>
 
 namespace
 {

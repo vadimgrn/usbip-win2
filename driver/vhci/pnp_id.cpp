@@ -5,9 +5,9 @@
 
 #include "vhci.h"
 #include "pnp.h"
-#include "usbip_vhci_api.h"
 #include "irp.h"
 #include "usbdsc.h"
+#include <usbip\vhci.h>
 
 #include <ntstrsafe.h>
 

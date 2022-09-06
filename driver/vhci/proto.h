@@ -3,7 +3,7 @@
 #include <wdm.h>
 #include <usb.h>
 
-#include "usbip_proto.h"
+#include <usbip\proto.h>
 
 struct vpdo_dev_t;
 

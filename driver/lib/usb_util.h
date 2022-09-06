@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "ch9.h"
-#include "usbip_proto.h"
+#include <usbip\ch9.h>
+#include <usbip\proto.h>
 
 #include <ntdef.h>
 #include <usbspec.h>

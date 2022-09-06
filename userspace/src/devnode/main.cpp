@@ -27,8 +27,8 @@ enum { EXIT_USAGE = EXIT_FAILURE + 1 };
 auto make_hwid_multiz(LPCWSTR hwid)
 {
         std::wstring s(hwid);
-        s += L'\0';
-        s += L'\0';
+        s += L'\0'; // first string
+        s += L'\0'; // end of the list
         return s;
 }
 

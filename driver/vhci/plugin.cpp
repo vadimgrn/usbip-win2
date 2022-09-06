@@ -8,16 +8,17 @@
 #include "vhci.h"
 #include "pnp_remove.h"
 #include "csq.h"
-#include "usbip_proto_op.h"
 #include "network.h"
 #include "proto.h"
-#include "ch9.h"
 #include "dbgcommon.h"
 #include "pdu.h"
 #include "strutil.h"
 #include "wsk_context.h"
 #include "wsk_receive.h"
 #include "pnp.h"
+
+#include <usbip\ch9.h>
+#include <usbip\proto_op.h>
 
 namespace
 {

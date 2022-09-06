@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="dbgcode.cpp" />
+    <ClCompile Include="file_ver.cpp" />
+    <ClCompile Include="usbip_common.cpp" />
+    <ClCompile Include="getopt.c" />
+    <ClCompile Include="usbip_proto_op.cpp" />
+    <ClCompile Include="usbip_setupdi.cpp" />
+    <ClCompile Include="usbip_util.cpp" />
+    <ClCompile Include="usbip_network.cpp" />
+    <ClCompile Include="usb_ids.cpp" />
+    <ClCompile Include="win_socket.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="dbgcode.h" />
+    <ClInclude Include="file_ver.h" />
+    <ClInclude Include="generic_handle.h" />
+    <ClInclude Include="usbip_common.h" />
+    <ClInclude Include="getopt.h" />
+    <ClInclude Include="usbip_setupdi.h" />
+    <ClInclude Include="usbip_util.h" />
+    <ClInclude Include="usbip_network.h" />
+    <ClInclude Include="usb_ids.h" />
+    <ClInclude Include="win_handle.h" />
+    <ClInclude Include="win_socket.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\usbip\consts.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\usbip\proto_op.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="usbip">
+      <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

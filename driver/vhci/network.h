@@ -5,7 +5,7 @@
 #pragma once
 
 #include "pageable.h"
-#include "usbip_api_consts.h"
+#include <usbip\consts.h>
 #include "mdl_cpp.h"
 #include "wsk_cpp.h"
 #include "pdu.h"

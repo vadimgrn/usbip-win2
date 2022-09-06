@@ -9,10 +9,11 @@
 #include "dev.h"
 #include "dbgcommon.h"
 #include "urbtransfer.h"
-#include "usbip_proto.h"
-#include "usbip_proto_op.h"
 #include "usbd_helper.h"
 #include "irp.h"
+
+#include <usbip\proto.h>
+#include <usbip\proto_op.h>
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)

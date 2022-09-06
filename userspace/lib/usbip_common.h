@@ -4,9 +4,10 @@
 
 #pragma once
 
-#include "ch9.h"
-#include "usbip_api_consts.h"
-#include "usbip_proto.h"
+#include <usbip\ch9.h>
+#include <usbip\consts.h>
+#include <usbip\proto.h>
+
 #include "usb_ids.h"
 
 #include <cstdint>

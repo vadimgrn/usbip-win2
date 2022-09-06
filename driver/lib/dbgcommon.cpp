@@ -1,6 +1,6 @@
 #include "dbgcommon.h"
-#include "usbip_proto.h"
-#include "usbip_vhci_api.h"
+#include <usbip\proto.h>
+#include <usbip\vhci.h>
 
 #include <usbdi.h>
 #include <usbuser.h>

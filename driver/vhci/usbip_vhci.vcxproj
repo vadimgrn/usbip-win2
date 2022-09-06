@@ -41,11 +41,11 @@
     <ClCompile Include="wsk_receive.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\ch9.h" />
-    <ClInclude Include="..\..\include\usbip_api_consts.h" />
-    <ClInclude Include="..\..\include\usbip_proto_op.h" />
-    <ClInclude Include="..\..\include\usbip_vhci_api.h" />
-    <ClInclude Include="..\..\include\usbip_proto.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h" />
+    <ClInclude Include="..\..\include\usbip\consts.h" />
+    <ClInclude Include="..\..\include\usbip\proto_op.h" />
+    <ClInclude Include="..\..\include\usbip\vhci.h" />
+    <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="csq.h" />
     <ClInclude Include="internal_ioctl.h" />
     <ClInclude Include="ioctl.h" />

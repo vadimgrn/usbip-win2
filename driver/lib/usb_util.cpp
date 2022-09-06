@@ -3,7 +3,7 @@
  */
 
 #include "usb_util.h"
-#include "usbip_api_consts.h"
+#include <usbip\consts.h>
 
 /*
  * The bcdUSB field reports the highest version of USB the device supports.
