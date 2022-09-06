@@ -3,9 +3,10 @@
 #include "devconf.tmh"
 
 #include "vhci.h"
+
 #include <usbip\vhci.h>
-#include "usbdsc.h"
-#include "dbgcommon.h"
+#include <libdrv\usbdsc.h>
+#include <libdrv\dbgcommon.h>
 
 #include <ntstrsafe.h>
 

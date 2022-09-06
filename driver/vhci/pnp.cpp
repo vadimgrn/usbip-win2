@@ -2,6 +2,8 @@
 #include "trace.h"
 #include "pnp.tmh"
 
+#include <libdrv\strutil.h>
+
 #include "vhci.h"
 #include "pnp_id.h"
 #include "irp.h"
@@ -11,7 +13,6 @@
 #include "pnp_start.h"
 #include "pnp_remove.h"
 #include "vhub.h"
-#include "strutil.h"
 
 #include <wdmguid.h>
 

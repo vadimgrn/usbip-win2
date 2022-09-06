@@ -4,16 +4,17 @@
 #include "trace.h"
 #include "pnp_remove.tmh"
 
+#include <usbip\vhci.h>
+
+#include <libdrv\strutil.h>
+#include <libdrv\wsk_cpp.h>
+
 #include "vhci.h"
 #include "pnp.h"
 #include "irp.h"
 #include "wmi.h"
 #include "vhub.h"
-#include "strutil.h"
 #include "csq.h"
-#include "wsk_cpp.h"
-
-#include <usbip\vhci.h>
 
 namespace
 {

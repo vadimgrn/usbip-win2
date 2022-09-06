@@ -7,9 +7,10 @@
 #include "trace.h"
 #include "wsk_receive.tmh"
 
+#include <libdrv\usbd_helper.h>
+#include <libdrv\dbgcommon.h>
+
 #include "dev.h"
-#include "usbd_helper.h"
-#include "dbgcommon.h"
 #include "urbtransfer.h"
 #include "csq.h"
 #include "irp.h"

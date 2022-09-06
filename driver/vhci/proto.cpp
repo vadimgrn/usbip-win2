@@ -2,7 +2,8 @@
 #include "trace.h"
 #include "proto.tmh"
 
-#include "usbd_helper.h"
+#include <libdrv\usbd_helper.h>
+
 #include "devconf.h"
 #include "dev.h"
 

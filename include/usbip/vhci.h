@@ -11,9 +11,9 @@
 
 #include <usbspec.h>
 
-#include <usbip\ch9.h>
-#include <usbip\consts.h>
-#include <usbip\proto.h>
+#include "ch9.h"
+#include "consts.h"
+#include "proto.h"
 
 enum hci_version { HCI_USB2, HCI_USB3 };
 inline const hci_version vhci_list[] { HCI_USB2, HCI_USB3 };

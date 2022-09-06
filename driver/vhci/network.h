@@ -4,11 +4,12 @@
 
 #pragma once
 
-#include "pageable.h"
 #include <usbip\consts.h>
-#include "mdl_cpp.h"
-#include "wsk_cpp.h"
-#include "pdu.h"
+
+#include <libdrv\pageable.h>
+#include <libdrv\mdl_cpp.h>
+#include <libdrv\wsk_cpp.h>
+#include <libdrv\pdu.h>
 
 struct _URB;
 struct usbip_header;

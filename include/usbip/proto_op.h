@@ -1,6 +1,6 @@
 #pragma once
 
-#include <usbip\consts.h>
+#include "consts.h"
 #include <basetsd.h>
 
 #include <PSHPACK1.H>

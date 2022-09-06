@@ -3,22 +3,23 @@
 #include "trace.h"
 #include "plugin.tmh"
 
+#include <usbip\ch9.h>
+#include <usbip\proto_op.h>
+
+#include <libdrv\dbgcommon.h>
+#include <libdrv\pdu.h>
+#include <libdrv\strutil.h>
+#include <libdrv\usb_util.h>
+
 #include "vhub.h"
-#include "usb_util.h"
 #include "vhci.h"
 #include "pnp_remove.h"
 #include "csq.h"
 #include "network.h"
 #include "proto.h"
-#include "dbgcommon.h"
-#include "pdu.h"
-#include "strutil.h"
 #include "wsk_context.h"
 #include "wsk_receive.h"
 #include "pnp.h"
-
-#include <usbip\ch9.h>
-#include <usbip\proto_op.h>
 
 namespace
 {

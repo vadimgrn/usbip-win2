@@ -1,9 +1,10 @@
 #include "ioctl_vhub.h"
-#include "dbgcommon.h"
+#include <libdrv\dbgcommon.h>
 #include "trace.h"
 #include "ioctl_vhub.tmh"
 
-#include "ch11.h"
+#include <libdrv\ch11.h>
+
 #include "ioctl_vhci.h"
 #include "vhci.h"
 #include "pnp.h"

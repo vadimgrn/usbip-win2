@@ -2,7 +2,8 @@
 #include "trace.h"
 #include "ioctl_vhci.tmh"
 
-#include "dbgcommon.h"
+#include <libdrv\dbgcommon.h>
+
 #include "vhci.h"
 #include "plugin.h"
 #include "vhub.h"

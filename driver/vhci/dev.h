@@ -1,13 +1,14 @@
 #pragma once
 
-#include "pageable.h"
+#include <usbip\vhci.h>
+
+#include <libdrv\pageable.h>
+#include <libdrv\usbdsc.h>
 
 #include <ntddk.h>
 #include <wmilib.h>
 
-#include <usbip\vhci.h>
 #include "devconf.h"
-#include "usbdsc.h"
 
 struct wsk_context;
 

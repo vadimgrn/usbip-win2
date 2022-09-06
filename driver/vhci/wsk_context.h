@@ -5,7 +5,7 @@
 #pragma once
 
 #include <usbip\proto.h>
-#include "mdl_cpp.h"
+#include <libdrv\mdl_cpp.h>
 
 struct vpdo_dev_t;
 

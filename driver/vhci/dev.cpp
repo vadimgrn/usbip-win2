@@ -1,9 +1,10 @@
 #include "dev.h"
 #include "trace.h"
 #include "dev.tmh"
-#include "pageable.h"
 #include "vhci.h"
 #include "irp.h"
+
+#include <libdrv\pageable.h>
 
 #include <limits.h>
 #include <wsk.h>

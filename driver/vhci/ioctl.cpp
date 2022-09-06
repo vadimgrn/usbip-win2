@@ -2,10 +2,11 @@
 #include "trace.h"
 #include "ioctl.tmh"
 
+#include <libdrv\dbgcommon.h>
+
 #include "irp.h"
 #include "ioctl_vhci.h"
 #include "ioctl_vhub.h"
-#include "dbgcommon.h"
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_

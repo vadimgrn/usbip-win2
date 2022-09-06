@@ -3,11 +3,12 @@
 #include "trace.h"
 #include "pnp_id.tmh"
 
+#include <usbip\vhci.h>
+#include <libdrv\usbdsc.h>
+
 #include "vhci.h"
 #include "pnp.h"
 #include "irp.h"
-#include "usbdsc.h"
-#include <usbip\vhci.h>
 
 #include <ntstrsafe.h>
 

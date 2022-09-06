@@ -3,6 +3,8 @@
 #include "trace.h"
 #include "vhci.tmh"
 
+#include <libdrv\wsk_cpp.h>
+
 #include "power.h"
 #include "pnp.h"
 #include "pnp_add.h"
@@ -10,7 +12,6 @@
 #include "wmi.h"
 #include "vhub.h"
 #include "ioctl.h"
-#include "wsk_cpp.h"
 #include "wsk_context.h"
 #include "internal_ioctl.h"
 
