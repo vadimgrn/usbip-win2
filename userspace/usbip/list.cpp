@@ -16,11 +16,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ws2tcpip.h>
+#include "vhci.h"
 
-#include "usbip_common.h"
-#include "usbip_network.h"
-#include "getopt.h"
+#include <libusbip\common.h>
+#include <libusbip\getopt.h>
 
 int list_exported_devices(const char *host);
 

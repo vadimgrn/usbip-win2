@@ -16,12 +16,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ws2tcpip.h>
-
-#include "usbip_common.h"
-#include "usbip_network.h"
+#include "vhci.h"
 #include "usbip.h"
-#include "dbgcode.h"
+
+#include <libusbip\common.h>
+#include <libusbip\network.h>
+#include <libusbip\dbgcode.h>
 
 #include <usbip\proto_op.h>
 

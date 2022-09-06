@@ -16,11 +16,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "getopt.h"
-#include "usbip_network.h"
-#include "usbip_vhci.h"
-#include "usbip_common.h"
-#include "dbgcode.h"
+#include "vhci.h"
+
+#include <libusbip\getopt.h>
+#include <libusbip\network.h>
+#include <libusbip\common.h>
+#include <libusbip\dbgcode.h>
 
 namespace
 {

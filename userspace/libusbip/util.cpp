@@ -1,4 +1,5 @@
-#include "usbip_util.h"
+#include "util.h"
+
 #include <vector>
 #include <windows.h>
 

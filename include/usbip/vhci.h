@@ -5,6 +5,7 @@
 #ifdef _KERNEL_MODE
   #include <ntddk.h>
 #else
+  #include <windows.h>
   #include <winioctl.h>
 #endif
 

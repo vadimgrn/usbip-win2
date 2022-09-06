@@ -1,5 +1,4 @@
 ﻿#include <usbip\proto_op.h>
-
 #include <intrin.h>
 
 void usbip_net_pack_uint32_t(int, UINT32 *num)

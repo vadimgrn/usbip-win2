@@ -2,10 +2,10 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#include "usbip_common.h"
-#include "usbip_util.h"
-#include <usbip\proto_op.h>
+#include "common.h"
+#include "util.h"
 
+#include <usbip\proto_op.h>
 #include <format>
 
 bool usbip_use_stderr;

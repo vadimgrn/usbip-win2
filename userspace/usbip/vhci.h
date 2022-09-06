@@ -3,7 +3,7 @@
 #include <vector>
 
 #include <usbip\vhci.h>
-#include "win_handle.h"
+#include <libusbip\win_handle.h>
 
 namespace usbip
 {

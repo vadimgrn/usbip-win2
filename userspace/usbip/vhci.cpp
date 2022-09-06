@@ -1,12 +1,12 @@
+#include <libusbip\common.h>
+#include <libusbip\dbgcode.h>
+#include <libusbip\setupdi.h>
+
 #include <cassert>
 #include <string>
 
 #include <initguid.h>
-
-#include "usbip_common.h"
-#include "dbgcode.h"
-#include "usbip_vhci.h"
-#include "usbip_setupdi.h"
+#include "vhci.h"
 
 namespace
 {

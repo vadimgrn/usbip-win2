@@ -3,27 +3,27 @@
   <ItemGroup>
     <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="usbip_common.cpp" />
+    <ClCompile Include="common.cpp" />
     <ClCompile Include="getopt.c" />
-    <ClCompile Include="usbip_proto_op.cpp" />
-    <ClCompile Include="usbip_setupdi.cpp" />
-    <ClCompile Include="usbip_util.cpp" />
-    <ClCompile Include="usbip_network.cpp" />
+    <ClCompile Include="proto_op.cpp" />
+    <ClCompile Include="setupdi.cpp" />
+    <ClCompile Include="util.cpp" />
+    <ClCompile Include="network.cpp" />
     <ClCompile Include="usb_ids.cpp" />
     <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="dbgcode.h" />
-    <ClInclude Include="file_ver.h" />
-    <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="usbip_common.h" />
-    <ClInclude Include="getopt.h" />
-    <ClInclude Include="usbip_setupdi.h" />
-    <ClInclude Include="usbip_util.h" />
-    <ClInclude Include="usbip_network.h" />
-    <ClInclude Include="usb_ids.h" />
-    <ClInclude Include="win_handle.h" />
-    <ClInclude Include="win_socket.h" />
+    <ClInclude Include="libusbip\dbgcode.h" />
+    <ClInclude Include="libusbip\file_ver.h" />
+    <ClInclude Include="libusbip\generic_handle.h" />
+    <ClInclude Include="libusbip\common.h" />
+    <ClInclude Include="libusbip\getopt.h" />
+    <ClInclude Include="libusbip\setupdi.h" />
+    <ClInclude Include="libusbip\util.h" />
+    <ClInclude Include="libusbip\network.h" />
+    <ClInclude Include="libusbip\usb_ids.h" />
+    <ClInclude Include="libusbip\win_handle.h" />
+    <ClInclude Include="libusbip\win_socket.h" />
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>

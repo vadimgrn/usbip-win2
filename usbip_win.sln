@@ -5,17 +5,17 @@ VisualStudioVersion = 17.2.32519.379
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_vhci", "driver\vhci\usbip_vhci.vcxproj", "{F35A874E-E790-44B5-9C14-749C8854A0C4}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_common", "userspace\lib\usbip_common.vcxproj", "{2C173853-88C0-4334-85BF-0B46CFD5A007}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip", "userspace\libusbip\libusbip.vcxproj", "{2C173853-88C0-4334-85BF-0B46CFD5A007}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip", "userspace\src\usbip\usbip.vcxproj", "{36CEE68D-D6CF-4413-978C-794488F44555}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip", "userspace\usbip\usbip.vcxproj", "{36CEE68D-D6CF-4413-978C-794488F44555}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libdrv", "driver\lib\libdrv.vcxproj", "{27AB4325-4980-4634-9818-AE6BD61DE532}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libdrv", "driver\libdrv\libdrv.vcxproj", "{27AB4325-4980-4634-9818-AE6BD61DE532}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "package", "driver\package\package.vcxproj", "{B7B9AC6F-45CC-4C98-9136-3D6E8F50AD1C}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "innosetup", "userspace\src\innosetup\innosetup.vcxproj", "{0B54108E-9FB0-45EA-B252-CEBC68A5CCF0}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "innosetup", "userspace\innosetup\innosetup.vcxproj", "{0B54108E-9FB0-45EA-B252-CEBC68A5CCF0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\src\devnode\devnode.vcxproj", "{7A610672-F2EF-4048-883A-41195D0977DC}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\devnode\devnode.vcxproj", "{7A610672-F2EF-4048-883A-41195D0977DC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

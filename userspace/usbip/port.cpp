@@ -14,12 +14,11 @@
  * GNU General Public License for more details.
  */
 
-#include <windows.h>
-
-#include "usbip_common.h"
-#include "usbip_vhci.h"
-#include "getopt.h"
+#include "vhci.h"
 #include "usbip.h"
+
+#include <libusbip\common.h>
+#include <libusbip\getopt.h>
 
 #include <set>
 #include <sstream>

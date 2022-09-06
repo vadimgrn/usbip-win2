@@ -16,12 +16,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <windows.h>
+#include "vhci.h"
 
-#include "getopt.h"
-#include "usbip_common.h"
-#include "usbip_vhci.h"
-
+#include <libusbip\getopt.h>
+#include <libusbip\common.h>
 
 void usbip_detach_usage()
 {

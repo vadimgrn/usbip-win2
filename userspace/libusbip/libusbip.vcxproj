@@ -11,24 +11,27 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{36CEE68D-D6CF-4413-978C-794488F44555}</ProjectGuid>
-    <RootNamespace>usbip</RootNamespace>
+    <ProjectGuid>{2C173853-88C0-4334-85BF-0B46CFD5A007}</ProjectGuid>
+    <RootNamespace>libusbip</RootNamespace>
+    <WindowsTargetPlatformVersion>
+    </WindowsTargetPlatformVersion>
+    <ProjectName>libusbip</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>NotSet</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
     <PlatformToolset>v143</PlatformToolset>
+    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>NotSet</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
     <PlatformToolset>v143</PlatformToolset>
+    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -53,8 +56,8 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\..\..\include;..\..\lib;windows;..\</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>libusbip;..\..\include;..\src</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -62,8 +65,14 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib</AdditionalDependencies>
     </Link>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+    <Lib>
+      <AdditionalDependencies>legacy_stdio_definitions.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -72,50 +81,52 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <OmitFramePointers>true</OmitFramePointers>
-      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <AdditionalIncludeDirectories>..\..\..\include;..\..\lib;windows;..\</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>libusbip;..\..\include;..\src</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <TreatWarningAsError>true</TreatWarningAsError>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
+      <OmitFramePointers>true</OmitFramePointers>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib</AdditionalDependencies>
     </Link>
+    <Lib>
+      <AdditionalDependencies>legacy_stdio_definitions.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="usbip.cpp" />
-    <ClCompile Include="usbip_attach.cpp" />
-    <ClCompile Include="usbip_detach.cpp" />
-    <ClCompile Include="usbip_list.cpp" />
-    <ClCompile Include="usbip_list_remote.cpp" />
-    <ClCompile Include="usbip_port.cpp" />
-    <ClCompile Include="usbip_vhci.cpp" />
+    <ClCompile Include="dbgcode.cpp" />
+    <ClCompile Include="file_ver.cpp" />
+    <ClCompile Include="common.cpp" />
+    <ClCompile Include="getopt.c" />
+    <ClCompile Include="proto_op.cpp" />
+    <ClCompile Include="setupdi.cpp" />
+    <ClCompile Include="util.cpp" />
+    <ClCompile Include="network.cpp" />
+    <ClCompile Include="usb_ids.cpp" />
+    <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\include\usbip\consts.h" />
-    <ClInclude Include="..\..\..\include\usbip\proto.h" />
-    <ClInclude Include="..\..\..\include\usbip\vhci.h" />
-    <ClInclude Include="resource.h" />
-    <ClInclude Include="usbip.h" />
-    <ClInclude Include="usbip_vhci.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\lib\usbip_common.vcxproj">
-      <Project>{2c173853-88c0-4334-85bf-0b46cfd5a007}</Project>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="usbip.rc" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="usb.ids" />
+    <ClInclude Include="..\..\include\usbip\ch9.h" />
+    <ClInclude Include="..\..\include\usbip\consts.h" />
+    <ClInclude Include="..\..\include\usbip\proto_op.h" />
+    <ClInclude Include="libusbip\dbgcode.h" />
+    <ClInclude Include="libusbip\file_ver.h" />
+    <ClInclude Include="libusbip\generic_handle.h" />
+    <ClInclude Include="libusbip\common.h" />
+    <ClInclude Include="libusbip\getopt.h" />
+    <ClInclude Include="libusbip\setupdi.h" />
+    <ClInclude Include="libusbip\util.h" />
+    <ClInclude Include="libusbip\network.h" />
+    <ClInclude Include="libusbip\usb_ids.h" />
+    <ClInclude Include="libusbip\win_handle.h" />
+    <ClInclude Include="libusbip\win_socket.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

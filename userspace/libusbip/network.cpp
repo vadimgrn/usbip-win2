@@ -3,9 +3,10 @@
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
-#include "usbip_common.h"
-#include "usbip_network.h"
+#include "network.h"
+#include "common.h"
 #include "dbgcode.h"
+
 #include <usbip\proto_op.h>
 
 #include <ws2tcpip.h>

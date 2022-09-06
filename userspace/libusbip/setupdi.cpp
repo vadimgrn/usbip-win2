@@ -1,5 +1,5 @@
-#include "usbip_setupdi.h"
-#include "usbip_common.h"
+#include "setupdi.h"
+#include "common.h"
 
 #include <cstdlib>
 

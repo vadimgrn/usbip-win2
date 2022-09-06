@@ -19,14 +19,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "getopt.h"
-#include "usbip_common.h"
-#include "usbip_network.h"
 #include "usbip.h"
-#include "win_socket.h"
-#include "file_ver.h"
 #include "resource.h"
-#include "usb_ids.h"
+
+#include <libusbip\usb_ids.h>
+#include <libusbip\win_socket.h>
+#include <libusbip\file_ver.h>
+#include <libusbip\getopt.h>
+#include <libusbip\common.h>
+#include <libusbip\network.h>
 
 #include <string>
 

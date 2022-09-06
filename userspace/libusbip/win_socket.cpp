@@ -1,5 +1,5 @@
 #include "win_socket.h"
-#include "usbip_common.h"
+#include "common.h"
 
 namespace
 {

@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\..\userspace\lib\usbip_proto_op.cpp" />
     <ClCompile Include="csq.cpp" />
     <ClCompile Include="wsk_context.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
@@ -29,6 +28,7 @@
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="wmi.cpp" />
     <ClCompile Include="wsk_receive.cpp" />
+    <ClCompile Include="..\..\userspace\libusbip\proto_op.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="csq.h" />

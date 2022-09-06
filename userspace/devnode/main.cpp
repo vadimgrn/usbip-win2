@@ -9,7 +9,7 @@
 #include <string>
 #include <filesystem>
 
-#include "usbip_setupdi.h"
+#include <libusbip\setupdi.h>
 
 /*
 * See: devcon utility, cmd_install/cmd_remove.
