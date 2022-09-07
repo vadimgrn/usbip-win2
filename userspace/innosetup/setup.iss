@@ -26,9 +26,7 @@
 
 #define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
 
-#define HWID1 "USBIP\root1"
-#define HWID2 "USBIP\root2"
-
+#define HWID_ROOT "USBIP\root"
 #define TestCert "USBIP Test"
 
 [Setup]
@@ -86,17 +84,13 @@ Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\u
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
-
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID1}"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID2}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
 ; @see devcon hwids "USBIP\*"
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID1} /subtree"; RunOnceId: "RemoveDevice1"; Flags: runhidden
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID2} /subtree"; RunOnceId: "RemoveDevice2"; Flags: runhidden
-
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip2_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DelClientDrivers"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveRootDevice"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip2_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden

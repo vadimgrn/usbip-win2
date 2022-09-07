@@ -58,7 +58,7 @@ struct vdev_t
 	SYSTEM_POWER_STATE SystemPowerState;
 	DEVICE_POWER_STATE DevicePowerState;
 
-	vdev_t *child_pdo; // root and vhci have cpdo and hpdo each
+	vdev_t *child_pdo; // use children_pdo for root_dev_t
 	vdev_t *parent;
 	vdev_t *fdo;
 
@@ -68,7 +68,11 @@ struct vdev_t
 	LONG intf_ref_cnt; // see _INTERFACE.InterfaceReference/InterfaceDereference
 };
 
-struct root_dev_t : vdev_t {};
+struct root_dev_t : vdev_t 
+{
+	vdev_t* children_pdo[ARRAYSIZE(vhci_list)];
+};
+
 struct cpdo_dev_t : vdev_t {};
 struct hpdo_dev_t : vdev_t {};
 

@@ -16,8 +16,7 @@ PnpLockDown=1
 "usbip"=Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-"usbip root1"=usbip_vhci_Device, USBIP\root1
-"usbip root2"=usbip_vhci_Device, USBIP\root2
+"usbip root"=usbip_vhci_Device, USBIP\root
 
 [DestinationDirs]
 DefaultDestDir = 12

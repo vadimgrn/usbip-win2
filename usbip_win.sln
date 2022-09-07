@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32519.379
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip_vhci", "driver\vhci\usbip_vhci.vcxproj", "{F35A874E-E790-44B5-9C14-749C8854A0C4}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_vhci", "driver\vhci\usbip_vhci.vcxproj", "{F35A874E-E790-44B5-9C14-749C8854A0C4}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip", "userspace\libusbip\libusbip.vcxproj", "{2C173853-88C0-4334-85BF-0B46CFD5A007}"
 EndProject
@@ -16,6 +16,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "innosetup", "userspace\innosetup\innosetup.vcxproj", "{0B54108E-9FB0-45EA-B252-CEBC68A5CCF0}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\devnode\devnode.vcxproj", "{7A610672-F2EF-4048-883A-41195D0977DC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2C173853-88C0-4334-85BF-0B46CFD5A007} = {2C173853-88C0-4334-85BF-0B46CFD5A007}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

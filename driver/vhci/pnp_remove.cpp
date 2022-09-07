@@ -20,7 +20,7 @@ namespace
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
+PAGEABLE void destroy(vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
@@ -37,7 +37,7 @@ PAGEABLE void destroy_vhci(vhci_dev_t &vhci)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy_vhub(vhub_dev_t &vhub)
+PAGEABLE void destroy(vhub_dev_t &vhub)
 {
 	PAGED_CODE();
 
@@ -139,7 +139,7 @@ PAGEABLE void close_socket(vpdo_dev_t &vpdo)
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
+PAGEABLE void destroy(vpdo_dev_t &vpdo)
 {
 	PAGED_CODE();
 	TraceMsg("%!hci_version! %04x, port %d", vpdo.version, ptr4log(&vpdo), vpdo.port);
@@ -163,11 +163,22 @@ PAGEABLE void destroy_vpdo(vpdo_dev_t &vpdo)
 	}
 }
 
+auto set_parent_null(_In_ vdev_t *child, _In_ vdev_t *parent)
+{
+	NT_ASSERT(child->parent == parent);
+	child->parent = nullptr;
+
+	if (auto fdo = child->fdo) {
+		NT_ASSERT(fdo->parent == parent);
+		fdo->parent = nullptr;
+	}
+}
+
 } // namespace
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy_device(vdev_t *vdev)
+PAGEABLE void destroy_device(_In_opt_ vdev_t *vdev)
 {
 	PAGED_CODE();
 
@@ -177,15 +188,13 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 
 	TraceMsg("%04x %!hci_version!, %!vdev_type_t!", ptr4log(vdev), vdev->version, vdev->type);
 
-	if (vdev->child_pdo) {
-		vdev->child_pdo->parent = nullptr;
-		if (vdev->child_pdo->fdo) {
-			vdev->child_pdo->fdo->parent = nullptr;
-		}
+	if (auto child = vdev->child_pdo) {
+		NT_ASSERT(vdev->type != VDEV_ROOT);
+		set_parent_null(child, vdev);
 	}
 
-	if (vdev->fdo) {
-		vdev->fdo->pdo = nullptr;
+	if (auto fdo = vdev->fdo) {
+		fdo->pdo = nullptr;
 	}
 
 	if (vdev->pdo && vdev->type != VDEV_ROOT) {
@@ -197,14 +206,21 @@ PAGEABLE void destroy_device(vdev_t *vdev)
 	}
 
 	switch (vdev->type) {
-	case VDEV_VHCI:
-		destroy_vhci(*(vhci_dev_t*)vdev);
+	case VDEV_VPDO:
+		destroy(*static_cast<vpdo_dev_t*>(vdev));
 		break;
 	case VDEV_VHUB:
-		destroy_vhub(*(vhub_dev_t*)vdev);
+		destroy(*static_cast<vhub_dev_t*>(vdev));
 		break;
-	case VDEV_VPDO:
-		destroy_vpdo(*(vpdo_dev_t*)vdev);
+	case VDEV_VHCI:
+		destroy(*static_cast<vhci_dev_t*>(vdev));
+		break;
+	case VDEV_ROOT:
+		for (auto child: static_cast<root_dev_t*>(vdev)->children_pdo) {
+			if (child) {
+				set_parent_null(child, vdev);
+			}
+		}
 		break;
 	}
 

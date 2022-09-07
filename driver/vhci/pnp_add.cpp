@@ -29,8 +29,8 @@ PAGEABLE auto get_version_type(_In_ DEVICE_OBJECT *devobj, _Out_ hci_version &ve
 
 	const vdev_type_t types[] { VDEV_ROOT, VDEV_VHCI, VDEV_VHUB };
 	const wchar_t* ids[] { 
-		HWID_ROOT1, HWID_EHCI, HWID_VHUB,  // HCI_USB2
-		HWID_ROOT2, HWID_XHCI, HWID_VHUB30 // HCI_USB3
+		HWID_ROOT, HWID_EHCI, HWID_VHUB,  // HCI_USB2
+		HWID_ROOT, HWID_XHCI, HWID_VHUB30 // HCI_USB3
 	};
 
 	err = STATUS_INVALID_PARAMETER;
@@ -54,11 +54,11 @@ PAGEABLE auto get_version_type(_In_ DEVICE_OBJECT *devobj, _Out_ hci_version &ve
 	return err;
 }
 
-PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ vdev_type_t type)
+PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ hci_version version, _In_ vdev_type_t type)
 {
 	PAGED_CODE();
 
-	auto devobj = vdev_create(vdev->Self->DriverObject, vdev->version, type);
+	auto devobj = vdev_create(vdev->Self->DriverObject, version, type);
 	if (!devobj) {
 		return nullptr;
 	}
@@ -68,14 +68,36 @@ PAGEABLE vdev_t *create_child_pdo(_In_ vdev_t *vdev, _In_ vdev_type_t type)
 	auto vdev_child = to_vdev(devobj);
 	vdev_child->parent = vdev;
 
+	TraceDbg("Parent %04x %!hci_version!, %!vdev_type_t! -> child %04x %!hci_version!, %!vdev_type_t!", 
+		  ptr4log(vdev), vdev->version, vdev->type, 
+		  ptr4log(vdev_child), vdev_child->version, vdev_child->type);
+
 	return vdev_child;
+}
+
+PAGEABLE auto init(_Inout_ root_dev_t &root)
+{
+	PAGED_CODE();
+
+	static_assert(ARRAYSIZE(vhci_list) == ARRAYSIZE(root.children_pdo));
+
+	for (int i = 0; i < ARRAYSIZE(vhci_list); ++i) {
+		if (auto pdo = create_child_pdo(&root, vhci_list[i], VDEV_CPDO)) {
+			root.children_pdo[i] = pdo;
+		} else {
+			return STATUS_INSUFFICIENT_RESOURCES;
+		}
+	}
+
+	NT_ASSERT(!root.child_pdo); // not used
+	return STATUS_SUCCESS;
 }
 
 PAGEABLE auto init(_Inout_ vhci_dev_t &vhci)
 {
 	PAGED_CODE();
 
-	vhci.child_pdo = create_child_pdo(&vhci, VDEV_HPDO);
+	vhci.child_pdo = create_child_pdo(&vhci, vhci.version, VDEV_HPDO);
         if (!vhci.child_pdo) {
                 return STATUS_UNSUCCESSFUL;
         }
@@ -104,24 +126,24 @@ PAGEABLE auto add_vdev(_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *Phy
 {
 	PAGED_CODE();
 
-	auto devobj = vdev_create(DriverObject, version, type);
-	if (!devobj) {
+	auto fdo = vdev_create(DriverObject, version, type);
+	if (!fdo) {
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	auto vdev = to_vdev(devobj);
+	auto vdev = to_vdev(fdo);
 	vdev->pdo = PhysicalDeviceObject;
 
 	if (type != VDEV_ROOT) {
-		auto vdev_pdo = to_vdev(vdev->pdo);
-		vdev->parent = vdev_pdo->parent;
+		auto vdev_pdo = to_vdev(PhysicalDeviceObject);
 		vdev_pdo->fdo = vdev;
+		vdev->parent = vdev_pdo->parent;
 	}
 
-	vdev->devobj_lower = IoAttachDeviceToDeviceStack(devobj, PhysicalDeviceObject);
+	vdev->devobj_lower = IoAttachDeviceToDeviceStack(fdo, PhysicalDeviceObject);
 	if (!vdev->devobj_lower) {
 		Trace(TRACE_LEVEL_ERROR, "IoAttachDeviceToDeviceStack error");
-		IoDeleteDevice(devobj);
+		IoDeleteDevice(fdo);
 		return STATUS_NO_SUCH_DEVICE;
 	}
 
@@ -129,7 +151,7 @@ PAGEABLE auto add_vdev(_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *Phy
 
 	switch (type) {
 	case VDEV_ROOT:
-		vdev->child_pdo = create_child_pdo(vdev, VDEV_CPDO);
+		err = init(*static_cast<root_dev_t*>(vdev));
 		break;
 	case VDEV_VHCI:
 		err = init(*static_cast<vhci_dev_t*>(vdev));
@@ -144,7 +166,7 @@ PAGEABLE auto add_vdev(_In_ DRIVER_OBJECT *DriverObject, _In_ DEVICE_OBJECT *Phy
         if (err) {
                 destroy_device(vdev);
         } else {
-                devobj->Flags &= ~DO_DEVICE_INITIALIZING; // should be the final step in the AddDevice process
+		fdo->Flags &= ~DO_DEVICE_INITIALIZING; // should be the final step in the AddDevice process
         }
 
         return err;
