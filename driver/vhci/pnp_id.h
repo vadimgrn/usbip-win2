@@ -13,13 +13,13 @@ struct vdev_t;
 
 // @see usbip_vhci.inf
 #define VHUB_PREFIX	L"USB\\ROOT_HUB"
-#define VHUB_VID	L"1209"
-#define VHUB_PID	L"8250"
-#define VHUB_REV	L"0000"
+#define VHUB_VID	L"1D6B"
+#define VHUB_PID	L"0002"
+#define VHUB_REV	L"0515"
 
 #define VHUB30_PREFIX	L"USB\\ROOT_HUB30"
 #define VHUB30_VID	VHUB_VID
-#define VHUB30_PID	L"8251"
+#define VHUB30_PID	L"0003"
 #define VHUB30_REV      VHUB_REV	
 
 #define HWID_VHUB \

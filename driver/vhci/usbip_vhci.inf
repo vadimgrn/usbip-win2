@@ -17,10 +17,10 @@ PnpLockDown=1
 
 [Standard.NT$ARCH$]
 "usbip ehci"=usbip_vhci_Device, USBIP\ehci
-"usbip USB 2.0 Root Hub"=usbip_vhci_Device, USB\ROOT_HUB&VID_1209&PID_8250&REV_0000
+"usbip root hub #1"=usbip_vhci_Device, USB\ROOT_HUB&VID_1D6B&PID_0002&REV_0515
 
 "usbip xhci"=usbip_vhci_Device, USBIP\xhci
-"usbip USB 3.0 Root Hub"=usbip_vhci_Device, USB\ROOT_HUB30&VID_1209&PID_8251&REV_0000
+"usbip root hub #2"=usbip_vhci_Device, USB\ROOT_HUB30&VID_1D6B&PID_0003&REV_0515
 
 [DestinationDirs]
 DefaultDestDir = 12
