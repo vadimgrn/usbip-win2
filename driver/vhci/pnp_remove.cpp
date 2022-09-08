@@ -163,7 +163,7 @@ PAGEABLE void destroy(vpdo_dev_t &vpdo)
 	}
 }
 
-auto set_parent_null(_In_ vdev_t *child, _In_ vdev_t *parent)
+auto set_parent_null(_In_ vdev_t *child, [[maybe_unused]] _In_ vdev_t *parent)
 {
 	NT_ASSERT(child->parent == parent);
 	child->parent = nullptr;
