@@ -10,11 +10,6 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\vhci\usbip_vhci.vcxproj">
-      <Project>{f35a874e-e790-44b5-9c14-749c8854a0c4}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B7B9AC6F-45CC-4C98-9136-3D6E8F50AD1C}</ProjectGuid>
     <TemplateGuid>{4605da2c-74a5-4865-98e1-152ef136825f}</TemplateGuid>

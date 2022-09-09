@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2021, 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
- */
+* Copyright (C) 2021, 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+*/
 
 #pragma once
 
