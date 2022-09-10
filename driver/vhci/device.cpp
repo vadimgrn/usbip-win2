@@ -2,9 +2,16 @@
 #include "trace.h"
 #include "device.tmh"
 
+#include <ntstrsafe.h>
+
 #include <usb.h>
+#include <usbiodef.h>
 #include <usbdlib.h>
+
 #include <wdfusb.h>
+#include <wdfobject.h>
+
+#include <Udecx.h>
 
 #include "driver.h"
 #include "queue.h"
@@ -15,39 +22,38 @@
 namespace
 {
 
-_Function_class_(EVT_WDF_DEVICE_PREPARE_HARDWARE)
-_IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS DevicePrepareHardware(_In_ WDFDEVICE Device, _In_ WDFCMRESLIST, _In_ WDFCMRESLIST)
+struct request_context
 {
-        PAGED_CODE();
-        TraceMsg("%04x", ptr4log(Device));
+};
 
-        auto status = STATUS_SUCCESS;
-        auto ctx = DeviceGetContext(Device);
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_context, RequestGetContext)
+/*
+auto get_device_name(_Out_ UNICODE_STRING &name, _In_ int instance_id)
+{
+#define BASE_DEVICE_NAME L"\\Device\\USBFDO-"
 
-        if (!ctx->UsbDevice) {
-                WDF_USB_DEVICE_CREATE_CONFIG createParams;
-                WDF_USB_DEVICE_CREATE_CONFIG_INIT(&createParams, USBD_CLIENT_CONTRACT_VERSION_602);
+        enum { 
+                maxuchar_cch = 3, // "255"
+                devname_cch = ARRAYSIZE(BASE_DEVICE_NAME) + maxuchar_cch,
+        };
 
-                status = WdfUsbTargetDeviceCreateWithParameters(Device, &createParams, WDF_NO_OBJECT_ATTRIBUTES, &ctx->UsbDevice);
-                if (!NT_SUCCESS(status)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfUsbTargetDeviceCreateWithParameters %!STATUS!", status);
-                        return status;
+        RtlInitUnicodeString(&name, L"");
+
+                DECLARE_UNICODE_STRING_SIZE(DeviceName, devname_cch*sizeof(WCHAR));
+
+                if (auto err = RtlUnicodeStringPrintf(&DeviceName, L"%ws%d", BASE_DEVICE_NAME, i)) {
+                        Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", err);
+                        return err;
                 }
         }
+}
+*/
 
-        WDF_USB_DEVICE_SELECT_CONFIG_PARAMS configParams;
-        WDF_USB_DEVICE_SELECT_CONFIG_PARAMS_INIT_MULTIPLE_INTERFACES(&configParams, 0, nullptr);
-
-        status = WdfUsbTargetDeviceSelectConfig(ctx->UsbDevice, WDF_NO_OBJECT_ATTRIBUTES, &configParams);
-        if (!NT_SUCCESS(status)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfUsbTargetDeviceSelectConfig %!STATUS!", status);
-                return status;
-        }
-
-        TraceMsg("%!STATUS!", status);
-        return status;
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void ControllerCleanup(_In_ WDFOBJECT)
+{
 }
 
 } // namespace
@@ -60,30 +66,80 @@ PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *Device
 {
         PAGED_CODE();
 
-        WDF_PNPPOWER_EVENT_CALLBACKS pnpPowerCallbacks;
-        WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnpPowerCallbacks);
+        WDF_PNPPOWER_EVENT_CALLBACKS PnpPowerCallbacks;
+        WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &PnpPowerCallbacks);
 
-        pnpPowerCallbacks.EvtDevicePrepareHardware = DevicePrepareHardware;
-        WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnpPowerCallbacks);
+        WDF_OBJECT_ATTRIBUTES RequestAttributes;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&RequestAttributes, request_context);
+        WdfDeviceInitSetRequestAttributes(DeviceInit, &RequestAttributes);
 
-        WDF_OBJECT_ATTRIBUTES deviceAttributes;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&deviceAttributes, device_context);
+        WDF_FILEOBJECT_CONFIG fileConfig;
+        WDF_FILEOBJECT_CONFIG_INIT(&fileConfig, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK);
 
-        WDFDEVICE device;
-        auto status = WdfDeviceCreate(&DeviceInit, &deviceAttributes, &device);
-        if (!NT_SUCCESS(status)) {
-                return status;
+        WdfDeviceInitSetFileObjectConfig(DeviceInit, &fileConfig, WDF_NO_OBJECT_ATTRIBUTES);
+
+        if (auto err = UdecxInitializeWdfDeviceInit(DeviceInit)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxInitializeWdfDeviceInit %!STATUS!", err);
+                return err;
+        }
+
+        WDF_OBJECT_ATTRIBUTES DeviceAttributes;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&DeviceAttributes, device_context);
+        DeviceAttributes.EvtCleanupCallback = ControllerCleanup;
+
+        WdfDeviceInitSetDeviceClass(DeviceInit, &GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
+
+#define BASE_DEVICE_NAME L"\\Device\\USBFDO-"
+
+        enum { 
+                maxuchar_cch = 3, // "255"
+                devname_cch = ARRAYSIZE(BASE_DEVICE_NAME) + maxuchar_cch,
+        };
+
+        WDFDEVICE device{};
+
+        for (ULONG i = 0; i < MAXUCHAR; ++i) {
+
+                DECLARE_UNICODE_STRING_SIZE(DeviceName, devname_cch*sizeof(WCHAR));
+
+                if (auto err = RtlUnicodeStringPrintf(&DeviceName, L"%ws%d", BASE_DEVICE_NAME, i)) {
+                        Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", err);
+                        return err;
+                }
+
+                if (auto err = WdfDeviceInitAssignName(DeviceInit, &DeviceName)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceInitAssignName %!STATUS!", err);
+                        return err;
+                }
+                
+                if (auto err = WdfDeviceCreate(&DeviceInit, &DeviceAttributes, &device)) {
+                        if (err != STATUS_OBJECT_NAME_COLLISION) {
+                                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
+                                return err;
+                        }
+                }
         }
 
         if (auto ctx = DeviceGetContext(device)) {
                 ctx->PrivateDeviceData = 0;
         }
 
-        status = WdfDeviceCreateDeviceInterface(device, &GUID_DEVINTERFACE_XHCI_USBIP, nullptr);
-        if (NT_SUCCESS(status)) {
-                status = QueueInitialize(device);
+        const GUID* guids[] = {
+                &GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
+                &GUID_DEVINTERFACE_XHCI_USBIP
+        };
+
+        for (auto guid: guids) {
+                if (auto err = WdfDeviceCreateDeviceInterface(device, guid, nullptr)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreateDeviceInterface %!STATUS!", err);
+                        return err;
+                }
         }
 
-        return status;
-}
+        if (auto err = QueueInitialize(device)) {
+                Trace(TRACE_LEVEL_ERROR, "QueueInitialize %!STATUS!", err);
+                return err;
+        }
 
+        return STATUS_SUCCESS;
+}

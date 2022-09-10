@@ -10,7 +10,7 @@ namespace
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void EvtIoDeviceControl(
+void IoDeviceControl(
         _In_ WDFQUEUE Queue,
         _In_ WDFREQUEST Request,
         _In_ size_t OutputBufferLength,
@@ -26,7 +26,7 @@ void EvtIoDeviceControl(
 _Function_class_(EVT_WDF_IO_QUEUE_IO_STOP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void EvtIoStop(
+void IoStop(
         _In_ WDFQUEUE Queue,
         _In_ WDFREQUEST Request,
         _In_ ULONG ActionFlags)
@@ -42,10 +42,11 @@ PAGEABLE NTSTATUS QueueInitialize(_In_ WDFDEVICE Device)
         PAGED_CODE();
     
         WDF_IO_QUEUE_CONFIG queueConfig;
-        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel);
+        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel); // WdfIoQueueDispatchSequential
 
-        queueConfig.EvtIoDeviceControl = EvtIoDeviceControl;
-        queueConfig.EvtIoStop = EvtIoStop;
+        queueConfig.PowerManaged = WdfFalse;
+        queueConfig.EvtIoDeviceControl = IoDeviceControl;
+        queueConfig.EvtIoStop = IoStop;
 
         WDFQUEUE queue;
         auto status = WdfIoQueueCreate(Device, &queueConfig, WDF_NO_OBJECT_ATTRIBUTES, &queue);

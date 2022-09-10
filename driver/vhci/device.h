@@ -7,8 +7,8 @@
 
 struct device_context
 {
-    WDFUSBDEVICE UsbDevice;
-    ULONG PrivateDeviceData;  // just a placeholder
+        WDFUSBDEVICE UsbDevice;
+        ULONG PrivateDeviceData;  // just a placeholder
 };
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_context, DeviceGetContext)

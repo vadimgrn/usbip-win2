@@ -26,7 +26,7 @@
 
 #define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
 
-#define HWID_ROOT "USBIP\root"
+#define HWID_ROOT "ROOT\VHCI_USBIP2"
 #define TestCert "USBIP Test"
 
 [Setup]
@@ -83,8 +83,8 @@ Name: modifypath; Description: "&Add to PATH environment variable for all users"
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip2_vhci.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_vhci.inf {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 

@@ -55,10 +55,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <SupportsPackaging>
+    </SupportsPackaging>
+    <UdeDriver>true</UdeDriver>
+    <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
+    <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <SupportsPackaging>
+    </SupportsPackaging>
+    <UdeDriver>true</UdeDriver>
+    <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
+    <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -70,9 +82,11 @@
   <PropertyGroup />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
