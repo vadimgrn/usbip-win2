@@ -17,12 +17,10 @@ struct Context
         std::string path;
 };
 
-int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, usbip::devno_t, void *context)
+int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, Context &ctx)
 {
-        auto &ctx = *reinterpret_cast<Context*>(context);
-
         if (auto inf = usbip::get_intf_detail(dev_info, data, *ctx.guid)) {
-                ctx.path = inf->DevicePath;
+                ctx.path.assign(inf->DevicePath, inf->cbSize);
                 return true;
         }
 
@@ -31,9 +29,11 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, usbip::devno_t, voi
 
 auto get_vhci_devpath(hci_version version)
 {
-        Context r{ &vhci_guid(version) };
-        usbip::traverse_intfdevs(walker_devpath, *r.guid, &r);
-        return r.path;
+        Context ctx{ &vhci_guid(version) };
+        auto f = [&ctx] (auto&&...args) { return walker_devpath(std::forward<decltype(args)>(args)..., ctx); };
+
+        usbip::traverse_intfdevs(*ctx.guid, f);
+        return ctx.path;
 }
 
 } // namespace
