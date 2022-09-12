@@ -9,8 +9,6 @@
 #include <usbdlib.h>
 
 #include <wdfusb.h>
-#include <wdfobject.h>
-
 #include <Udecx.h>
 
 #include "driver.h"
@@ -65,7 +63,10 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
-
+        TraceDbg("DEBUG");
+        TraceMsg("MSG %p", DeviceInit);
+        return STATUS_INSUFFICIENT_RESOURCES;
+/*
         WDF_PNPPOWER_EVENT_CALLBACKS PnpPowerCallbacks;
         WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &PnpPowerCallbacks);
 
@@ -142,4 +143,5 @@ PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *Device
         }
 
         return STATUS_SUCCESS;
+*/
 }

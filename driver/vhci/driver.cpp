@@ -17,25 +17,15 @@ PAGEABLE void DriverUnload(_In_ DRIVER_OBJECT *drvobj)
 	WPP_CLEANUP(drvobj);
 }
 
-_Function_class_(EVT_WDF_DRIVER_UNLOAD)
-_IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-void DriverUnload(_In_ WDFDRIVER Driver)
-{
-	PAGED_CODE();
-	if (auto drvobj = WdfDriverWdmGetDriverObject(Driver)) {
-		DriverUnload(drvobj);
-	}
-}
-
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGEABLE void CleanupCallback(_In_ WDFOBJECT DriverObject)
 {
-        PAGED_CODE();
-	TraceMsg("%04x", ptr4log(DriverObject));
-//	static_cast<WDFDRIVER>(DriverObject);
+	PAGED_CODE();
+	if (auto drvobj = WdfDriverWdmGetDriverObject(static_cast<WDFDRIVER>(DriverObject))) {
+		DriverUnload(drvobj);
+	}
 }
 
 /*
@@ -53,16 +43,16 @@ PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
 	ULONG len = 0;
 	KEY_VALUE_PARTIAL_INFORMATION info;
 
-	NTSTATUS st = ZwQueryValueKey(h, &name, KeyValuePartialInformation, &info, sizeof(info), &len);
+	auto err = ZwQueryValueKey(h, &name, KeyValuePartialInformation, &info, sizeof(info), &len);
 
-	if (st == STATUS_OBJECT_NAME_NOT_FOUND) {
+	if (err == STATUS_OBJECT_NAME_NOT_FOUND) {
 		DWORD val = 1;
-		st = ZwSetValueKey(h, &name, 0, REG_DWORD, &val, sizeof(val));
+		err = ZwSetValueKey(h, &name, 0, REG_DWORD, &val, sizeof(val));
 	} else {
-		NT_ASSERT(!st);
+		NT_ASSERT(!err);
 	}
 
-	return st;
+	return err;
 }
 
 /*
@@ -78,8 +68,7 @@ PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
 
-	UNICODE_STRING params;
-	RtlInitUnicodeString(&params, L"\\Parameters");
+	DECLARE_CONST_UNICODE_STRING(params, L"\\Parameters");
 
 	UNICODE_STRING path;
 	path.Length = 0;
@@ -90,7 +79,7 @@ PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	NTSTATUS err = RtlUnicodeStringCopy(&path, RegistryPath);
+	auto err = RtlUnicodeStringCopy(&path, RegistryPath);
 	NT_ASSERT(!err);
 
 	err = RtlUnicodeStringCat(&path, &params);
@@ -124,30 +113,27 @@ EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STR
 	auto st = set_ifr_verbose(RegistryPath);
 	WPP_INIT_TRACING(DriverObject, RegistryPath);
 	if (st) {
-		Trace(TRACE_LEVEL_CRITICAL, "Can't set IFR parameter: %!STATUS!", st);
+		Trace(TRACE_LEVEL_CRITICAL, "set_ifr_verbose %!STATUS!", st);
 		DriverUnload(DriverObject);
 		return st;
 	}
 
-	TraceMsg("%04x", ptr4log(DriverObject));
+        TraceMsg("DriverObject %04x, RegistryPath %!USTR!", ptr4log(DriverObject), RegistryPath);
 
-        WDF_OBJECT_ATTRIBUTES attributes;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-        attributes.EvtCleanupCallback = CleanupCallback;
+	WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
 
-        WDF_DRIVER_CONFIG config;
-        WDF_DRIVER_CONFIG_INIT(&config, DriverDeviceAdd);
+	attrs.EvtCleanupCallback = CleanupCallback;
 
-	config.EvtDriverUnload = DriverUnload;
-	config.DriverPoolTag = USBIP_VHCI_POOL_TAG;
+        WDF_DRIVER_CONFIG cfg;
+        WDF_DRIVER_CONFIG_INIT(&cfg, DriverDeviceAdd);
+        cfg.DriverPoolTag = USBIP_VHCI_POOL_TAG;
 
-        auto status = WdfDriverCreate(DriverObject, RegistryPath, &attributes, &config, WDF_NO_HANDLE);
-        if (!NT_SUCCESS(status)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDriverCreate %!STATUS!", status);
-		DriverUnload(DriverObject);
-		return status;
+        if (auto err = WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, WDF_NO_HANDLE)) {
+                Trace(TRACE_LEVEL_CRITICAL,"WdfDriverCreate %!STATUS!", err);
+                DriverUnload(DriverObject);
+		return err;
         }
 
-	TraceMsg("%!STATUS!", status);
-        return status;
+        return STATUS_SUCCESS;
 }

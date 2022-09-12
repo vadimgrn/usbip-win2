@@ -90,7 +90,7 @@ Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_vhci.inf {#HWID_R
 
 ; @see devcon hwids "USBIP\*"
 Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveRootDevice"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip2_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_ROOT} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden

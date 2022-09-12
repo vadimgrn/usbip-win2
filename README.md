@@ -52,7 +52,7 @@
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`
-- Set certificate driver signing for `package`, `usbip_vhci` projects
+- Set certificate driver signing for `package`, `usbip2_vhci` projects
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Enter `..\usbip_test.pfx` (password: usbip)
 - Build the solution
@@ -122,7 +122,7 @@ port 1 is successfully detached
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
 - Use this tracing GUID for vhci driver
-  - `8b56380d-5174-4b15-b6f4-4c47008801a4`
+  - `e8fb7783-ce25-41cb-84a3-40282df17f59`
 - Install Debug build
 - Start a log session for vhci driver (copy commands to .bat file and run it)
 ```
@@ -130,7 +130,7 @@ port 1 is successfully detached
 set NAME=usbip-vhci
 tracelog.exe -stop %NAME%
 tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
-tracelog.exe -start %NAME% -guid #8b56380d-5174-4b15-b6f4-4c47008801a4 -f %NAME%.etl -flag 0x3F -level 5
+tracelog.exe -start %NAME% -guid #e8fb7783-ce25-41cb-84a3-40282df17f59 -f %NAME%.etl -flag 0x1F -level 5
 ```
 - Reproduce the issue
 - Stop the log session and get plain text log (copy commands to .bat file and run it)
@@ -179,7 +179,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 8 9 12 18 10 14 15 20 24 26 34 35 /driver usbip2_vhci.sys
+verifier /rc 1 2 4 5 6 8 9 12 16 18 10 14 15 20 24 26 34 35 /driver usbip2_vhci.sys
 ```
 - Query driver statistics
 ```
@@ -189,4 +189,4 @@ verifier /query
 ```
 verifier /reset
 ```
-- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip_vhci projects
+- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip2_vhci projects

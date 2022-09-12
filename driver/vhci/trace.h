@@ -7,19 +7,18 @@
 //
 // Define the tracing flags.
 //
-// Tracing GUID - 8b56380d-5174-4b15-b6f4-4c47008801a4
+// Tracing GUID - ed18c9c5-8322-48ae-bf78-d01d898a1562
 //
 
 #define WPP_CONTROL_GUIDS                                                \
     WPP_DEFINE_CONTROL_GUID(                                             \
-        UsbipVhciTraceGuid, (8b56380d,5174,4b15,b6f4,4c47008801a4),      \
+        VhciTraceGuid, (ed18c9c5,8322,48ae,bf78,d01d898a1562),           \
                                                                          \
         WPP_DEFINE_BIT(FLAG_GENERAL)           /* bit  0 = 0x00000001 */ \
         WPP_DEFINE_BIT(FLAG_USBIP)             /* bit  1 = 0x00000002 */ \
         WPP_DEFINE_BIT(FLAG_URB)               /* bit  2 = 0x00000004 */ \
         WPP_DEFINE_BIT(FLAG_DBG)               /* bit  3 = 0x00000008 */ \
         WPP_DEFINE_BIT(FLAG_WSK)               /* bit  4 = 0x00000010 */ \
-        WPP_DEFINE_BIT(FLAG_CSQ)               /* bit  5 = 0x00000020 */ \
         )                             
 
 #define WPP_FLAG_LEVEL_LOGGER(flag, level) \

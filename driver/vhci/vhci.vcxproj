@@ -106,7 +106,7 @@
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <DriverSign>
-      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib</AdditionalDependencies>
@@ -124,7 +124,7 @@
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <DriverSign>
-      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib</AdditionalDependencies>
