@@ -179,7 +179,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 8 9 12 18 10 14 15 20 24 26 35 /driver usbip2_vhci.sys
+verifier /rc 1 2 4 5 6 8 9 12 18 10 14 15 20 24 26 34 35 /driver usbip2_vhci.sys
 ```
 - Query driver statistics
 ```

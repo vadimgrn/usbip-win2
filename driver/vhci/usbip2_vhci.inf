@@ -7,7 +7,7 @@ Signature="$WINDOWS NT$"
 Class=USB
 ClassGuid={36FC9E60-C465-11CF-8056-444553540000}
 Provider=%ManufacturerName%
-CatalogFile=usbip2_vhci.cat
+CatalogFile=%vhci.driver%.cat
 PnpLockDown=1
 
 [DestinationDirs]
@@ -15,10 +15,10 @@ DefaultDestDir = 12
 vhci_Device_CoInstaller_CopyFiles = 11
 
 [SourceDisksNames]
-1 = %DiskName%,,,""
+1 = "Vhci Installation Disk #1",,,""
 
 [SourceDisksFiles]
-usbip2_vhci.sys  = 1,,
+%vhci.driver%.sys  = 1,,
 WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
 
 ;*****************************************
@@ -32,7 +32,7 @@ WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with
 %vhci.DeviceDesc%=vhci_Device, ROOT\VHCI_USBIP2
 
 [vhci_Device.NT]
-CopyFiles=@usbip2_vhci.sys
+CopyFiles=@%vhci.driver%.sys
 
 [vhci_Device.NT.HW]
 AddReg=vhci_AddReg
@@ -45,15 +45,15 @@ AddReg=vhci_AddReg
 
 ;-------------- Service installation
 [vhci_Device.NT.Services]
-AddService = usbip2_vhci,%SPSVCINST_ASSOCSERVICE%, vhci_Service_Inst
+AddService = %vhci.driver%,%SPSVCINST_ASSOCSERVICE%, vhci_Service_Inst
 
 ; -------------- vhci driver install sections
 [vhci_Service_Inst]
-DisplayName    = %vhci.SVCDESC%
+DisplayName    = "usbip2 vhci service"
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
-ServiceBinary  = %12%\usbip2_vhci.sys
+ServiceBinary  = %12%\%vhci.driver%.sys
 Dependencies   = ucx01000, udecx
 
 ;
@@ -71,13 +71,12 @@ HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfC
 WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
 
 [vhci_Device.NT.Wdf]
-KmdfService =  usbip2_vhci, vhci_wdfsect
+KmdfService =  %vhci.driver%, vhci_wdfsect
 [vhci_wdfsect]
 KmdfLibraryVersion = $KMDFVERSION$
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
 ManufacturerName="usbip-win2"
-DiskName = "vhci Installation Disk"
 vhci.DeviceDesc = "usbip2 vhci"
-vhci.SVCDESC = "usbip2 vhci service"
+vhci.driver = "usbip2_vhci"

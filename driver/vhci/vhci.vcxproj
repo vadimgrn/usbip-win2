@@ -61,6 +61,9 @@
     <UdeDriver>true</UdeDriver>
     <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
     <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_MINIMUM_VERSION_REQUIRED>31</KMDF_MINIMUM_VERSION_REQUIRED>
+    <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
@@ -71,6 +74,9 @@
     <UdeDriver>true</UdeDriver>
     <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
     <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_MINIMUM_VERSION_REQUIRED>31</KMDF_MINIMUM_VERSION_REQUIRED>
+    <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
