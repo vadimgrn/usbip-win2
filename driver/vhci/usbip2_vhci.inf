@@ -6,7 +6,7 @@
 Signature="$WINDOWS NT$"
 Class=USB
 ClassGuid={36FC9E60-C465-11CF-8056-444553540000}
-Provider=%ManufacturerName%
+Provider=%Manufacturer%
 CatalogFile=%vhci.driver%.cat
 PnpLockDown=1
 
@@ -26,7 +26,7 @@ WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with
 ;*****************************************
 
 [Manufacturer]
-%ManufacturerName%=Standard,NT$ARCH$
+%Manufacturer%=Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
 %vhci.DeviceDesc%=vhci_Device, ROOT\VHCI_USBIP2
@@ -77,6 +77,6 @@ KmdfLibraryVersion = $KMDFVERSION$
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
-ManufacturerName="usbip-win2"
+Manufacturer="usbip-win2"
 vhci.DeviceDesc = "usbip2 vhci"
 vhci.driver = "usbip2_vhci"
