@@ -62,7 +62,8 @@
     <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
     <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
-    <KMDF_MINIMUM_VERSION_REQUIRED>31</KMDF_MINIMUM_VERSION_REQUIRED>
+    <KMDF_MINIMUM_VERSION_REQUIRED>
+    </KMDF_MINIMUM_VERSION_REQUIRED>
     <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -75,7 +76,8 @@
     <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
     <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
-    <KMDF_MINIMUM_VERSION_REQUIRED>31</KMDF_MINIMUM_VERSION_REQUIRED>
+    <KMDF_MINIMUM_VERSION_REQUIRED>
+    </KMDF_MINIMUM_VERSION_REQUIRED>
     <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -106,7 +108,8 @@
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>
+      </FileDigestAlgorithm>
     </DriverSign>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib</AdditionalDependencies>
@@ -124,7 +127,8 @@
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>
+      </FileDigestAlgorithm>
     </DriverSign>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib</AdditionalDependencies>

@@ -27,7 +27,7 @@
 #define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
 
 #define InfFile "usbip2_vhci.inf"
-#define HWID_ROOT "ROOT\VHCI_USBIP2"
+#define HWID_ROOT "ROOT\USBIP2_VHCI"
 #define TestCert "USBIP Test"
 
 [Setup]
@@ -89,7 +89,7 @@ Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\{#InfFile} {#HWID_ROOT}"
 
 [UninstallRun]
 
-; @see devcon hwids "*USBIP2*"
+; @see devcon hwids "*USBIP*"
 Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveRootDevice"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_ROOT} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
 

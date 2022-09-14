@@ -52,7 +52,7 @@
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`
-- Set certificate driver signing for `package`, `usbip2_vhci` projects
+- Set certificate driver signing for `package` project
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Enter `..\usbip_test.pfx` (password: usbip)
 - Build the solution
@@ -179,7 +179,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 8 9 12 16 18 10 14 15 20 24 26 34 35 /driver usbip2_vhci.sys
+verifier /rc 1 2 4 5 6 9 11 12 16 18 10 14 15 20 24 26 33 34 35 36 /driver usbip2_vhci.sys
 ```
 - Query driver statistics
 ```

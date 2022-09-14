@@ -7,18 +7,18 @@ Signature="$WINDOWS NT$"
 Class=USB
 ClassGuid={36FC9E60-C465-11CF-8056-444553540000}
 Provider=%Manufacturer%
-CatalogFile=%vhci.driver%.cat
+CatalogFile=%DriverName%.cat
 PnpLockDown=1
 
 [DestinationDirs]
-DefaultDestDir = 12
+DefaultDestDir = 13 ; Driver package isolation
 vhci_Device_CoInstaller_CopyFiles = 11
 
 [SourceDisksNames]
-1 = "Vhci Installation Disk #1",,,""
+1 = "USBIP2 VHCI Installation Disk #1",,,""
 
 [SourceDisksFiles]
-%vhci.driver%.sys  = 1,,
+usbip2_vhci.sys = 1,, ; %DriverName% doesn't work
 WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
 
 ;*****************************************
@@ -29,10 +29,10 @@ WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with
 %Manufacturer%=Standard,NT$ARCH$
 
 [Standard.NT$ARCH$]
-%vhci.DeviceDesc%=vhci_Device, ROOT\VHCI_USBIP2
+"USBIP2 VHCI"=vhci_Device, ROOT\USBIP2_VHCI
 
 [vhci_Device.NT]
-CopyFiles=@%vhci.driver%.sys
+CopyFiles=@usbip2_vhci.sys ; %DriverName% doesn't work
 
 [vhci_Device.NT.HW]
 AddReg=vhci_AddReg
@@ -41,19 +41,19 @@ AddReg=vhci_AddReg
 ; By default, USBDevice class uses iProduct descriptor to name the device in
 ; Device Manager on Windows 8 and higher.
 ; Uncomment for this device to use %DeviceName% on Windows 8 and higher:
-; HKR,,FriendlyName,,%vhci.DeviceDesc%
+; HKR,,FriendlyName,,%DeviceName%
 
 ;-------------- Service installation
 [vhci_Device.NT.Services]
-AddService = %vhci.driver%,%SPSVCINST_ASSOCSERVICE%, vhci_Service_Inst
+AddService = %ServiceName%,%SPSVCINST_ASSOCSERVICE%, vhci_Service_Inst
 
 ; -------------- vhci driver install sections
 [vhci_Service_Inst]
-DisplayName    = "usbip2 vhci service"
+DisplayName    = "USBIP2 VHCI Service"
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
-ServiceBinary  = %12%\%vhci.driver%.sys
+ServiceBinary  = %13%\%DriverName%.sys ; Driver package isolation
 Dependencies   = ucx01000, udecx
 
 ;
@@ -71,12 +71,12 @@ HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfC
 WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
 
 [vhci_Device.NT.Wdf]
-KmdfService =  %vhci.driver%, vhci_wdfsect
+KmdfService = %ServiceName%, vhci_wdfsect
 [vhci_wdfsect]
 KmdfLibraryVersion = $KMDFVERSION$
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
-Manufacturer="usbip-win2"
-vhci.DeviceDesc = "usbip2 vhci"
-vhci.driver = "usbip2_vhci"
+Manufacturer="USBIP-WIN2"
+DriverName = "usbip2_vhci"
+ServiceName = %DriverName%

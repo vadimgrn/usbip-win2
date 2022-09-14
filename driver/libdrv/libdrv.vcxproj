@@ -37,8 +37,7 @@
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <DriverType>KMDF</DriverType>
-    <DriverTargetPlatform>
-    </DriverTargetPlatform>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <SpectreMitigation>false</SpectreMitigation>
     <TargetVersion>Windows10</TargetVersion>
     <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
@@ -48,8 +47,7 @@
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <DriverType>KMDF</DriverType>
-    <DriverTargetPlatform>
-    </DriverTargetPlatform>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <SpectreMitigation>false</SpectreMitigation>
     <TargetVersion>Windows10</TargetVersion>
     <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
