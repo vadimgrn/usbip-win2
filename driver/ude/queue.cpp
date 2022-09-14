@@ -3,6 +3,7 @@
 #include "queue.tmh"
 
 #include <usb.h>
+#include "vhci.h"
 
 namespace
 {
@@ -37,23 +38,28 @@ void IoStop(
 } // namespace
 
 
-PAGEABLE NTSTATUS QueueInitialize(_In_ WDFDEVICE Device)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS QueueInitialize(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-    
-        WDF_IO_QUEUE_CONFIG queueConfig;
-        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&queueConfig, WdfIoQueueDispatchParallel); // WdfIoQueueDispatchSequential
 
-        queueConfig.PowerManaged = WdfFalse;
-        queueConfig.EvtIoDeviceControl = IoDeviceControl;
-        queueConfig.EvtIoStop = IoStop;
+        WDF_IO_QUEUE_CONFIG cfg;
+        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
+
+        cfg.PowerManaged = WdfFalse;
+        cfg.EvtIoDeviceControl = IoDeviceControl;
+        cfg.EvtIoStop = IoStop;
 
         WDFQUEUE queue;
-        auto status = WdfIoQueueCreate(Device, &queueConfig, WDF_NO_OBJECT_ATTRIBUTES, &queue);
-
-        if (!NT_SUCCESS(status)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate failed %!STATUS!", status);
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &queue)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
+                return err;
         }
 
-        return status;
+        if (auto ctx = get_vhci_context(vhci)) {
+                ctx->queue = queue;
+        }
+
+        return STATUS_SUCCESS;
 }

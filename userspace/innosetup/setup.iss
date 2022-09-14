@@ -24,7 +24,7 @@
 #define Copyright GetFileCopyright(ExePath)
 #define Company GetFileCompany(ExePath)
 
-#define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
+#define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
 #define InfFile "usbip2_vhci.inf"
 #define HWID_ROOT "ROOT\USBIP2_VHCI"

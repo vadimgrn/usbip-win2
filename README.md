@@ -29,7 +29,7 @@
 - x86 build is removed
 - Server (stub driver) is removed
 - UDE client driver is removed, WDM driver is superseded it
-- Client (VHCI driver)
+- Client (UDE driver)
   - Significantly refactored and improved
   - The core of the driver was rewritten from scratch
   - attacher.exe (usbip_xfer.exe) is no longer used
@@ -121,24 +121,24 @@ port 1 is successfully detached
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
-- Use this tracing GUID for vhci driver
-  - `e8fb7783-ce25-41cb-84a3-40282df17f59`
+- Use this tracing GUID for UDE driver
+  - `ed18c9c5-8322-48ae-bf78-d01d898a1562`
 - Install Debug build
-- Start a log session for vhci driver (copy commands to .bat file and run it)
+- Start a log session for UDE driver (copy commands to .bat file and run it)
 ```
 @echo off
-set NAME=usbip-vhci
+set NAME=usbip2-vhub
 tracelog.exe -stop %NAME%
-tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
-tracelog.exe -start %NAME% -guid #e8fb7783-ce25-41cb-84a3-40282df17f59 -f %NAME%.etl -flag 0x1F -level 5
+tracelog.exe -start %NAME% -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%.etl -flag 0x1F -level 5
 ```
 - Reproduce the issue
 - Stop the log session and get plain text log (copy commands to .bat file and run it)
 ```
 @echo off
-set NAME=usbip-vhci
+set NAME=usbip2-vhub
 set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
+tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%.txt %NAME%.etl
 rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
 rem rm sed*
@@ -151,7 +151,7 @@ rem rm sed*
   - Click on "Settings" in "Startup and Recovery"
   - "System failure", "Write debugging information", pick "Automatic Memory Dump" or "Kernel Memory Dump"
   - Check "Overwrite any existing file"
-- Start WPP tracing session for vhci driver as described in the previous topic
+- Start WPP tracing session for UDE driver as described in the previous topic
 - When BSOD has occured
   - Reboot PC if automatic reboot is not set
   - Run Windows debugger WinDbg.exe as Administrator
@@ -159,9 +159,9 @@ rem rm sed*
   - Run following commands and copy the output
 ```
 !analyze -v
-!wmitrace.searchpath %TEMP%\usbip-vhci
+!wmitrace.searchpath %TEMP%\usbip2-vhub
 !wmitrace.setprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
-!wmitrace.logdump usbip-vhci
+!wmitrace.logdump usbip2-vhub
 ```
 
 ## Obtaining USB/IP log on Linux
@@ -179,7 +179,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 9 11 12 16 18 10 14 15 20 24 26 33 34 35 36 /driver usbip2_vhci.sys
+verifier /rc 1 2 4 5 6 9 11 12 16 18 10 14 15 20 24 26 33 34 35 36 /driver usbip2_vhub.sys
 ```
 - Query driver statistics
 ```
@@ -189,4 +189,4 @@ verifier /query
 ```
 verifier /reset
 ```
-- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip2_vhci projects
+- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip2_vhub projects

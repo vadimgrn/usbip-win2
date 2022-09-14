@@ -1,5 +1,5 @@
 #include "driver.h"
-#include "device.h"
+#include "vhci.h"
 #include "trace.h"
 #include "driver.tmh"
 
@@ -11,7 +11,7 @@ namespace
  * The default setting of zero causes the IFR to log errors, warnings, and informational events.
  * Set to one to add verbose output to the log.
  *
- * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
+ * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhub\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -39,14 +39,13 @@ PAGEABLE auto set_ifr_verbose()
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGEABLE void CleanupCallback(_In_ WDFOBJECT DriverObject)
+PAGEABLE void driver_cleanup(_In_ WDFOBJECT DriverObject)
 {
 	PAGED_CODE();
 
-	if (auto drvobj = WdfDriverWdmGetDriverObject(static_cast<WDFDRIVER>(DriverObject))) {
-		Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x", ptr4log(drvobj));
-		WPP_CLEANUP(drvobj);
-	}
+	auto drvobj = WdfDriverWdmGetDriverObject(static_cast<WDFDRIVER>(DriverObject));
+	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x", ptr4log(drvobj));
+	WPP_CLEANUP(drvobj);
 }
 
 _IRQL_requires_same_
@@ -57,7 +56,7 @@ PAGEABLE auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRIN
 
 	WDF_OBJECT_ATTRIBUTES attrs;
 	WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-	attrs.EvtCleanupCallback = CleanupCallback;
+	attrs.EvtCleanupCallback = driver_cleanup;
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DriverDeviceAdd);

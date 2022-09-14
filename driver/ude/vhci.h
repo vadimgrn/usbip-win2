@@ -5,13 +5,17 @@
 
 #include <libdrv\pageable.h>
 
-struct device_context
+struct vhci_context
 {
-        WDFUSBDEVICE UsbDevice;
-        ULONG PrivateDeviceData;  // just a placeholder
+        WDFUSBDEVICE vhci;
+        WDFQUEUE queue;
 };
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_context, get_vhci_context)
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_context, DeviceGetContext)
+struct request_context
+{
+};
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_context, get_request_context)
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
