@@ -5,6 +5,7 @@
 #include <ntstrsafe.h>
 
 #include <usb.h>
+#include <usbdlib.h>
 #include <usbiodef.h>
 
 #include <wdfusb.h>
@@ -43,19 +44,98 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
 {
-        [[maybe_unused]] auto hub = static_cast<WDFDEVICE>(DeviceObject);
+        auto vhci = static_cast<WDFDEVICE>(DeviceObject);
+        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
 }
 
 _Function_class_(EVT_UDECX_WDF_DEVICE_QUERY_USB_CAPABILITY)
 _IRQL_requires_same_
 NTSTATUS query_usb_capability(
         _In_ WDFDEVICE /*UdecxWdfDevice*/,
-        _In_ PGUID /*CapabilityType*/,
+        _In_ GUID *CapabilityType,
         _In_ ULONG /*OutputBufferLength*/,
         _Out_writes_to_opt_(OutputBufferLength, *ResultLength) PVOID /*OutputBuffer*/,
-        _Out_ PULONG /*ResultLength*/)
+        _Out_ ULONG *ResultLength)
 {
-        return STATUS_NOT_IMPLEMENTED;
+        *ResultLength = 0;
+        auto st = STATUS_NOT_IMPLEMENTED;
+
+        if (*CapabilityType == GUID_USB_CAPABILITY_CHAINED_MDLS) {
+                st = STATUS_SUCCESS;
+        } else if (*CapabilityType == GUID_USB_CAPABILITY_SELECTIVE_SUSPEND) {
+                st = STATUS_NOT_SUPPORTED;
+        } else if (*CapabilityType == GUID_USB_CAPABILITY_FUNCTION_SUSPEND) {
+                st = STATUS_NOT_SUPPORTED;
+        } else if (*CapabilityType == GUID_USB_CAPABILITY_DEVICE_CONNECTION_HIGH_SPEED_COMPATIBLE) {
+                st = STATUS_SUCCESS;
+        } else if (*CapabilityType == GUID_USB_CAPABILITY_DEVICE_CONNECTION_SUPER_SPEED_COMPATIBLE) {
+                st = STATUS_SUCCESS;
+        }
+
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto setup(_Inout_ WDFDEVICE_INIT *DeviceInit)
+{
+        PAGED_CODE();
+
+        WDF_PNPPOWER_EVENT_CALLBACKS pnp_power;
+        WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnp_power);
+        WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnp_power);
+
+        WDF_FILEOBJECT_CONFIG fileobj_cfg;
+        WDF_FILEOBJECT_CONFIG_INIT(&fileobj_cfg, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK);
+        WdfDeviceInitSetFileObjectConfig(DeviceInit, &fileobj_cfg, WDF_NO_OBJECT_ATTRIBUTES);
+
+        WDF_OBJECT_ATTRIBUTES request_attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&request_attrs, request_context);
+        WdfDeviceInitSetRequestAttributes(DeviceInit, &request_attrs);
+
+        return UdecxInitializeWdfDeviceInit(DeviceInit);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto create_device(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
+{
+        PAGED_CODE();
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, vhci_context);
+        attrs.EvtCleanupCallback = vhci_cleanup;
+
+        if (auto err = WdfDeviceCreate(&DeviceInit, &attrs, &vhci)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
+                return err;
+        }
+
+        if (auto ctx = get_vhci_context(vhci)) {
+                ctx->vhci = reinterpret_cast<WDFUSBDEVICE>(vhci);
+        }
+
+        return create_interfaces(vhci);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        UDECX_WDF_DEVICE_CONFIG cfg;
+        UDECX_WDF_DEVICE_CONFIG_INIT(&cfg, query_usb_capability);
+
+        cfg.NumberOfUsb20Ports = VHUB_NUM_PORTS;
+        cfg.NumberOfUsb30Ports = VHUB_NUM_PORTS;
+
+        if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
+                return err;
+        }
+
+        return queue_initialize(vhci);
 }
 
 } // namespace
@@ -68,55 +148,20 @@ PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *Device
 {
         PAGED_CODE();
 
-        WDF_PNPPOWER_EVENT_CALLBACKS PnpPowerCallbacks;
-        WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &PnpPowerCallbacks);
-
-        WDF_OBJECT_ATTRIBUTES request_attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&request_attrs, request_context);
-        WdfDeviceInitSetRequestAttributes(DeviceInit, &request_attrs);
-
-        WDF_FILEOBJECT_CONFIG file_cfg;
-        WDF_FILEOBJECT_CONFIG_INIT(&file_cfg, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK);
-        WdfDeviceInitSetFileObjectConfig(DeviceInit, &file_cfg, WDF_NO_OBJECT_ATTRIBUTES);
-
-        if (auto err = UdecxInitializeWdfDeviceInit(DeviceInit)) {
+        if (auto err = setup(DeviceInit)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxInitializeWdfDeviceInit %!STATUS!", err);
                 return err;
         }
 
-        WDF_OBJECT_ATTRIBUTES vhci_attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&vhci_attrs, vhci_context);
-        vhci_attrs.EvtCleanupCallback = vhci_cleanup;
-
         WDFDEVICE vhci;
-        if (auto err = WdfDeviceCreate(&DeviceInit, &vhci_attrs, &vhci)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
+        if (auto err = create_device(vhci, DeviceInit)) {
                 return err;
         }
 
-        if (auto ctx = get_vhci_context(vhci)) {
-                ctx->vhci = reinterpret_cast<WDFUSBDEVICE>(vhci);
-        }
-
-        if (auto err = create_interfaces(vhci)) {
+        if (auto err = add_usb_device_emulation(vhci)) {
                 return err;
         }
 
-        UDECX_WDF_DEVICE_CONFIG vhci_cfg;
-        UDECX_WDF_DEVICE_CONFIG_INIT(&vhci_cfg, query_usb_capability);
-
-        if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &vhci_cfg)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
-                return err;
-        }
-
-        if (auto err = QueueInitialize(vhci)) {
-                return err;
-        }
-
-//        if (auto err = Usb_Initialize(hub)) {
-//                return err;
-//        }
-
+        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
         return STATUS_SUCCESS;
 }

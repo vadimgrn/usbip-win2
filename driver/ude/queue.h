@@ -13,4 +13,4 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(queue_context, get_queue_context);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS QueueInitialize(_In_ WDFDEVICE vhci);
+PAGEABLE NTSTATUS queue_initialize(_In_ WDFDEVICE vhci);

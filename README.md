@@ -127,7 +127,7 @@ port 1 is successfully detached
 - Start a log session for UDE driver (copy commands to .bat file and run it)
 ```
 @echo off
-set NAME=usbip2-vhub
+set NAME=usbip2-vhci
 tracelog.exe -stop %NAME%
 tracelog.exe -start %NAME% -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%.etl -flag 0x1F -level 5
 ```
@@ -135,7 +135,7 @@ tracelog.exe -start %NAME% -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%
 - Stop the log session and get plain text log (copy commands to .bat file and run it)
 ```
 @echo off
-set NAME=usbip2-vhub
+set NAME=usbip2-vhci
 set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 tracelog.exe -stop %NAME%
 tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
@@ -159,9 +159,9 @@ rem rm sed*
   - Run following commands and copy the output
 ```
 !analyze -v
-!wmitrace.searchpath %TEMP%\usbip2-vhub
+!wmitrace.searchpath %TEMP%\usbip2-vhci
 !wmitrace.setprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
-!wmitrace.logdump usbip2-vhub
+!wmitrace.logdump usbip2-vhci
 ```
 
 ## Obtaining USB/IP log on Linux
@@ -179,7 +179,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 9 11 12 16 18 10 14 15 20 24 26 33 34 35 36 /driver usbip2_vhub.sys
+verifier /rc 1 2 4 5 6 9 11 12 16 18 10 14 15 20 24 26 33 34 35 36 /driver usbip2_vhci.sys
 ```
 - Query driver statistics
 ```
@@ -189,4 +189,4 @@ verifier /query
 ```
 verifier /reset
 ```
-- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip2_vhub projects
+- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip2_vhci projects

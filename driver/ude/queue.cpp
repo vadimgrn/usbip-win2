@@ -3,6 +3,10 @@
 #include "queue.tmh"
 
 #include <usb.h>
+#include <wdfusb.h>
+#include <UdeCx.h>
+
+#include "driver.h"
 #include "vhci.h"
 
 namespace
@@ -18,10 +22,13 @@ void IoDeviceControl(
         _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode)
 {
-        TraceDbg("Queue 0x%p, Request 0x%p OutputBufferLength %d InputBufferLength %d IoControlCode %d", 
-                  Queue, Request, (int) OutputBufferLength, (int) InputBufferLength, IoControlCode);
+        TraceDbg("Queue %04x, Request %04x, OutputBufferLength %Iu, InputBufferLength %Iu, IoControlCode %#lx", 
+                  ptr4log(Queue), ptr4log(Request), OutputBufferLength, InputBufferLength, IoControlCode);
 
-        WdfRequestComplete(Request, STATUS_SUCCESS);
+        if (!UdecxWdfDeviceTryHandleUserIoctl(WdfIoQueueGetDevice(Queue), Request)) {
+                TraceDbg("Not handled");
+                WdfRequestComplete(Request, STATUS_INVALID_DEVICE_REQUEST);
+        }
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_STOP)
@@ -32,7 +39,7 @@ void IoStop(
         _In_ WDFREQUEST Request,
         _In_ ULONG ActionFlags)
 {
-        TraceMsg("Queue 0x%p, Request 0x%p ActionFlags %d", Queue, Request, ActionFlags);
+        TraceMsg("Queue %04x, Request %04x, ActionFlags %#lx", ptr4log(Queue), ptr4log(Request), ActionFlags);
 }
 
 } // namespace
@@ -40,7 +47,7 @@ void IoStop(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS QueueInitialize(_In_ WDFDEVICE vhci)
+PAGEABLE NTSTATUS queue_initialize(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 
