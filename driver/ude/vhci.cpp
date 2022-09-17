@@ -152,7 +152,7 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        return queue_initialize(vhci);
+        return create_default_queue(vhci);
 }
 
 } // namespace

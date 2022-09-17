@@ -17,6 +17,7 @@ const char *get_usbd_status(USBD_STATUS status);
 
 const char *device_control_name(ULONG ioctl_code);
 const char *internal_device_control_name(ULONG ioctl_code);
+const char *usbuser_request_name(_In_ ULONG UsbUserRequest);
 
 const char *usbd_pipe_type_str(USBD_PIPE_TYPE t);
 const char *urb_function_str(int function);

@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ioctl.cpp" />
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="queue.cpp" />
@@ -21,6 +22,7 @@
     <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
     <ClInclude Include="..\..\include\usbip\vhci.h" />
+    <ClInclude Include="ioctl.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="driver.h" />
     <ClInclude Include="queue.h" />

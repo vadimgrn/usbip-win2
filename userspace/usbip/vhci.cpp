@@ -53,7 +53,7 @@ auto usbip::vhci_driver_open() -> Handle
 
 std::vector<ioctl_usbip_vhci_imported_dev> usbip::vhci_get_imported_devs(HANDLE hdev)
 {
-        std::vector<ioctl_usbip_vhci_imported_dev> v(VHUB_NUM_PORTS + 1);
+        std::vector<ioctl_usbip_vhci_imported_dev> v(USBIP_TOTAL_PORTS + 1);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
         if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, nullptr, nullptr)) {

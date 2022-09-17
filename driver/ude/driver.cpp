@@ -15,7 +15,7 @@ namespace
  * The default setting of zero causes the IFR to log errors, warnings, and informational events.
  * Set to one to add verbose output to the log.
  *
- * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhub\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
+ * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
