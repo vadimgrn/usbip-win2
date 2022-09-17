@@ -95,7 +95,7 @@ void usage(const std::wstring &program)
 } // namespace
 
 
-int wmain(int argc, wchar_t* argv[])
+int wmain(int argc, wchar_t* argv[]) // _tmain if include <tchar.h>
 {
         if (argc >= 2) {
                 auto cmd = std::wstring_view(argv[1]);

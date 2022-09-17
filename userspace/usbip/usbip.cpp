@@ -28,8 +28,7 @@
 #include <libusbip\getopt.h>
 #include <libusbip\common.h>
 #include <libusbip\network.h>
-
-#include <string>
+#include <libusbip\util.h>
 
 namespace
 {
@@ -93,16 +92,15 @@ int usbip_help(int argc, char *argv[])
 
 int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
 {
-	FileVersion v;
-	std::string s(v.GetFileVersion());
-	printf("%s\n", s.c_str());
-	return 0;
-}
+	assert(__argv[0] != argv[0]);
 
-int run_command(const struct command *cmd, int argc, char *argv[])
-{
-	dbg("running command: %s", cmd->name);
-	return cmd->fn(argc, argv);
+	auto me = utf8_to_wchar(__argv[0]);
+	FileVersion fv(me);
+
+	auto ver = fv.GetFileVersion();
+	printf("%S\n", ver.data());
+
+	return 0;
 }
 
 auto get_ids_data()
@@ -171,7 +169,7 @@ int main(int argc, char *argv[])
 				argc -= optind;
 				argv += optind;
 				optind = 0;
-				return run_command(&c, argc, argv);
+				return c.fn(argc, argv);
 			}
 		err("invalid command: %s", cmd);
 	}

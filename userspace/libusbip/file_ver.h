@@ -8,41 +8,41 @@
 class FileVersion 
 {
 public:
-        FileVersion(const char *path = nullptr);
+        FileVersion(const std::wstring_view &path) { SetFile(path); }
 
         explicit operator bool () const { return !m_info.empty(); }
         auto operator !() const { return m_info.empty(); }
 
-        DWORD SetFile(const char *path);
-        std::string VerLanguageName() const;
+        DWORD SetFile(const std::wstring_view &path);
+        std::wstring VerLanguageName() const;
 
         void SetDefTranslation() { m_def_transl = GetTranslation(true); }
 
         void SetTranslation(WORD lang_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), UINT code_page = GetACP());
         void GetTranslation(WORD &lang_id, UINT &code_page) const;
                                               
-        auto GetCompanyName() const { return VerQueryValue("CompanyName"); }
-        auto GetComments() const { return VerQueryValue("Comments"); }
-        auto GetFileDescription() const { return VerQueryValue("FileDescription"); }
-        auto GetFileVersion() const { return VerQueryValue("FileVersion"); }
-        auto GetInternalName() const { return VerQueryValue("InternalName"); }
-        auto GetLegalCopyright() const { return VerQueryValue("LegalCopyright"); }
-        auto GetLegalTrademarks() const { return VerQueryValue("LegalTrademarks"); }
-        auto GetOriginalFilename() const { return VerQueryValue("OriginalFilename"); }
-        auto GetPrivateBuild() const { return VerQueryValue("PrivateBuild"); }
-        auto GetProductName() const { return VerQueryValue("ProductName"); }
-        auto GetProductVersion() const { return VerQueryValue("ProductVersion"); }
-        auto GetSpecialBuild() const { return VerQueryValue("SpecialBuild"); }
+        auto GetCompanyName() const { return VerQueryValue(L"CompanyName"); }
+        auto GetComments() const { return VerQueryValue(L"Comments"); }
+        auto GetFileDescription() const { return VerQueryValue(L"FileDescription"); }
+        auto GetFileVersion() const { return VerQueryValue(L"FileVersion"); }
+        auto GetInternalName() const { return VerQueryValue(L"InternalName"); }
+        auto GetLegalCopyright() const { return VerQueryValue(L"LegalCopyright"); }
+        auto GetLegalTrademarks() const { return VerQueryValue(L"LegalTrademarks"); }
+        auto GetOriginalFilename() const { return VerQueryValue(L"OriginalFilename"); }
+        auto GetPrivateBuild() const { return VerQueryValue(L"PrivateBuild"); }
+        auto GetProductName() const { return VerQueryValue(L"ProductName"); }
+        auto GetProductVersion() const { return VerQueryValue(L"ProductVersion"); }
+        auto GetSpecialBuild() const { return VerQueryValue(L"SpecialBuild"); }
 
 private:
-        std::vector<char> m_info;
-        std::string m_def_transl;
+        std::vector<wchar_t> m_info;
+        std::wstring m_def_transl;
 
         static DWORD PackTransl(WORD lang_id, UINT code_page);
-        static std::string MakeTransl(DWORD transl);
+        static std::wstring MakeTransl(DWORD transl);
 
-        std::string GetTranslation(bool original = false) const;
+        std::wstring GetTranslation(bool original = false) const;
 
-        void *VerQueryValue(const std::string &val, UINT &buf_sz) const;
-        std::string_view VerQueryValue(const char *val) const;
+        void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const;
+        std::wstring_view VerQueryValue(const wchar_t *val) const;
 };

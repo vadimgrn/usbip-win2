@@ -13,12 +13,12 @@
 class Resource
 {
 public:
-	Resource(_In_opt_ HMODULE hModule, _In_ LPCSTR name, _In_ LPCSTR type) { load(hModule, name, type); }
+	Resource(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type) { load(hModule, name, type); }
 
 	explicit operator bool() const noexcept { return hResInfo && hResData; }
 	auto operator!() const noexcept { return !bool(*this); } 
 
-	DWORD load(_In_opt_ HMODULE hModule, _In_ LPCSTR name, _In_ LPCSTR type);
+	DWORD load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type);
 
 	auto data() const noexcept { return LockResource(hResData); }
 	auto size(HMODULE hModule) const noexcept { return SizeofResource(hModule, hResInfo); }

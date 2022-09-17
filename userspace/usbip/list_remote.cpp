@@ -75,6 +75,7 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 		usbip_net_pack_usb_device(0, &udev);
 
 		auto &ids = get_ids();
+
 		auto product_name = usbip_names_get_product(ids, udev.idVendor, udev.idProduct);
 		auto class_name = usbip_names_get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
 

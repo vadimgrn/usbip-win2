@@ -55,7 +55,7 @@ void for_each_line(std::string_view text, const line_f &f)
 } // namespace
 
 
-DWORD Resource::load(_In_opt_ HMODULE hModule, _In_ LPCSTR name, _In_ LPCSTR type)
+DWORD Resource::load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type)
 {
         hResInfo = FindResource(hModule, name, type);
         if (!hResInfo) {

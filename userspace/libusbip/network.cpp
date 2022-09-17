@@ -234,8 +234,7 @@ usbip::Socket usbip_net_tcp_connect(const char *hostname, const char *port)
 	/* get all possible addresses */
 	ret = getaddrinfo(hostname, port, &hints, &res);
 	if (ret < 0) {
-		dbg("getaddrinfo: %s port %s: %s", hostname, port,
-		    gai_strerror(ret));
+		dbg("getaddrinfo: %s port %s: %S", hostname, port, gai_strerror(ret));
 		return sock;
 	}
 

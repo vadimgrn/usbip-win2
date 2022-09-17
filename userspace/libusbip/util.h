@@ -2,7 +2,6 @@
 
 #include <string>
 
-std::string get_module_dir(); 
 std::wstring utf8_to_wchar(const char *str);
 
 inline auto utf8_to_wchar(const std::string &s)

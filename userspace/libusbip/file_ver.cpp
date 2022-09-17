@@ -5,21 +5,16 @@
 #include <exception>
 #include <cassert>
 
-FileVersion::FileVersion(const char *path)
+DWORD FileVersion::SetFile(const std::wstring_view &path)
 {
-        SetFile(path ? path : __argv[0]);
-}
-
-DWORD FileVersion::SetFile(const char *path)
-{
-        auto m_info_sz = GetFileVersionInfoSize(path, nullptr);
-        if (!m_info_sz) {
+        auto sz = GetFileVersionInfoSize(path.data(), nullptr);
+        if (!sz) {
                 return GetLastError();
         }
 
-        m_info.resize(m_info_sz);
+        m_info.resize(sz);
 
-        if (!GetFileVersionInfo(path, 0, m_info_sz, m_info.data())) {
+        if (!GetFileVersionInfo(path.data(), 0, sz, m_info.data())) {
                 return GetLastError();
         } 
 
@@ -33,7 +28,7 @@ void FileVersion::SetTranslation(WORD lang_id, UINT code_page)
         m_def_transl = MakeTransl(transl);
 }
 
-void *FileVersion::VerQueryValue(const std::string &val, UINT &buf_sz) const
+void *FileVersion::VerQueryValue(const std::wstring &val, UINT &buf_sz) const
 {
         if (m_info.empty()) {
                 throw std::exception("FileVersion::VerQueryValue: not initialized");
@@ -49,42 +44,42 @@ void *FileVersion::VerQueryValue(const std::string &val, UINT &buf_sz) const
         return buf;
 }
 
-std::string_view FileVersion::VerQueryValue(const char *val) const
+std::wstring_view FileVersion::VerQueryValue(const wchar_t *val) const
 {
-        std::string_view res;
-        auto s = "\\StringFileInfo\\" + GetTranslation() + '\\' + val;
+        std::wstring_view res;
+        auto s = L"\\StringFileInfo\\" + GetTranslation() + L'\\' + val;
 
         UINT buf_sz;
         auto buf = VerQueryValue(s, buf_sz);
 
         if (buf && buf_sz) {
-                res = std::string_view(static_cast<const char*>(buf), buf_sz);
+                res = std::wstring_view(static_cast<const wchar_t*>(buf), buf_sz);
         }
 
         return res;
 }
 
-std::string FileVersion::VerLanguageName() const
+std::wstring FileVersion::VerLanguageName() const
 {
         WORD wLang = 0;
 
-        std::istringstream is(std::string(m_def_transl, m_def_transl.size() >> 1));
+        std::wistringstream is(std::wstring(m_def_transl, m_def_transl.size() >> 1));
         if (!(is >> std::hex >> wLang)) {
                 throw std::exception("FileVersion::VerLanguageName: stream in error state");
         }
 
 	auto cnt = ::VerLanguageName(wLang, 0, 0);
-        std::vector<char> v(cnt);
+        std::vector<wchar_t> v(cnt);
 
         cnt = ::VerLanguageName(wLang, v.data(), cnt);
-        return std::string(v.data(), cnt);
+        return std::wstring(v.data(), cnt);
 }
 
-std::string FileVersion::MakeTransl(DWORD transl)
+std::wstring FileVersion::MakeTransl(DWORD transl)
 {
-	std::ostringstream os;
+	std::wostringstream os;
 
-	os << std::hex << std::noshowbase << std::setfill('0')
+	os << std::hex << std::noshowbase << std::setfill(L'0')
 	   << std::setw(sizeof(WORD) << 1) << LOWORD(transl)  // lang_id
            << std::setw(sizeof(WORD) << 1) << HIWORD(transl); // code page
 
@@ -120,16 +115,16 @@ DWORD FileVersion::PackTransl(WORD lang_id, UINT code_page)
  * and code page) obtained from file, otherwise returns value stored
  * by previous call of SetTranslation.
  */
-std::string FileVersion::GetTranslation(bool original) const
+std::wstring FileVersion::GetTranslation(bool original) const
 {
         if (!original) {
                 return m_def_transl;
         }
 
-        std::string s;
+        std::wstring s;
 
         UINT buf_sz;
-        auto buf = VerQueryValue("\\VarFileInfo\\Translation", buf_sz);
+        auto buf = VerQueryValue(L"\\VarFileInfo\\Translation", buf_sz);
 
         if (buf && buf_sz) {
                 auto dw = *reinterpret_cast<DWORD*>(buf); // first always must present
@@ -143,7 +138,7 @@ std::string FileVersion::GetTranslation(bool original) const
 void FileVersion::GetTranslation(WORD &lang_id, UINT &code_page) const
 {
         DWORD dw = 0;
-        std::istringstream is(m_def_transl);
+        std::wistringstream is(m_def_transl);
 
         if (!(is >> std::hex >> dw)) {
                 throw std::exception("FileVersion::GetTranslation: istream in error state");

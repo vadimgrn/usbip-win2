@@ -13,8 +13,7 @@ enum op_status_t // op_common.status
 /* error codes for userspace tools and library */
 enum err_t
 {
-        ERR_USB_VER = -13,
-        ERR_CERTIFICATE,
+        ERR_CERTIFICATE = -12,
         ERR_ACCESS,
         ERR_PORTFULL,
         ERR_DRIVER,

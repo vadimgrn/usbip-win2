@@ -11,16 +11,11 @@
 namespace
 {
 
-struct Context
+bool walker_devpath(std::wstring &path, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        const GUID *guid;
-        std::string path;
-};
-
-int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, Context &ctx)
-{
-        if (auto inf = usbip::get_intf_detail(dev_info, data, *ctx.guid)) {
-                ctx.path.assign(inf->DevicePath, inf->cbSize);
+        if (auto inf = usbip::get_intf_detail(dev_info, data, GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER)) {
+                assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
+                path = inf->DevicePath;
                 return true;
         }
 
@@ -29,11 +24,11 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, Context &ctx)
 
 auto get_vhci_devpath()
 {
-        Context ctx{ &GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER };
-        auto f = [&ctx] (auto&&...args) { return walker_devpath(std::forward<decltype(args)>(args)..., ctx); };
+        std::wstring path;
+        auto f = [&path] (auto&&...args) { return walker_devpath(path, std::forward<decltype(args)>(args)...); };
 
-        usbip::traverse_intfdevs(*ctx.guid, f);
-        return ctx.path;
+        usbip::traverse_intfdevs(GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER, f);
+        return path;
 }
 
 } // namespace
@@ -48,9 +43,9 @@ auto usbip::vhci_driver_open() -> Handle
                 return h;
         }
         
-        dbg("device path: %s", devpath.c_str());
+        dbg("device path: %S", devpath.c_str());
         
-        auto fh = CreateFile(devpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, nullptr);
+        auto fh = CreateFile(devpath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
         h.reset(fh);
 
         return h;

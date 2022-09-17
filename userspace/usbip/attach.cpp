@@ -92,8 +92,6 @@ constexpr auto get_error(int result) { return result >> 16; }
 int attach_device(const char *host, const char *busid, const char *serial, bool terse)
 {
         auto result = import_device(host, busid, serial);
-        if (get_port(result) || get_error(result) != ERR_USB_VER) {
-        }
 
         if (int port = get_port(result)) {
 
