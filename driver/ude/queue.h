@@ -1,5 +1,9 @@
 #pragma once
 
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include <wdm.h>
 #include <wdf.h>
 

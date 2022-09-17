@@ -1,5 +1,9 @@
 #pragma once
 
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include <wdm.h>
 #include <wdf.h>
 
@@ -7,7 +11,6 @@
 
 struct vhci_context
 {
-        WDFUSBDEVICE vhci;
         WDFQUEUE queue;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_context, get_vhci_context)

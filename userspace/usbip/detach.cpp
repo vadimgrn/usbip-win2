@@ -47,9 +47,7 @@ static int detach_port(const char* portstr)
 		return 1;
 	}
 
-	auto version = get_hci_version(port);
-
-        auto hdev = usbip::vhci_driver_open(version);
+        auto hdev = usbip::vhci_driver_open();
 	if (!hdev) {
 		err("can't open vhci driver");
 		return 2;

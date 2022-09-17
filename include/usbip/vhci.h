@@ -16,11 +16,10 @@
 #include "proto.h"
 
 enum hci_version { HCI_USB2, HCI_USB3 };
-inline const hci_version vhci_list[] { HCI_USB2, HCI_USB3 };
 
 enum { 
         VHUB_NUM_PORTS = 30, // see ch11.h, USB_MAXCHILDREN
-        USBIP_TOTAL_PORTS = ARRAYSIZE(vhci_list)*VHUB_NUM_PORTS
+        USBIP_TOTAL_PORTS = 2*VHUB_NUM_PORTS
 };
 
 constexpr auto is_valid_rhport(int port) // root hub port
@@ -66,20 +65,8 @@ static_assert(get_hci_version(make_vport(HCI_USB3, VHUB_NUM_PORTS)) == HCI_USB3)
 static_assert(get_rhport(make_vport(HCI_USB2, VHUB_NUM_PORTS)) == VHUB_NUM_PORTS);
 static_assert(get_rhport(make_vport(HCI_USB3, VHUB_NUM_PORTS)) == VHUB_NUM_PORTS);
 
-
-DEFINE_GUID(GUID_DEVINTERFACE_EHCI_USBIP,
-        0xB8B60941, 0xCACB, 0x454A, 0xA8, 0xD1, 0x35, 0xAC, 0xB8, 0xFA, 0x1F, 0x1E);
-
-DEFINE_GUID(GUID_DEVINTERFACE_XHCI_USBIP,
-        0xC1B20918, 0x5628, 0x42F8, 0xA6, 0xD4, 0xA9, 0x2C, 0x8C, 0xCE, 0xB1, 0x8F);
-
-constexpr auto& vhci_guid(hci_version version)
-{
-        return version == HCI_USB3 ? GUID_DEVINTERFACE_XHCI_USBIP : GUID_DEVINTERFACE_EHCI_USBIP;
-}
-
-DEFINE_GUID(USBIP_BUS_WMI_STD_DATA_GUID,
-        0xCF26E276, 0x6C60, 0x4442, 0x8B, 0x58, 0x93, 0xAD, 0xA6, 0x69, 0x39, 0xB3);
+DEFINE_GUID(GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER,
+        0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
 constexpr auto USBIP_VHCI_IOCTL(int idx)
 {

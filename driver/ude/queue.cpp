@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "queue.h"
 #include "trace.h"
 #include "queue.tmh"
@@ -31,17 +35,6 @@ void IoDeviceControl(
         }
 }
 
-_Function_class_(EVT_WDF_IO_QUEUE_IO_STOP)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void IoStop(
-        _In_ WDFQUEUE Queue,
-        _In_ WDFREQUEST Request,
-        _In_ ULONG ActionFlags)
-{
-        TraceMsg("Queue %04x, Request %04x, ActionFlags %#lx", ptr4log(Queue), ptr4log(Request), ActionFlags);
-}
-
 } // namespace
 
 
@@ -54,18 +47,14 @@ PAGEABLE NTSTATUS queue_initialize(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
 
-        cfg.PowerManaged = WdfFalse;
         cfg.EvtIoDeviceControl = IoDeviceControl;
-        cfg.EvtIoStop = IoStop;
+        cfg.PowerManaged = WdfFalse;
 
-        WDFQUEUE queue;
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &queue)) {
+        auto ctx = get_vhci_context(vhci);
+
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &ctx->queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
-        }
-
-        if (auto ctx = get_vhci_context(vhci)) {
-                ctx->queue = queue;
         }
 
         return STATUS_SUCCESS;

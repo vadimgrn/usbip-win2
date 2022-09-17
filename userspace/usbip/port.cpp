@@ -51,36 +51,25 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
         return 0;
 }
 
-auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int port)
+auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs)
 {
-        std::vector<hci_version> versions;
-
-        if (port > 0) {
-                versions.push_back(get_hci_version(port));
-        } else for (auto ver: vhci_list) {
-                versions.push_back(ver);
+        auto hdev = usbip::vhci_driver_open();
+        if (!hdev) {
+                err("failed to open vhci driver");
+                return 3;
         }
-
-        for (auto ver: versions) {
-
-                auto hdev = usbip::vhci_driver_open(ver);
-                if (!hdev) {
-                        err("failed to open vhci driver");
-                        return 3;
-                }
         
-                auto v = usbip::vhci_get_imported_devs(hdev.get());
-                if (v.empty()) {
-                        err("failed to get attach information");
-                        return 2;
-                }
+        auto v = usbip::vhci_get_imported_devs(hdev.get());
+        if (v.empty()) {
+                err("failed to get attach information");
+                return 2;
+        }
                 
-                for (auto &d: v) {
-                        if (d.port) {
-                                devs.push_back(d);
-                        } else {
-                                break;
-                        }
+        for (auto &d: v) {
+                if (d.port) {
+                        devs.push_back(d);
+                } else {
+                        break;
                 }
         }
 
@@ -92,11 +81,8 @@ int list_imported_devices(const std::set<int> &ports)
         std::vector<ioctl_usbip_vhci_imported_dev> devs;
         devs.reserve(USBIP_TOTAL_PORTS);
 
-        {
-                auto port = ports.size() == 1 ? *ports.begin() : 0;
-                if (auto err = get_imported_devices(devs, port)) {
-                        return err;
-                }
+        if (auto err = get_imported_devices(devs)) {
+                return err;
         }
 
         printf("Imported USB devices\n");

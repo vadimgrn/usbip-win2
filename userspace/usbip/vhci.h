@@ -8,7 +8,7 @@
 namespace usbip
 {
 
-Handle vhci_driver_open(hci_version version);
+Handle vhci_driver_open();
 
 std::vector<ioctl_usbip_vhci_imported_dev> vhci_get_imported_devs(HANDLE hdev);
 

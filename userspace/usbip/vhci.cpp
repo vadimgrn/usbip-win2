@@ -27,9 +27,9 @@ int walker_devpath(HDEVINFO dev_info, SP_DEVINFO_DATA *data, Context &ctx)
         return false;
 }
 
-auto get_vhci_devpath(hci_version version)
+auto get_vhci_devpath()
 {
-        Context ctx{ &vhci_guid(version) };
+        Context ctx{ &GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER };
         auto f = [&ctx] (auto&&...args) { return walker_devpath(std::forward<decltype(args)>(args)..., ctx); };
 
         usbip::traverse_intfdevs(*ctx.guid, f);
@@ -39,11 +39,11 @@ auto get_vhci_devpath(hci_version version)
 } // namespace
 
 
-auto usbip::vhci_driver_open(hci_version version) -> Handle
+auto usbip::vhci_driver_open() -> Handle
 {
         Handle h;
 
-        auto devpath = get_vhci_devpath(version);
+        auto devpath = get_vhci_devpath();
         if (devpath.empty()) {
                 return h;
         }

@@ -111,7 +111,7 @@
       <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -129,7 +129,7 @@
       <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

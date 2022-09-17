@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "driver.h"
 #include "vhci.h"
 #include "trace.h"
