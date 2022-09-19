@@ -9,6 +9,9 @@
 
 #include <libdrv\pageable.h>
 
+namespace usbip
+{
+
 struct vhci_context
 {
         WDFQUEUE default_queue;
@@ -23,5 +26,6 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_context, get_request_context)
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
+PAGEABLE EXTERN_C NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
 
+} // namespace usbip

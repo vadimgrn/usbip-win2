@@ -27,7 +27,7 @@
 namespace
 {
 
-int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
+int usbip_vhci_imported_device_dump(const usbip::vhci::ioctl_imported_dev &d)
 {
         if (d.status == VDEV_ST_NULL || d.status == VDEV_ST_NOTASSIGNED) {
                 return 0;
@@ -51,7 +51,7 @@ int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
         return 0;
 }
 
-auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs)
+auto get_imported_devices(std::vector<usbip::vhci::ioctl_imported_dev> &devs)
 {
         auto hdev = usbip::vhci_driver_open();
         if (!hdev) {
@@ -78,8 +78,8 @@ auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs)
 
 int list_imported_devices(const std::set<int> &ports)
 {
-        std::vector<ioctl_usbip_vhci_imported_dev> devs;
-        devs.reserve(USBIP_TOTAL_PORTS);
+        std::vector<usbip::vhci::ioctl_imported_dev> devs;
+        devs.reserve(usbip::vhci::TOTAL_PORTS);
 
         if (auto err = get_imported_devices(devs)) {
                 return err;
@@ -115,7 +115,7 @@ void usbip_port_usage()
 "usage: usbip port [portN...]\n"
 "    portN      list given port(s) for checking, valid range is 1-%d\n";
 
-        printf(fmt, USBIP_TOTAL_PORTS);
+        printf(fmt, usbip::vhci::TOTAL_PORTS);
 }
 
 int usbip_port_show(int argc, char *argv[])
@@ -127,7 +127,7 @@ int usbip_port_show(int argc, char *argv[])
                 auto str = argv[i];
                 int port;
 
-                if ((std::istringstream(str) >> port) && is_valid_vport(port)) {
+                if ((std::istringstream(str) >> port) && usbip::vhci::is_valid_vport(port)) {
                         ports.insert(port);
                 } else {
                         err("invalid port: %s", str);

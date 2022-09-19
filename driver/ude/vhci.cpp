@@ -24,13 +24,15 @@
 namespace
 {
 
+using namespace usbip;
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 auto create_interfaces(_In_ WDFDEVICE vhci)
 {
         const GUID* v[] = {
                 &GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
-                &GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER
+                &vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER
         };
 
         for (auto guid: v) {
@@ -143,9 +145,9 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
         UDECX_WDF_DEVICE_CONFIG cfg;
         UDECX_WDF_DEVICE_CONFIG_INIT(&cfg, query_usb_capability);
 
-        cfg.NumberOfUsb20Ports = VHUB_NUM_PORTS;
-        cfg.NumberOfUsb30Ports = VHUB_NUM_PORTS;
-        static_assert(USBIP_TOTAL_PORTS == 2*VHUB_NUM_PORTS);
+        cfg.NumberOfUsb20Ports = vhci::VHUB_NUM_PORTS;
+        cfg.NumberOfUsb30Ports = vhci::VHUB_NUM_PORTS;
+        static_assert(vhci::TOTAL_PORTS == 2*vhci::VHUB_NUM_PORTS);
 
         if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
@@ -161,7 +163,7 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
+PAGEABLE EXTERN_C NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 

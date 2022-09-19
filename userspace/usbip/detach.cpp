@@ -21,33 +21,26 @@
 #include <libusbip\getopt.h>
 #include <libusbip\common.h>
 
-void usbip_detach_usage()
+namespace
 {
-	auto &fmt = 
-"usage: usbip detach <args>\n"
-"    -p, --port=<port>    "
-" port the device is on, max %d, * or below 1 - all ports\n";
 
-	printf(fmt, USBIP_TOTAL_PORTS);
-}
-
-static int detach_port(const char* portstr)
+int detach_port(const char *portstr)
 {
-        int port{};
+	int port{};
 
 	if (!strcmp(portstr, "*")) {
-                port = -1;
-        } else if (sscanf_s(portstr, "%d", &port) != 1) {
+		port = -1;
+	} else if (sscanf_s(portstr, "%d", &port) != 1) {
 		err("invalid port: %s", portstr);
 		return 1;
 	}
-	
-	if (port > USBIP_TOTAL_PORTS) {
-		err("invalid port %d, max is %d", port, USBIP_TOTAL_PORTS);
+
+	if (port > usbip::vhci::TOTAL_PORTS) {
+		err("invalid port %d, max is %d", port, usbip::vhci::TOTAL_PORTS);
 		return 1;
 	}
 
-        auto hdev = usbip::vhci_driver_open();
+	auto hdev = usbip::vhci_driver_open();
 	if (!hdev) {
 		err("can't open vhci driver");
 		return 2;
@@ -57,15 +50,15 @@ static int detach_port(const char* portstr)
 	hdev.reset();
 
 	if (!ret) {
-                if (port <= 0) {
-                        printf("all ports are detached\n");
-                } else {
-                        printf("port %d is succesfully detached\n", port);
-                }
+		if (port <= 0) {
+			printf("all ports are detached\n");
+		} else {
+			printf("port %d is succesfully detached\n", port);
+		}
 		return 0;
 	}
 
-        switch (ret) {
+	switch (ret) {
 	case ERR_INVARG:
 		err("invalid port: %d", port);
 		break;
@@ -75,8 +68,21 @@ static int detach_port(const char* portstr)
 	default:
 		err("failed to detach");
 	}
-	
-        return 3;
+
+	return 3;
+}
+
+} // namespace
+
+
+void usbip_detach_usage()
+{
+	auto &fmt = 
+"usage: usbip detach <args>\n"
+"    -p, --port=<port>    "
+" port the device is on, max %d, * or below 1 - all ports\n";
+
+	printf(fmt, usbip::vhci::TOTAL_PORTS);
 }
 
 int usbip_detach(int argc, char *argv[])

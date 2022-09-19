@@ -13,7 +13,7 @@ namespace
 
 bool walker_devpath(std::wstring &path, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = usbip::get_intf_detail(dev_info, data, GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER)) {
+        if (auto inf = usbip::get_intf_detail(dev_info, data, usbip::vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
@@ -27,7 +27,7 @@ auto get_vhci_devpath()
         std::wstring path;
         auto f = [&path] (auto&&...args) { return walker_devpath(path, std::forward<decltype(args)>(args)...); };
 
-        usbip::traverse_intfdevs(GUID_DEVINTERFACE_USBIP_HOST_CONTROLLER, f);
+        usbip::traverse_intfdevs(usbip::vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER, f);
         return path;
 }
 
@@ -51,12 +51,12 @@ auto usbip::vhci_driver_open() -> Handle
         return h;
 }
 
-std::vector<ioctl_usbip_vhci_imported_dev> usbip::vhci_get_imported_devs(HANDLE hdev)
+auto usbip::vhci_get_imported_devs(HANDLE hdev) -> std::vector<vhci::ioctl_imported_dev>
 {
-        std::vector<ioctl_usbip_vhci_imported_dev> v(USBIP_TOTAL_PORTS + 1);
+        std::vector<vhci::ioctl_imported_dev> v(vhci::TOTAL_PORTS + 1);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
-        if (!DeviceIoControl(hdev, IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, nullptr, nullptr)) {
+        if (!DeviceIoControl(hdev, vhci::IOCTL_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, nullptr, nullptr)) {
                 dbg("failed to get imported devices: 0x%lx", GetLastError());
                 v.clear();
         }
@@ -64,9 +64,9 @@ std::vector<ioctl_usbip_vhci_imported_dev> usbip::vhci_get_imported_devs(HANDLE 
         return v;
 }
 
-bool usbip::vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
+bool usbip::vhci_attach_device(HANDLE hdev, vhci::ioctl_plugin &r)
 {
-        auto ok = DeviceIoControl(hdev, IOCTL_USBIP_VHCI_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
+        auto ok = DeviceIoControl(hdev, vhci::IOCTL_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
         if (!ok) {
                 dbg("%s: DeviceIoControl error %#x", __func__, GetLastError());
         }
@@ -75,9 +75,9 @@ bool usbip::vhci_attach_device(HANDLE hdev, ioctl_usbip_vhci_plugin &r)
 
 int usbip::vhci_detach_device(HANDLE hdev, int port)
 {
-        ioctl_usbip_vhci_unplug r{ port };
+        vhci::ioctl_unplug r{ port };
 
-        if (DeviceIoControl(hdev, IOCTL_USBIP_VHCI_UNPLUG_HARDWARE, &r, sizeof(r), nullptr, 0, nullptr, nullptr)) {
+        if (DeviceIoControl(hdev, vhci::IOCTL_UNPLUG_HARDWARE, &r, sizeof(r), nullptr, 0, nullptr, nullptr)) {
                 return 0;
         }
 

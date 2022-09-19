@@ -10,9 +10,9 @@
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS get_imported_devices(_In_ WDFREQUEST Request)
+PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
 {
-        ioctl_usbip_vhci_imported_dev *dev{};
+        vhci::ioctl_imported_dev *dev{};
         size_t buf_sz = 0;
 
         if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*dev), &PVOID(dev), &buf_sz)) {
@@ -27,9 +27,9 @@ PAGEABLE NTSTATUS get_imported_devices(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS plugin_hardware(_In_ WDFREQUEST Request)
+PAGEABLE NTSTATUS usbip::plugin_hardware(_In_ WDFREQUEST Request)
 {
-        ioctl_usbip_vhci_plugin *r{};
+        vhci::ioctl_plugin *r{};
 
         if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
                 return err;
@@ -41,9 +41,9 @@ PAGEABLE NTSTATUS plugin_hardware(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS unplug_hardware(_In_ WDFREQUEST Request)
+PAGEABLE NTSTATUS usbip::unplug_hardware(_In_ WDFREQUEST Request)
 {
-        ioctl_usbip_vhci_unplug *r{};
+        vhci::ioctl_unplug *r{};
 
         if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
                 return err;

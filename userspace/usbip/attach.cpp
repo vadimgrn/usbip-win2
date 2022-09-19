@@ -34,7 +34,7 @@ const char usbip_attach_usage_string[] =
 "    -t, --terse            show port number as a result\n";
 
 
-auto init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const char *serial)
+auto init(usbip::vhci::ioctl_plugin &r, const char *host, const char *busid, const char *serial)
 {
         struct Data
         {
@@ -65,7 +65,7 @@ auto init(ioctl_usbip_vhci_plugin &r, const char *host, const char *busid, const
 
 auto import_device(const char *host, const char *busid, const char *serial)
 {
-        ioctl_usbip_vhci_plugin r{};
+        usbip::vhci::ioctl_plugin r{};
         if (auto err = init(r, host, busid, serial)) {
                 return make_error(err);
         }

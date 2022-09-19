@@ -19,6 +19,8 @@
 namespace
 {
 
+using namespace usbip;
+
 /*
  * IRP_MJ_DEVICE_CONTROL 
  */
@@ -40,13 +42,13 @@ void IoDeviceControl(
         auto complete = true;
 
         switch (IoControlCode) {
-        case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
+        case vhci::IOCTL_GET_IMPORTED_DEVICES:
                 st = get_imported_devices(Request);
                 break;
-        case IOCTL_USBIP_VHCI_PLUGIN_HARDWARE:
+        case vhci::IOCTL_PLUGIN_HARDWARE:
                 st = plugin_hardware(Request);
                 break;
-        case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
+        case vhci::IOCTL_UNPLUG_HARDWARE:
                 st = unplug_hardware(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
@@ -71,7 +73,7 @@ void IoDeviceControl(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create_default_queue(_In_ WDFDEVICE vhci)
+PAGEABLE NTSTATUS usbip::create_default_queue(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 

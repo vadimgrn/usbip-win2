@@ -10,6 +10,8 @@
 namespace
 {
 
+using namespace usbip;
+
 /*
  * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
  * The default setting of zero causes the IFR to log errors, warnings, and informational events.
