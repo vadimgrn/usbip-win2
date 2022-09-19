@@ -15,7 +15,7 @@ PAGEABLE NTSTATUS get_imported_devices(_In_ WDFREQUEST Request)
         ioctl_usbip_vhci_imported_dev *dev{};
         size_t buf_sz = 0;
 
-        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*dev), &static_cast<void*>(dev), &buf_sz)) {
+        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*dev), &PVOID(dev), &buf_sz)) {
                 return err;
         }
 
@@ -31,7 +31,7 @@ PAGEABLE NTSTATUS plugin_hardware(_In_ WDFREQUEST Request)
 {
         ioctl_usbip_vhci_plugin *r{};
 
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &static_cast<void*>(r), nullptr)) {
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
                 return err;
         }
 
@@ -45,7 +45,7 @@ PAGEABLE NTSTATUS unplug_hardware(_In_ WDFREQUEST Request)
 {
         ioctl_usbip_vhci_unplug *r{};
 
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &static_cast<void*>(r), nullptr)) {
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
                 return err;
         }
 

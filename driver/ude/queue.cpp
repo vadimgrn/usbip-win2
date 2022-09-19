@@ -6,22 +6,18 @@
 #include "trace.h"
 #include "queue.tmh"
 
-#include "driver.h"
 #include "vhci.h"
 #include "ioctl.h"
 
 #include <libdrv\dbgcommon.h>
 #include <usbip\vhci.h>
 
-#include <usb.h>
 #include <usbuser.h>
-
 #include <wdfusb.h>
 #include <UdeCx.h>
 
 namespace
 {
-
 
 /*
  * IRP_MJ_DEVICE_CONTROL 
@@ -36,19 +32,12 @@ void IoDeviceControl(
         _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode)
 {
-        if (IoControlCode == IOCTL_USB_USER_REQUEST) {
-                USBUSER_REQUEST_HEADER *r{}; 
-                if (!WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &static_cast<void*>(r), nullptr)) {
-                        TraceDbg("USB_USER_REQUEST, %s(%#08lX), RequestBufferLength %lu", 
-                                  usbuser_request_name(r->UsbUserRequest), r->UsbUserRequest, r->RequestBufferLength);
-                }
-        } else {
-                TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
-                          device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
-        }
+        TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
+                  device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
 
-        auto complete = true;
+        USBUSER_REQUEST_HEADER *hdr{};
         auto st = STATUS_INVALID_DEVICE_REQUEST;
+        auto complete = true;
 
         switch (IoControlCode) {
         case IOCTL_USBIP_VHCI_GET_IMPORTED_DEVICES:
@@ -60,12 +49,19 @@ void IoDeviceControl(
         case IOCTL_USBIP_VHCI_UNPLUG_HARDWARE:
                 st = unplug_hardware(Request);
                 break;
+        case IOCTL_USB_USER_REQUEST:
+                if (NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), &PVOID(hdr), nullptr))) {
+                        TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), hdr->UsbUserRequest);
+                }
+                [[fallthrough]];
         default:
                 complete = !UdecxWdfDeviceTryHandleUserIoctl(WdfIoQueueGetDevice(Queue), Request);
         }
 
         if (complete) {
-                Trace(TRACE_LEVEL_ERROR, "%!STATUS!", st);
+                if (st) {
+                        Trace(TRACE_LEVEL_ERROR, "-> %!STATUS!", st);
+                }
                 WdfRequestComplete(Request, st);
         }
 }
