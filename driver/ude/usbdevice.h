@@ -12,8 +12,13 @@
 namespace usbip
 {
 
+namespace vhci 
+{
+        struct ioctl_plugin;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create_default_queue(_In_ WDFDEVICE vhci);
+PAGEABLE NTSTATUS create_usbdevice(_In_ WDFDEVICE vhci, vhci::ioctl_plugin &r);
 
 } // namespace usbip

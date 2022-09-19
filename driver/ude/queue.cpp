@@ -42,14 +42,14 @@ void IoDeviceControl(
         auto complete = true;
 
         switch (IoControlCode) {
-        case vhci::IOCTL_GET_IMPORTED_DEVICES:
-                st = get_imported_devices(Request);
-                break;
         case vhci::IOCTL_PLUGIN_HARDWARE:
                 st = plugin_hardware(Request);
                 break;
         case vhci::IOCTL_UNPLUG_HARDWARE:
                 st = unplug_hardware(Request);
+                break;
+        case vhci::IOCTL_GET_IMPORTED_DEVICES:
+                st = get_imported_devices(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
                 if (NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), &PVOID(hdr), nullptr))) {

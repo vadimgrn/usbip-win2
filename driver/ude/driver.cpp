@@ -7,6 +7,8 @@
 #include "trace.h"
 #include "driver.tmh"
 
+#include <libdrv\wsk_cpp.h>
+
 namespace
 {
 
@@ -51,6 +53,8 @@ PAGEABLE void driver_cleanup(_In_ WDFOBJECT DriverObject)
 
 	auto drvobj = WdfDriverWdmGetDriverObject(static_cast<WDFDRIVER>(DriverObject));
 	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x", ptr4log(drvobj));
+	
+	wsk::shutdown();
 	WPP_CLEANUP(drvobj);
 }
 
@@ -82,14 +86,19 @@ EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STR
 {
         PAGED_CODE();
 
-        if (auto err = driver_create(DriverObject, RegistryPath)) {
+	if (auto err = driver_create(DriverObject, RegistryPath)) {
 		return err;
-        }
+        } else {
+		err = set_ifr_verbose();
+		WPP_INIT_TRACING(DriverObject, RegistryPath);
+		if (err) {
+			Trace(TRACE_LEVEL_ERROR, "set_ifr_verbose %!STATUS!", err);
+		}
+	}
 
-	auto err = set_ifr_verbose();
-	WPP_INIT_TRACING(DriverObject, RegistryPath);
-	if (err) {
-		Trace(TRACE_LEVEL_ERROR, "set_ifr_verbose %!STATUS!", err);
+	if (auto err = wsk::initialize()) {
+		Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
+		return err;
 	}
 
 	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x, RegistryPath %!USTR!", ptr4log(DriverObject), RegistryPath);

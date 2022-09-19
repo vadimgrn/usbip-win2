@@ -11,7 +11,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\userspace\libusbip\proto_op.cpp" />
     <ClCompile Include="ioctl.cpp" />
+    <ClCompile Include="network.cpp" />
+    <ClCompile Include="urbtransfer.cpp" />
+    <ClCompile Include="usbdevice.cpp" />
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="queue.cpp" />
@@ -23,6 +27,9 @@
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
     <ClInclude Include="..\..\include\usbip\vhci.h" />
     <ClInclude Include="ioctl.h" />
+    <ClInclude Include="network.h" />
+    <ClInclude Include="urbtransfer.h" />
+    <ClInclude Include="usbdevice.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="driver.h" />
     <ClInclude Include="queue.h" />
@@ -113,7 +120,7 @@
       <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib;$(DDK_LIB_PATH)netio.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -131,7 +138,7 @@
       <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
     </DriverSign>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib;$(DDK_LIB_PATH)netio.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

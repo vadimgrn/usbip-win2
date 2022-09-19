@@ -63,21 +63,24 @@ NTSTATUS query_usb_capability(
         _Out_writes_to_opt_(OutputBufferLength, *ResultLength) PVOID /*OutputBuffer*/,
         _Out_ ULONG *ResultLength)
 {
-        *ResultLength = 0;
-        auto st = STATUS_NOT_IMPLEMENTED;
+        const GUID* supported[] = {
+                &GUID_USB_CAPABILITY_CHAINED_MDLS, 
+                &GUID_USB_CAPABILITY_SELECTIVE_SUSPEND, // class extension reports it as supported without invoking the callback
+                &GUID_USB_CAPABILITY_FUNCTION_SUSPEND,
+                &GUID_USB_CAPABILITY_DEVICE_CONNECTION_HIGH_SPEED_COMPATIBLE, 
+                &GUID_USB_CAPABILITY_DEVICE_CONNECTION_SUPER_SPEED_COMPATIBLE 
+        };
 
-        if (*CapabilityType == GUID_USB_CAPABILITY_CHAINED_MDLS) {
-                st = STATUS_SUCCESS;
-        } else if (*CapabilityType == GUID_USB_CAPABILITY_SELECTIVE_SUSPEND) {
-                st = STATUS_SUCCESS;
-        } else if (*CapabilityType == GUID_USB_CAPABILITY_FUNCTION_SUSPEND) {
-                st = STATUS_SUCCESS;
-        } else if (*CapabilityType == GUID_USB_CAPABILITY_DEVICE_CONNECTION_HIGH_SPEED_COMPATIBLE) {
-                st = STATUS_SUCCESS;
-        } else if (*CapabilityType == GUID_USB_CAPABILITY_DEVICE_CONNECTION_SUPER_SPEED_COMPATIBLE) {
-                st = STATUS_SUCCESS;
+        auto st = STATUS_NOT_SUPPORTED;
+
+        for (auto i: supported) {
+                if (*i == *CapabilityType) {
+                        st = STATUS_SUCCESS;
+                        break;
+                }
         }
 
+        *ResultLength = 0;
         return st;
 }
 
@@ -163,7 +166,7 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE EXTERN_C NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
+PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 

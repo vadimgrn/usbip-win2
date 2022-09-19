@@ -97,7 +97,7 @@ void usage(const std::wstring &program)
         const char fmt[] = 
 "Usage: %S <command> <arg>...\n"
 "Commands:\n"
-"install <inf> <hwid>\tinstall a device/node and its driver\n";                
+"install <inf> <hwid>\tinstall a device node and its driver\n";                
 
         printf(fmt, program.c_str());
 }

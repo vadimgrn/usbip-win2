@@ -6,7 +6,40 @@
 #include "trace.h"
 #include "ioctl.tmh"
 
+#include "usbdevice.h"
 #include <usbip\vhci.h>
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS usbip::plugin_hardware(_In_ WDFREQUEST Request)
+{
+        vhci::ioctl_plugin *r{};
+
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
+                return err;
+        }
+
+        TraceMsg("%s:%s, busid %s, serial %s", r->host, r->service, r->busid, r->serial);
+        
+        auto queue = WdfRequestGetIoQueue(Request);
+        auto vhci = WdfIoQueueGetDevice(queue);
+
+        return create_usbdevice(vhci, *r);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS usbip::unplug_hardware(_In_ WDFREQUEST Request)
+{
+        vhci::ioctl_unplug *r{};
+
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
+                return err;
+        }
+
+        TraceMsg("Port #%d", r->port);
+        return STATUS_NOT_IMPLEMENTED;
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -22,33 +55,5 @@ PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
         auto cnt = buf_sz/sizeof(*dev);
         TraceMsg("Count %Iu", cnt);
 
-        return STATUS_NOT_IMPLEMENTED;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::plugin_hardware(_In_ WDFREQUEST Request)
-{
-        vhci::ioctl_plugin *r{};
-
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
-                return err;
-        }
-
-        TraceMsg("%s:%s, busid %s, serial %s", r->host, r->service, r->busid, *r->serial ? r->serial : " ");
-        return STATUS_NOT_IMPLEMENTED;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::unplug_hardware(_In_ WDFREQUEST Request)
-{
-        vhci::ioctl_unplug *r{};
-
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
-                return err;
-        }
-
-        TraceMsg("Port #%d", r->port);
         return STATUS_NOT_IMPLEMENTED;
 }
