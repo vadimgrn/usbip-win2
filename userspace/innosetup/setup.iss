@@ -84,7 +84,7 @@ Name: modifypath; Description: "&Add to PATH environment variable for all users"
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#InfFile} /install"; WorkingDir: "{tmp}"; Flags: runhidden
+; Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#InfFile} /install"; WorkingDir: "{tmp}"; Flags: runhidden
 Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\{#InfFile} {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]

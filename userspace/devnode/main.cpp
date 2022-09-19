@@ -60,7 +60,7 @@ auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
         auto hwid_multiz = make_hwid_multiz(hwid);
 
         if (!SetupDiSetDeviceRegistryProperty(dev_list.get(), &dev_data, SPDRP_HARDWAREID, 
-                reinterpret_cast<const BYTE*>(hwid_multiz.data()), DWORD(hwid_multiz.size()*sizeof(*hwid_multiz.data())))) {
+                reinterpret_cast<const BYTE*>(hwid_multiz.data()), DWORD(hwid_multiz.length()*sizeof(*hwid_multiz.data())))) {
                 fprintf(stderr, "SetupDiSetDeviceRegistryProperty error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
         }
@@ -70,13 +70,23 @@ auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
                 return EXIT_FAILURE;
         }
 
-        BOOL reboot{};
+        SP_DEVINSTALL_PARAMS params{ .cbSize = sizeof(params) };
+        if (!SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
+                fprintf(stderr, "SetupDiGetDeviceInstallParams error %#lx\n", GetLastError());
+                return EXIT_FAILURE;
+        }
+        auto reboot_required = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
 
-        if (!UpdateDriverForPlugAndPlayDevices(nullptr, hwid, infpath.c_str(), INSTALLFLAG_FORCE, &reboot)) {
+        // the same as "pnputil /add-driver usbip2_vhci.inf /install"
+
+        BOOL RebootRequired;
+        if (!UpdateDriverForPlugAndPlayDevices(nullptr, hwid, infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
                 fprintf(stderr, "UpdateDriverForPlugAndPlayDevices error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
-        } else if (reboot) {
-                printf("System reboot is required\n");
+        }
+
+        if ((reboot_required || RebootRequired) && SetupPromptReboot(nullptr, nullptr, false) < 0 ) {
+                fprintf(stderr, "SetupPromptReboot error %#lx\n", GetLastError());
         }
 
         return EXIT_SUCCESS;

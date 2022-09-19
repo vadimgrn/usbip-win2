@@ -59,4 +59,4 @@ Dependencies   = ucx01000, udecx
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
 Manufacturer="USBIP-WIN2"
-DisplayName="USBIP2 USB 3.0 Virtual Host Controller" ; for device and service
+DisplayName="USBIP2 USB 3.X Virtual Host Controller" ; for device and service
