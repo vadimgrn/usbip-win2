@@ -18,13 +18,19 @@
 #include "driver.h"
 #include "queue.h"
 
-#include <initguid.h>
-#include <usbip\vhci.h>
-
 namespace
 {
 
 using namespace usbip;
+
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
+{
+        auto vhci = static_cast<WDFDEVICE>(DeviceObject);
+        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -43,15 +49,6 @@ auto create_interfaces(_In_ WDFDEVICE vhci)
         }
 
         return STATUS_SUCCESS;
-}
-
-_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
-{
-        auto vhci = static_cast<WDFDEVICE>(DeviceObject);
-        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
 }
 
 _Function_class_(EVT_UDECX_WDF_DEVICE_QUERY_USB_CAPABILITY)
@@ -86,7 +83,7 @@ NTSTATUS query_usb_capability(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto setup(_Inout_ WDFDEVICE_INIT *DeviceInit)
+PAGEABLE auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 
@@ -123,6 +120,26 @@ PAGEABLE auto setup(_Inout_ WDFDEVICE_INIT *DeviceInit)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto initialize(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        auto ctx = get_vhci_context(vhci);
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        attrs.ParentObject = vhci;
+
+        if (auto err = WdfSpinLockCreate(&attrs, &ctx->devices_lock)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto create_device(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
@@ -133,6 +150,10 @@ PAGEABLE auto create_device(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceIn
 
         if (auto err = WdfDeviceCreate(&DeviceInit, &attrs, &vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
+                return err;
+        }
+
+        if (auto err = initialize(vhci)) {
                 return err;
         }
 
@@ -170,12 +191,17 @@ PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT 
 {
         PAGED_CODE();
 
-        if (auto err = setup(DeviceInit)) {
+        if (auto err = initialize(DeviceInit)) {
                 return err;
         }
 
-        WDFDEVICE vhci;
+        WDFDEVICE vhci{};
+        static_assert(!WDF_NO_HANDLE);
+
         if (auto err = create_device(vhci, DeviceInit)) {
+                if (vhci) {
+                        WdfObjectDelete(vhci);
+                }
                 return err;
         }
 

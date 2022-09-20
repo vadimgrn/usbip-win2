@@ -8,13 +8,19 @@
 #include <wdf.h>
 
 #include <libdrv\pageable.h>
+#include <usbip\vhci.h>
 
 namespace usbip
 {
 
+struct usbdevice_context;
+
 struct vhci_context
 {
         WDFQUEUE default_queue;
+
+        usbdevice_context* devices[vhci::TOTAL_PORTS];
+        WDFSPINLOCK devices_lock;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_context, get_vhci_context)
 

@@ -9,16 +9,21 @@
 
 #include <libdrv\pageable.h>
 
+#include <usb.h>
+#include <wdfusb.h>
+#include <UdeCx.h>
+
 namespace usbip
 {
 
-namespace vhci 
+struct usbdevice_context
 {
-        struct ioctl_plugin;
-}
+};        
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(usbdevice_context, get_usbdevice_context)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create_usbdevice(_In_ WDFDEVICE vhci, vhci::ioctl_plugin &r);
+PAGEABLE NTSTATUS create_usbdevice(
+        _Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed);
 
 } // namespace usbip
