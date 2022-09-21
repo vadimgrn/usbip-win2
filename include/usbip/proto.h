@@ -17,6 +17,8 @@ enum usbip_request_type
 enum usbip_dir { USBIP_DIR_OUT, USBIP_DIR_IN }; // transfer direction like USB_DIR_IN, USB_DIR_OUT
 enum { USBIP_MAX_ISO_PACKETS = 1024 };
 
+const INT32 number_of_packets_non_isoch = -1; // see protocol for USBIP_CMD_SUBMIT/USBIP_RET_SUBMIT
+
 typedef UINT32 seqnum_t;
 
 #include <PSHPACK1.H>
