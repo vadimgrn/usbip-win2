@@ -16,6 +16,7 @@
 #include <Udecx.h>
 
 #include "driver.h"
+#include "usbdevice.h"
 #include "queue.h"
 
 namespace
@@ -30,6 +31,19 @@ void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
 {
         auto vhci = static_cast<WDFDEVICE>(DeviceObject);
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
+
+        auto ctx = get_vhci_context(vhci);
+
+        for (auto &handle: ctx->devices) {
+                if (handle) {
+                        if (auto err = UdecxUsbDevicePlugOutAndDelete(handle)) {
+                                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete %!STATUS!", err);
+                        }
+                        WdfObjectDereference(handle);
+                        handle = WDF_NO_HANDLE;
+                        static_assert(!WDF_NO_HANDLE);
+                }
+        }
 }
 
 _IRQL_requires_same_
@@ -183,6 +197,37 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
 
 } // namespace
 
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS usbip::assign_hub_port(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
+{
+        auto udev_ctx = get_usbdevice_context(udev);
+        NT_ASSERT(!udev_ctx->port);
+
+        auto hci_ver = to_hci_version(speed);
+        auto from = vhci::make_vport(hci_ver, 0);
+
+        auto vhci_ctx = get_vhci_context(vhci); 
+        WdfSpinLockAcquire(vhci_ctx->devices_lock);
+
+        for (int i = from; i - from < vhci::VHUB_NUM_PORTS; ++i) {
+                NT_ASSERT(i < ARRAYSIZE(vhci_ctx->devices));
+                auto &handle = vhci_ctx->devices[i];
+                if (!handle) {
+                        handle = udev;
+                        WdfObjectReference(udev);
+
+                        udev_ctx->port = i + 1;
+                        NT_ASSERT(vhci::is_valid_vport(udev_ctx->port));
+                        break;
+                }
+        }
+
+        WdfSpinLockRelease(vhci_ctx->devices_lock);
+
+        return udev_ctx->port ? STATUS_SUCCESS : STATUS_END_OF_FILE;
+}
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_

@@ -6,11 +6,32 @@
 #include "trace.h"
 #include "ioctl.tmh"
 
+#include "vhci.h"
 #include "usbdevice.h"
 #include <usbip\vhci.h>
 
 namespace
 {
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto plugin(_In_ UDECXUSBDEVICE udev)
+{
+        PAGED_CODE();
+
+        auto ctx = usbip::get_usbdevice_context(udev);
+
+        UDECX_USB_DEVICE_PLUG_IN_OPTIONS options;
+        UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
+
+        auto &portnum = usbip::vhci::get_hci_version(ctx->port) == usbip::vhci::HCI_USB3 ? 
+                        options.Usb30PortNumber : options.Usb20PortNumber;
+
+        portnum = usbip::vhci::get_rhport(ctx->port); // 1..
+
+        return UdecxUsbDevicePlugIn(udev, &options);
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto do_plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ usbip::vhci::ioctl_plugin &r)
@@ -20,15 +41,20 @@ PAGEABLE auto do_plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ usbip::vhci::ioctl
         auto &error = r.port;
         error = ERR_PORTFULL;
 
+        auto speed = UdecxUsbHighSpeed; // FIXME
+
         UDECXUSBDEVICE udev{};
-        if (auto err = usbip::create_usbdevice(udev, vhci, UdecxUsbHighSpeed)) { // FIXME
+        if (auto err = usbip::create_usbdevice(udev, vhci, speed)) {
                 return err;
         }
 
-        UDECX_USB_DEVICE_PLUG_IN_OPTIONS options;
-        UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
+        if (auto err = usbip::assign_hub_port(vhci, udev, speed)) {
+                Trace(TRACE_LEVEL_ERROR, "assign_hub_port %!STATUS!", err);
+                WdfObjectDelete(udev);
+                return err;
+        }
 
-        if (auto err = UdecxUsbDevicePlugIn(udev, &options)) {
+        if (auto err = plugin(udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
                 WdfObjectDelete(udev);
                 return err;
