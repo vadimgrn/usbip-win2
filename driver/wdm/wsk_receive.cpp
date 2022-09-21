@@ -873,7 +873,16 @@ auto validate_header(_Inout_ usbip_header &hdr)
 	auto &base = hdr.base;
 	auto cmd = static_cast<usbip_request_type>(base.command);
 
-	if (!(cmd == USBIP_RET_SUBMIT || cmd == USBIP_RET_UNLINK)) {
+	switch (cmd) {
+	case USBIP_RET_SUBMIT: {
+		auto &ret = hdr.u.ret_submit;
+		if (ret.number_of_packets == number_of_packets_non_isoch) {
+			ret.number_of_packets = 0;
+		}
+	}	break;
+	case USBIP_RET_UNLINK:
+		break;
+	default:
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
 		return false;
 	}
