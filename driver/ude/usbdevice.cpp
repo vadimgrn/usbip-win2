@@ -90,13 +90,12 @@ PAGEABLE NTSTATUS usbip::create_usbdevice(
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, usbdevice_context);
         attrs.EvtCleanupCallback = usbdevice_cleanup;
 
-        auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev);
-        if (err) {
+        if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
-        } else {
-                Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr4log(udev));
+                UdecxUsbDeviceInitFree(init); // FIXME: call on driver unload?
+                return err;
         }
 
-        UdecxUsbDeviceInitFree(init);
-        return err;
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr4log(udev));
+        return STATUS_SUCCESS;
 }

@@ -33,17 +33,25 @@ void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
 
         auto ctx = get_vhci_context(vhci);
+        WdfSpinLockAcquire(ctx->devices_lock);
 
-        for (auto &handle: ctx->devices) {
-                if (handle) {
-                        if (auto err = UdecxUsbDevicePlugOutAndDelete(handle)) {
-                                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete %!STATUS!", err);
-                        }
-                        WdfObjectDereference(handle);
-                        handle = WDF_NO_HANDLE;
+        for (auto &udev: ctx->devices) {
+                if (!udev) {
                         static_assert(!WDF_NO_HANDLE);
+                        continue;
                 }
+
+                if (auto err = UdecxUsbDevicePlugOutAndDelete(udev)) {
+                        Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete %!STATUS!", err);
+                } else {
+                        TraceDbg("udev %04x unplugged", ptr4log(udev));
+                }
+
+                WdfObjectDereference(udev);
+                udev = WDF_NO_HANDLE;
         }
+
+        WdfSpinLockRelease(ctx->devices_lock);
 }
 
 _IRQL_requires_same_
@@ -199,8 +207,9 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
 
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::assign_hub_port(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE int usbip::assign_hub_port(
+        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         auto udev_ctx = get_usbdevice_context(udev);
         NT_ASSERT(!udev_ctx->port);
@@ -211,22 +220,19 @@ PAGEABLE NTSTATUS usbip::assign_hub_port(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVIC
         auto vhci_ctx = get_vhci_context(vhci); 
         WdfSpinLockAcquire(vhci_ctx->devices_lock);
 
-        for (int i = from; i - from < vhci::VHUB_NUM_PORTS; ++i) {
+        for (int i = from; i < from + vhci::VHUB_NUM_PORTS; ++i) {
                 NT_ASSERT(i < ARRAYSIZE(vhci_ctx->devices));
                 auto &handle = vhci_ctx->devices[i];
                 if (!handle) {
                         handle = udev;
                         WdfObjectReference(udev);
-
                         udev_ctx->port = i + 1;
-                        NT_ASSERT(vhci::is_valid_vport(udev_ctx->port));
                         break;
                 }
         }
 
         WdfSpinLockRelease(vhci_ctx->devices_lock);
-
-        return udev_ctx->port ? STATUS_SUCCESS : STATUS_END_OF_FILE;
+        return udev_ctx->port;
 }
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)

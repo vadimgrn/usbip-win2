@@ -11,8 +11,10 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
-#include <libdrv\pageable.h>
+#include <initguid.h>
 #include <usbip\vhci.h>
+
+#include <libdrv\pageable.h>
 
 namespace usbip
 {
@@ -37,8 +39,8 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS assign_hub_port(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed);
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE int assign_hub_port(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed);
 
 constexpr auto to_hci_version(_In_ UDECX_USB_DEVICE_SPEED speed)
 {

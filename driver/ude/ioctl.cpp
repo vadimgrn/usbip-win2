@@ -6,6 +6,7 @@
 #include "trace.h"
 #include "ioctl.tmh"
 
+#include "driver.h"
 #include "vhci.h"
 #include "usbdevice.h"
 #include <usbip\vhci.h>
@@ -13,54 +14,58 @@
 namespace
 {
 
+using namespace usbip;
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugin(_In_ UDECXUSBDEVICE udev)
+PAGEABLE auto plugin(_Out_ int &port, _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         PAGED_CODE();
 
-        auto ctx = usbip::get_usbdevice_context(udev);
+        port = assign_hub_port(vhci, udev, speed);
+
+        if (!vhci::is_valid_vport(port)) {
+                Trace(TRACE_LEVEL_ERROR, "All hub ports are occupied");
+                return ERR_PORTFULL;
+        }
 
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS options;
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
 
-        auto &portnum = usbip::vhci::get_hci_version(ctx->port) == usbip::vhci::HCI_USB3 ? 
-                        options.Usb30PortNumber : options.Usb20PortNumber;
+        if (auto ctx = get_usbdevice_context(udev)) {
+                auto &num = vhci::get_hci_version(port) == vhci::HCI_USB3 ? 
+                            options.Usb30PortNumber : options.Usb20PortNumber;
 
-        portnum = usbip::vhci::get_rhport(ctx->port); // 1..
+                num = vhci::get_rhport(port);
+        }
+        
+        if (auto err = UdecxUsbDevicePlugIn(udev, &options)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
+                return ERR_GENERAL;
+        }
 
-        return UdecxUsbDevicePlugIn(udev, &options);
+        return ERR_NONE;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto do_plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ usbip::vhci::ioctl_plugin &r)
+PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
 {
         PAGED_CODE();
 
         auto &error = r.port;
-        error = ERR_PORTFULL;
-
         auto speed = UdecxUsbHighSpeed; // FIXME
 
         UDECXUSBDEVICE udev{};
-        if (auto err = usbip::create_usbdevice(udev, vhci, speed)) {
-                return err;
-        }
 
-        if (auto err = usbip::assign_hub_port(vhci, udev, speed)) {
-                Trace(TRACE_LEVEL_ERROR, "assign_hub_port %!STATUS!", err);
+        if (NT_ERROR(create_usbdevice(udev, vhci, speed))) {
+                error = ERR_GENERAL;
+        } else if (auto err = plugin(r.port, vhci, udev, speed)) {
+                error = err;
                 WdfObjectDelete(udev);
-                return err;
+        } else {
+                TraceMsg("udev %04x -> port #%d", ptr4log(udev), r.port);
         }
-
-        if (auto err = plugin(udev)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
-                WdfObjectDelete(udev);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -78,11 +83,13 @@ PAGEABLE NTSTATUS usbip::plugin_hardware(_In_ WDFREQUEST Request)
         }
 
         TraceMsg("%s:%s, busid %s, serial %s", r->host, r->service, r->busid, r->serial);
-        
         auto queue = WdfRequestGetIoQueue(Request);
-        auto vhci = WdfIoQueueGetDevice(queue);
+        
+        if (auto vhci = WdfIoQueueGetDevice(queue)) {
+                ::plugin_hardware(vhci, *r);
+        }
 
-        return do_plugin_hardware(vhci, *r);
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_

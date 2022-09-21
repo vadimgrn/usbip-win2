@@ -18,7 +18,7 @@ namespace usbip
 
 struct usbdevice_context
 {
-        int port; // [1..TOTAL_PORTS]
+        int port; // vhci_context.devices[port - 1]
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(usbdevice_context, get_usbdevice_context)
 
