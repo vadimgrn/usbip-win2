@@ -22,6 +22,6 @@ PAGEABLE NTSTATUS plugin_hardware(_In_ WDFREQUEST Request);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS unplug_hardware(_In_ WDFREQUEST Request);
+PAGEABLE NTSTATUS plugout_hardware(_In_ WDFREQUEST Request);
 
 } // namespace usbip

@@ -45,8 +45,8 @@ void IoDeviceControl(
         case vhci::IOCTL_PLUGIN_HARDWARE:
                 st = plugin_hardware(Request);
                 break;
-        case vhci::IOCTL_UNPLUG_HARDWARE:
-                st = unplug_hardware(Request);
+        case vhci::IOCTL_PLUGOUT_HARDWARE:
+                st = plugout_hardware(Request);
                 break;
         case vhci::IOCTL_GET_IMPORTED_DEVICES:
                 st = get_imported_devices(Request);
@@ -61,9 +61,7 @@ void IoDeviceControl(
         }
 
         if (complete) {
-                if (st) {
-                        Trace(TRACE_LEVEL_ERROR, "-> %!STATUS!", st);
-                }
+                TraceDbg("%!STATUS!, Information %Iu", st, WdfRequestGetInformation(Request));
                 WdfRequestComplete(Request, st);
         }
 }

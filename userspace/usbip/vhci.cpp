@@ -56,28 +56,35 @@ auto usbip::vhci_get_imported_devs(HANDLE hdev) -> std::vector<vhci::ioctl_impor
         std::vector<vhci::ioctl_imported_dev> v(vhci::TOTAL_PORTS + 1);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
-        if (!DeviceIoControl(hdev, vhci::IOCTL_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, nullptr, nullptr)) {
+        DWORD BytesReturned{};
+        if (!DeviceIoControl(hdev, vhci::IOCTL_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, &BytesReturned, nullptr)) {
                 dbg("failed to get imported devices: 0x%lx", GetLastError());
                 v.clear();
         }
 
+        assert(!(BytesReturned % sizeof(v[0])));
+        v.resize(BytesReturned/sizeof(v[0]));
+        
         return v;
 }
 
 bool usbip::vhci_attach_device(HANDLE hdev, vhci::ioctl_plugin &r)
 {
-        auto ok = DeviceIoControl(hdev, vhci::IOCTL_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), nullptr, nullptr);
+        DWORD BytesReturned{};
+        auto ok = DeviceIoControl(hdev, vhci::IOCTL_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), &BytesReturned, nullptr);
         if (!ok) {
                 dbg("%s: DeviceIoControl error %#x", __func__, GetLastError());
         }
+ 
+        assert(BytesReturned == sizeof(r.port));
         return ok;
 }
 
 int usbip::vhci_detach_device(HANDLE hdev, int port)
 {
-        vhci::ioctl_unplug r{ port };
+        vhci::ioctl_plugout r{ port };
 
-        if (DeviceIoControl(hdev, vhci::IOCTL_UNPLUG_HARDWARE, &r, sizeof(r), nullptr, 0, nullptr, nullptr)) {
+        if (DeviceIoControl(hdev, vhci::IOCTL_PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, nullptr, nullptr)) {
                 return 0;
         }
 

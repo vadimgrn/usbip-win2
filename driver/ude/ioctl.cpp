@@ -11,20 +11,46 @@
 #include "usbdevice.h"
 #include <usbip\vhci.h>
 
+#include <ws2def.h>
+#include <ntstrsafe.h>
+
 namespace
 {
 
 using namespace usbip;
 
+static_assert(sizeof(vhci::ioctl_plugin::service) == NI_MAXSERV);
+static_assert(sizeof(vhci::ioctl_plugin::host) == NI_MAXHOST);
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugin(_Out_ int &port, _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGEABLE auto get_vhci(_In_ WDFREQUEST Request)
+{
+        PAGED_CODE();
+        auto queue = WdfRequestGetIoQueue(Request);
+        return WdfIoQueueGetDevice(queue);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
+{
+        PAGED_CODE();
+        ANSI_STRING s{ 0, len, dest };
+
+        if (auto err = RtlUnicodeStringToAnsiString(&s, &src, false)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringToAnsiString('%!USTR!') %!STATUS!", &src, err);
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         PAGED_CODE();
 
-        port = assign_hub_port(vhci, udev, speed);
-
-        if (!vhci::is_valid_vport(port)) {
+        port = claim_hub_port(udev, speed);
+        if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All hub ports are occupied");
                 return ERR_PORTFULL;
         }
@@ -32,15 +58,11 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE u
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS options;
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
 
-        if (auto ctx = get_usbdevice_context(udev)) {
-                auto &num = vhci::get_hci_version(port) == vhci::HCI_USB3 ? 
-                            options.Usb30PortNumber : options.Usb20PortNumber;
-
-                num = vhci::get_rhport(port);
-        }
+        auto &num = vhci::get_hci_version(port) == vhci::HCI_USB3 ? options.Usb30PortNumber : options.Usb20PortNumber;
+        num = port;
         
         if (auto err = UdecxUsbDevicePlugIn(udev, &options)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!, port %d", num, err);
                 return ERR_GENERAL;
         }
 
@@ -52,20 +74,51 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
 {
         PAGED_CODE();
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, serial %s", r.host, r.service, r.busid, r.serial);
 
         auto &error = r.port;
-        auto speed = UdecxUsbHighSpeed; // FIXME
+        auto speed = UdecxUsbSuperSpeed; // FIXME
 
         UDECXUSBDEVICE udev{};
 
         if (NT_ERROR(create_usbdevice(udev, vhci, speed))) {
-                error = ERR_GENERAL;
-        } else if (auto err = plugin(r.port, vhci, udev, speed)) {
-                error = err;
-                WdfObjectDelete(udev);
+                error = make_error(ERR_GENERAL);
+        } else if (auto err = plugin(r.port, udev, speed)) {
+                error = make_error(err);
+                WdfObjectDelete(udev); // UdecxUsbDevicePlugIn failed or wasn't called
         } else {
-                TraceMsg("udev %04x -> port #%d", ptr4log(udev), r.port);
+                Trace(TRACE_LEVEL_INFORMATION, "udev %04x -> port %d", ptr4log(udev), r.port);
         }
+}
+
+/*
+ * @arg port [1, vhci::TOTAL_PORTS]
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto plugout(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool bad_port_msg)
+{
+        PAGED_CODE();
+
+        auto udev = find_usbdevice(vhci, port); // WdfObjectDereference
+        if (!udev) {
+                if (bad_port_msg) {
+                        Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", port);
+                }
+                return STATUS_NO_SUCH_DEVICE;
+        }
+
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x, port %d", ptr4log(udev), port);
+
+        auto err = UdecxUsbDevicePlugOutAndDelete(udev); // PASSIVE_LEVEL
+        if (err) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete %!STATUS!", err);
+        }
+
+        WdfObjectDelete(udev); // EvtCleanupCallback is not called without this
+        WdfObjectDereference(udev);
+
+        return err;
 }
 
 } // namespace
@@ -82,11 +135,33 @@ PAGEABLE NTSTATUS usbip::plugin_hardware(_In_ WDFREQUEST Request)
                 return err;
         }
 
-        TraceMsg("%s:%s, busid %s, serial %s", r->host, r->service, r->busid, r->serial);
-        auto queue = WdfRequestGetIoQueue(Request);
-        
-        if (auto vhci = WdfIoQueueGetDevice(queue)) {
-                ::plugin_hardware(vhci, *r);
+        auto vhci = get_vhci(Request);
+        ::plugin_hardware(vhci, *r);
+
+        WdfRequestSetInformation(Request, sizeof(r->port));
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS usbip::plugout_hardware(_In_ WDFREQUEST Request)
+{
+        PAGED_CODE();
+
+        vhci::ioctl_plugout *r{};
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
+                return err;
+        }
+
+        TraceDbg("port %d", r->port);
+        auto vhci = get_vhci(Request);
+
+        if (r->port > 0) {
+                return plugout(vhci, r->port, true);
+        }
+
+        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
+                plugout(vhci, port, false);
         }
 
         return STATUS_SUCCESS;
@@ -94,33 +169,62 @@ PAGEABLE NTSTATUS usbip::plugin_hardware(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::unplug_hardware(_In_ WDFREQUEST Request)
-{
-        PAGED_CODE();
-        vhci::ioctl_unplug *r{};
-
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
-                return err;
-        }
-
-        TraceMsg("Port #%d", r->port);
-        return STATUS_NOT_IMPLEMENTED;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
-        vhci::ioctl_imported_dev *dev{};
+ 
         size_t buf_sz = 0;
-
+        vhci::ioctl_imported_dev *dev{};
         if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*dev), &PVOID(dev), &buf_sz)) {
                 return err;
         }
 
         auto cnt = buf_sz/sizeof(*dev);
-        TraceMsg("Count %Iu", cnt);
+        if (!cnt) {
+                return STATUS_INVALID_PARAMETER;
+        }
 
-        return STATUS_NOT_IMPLEMENTED;
+        auto vhci = get_vhci(Request);
+
+        int dev_cnt = 0;
+        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
+
+                auto udev = find_usbdevice(vhci, port); // WdfObjectDereference
+                if (!udev) {
+                        continue;
+                }
+
+                if (!--cnt) {
+                        WdfObjectDereference(udev);
+                        break;
+                }
+
+                auto ctx = get_usbdevice_context(udev);
+
+                dev->port = ctx->port;
+                //RtlStringCbCopyA(dev->busid, sizeof(dev->busid), ctx->busid);
+
+                //to_ansi_str(dev->service, sizeof(dev->service), ctx->service_name);
+                //to_ansi_str(dev->host, sizeof(dev->host), ctx->node_name);
+                //to_ansi_str(dev->serial, sizeof(dev->serial), ctx->serial);
+
+                dev->status = SDEV_ST_USED;
+/*
+                if (auto d = &vpdo->descriptor) {
+                        dev->vendor = d->idVendor;
+                        dev->product = d->idProduct;
+                }
+
+                dev->devid = vpdo->devid;
+                dev->speed = vpdo->speed;
+*/
+                WdfObjectDereference(udev);
+                ++dev_cnt;
+                ++dev;
+        }
+
+        dev->port = 0; // end of data
+
+        WdfRequestSetInformation(Request, ++dev_cnt*sizeof(*dev));
+        return STATUS_SUCCESS;
 }

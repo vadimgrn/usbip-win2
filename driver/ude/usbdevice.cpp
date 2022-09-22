@@ -14,13 +14,17 @@
 namespace
 {
 
+using namespace usbip;
+
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbdevice_cleanup(_In_ WDFOBJECT DeviceObject)
 {
         auto udev = static_cast<UDECXUSBDEVICE>(DeviceObject);
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", usbip::ptr4log(udev));
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr4log(udev));
+
+        reclaim_hub_port(udev);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
@@ -94,6 +98,10 @@ PAGEABLE NTSTATUS usbip::create_usbdevice(
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
                 UdecxUsbDeviceInitFree(init); // FIXME: call on driver unload?
                 return err;
+        }
+
+        if (auto ctx = get_usbdevice_context(udev)) {
+                ctx->vhci = vhci;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr4log(udev));

@@ -18,6 +18,14 @@ namespace usbip
 
 struct usbdevice_context
 {
+        // from vhci::ioctl_plugin
+        PSTR busid;
+        UNICODE_STRING node_name;
+        UNICODE_STRING service_name;
+        UNICODE_STRING serial; // user-defined
+        //
+
+        WDFDEVICE vhci;
         int port; // vhci_context.devices[port - 1]
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(usbdevice_context, get_usbdevice_context)

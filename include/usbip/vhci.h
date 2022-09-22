@@ -78,7 +78,7 @@ constexpr auto IOCTL(int idx)
 
 enum {
         IOCTL_PLUGIN_HARDWARE      = IOCTL(0),
-        IOCTL_UNPLUG_HARDWARE      = IOCTL(1),
+        IOCTL_PLUGOUT_HARDWARE     = IOCTL(1),
         IOCTL_GET_IMPORTED_DEVICES = IOCTL(2),
 };
 
@@ -100,7 +100,7 @@ struct ioctl_imported_dev : ioctl_plugin
         usb_device_speed speed;
 };
 
-struct ioctl_unplug
+struct ioctl_plugout
 {
         int port; // [1..TOTAL_PORTS] or all ports if <= 0
 };

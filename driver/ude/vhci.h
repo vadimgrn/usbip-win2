@@ -33,18 +33,26 @@ struct request_context
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_context, get_request_context)
 
-_Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
-_IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int assign_hub_port(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed);
-
 constexpr auto to_hci_version(_In_ UDECX_USB_DEVICE_SPEED speed)
 {
         return speed >= UdecxUsbSuperSpeed ? vhci::HCI_USB3 : vhci::HCI_USB2;
 }
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE int claim_hub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+UDECXUSBDEVICE find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void reclaim_hub_port(_In_ UDECXUSBDEVICE udev);
+
+_Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
 
 } // namespace usbip
