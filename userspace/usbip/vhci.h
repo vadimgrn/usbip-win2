@@ -10,7 +10,7 @@ namespace usbip
 
 Handle vhci_driver_open();
 
-std::vector<vhci::ioctl_imported_dev> vhci_get_imported_devs(HANDLE hdev);
+std::vector<vhci::ioctl_imported_dev> vhci_get_imported_devs(HANDLE hdev, bool &result);
 
 bool vhci_attach_device(HANDLE hdev, vhci::ioctl_plugin &r);
 int vhci_detach_device(HANDLE hdev, int port);

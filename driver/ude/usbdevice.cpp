@@ -84,7 +84,7 @@ PAGEABLE NTSTATUS usbip::create_usbdevice(
 {
         PAGED_CODE();
 
-        auto init = create_usbdevice_init(vhci, speed);
+        auto init = create_usbdevice_init(vhci, speed); // must be freed if UdecxUsbDeviceCreate fails
         if (!init) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceInitAllocate error");
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -96,7 +96,7 @@ PAGEABLE NTSTATUS usbip::create_usbdevice(
 
         if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
-                UdecxUsbDeviceInitFree(init); // FIXME: call on driver unload?
+                UdecxUsbDeviceInitFree(init); // must never be called if success, Udecx will do that itself
                 return err;
         }
 

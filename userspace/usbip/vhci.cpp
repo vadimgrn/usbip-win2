@@ -51,20 +51,23 @@ auto usbip::vhci_driver_open() -> Handle
         return h;
 }
 
-auto usbip::vhci_get_imported_devs(HANDLE hdev) -> std::vector<vhci::ioctl_imported_dev>
+auto usbip::vhci_get_imported_devs(HANDLE hdev, bool &result) -> std::vector<vhci::ioctl_imported_dev>
 {
-        std::vector<vhci::ioctl_imported_dev> v(vhci::TOTAL_PORTS + 1);
+        std::vector<vhci::ioctl_imported_dev> v(vhci::TOTAL_PORTS);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
         DWORD BytesReturned{};
-        if (!DeviceIoControl(hdev, vhci::IOCTL_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, &BytesReturned, nullptr)) {
-                dbg("failed to get imported devices: 0x%lx", GetLastError());
+
+        if (DeviceIoControl(hdev, vhci::IOCTL_GET_IMPORTED_DEVICES, nullptr, 0, v.data(), idevs_bytes, &BytesReturned, nullptr)) {
+                assert(!(BytesReturned % sizeof(v[0])));
+                v.resize(BytesReturned / sizeof(v[0]));
+                result = true;
+        } else {
+                dbg("DeviceIoControl error %#lx", GetLastError());
                 v.clear();
+                result = false;
         }
 
-        assert(!(BytesReturned % sizeof(v[0])));
-        v.resize(BytesReturned/sizeof(v[0]));
-        
         return v;
 }
 
@@ -73,7 +76,7 @@ bool usbip::vhci_attach_device(HANDLE hdev, vhci::ioctl_plugin &r)
         DWORD BytesReturned{};
         auto ok = DeviceIoControl(hdev, vhci::IOCTL_PLUGIN_HARDWARE, &r, sizeof(r), &r, sizeof(r.port), &BytesReturned, nullptr);
         if (!ok) {
-                dbg("%s: DeviceIoControl error %#x", __func__, GetLastError());
+                dbg("DeviceIoControl error %#lx", GetLastError());
         }
  
         assert(BytesReturned == sizeof(r.port));
@@ -89,7 +92,7 @@ int usbip::vhci_detach_device(HANDLE hdev, int port)
         }
 
         auto err = GetLastError();
-        dbg("%s: DeviceIoControl error %#x", __func__, err);
+        dbg("DeviceIoControl error %#lx", err);
 
         switch (err) {
         case ERROR_FILE_NOT_FOUND:

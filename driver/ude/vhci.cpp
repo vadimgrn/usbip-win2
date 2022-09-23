@@ -233,7 +233,7 @@ void usbip::reclaim_hub_port(_In_ UDECXUSBDEVICE udev)
         static_assert(sizeof(udev_ctx->port) == sizeof(LONG));
 
         auto port = InterlockedExchange(reinterpret_cast<LONG*>(&udev_ctx->port), 0);
-        if (!port) { // was not attached
+        if (!port) {
                 return;
         }
 
@@ -264,7 +264,8 @@ UDECXUSBDEVICE usbip::find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
                 return WDF_NO_HANDLE;
         }
 
-        auto ctx = get_vhci_context(vhci); 
+        auto ctx = get_vhci_context(vhci);
+
         WdfSpinLockAcquire(ctx->devices_lock);
 
         auto udev = ctx->devices[port - 1];

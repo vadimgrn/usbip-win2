@@ -59,18 +59,11 @@ auto get_imported_devices(std::vector<usbip::vhci::ioctl_imported_dev> &devs)
                 return 3;
         }
         
-        auto v = usbip::vhci_get_imported_devs(hdev.get());
-        if (v.empty()) {
-                err("failed to get attach information");
+        bool ok = false;
+        devs = usbip::vhci_get_imported_devs(hdev.get(), ok);
+        if (!ok) {
+                err("failed to get imported devices information");
                 return 2;
-        }
-                
-        for (auto &d: v) {
-                if (d.port) {
-                        devs.push_back(d);
-                } else {
-                        break;
-                }
         }
 
         return 0;
@@ -79,8 +72,6 @@ auto get_imported_devices(std::vector<usbip::vhci::ioctl_imported_dev> &devs)
 int list_imported_devices(const std::set<int> &ports)
 {
         std::vector<usbip::vhci::ioctl_imported_dev> devs;
-        devs.reserve(usbip::vhci::TOTAL_PORTS);
-
         if (auto err = get_imported_devices(devs)) {
                 return err;
         }
