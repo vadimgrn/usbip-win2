@@ -16,13 +16,15 @@ namespace
 
 using namespace usbip;
 
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_udexusbdevice_context);
+
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbdevice_cleanup(_In_ WDFOBJECT DeviceObject)
 {
         auto udev = static_cast<UDECXUSBDEVICE>(DeviceObject);
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr4(udev));
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
 
         reclaim_roothub_port(udev);
 }
@@ -104,6 +106,70 @@ PAGEABLE NTSTATUS usbip::create_usbdevice(
                 ctx->vhci = vhci;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr4(udev));
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
         return STATUS_SUCCESS;
+}
+
+/*
+ * UDECXUSBDEVICE must be destroyed in two steps:
+ * 1.Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
+ *   A device will be plugged out from a hub, but not destroyed.
+ * 2.Call WdfObjectDelete to destroy it, EvtCleanupCallback will be called.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void usbip::destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
+{
+        PAGED_CODE();
+
+        auto &ctx = *get_usbdevice_context(udev);
+        static_assert(sizeof(ctx.destroyed) == sizeof(CHAR));
+
+        if (InterlockedExchange8(reinterpret_cast<CHAR*>(&ctx.destroyed), true)) {
+                TraceDbg("udev %04x was already destroyed, port %d", ptr04x(udev), ctx.port);
+                return;
+        }
+
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x, port %d", ptr04x(udev), ctx.port);
+
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(udev)) { // PASSIVE_LEVEL
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(udev=%04x) %!STATUS!", ptr04x(udev), err);
+        }
+
+        WdfObjectDelete(udev);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::schedule_destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
+{
+        auto func = [] (auto WorkItem)
+        {
+                if (auto udev = *get_udexusbdevice_context(WorkItem)) {
+                        destroy_usbdevice(udev);
+                        WdfObjectDereference(udev);
+                }
+                WdfObjectDelete(WorkItem); // can be omitted
+        };
+
+        WDF_WORKITEM_CONFIG cfg;
+        WDF_WORKITEM_CONFIG_INIT(&cfg, func);
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
+        attrs.ParentObject = udev;
+
+        WDFWORKITEM wi{};
+        if (auto err = WdfWorkItemCreate(&cfg, &attrs, &wi)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
+                return err;
+        }
+
+        *get_udexusbdevice_context(wi) = udev;
+        WdfObjectReference(udev);
+
+        WdfWorkItemEnqueue(wi);
+
+        static_assert(NT_SUCCESS(STATUS_PENDING));
+        return STATUS_PENDING;
 }

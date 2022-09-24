@@ -4,10 +4,10 @@
 
 #include "wdfobjectref.h"
 
-usbip::WdfObjectRef::WdfObjectRef(WDFOBJECT handle) :
+usbip::WdfObjectRef::WdfObjectRef(WDFOBJECT handle, bool add_ref) :
         m_handle(handle) 
 {
-        if (m_handle) {
+        if (m_handle && add_ref) {
                 WdfObjectReference(m_handle);
         }
 }

@@ -13,7 +13,7 @@ namespace usbip
 class WdfObjectRef
 {
 public:
-        explicit WdfObjectRef(WDFOBJECT handle = WDF_NO_HANDLE);
+        explicit WdfObjectRef(WDFOBJECT handle = WDF_NO_HANDLE, bool add_ref = true);
         ~WdfObjectRef() { reset(); }
 
         WdfObjectRef(const WdfObjectRef &obj) : WdfObjectRef(obj.m_handle) {}

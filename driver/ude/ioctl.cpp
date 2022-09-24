@@ -37,10 +37,34 @@ PAGEABLE void to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_
 {
         PAGED_CODE();
         ANSI_STRING s{ 0, len, dest };
-
         if (auto err = RtlUnicodeStringToAnsiString(&s, &src, false)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringToAnsiString('%!USTR!') %!STATUS!", &src, err);
         }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const usbdevice_context &src)
+{
+        PAGED_CODE();
+
+        dst.port = src.port;
+        //RtlStringCbCopyA(dst.busid, sizeof(dst.busid), src.busid);
+
+        //to_ansi_str(dst.service, sizeof(dst.service), src.service_name);
+        //to_ansi_str(dst.host, sizeof(dst.host), src.node_name);
+        //to_ansi_str(dst.serial, sizeof(dst.serial), src.serial);
+
+        dst.status = SDEV_ST_USED;
+/*
+        if (auto d = &vpdo->descriptor) {
+                dst.vendor = d->idVendor;
+                dst.product = d->idProduct;
+        }
+
+        dst.devid = vpdo->devid;
+        dst.speed = vpdo->speed;
+*/
 }
 
 _IRQL_requires_same_
@@ -51,7 +75,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_D
 
         port = claim_roothub_port(udev, speed);
         if (!port) {
-                Trace(TRACE_LEVEL_ERROR, "All hub ports are occupied");
+                Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERR_PORTFULL;
         }
 
@@ -87,41 +111,8 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
                 error = make_error(err);
                 WdfObjectDelete(udev); // UdecxUsbDevicePlugIn failed or was not called
         } else {
-                Trace(TRACE_LEVEL_INFORMATION, "udev %04x -> port %d", ptr4(udev), r.port);
+                Trace(TRACE_LEVEL_INFORMATION, "udev %04x -> port %d", ptr04x(udev), r.port);
         }
-}
-
-/*
- * UDECXUSBDEVICE must be destroyed in two steps:
- * 1.Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
- *   A device will be plugged out from a hub, but not destroyed.
- * 2.Call WdfObjectDelete to destroy it, EvtCleanupCallback will be called.
- *
- * @param port [1, vhci::TOTAL_PORTS]
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugout(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool bad_port_msg)
-{
-        PAGED_CODE();
-
-        auto udev = find_usbdevice(vhci, port);
-        if (!udev) {
-                if (bad_port_msg) {
-                        Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", port);
-                }
-                return STATUS_NO_SUCH_DEVICE;
-        }
-
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x, port %d", ptr4(udev.get()), port);
-
-        auto err = UdecxUsbDevicePlugOutAndDelete(udev.get<UDECXUSBDEVICE>()); // PASSIVE_LEVEL
-        if (err) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete %!STATUS!", err);
-        }
-
-        WdfObjectDelete(udev.get()); // must always be called
-        return err;
 }
 
 } // namespace
@@ -159,11 +150,18 @@ PAGEABLE NTSTATUS usbip::plugout_hardware(_In_ WDFREQUEST Request)
         auto vhci = get_vhci(Request);
 
         if (r->port > 0) {
-                return plugout(vhci, r->port, true);
+                if (auto udev = get_usbdevice(vhci, r->port)) {
+                        destroy_usbdevice(udev.get<UDECXUSBDEVICE>());
+                        return STATUS_SUCCESS;
+                }
+                Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
+                return STATUS_NO_SUCH_DEVICE;
         }
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
-                plugout(vhci, port, false);
+                if (auto udev = get_usbdevice(vhci, port)) {
+                        destroy_usbdevice(udev.get<UDECXUSBDEVICE>());
+                }
         }
 
         return STATUS_SUCCESS;
@@ -186,34 +184,14 @@ PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
 
         auto vhci = get_vhci(Request);
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt--; ++port) {
-
-                auto udev = find_usbdevice(vhci, port);
-                if (!udev) {
-                        continue;
+        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt; ++port) {
+                if (auto udev = get_usbdevice(vhci, port)) {
+                        auto ctx = get_usbdevice_context(udev.get());
+                        fill(*dev, *ctx);
+                        ++result_cnt;
+                        ++dev;
+                        --cnt;
                 }
-
-                auto ctx = get_usbdevice_context(udev.get());
-
-                dev->port = ctx->port;
-                //RtlStringCbCopyA(dev->busid, sizeof(dev->busid), ctx->busid);
-
-                //to_ansi_str(dev->service, sizeof(dev->service), ctx->service_name);
-                //to_ansi_str(dev->host, sizeof(dev->host), ctx->node_name);
-                //to_ansi_str(dev->serial, sizeof(dev->serial), ctx->serial);
-
-                dev->status = SDEV_ST_USED;
-/*
-                if (auto d = &vpdo->descriptor) {
-                        dev->vendor = d->idVendor;
-                        dev->product = d->idProduct;
-                }
-
-                dev->devid = vpdo->devid;
-                dev->speed = vpdo->speed;
-*/
-                ++result_cnt;
-                ++dev;
         }
 
         WdfRequestSetInformation(Request, result_cnt*sizeof(*dev));

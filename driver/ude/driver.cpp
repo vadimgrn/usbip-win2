@@ -52,7 +52,7 @@ PAGEABLE void driver_cleanup(_In_ WDFOBJECT DriverObject)
 	PAGED_CODE();
 
 	auto drvobj = WdfDriverWdmGetDriverObject(static_cast<WDFDRIVER>(DriverObject));
-	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x", ptr4(drvobj));
+	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x", ptr04x(drvobj));
 	
 	wsk::shutdown();
 	WPP_CLEANUP(drvobj);
@@ -101,6 +101,6 @@ EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STR
 		return err;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x, RegistryPath %!USTR!", ptr4(DriverObject), RegistryPath);
+	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x, RegistryPath %!USTR!", ptr04x(DriverObject), RegistryPath);
 	return STATUS_SUCCESS;
 }
