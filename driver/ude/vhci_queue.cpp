@@ -2,12 +2,12 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "queue.h"
+#include "vhci_queue.h"
 #include "trace.h"
-#include "queue.tmh"
+#include "vhci_queue.tmh"
 
 #include "vhci.h"
-#include "ioctl.h"
+#include "vhci_ioctl.h"
 
 #include <libdrv\dbgcommon.h>
 #include <usbip\vhci.h>

@@ -23,9 +23,9 @@
     </ClInclude>
     <ClInclude Include="vhci.h" />
     <ClInclude Include="driver.h" />
-    <ClInclude Include="queue.h" />
+    <ClInclude Include="vhci_queue.h" />
     <ClInclude Include="trace.h" />
-    <ClInclude Include="ioctl.h" />
+    <ClInclude Include="vhci_ioctl.h" />
     <ClInclude Include="usbdevice.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="urbtransfer.h" />
@@ -33,8 +33,8 @@
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
-    <ClCompile Include="queue.cpp" />
-    <ClCompile Include="ioctl.cpp" />
+    <ClCompile Include="vhci_queue.cpp" />
+    <ClCompile Include="vhci_ioctl.cpp" />
     <ClCompile Include="usbdevice.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="urbtransfer.cpp" />

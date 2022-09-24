@@ -2,9 +2,9 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "ioctl.h"
+#include "vhci_ioctl.h"
 #include "trace.h"
-#include "ioctl.tmh"
+#include "vhci_ioctl.tmh"
 
 #include "driver.h"
 #include "vhci.h"

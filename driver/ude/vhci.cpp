@@ -17,7 +17,7 @@
 
 #include "driver.h"
 #include "usbdevice.h"
-#include "queue.h"
+#include "vhci_queue.h"
 
 namespace
 {
