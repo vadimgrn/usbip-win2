@@ -49,7 +49,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_D
 {
         PAGED_CODE();
 
-        port = claim_hub_port(udev, speed);
+        port = claim_roothub_port(udev, speed);
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All hub ports are occupied");
                 return ERR_PORTFULL;
@@ -62,7 +62,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_D
         num = port;
         
         if (auto err = UdecxUsbDevicePlugIn(udev, &options)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!, port %d", num, err);
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!, port %lu", err, num);
                 return ERR_GENERAL;
         }
 
@@ -87,7 +87,7 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
                 error = make_error(err);
                 WdfObjectDelete(udev); // UdecxUsbDevicePlugIn failed or was not called
         } else {
-                Trace(TRACE_LEVEL_INFORMATION, "udev %04x -> port %d", ptr4log(udev), r.port);
+                Trace(TRACE_LEVEL_INFORMATION, "udev %04x -> port %d", ptr4(udev), r.port);
         }
 }
 
@@ -105,7 +105,7 @@ PAGEABLE auto plugout(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool bad_port_msg
 {
         PAGED_CODE();
 
-        auto udev = find_usbdevice(vhci, port); // WdfObjectDereference
+        auto udev = find_usbdevice(vhci, port);
         if (!udev) {
                 if (bad_port_msg) {
                         Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", port);
@@ -113,16 +113,14 @@ PAGEABLE auto plugout(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool bad_port_msg
                 return STATUS_NO_SUCH_DEVICE;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x, port %d", ptr4log(udev), port);
+        Trace(TRACE_LEVEL_INFORMATION, "udev %04x, port %d", ptr4(udev.get()), port);
 
-        auto err = UdecxUsbDevicePlugOutAndDelete(udev); // PASSIVE_LEVEL
+        auto err = UdecxUsbDevicePlugOutAndDelete(udev.get<UDECXUSBDEVICE>()); // PASSIVE_LEVEL
         if (err) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete %!STATUS!", err);
         }
 
-        WdfObjectDelete(udev); // must always be called
-        WdfObjectDereference(udev);
-
+        WdfObjectDelete(udev.get()); // must always be called
         return err;
 }
 
@@ -188,14 +186,14 @@ PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
 
         auto vhci = get_vhci(Request);
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt; ++port) {
+        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt--; ++port) {
 
-                auto udev = find_usbdevice(vhci, port); // WdfObjectDereference
+                auto udev = find_usbdevice(vhci, port);
                 if (!udev) {
                         continue;
                 }
 
-                auto ctx = get_usbdevice_context(udev);
+                auto ctx = get_usbdevice_context(udev.get());
 
                 dev->port = ctx->port;
                 //RtlStringCbCopyA(dev->busid, sizeof(dev->busid), ctx->busid);
@@ -214,10 +212,8 @@ PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
                 dev->devid = vpdo->devid;
                 dev->speed = vpdo->speed;
 */
-                WdfObjectDereference(udev);
                 ++result_cnt;
                 ++dev;
-                --cnt;
         }
 
         WdfRequestSetInformation(Request, result_cnt*sizeof(*dev));

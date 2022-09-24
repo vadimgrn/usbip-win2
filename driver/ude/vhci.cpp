@@ -30,7 +30,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
 {
         auto vhci = static_cast<WDFDEVICE>(DeviceObject);
-        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
+        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4(vhci));
 }
 
 _IRQL_requires_same_
@@ -188,7 +188,7 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int usbip::claim_hub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGEABLE int usbip::claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         PAGED_CODE();
 
@@ -209,9 +209,9 @@ PAGEABLE int usbip::claim_hub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVI
                 auto &handle = vhci_ctx->devices[i];
 
                 if (!handle) {
+                        WdfObjectReference(handle = udev);
                         port = i + 1;
                         NT_ASSERT(vhci::is_valid_vport(port));
-                        WdfObjectReference(handle = udev);
                         break;
                 }
         }
@@ -219,7 +219,7 @@ PAGEABLE int usbip::claim_hub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVI
         WdfSpinLockRelease(vhci_ctx->devices_lock);
 
         if (port) {
-                TraceDbg("udev %04x, port %d", ptr4log(udev), port);
+                TraceDbg("udev %04x, port %d", ptr4(udev), port);
         }
 
         return port;
@@ -227,7 +227,7 @@ PAGEABLE int usbip::claim_hub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVI
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::reclaim_hub_port(_In_ UDECXUSBDEVICE udev)
+void usbip::reclaim_roothub_port(_In_ UDECXUSBDEVICE udev)
 {
         auto udev_ctx = get_usbdevice_context(udev);
         static_assert(sizeof(udev_ctx->port) == sizeof(LONG));
@@ -237,7 +237,7 @@ void usbip::reclaim_hub_port(_In_ UDECXUSBDEVICE udev)
                 return;
         }
 
-        TraceDbg("udev %04x, port %ld", ptr4log(udev), port);
+        TraceDbg("udev %04x, port %ld", ptr4(udev), port);
         NT_ASSERT(vhci::is_valid_vport(port));
 
         auto vhci_ctx = get_vhci_context(udev_ctx->vhci); 
@@ -253,25 +253,21 @@ void usbip::reclaim_hub_port(_In_ UDECXUSBDEVICE udev)
         WdfObjectDereference(udev);
 }
 
-/*
- * @result must be WdfObjectDereference-d after use
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-UDECXUSBDEVICE usbip::find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
+auto usbip::find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port) -> WdfObjectRef
 {
+        WdfObjectRef udev;
         if (!vhci::is_valid_vport(port)) {
-                return WDF_NO_HANDLE;
+                return udev;
         }
 
         auto ctx = get_vhci_context(vhci);
-
         WdfSpinLockAcquire(ctx->devices_lock);
 
-        auto udev = ctx->devices[port - 1];
-        if (udev) {
-                NT_ASSERT(get_usbdevice_context(udev)->port == port);
-                WdfObjectReference(udev);
+        if (auto handle = ctx->devices[port - 1]) {
+                udev.reset(handle);
+                NT_ASSERT(get_usbdevice_context(udev.get())->port == port);
         }
 
         WdfSpinLockRelease(ctx->devices_lock);
@@ -303,6 +299,6 @@ PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT 
                 return err;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4log(vhci));
+        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr4(vhci));
         return STATUS_SUCCESS;
 }

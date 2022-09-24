@@ -83,7 +83,7 @@ PAGEABLE NTSTATUS usbip::create_default_queue(_In_ WDFDEVICE vhci)
 
         auto ctx = get_vhci_context(vhci);
 
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &ctx->default_queue)) {
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &ctx->queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }

@@ -15,15 +15,16 @@
 #include <usbip\vhci.h>
 
 #include <libdrv\pageable.h>
+#include <libdrv\wdfobjectref.h>
 
 namespace usbip
 {
 
 struct vhci_context
 {
-        WDFQUEUE default_queue;
+        WDFQUEUE queue;
 
-        UDECXUSBDEVICE devices[vhci::TOTAL_PORTS];
+        UDECXUSBDEVICE devices[vhci::TOTAL_PORTS]; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_context, get_vhci_context)
@@ -40,15 +41,15 @@ constexpr auto to_hci_version(_In_ UDECX_USB_DEVICE_SPEED speed)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int claim_hub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed);
+PAGEABLE int claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-UDECXUSBDEVICE find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+WdfObjectRef find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void reclaim_hub_port(_In_ UDECXUSBDEVICE udev);
+void reclaim_roothub_port(_In_ UDECXUSBDEVICE udev);
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
