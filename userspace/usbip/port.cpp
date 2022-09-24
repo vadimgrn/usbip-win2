@@ -118,7 +118,7 @@ int usbip_port_show(int argc, char *argv[])
                 auto str = argv[i];
                 int port;
 
-                if ((std::istringstream(str) >> port) && usbip::vhci::is_valid_vport(port)) {
+                if ((std::istringstream(str) >> port) && usbip::vhci::is_valid_port(port)) {
                         ports.insert(port);
                 } else {
                         err("invalid port: %s", str);

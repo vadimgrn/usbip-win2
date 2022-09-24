@@ -21,52 +21,46 @@ namespace usbip::vhci
 enum hci_version { HCI_USB2, HCI_USB3 };
 
 enum { 
-        VHUB_NUM_PORTS = 30,
-        TOTAL_PORTS = 2*VHUB_NUM_PORTS
+        USB2_PORTS = 30,
+        USB3_PORTS = USB2_PORTS,
+        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
 };
 
-constexpr auto is_valid_rhport(int port) // root hub port
-{
-        return port > 0 && port <= VHUB_NUM_PORTS;
-}
-
-constexpr auto is_valid_vport(int port) // virtual port
+constexpr auto is_valid_port(int port)
 {
         return port > 0 && port <= TOTAL_PORTS;
 }
 
-
-constexpr auto get_hci_version(int vport) // [1..TOTAL_PORTS]
+constexpr auto get_num_ports(hci_version version)
 {
-        return hci_version(--vport/VHUB_NUM_PORTS);
+        return version == HCI_USB2 ? USB2_PORTS : USB3_PORTS;
 }
-static_assert(get_hci_version(1) == HCI_USB2);
-static_assert(get_hci_version(VHUB_NUM_PORTS) == HCI_USB2);
-static_assert(get_hci_version(VHUB_NUM_PORTS + 1) == HCI_USB3);
-static_assert(get_hci_version(TOTAL_PORTS) == HCI_USB3);
 
-
-constexpr auto get_rhport(int vport) // [1..TOTAL_PORTS]
+constexpr auto get_hci_version(int port) // [1..TOTAL_PORTS]
 {
-        return --vport % VHUB_NUM_PORTS + 1;
+        return port <= USB2_PORTS ? HCI_USB2 : HCI_USB3;
 }
-static_assert(get_rhport(1) == 1);
-static_assert(get_rhport(VHUB_NUM_PORTS) == VHUB_NUM_PORTS);
-static_assert(get_rhport(VHUB_NUM_PORTS + 1) == 1);
-static_assert(get_rhport(TOTAL_PORTS) == VHUB_NUM_PORTS);
+static_assert(get_hci_version(1) == (USB2_PORTS ? HCI_USB2 : HCI_USB3));
+static_assert(get_hci_version(USB2_PORTS) == HCI_USB2);
+static_assert(get_hci_version(USB2_PORTS + 1) == HCI_USB3);
+static_assert(get_hci_version(TOTAL_PORTS) == (USB3_PORTS ? HCI_USB3 : HCI_USB2));
 
-
-constexpr auto make_vport(hci_version version, int rhport) // [1..VHUB_NUM_PORTS]
+constexpr auto make_port(hci_version version, int number) // [1..get_num_ports(version)]
 {
-        return int(VHUB_NUM_PORTS)*version + rhport;
+        return int(version)*USB2_PORTS + number;
 }
-static_assert(make_vport(HCI_USB3, VHUB_NUM_PORTS) == TOTAL_PORTS);
+static_assert(make_port(HCI_USB2, 0) == 0);
+static_assert(make_port(HCI_USB2, 1) == 1);
+static_assert(make_port(HCI_USB2, USB2_PORTS) == USB2_PORTS);
+static_assert(make_port(HCI_USB3, 1) == USB2_PORTS + 1);
+static_assert(make_port(HCI_USB3, USB3_PORTS) == TOTAL_PORTS);
 
-static_assert(get_hci_version(make_vport(HCI_USB2, VHUB_NUM_PORTS)) == HCI_USB2);
-static_assert(get_hci_version(make_vport(HCI_USB3, VHUB_NUM_PORTS)) == HCI_USB3);
+static_assert(get_hci_version(make_port(HCI_USB2, 1)) == (USB2_PORTS ? HCI_USB2 : HCI_USB3));
+static_assert(get_hci_version(make_port(HCI_USB2, USB2_PORTS)) == HCI_USB2);
+static_assert(get_hci_version(make_port(HCI_USB2, USB2_PORTS + 1)) == HCI_USB3);
+static_assert(get_hci_version(make_port(HCI_USB3, 1)) == HCI_USB3);
+static_assert(get_hci_version(make_port(HCI_USB3, USB3_PORTS)) == (USB3_PORTS ? HCI_USB3 : HCI_USB2));
 
-static_assert(get_rhport(make_vport(HCI_USB2, VHUB_NUM_PORTS)) == VHUB_NUM_PORTS);
-static_assert(get_rhport(make_vport(HCI_USB3, VHUB_NUM_PORTS)) == VHUB_NUM_PORTS);
 
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);

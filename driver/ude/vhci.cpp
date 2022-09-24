@@ -171,9 +171,8 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
         UDECX_WDF_DEVICE_CONFIG cfg;
         UDECX_WDF_DEVICE_CONFIG_INIT(&cfg, query_usb_capability);
 
-        cfg.NumberOfUsb20Ports = vhci::VHUB_NUM_PORTS;
-        cfg.NumberOfUsb30Ports = vhci::VHUB_NUM_PORTS;
-        static_assert(vhci::TOTAL_PORTS == 2*vhci::VHUB_NUM_PORTS);
+        cfg.NumberOfUsb20Ports = vhci::USB2_PORTS;
+        cfg.NumberOfUsb30Ports = vhci::USB3_PORTS;
 
         if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
@@ -199,11 +198,11 @@ PAGEABLE int usbip::claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_
         NT_ASSERT(!port);
 
         auto hci_ver = to_hci_version(speed);
-        auto from = vhci::make_vport(hci_ver, 0);
+        auto from = make_port(hci_ver, 0);
 
         WdfSpinLockAcquire(vhci_ctx.devices_lock);
 
-        for (auto i = from; i < from + vhci::VHUB_NUM_PORTS; ++i) {
+        for (auto i = from; i < from + get_num_ports(hci_ver); ++i) {
 
                 NT_ASSERT(i < ARRAYSIZE(vhci_ctx.devices));
                 auto &handle = vhci_ctx.devices[i];
@@ -211,7 +210,7 @@ PAGEABLE int usbip::claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_
                 if (!handle) {
                         WdfObjectReference(handle = udev);
                         port = i + 1;
-                        NT_ASSERT(vhci::is_valid_vport(port));
+                        NT_ASSERT(vhci::is_valid_port(port));
                         break;
                 }
         }
@@ -238,7 +237,7 @@ void usbip::reclaim_roothub_port(_In_ UDECXUSBDEVICE udev)
         }
 
         TraceDbg("udev %04x, port %ld", ptr04x(udev), port);
-        NT_ASSERT(vhci::is_valid_vport(port));
+        NT_ASSERT(vhci::is_valid_port(port));
 
         auto &vhci_ctx = *get_vhci_context(udev_ctx.vhci); 
 
@@ -258,7 +257,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port) -> WdfObjectRef
 {
         WdfObjectRef udev;
-        if (!vhci::is_valid_vport(port)) {
+        if (!vhci::is_valid_port(port)) {
                 return udev;
         }
 

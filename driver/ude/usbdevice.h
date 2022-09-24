@@ -7,11 +7,11 @@
 #include <wdm.h>
 #include <wdf.h>
 
-#include <libdrv\pageable.h>
-
 #include <usb.h>
 #include <wdfusb.h>
 #include <UdeCx.h>
+
+#include <libdrv\pageable.h>
 
 namespace usbip
 {
