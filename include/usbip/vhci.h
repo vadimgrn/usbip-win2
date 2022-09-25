@@ -18,8 +18,6 @@
 namespace usbip::vhci
 {
 
-enum hci_version { HCI_USB2, HCI_USB3 };
-
 enum { 
         USB2_PORTS = 30,
         USB3_PORTS = USB2_PORTS,
@@ -30,30 +28,6 @@ constexpr auto is_valid_port(int port)
 {
         return port > 0 && port <= TOTAL_PORTS;
 }
-
-constexpr auto get_num_ports(hci_version version)
-{
-        return version == HCI_USB2 ? USB2_PORTS : USB3_PORTS;
-}
-
-constexpr auto get_hci_version(int port) // [1..TOTAL_PORTS]
-{
-        return port <= USB2_PORTS ? HCI_USB2 : HCI_USB3;
-}
-static_assert(get_hci_version(1) == (USB2_PORTS ? HCI_USB2 : HCI_USB3));
-static_assert(get_hci_version(USB2_PORTS) == HCI_USB2);
-static_assert(get_hci_version(USB2_PORTS + 1) == HCI_USB3);
-static_assert(get_hci_version(TOTAL_PORTS) == (USB3_PORTS ? HCI_USB3 : HCI_USB2));
-
-constexpr auto make_port(hci_version version, int number) // [1..get_num_ports(version)]
-{
-        return (version == HCI_USB2 ? 0 : USB2_PORTS) + number;
-}
-static_assert(make_port(HCI_USB2, 0) == 0);
-static_assert(make_port(HCI_USB2, 1) == 1);
-static_assert(make_port(HCI_USB2, USB2_PORTS) == USB2_PORTS);
-static_assert(make_port(HCI_USB3, 1) == USB2_PORTS + 1);
-static_assert(make_port(HCI_USB3, USB3_PORTS) == TOTAL_PORTS);
 
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);

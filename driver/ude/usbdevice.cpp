@@ -26,7 +26,7 @@ void usbdevice_cleanup(_In_ WDFOBJECT DeviceObject)
         auto udev = static_cast<UDECXUSBDEVICE>(DeviceObject);
         Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
 
-        reclaim_roothub_port(udev);
+        forget_usbdevice(udev);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)

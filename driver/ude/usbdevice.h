@@ -26,8 +26,8 @@ struct usbdevice_context
         //
 
         WDFDEVICE vhci;
-        int port; // vhci_context.devices[port - 1]
         bool destroyed;
+        int port; // [1..vhci::TOTAL_PORTS], unique device id, this is not roothub's port number
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(usbdevice_context, get_usbdevice_context)
 

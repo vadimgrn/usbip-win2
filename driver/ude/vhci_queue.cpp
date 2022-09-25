@@ -75,24 +75,21 @@ PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const usbdevice_con
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
-        port = claim_roothub_port(udev, speed);
+        port = remember_usbdevice(udev);
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERR_PORTFULL;
         }
 
-        UDECX_USB_DEVICE_PLUG_IN_OPTIONS options;
+        UDECX_USB_DEVICE_PLUG_IN_OPTIONS options; 
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
 
-        auto &num = vhci::get_hci_version(port) == vhci::HCI_USB3 ? options.Usb30PortNumber : options.Usb20PortNumber;
-        num = port;
-
         if (auto err = UdecxUsbDevicePlugIn(udev, &options)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!, port %lu", err, num);
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
                 return ERR_GENERAL;
         }
 
@@ -113,7 +110,7 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
 
         if (NT_ERROR(create_usbdevice(udev, vhci, speed))) {
                 error = make_error(ERR_GENERAL);
-        } else if (auto err = plugin(r.port, udev, speed)) {
+        } else if (auto err = plugin(r.port, udev)) {
                 error = make_error(err);
                 WdfObjectDelete(udev); // UdecxUsbDevicePlugIn failed or was not called
         } else {

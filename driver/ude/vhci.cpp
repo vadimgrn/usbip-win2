@@ -144,28 +144,6 @@ PAGEABLE auto initialize(_In_ WDFDEVICE vhci)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_device(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
-{
-        PAGED_CODE();
-
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, vhci_context);
-        attrs.EvtCleanupCallback = vhci_cleanup;
-
-        if (auto err = WdfDeviceCreate(&DeviceInit, &attrs, &vhci)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
-                return err;
-        }
-
-        if (auto err = initialize(vhci)) {
-                return err;
-        }
-
-        return create_interfaces(vhci);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
@@ -184,12 +162,38 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
         return create_default_queue(vhci);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
+{
+        PAGED_CODE();
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, vhci_context);
+        attrs.EvtCleanupCallback = vhci_cleanup;
+
+        if (auto err = WdfDeviceCreate(&DeviceInit, &attrs, &vhci)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
+                return err;
+        }
+
+        if (auto err = initialize(vhci)) {
+                return err;
+        }
+
+        if (auto err = create_interfaces(vhci)) {
+                return err;
+        }
+
+        return add_usb_device_emulation(vhci);
+}
+
 } // namespace
 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int usbip::claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGEABLE int usbip::remember_usbdevice(_In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
@@ -199,16 +203,10 @@ PAGEABLE int usbip::claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_
         auto &port = udev_ctx.port;
         NT_ASSERT(!port);
 
-        auto hci_ver = to_hci_version(speed);
-        auto from = make_port(hci_ver, 0);
-
         WdfSpinLockAcquire(vhci_ctx.devices_lock);
 
-        for (auto i = from; i < from + get_num_ports(hci_ver); ++i) {
-
-                NT_ASSERT(i < ARRAYSIZE(vhci_ctx.devices));
+        for (int i = 0; i < ARRAYSIZE(vhci_ctx.devices); ++i) {
                 auto &handle = vhci_ctx.devices[i];
-
                 if (!handle) {
                         WdfObjectReference(handle = udev);
                         port = i + 1;
@@ -228,7 +226,7 @@ PAGEABLE int usbip::claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::reclaim_roothub_port(_In_ UDECXUSBDEVICE udev)
+void usbip::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
 {
         auto &udev_ctx = *get_usbdevice_context(udev);
         static_assert(sizeof(udev_ctx.port) == sizeof(LONG));
@@ -268,7 +266,7 @@ wdf::WdfObjectRef usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 
         if (auto handle = ctx.devices[port - 1]) {
                 udev.reset(handle); // adds reference
-                NT_ASSERT(get_usbdevice_context(udev.get())->port == port);
+                NT_ASSERT(get_usbdevice_context(handle)->port == port);
         }
 
         WdfSpinLockRelease(ctx.devices_lock);
@@ -287,16 +285,8 @@ PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT 
         }
 
         WDFDEVICE vhci{};
-        static_assert(!WDF_NO_HANDLE);
-
-        if (auto err = create_device(vhci, DeviceInit)) {
-                if (vhci) {
-                        WdfObjectDelete(vhci);
-                }
-                return err;
-        }
-
-        if (auto err = add_usb_device_emulation(vhci)) {
+        if (auto err = create_vhci(vhci, DeviceInit)) {
+                WdfObjectDeleteSafe(vhci);
                 return err;
         }
 
