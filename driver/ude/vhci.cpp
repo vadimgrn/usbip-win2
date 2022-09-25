@@ -254,9 +254,9 @@ void usbip::reclaim_roothub_port(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port) -> WdfObjectRef
+wdf::WdfObjectRef usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 {
-        WdfObjectRef udev;
+        wdf::WdfObjectRef udev;
         if (!vhci::is_valid_port(port)) {
                 return udev;
         }
@@ -265,7 +265,7 @@ auto usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port) -> WdfObjectRef
         WdfSpinLockAcquire(ctx.devices_lock);
 
         if (auto handle = ctx.devices[port - 1]) {
-                udev.reset(handle);
+                udev.reset(handle); // adds reference
                 NT_ASSERT(get_usbdevice_context(udev.get())->port == port);
         }
 

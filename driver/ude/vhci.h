@@ -45,7 +45,7 @@ PAGEABLE int claim_roothub_port(_In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WdfObjectRef get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+wdf::WdfObjectRef get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -7,14 +7,16 @@
 #include <wdm.h>
 #include <wdf.h>
 
-namespace usbip
+namespace wdf
 {
 
 class WdfObjectRef
 {
 public:
-        explicit WdfObjectRef(WDFOBJECT handle = WDF_NO_HANDLE, bool add_ref = true);
-        ~WdfObjectRef() { reset(); }
+        WdfObjectRef() = default;
+        explicit WdfObjectRef(WDFOBJECT handle, bool add_ref = true);
+
+        ~WdfObjectRef();
 
         WdfObjectRef(const WdfObjectRef &obj) : WdfObjectRef(obj.m_handle) {}
         WdfObjectRef& operator =(const WdfObjectRef &obj);
@@ -31,10 +33,10 @@ public:
         auto get() const { return static_cast<T>(m_handle); static_assert(sizeof(T) == sizeof(m_handle)); }
 
         WDFOBJECT release();
-        void reset(WDFOBJECT handle = WDF_NO_HANDLE);
+        void reset(WDFOBJECT handle = WDF_NO_HANDLE, bool add_ref = true);
 
 private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
 
-} // namespace usbip
+} // namespace wdf
