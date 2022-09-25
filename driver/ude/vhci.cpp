@@ -31,6 +31,8 @@ void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
 {
         auto vhci = static_cast<WDFDEVICE>(DeviceObject);
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
+
+        destroy_all_usbdevices(vhci);
 }
 
 _IRQL_requires_same_

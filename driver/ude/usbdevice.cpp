@@ -173,3 +173,17 @@ NTSTATUS usbip::schedule_destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
         static_assert(NT_SUCCESS(STATUS_PENDING));
         return STATUS_PENDING;
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
+{
+        auto passive = KeGetCurrentIrql() == PASSIVE_LEVEL;
+
+        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
+                if (auto udev = get_usbdevice(vhci, port)) {
+                        auto handle = udev.get<UDECXUSBDEVICE>();
+                        passive ? destroy_usbdevice(handle) : schedule_destroy_usbdevice(handle);
+                }
+        }
+}

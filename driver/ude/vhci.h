@@ -11,11 +11,11 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
-#include <initguid.h>
-#include <usbip\vhci.h>
-
 #include <libdrv\pageable.h>
 #include <libdrv\wdfobjectref.h>
+
+#include <initguid.h>
+#include <usbip\vhci.h>
 
 namespace usbip
 {

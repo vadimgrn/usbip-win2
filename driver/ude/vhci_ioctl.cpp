@@ -148,23 +148,18 @@ PAGEABLE NTSTATUS usbip::plugout_hardware(_In_ WDFREQUEST Request)
         }
 
         auto vhci = get_vhci(Request);
+        auto err = STATUS_SUCCESS;
 
-        if (r->port > 0) {
-                if (auto udev = get_usbdevice(vhci, r->port)) {
-                        destroy_usbdevice(udev.get<UDECXUSBDEVICE>());
-                        return STATUS_SUCCESS;
-                }
+        if (r->port <= 0) {
+                destroy_all_usbdevices(vhci);
+        } else if (auto udev = get_usbdevice(vhci, r->port)) {
+                destroy_usbdevice(udev.get<UDECXUSBDEVICE>());
+        } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
-                return STATUS_NO_SUCH_DEVICE;
+                err = STATUS_NO_SUCH_DEVICE;
         }
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
-                if (auto udev = get_usbdevice(vhci, port)) {
-                        destroy_usbdevice(udev.get<UDECXUSBDEVICE>());
-                }
-        }
-
-        return STATUS_SUCCESS;
+        return err;
 }
 
 _IRQL_requires_same_
@@ -186,10 +181,8 @@ PAGEABLE NTSTATUS usbip::get_imported_devices(_In_ WDFREQUEST Request)
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt; ++port) {
                 if (auto udev = get_usbdevice(vhci, port)) {
-                        auto ctx = get_usbdevice_context(udev.get());
-                        fill(*dev, *ctx);
-                        ++result_cnt;
-                        ++dev;
+                        auto &ctx = *get_usbdevice_context(udev.get());
+                        fill(dev[result_cnt++], ctx);
                         --cnt;
                 }
         }
