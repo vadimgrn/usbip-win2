@@ -77,7 +77,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
-        port = vhci::remember_usbdevice(udev);
+        port = vhci::remember_usbdevice(udev); // FIXME: find out and use automatically assigned port number
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERR_PORTFULL;
@@ -151,7 +151,7 @@ PAGEABLE auto plugout_hardware(_In_ WDFREQUEST Request)
 
         if (r->port <= 0) {
                 vhci::destroy_all_usbdevices(vhci);
-        } else if (auto udev = vhci::get_usbdevice(vhci, r->port)) {
+        } else if (auto udev = vhci::find_usbdevice(vhci, r->port)) {
                 usbdevice::destroy(udev.get<UDECXUSBDEVICE>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
@@ -179,7 +179,7 @@ PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
         auto vhci = get_vhci(Request);
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt; ++port) {
-                if (auto udev = vhci::get_usbdevice(vhci, port)) {
+                if (auto udev = vhci::find_usbdevice(vhci, port)) {
                         auto &ctx = *get_usbdevice_context(udev.get());
                         fill(dev[result_cnt++], ctx);
                         --cnt;
@@ -240,7 +240,7 @@ void IoDeviceControl(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::create_default_queue(_In_ WDFDEVICE vhci)
+PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 

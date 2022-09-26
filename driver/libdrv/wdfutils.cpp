@@ -4,7 +4,7 @@
 
 #include "wdfutils.h"
 
-wdf::ObjectReference::ObjectReference(WDFOBJECT handle, bool add_ref) :
+wdf::ObjectRef::ObjectRef(WDFOBJECT handle, bool add_ref) :
         m_handle(handle) 
 {
         if (m_handle && add_ref) {
@@ -12,33 +12,33 @@ wdf::ObjectReference::ObjectReference(WDFOBJECT handle, bool add_ref) :
         }
 }
 
-wdf::ObjectReference::~ObjectReference()
+wdf::ObjectRef::~ObjectRef()
 {
         if (m_handle) {
                 WdfObjectDereference(m_handle);
         }
 }
 
-auto wdf::ObjectReference::operator =(const ObjectReference &obj) -> ObjectReference&
+auto wdf::ObjectRef::operator =(const ObjectRef &obj) -> ObjectRef&
 {
         reset(obj.m_handle);
         return *this;
 }
 
-auto wdf::ObjectReference::operator =(ObjectReference &&obj) -> ObjectReference&
+auto wdf::ObjectRef::operator =(ObjectRef &&obj) -> ObjectRef&
 {
         reset(obj.release(), false);
         return *this;
 }
 
-WDFOBJECT wdf::ObjectReference::release()
+WDFOBJECT wdf::ObjectRef::release()
 {
         auto h = m_handle;
         m_handle = WDF_NO_HANDLE;
         return h;
 }
 
-void wdf::ObjectReference::reset(WDFOBJECT handle, bool add_ref)
+void wdf::ObjectRef::reset(WDFOBJECT handle, bool add_ref)
 {
         if (m_handle == handle) {
                 return;

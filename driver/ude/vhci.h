@@ -34,7 +34,7 @@ PAGEABLE int remember_usbdevice(_In_ UDECXUSBDEVICE udev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectReference get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+wdf::ObjectRef find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

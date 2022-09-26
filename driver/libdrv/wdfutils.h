@@ -10,19 +10,19 @@
 namespace wdf
 {
 
-class ObjectReference
+class ObjectRef
 {
 public:
-        ObjectReference() = default;
-        explicit ObjectReference(WDFOBJECT handle, bool add_ref = true);
+        ObjectRef() = default;
+        explicit ObjectRef(WDFOBJECT handle, bool add_ref = true);
 
-        ~ObjectReference();
+        ~ObjectRef();
 
-        ObjectReference(const ObjectReference &obj) : ObjectReference(obj.m_handle) {}
-        ObjectReference& operator =(const ObjectReference &obj);
+        ObjectRef(const ObjectRef &obj) : ObjectRef(obj.m_handle) {}
+        ObjectRef& operator =(const ObjectRef &obj);
 
-        ObjectReference(ObjectReference &&obj) : m_handle(obj.release()) {}
-        ObjectReference& operator =(ObjectReference &&obj);
+        ObjectRef(ObjectRef &&obj) : m_handle(obj.release()) {}
+        ObjectRef& operator =(ObjectRef &&obj);
 
         explicit operator bool() const { return m_handle; }
         auto operator !() const { return !m_handle; }

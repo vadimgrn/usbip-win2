@@ -9,11 +9,11 @@
 
 #include <libdrv\pageable.h>
 
-namespace usbip
+namespace usbip::vhci
 {
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS create_default_queue(_In_ WDFDEVICE vhci);
 
-} // namespace usbip
+} // namespace usbip::vhci

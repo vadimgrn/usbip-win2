@@ -91,7 +91,7 @@ NTSTATUS query_usb_capability(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
+PAGEABLE auto setup(_Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 
@@ -128,7 +128,7 @@ PAGEABLE auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto initialize(_In_ WDFDEVICE vhci)
+PAGEABLE auto setup_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
         auto &ctx = *get_vhci_context(vhci);
@@ -147,7 +147,7 @@ PAGEABLE auto initialize(_In_ WDFDEVICE vhci)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
+PAGEABLE auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 
@@ -162,7 +162,7 @@ PAGEABLE auto add_usb_device_emulation(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        return create_default_queue(vhci);
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -177,18 +177,20 @@ PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit
 
         if (auto err = WdfDeviceCreate(&DeviceInit, &attrs, &vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
+                NT_ASSERT(!vhci);
                 return err;
         }
 
-        if (auto err = initialize(vhci)) {
-                return err;
+        using func_t = NTSTATUS(WDFDEVICE);
+        func_t *functions[] { setup_context, create_interfaces, add_usbdevice_emulation, vhci::create_default_queue };
+
+        for (auto f: functions) {
+                if (auto err = f(vhci)) {
+                        return err;
+                }
         }
 
-        if (auto err = create_interfaces(vhci)) {
-                return err;
-        }
-
-        return add_usb_device_emulation(vhci);
+        return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -257,9 +259,9 @@ void usbip::vhci::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectReference usbip::vhci::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
+wdf::ObjectRef usbip::vhci::find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 {
-        wdf::ObjectReference udev;
+        wdf::ObjectRef udev;
         if (!is_valid_port(port)) {
                 return udev;
         }
@@ -284,7 +286,7 @@ PAGEABLE void usbip::vhci::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
-                if (auto udev = get_usbdevice(vhci, port)) {
+                if (auto udev = find_usbdevice(vhci, port)) {
                         usbdevice::destroy(udev.get<UDECXUSBDEVICE>());
                 }
         }
@@ -297,7 +299,7 @@ PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT 
 {
         PAGED_CODE();
 
-        if (auto err = initialize(DeviceInit)) {
+        if (auto err = setup(DeviceInit)) {
                 return err;
         }
 

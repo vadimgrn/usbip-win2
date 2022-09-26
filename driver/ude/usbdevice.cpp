@@ -52,7 +52,7 @@ void endpoints_configure(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_usbdevice_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         PAGED_CODE();
 
@@ -86,7 +86,7 @@ PAGEABLE NTSTATUS usbip::usbdevice::create(
 {
         PAGED_CODE();
 
-        auto init = create_usbdevice_init(vhci, speed); // must be freed if UdecxUsbDeviceCreate fails
+        auto init = create_init(vhci, speed); // must be freed if UdecxUsbDeviceCreate fails
         if (!init) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceInitAllocate error");
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -98,7 +98,8 @@ PAGEABLE NTSTATUS usbip::usbdevice::create(
 
         if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
-                UdecxUsbDeviceInitFree(init); // must never be called if success, Udecx will do that itself
+                UdecxUsbDeviceInitFree(init); // must never be called if success, Udecx does that itself
+                NT_ASSERT(!udev);
                 return err;
         }
 
@@ -114,7 +115,7 @@ PAGEABLE NTSTATUS usbip::usbdevice::create(
  * UDECXUSBDEVICE must be destroyed in two steps:
  * 1.Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
  *   A device will be plugged out from a hub, but not destroyed.
- * 2.Call WdfObjectDelete to destroy it, EvtCleanupCallback will be called.
+ * 2.Call WdfObjectDelete to destroy it.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -145,11 +146,11 @@ NTSTATUS usbip::usbdevice::schedule_destroy(_In_ UDECXUSBDEVICE udev)
 {
         auto func = [] (auto WorkItem)
         {
+                WdfObjectDelete(WorkItem); // can be omitted
                 if (auto udev = *get_udexusbdevice_context(WorkItem)) {
                         destroy(udev);
                         WdfObjectDereference(udev);
                 }
-                WdfObjectDelete(WorkItem); // can be omitted
         };
 
         WDF_WORKITEM_CONFIG cfg;
