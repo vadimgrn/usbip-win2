@@ -25,11 +25,13 @@ namespace
 
 using namespace usbip;
 
-_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
+_Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
 {
+        PAGED_CODE(); // WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE
+
         auto vhci = static_cast<WDFDEVICE>(DeviceObject);
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
 
@@ -276,15 +278,15 @@ wdf::WdfObjectRef usbip::vhci::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 
 
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::vhci::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void usbip::vhci::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
 {
-        auto passive = KeGetCurrentIrql() == PASSIVE_LEVEL;
+        PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
                 if (auto udev = get_usbdevice(vhci, port)) {
                         auto handle = udev.get<UDECXUSBDEVICE>();
-                        passive ? usbdevice::destroy(handle) : usbdevice::schedule_destroy(handle);
+                        usbdevice::destroy(handle);
                 }
         }
 }
