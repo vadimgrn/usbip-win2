@@ -9,7 +9,7 @@
     <ClCompile Include="usb_util.cpp" />
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
-    <ClCompile Include="wdfobjectref.cpp" />
+    <ClCompile Include="wdfutils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -31,7 +31,7 @@
     <ClInclude Include="..\..\include\usbip\proto.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="wdfobjectref.h" />
+    <ClInclude Include="wdfutils.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

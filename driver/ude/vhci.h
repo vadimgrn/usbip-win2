@@ -12,7 +12,7 @@
 #include <UdeCx.h>
 
 #include <libdrv\pageable.h>
-#include <libdrv\wdfobjectref.h>
+#include <libdrv\wdfutils.h>
 
 namespace usbip
 {
@@ -21,14 +21,6 @@ _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void WdfObjectDeleteSafe(_In_ WDFOBJECT Object)
-{
-        if (Object) {
-                WdfObjectDelete(Object);
-        }
-}
 
 } // namespace usbip
 
@@ -42,7 +34,7 @@ PAGEABLE int remember_usbdevice(_In_ UDECXUSBDEVICE udev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::WdfObjectRef get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+wdf::ObjectReference get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -257,9 +257,9 @@ void usbip::vhci::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::WdfObjectRef usbip::vhci::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
+wdf::ObjectReference usbip::vhci::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 {
-        wdf::WdfObjectRef udev;
+        wdf::ObjectReference udev;
         if (!is_valid_port(port)) {
                 return udev;
         }
@@ -285,8 +285,7 @@ PAGEABLE void usbip::vhci::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
                 if (auto udev = get_usbdevice(vhci, port)) {
-                        auto handle = udev.get<UDECXUSBDEVICE>();
-                        usbdevice::destroy(handle);
+                        usbdevice::destroy(udev.get<UDECXUSBDEVICE>());
                 }
         }
 }
@@ -304,7 +303,7 @@ PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT 
 
         WDFDEVICE vhci{};
         if (auto err = create_vhci(vhci, DeviceInit)) {
-                WdfObjectDeleteSafe(vhci);
+                wdf::ObjectDeleteSafe(vhci);
                 return err;
         }
 

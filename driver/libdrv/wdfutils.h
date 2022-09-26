@@ -10,19 +10,19 @@
 namespace wdf
 {
 
-class WdfObjectRef
+class ObjectReference
 {
 public:
-        WdfObjectRef() = default;
-        explicit WdfObjectRef(WDFOBJECT handle, bool add_ref = true);
+        ObjectReference() = default;
+        explicit ObjectReference(WDFOBJECT handle, bool add_ref = true);
 
-        ~WdfObjectRef();
+        ~ObjectReference();
 
-        WdfObjectRef(const WdfObjectRef &obj) : WdfObjectRef(obj.m_handle) {}
-        WdfObjectRef& operator =(const WdfObjectRef &obj);
+        ObjectReference(const ObjectReference &obj) : ObjectReference(obj.m_handle) {}
+        ObjectReference& operator =(const ObjectReference &obj);
 
-        WdfObjectRef(WdfObjectRef &&obj) : m_handle(obj.release()) {}
-        WdfObjectRef& operator =(WdfObjectRef &&obj);
+        ObjectReference(ObjectReference &&obj) : m_handle(obj.release()) {}
+        ObjectReference& operator =(ObjectReference &&obj);
 
         explicit operator bool() const { return m_handle; }
         auto operator !() const { return !m_handle; }
@@ -38,5 +38,13 @@ public:
 private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void ObjectDeleteSafe(_In_ WDFOBJECT Object)
+{
+        if (Object) {
+                WdfObjectDelete(Object);
+        }
+}
 
 } // namespace wdf
