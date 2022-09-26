@@ -14,37 +14,8 @@
 #include <libdrv\pageable.h>
 #include <libdrv\wdfobjectref.h>
 
-#include <initguid.h>
-#include <usbip\vhci.h>
-
 namespace usbip
 {
-
-struct vhci_context
-{
-        WDFQUEUE queue;
-
-        UDECXUSBDEVICE devices[vhci::TOTAL_PORTS]; // do not access directly, functions must be used
-        WDFSPINLOCK devices_lock;
-};
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_context, get_vhci_context)
-
-struct request_context
-{
-};
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_context, get_request_context)
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int remember_usbdevice(_In_ UDECXUSBDEVICE udev);
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::WdfObjectRef get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void forget_usbdevice(_In_ UDECXUSBDEVICE udev);
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
@@ -60,3 +31,25 @@ inline void WdfObjectDeleteSafe(_In_ WDFOBJECT Object)
 }
 
 } // namespace usbip
+
+
+namespace usbip::vhci
+{
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE int remember_usbdevice(_In_ UDECXUSBDEVICE udev);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+wdf::WdfObjectRef get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void forget_usbdevice(_In_ UDECXUSBDEVICE udev);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void destroy_all_usbdevices(_In_ WDFDEVICE vhci);
+
+} // namespace usbip::vhci

@@ -9,16 +9,14 @@
 #include "driver.h"
 #include "vhci.h"
 #include "usbdevice.h"
+#include "context.h"
 
-#include <usbip\vhci.h>
 #include <libdrv\dbgcommon.h>
 
 #include <ws2def.h>
 #include <ntstrsafe.h>
 
 #include <usbuser.h>
-#include <wdfusb.h>
-#include <UdeCx.h>
 
 namespace
 {
@@ -79,7 +77,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
-        port = remember_usbdevice(udev);
+        port = vhci::remember_usbdevice(udev);
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERR_PORTFULL;
@@ -108,7 +106,7 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
 
         UDECXUSBDEVICE udev{};
 
-        if (NT_ERROR(create_usbdevice(udev, vhci, speed))) {
+        if (NT_ERROR(usbdevice::create(udev, vhci, speed))) {
                 error = make_error(ERR_GENERAL);
         } else if (auto err = plugin(r.port, udev)) {
                 error = make_error(err);
@@ -152,9 +150,9 @@ PAGEABLE auto plugout_hardware(_In_ WDFREQUEST Request)
         auto err = STATUS_SUCCESS;
 
         if (r->port <= 0) {
-                destroy_all_usbdevices(vhci);
-        } else if (auto udev = get_usbdevice(vhci, r->port)) {
-                destroy_usbdevice(udev.get<UDECXUSBDEVICE>());
+                vhci::destroy_all_usbdevices(vhci);
+        } else if (auto udev = vhci::get_usbdevice(vhci, r->port)) {
+                usbdevice::destroy(udev.get<UDECXUSBDEVICE>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
                 err = STATUS_NO_SUCH_DEVICE;
@@ -181,7 +179,7 @@ PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
         auto vhci = get_vhci(Request);
 
         for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt; ++port) {
-                if (auto udev = get_usbdevice(vhci, port)) {
+                if (auto udev = vhci::get_usbdevice(vhci, port)) {
                         auto &ctx = *get_usbdevice_context(udev.get());
                         fill(dev[result_cnt++], ctx);
                         --cnt;

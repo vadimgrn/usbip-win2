@@ -18,6 +18,7 @@
 #include "driver.h"
 #include "usbdevice.h"
 #include "vhci_queue.h"
+#include "context.h"
 
 namespace
 {
@@ -32,7 +33,7 @@ void vhci_cleanup(_In_ WDFOBJECT DeviceObject)
         auto vhci = static_cast<WDFDEVICE>(DeviceObject);
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
 
-        destroy_all_usbdevices(vhci);
+        vhci::destroy_all_usbdevices(vhci);
 }
 
 _IRQL_requires_same_
@@ -193,7 +194,7 @@ PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int usbip::remember_usbdevice(_In_ UDECXUSBDEVICE udev)
+PAGEABLE int usbip::vhci::remember_usbdevice(_In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
@@ -210,7 +211,7 @@ PAGEABLE int usbip::remember_usbdevice(_In_ UDECXUSBDEVICE udev)
                 if (!handle) {
                         WdfObjectReference(handle = udev);
                         port = i + 1;
-                        NT_ASSERT(vhci::is_valid_port(port));
+                        NT_ASSERT(is_valid_port(port));
                         break;
                 }
         }
@@ -226,7 +227,7 @@ PAGEABLE int usbip::remember_usbdevice(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
+void usbip::vhci::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
 {
         auto &udev_ctx = *get_usbdevice_context(udev);
         static_assert(sizeof(udev_ctx.port) == sizeof(LONG));
@@ -237,7 +238,7 @@ void usbip::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
         }
 
         TraceDbg("udev %04x, port %ld", ptr04x(udev), port);
-        NT_ASSERT(vhci::is_valid_port(port));
+        NT_ASSERT(is_valid_port(port));
 
         auto &vhci_ctx = *get_vhci_context(udev_ctx.vhci); 
 
@@ -254,10 +255,10 @@ void usbip::forget_usbdevice(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::WdfObjectRef usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
+wdf::WdfObjectRef usbip::vhci::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 {
         wdf::WdfObjectRef udev;
-        if (!vhci::is_valid_port(port)) {
+        if (!is_valid_port(port)) {
                 return udev;
         }
 
@@ -271,6 +272,21 @@ wdf::WdfObjectRef usbip::get_usbdevice(_In_ WDFDEVICE vhci, _In_ int port)
 
         WdfSpinLockRelease(ctx.devices_lock);
         return udev;
+}
+
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::vhci::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
+{
+        auto passive = KeGetCurrentIrql() == PASSIVE_LEVEL;
+
+        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
+                if (auto udev = get_usbdevice(vhci, port)) {
+                        auto handle = udev.get<UDECXUSBDEVICE>();
+                        passive ? usbdevice::destroy(handle) : usbdevice::schedule_destroy(handle);
+                }
+        }
 }
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)

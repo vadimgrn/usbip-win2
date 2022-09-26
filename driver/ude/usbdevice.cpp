@@ -9,7 +9,7 @@
 #include "driver.h"
 #include "network.h"
 #include "vhci.h"
-#include <usbip\vhci.h>
+#include "context.h"
 
 namespace
 {
@@ -26,7 +26,7 @@ void usbdevice_cleanup(_In_ WDFOBJECT DeviceObject)
         auto udev = static_cast<UDECXUSBDEVICE>(DeviceObject);
         Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
 
-        forget_usbdevice(udev);
+        vhci::forget_usbdevice(udev);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
@@ -81,7 +81,7 @@ PAGEABLE auto create_usbdevice_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_S
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::create_usbdevice(
+PAGEABLE NTSTATUS usbip::usbdevice::create(
         _Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         PAGED_CODE();
@@ -118,7 +118,7 @@ PAGEABLE NTSTATUS usbip::create_usbdevice(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void usbip::destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
+PAGEABLE void usbip::usbdevice::destroy(_In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
@@ -141,12 +141,12 @@ PAGEABLE void usbip::destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::schedule_destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
+NTSTATUS usbip::usbdevice::schedule_destroy(_In_ UDECXUSBDEVICE udev)
 {
         auto func = [] (auto WorkItem)
         {
                 if (auto udev = *get_udexusbdevice_context(WorkItem)) {
-                        destroy_usbdevice(udev);
+                        destroy(udev);
                         WdfObjectDereference(udev);
                 }
                 WdfObjectDelete(WorkItem); // can be omitted
@@ -172,18 +172,4 @@ NTSTATUS usbip::schedule_destroy_usbdevice(_In_ UDECXUSBDEVICE udev)
 
         static_assert(NT_SUCCESS(STATUS_PENDING));
         return STATUS_PENDING;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::destroy_all_usbdevices(_In_ WDFDEVICE vhci)
-{
-        auto passive = KeGetCurrentIrql() == PASSIVE_LEVEL;
-
-        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices); ++port) {
-                if (auto udev = get_usbdevice(vhci, port)) {
-                        auto handle = udev.get<UDECXUSBDEVICE>();
-                        passive ? destroy_usbdevice(handle) : schedule_destroy_usbdevice(handle);
-                }
-        }
 }

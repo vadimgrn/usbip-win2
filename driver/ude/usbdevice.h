@@ -13,39 +13,19 @@
 
 #include <libdrv\pageable.h>
 
-namespace usbip
+namespace usbip::usbdevice
 {
-
-struct usbdevice_context
-{
-        // from vhci::ioctl_plugin
-        PSTR busid;
-        UNICODE_STRING node_name;
-        UNICODE_STRING service_name;
-        UNICODE_STRING serial; // user-defined
-        //
-
-        WDFDEVICE vhci;
-        bool destroyed;
-        int port; // [1..vhci::TOTAL_PORTS], unique device id, this is not roothub's port number
-};        
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(usbdevice_context, get_usbdevice_context)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create_usbdevice(
-        _Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed);
+PAGEABLE NTSTATUS create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy_usbdevice(_In_ UDECXUSBDEVICE udev);
+PAGEABLE void destroy(_In_ UDECXUSBDEVICE udev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS schedule_destroy_usbdevice(_In_ UDECXUSBDEVICE udev);
+NTSTATUS schedule_destroy(_In_ UDECXUSBDEVICE udev);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void destroy_all_usbdevices(_In_ WDFDEVICE vhci);
-
-} // namespace usbip
+} // namespace usbip::usbdevice

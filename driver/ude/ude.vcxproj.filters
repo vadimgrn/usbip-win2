@@ -28,6 +28,7 @@
     <ClInclude Include="usbdevice.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="urbtransfer.h" />
+    <ClInclude Include="context.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />

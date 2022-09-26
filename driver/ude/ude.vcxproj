@@ -25,6 +25,7 @@
     <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
     <ClInclude Include="..\..\include\usbip\vhci.h" />
+    <ClInclude Include="context.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="usbdevice.h" />
