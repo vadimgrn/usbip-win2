@@ -13,12 +13,17 @@
 
 #include <libdrv\pageable.h>
 
-namespace usbip::usbdevice
+namespace usbip
+{
+        struct device_ctx_data;
+}
+
+namespace usbip::device
 {
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed);
+PAGEABLE NTSTATUS create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_data *data);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -28,4 +33,4 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS schedule_destroy(_In_ UDECXUSBDEVICE udev);
 
-} // namespace usbip::usbdevice
+} // namespace usbip::device

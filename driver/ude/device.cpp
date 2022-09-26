@@ -2,31 +2,99 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "usbdevice.h"
+#include "device.h"
 #include "trace.h"
-#include "usbdevice.tmh"
+#include "device.tmh"
 
-#include "driver.h"
 #include "network.h"
 #include "vhci.h"
 #include "context.h"
+
+#include <libdrv\strutil.h>
 
 namespace
 {
 
 using namespace usbip;
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_udexusbdevice_context);
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_udev_ctx);
 
-_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbdevice_cleanup(_In_ WDFOBJECT DeviceObject)
+auto to_udex_speed(_In_ usb_device_speed speed)
 {
-        auto udev = static_cast<UDECXUSBDEVICE>(DeviceObject);
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
+        switch (speed) {
+        case USB_SPEED_SUPER_PLUS:
+        case USB_SPEED_SUPER:
+                return UdecxUsbSuperSpeed;
+        case USB_SPEED_FULL:
+                return UdecxUsbFullSpeed;
+        case USB_SPEED_LOW:
+                return UdecxUsbLowSpeed;
+        case USB_SPEED_HIGH:
+        case USB_SPEED_WIRELESS:
+        case USB_SPEED_UNKNOWN:
+        default:
+                return UdecxUsbHighSpeed;
+        }
+}
 
-        vhci::forget_usbdevice(udev);
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void close_socket(_Inout_ wsk::SOCKET* &sock)
+{
+        PAGED_CODE();
+
+        if (!sock) {
+                return;
+        }
+
+        if (auto err = event_callback_control(sock, WSK_EVENT_DISABLE | WSK_EVENT_DISCONNECT, true)) {
+                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+        }
+
+        if (auto err = disconnect(sock)) {
+                Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
+        }
+
+        if (auto err = close(sock)) {
+                Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
+        }
+
+        sock = nullptr;
+}
+
+_Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void NTAPI usbdevice_destroy(_In_ WDFOBJECT Object)
+{
+        PAGED_CODE();
+
+        auto udev = static_cast<UDECXUSBDEVICE>(Object);
+        TraceDbg("udev %04x", ptr04x(udev));
+
+        if (auto ctx = get_device_ctx(udev)) {
+                free(ctx->data);
+        }
+}
+
+_Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbdevice_cleanup(_In_ WDFOBJECT Object)
+{
+        PAGED_CODE();
+
+        auto udev = static_cast<UDECXUSBDEVICE>(Object);
+        TraceDbg("udev %04x", ptr04x(udev));
+
+        vhci::forget_device(udev);
+
+        if (auto ctx = get_device_ctx(udev)) {
+                close_socket(ctx->data->sock);
+//              cancel_pending_irps(*ctx->data);
+        }
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
@@ -81,10 +149,12 @@ PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::usbdevice::create(
-        _Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_data *data)
 {
         PAGED_CODE();
+
+        NT_ASSERT(data);
+        auto speed = to_udex_speed(data->speed);
 
         auto init = create_init(vhci, speed); // must be freed if UdecxUsbDeviceCreate fails
         if (!init) {
@@ -93,18 +163,20 @@ PAGEABLE NTSTATUS usbip::usbdevice::create(
         }
 
         WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, usbdevice_context);
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, device_ctx);
         attrs.EvtCleanupCallback = usbdevice_cleanup;
+        attrs.EvtDestroyCallback = usbdevice_destroy;
 
         if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
                 UdecxUsbDeviceInitFree(init); // must never be called if success, Udecx does that itself
-                NT_ASSERT(!udev);
                 return err;
         }
 
-        if (auto ctx = get_usbdevice_context(udev)) {
+        if (auto ctx = get_device_ctx(udev)) {
                 ctx->vhci = vhci;
+                ctx->data = data;
+                data->ctx = ctx;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
@@ -119,11 +191,11 @@ PAGEABLE NTSTATUS usbip::usbdevice::create(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void usbip::usbdevice::destroy(_In_ UDECXUSBDEVICE udev)
+PAGEABLE void usbip::device::destroy(_In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
-        auto &ctx = *get_usbdevice_context(udev);
+        auto &ctx = *get_device_ctx(udev);
         static_assert(sizeof(ctx.destroyed) == sizeof(CHAR));
 
         if (InterlockedExchange8(reinterpret_cast<CHAR*>(&ctx.destroyed), true)) {
@@ -142,15 +214,15 @@ PAGEABLE void usbip::usbdevice::destroy(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::usbdevice::schedule_destroy(_In_ UDECXUSBDEVICE udev)
+NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE udev)
 {
         auto func = [] (auto WorkItem)
         {
-                WdfObjectDelete(WorkItem); // can be omitted
-                if (auto udev = *get_udexusbdevice_context(WorkItem)) {
+                if (auto udev = *get_udev_ctx(WorkItem)) {
                         destroy(udev);
                         WdfObjectDereference(udev);
                 }
+                WdfObjectDelete(WorkItem); // can be omitted
         };
 
         WDF_WORKITEM_CONFIG cfg;
@@ -166,7 +238,7 @@ NTSTATUS usbip::usbdevice::schedule_destroy(_In_ UDECXUSBDEVICE udev)
                 return err;
         }
 
-        *get_udexusbdevice_context(wi) = udev;
+        *get_udev_ctx(wi) = udev;
         WdfObjectReference(udev);
 
         WdfWorkItemEnqueue(wi);

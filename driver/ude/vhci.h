@@ -30,18 +30,18 @@ namespace usbip::vhci
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int remember_usbdevice(_In_ UDECXUSBDEVICE udev);
+PAGEABLE int remember_device(_In_ UDECXUSBDEVICE udev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef find_usbdevice(_In_ WDFDEVICE vhci, _In_ int port);
+wdf::ObjectRef find_device(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void forget_usbdevice(_In_ UDECXUSBDEVICE udev);
+void forget_device(_In_ UDECXUSBDEVICE udev);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy_all_usbdevices(_In_ WDFDEVICE vhci);
+PAGEABLE void destroy_all_devices(_In_ WDFDEVICE vhci);
 
 } // namespace usbip::vhci

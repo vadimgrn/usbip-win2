@@ -6,16 +6,19 @@
 #include "trace.h"
 #include "vhci_queue.tmh"
 
-#include "driver.h"
-#include "vhci.h"
-#include "usbdevice.h"
 #include "context.h"
+#include "vhci.h"
+#include "device.h"
+#include "wsk_receive.h"
+#include "network.h"
 
 #include <libdrv\dbgcommon.h>
+#include <libdrv\mdl_cpp.h>
 
-#include <ws2def.h>
+#include <usbip\proto_op.h>
+
 #include <ntstrsafe.h>
-
+#include <ws2def.h>
 #include <usbuser.h>
 
 namespace
@@ -25,6 +28,19 @@ using namespace usbip;
 
 static_assert(sizeof(vhci::ioctl_plugin::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::ioctl_plugin::host) == NI_MAXHOST);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void log(const usbip_usb_device &d)
+{
+        Trace(TRACE_LEVEL_VERBOSE, "usbip_usb_device(path '%s', busid %s, busnum %d, devnum %d, %!usb_device_speed!,"
+                "vid %#x, pid %#x, rev %#x, class/sub/proto %x/%x/%x, "
+                "bConfigurationValue %d, bNumConfigurations %d, bNumInterfaces %d)", 
+                d.path, d.busid, d.busnum, d.devnum, d.speed, 
+                d.idVendor, d.idProduct, d.bcdDevice,
+                d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, 
+                d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -48,27 +64,224 @@ PAGEABLE void to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const usbdevice_context &src)
+PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
+{
+        PAGED_CODE();
+        auto &d = *ctx.data;
+
+//      ioctl_plugin
+        dst.port = ctx.port;
+        if (auto s = d.busid) {
+                RtlStringCbCopyA(dst.busid, sizeof(dst.busid), s);
+        }
+        to_ansi_str(dst.service, sizeof(dst.service), d.service_name);
+        to_ansi_str(dst.host, sizeof(dst.host), d.node_name);
+        to_ansi_str(dst.serial, sizeof(dst.serial), d.serial);
+
+//      ioctl_imported_dev
+        dst.status = SDEV_ST_USED;
+        dst.vendor = d.vendor_id;
+        dst.product = d.product_id;
+        dst.devid = d.devid;
+        dst.speed = d.speed;
+}
+
+/*
+ * @see <linux>/tools/usb/usbip/src/usbipd.c, recv_request_import
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto send_req_import(_In_ device_ctx_data &data)
 {
         PAGED_CODE();
 
-        dst.port = src.port;
-        //RtlStringCbCopyA(dst.busid, sizeof(dst.busid), src.busid);
+        struct {
+                op_common hdr{ USBIP_VERSION, OP_REQ_IMPORT, ST_OK };
+                op_import_request body;
+        } req;
 
-        //to_ansi_str(dst.service, sizeof(dst.service), src.service_name);
-        //to_ansi_str(dst.host, sizeof(dst.host), src.node_name);
-        //to_ansi_str(dst.serial, sizeof(dst.serial), src.serial);
+        static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
 
-        dst.status = SDEV_ST_USED;
-        /*
-        if (auto d = &vpdo->descriptor) {
-        dst.vendor = d->idVendor;
-        dst.product = d->idProduct;
+        strcpy_s(req.body.busid, sizeof(req.body.busid), data.busid);
+
+        PACK_OP_COMMON(0, &req.hdr);
+        PACK_OP_IMPORT_REQUEST(0, &req.body);
+
+        return send(data.sock, memory::stack, &req, sizeof(req));
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto recv_rep_import(_In_ device_ctx_data &data, _In_ memory pool, _Out_ op_import_reply &reply)
+{
+        PAGED_CODE();
+
+        auto status = ST_OK;
+
+        if (auto err = recv_op_common(data.sock, OP_REP_IMPORT, status)) {
+                return make_error(err);
         }
 
-        dst.devid = vpdo->devid;
-        dst.speed = vpdo->speed;
-        */
+        if (status) {
+                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT %!op_status_t!", status);
+                return make_error(ERR_NONE, status);
+        }
+
+        if (auto err = recv(data.sock, pool, &reply, sizeof(reply))) {
+                Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
+                return make_error(ERR_NETWORK);
+        }
+
+        PACK_OP_IMPORT_REPLY(0, &reply);
+
+        if (strncmp(reply.udev.busid, data.busid, sizeof(reply.udev.busid))) {
+                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, data.busid);
+                return make_error(ERR_PROTOCOL);
+        }
+
+        return make_error(ERR_NONE);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto import_remote_device(_Inout_ device_ctx_data &data)
+{
+        PAGED_CODE();
+
+        if (auto err = send_req_import(data)) {
+                Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
+                return make_error(ERR_NETWORK);
+        }
+
+        op_import_reply reply{};
+
+        if (auto err = recv_rep_import(data, memory::stack, reply)) { // result made by make_error()
+                return err;
+        }
+
+        auto &udev = reply.udev;
+        log(udev);
+
+        data.speed = static_cast<usb_device_speed>(udev.speed);
+
+        data.vendor_id = udev.idVendor;
+        data.product_id = udev.idProduct;
+
+        data.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
+
+        if (auto err = event_callback_control(data.sock, WSK_EVENT_DISCONNECT, false)) {
+                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+                return make_error(ERR_NETWORK);
+        }
+
+        return make_error(ERR_NONE);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_data &data)
+{
+        PAGED_CODE();
+
+        ADDRINFOEXW hints{};
+        hints.ai_flags = AI_NUMERICSERV;
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP; // zero isn't work
+
+        return wsk::getaddrinfo(result, &data.node_name, &data.service_name, &hints);
+}
+
+/*
+ * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto set_options(wsk::SOCKET *sock)
+{
+        PAGED_CODE();
+
+        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
+
+        int idle = 0;
+        int cnt = 0;
+        int intvl = 0;
+
+        if (auto err = get_keepalive_opts(sock, &idle, &cnt, &intvl)) {
+                Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", err);
+                return err;
+        }
+
+        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
+                idle, cnt, intvl, keepalive(idle, cnt, intvl));
+
+        enum { IDLE = 30, CNT = 9, INTVL = 10 };
+
+        if (auto err = set_keepalive(sock, IDLE, CNT, INTVL)) {
+                Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
+                return err;
+        }
+
+        bool optval{};
+        if (auto err = get_keepalive(sock, optval)) {
+                Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
+                return err;
+        }
+
+        NT_VERIFY(!get_keepalive_opts(sock, &idle, &cnt, &intvl));
+
+        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
+                idle, cnt, intvl, keepalive(idle, cnt, intvl));
+
+        bool ok = optval && keepalive(idle, cnt, intvl) == keepalive(IDLE, CNT, INTVL);
+        return ok ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
+{
+        PAGED_CODE();
+
+        if (auto err = set_options(sock)) {
+                return err;
+        }
+
+        SOCKADDR_INET any{ static_cast<ADDRESS_FAMILY>(ai.ai_family) }; // see INADDR_ANY, IN6ADDR_ANY_INIT
+
+        if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&any))) {
+                Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", err);
+                return err;
+        }
+
+        auto err = connect(sock, ai.ai_addr);
+        if (err) {
+                Trace(TRACE_LEVEL_ERROR, "address %!BIN! -> %!STATUS!", 
+                        WppBinary(ai.ai_addr, static_cast<USHORT>(ai.ai_addrlen)), err);
+        }
+
+        return err;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto connect(_Inout_ device_ctx_data &data)
+{
+        PAGED_CODE();
+
+        ADDRINFOEXW *ai{};
+        if (auto err = getaddrinfo(ai, data)) {
+                Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
+                return ERR_NETWORK;
+        }
+
+        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ nullptr, WskDisconnectEvent };
+
+        NT_ASSERT(!data.sock);
+        data.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &data, &dispatch, ai, try_connect, nullptr);
+
+        wsk::free(ai);
+        return data.sock ? ERR_NONE : ERR_NETWORK;
 }
 
 _IRQL_requires_same_
@@ -77,7 +290,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
 {
         PAGED_CODE();
 
-        port = vhci::remember_usbdevice(udev); // FIXME: find out and use automatically assigned port number
+        port = vhci::remember_device(udev); // FIXME: find out and use automatically assigned port number
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERR_PORTFULL;
@@ -94,6 +307,16 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
         return ERR_NONE;
 }
 
+struct device_ctx_data_ptr
+{
+        ~device_ctx_data_ptr() { free(ptr); }
+
+        auto operator ->() const { return ptr; }
+        void release() { ptr = nullptr; }
+
+        device_ctx_data *ptr{};
+};
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
@@ -102,13 +325,34 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, serial %s", r.host, r.service, r.busid, r.serial);
 
         auto &error = r.port;
-        auto speed = UdecxUsbSuperSpeed; // FIXME
+        device_ctx_data_ptr data;
+
+        if (NT_ERROR(create(data.ptr, r))) {
+                error = make_error(ERR_GENERAL);
+                return;
+        }
+
+        if (auto err = connect(*data.ptr)) {
+                Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &data->node_name, &data->service_name);
+                error = make_error(err);
+                return;
+        }
+
+        Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &data->node_name, &data->service_name);
+
+        if (bool(error = import_remote_device(*data.ptr))) {
+                return;
+        }
 
         UDECXUSBDEVICE udev{};
-
-        if (NT_ERROR(usbdevice::create(udev, vhci, speed))) {
+        if (NT_ERROR(device::create(udev, vhci, data.ptr))) {
                 error = make_error(ERR_GENERAL);
-        } else if (auto err = plugin(r.port, udev)) {
+                return;
+        }
+   
+        data.release();
+
+        if (auto err = plugin(r.port, udev)) {
                 error = make_error(err);
                 WdfObjectDelete(udev); // UdecxUsbDevicePlugIn failed or was not called
         } else {
@@ -150,9 +394,9 @@ PAGEABLE auto plugout_hardware(_In_ WDFREQUEST Request)
         auto err = STATUS_SUCCESS;
 
         if (r->port <= 0) {
-                vhci::destroy_all_usbdevices(vhci);
-        } else if (auto udev = vhci::find_usbdevice(vhci, r->port)) {
-                usbdevice::destroy(udev.get<UDECXUSBDEVICE>());
+                vhci::destroy_all_devices(vhci);
+        } else if (auto udev = vhci::find_device(vhci, r->port)) {
+                device::destroy(udev.get<UDECXUSBDEVICE>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
                 err = STATUS_NO_SUCH_DEVICE;
@@ -178,13 +422,15 @@ PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
 
         auto vhci = get_vhci(Request);
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_context::devices) && cnt; ++port) {
-                if (auto udev = vhci::find_usbdevice(vhci, port)) {
-                        auto &ctx = *get_usbdevice_context(udev.get());
+        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices) && cnt; ++port) {
+                if (auto udev = vhci::find_device(vhci, port)) {
+                        auto &ctx = *get_device_ctx(udev.get());
                         fill(dev[result_cnt++], ctx);
                         --cnt;
                 }
         }
+
+        TraceDbg("%d device(s) reported", result_cnt);
 
         WdfRequestSetInformation(Request, result_cnt*sizeof(*dev));
         return STATUS_SUCCESS;
@@ -250,7 +496,7 @@ PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
 
-        auto ctx = get_vhci_context(vhci);
+        auto ctx = get_vhci_ctx(vhci);
 
         if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &ctx->queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);

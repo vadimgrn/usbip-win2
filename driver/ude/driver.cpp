@@ -7,6 +7,7 @@
 #include "trace.h"
 #include "driver.tmh"
 
+#include "context.h"
 #include <libdrv\wsk_cpp.h>
 
 namespace
@@ -70,7 +71,7 @@ PAGEABLE auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRIN
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DriverDeviceAdd);
-	cfg.DriverPoolTag = USBIP_VHCI_POOL_TAG;
+	cfg.DriverPoolTag = POOL_TAG;
 
 	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, WDF_NO_HANDLE);
 }

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
@@ -9,6 +9,8 @@
 namespace usbip
 {
 
-const ULONG POOL_TAG = 'ICHV';
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags);
 
 } // namespace usbip

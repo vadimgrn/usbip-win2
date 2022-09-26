@@ -24,7 +24,7 @@ struct usbip_usb_device
 
         UINT16 idVendor;
         UINT16 idProduct;
-        UINT16 bcdDevice;
+        UINT16 bcdDevice; // Device Release Number
 
         UINT8 bDeviceClass;
         UINT8 bDeviceSubClass;

@@ -55,8 +55,8 @@ struct ioctl_plugin
 struct ioctl_imported_dev : ioctl_plugin
 {
         usbip_device_status status;
-        unsigned short vendor;
-        unsigned short product;
+        UINT16 vendor;
+        UINT16 product;
         UINT32 devid;
         usb_device_speed speed;
 };
