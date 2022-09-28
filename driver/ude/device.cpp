@@ -70,25 +70,57 @@ void device_cleanup(_In_ WDFOBJECT Object)
         }
 }
 
+_Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
+_IRQL_requires_same_
+NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev)
+{
+        TraceDbg("vhci %04x, udev %04x", ptr04x(vhci), ptr04x(udev));
+        return STATUS_SUCCESS;
+}
+
+_Function_class_(EVT_UDECX_USB_DEVICE_D0_EXIT)
+_IRQL_requires_same_
+NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
+{
+        TraceDbg("vhci %04x, udev %04x, %!UDECX_USB_DEVICE_WAKE_SETTING!", ptr04x(vhci), ptr04x(udev), WakeSetting);
+        return STATUS_SUCCESS;
+}
+
+_Function_class_(EVT_UDECX_USB_DEVICE_SET_FUNCTION_SUSPEND_AND_WAKE)
+_IRQL_requires_same_
+NTSTATUS device_set_function_suspend_and_wake(
+        _In_ WDFDEVICE vhci, 
+        _In_ UDECXUSBDEVICE udev, 
+        _In_ ULONG Interface, 
+        _In_ UDECX_USB_DEVICE_FUNCTION_POWER FunctionPower)
+{
+        TraceDbg("vhci %04x, udev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
+                ptr04x(vhci), ptr04x(udev), Interface, FunctionPower);
+
+        return STATUS_SUCCESS;
+}
+
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
 _IRQL_requires_same_
-NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE /*UdecxUsbDevice*/, _In_ _UDECXUSBENDPOINT_INIT* /*UdecxEndpointInit*/)
+NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ _UDECXUSBENDPOINT_INIT *init)
 {
+        TraceDbg("udev %04x", ptr04x(udev));
         return STATUS_NOT_IMPLEMENTED;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
-NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE /*UdecxUsbDevice*/, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA* /*EndpointToCreate*/)
+NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *EndpointToCreate)
 {
+        TraceDbg("udev %04x", ptr04x(udev));
         return STATUS_NOT_IMPLEMENTED;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
 _IRQL_requires_same_
-void endpoints_configure(
-        _In_ UDECXUSBDEVICE /*UdecxUsbDevice*/, _In_ WDFREQUEST /*Request*/, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS* /*Params*/)
+void endpoints_configure(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ WDFREQUEST Request, [[maybe_unused]]  _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *Params)
 {
+        TraceDbg("udev %04x", ptr04x(udev));
 }
 
 _IRQL_requires_same_
@@ -104,6 +136,12 @@ PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed
 
         UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS cb;
         UDECX_USB_DEVICE_CALLBACKS_INIT(&cb);
+
+        cb.EvtUsbDeviceLinkPowerEntry = device_d0_entry;
+        cb.EvtUsbDeviceLinkPowerExit = device_d0_exit;
+
+        cb.EvtUsbDeviceSetFunctionSuspendAndWake = device_set_function_suspend_and_wake; // required for USB 3 devices
+//      cb.EvtUsbDeviceReset = nullptr;
 
         cb.EvtUsbDeviceDefaultEndpointAdd = default_endpoint_add;
         cb.EvtUsbDeviceEndpointAdd = endpoint_add;
