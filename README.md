@@ -24,7 +24,7 @@
   - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data from URB transfer buffer
   - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
 - [System Worker Threads](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/system-worker-threads) are used to initiate receive operation
-  
+
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - x86 build is removed
 - Server (stub driver) is removed
@@ -161,7 +161,8 @@ rem rm sed*
 !analyze -v
 !wmitrace.searchpath %TEMP%\usbip2-vhci
 !wmitrace.setprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
-!wmitrace.logdump usbip2-vhci
+!wdfkd.wdflogdump usbip2_vhci -f
+!wdfkd.wdflogdump usbip2_vhci -d
 ```
 
 ## Obtaining USB/IP log on Linux

@@ -255,10 +255,8 @@ PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
 
         auto err = connect(sock, ai.ai_addr);
         if (err) {
-                Trace(TRACE_LEVEL_ERROR, "address %!BIN! -> %!STATUS!", 
-                        WppBinary(ai.ai_addr, static_cast<USHORT>(ai.ai_addrlen)), err);
+                Trace(TRACE_LEVEL_ERROR, "WskConnect %!STATUS!", err);
         }
-
         return err;
 }
 
@@ -492,14 +490,13 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
+        auto ctx = get_vhci_ctx(vhci);
 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
 
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
-
-        auto ctx = get_vhci_ctx(vhci);
 
         if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &ctx->queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);

@@ -10,6 +10,8 @@
 #include "vhci.h"
 #include "context.h"
 
+#include <libdrv\dbgcommon.h>
+
 namespace
 {
 
@@ -18,9 +20,11 @@ using namespace usbip;
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_udev_ctx);
 
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto to_udex_speed(_In_ usb_device_speed speed)
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGEABLE auto to_udex_speed(_In_ usb_device_speed speed)
 {
+        PAGED_CODE();
+
         switch (speed) {
         case USB_SPEED_SUPER_PLUS:
         case USB_SPEED_SUPER:
@@ -60,14 +64,37 @@ void device_cleanup(_In_ WDFOBJECT Object)
         PAGED_CODE();
 
         auto udev = static_cast<UDECXUSBDEVICE>(Object);
+        auto &ctx = *get_device_ctx(udev);
+
         TraceDbg("udev %04x", ptr04x(udev));
 
         vhci::forget_device(udev);
+        close_socket(ctx.ext->sock);
+}
 
-        if (auto ctx = get_device_ctx(udev)) {
-                close_socket(ctx->ext->sock);
-//              cancel_pending_irps(*ctx->ext);
-        }
+_Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
+_IRQL_requires_same_
+void endpoint_reset([[maybe_unused]]_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST Request)
+{
+        TraceDbg("\n"); 
+        WdfRequestComplete(Request, STATUS_SUCCESS);
+}
+
+_Function_class_(EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void NTAPI internal_device_control(
+        [[maybe_unused]] _In_ WDFQUEUE Queue, 
+        _In_ WDFREQUEST Request,
+        _In_ size_t OutputBufferLength,
+        _In_ size_t InputBufferLength,
+        _In_ ULONG IoControlCode)
+{
+        TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
+                  internal_device_control_name(IoControlCode), IoControlCode, 
+                  OutputBufferLength, InputBufferLength);
+
+        WdfRequestComplete(Request, STATUS_NOT_IMPLEMENTED);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
@@ -100,12 +127,80 @@ NTSTATUS device_set_function_suspend_and_wake(
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto create_queue(_In_ UDECXUSBENDPOINT endp)
+{
+        PAGED_CODE();
+
+        WDF_IO_QUEUE_CONFIG cfg;
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel);
+        cfg.EvtIoInternalDeviceControl = internal_device_control;
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        attrs.ParentObject = endp;
+
+        auto &ctx = *get_endpoint_ctx(endp);
+        auto &dev_ctx = *get_device_ctx(ctx.device);
+
+        if (auto err = WdfIoQueueCreate(dev_ctx.vhci, &cfg, &attrs, &ctx.queue)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
+                return err;
+        }
+
+        UdecxUsbEndpointSetWdfIoQueue(endp, ctx.queue); // PASSIVE_LEVEL
+
+        TraceDbg("udev %04x, endp %04x -> queue %04x", ptr04x(ctx.device), ptr04x(endp), ptr04x(ctx.queue));
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto create_endpoint(
+        _Out_ UDECXUSBENDPOINT &result, _In_ UDECXUSBDEVICE udev, _In_ _UDECXUSBENDPOINT_INIT *init, 
+        _In_ UCHAR EndpointAddress, _In_ EVT_UDECX_USB_ENDPOINT_RESET *EvtUsbEndpointReset)
+{
+        PAGED_CODE();
+
+        UdecxUsbEndpointInitSetEndpointAddress(init, EndpointAddress);
+
+        UDECX_USB_ENDPOINT_CALLBACKS cb;
+        UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, EvtUsbEndpointReset);
+        UdecxUsbEndpointInitSetCallbacks(init, &cb);
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
+        attrs.ParentObject = udev;
+
+        if (auto err = UdecxUsbEndpointCreate(&init, &attrs, &result)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
+                return err;
+        }
+
+        if (auto ctx = get_endpoint_ctx(result)) {
+                ctx->device = udev;
+        }
+
+        if (auto err = create_queue(result)) {
+                return err;
+        }
+
+        TraceDbg("udev %04x -> endp %04x, addr %#x", ptr04x(udev), ptr04x(result), EndpointAddress);
+        return STATUS_SUCCESS;
+}
+
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
 _IRQL_requires_same_
-NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ _UDECXUSBENDPOINT_INIT *init)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE udev, _In_ _UDECXUSBENDPOINT_INIT *init)
 {
+        PAGED_CODE();
+
+        auto &ctx = *get_device_ctx(udev);
         TraceDbg("udev %04x", ptr04x(udev));
-        return STATUS_NOT_IMPLEMENTED;
+
+        return create_endpoint(ctx.ep0, udev, init, USB_DEFAULT_DEVICE_ADDRESS, endpoint_reset);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
@@ -118,9 +213,10 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ UDECX_USB_
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
 _IRQL_requires_same_
-void endpoints_configure(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ WDFREQUEST Request, [[maybe_unused]]  _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *Params)
+void endpoints_configure(_In_ UDECXUSBDEVICE udev, _In_ WDFREQUEST Request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *Params)
 {
-        TraceDbg("udev %04x", ptr04x(udev));
+        TraceDbg("udev %04x, EndpointsToConfigureCount %lu", ptr04x(udev), Params->EndpointsToConfigureCount);
+        WdfRequestComplete(Request, STATUS_NOT_IMPLEMENTED);
 }
 
 _IRQL_requires_same_
@@ -177,7 +273,7 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVI
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, device_ctx);
         attrs.EvtCleanupCallback = device_cleanup;
         attrs.EvtDestroyCallback = device_destroy;
-        attrs.ParentObject = vhci; // FIXME: must be usb hub?
+//      attrs.ParentObject = vhci; // FIXME: by default?
 
         if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);

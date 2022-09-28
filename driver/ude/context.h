@@ -32,10 +32,11 @@ namespace usbip
 
 /*
  * Device context for WDFDEVICE, Virtual Host Controller Interface.
+ * Parent is WDFDRIVER.
  */
 struct vhci_ctx
 {
-        WDFQUEUE queue;
+        WDFQUEUE queue; // default
 
         UDECXUSBDEVICE devices[vhci::TOTAL_PORTS]; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
@@ -67,6 +68,7 @@ struct device_ctx_ext
         UNICODE_STRING node_name;
         UNICODE_STRING service_name;
         UNICODE_STRING serial; // user-defined
+        //
         
         vhci::ioctl_imported_dev_data dev; // for ioctl_imported_dev
 };
@@ -77,13 +79,25 @@ struct device_ctx_ext
 struct device_ctx
 {
         device_ctx_ext *ext;
-        WDFDEVICE vhci;
+
+        WDFDEVICE vhci; // parent
+        UDECXUSBENDPOINT ep0; // default control pipe
 
         int port; // vhci_ctx.devices[port - 1], unique device id, this is not roothub's port number
         seqnum_t seqnum; // @see next_seqnum
         bool destroyed;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
+
+/*
+* Device context for UDECXUSBENDPOINT.
+*/
+struct endpoint_ctx
+{
+        UDECXUSBDEVICE device; // parent
+        WDFQUEUE queue; // parent is UDECXUSBENDPOINT
+};        
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 struct request_ctx
 {
@@ -99,6 +113,10 @@ constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
 constexpr auto extract_dir(seqnum_t seqnum) { return usbip_dir(seqnum & 1); }
 constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 
+constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
+{
+        return (busnum << 16) | devnum;
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -130,11 +148,6 @@ inline auto ptr04x(const void *ptr) // use format "%04x"
 inline auto ph4log(USBD_PIPE_HANDLE handle)
 {
         return reinterpret_cast<uintptr_t>(handle);
-}
-
-constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
-{
-        return (busnum << 16) | devnum;
 }
 
 } // namespace usbip
