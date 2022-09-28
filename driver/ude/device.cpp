@@ -10,8 +10,6 @@
 #include "vhci.h"
 #include "context.h"
 
-#include <libdrv\strutil.h>
-
 namespace
 {
 
@@ -27,47 +25,22 @@ auto to_udex_speed(_In_ usb_device_speed speed)
         case USB_SPEED_SUPER_PLUS:
         case USB_SPEED_SUPER:
                 return UdecxUsbSuperSpeed;
+        case USB_SPEED_WIRELESS:
+        case USB_SPEED_HIGH:
+                return UdecxUsbHighSpeed;
         case USB_SPEED_FULL:
                 return UdecxUsbFullSpeed;
         case USB_SPEED_LOW:
-                return UdecxUsbLowSpeed;
-        case USB_SPEED_HIGH:
-        case USB_SPEED_WIRELESS:
         case USB_SPEED_UNKNOWN:
         default:
-                return UdecxUsbHighSpeed;
+                return UdecxUsbLowSpeed;
         }
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void close_socket(_Inout_ wsk::SOCKET* &sock)
-{
-        PAGED_CODE();
-
-        if (!sock) {
-                return;
-        }
-
-        if (auto err = event_callback_control(sock, WSK_EVENT_DISABLE | WSK_EVENT_DISCONNECT, true)) {
-                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
-        }
-
-        if (auto err = disconnect(sock)) {
-                Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
-        }
-
-        if (auto err = close(sock)) {
-                Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
-        }
-
-        sock = nullptr;
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI usbdevice_destroy(_In_ WDFOBJECT Object)
+void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
@@ -75,14 +48,14 @@ void NTAPI usbdevice_destroy(_In_ WDFOBJECT Object)
         TraceDbg("udev %04x", ptr04x(udev));
 
         if (auto ctx = get_device_ctx(udev)) {
-                free(ctx->data);
+                free(ctx->ext);
         }
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbdevice_cleanup(_In_ WDFOBJECT Object)
+void device_cleanup(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
@@ -92,8 +65,8 @@ void usbdevice_cleanup(_In_ WDFOBJECT Object)
         vhci::forget_device(udev);
 
         if (auto ctx = get_device_ctx(udev)) {
-                close_socket(ctx->data->sock);
-//              cancel_pending_irps(*ctx->data);
+                close_socket(ctx->ext->sock);
+//              cancel_pending_irps(*ctx->ext);
         }
 }
 
@@ -149,12 +122,12 @@ PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_data *data)
+PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
 
-        NT_ASSERT(data);
-        auto speed = to_udex_speed(data->speed);
+        NT_ASSERT(ext);
+        auto speed = to_udex_speed(ext->dev.speed);
 
         auto init = create_init(vhci, speed); // must be freed if UdecxUsbDeviceCreate fails
         if (!init) {
@@ -164,8 +137,9 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVI
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, device_ctx);
-        attrs.EvtCleanupCallback = usbdevice_cleanup;
-        attrs.EvtDestroyCallback = usbdevice_destroy;
+        attrs.EvtCleanupCallback = device_cleanup;
+        attrs.EvtDestroyCallback = device_destroy;
+        attrs.ParentObject = vhci; // FIXME: must be usb hub?
 
         if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
@@ -175,8 +149,8 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVI
 
         if (auto ctx = get_device_ctx(udev)) {
                 ctx->vhci = vhci;
-                ctx->data = data;
-                data->ctx = ctx;
+                ctx->ext = ext;
+                ext->ctx = ctx;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));

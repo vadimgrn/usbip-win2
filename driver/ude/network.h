@@ -19,6 +19,10 @@ namespace usbip
 
 using wsk::SOCKET;
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void close_socket(_Inout_ SOCKET* &sock);
+
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
 

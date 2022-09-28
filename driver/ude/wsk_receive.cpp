@@ -13,10 +13,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
-	auto data = static_cast<device_ctx_data*>(SocketContext);
+	auto ext = static_cast<device_ctx_ext*>(SocketContext);
 
-	if (auto ctx = data->ctx) {
-		auto udev = static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx));
+	if (auto udev = get_device(ext)) {
 		TraceMsg("udev %04x, Flags %#x", ptr04x(udev), Flags);
 		device::schedule_destroy(udev);
 	}

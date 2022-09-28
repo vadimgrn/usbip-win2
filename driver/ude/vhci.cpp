@@ -170,7 +170,7 @@ PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit
 {
         PAGED_CODE();
 
-        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES attrs; // default parent (driver object) is OK
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, vhci_ctx);
         attrs.EvtCleanupCallback = vhci_cleanup;
 
@@ -235,6 +235,7 @@ void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE udev)
         auto &vhci_ctx = *get_vhci_ctx(udev_ctx.vhci); 
 
         auto &port = udev_ctx.port;
+
         int old_port = 0;
         bool removed = false;
 

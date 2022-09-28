@@ -14,6 +14,7 @@
 
 #include <libdrv\dbgcommon.h>
 #include <libdrv\mdl_cpp.h>
+#include <libdrv\strutil.h>
 
 #include <usbip\proto_op.h>
 
@@ -53,37 +54,34 @@ PAGEABLE auto get_vhci(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
-{
-        PAGED_CODE();
-        ANSI_STRING s{ 0, len, dest };
-        if (auto err = RtlUnicodeStringToAnsiString(&s, &src, false)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringToAnsiString('%!USTR!') %!STATUS!", &src, err);
-        }
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
-        auto &d = *ctx.data;
+        auto &src = *ctx.ext;
 
 //      ioctl_plugin
         dst.port = ctx.port;
-        if (auto s = d.busid) {
+        if (auto s = src.busid) {
                 RtlStringCbCopyA(dst.busid, sizeof(dst.busid), s);
         }
-        to_ansi_str(dst.service, sizeof(dst.service), d.service_name);
-        to_ansi_str(dst.host, sizeof(dst.host), d.node_name);
-        to_ansi_str(dst.serial, sizeof(dst.serial), d.serial);
 
-//      ioctl_imported_dev
-        dst.status = SDEV_ST_USED;
-        dst.vendor = d.vendor_id;
-        dst.product = d.product_id;
-        dst.devid = d.devid;
-        dst.speed = d.speed;
+        struct {
+                char *ansi;
+                USHORT ansi_sz;
+                const UNICODE_STRING &ustr;
+        } const v[] = {
+                {dst.service, sizeof(dst.service), src.service_name},
+                {dst.host, sizeof(dst.host), src.node_name},
+                {dst.serial, sizeof(dst.serial), src.serial}
+        };
+
+        for (auto &[ansi, ansi_sz, ustr]: v) {
+                if (auto err = to_ansi_str(ansi, ansi_sz, ustr)) {
+                        Trace(TRACE_LEVEL_ERROR, "to_ansi_str('%!USTR!') %!STATUS!", &ustr, err);
+                }
+        }
+
+        static_cast<vhci::ioctl_imported_dev_data&>(dst) = src.dev;
 }
 
 /*
@@ -91,7 +89,7 @@ PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &c
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto send_req_import(_In_ device_ctx_data &data)
+PAGEABLE auto send_req_import(_In_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -102,23 +100,23 @@ PAGEABLE auto send_req_import(_In_ device_ctx_data &data)
 
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
 
-        strcpy_s(req.body.busid, sizeof(req.body.busid), data.busid);
+        strcpy_s(req.body.busid, sizeof(req.body.busid), ext.busid);
 
         PACK_OP_COMMON(0, &req.hdr);
         PACK_OP_IMPORT_REQUEST(0, &req.body);
 
-        return send(data.sock, memory::stack, &req, sizeof(req));
+        return send(ext.sock, memory::stack, &req, sizeof(req));
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto recv_rep_import(_In_ device_ctx_data &data, _In_ memory pool, _Out_ op_import_reply &reply)
+PAGEABLE auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
 {
         PAGED_CODE();
 
         auto status = ST_OK;
 
-        if (auto err = recv_op_common(data.sock, OP_REP_IMPORT, status)) {
+        if (auto err = recv_op_common(ext.sock, OP_REP_IMPORT, status)) {
                 return make_error(err);
         }
 
@@ -127,15 +125,15 @@ PAGEABLE auto recv_rep_import(_In_ device_ctx_data &data, _In_ memory pool, _Out
                 return make_error(ERR_NONE, status);
         }
 
-        if (auto err = recv(data.sock, pool, &reply, sizeof(reply))) {
+        if (auto err = recv(ext.sock, pool, &reply, sizeof(reply))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }
 
         PACK_OP_IMPORT_REPLY(0, &reply);
 
-        if (strncmp(reply.udev.busid, data.busid, sizeof(reply.udev.busid))) {
-                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, data.busid);
+        if (strncmp(reply.udev.busid, ext.busid, sizeof(reply.udev.busid))) {
+                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, ext.busid);
                 return make_error(ERR_PROTOCOL);
         }
 
@@ -144,32 +142,33 @@ PAGEABLE auto recv_rep_import(_In_ device_ctx_data &data, _In_ memory pool, _Out
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto import_remote_device(_Inout_ device_ctx_data &data)
+PAGEABLE auto import_remote_device(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
-        if (auto err = send_req_import(data)) {
+        if (auto err = send_req_import(ext)) {
                 Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }
 
         op_import_reply reply{};
 
-        if (auto err = recv_rep_import(data, memory::stack, reply)) { // result made by make_error()
+        if (auto err = recv_rep_import(ext, memory::stack, reply)) { // result made by make_error()
                 return err;
         }
 
         auto &udev = reply.udev;
         log(udev);
 
-        data.speed = static_cast<usb_device_speed>(udev.speed);
+        if (auto d = &ext.dev) {
+                d->status = SDEV_ST_USED;
+                d->vendor = udev.idVendor;
+                d->product = udev.idProduct;
+                d->devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
+                d->speed = static_cast<usb_device_speed>(udev.speed);
+        }
 
-        data.vendor_id = udev.idVendor;
-        data.product_id = udev.idProduct;
-
-        data.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
-
-        if (auto err = event_callback_control(data.sock, WSK_EVENT_DISCONNECT, false)) {
+        if (auto err = event_callback_control(ext.sock, WSK_EVENT_DISCONNECT, false)) {
                 Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
                 return make_error(ERR_NETWORK);
         }
@@ -179,7 +178,7 @@ PAGEABLE auto import_remote_device(_Inout_ device_ctx_data &data)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_data &data)
+PAGEABLE auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -189,7 +188,7 @@ PAGEABLE auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_data &data
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_protocol = IPPROTO_TCP; // zero isn't work
 
-        return wsk::getaddrinfo(result, &data.node_name, &data.service_name, &hints);
+        return wsk::getaddrinfo(result, &ext.node_name, &ext.service_name, &hints);
 }
 
 /*
@@ -265,23 +264,23 @@ PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto connect(_Inout_ device_ctx_data &data)
+PAGEABLE auto connect(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
         ADDRINFOEXW *ai{};
-        if (auto err = getaddrinfo(ai, data)) {
+        if (auto err = getaddrinfo(ai, ext)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
                 return ERR_NETWORK;
         }
 
         static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ nullptr, WskDisconnectEvent };
 
-        NT_ASSERT(!data.sock);
-        data.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &data, &dispatch, ai, try_connect, nullptr);
+        NT_ASSERT(!ext.sock);
+        ext.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &ext, &dispatch, ai, try_connect, nullptr);
 
         wsk::free(ai);
-        return data.sock ? ERR_NONE : ERR_NETWORK;
+        return ext.sock ? ERR_NONE : ERR_NETWORK;
 }
 
 _IRQL_requires_same_
@@ -307,14 +306,20 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
         return ERR_NONE;
 }
 
-struct device_ctx_data_ptr
+struct device_ctx_ext_ptr
 {
-        ~device_ctx_data_ptr() { free(ptr); }
+        ~device_ctx_ext_ptr() 
+        { 
+                if (ptr) {
+                        close_socket(ptr->sock);
+                        free(ptr); 
+                }
+        }
 
         auto operator ->() const { return ptr; }
         void release() { ptr = nullptr; }
 
-        device_ctx_data *ptr{};
+        device_ctx_ext *ptr{};
 };
 
 _IRQL_requires_same_
@@ -325,32 +330,30 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, serial %s", r.host, r.service, r.busid, r.serial);
 
         auto &error = r.port;
-        device_ctx_data_ptr data;
+        error = make_error(ERR_GENERAL);
 
-        if (NT_ERROR(create(data.ptr, r))) {
-                error = make_error(ERR_GENERAL);
+        device_ctx_ext_ptr ext;
+        if (NT_ERROR(create_device_ctx_ext(ext.ptr, r))) {
                 return;
         }
 
-        if (auto err = connect(*data.ptr)) {
-                Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &data->node_name, &data->service_name);
+        if (auto err = connect(*ext.ptr)) {
                 error = make_error(err);
+                Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
                 return;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &data->node_name, &data->service_name);
+        Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
 
-        if (bool(error = import_remote_device(*data.ptr))) {
+        if (bool(error = import_remote_device(*ext.ptr))) {
                 return;
         }
 
         UDECXUSBDEVICE udev{};
-        if (NT_ERROR(device::create(udev, vhci, data.ptr))) {
-                error = make_error(ERR_GENERAL);
+        if (NT_ERROR(device::create(udev, vhci, ext.ptr))) {
                 return;
         }
-   
-        data.release();
+        ext.release(); // now udev owns it
 
         if (auto err = plugin(r.port, udev)) {
                 error = make_error(err);

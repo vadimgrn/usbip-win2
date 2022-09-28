@@ -52,14 +52,20 @@ struct ioctl_plugin
         char serial[255];
 };
 
-struct ioctl_imported_dev : ioctl_plugin
+struct ioctl_imported_dev_data
 {
         usbip_device_status status;
+
         UINT16 vendor;
         UINT16 product;
+
         UINT32 devid;
+        static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
+
         usb_device_speed speed;
 };
+
+struct ioctl_imported_dev : ioctl_plugin, ioctl_imported_dev_data {};
 
 struct ioctl_plugout
 {

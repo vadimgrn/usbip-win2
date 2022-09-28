@@ -48,3 +48,29 @@ void libdrv_free(void *data)
 		ExFreePoolWithTag(data, libdrv_pooltag);
 	}
 }
+
+/*
+* RtlFreeUnicodeString must be used to release memory.
+* @see RtlUTF8StringToUnicodeString
+*/
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
+{
+        PAGED_CODE();
+
+        ANSI_STRING s;
+        RtlInitAnsiString(&s, ansi);
+
+        return RtlAnsiStringToUnicodeString(&dst, &s, true);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
+{
+        PAGED_CODE();
+        ANSI_STRING s{ 0, len, dest };
+        return RtlUnicodeStringToAnsiString(&s, &src, false);
+}
+

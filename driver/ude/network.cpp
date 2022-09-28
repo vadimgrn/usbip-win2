@@ -177,3 +177,29 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 }
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE void usbip::close_socket(_Inout_ SOCKET* &sock)
+{
+        PAGED_CODE();
+
+        if (!sock) {
+                return;
+        }
+
+        if (auto err = event_callback_control(sock, WSK_EVENT_DISABLE | WSK_EVENT_DISCONNECT, true)) {
+                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
+        }
+
+        if (auto err = disconnect(sock)) {
+                Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
+        }
+
+        if (auto err = close(sock)) {
+                Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
+        }
+
+        sock = nullptr;
+}
+
