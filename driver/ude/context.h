@@ -99,11 +99,15 @@ struct endpoint_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
-struct request_ctx
-{
-};
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto get_vhci(_In_ WDFREQUEST Request)
+{
+        auto queue = WdfRequestGetIoQueue(Request);
+        return WdfIoQueueGetDevice(queue);
+}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

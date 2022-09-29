@@ -6,9 +6,10 @@
 #include "trace.h"
 #include "device.tmh"
 
+#include "context.h"
 #include "network.h"
 #include "vhci.h"
-#include "context.h"
+#include "device_ioctl.h"
 
 #include <libdrv\dbgcommon.h>
 
@@ -17,7 +18,7 @@ namespace
 
 using namespace usbip;
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_udev_ctx);
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_workitem_ctx);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -80,23 +81,6 @@ void endpoint_reset([[maybe_unused]]_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST 
         WdfRequestComplete(Request, STATUS_SUCCESS);
 }
 
-_Function_class_(EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI internal_device_control(
-        [[maybe_unused]] _In_ WDFQUEUE Queue, 
-        _In_ WDFREQUEST Request,
-        _In_ size_t OutputBufferLength,
-        _In_ size_t InputBufferLength,
-        _In_ ULONG IoControlCode)
-{
-        TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
-                  internal_device_control_name(IoControlCode), IoControlCode, 
-                  OutputBufferLength, InputBufferLength);
-
-        WdfRequestComplete(Request, STATUS_NOT_IMPLEMENTED);
-}
-
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
 NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev)
@@ -135,10 +119,10 @@ PAGEABLE auto create_queue(_In_ UDECXUSBENDPOINT endp)
 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel);
-        cfg.EvtIoInternalDeviceControl = internal_device_control;
+        cfg.EvtIoInternalDeviceControl = usbip::device::internal_device_control;
 
         WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBENDPOINT);
         attrs.ParentObject = endp;
 
         auto &ctx = *get_endpoint_ctx(endp);
@@ -149,6 +133,7 @@ PAGEABLE auto create_queue(_In_ UDECXUSBENDPOINT endp)
                 return err;
         }
 
+        *get_queue_ctx(ctx.queue) = endp;
         UdecxUsbEndpointSetWdfIoQueue(endp, ctx.queue); // PASSIVE_LEVEL
 
         TraceDbg("udev %04x, endp %04x -> queue %04x", ptr04x(ctx.device), ptr04x(endp), ptr04x(ctx.queue));
@@ -216,7 +201,7 @@ _IRQL_requires_same_
 void endpoints_configure(_In_ UDECXUSBDEVICE udev, _In_ WDFREQUEST Request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *Params)
 {
         TraceDbg("udev %04x, EndpointsToConfigureCount %lu", ptr04x(udev), Params->EndpointsToConfigureCount);
-        WdfRequestComplete(Request, STATUS_NOT_IMPLEMENTED);
+        WdfRequestComplete(Request, STATUS_SUCCESS);
 }
 
 _IRQL_requires_same_
@@ -326,7 +311,7 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE udev)
 {
         auto func = [] (auto WorkItem)
         {
-                if (auto udev = *get_udev_ctx(WorkItem)) {
+                if (auto udev = *get_workitem_ctx(WorkItem)) {
                         destroy(udev);
                         WdfObjectDereference(udev);
                 }
@@ -346,7 +331,7 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE udev)
                 return err;
         }
 
-        *get_udev_ctx(wi) = udev;
+        *get_workitem_ctx(wi) = udev;
         WdfObjectReference(udev);
 
         WdfWorkItemEnqueue(wi);

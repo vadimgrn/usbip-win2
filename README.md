@@ -159,10 +159,11 @@ rem rm sed*
   - Run following commands and copy the output
 ```
 !analyze -v
-!wmitrace.searchpath %TEMP%\usbip2-vhci
-!wmitrace.setprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
-!wdfkd.wdflogdump usbip2_vhci -f
-!wdfkd.wdflogdump usbip2_vhci -d
+!wdfkd.wdfsearchpath %TEMP%\usbip2-vhci
+!wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
+!wdfkd.wdfsetdriver usbip2_vhci
+!wdfkd.wdflogdump -f
+!wdfkd.wdflogdump -d
 ```
 
 ## Obtaining USB/IP log on Linux

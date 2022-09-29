@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\userspace\libusbip\proto_op.cpp" />
     <ClCompile Include="context.cpp" />
+    <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="device.cpp" />
@@ -28,6 +29,7 @@
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
     <ClInclude Include="..\..\include\usbip\vhci.h" />
     <ClInclude Include="context.h" />
+    <ClInclude Include="device_ioctl.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="device.h" />

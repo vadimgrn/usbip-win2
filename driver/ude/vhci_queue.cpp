@@ -45,15 +45,6 @@ inline void log(const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto get_vhci(_In_ WDFREQUEST Request)
-{
-        PAGED_CODE();
-        auto queue = WdfRequestGetIoQueue(Request);
-        return WdfIoQueueGetDevice(queue);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();

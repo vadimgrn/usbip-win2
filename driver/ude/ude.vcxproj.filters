@@ -30,6 +30,7 @@
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="wsk_receive.h" />
+    <ClInclude Include="device_ioctl.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -41,6 +42,7 @@
     <ClCompile Include="..\..\userspace\libusbip\proto_op.cpp" />
     <ClCompile Include="context.cpp" />
     <ClCompile Include="wsk_receive.cpp" />
+    <ClCompile Include="device_ioctl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_vhci.inf" />
