@@ -14,12 +14,12 @@
   * @see is_valid_seqnum
   */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-seqnum_t usbip::next_seqnum(_Inout_ device_ctx &udev, _In_ bool dir_in)
+seqnum_t usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in)
 {
 	static_assert(!USBIP_DIR_OUT);
 	static_assert(USBIP_DIR_IN);
 
-	auto &seqnum = udev.seqnum;
+	auto &seqnum = dev.seqnum;
 	static_assert(sizeof(seqnum) == sizeof(LONG));
 
 	while (true) {

@@ -36,8 +36,6 @@ namespace usbip
  */
 struct vhci_ctx
 {
-        WDFQUEUE queue; // default
-
         UDECXUSBDEVICE devices[vhci::TOTAL_PORTS]; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 };
@@ -95,7 +93,6 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
-        WDFQUEUE queue; // parent is UDECXUSBENDPOINT
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
@@ -111,7 +108,7 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-seqnum_t next_seqnum(_Inout_ device_ctx &udev, _In_ bool dir_in);
+seqnum_t next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in);
 
 constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
 constexpr auto extract_dir(seqnum_t seqnum) { return usbip_dir(seqnum & 1); }

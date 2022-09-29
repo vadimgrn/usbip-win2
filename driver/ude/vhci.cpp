@@ -196,14 +196,14 @@ PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE udev)
+PAGEABLE int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
-        auto &udev_ctx = *get_device_ctx(udev);
-        auto &vhci_ctx = *get_vhci_ctx(udev_ctx.vhci); 
+        auto &dev_ctx = *get_device_ctx(dev);
+        auto &vhci_ctx = *get_vhci_ctx(dev_ctx.vhci); 
 
-        auto &port = udev_ctx.port;
+        auto &port = dev_ctx.port;
         NT_ASSERT(!port);
 
         WdfSpinLockAcquire(vhci_ctx.devices_lock);
@@ -211,7 +211,7 @@ PAGEABLE int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE udev)
         for (int i = 0; i < ARRAYSIZE(vhci_ctx.devices); ++i) {
                 auto &handle = vhci_ctx.devices[i];
                 if (!handle) {
-                        WdfObjectReference(handle = udev);
+                        WdfObjectReference(handle = dev);
                         port = i + 1;
                         NT_ASSERT(is_valid_port(port));
                         break;
@@ -221,7 +221,7 @@ PAGEABLE int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE udev)
         WdfSpinLockRelease(vhci_ctx.devices_lock);
 
         if (port) {
-                TraceDbg("udev %04x, port %d", ptr04x(udev), port);
+                TraceDbg("dev %04x, port %d", ptr04x(dev), port);
         }
 
         return port;
@@ -229,12 +229,12 @@ PAGEABLE int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE udev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE udev)
+void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE dev)
 {
-        auto &udev_ctx = *get_device_ctx(udev);
-        auto &vhci_ctx = *get_vhci_ctx(udev_ctx.vhci); 
+        auto &dev_ctx = *get_device_ctx(dev);
+        auto &vhci_ctx = *get_vhci_ctx(dev_ctx.vhci); 
 
-        auto &port = udev_ctx.port;
+        auto &port = dev_ctx.port;
 
         int old_port = 0;
         bool removed = false;
@@ -247,7 +247,7 @@ void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE udev)
                 NT_ASSERT(is_valid_port(port));
                 auto &handle = vhci_ctx.devices[port - 1];
 
-                NT_ASSERT(handle == udev);
+                NT_ASSERT(handle == dev);
                 handle = WDF_NO_HANDLE;
 
                 port = 0;
@@ -256,8 +256,8 @@ void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE udev)
         WdfSpinLockRelease(vhci_ctx.devices_lock);
 
         if (removed) {
-                TraceDbg("udev %04x, port %ld", ptr04x(udev), old_port);
-                WdfObjectDereference(udev);
+                TraceDbg("dev %04x, port %ld", ptr04x(dev), old_port);
+                WdfObjectDereference(dev);
         }
 }
 
@@ -265,9 +265,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
 {
-        wdf::ObjectRef udev;
+        wdf::ObjectRef dev;
         if (!is_valid_port(port)) {
-                return udev;
+                return dev;
         }
 
         auto &ctx = *get_vhci_ctx(vhci);
@@ -275,11 +275,11 @@ wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
 
         if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
-                udev.reset(handle); // adds reference
+                dev.reset(handle); // adds reference
         }
 
         WdfSpinLockRelease(ctx.devices_lock);
-        return udev;
+        return dev;
 }
 
 
@@ -290,8 +290,8 @@ PAGEABLE void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto udev = find_device(vhci, port)) {
-                        device::destroy(udev.get<UDECXUSBDEVICE>());
+                if (auto dev = find_device(vhci, port)) {
+                        device::destroy(dev.get<UDECXUSBDEVICE>());
                 }
         }
 }

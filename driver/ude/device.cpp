@@ -49,10 +49,10 @@ void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
-        auto udev = static_cast<UDECXUSBDEVICE>(Object);
-        TraceDbg("udev %04x", ptr04x(udev));
+        auto dev = static_cast<UDECXUSBDEVICE>(Object);
+        TraceDbg("dev %04x", ptr04x(dev));
 
-        if (auto ctx = get_device_ctx(udev)) {
+        if (auto ctx = get_device_ctx(dev)) {
                 free(ctx->ext);
         }
 }
@@ -64,12 +64,12 @@ void device_cleanup(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
-        auto udev = static_cast<UDECXUSBDEVICE>(Object);
-        auto &ctx = *get_device_ctx(udev);
+        auto dev = static_cast<UDECXUSBDEVICE>(Object);
+        auto &ctx = *get_device_ctx(dev);
 
-        TraceDbg("udev %04x", ptr04x(udev));
+        TraceDbg("dev %04x", ptr04x(dev));
 
-        vhci::forget_device(udev);
+        vhci::forget_device(dev);
         close_socket(ctx.ext->sock);
 }
 
@@ -83,17 +83,17 @@ void endpoint_reset([[maybe_unused]]_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST 
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
-NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev)
+NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev)
 {
-        TraceDbg("vhci %04x, udev %04x", ptr04x(vhci), ptr04x(udev));
+        TraceDbg("vhci %04x, dev %04x", ptr04x(vhci), ptr04x(dev));
         return STATUS_SUCCESS;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_EXIT)
 _IRQL_requires_same_
-NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE udev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
+NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
 {
-        TraceDbg("vhci %04x, udev %04x, %!UDECX_USB_DEVICE_WAKE_SETTING!", ptr04x(vhci), ptr04x(udev), WakeSetting);
+        TraceDbg("vhci %04x, dev %04x, %!UDECX_USB_DEVICE_WAKE_SETTING!", ptr04x(vhci), ptr04x(dev), WakeSetting);
         return STATUS_SUCCESS;
 }
 
@@ -101,12 +101,12 @@ _Function_class_(EVT_UDECX_USB_DEVICE_SET_FUNCTION_SUSPEND_AND_WAKE)
 _IRQL_requires_same_
 NTSTATUS device_set_function_suspend_and_wake(
         _In_ WDFDEVICE vhci, 
-        _In_ UDECXUSBDEVICE udev, 
+        _In_ UDECXUSBDEVICE dev, 
         _In_ ULONG Interface, 
         _In_ UDECX_USB_DEVICE_FUNCTION_POWER FunctionPower)
 {
-        TraceDbg("vhci %04x, udev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
-                ptr04x(vhci), ptr04x(udev), Interface, FunctionPower);
+        TraceDbg("vhci %04x, dev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
+                ptr04x(vhci), ptr04x(dev), Interface, FunctionPower);
 
         return STATUS_SUCCESS;
 }
@@ -128,22 +128,23 @@ PAGEABLE auto create_queue(_In_ UDECXUSBENDPOINT endp)
         auto &ctx = *get_endpoint_ctx(endp);
         auto &dev_ctx = *get_device_ctx(ctx.device);
 
-        if (auto err = WdfIoQueueCreate(dev_ctx.vhci, &cfg, &attrs, &ctx.queue)) {
+        WDFQUEUE queue; // save to endpoint_ctx if it requires
+        if (auto err = WdfIoQueueCreate(dev_ctx.vhci, &cfg, &attrs, &queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
 
-        *get_queue_ctx(ctx.queue) = endp;
-        UdecxUsbEndpointSetWdfIoQueue(endp, ctx.queue); // PASSIVE_LEVEL
+        *get_queue_ctx(queue) = endp;
+        UdecxUsbEndpointSetWdfIoQueue(endp, queue); // PASSIVE_LEVEL
 
-        TraceDbg("udev %04x, endp %04x -> queue %04x", ptr04x(ctx.device), ptr04x(endp), ptr04x(ctx.queue));
+        TraceDbg("dev %04x, endp %04x -> queue %04x", ptr04x(ctx.device), ptr04x(endp), ptr04x(queue));
         return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE auto create_endpoint(
-        _Out_ UDECXUSBENDPOINT &result, _In_ UDECXUSBDEVICE udev, _In_ _UDECXUSBENDPOINT_INIT *init, 
+        _Out_ UDECXUSBENDPOINT &result, _In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPOINT_INIT *init, 
         _In_ UCHAR EndpointAddress, _In_ EVT_UDECX_USB_ENDPOINT_RESET *EvtUsbEndpointReset)
 {
         PAGED_CODE();
@@ -156,7 +157,7 @@ PAGEABLE auto create_endpoint(
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
-        attrs.ParentObject = udev;
+        attrs.ParentObject = dev;
 
         if (auto err = UdecxUsbEndpointCreate(&init, &attrs, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
@@ -164,43 +165,43 @@ PAGEABLE auto create_endpoint(
         }
 
         if (auto ctx = get_endpoint_ctx(result)) {
-                ctx->device = udev;
+                ctx->device = dev;
         }
 
         if (auto err = create_queue(result)) {
                 return err;
         }
 
-        TraceDbg("udev %04x -> endp %04x, addr %#x", ptr04x(udev), ptr04x(result), EndpointAddress);
+        TraceDbg("dev %04x -> endp %04x, addr %#x", ptr04x(dev), ptr04x(result), EndpointAddress);
         return STATUS_SUCCESS;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE udev, _In_ _UDECXUSBENDPOINT_INIT *init)
+PAGEABLE NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPOINT_INIT *init)
 {
         PAGED_CODE();
 
-        auto &ctx = *get_device_ctx(udev);
-        TraceDbg("udev %04x", ptr04x(udev));
+        auto &ctx = *get_device_ctx(dev);
+        TraceDbg("dev %04x", ptr04x(dev));
 
-        return create_endpoint(ctx.ep0, udev, init, USB_DEFAULT_DEVICE_ADDRESS, endpoint_reset);
+        return create_endpoint(ctx.ep0, dev, init, USB_DEFAULT_DEVICE_ADDRESS, endpoint_reset);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
-NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE udev, [[maybe_unused]] _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *EndpointToCreate)
+NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, [[maybe_unused]] _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *EndpointToCreate)
 {
-        TraceDbg("udev %04x", ptr04x(udev));
+        TraceDbg("dev %04x", ptr04x(dev));
         return STATUS_NOT_IMPLEMENTED;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
 _IRQL_requires_same_
-void endpoints_configure(_In_ UDECXUSBDEVICE udev, _In_ WDFREQUEST Request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *Params)
+void endpoints_configure(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST Request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *Params)
 {
-        TraceDbg("udev %04x, EndpointsToConfigureCount %lu", ptr04x(udev), Params->EndpointsToConfigureCount);
+        TraceDbg("dev %04x, EndpointsToConfigureCount %lu", ptr04x(dev), Params->EndpointsToConfigureCount);
         WdfRequestComplete(Request, STATUS_SUCCESS);
 }
 
@@ -241,7 +242,7 @@ PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
+PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
 
@@ -260,19 +261,19 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVI
         attrs.EvtDestroyCallback = device_destroy;
 //      attrs.ParentObject = vhci; // FIXME: by default?
 
-        if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &udev)) {
+        if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &dev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
                 UdecxUsbDeviceInitFree(init); // must never be called if success, Udecx does that itself
                 return err;
         }
 
-        if (auto ctx = get_device_ctx(udev)) {
+        if (auto ctx = get_device_ctx(dev)) {
                 ctx->vhci = vhci;
                 ctx->ext = ext;
                 ext->ctx = ctx;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x", ptr04x(udev));
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(dev));
         return STATUS_SUCCESS;
 }
 
@@ -284,36 +285,36 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &udev, _In_ WDFDEVI
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void usbip::device::destroy(_In_ UDECXUSBDEVICE udev)
+PAGEABLE void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
-        auto &ctx = *get_device_ctx(udev);
+        auto &ctx = *get_device_ctx(dev);
         static_assert(sizeof(ctx.destroyed) == sizeof(CHAR));
 
         if (InterlockedExchange8(reinterpret_cast<CHAR*>(&ctx.destroyed), true)) {
-                TraceDbg("udev %04x was already destroyed, port %d", ptr04x(udev), ctx.port);
+                TraceDbg("dev %04x was already destroyed, port %d", ptr04x(dev), ctx.port);
                 return;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "udev %04x, port %d", ptr04x(udev), ctx.port);
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(dev), ctx.port);
 
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(udev)) { // PASSIVE_LEVEL
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(udev=%04x) %!STATUS!", ptr04x(udev), err);
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // PASSIVE_LEVEL
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(dev), err);
         }
 
-        WdfObjectDelete(udev);
+        WdfObjectDelete(dev);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE udev)
+NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
 {
         auto func = [] (auto WorkItem)
         {
-                if (auto udev = *get_workitem_ctx(WorkItem)) {
-                        destroy(udev);
-                        WdfObjectDereference(udev);
+                if (auto dev = *get_workitem_ctx(WorkItem)) {
+                        destroy(dev);
+                        WdfObjectDereference(dev);
                 }
                 WdfObjectDelete(WorkItem); // can be omitted
         };
@@ -323,7 +324,7 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE udev)
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
-        attrs.ParentObject = udev;
+        attrs.ParentObject = dev;
 
         WDFWORKITEM wi{};
         if (auto err = WdfWorkItemCreate(&cfg, &attrs, &wi)) {
@@ -331,11 +332,21 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE udev)
                 return err;
         }
 
-        *get_workitem_ctx(wi) = udev;
-        WdfObjectReference(udev);
+        *get_workitem_ctx(wi) = dev;
+        WdfObjectReference(dev);
 
         WdfWorkItemEnqueue(wi);
 
         static_assert(NT_SUCCESS(STATUS_PENDING));
         return STATUS_PENDING;
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+UDECXUSBDEVICE usbip::device::get_device(_In_ WDFQUEUE queue)
+{
+        auto endp = *get_queue_ctx(queue);
+        auto ctx = get_endpoint_ctx(endp);
+        return ctx->device;
+}
+

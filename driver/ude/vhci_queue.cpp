@@ -148,15 +148,15 @@ PAGEABLE auto import_remote_device(_Inout_ device_ctx_ext &ext)
                 return err;
         }
 
-        auto &udev = reply.udev;
-        log(udev);
+        auto &dev = reply.udev;
+        log(dev);
 
         if (auto d = &ext.dev) {
                 d->status = SDEV_ST_USED;
-                d->vendor = udev.idVendor;
-                d->product = udev.idProduct;
-                d->devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
-                d->speed = static_cast<usb_device_speed>(udev.speed);
+                d->vendor = dev.idVendor;
+                d->product = dev.idProduct;
+                d->devid = make_devid(static_cast<UINT16>(dev.busnum), static_cast<UINT16>(dev.devnum));
+                d->speed = static_cast<usb_device_speed>(dev.speed);
         }
 
         if (auto err = event_callback_control(ext.sock, WSK_EVENT_DISCONNECT, false)) {
@@ -274,11 +274,11 @@ PAGEABLE auto connect(_Inout_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
+PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
-        port = vhci::remember_device(udev); // FIXME: find out and use automatically assigned port number
+        port = vhci::remember_device(dev); // FIXME: find out and use automatically assigned port number
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERR_PORTFULL;
@@ -287,7 +287,7 @@ PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE udev)
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS options; 
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
 
-        if (auto err = UdecxUsbDevicePlugIn(udev, &options)) {
+        if (auto err = UdecxUsbDevicePlugIn(dev, &options)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
                 return ERR_GENERAL;
         }
@@ -338,17 +338,17 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
                 return;
         }
 
-        UDECXUSBDEVICE udev{};
-        if (NT_ERROR(device::create(udev, vhci, ext.ptr))) {
+        UDECXUSBDEVICE dev{};
+        if (NT_ERROR(device::create(dev, vhci, ext.ptr))) {
                 return;
         }
-        ext.release(); // now udev owns it
+        ext.release(); // now dev owns it
 
-        if (auto err = plugin(r.port, udev)) {
+        if (auto err = plugin(r.port, dev)) {
                 error = make_error(err);
-                WdfObjectDelete(udev); // UdecxUsbDevicePlugIn failed or was not called
+                WdfObjectDelete(dev); // UdecxUsbDevicePlugIn failed or was not called
         } else {
-                Trace(TRACE_LEVEL_INFORMATION, "udev %04x -> port %d", ptr04x(udev), r.port);
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x -> port %d", ptr04x(dev), r.port);
         }
 }
 
@@ -387,8 +387,8 @@ PAGEABLE auto plugout_hardware(_In_ WDFREQUEST Request)
 
         if (r->port <= 0) {
                 vhci::destroy_all_devices(vhci);
-        } else if (auto udev = vhci::find_device(vhci, r->port)) {
-                device::destroy(udev.get<UDECXUSBDEVICE>());
+        } else if (auto dev = vhci::find_device(vhci, r->port)) {
+                device::destroy(dev.get<UDECXUSBDEVICE>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
                 err = STATUS_NO_SUCH_DEVICE;
@@ -404,27 +404,27 @@ PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
         PAGED_CODE();
 
         size_t buf_sz = 0;
-        vhci::ioctl_imported_dev *dev{};
-        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*dev), &PVOID(dev), &buf_sz)) {
+        vhci::ioctl_imported_dev *result{};
+        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*result), &PVOID(result), &buf_sz)) {
                 return err;
         }
 
-        auto cnt = buf_sz/sizeof(*dev);
+        auto cnt = buf_sz/sizeof(*result);
         int result_cnt = 0;
 
         auto vhci = get_vhci(Request);
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices) && cnt; ++port) {
-                if (auto udev = vhci::find_device(vhci, port)) {
-                        auto &ctx = *get_device_ctx(udev.get());
-                        fill(dev[result_cnt++], ctx);
+                if (auto dev = vhci::find_device(vhci, port)) {
+                        auto &ctx = *get_device_ctx(dev.get());
+                        fill(result[result_cnt++], ctx);
                         --cnt;
                 }
         }
 
         TraceDbg("%d device(s) reported", result_cnt);
 
-        WdfRequestSetInformation(Request, result_cnt*sizeof(*dev));
+        WdfRequestSetInformation(Request, result_cnt*sizeof(*result));
         return STATUS_SUCCESS;
 }
 
@@ -481,7 +481,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-        auto ctx = get_vhci_ctx(vhci);
 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
@@ -489,7 +488,7 @@ PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
 
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &ctx->queue)) {
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
