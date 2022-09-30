@@ -141,13 +141,4 @@ inline auto ptr04x(const void *ptr) // use format "%04x"
         return static_cast<UINT32>(n);
 }
 
-/*
- * Use format "%#Ix"
- * @see make_pipe_handle 
- */ 
-inline auto ph4log(USBD_PIPE_HANDLE handle)
-{
-        return reinterpret_cast<uintptr_t>(handle);
-}
-
 } // namespace usbip

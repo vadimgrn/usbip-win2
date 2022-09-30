@@ -42,7 +42,7 @@ const char *request_type(UCHAR type)
 	return v[type];
 }
 
-const char *recipient(UCHAR recipient)
+const char *request_recipient(UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
 	NT_ASSERT(recipient < ARRAYSIZE(v));
