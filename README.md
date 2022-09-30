@@ -116,6 +116,13 @@ port 1 is successfully detached
 - Disable test signing
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
+- How to remove the driver and app if an uninstaller is corrupted
+  - Run these commands as Administrator
+```
+pnputil /remove-device /deviceid ROOT\USBIP2_VHCI /subtree
+FOR /F %P IN ('findstr /m ROOT\USBIP2_VHCI C:\Windows\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
+```
+  - Delete the folder "C:\Program Files\usbip-win2"
 
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used

@@ -486,15 +486,15 @@ PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
-/*
+
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        attrs.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); }; 
         attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
         attrs.ExecutionLevel = WdfExecutionLevelPassive;
         attrs.ParentObject = vhci;
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Default queue %04x", ptr04x(obj)); }; 
-*/
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, nullptr)) {
+
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }

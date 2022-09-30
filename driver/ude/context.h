@@ -12,7 +12,6 @@
 #include <UdeCx.h>
 
 #include <libdrv\pageable.h>
-#include <usbip\ch9.h>
 
 #include <initguid.h>
 #include <usbip\vhci.h>
@@ -76,10 +75,10 @@ struct device_ctx_ext
  */
 struct device_ctx
 {
-        device_ctx_ext *ext;
+        device_ctx_ext *ext; // must be free-d
 
         WDFDEVICE vhci; // parent
-        UDECXUSBENDPOINT ep0; // default control pipe
+//      UDECXUSBENDPOINT ep0; // default control pipe
 
         int port; // vhci_ctx.devices[port - 1], unique device id, this is not roothub's port number
         seqnum_t seqnum; // @see next_seqnum

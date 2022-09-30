@@ -42,27 +42,24 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void NTAPI usbip::device::internal_device_control(
         _In_ WDFQUEUE Queue, 
         _In_ WDFREQUEST Request,
-        _In_ size_t OutputBufferLength,
-        _In_ size_t InputBufferLength,
+        _In_ size_t /*OutputBufferLength*/,
+        _In_ size_t /*InputBufferLength*/,
         _In_ ULONG IoControlCode)
 {
         auto dev = get_device(Queue);
+        TraceDbg("%s(%#08lX), dev %04x", internal_device_control_name(IoControlCode), IoControlCode, ptr04x(dev));
 
-        TraceDbg("dev %04x, %s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
-                  ptr04x(dev), internal_device_control_name(IoControlCode), IoControlCode, 
-                  OutputBufferLength, InputBufferLength);
-
-        auto st = STATUS_NOT_SUPPORTED;
-
-        switch (IoControlCode) {
-        case IOCTL_INTERNAL_USB_SUBMIT_URB:
-                st = submit_urb(dev, Request);
-                break;
+        if (IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB) {
+                auto st = STATUS_INVALID_DEVICE_REQUEST;
+                Trace(TRACE_LEVEL_ERROR, "-> %!STATUS!", st);
+                WdfRequestComplete(Request, st);
+                return;
         }
 
-        TraceDbg("-> %!STATUS!", st);
+        auto st = submit_urb(dev, Request);
+        TraceDbg("%!STATUS!", st);
 
         if (st != STATUS_PENDING) {
-                WdfRequestComplete(Request, st);
+                UdecxUrbCompleteWithNtStatus(Request, st);
         }
 }
