@@ -2,9 +2,9 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "vhci_queue.h"
+#include "vhci_ioctl.h"
 #include "trace.h"
-#include "vhci_queue.tmh"
+#include "vhci_ioctl.tmh"
 
 #include "context.h"
 #include "vhci.h"
@@ -484,10 +484,16 @@ PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
-
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
-
+/*
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
+        attrs.ExecutionLevel = WdfExecutionLevelPassive;
+        attrs.ParentObject = vhci;
+        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Default queue %04x", ptr04x(obj)); }; 
+*/
         if (auto err = WdfIoQueueCreate(vhci, &cfg, WDF_NO_OBJECT_ATTRIBUTES, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;

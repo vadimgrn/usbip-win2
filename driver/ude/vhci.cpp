@@ -16,7 +16,7 @@
 #include <Udecx.h>
 
 #include "device.h"
-#include "vhci_queue.h"
+#include "vhci_ioctl.h"
 #include "context.h"
 
 namespace

@@ -21,7 +21,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\devnod
 		{2C173853-88C0-4334-85BF-0B46CFD5A007} = {2C173853-88C0-4334-85BF-0B46CFD5A007}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ude", "driver\ude\ude.vcxproj", "{3A3812CE-3370-4B5F-829D-43433267B154}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_vhci", "driver\ude\usbip2_vhci.vcxproj", "{3A3812CE-3370-4B5F-829D-43433267B154}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
