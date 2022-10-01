@@ -31,6 +31,7 @@
     <ClInclude Include="context.h" />
     <ClInclude Include="wsk_receive.h" />
     <ClInclude Include="device_ioctl.h" />
+    <ClInclude Include="wsk_context.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -43,6 +44,7 @@
     <ClCompile Include="context.cpp" />
     <ClCompile Include="wsk_receive.cpp" />
     <ClCompile Include="device_ioctl.cpp" />
+    <ClCompile Include="wsk_context.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_vhci.inf" />

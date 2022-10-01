@@ -19,9 +19,26 @@ namespace
 
 using namespace usbip;
 
+/*
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto new_wsk_context(_In_ const endpoint_ctx &endp, _Inout_opt_ IRP *irp, _In_ ULONG NumberOfPackets = 0)
+{
+        if (irp) {
+                get_pipe_handle(irp) = handle;
+        }
+
+        auto ctx = alloc_wsk_context(NumberOfPackets);
+        if (ctx) {
+                ctx->vpdo = &vpdo;
+                ctx->irp = irp;
+        }
+
+        return ctx;
+}
+*/
 
 using urb_function_t = NTSTATUS (WDFREQUEST, IRP*, URB&, const endpoint_ctx&);
-
 
 /*
  * Any URBs queued for such an endpoint should normally be unlinked by the driver before clearing the halt condition,
@@ -367,7 +384,8 @@ NTSTATUS get_current_frame_number(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ U
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS control_transfer(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
+NTSTATUS control_transfer(
+        _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &)
 {
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
@@ -384,6 +402,28 @@ NTSTATUS control_transfer(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ co
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
+/*
+        auto ctx = new_wsk_context(vpdo, irp, r.PipeHandle);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
+                free(ctx, false);
+                return err;
+        }
+
+        if (is_transfer_direction_out(ctx->hdr) != is_transfer_dir_out(urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
+                Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
+                free(ctx, false);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
+        RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
+
+        return send(ctx, &urb);
+*/
         return STATUS_NOT_IMPLEMENTED;
 }
 

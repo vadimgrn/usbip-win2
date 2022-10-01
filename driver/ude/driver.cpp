@@ -8,12 +8,45 @@
 #include "driver.tmh"
 
 #include "context.h"
+#include "wsk_context.h"
+
 #include <libdrv\wsk_cpp.h>
 
 namespace
 {
 
 using namespace usbip;
+
+_Enum_is_bitflag_ enum { INIT_WSK_CTX_LIST = 1 };
+unsigned int g_init_flags;
+
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGEABLE void driver_cleanup(_In_ WDFOBJECT Object)
+{
+	PAGED_CODE();
+
+	auto drv = static_cast<WDFDRIVER>(Object);
+	Trace(TRACE_LEVEL_INFORMATION, "Driver %04x", ptr04x(drv));
+
+	wsk::shutdown();
+
+	auto drvobj = WdfDriverWdmGetDriverObject(drv);
+	WPP_CLEANUP(drvobj);
+}
+
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGEABLE void NTAPI driver_destroy(_In_ WDFOBJECT)
+{
+	PAGED_CODE();
+	if (g_init_flags & INIT_WSK_CTX_LIST) {
+		ExDeleteLookasideListEx(&wsk_context_list);
+	}
+
+}
 
 /*
  * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
@@ -24,7 +57,8 @@ using namespace usbip;
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGEABLE auto set_ifr_verbose()
+__declspec(code_seg("INIT"))
+auto set_ifr_verbose()
 {
 	PAGED_CODE();
 
@@ -45,35 +79,45 @@ PAGEABLE auto set_ifr_verbose()
 	return err;
 }
 
-_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-PAGEABLE void driver_cleanup(_In_ WDFOBJECT DriverObject)
-{
-	PAGED_CODE();
-
-	auto drvobj = WdfDriverWdmGetDriverObject(static_cast<WDFDRIVER>(DriverObject));
-	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x", ptr04x(drvobj));
-	
-	wsk::shutdown();
-	WPP_CLEANUP(drvobj);
-}
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
+__declspec(code_seg("INIT"))
+auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
 
 	WDF_OBJECT_ATTRIBUTES attrs;
 	WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
 	attrs.EvtCleanupCallback = driver_cleanup;
+	attrs.EvtDestroyCallback = driver_destroy;
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DriverDeviceAdd);
 	cfg.DriverPoolTag = POOL_TAG;
 
-	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, WDF_NO_HANDLE);
+	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, nullptr);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+__declspec(code_seg("INIT"))
+auto init()
+{
+	PAGED_CODE();
+
+	if (auto err = init_wsk_context_list()) {
+		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", err);
+		return err;
+	} else {
+		g_init_flags |= INIT_WSK_CTX_LIST;
+	}
+
+	if (auto err = wsk::initialize()) {
+		Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
+		return err;
+	}
+
+	return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -97,11 +141,10 @@ EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STR
 		}
 	}
 
-	if (auto err = wsk::initialize()) {
-		Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
+	if (auto err = init()) {
 		return err;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "DriverObject %04x, RegistryPath %!USTR!", ptr04x(DriverObject), RegistryPath);
+	Trace(TRACE_LEVEL_INFORMATION, "RegistryPath '%!USTR!'", RegistryPath);
 	return STATUS_SUCCESS;
 }

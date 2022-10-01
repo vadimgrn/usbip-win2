@@ -20,6 +20,7 @@
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="vhci_ioctl.cpp" />
+    <ClCompile Include="wsk_context.cpp" />
     <ClCompile Include="wsk_receive.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -37,6 +38,7 @@
     <ClInclude Include="driver.h" />
     <ClInclude Include="vhci_ioctl.h" />
     <ClInclude Include="trace.h" />
+    <ClInclude Include="wsk_context.h" />
     <ClInclude Include="wsk_receive.h" />
   </ItemGroup>
   <ItemGroup>
