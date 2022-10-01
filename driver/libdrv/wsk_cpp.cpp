@@ -108,7 +108,7 @@ NTSTATUS socket_async_context::completion(
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
+PAGEABLE NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
 {
         PAGED_CODE();
         NT_ASSERT(*this);
@@ -157,7 +157,7 @@ auto GetProviderNPIOnce(bool testonly = false)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-void ReleaseProviderNPIOnce()
+PAGEABLE void ReleaseProviderNPIOnce()
 {
         PAGED_CODE();
 
@@ -167,7 +167,7 @@ void ReleaseProviderNPIOnce()
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-void deinitialize()
+PAGEABLE void deinitialize()
 {
         PAGED_CODE();
 
@@ -240,7 +240,7 @@ auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, si
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, _In_ bool send)
+PAGEABLE auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, _In_ bool send)
 {
         PAGED_CODE();
         NT_ASSERT(sock);
@@ -279,7 +279,7 @@ NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags,
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags)
+PAGEABLE NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags)
 {
         PAGED_CODE();
 
@@ -294,7 +294,7 @@ NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual)
+PAGEABLE NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_opt_ SIZE_T *actual)
 {
         PAGED_CODE();
 
@@ -315,7 +315,7 @@ NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags,
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::getaddrinfo(
+PAGEABLE NTSTATUS wsk::getaddrinfo(
         _Outptr_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
@@ -347,7 +347,7 @@ NTSTATUS wsk::getaddrinfo(
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-void wsk::free(_In_opt_ ADDRINFOEXW *AddrInfo)
+PAGEABLE void wsk::free(_In_opt_ ADDRINFOEXW *AddrInfo)
 {
         PAGED_CODE();
 
@@ -359,7 +359,7 @@ void wsk::free(_In_opt_ ADDRINFOEXW *AddrInfo)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::socket(
+PAGEABLE NTSTATUS wsk::socket(
         _Outptr_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
@@ -402,7 +402,7 @@ NTSTATUS wsk::socket(
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::control_client(
+PAGEABLE NTSTATUS wsk::control_client(
         _In_ ULONG ControlCode,
         _In_ SIZE_T InputSize,
         _In_reads_bytes_opt_(InputSize) void *InputBuffer,
@@ -445,7 +445,7 @@ NTSTATUS wsk::control_client(
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::control(
+PAGEABLE NTSTATUS wsk::control(
         _In_ SOCKET *sock,
         _In_ WSK_CONTROL_SOCKET_TYPE RequestType,
         _In_ ULONG ControlCode,
@@ -481,7 +481,7 @@ NTSTATUS wsk::control(
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable)
+PAGEABLE NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable)
 {
         PAGED_CODE();
 
@@ -496,7 +496,7 @@ NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wa
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::close(_In_ SOCKET *sock)
+PAGEABLE NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
         PAGED_CODE();
 
@@ -515,7 +515,7 @@ NTSTATUS wsk::close(_In_ SOCKET *sock)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
+PAGEABLE NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
 {
         PAGED_CODE();
 
@@ -529,7 +529,7 @@ NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
+PAGEABLE NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
 {
         PAGED_CODE();
 
@@ -543,7 +543,7 @@ NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_ ULONG flags)
+PAGEABLE NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_ ULONG flags)
 {
         PAGED_CODE();
 
@@ -563,7 +563,7 @@ NTSTATUS wsk::release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndicatio
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress)
+PAGEABLE NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress)
 {
         PAGED_CODE();
 
@@ -577,7 +577,7 @@ NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress)
+PAGEABLE NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress)
 {
         PAGED_CODE();
 
@@ -591,7 +591,7 @@ NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-auto wsk::for_each(
+PAGEABLE auto wsk::for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch,
         _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _Inout_opt_ void *ctx) -> SOCKET*
 {
@@ -619,7 +619,7 @@ auto wsk::for_each(
  * Error if optval is ULONG, one byte is written actually.
  */
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
+PAGEABLE NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
 {
         PAGED_CODE();
         return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
@@ -630,7 +630,7 @@ NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
  * TCP_KEEPIDLE default is 2*60*60 sec.
  */
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
+PAGEABLE NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
 {
         PAGED_CODE();
 
@@ -663,7 +663,7 @@ NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl)
+PAGEABLE NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl)
 {
         PAGED_CODE();
 
@@ -689,7 +689,7 @@ NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *in
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-NTSTATUS wsk::initialize()
+PAGEABLE NTSTATUS wsk::initialize()
 {
         PAGED_CODE();
         WSK_CLIENT_NPI npi{ nullptr, &g_WskDispatch };
@@ -703,7 +703,7 @@ NTSTATUS wsk::initialize()
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-void wsk::shutdown()
+PAGEABLE void wsk::shutdown()
 {
         PAGED_CODE();
         ReleaseProviderNPIOnce();
@@ -711,7 +711,7 @@ void wsk::shutdown()
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-WSK_PROVIDER_NPI* wsk::GetProviderNPI()
+PAGEABLE WSK_PROVIDER_NPI* wsk::GetProviderNPI()
 {
         PAGED_CODE();
         return GetProviderNPIOnce();
