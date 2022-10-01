@@ -78,7 +78,7 @@ struct device_ctx
         device_ctx_ext *ext; // must be free-d
 
         WDFDEVICE vhci; // parent
-//      UDECXUSBENDPOINT ep0; // default control pipe
+        WDFQUEUE queue; // for server's response
 
         int port; // vhci_ctx.devices[port - 1], unique device id, this is not roothub's port number
         seqnum_t seqnum; // @see next_seqnum
@@ -99,7 +99,7 @@ struct endpoint_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx);
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // queue must be owned by endpoint
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

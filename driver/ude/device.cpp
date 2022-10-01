@@ -111,9 +111,46 @@ NTSTATUS device_set_function_suspend_and_wake(
         return STATUS_SUCCESS;
 }
 
+_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
+{
+        TraceDbg("queue %04x, request %04x", ptr04x(queue), ptr04x(request));
+        WdfRequestComplete(request, STATUS_CANCELLED);
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_queue(_In_ UDECXUSBENDPOINT endp)
+PAGEABLE auto create_device_queue(_In_ UDECXUSBDEVICE dev)
+{
+        PAGED_CODE();
+
+        WDF_IO_QUEUE_CONFIG cfg;
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchManual);
+        cfg.EvtIoCanceledOnQueue = canceled_on_queue;
+        cfg.PowerManaged = WdfFalse;
+
+        WDF_OBJECT_ATTRIBUTES attrs;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Device queue %04x cleanup", ptr04x(obj)); };
+        attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
+        attrs.ParentObject = dev;
+
+        auto &ctx = *get_device_ctx(dev);
+
+        if (auto err = WdfIoQueueCreate(ctx.vhci, &cfg, &attrs, &ctx.queue)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
+                return err;
+        }
+
+        TraceDbg("dev %04x, queue %04x", ptr04x(dev), ptr04x(ctx.queue));
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGEABLE auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
 {
         PAGED_CODE();
 
@@ -181,7 +218,7 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
                 ctx->bInterval = bInterval;
         }
 
-        if (auto err = create_queue(endp)) {
+        if (auto err = create_endpoint_queue(endp)) {
                 return err;
         }
 
@@ -301,6 +338,10 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVIC
                 ext->ctx = ctx;
         }
 
+        if (auto err = create_device_queue(dev)) {
+                return err;
+        }
+
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(dev));
         return STATUS_SUCCESS;
 }
@@ -368,12 +409,3 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
         static_assert(NT_SUCCESS(STATUS_PENDING));
         return STATUS_PENDING;
 }
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-UDECXUSBDEVICE usbip::device::get_device(_In_ WDFQUEUE queue)
-{
-        auto endp = *get_queue_ctx(queue);
-        return get_endpoint_ctx(endp)->device;
-}
-

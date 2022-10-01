@@ -33,8 +33,4 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS schedule_destroy(_In_ UDECXUSBDEVICE dev);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-UDECXUSBDEVICE get_device(_In_ WDFQUEUE queue);
-
 } // namespace usbip::device
