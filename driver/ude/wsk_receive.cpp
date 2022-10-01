@@ -16,7 +16,7 @@ NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flag
 	auto ext = static_cast<device_ctx_ext*>(SocketContext);
 
 	if (auto dev = get_device(ext)) {
-		TraceMsg("dev %04x, Flags %#lx", ptr04x(dev), Flags);
+		Trace(TRACE_LEVEL_INFORMATION, "dev %04x, Flags %#lx", ptr04x(dev), Flags);
 		device::schedule_destroy(dev);
 	}
 

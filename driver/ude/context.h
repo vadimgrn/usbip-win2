@@ -92,6 +92,10 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
+
+        // from USB_ENDPOINT_DESCRIPTOR
+        UCHAR bEndpointAddress;
+        UCHAR bInterval;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 

@@ -150,10 +150,15 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 {
         PAGED_CODE();
 
-        auto addr = data->EndpointDescriptor ?
-                    data->EndpointDescriptor->bEndpointAddress : UCHAR(USB_DEFAULT_ENDPOINT_ADDRESS);
+        UCHAR bEndpointAddress = USB_DEFAULT_ENDPOINT_ADDRESS;
+        UCHAR bInterval{};
 
-        UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, addr);
+        if (auto d = data->EndpointDescriptor) {
+                bEndpointAddress = d->bEndpointAddress;
+                bInterval = d->bInterval;
+        }
+
+        UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, bEndpointAddress);
 
         UDECX_USB_ENDPOINT_CALLBACKS cb;
         UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, endpoint_reset);
@@ -169,13 +174,20 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
                 return err;
         }
-        get_endpoint_ctx(endp)->device = dev;
+
+        if (auto ctx = get_endpoint_ctx(endp)) {
+                ctx->device = dev;
+                ctx->bEndpointAddress = bEndpointAddress;
+                ctx->bInterval = bInterval;
+        }
 
         if (auto err = create_queue(endp)) {
                 return err;
         }
 
-        TraceDbg("dev %04x, endp %04x{address=%#x}", ptr04x(dev), ptr04x(endp), addr);
+        TraceDbg("dev %04x, endp %04x{bEndpointAddress %#x, bInterval %d}", ptr04x(dev), ptr04x(endp), 
+                  bEndpointAddress, bInterval);
+
         return STATUS_SUCCESS;
 }
 
@@ -204,7 +216,7 @@ void endpoints_configure(
                 st = STATUS_SUCCESS;
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
-                TraceDbg("dev %04x, released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
+                TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
                           WppBinary(params->ReleasedEndpoints, 
                                     USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
                 st = STATUS_SUCCESS;

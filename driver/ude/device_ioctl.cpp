@@ -20,7 +20,7 @@ namespace
 using namespace usbip;
 
 
-using urb_function_t = NTSTATUS (UDECXUSBDEVICE dev, WDFREQUEST, IRP*, URB&);
+using urb_function_t = NTSTATUS (WDFREQUEST, IRP*, URB&, const endpoint_ctx&);
 
 
 /*
@@ -53,7 +53,7 @@ using urb_function_t = NTSTATUS (UDECXUSBDEVICE dev, WDFREQUEST, IRP*, URB&);
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS pipe_request(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS pipe_request(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbPipeRequest;
         NT_ASSERT(r.PipeHandle);
@@ -84,7 +84,7 @@ NTSTATUS pipe_request(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *ir
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS control_get_status_request(
-        _In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ UCHAR recipient)
+        _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&, _In_ UCHAR recipient)
 {
         auto &r = urb.UrbControlGetStatusRequest;
 
@@ -97,35 +97,35 @@ NTSTATUS control_get_status_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_status_from_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_status_from_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_get_status_request(dev, request, irp, urb, USB_RECIP_DEVICE);
+        return control_get_status_request(request, irp, urb, endp, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_status_from_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_status_from_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_get_status_request(dev, request, irp, urb, USB_RECIP_INTERFACE);
+        return control_get_status_request(request, irp, urb, endp, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_status_from_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_status_from_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_get_status_request(dev, request, irp, urb, USB_RECIP_ENDPOINT);
+        return control_get_status_request(request, irp, urb, endp, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_status_from_other(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_status_from_other(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_get_status_request(dev, request, irp, urb, USB_RECIP_OTHER);
+        return control_get_status_request(request, irp, urb, endp, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS control_vendor_class_request(
-        _In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ UCHAR type, _In_ UCHAR recipient)
+        _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&, _In_ UCHAR type, _In_ UCHAR recipient)
 {
         auto &r = urb.UrbControlVendorClassRequest;
 
@@ -142,63 +142,63 @@ NTSTATUS control_vendor_class_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS vendor_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS vendor_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_VENDOR, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS vendor_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS vendor_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_VENDOR, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS vendor_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS vendor_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_VENDOR, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS vendor_other(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS vendor_other(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_VENDOR, USB_RECIP_OTHER);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_VENDOR, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS class_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS class_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_CLASS, USB_RECIP_DEVICE);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_CLASS, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS class_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS class_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_CLASS, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS class_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS class_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_CLASS, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS class_other(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS class_other(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_vendor_class_request(dev, request, irp, urb, USB_TYPE_CLASS, USB_RECIP_OTHER);
+        return control_vendor_class_request(request, irp, urb, endp, USB_TYPE_CLASS, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS control_descriptor_request(
-        _In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, 
+        _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&,
         _In_ bool dir_in, _In_ UCHAR recipient)
 {
         auto &r = urb.UrbControlDescriptorRequest;
@@ -213,49 +213,49 @@ NTSTATUS control_descriptor_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_descriptor_from_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_descriptor_from_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_descriptor_request(dev, request, irp, urb, bool(USB_DIR_IN), USB_RECIP_DEVICE);
+        return control_descriptor_request(request, irp, urb, endp, bool(USB_DIR_IN), USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_descriptor_to_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_descriptor_to_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_descriptor_request(dev, request, irp, urb, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
+        return control_descriptor_request(request, irp, urb, endp, bool(USB_DIR_OUT), USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_descriptor_from_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_descriptor_from_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_descriptor_request(dev, request, irp, urb, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
+        return control_descriptor_request(request, irp, urb, endp, bool(USB_DIR_IN), USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_descriptor_to_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_descriptor_to_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_descriptor_request(dev, request, irp, urb,  bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
+        return control_descriptor_request(request, irp, urb, endp, bool(USB_DIR_OUT), USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_descriptor_from_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_descriptor_from_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_descriptor_request(dev, request, irp, urb, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
+        return control_descriptor_request(request, irp, urb, endp, bool(USB_DIR_IN), USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_descriptor_to_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_descriptor_to_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_descriptor_request(dev, request, irp, urb, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
+        return control_descriptor_request(request, irp, urb, endp, bool(USB_DIR_OUT), USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS control_feature_request(
-        _In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, 
+        _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&,
         _In_ UCHAR bRequest, _In_ UCHAR recipient)
 {
         auto &r = urb.UrbControlFeatureRequest;
@@ -269,63 +269,63 @@ NTSTATUS control_feature_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_feature_to_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_feature_to_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_SET_FEATURE, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_feature_to_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_feature_to_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_SET_FEATURE, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_feature_to_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_feature_to_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_SET_FEATURE, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS set_feature_to_other(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS set_feature_to_other(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb,  USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_SET_FEATURE, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS clear_feature_to_device(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS clear_feature_to_device(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_DEVICE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS clear_feature_to_interface(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS clear_feature_to_interface(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_INTERFACE);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS clear_feature_to_endpoint(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS clear_feature_to_endpoint(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_ENDPOINT);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS clear_feature_to_other(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS clear_feature_to_other(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
-        return control_feature_request(dev, request, irp, urb, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
+        return control_feature_request(request, irp, urb, endp, USB_REQUEST_CLEAR_FEATURE, USB_RECIP_OTHER);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS select_configuration(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP*, _In_ URB &urb)
+NTSTATUS select_configuration(_In_ WDFREQUEST, _In_ IRP*, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbSelectConfiguration;
         auto cd = r.ConfigurationDescriptor; // nullptr if unconfigured
@@ -337,7 +337,7 @@ NTSTATUS select_configuration(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP*, _
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS select_interface(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP*, _In_ URB &urb)
+NTSTATUS select_interface(_In_ WDFREQUEST, _In_ IRP*, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbSelectInterface;
         auto &iface = r.Interface;
@@ -354,7 +354,7 @@ NTSTATUS select_interface(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP*, _In_ 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_current_frame_number(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_current_frame_number(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &num = urb.UrbGetCurrentFrameNumber.FrameNumber;
 //      num = 0; // vpdo.current_frame_number;
@@ -367,7 +367,7 @@ NTSTATUS get_current_frame_number(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, 
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS control_transfer(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS control_transfer(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
@@ -389,7 +389,7 @@ NTSTATUS control_transfer(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS bulk_or_interrupt_transfer(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbBulkOrInterruptTransfer;
 
@@ -410,7 +410,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ I
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS isoch_transfer(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS isoch_transfer(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbIsochronousTransfer;
 
@@ -432,7 +432,7 @@ NTSTATUS isoch_transfer(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS function_deprecated(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS function_deprecated(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         TraceUrb("irp %04x: %s not supported", ptr04x(irp), urb_function_str(urb.UrbHeader.Function));
 
@@ -442,7 +442,7 @@ NTSTATUS function_deprecated(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ 
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_configuration(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_configuration(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbControlGetConfigurationRequest;
         TraceUrb("irp %04x -> TransferBufferLength %lu (must be 1)", ptr04x(irp), r.TransferBufferLength);
@@ -452,7 +452,7 @@ NTSTATUS get_configuration(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, 
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_interface(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_interface(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbControlGetInterfaceRequest;
 
@@ -467,7 +467,7 @@ NTSTATUS get_interface(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_ms_feature_descriptor(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_ms_feature_descriptor(_In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbOSFeatureDescriptorRequest;
 
@@ -485,7 +485,7 @@ NTSTATUS get_ms_feature_descriptor(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IR
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS get_isoch_pipe_transfer_path_delays(
-        _In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+        _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbGetIsochPipeTransferPathDelays;
 
@@ -500,7 +500,7 @@ NTSTATUS get_isoch_pipe_transfer_path_delays(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS open_static_streams(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS open_static_streams(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         auto &r = urb.UrbOpenStaticStreams;
 
@@ -606,16 +606,18 @@ urb_function_t* const urb_functions[] =
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto submit_urb(_In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request)
+auto submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp));
 
         auto func = urb.UrbHeader.Function;
-        TraceDbg("%s(%#04x), dev %04x", urb_function_str(func), func, ptr04x(dev));
+        auto &ctx = *get_endpoint_ctx(endp);
+
+        TraceDbg("%s(%#04x), dev %04x, endp %04x", urb_function_str(func), func, ptr04x(ctx.device), ptr04x(endp));
 
         if (auto handler = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr) {
-                return handler(dev, request, irp, urb);
+                return handler(request, irp, urb, ctx);
         }
 
         Trace(TRACE_LEVEL_ERROR, "%s(%#04x) has no handler (reserved?)", urb_function_str(func), func);
@@ -647,8 +649,8 @@ void NTAPI usbip::device::internal_device_control(
                 return;
         }
 
-        auto dev = get_device(Queue);
-        auto st = submit_urb(dev, Request);
+        auto endp = *get_queue_ctx(Queue);
+        auto st = submit_urb(Request, endp);
 
         if (st != STATUS_PENDING) {
                 TraceDbg("%!STATUS!", st);
