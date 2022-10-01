@@ -354,13 +354,15 @@ NTSTATUS select_interface(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP*, _In_ 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_current_frame_number(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb)
+NTSTATUS get_current_frame_number(_In_ UDECXUSBDEVICE, _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb)
 {
         auto &num = urb.UrbGetCurrentFrameNumber.FrameNumber;
-        num = 0; // vpdo.current_frame_number;
+//      num = 0; // vpdo.current_frame_number;
 
         TraceUrb("irp %04x: FrameNumber %lu", ptr04x(irp), num);
-        return STATUS_NOT_SUPPORTED;
+
+        UdecxUrbComplete(request, USBD_STATUS_NOT_SUPPORTED);
+        return STATUS_PENDING;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

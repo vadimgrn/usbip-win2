@@ -434,13 +434,15 @@ PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void IoDeviceControl(
+PAGEABLE void IoDeviceControl(
         _In_ WDFQUEUE Queue,
         _In_ WDFREQUEST Request,
         _In_ size_t OutputBufferLength,
         _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode)
 {
+        PAGED_CODE();
+
         TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
                   device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
 
@@ -464,7 +466,7 @@ void IoDeviceControl(
                 }
                 [[fallthrough]];
         default:
-                complete = !UdecxWdfDeviceTryHandleUserIoctl(WdfIoQueueGetDevice(Queue), Request);
+                complete = !UdecxWdfDeviceTryHandleUserIoctl(WdfIoQueueGetDevice(Queue), Request); // PASSIVE_LEVEL
         }
 
         if (complete) {
@@ -476,6 +478,14 @@ void IoDeviceControl(
 } // namespace
 
 
+/*
+ * The framework sets the SynchronizationScope value of framework driver objects to WdfSynchronizationScopeNone. 
+ * It sets the SynchronizationScope value of framework device objects and framework queue objects 
+ * to WdfSynchronizationScopeInheritFromParent. 
+ * 
+ * attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // spinlock acquiring raises IRQL to DPC
+ * attrs.ExecutionLevel = WdfExecutionLevelPassive;
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
@@ -483,15 +493,13 @@ PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
+        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchParallel);
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); }; 
-        attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
-        attrs.ExecutionLevel = WdfExecutionLevelPassive;
+        attrs.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); };
         attrs.ParentObject = vhci;
 
         if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, nullptr)) {

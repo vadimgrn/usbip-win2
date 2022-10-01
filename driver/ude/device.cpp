@@ -143,23 +143,21 @@ PAGEABLE auto create_queue(_In_ UDECXUSBENDPOINT endp)
         return STATUS_SUCCESS;
 }
 
+_Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_endpoint(
-        _In_ UDECXUSBDEVICE dev,
-        _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA &data,
-        _In_ EVT_UDECX_USB_ENDPOINT_RESET *EvtUsbEndpointReset)
+NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
 {
         PAGED_CODE();
 
-        auto addr = data.EndpointDescriptor ?
-                    data.EndpointDescriptor->bEndpointAddress : UCHAR(USB_DEFAULT_DEVICE_ADDRESS);
+        auto addr = data->EndpointDescriptor ?
+                    data->EndpointDescriptor->bEndpointAddress : UCHAR(USB_DEFAULT_ENDPOINT_ADDRESS);
 
-        UdecxUsbEndpointInitSetEndpointAddress(data.UdecxUsbEndpointInit, addr);
+        UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, addr);
 
         UDECX_USB_ENDPOINT_CALLBACKS cb;
-        UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, EvtUsbEndpointReset);
-        UdecxUsbEndpointInitSetCallbacks(data.UdecxUsbEndpointInit, &cb);
+        UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, endpoint_reset);
+        UdecxUsbEndpointInitSetCallbacks(data->UdecxUsbEndpointInit, &cb);
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
@@ -167,7 +165,7 @@ PAGEABLE auto create_endpoint(
         attrs.ParentObject = dev;
 
         UDECXUSBENDPOINT endp;
-        if (auto err = UdecxUsbEndpointCreate(&data.UdecxUsbEndpointInit, &attrs, &endp)) {
+        if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attrs, &endp)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
                 return err;
         }
@@ -188,16 +186,7 @@ PAGEABLE NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBEN
 {
         PAGED_CODE();
         UDECX_USB_ENDPOINT_INIT_AND_METADATA data{ init };
-        return create_endpoint(dev, data, endpoint_reset);
-}
-
-_Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
-{
-        PAGED_CODE();
-        return create_endpoint(dev, *data, endpoint_reset);
+        return endpoint_add(dev, &data);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
