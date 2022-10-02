@@ -139,10 +139,4 @@ inline auto get_device(_In_ device_ctx_ext *ext)
         return static_cast<UDECXUSBDEVICE>(ctx ? WdfObjectContextGetObject(ctx) : WDF_NO_HANDLE);
 }
 
-inline auto ptr04x(const void *ptr) // use format "%04x"
-{
-        auto n = reinterpret_cast<uintptr_t>(ptr);
-        return static_cast<UINT32>(n);
-}
-
 } // namespace usbip

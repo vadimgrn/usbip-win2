@@ -6,13 +6,14 @@
 #include "trace.h"
 #include "wsk_context.tmh"
 
-#include "driver.h"
-#include "context.h"
-
 namespace
 {
 
 using namespace usbip;
+
+ULONG g_tag;
+bool g_initialized;
+LOOKASIDE_LIST_EX g_lookaside;
 
 _IRQL_requires_same_
 _Function_class_(free_function_ex)
@@ -32,10 +33,10 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
         }
 
         if (auto ptr = ctx->isoc) {
-                ExFreePoolWithTag(ptr, POOL_TAG);
+                ExFreePoolWithTag(ptr, g_tag);
         }
 
-        ExFreePoolWithTag(ctx, POOL_TAG);
+        ExFreePoolWithTag(ctx, g_tag);
 }
 
 _IRQL_requires_same_
@@ -43,7 +44,7 @@ _Function_class_(allocate_function_ex)
 void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {
         NT_ASSERT(PoolType == NonPagedPoolNx);
-        NT_ASSERT(Tag == POOL_TAG);
+        NT_ASSERT(Tag == g_tag);
 
         auto ctx = (wsk_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, NumberOfBytes, Tag);
         if (!ctx) {
@@ -78,11 +79,29 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
  * For this reason ExFreeToLookasideListEx always calls L.FreeEx instead of InterlockedPushEntrySList.
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::init_wsk_context_list()
+_IRQL_requires_(DISPATCH_LEVEL)
+NTSTATUS usbip::init_wsk_context_list(_In_ ULONG tag)
 {
-        return ExInitializeLookasideListEx(&wsk_context_list, allocate_function_ex, free_function_ex, 
-                                           NonPagedPoolNx, 0, sizeof(wsk_context), POOL_TAG, 0);
+        if (g_initialized) {
+                return STATUS_ALREADY_INITIALIZED;
+        }
+
+        g_tag = tag;
+        auto err = ExInitializeLookasideListEx(&g_lookaside, allocate_function_ex, free_function_ex, 
+                                               NonPagedPoolNx, 0, sizeof(wsk_context), tag, 0);
+
+        g_initialized = !err;
+        return err;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::delete_wsk_context_list()
+{
+        if (g_initialized) {
+                ExDeleteLookasideListEx(&g_lookaside);
+                g_initialized = false;
+        }
 }
 
 /*
@@ -92,13 +111,13 @@ PAGEABLE NTSTATUS usbip::init_wsk_context_list()
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usbip::alloc_wsk_context(_In_ ULONG NumberOfPackets) -> wsk_context*
 {
-        auto ctx = (wsk_context*)ExAllocateFromLookasideListEx(&wsk_context_list);
+        auto ctx = (wsk_context*)ExAllocateFromLookasideListEx(&g_lookaside);
 
         if (!ctx) {
                 Trace(TRACE_LEVEL_ERROR, "ExAllocateFromLookasideListEx error");
         } else if (auto err = prepare_isoc(*ctx, NumberOfPackets)) {
                 Trace(TRACE_LEVEL_ERROR, "prepare_isoc(NumberOfPackets %lu) %!STATUS!", NumberOfPackets, err);
-                free_function_ex(ctx, &wsk_context_list);
+                free_function_ex(ctx, &g_lookaside);
                 ctx = nullptr;
         }
 
@@ -118,13 +137,13 @@ NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         ULONG isoc_len = NumberOfPackets*sizeof(*ctx.isoc);
 
         if (ctx.isoc_alloc_cnt < NumberOfPackets) {
-                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, POOL_TAG);
+                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, g_tag);
                 if (!isoc) {
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
 
                 if (ctx.isoc) {
-                        ExFreePoolWithTag(ctx.isoc, POOL_TAG);
+                        ExFreePoolWithTag(ctx.isoc, g_tag);
                 }
 
                 ctx.isoc = isoc;
@@ -161,5 +180,5 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
                 ::reuse(*ctx);
         }
 
-        ExFreeToLookasideListEx(&wsk_context_list, ctx);
+        ExFreeToLookasideListEx(&g_lookaside, ctx);
 }

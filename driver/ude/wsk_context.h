@@ -5,18 +5,10 @@
 #pragma once
 
 #include <usbip\proto.h>
-
 #include <libdrv\mdl_cpp.h>
-#include <libdrv\pageable.h>
 
 namespace usbip
 {
-
-inline LOOKASIDE_LIST_EX wsk_context_list;
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS init_wsk_context_list();
 
 struct wsk_context
 {
@@ -37,6 +29,14 @@ struct wsk_context
         ULONG isoc_alloc_cnt;
         bool is_isoc;
 };
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS init_wsk_context_list(_In_ ULONG tag);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void delete_wsk_context_list();
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets);

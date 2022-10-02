@@ -17,9 +17,6 @@ namespace
 
 using namespace usbip;
 
-_Enum_is_bitflag_ enum { INIT_WSK_CTX_LIST = 1 };
-unsigned int g_init_flags;
-
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -28,24 +25,13 @@ PAGEABLE void driver_cleanup(_In_ WDFOBJECT Object)
 	PAGED_CODE();
 
 	auto drv = static_cast<WDFDRIVER>(Object);
-	Trace(TRACE_LEVEL_INFORMATION, "Driver %04x", ptr04x(drv));
+	Trace(TRACE_LEVEL_INFORMATION, "driver %04x", ptr04x(drv));
 
 	wsk::shutdown();
+	delete_wsk_context_list();
 
 	auto drvobj = WdfDriverWdmGetDriverObject(drv);
 	WPP_CLEANUP(drvobj);
-}
-
-_Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-PAGEABLE void NTAPI driver_destroy(_In_ WDFOBJECT)
-{
-	PAGED_CODE();
-	if (g_init_flags & INIT_WSK_CTX_LIST) {
-		ExDeleteLookasideListEx(&wsk_context_list);
-	}
-
 }
 
 /*
@@ -89,7 +75,6 @@ auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *Regist
 	WDF_OBJECT_ATTRIBUTES attrs;
 	WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
 	attrs.EvtCleanupCallback = driver_cleanup;
-	attrs.EvtDestroyCallback = driver_destroy;
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DriverDeviceAdd);
@@ -105,11 +90,9 @@ auto init()
 {
 	PAGED_CODE();
 
-	if (auto err = init_wsk_context_list()) {
+	if (auto err = init_wsk_context_list(POOL_TAG)) {
 		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", err);
 		return err;
-	} else {
-		g_init_flags |= INIT_WSK_CTX_LIST;
 	}
 
 	if (auto err = wsk::initialize()) {
