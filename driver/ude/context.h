@@ -99,6 +99,32 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
 
+
+enum irp_status_t : SHORT { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
+
+/*
+ * Device context for WDFREQUEST.
+ */
+struct request_ctx
+{
+        irp_status_t status;
+        bool use_handle;
+        union {
+                USBD_PIPE_HANDLE handle;
+                seqnum_t seqnum;
+        };        
+};
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ irp_status_t status)
+{
+        NT_ASSERT(status != ST_NONE);
+        NT_ASSERT(status != ST_IRP_NULL);
+        static_assert(sizeof(ctx.status) == sizeof(SHORT));
+        return InterlockedCompareExchange16(reinterpret_cast<SHORT*>(&ctx.status), status, ST_NONE);
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_vhci(_In_ WDFREQUEST Request)

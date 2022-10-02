@@ -9,6 +9,7 @@
 #include "context.h"
 #include "vhci.h"
 #include "device.h"
+#include "device_queue.h"
 
 #include <libdrv\dbgcommon.h>
 
@@ -385,7 +386,7 @@ NTSTATUS get_current_frame_number(_In_ WDFREQUEST request, _In_ IRP *irp, _In_ U
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS control_transfer(
-        _In_ WDFREQUEST, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &)
+        _In_ WDFREQUEST request, _In_ IRP *irp, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
@@ -401,6 +402,31 @@ NTSTATUS control_transfer(
                         urb.UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
+
+        if (auto ctx = get_request_ctx(request)) {
+                ctx->seqnum = 1;
+        }
+
+        auto queue = get_device_ctx(endp.device)->queue;
+
+        if (auto err = WdfRequestForwardToIoQueue(request, queue)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
+                return err;
+        }
+
+        TraceDbg("Forwarded %04x", ptr04x(request));
+
+        if (auto req = device::dequeue(endp.device, 1)) {
+                TraceDbg("Dequeued %04x", ptr04x(req));
+                UdecxUrbComplete(req, USBD_STATUS_NOT_SUPPORTED);
+        } else if (auto err = WdfIoQueueRetrieveNextRequest(queue, &request)) {
+                TraceDbg("Not found, retrieve %!STATUS!", err);
+        } else {
+                TraceDbg("Retrieved %04x", ptr04x(request));
+                UdecxUrbComplete(request, USBD_STATUS_NOT_SUPPORTED);
+        }
+
+        return STATUS_PENDING;
 
 /*
         auto ctx = new_wsk_context(vpdo, irp, r.PipeHandle);
@@ -424,7 +450,6 @@ NTSTATUS control_transfer(
 
         return send(ctx, &urb);
 */
-        return STATUS_NOT_IMPLEMENTED;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -100,11 +100,11 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 
         WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS idle_settings;
         WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleUsbSelectiveSuspend); // IdleCanWakeFromS0
-/*
+
         WDF_OBJECT_ATTRIBUTES request_attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&request_attrs, request_ctx);
         WdfDeviceInitSetRequestAttributes(DeviceInit, &request_attrs);
-*/
+
         WDF_FILEOBJECT_CONFIG fobj_cfg;
         WDF_FILEOBJECT_CONFIG_INIT(&fobj_cfg, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK, WDF_NO_EVENT_CALLBACK);
         fobj_cfg.FileObjectClass = WdfFileObjectNotRequired;

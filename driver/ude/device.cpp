@@ -124,7 +124,7 @@ PAGED auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBENDPOINT);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("queue %04x cleanup", ptr04x(obj)); };
+        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
         attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
         attrs.ParentObject = endp;
 
@@ -167,7 +167,7 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("endp %04x cleanup", ptr04x(obj)); }; 
+        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Endpoint %04x cleanup", ptr04x(obj)); }; 
         attrs.ParentObject = dev;
 
         UDECXUSBENDPOINT endp;
