@@ -11,7 +11,7 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
-#include <libdrv\pageable.h>
+#include <libdrv\codeseg.h>
 
 #include <initguid.h>
 #include <usbip\vhci.h>
@@ -124,11 +124,11 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create_device_ctx_ext(_Outptr_ device_ctx_ext* &d, _In_ const vhci::ioctl_plugin &r);
+PAGED NTSTATUS create_device_ctx_ext(_Outptr_ device_ctx_ext* &d, _In_ const vhci::ioctl_plugin &r);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void free(_In_ device_ctx_ext *ext);
+PAGED void free(_In_ device_ctx_ext *ext);
 
 _IRQL_requires_same_
 _IRQL_requires_(DISPATCH_LEVEL)

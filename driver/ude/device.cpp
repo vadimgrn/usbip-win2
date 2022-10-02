@@ -22,7 +22,7 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_workitem_ctx);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGEABLE auto to_udex_speed(_In_ usb_device_speed speed)
+PAGED auto to_udex_speed(_In_ usb_device_speed speed)
 {
         PAGED_CODE();
 
@@ -122,7 +122,7 @@ void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_device_queue(_In_ UDECXUSBDEVICE dev)
+PAGED auto create_device_queue(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
@@ -150,7 +150,7 @@ PAGEABLE auto create_device_queue(_In_ UDECXUSBDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
+PAGED auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
 {
         PAGED_CODE();
 
@@ -231,7 +231,7 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 _Function_class_(EVT_UDECX_USB_DEVICE_DEFAULT_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPOINT_INIT *init)
+PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPOINT_INIT *init)
 {
         PAGED_CODE();
         UDECX_USB_ENDPOINT_INIT_AND_METADATA data{ init };
@@ -272,7 +272,7 @@ void endpoints_configure(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
 {
         PAGED_CODE();
 
@@ -307,7 +307,7 @@ PAGEABLE auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
+PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
 
@@ -354,7 +354,7 @@ PAGEABLE NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVIC
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
+PAGED void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 

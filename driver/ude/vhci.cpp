@@ -90,7 +90,7 @@ NTSTATUS query_usb_capability(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
+PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 
@@ -127,7 +127,7 @@ PAGEABLE auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto init_context(_In_ WDFDEVICE vhci)
+PAGED auto init_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
@@ -146,7 +146,7 @@ PAGEABLE auto init_context(_In_ WDFDEVICE vhci)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
+PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 
@@ -166,7 +166,7 @@ PAGEABLE auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
+PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 
@@ -196,7 +196,7 @@ PAGEABLE auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
+PAGED int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
@@ -285,7 +285,7 @@ wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
+PAGED void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 
@@ -299,7 +299,7 @@ PAGEABLE void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
+PAGED NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
 

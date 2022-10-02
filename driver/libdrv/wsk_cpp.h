@@ -4,25 +4,23 @@
 
 #pragma once
 
-#include <wdm.h>
+#include "codeseg.h"
 #include <wsk.h>
-
-#include "pageable.h"
 
 namespace wsk
 {
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS initialize();
+PAGED NTSTATUS initialize();
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void shutdown(); 
+PAGED void shutdown(); 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE WSK_PROVIDER_NPI *GetProviderNPI();
+PAGED WSK_PROVIDER_NPI *GetProviderNPI();
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS control_client(
+PAGED NTSTATUS control_client(
         _In_ ULONG ControlCode,
         _In_ SIZE_T InputSize,
         _In_reads_bytes_opt_(InputSize) void *InputBuffer,
@@ -34,7 +32,7 @@ PAGEABLE NTSTATUS control_client(
 struct SOCKET;
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS socket(
+PAGED NTSTATUS socket(
         _Outptr_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
@@ -44,7 +42,7 @@ PAGEABLE NTSTATUS socket(
         _In_opt_ const void *Dispatch);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS control(
+PAGED NTSTATUS control(
         _In_ SOCKET *sock,
         _In_ WSK_CONTROL_SOCKET_TYPE RequestType,
         _In_ ULONG ControlCode,
@@ -58,25 +56,25 @@ PAGEABLE NTSTATUS control(
         _Out_opt_ SIZE_T *OutputSizeReturnedIrp);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable);
+PAGED NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
+PAGED NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress);
+PAGED NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress);
+PAGED NTSTATUS getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress);
+PAGED NTSTATUS getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddress);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0);
+PAGED NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0, _Out_opt_ SIZE_T *actual = nullptr);
+PAGED NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags = 0, _Out_opt_ SIZE_T *actual = nullptr);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp);
@@ -88,40 +86,40 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
+PAGED NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS close(_In_ SOCKET *sock);
+PAGED NTSTATUS close(_In_ SOCKET *sock);
 
 //
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS get_keepalive(_In_ SOCKET *sock, bool &optval);
+PAGED NTSTATUS get_keepalive(_In_ SOCKET *sock, bool &optval);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl);
+PAGED NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS set_keepalive(_In_ SOCKET *sock, int idle = 0, int cnt = 0, int intvl = 0);
+PAGED NTSTATUS set_keepalive(_In_ SOCKET *sock, int idle = 0, int cnt = 0, int intvl = 0);
 
 //
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE NTSTATUS getaddrinfo(
+PAGED NTSTATUS getaddrinfo(
         _Outptr_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
         _In_opt_ ADDRINFOEXW *Hints);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE void free(_In_opt_ ADDRINFOEXW *AddrInfo);
+PAGED void free(_In_opt_ ADDRINFOEXW *AddrInfo);
 
 //
 
 using addrinfo_f = NTSTATUS (_In_ SOCKET *sock, _In_ const ADDRINFOEXW &ai, _Inout_opt_ void *ctx);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGEABLE SOCKET *for_each(
+PAGED SOCKET *for_each(
         _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
         _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _Inout_opt_ void *ctx);
 

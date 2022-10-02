@@ -20,7 +20,7 @@ using namespace usbip;
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGEABLE void driver_cleanup(_In_ WDFOBJECT Object)
+PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 {
 	PAGED_CODE();
 
@@ -43,8 +43,7 @@ PAGEABLE void driver_cleanup(_In_ WDFOBJECT Object)
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-__declspec(code_seg("INIT"))
-auto set_ifr_verbose()
+CS_INIT auto set_ifr_verbose()
 {
 	PAGED_CODE();
 
@@ -67,8 +66,7 @@ auto set_ifr_verbose()
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-__declspec(code_seg("INIT"))
-auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
+CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
 {
 	PAGED_CODE();
 
@@ -85,8 +83,7 @@ auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *Regist
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-__declspec(code_seg("INIT"))
-auto init()
+CS_INIT auto init()
 {
 	PAGED_CODE();
 
@@ -109,8 +106,7 @@ auto init()
 _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-__declspec(code_seg("INIT"))
-EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
+CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
 {
         PAGED_CODE();
 
@@ -124,10 +120,6 @@ EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STR
 		}
 	}
 
-	if (auto err = init()) {
-		return err;
-	}
-
 	Trace(TRACE_LEVEL_INFORMATION, "RegistryPath '%!USTR!'", RegistryPath);
-	return STATUS_SUCCESS;
+	return init();
 }

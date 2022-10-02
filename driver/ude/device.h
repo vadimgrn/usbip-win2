@@ -11,7 +11,7 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
-#include <libdrv\pageable.h>
+#include <libdrv\codeseg.h>
 
 namespace usbip
 {
@@ -23,11 +23,11 @@ namespace usbip::device
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext);
+PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void destroy(_In_ UDECXUSBDEVICE dev);
+PAGED void destroy(_In_ UDECXUSBDEVICE dev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -45,7 +45,7 @@ inline void log(const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
+PAGED void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
         auto &src = *ctx.ext;
@@ -80,7 +80,7 @@ PAGEABLE void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &c
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto send_req_import(_In_ device_ctx_ext &ext)
+PAGED auto send_req_import(_In_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -101,7 +101,7 @@ PAGEABLE auto send_req_import(_In_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
+PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
 {
         PAGED_CODE();
 
@@ -133,7 +133,7 @@ PAGEABLE auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto import_remote_device(_Inout_ device_ctx_ext &ext)
+PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -169,7 +169,7 @@ PAGEABLE auto import_remote_device(_Inout_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_ext &ext)
+PAGED auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -187,7 +187,7 @@ PAGEABLE auto getaddrinfo(_Out_ ADDRINFOEXW* &result, _In_ device_ctx_ext &ext)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto set_options(wsk::SOCKET *sock)
+PAGED auto set_options(wsk::SOCKET *sock)
 {
         PAGED_CODE();
 
@@ -229,7 +229,7 @@ PAGEABLE auto set_options(wsk::SOCKET *sock)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
+PAGED auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
 {
         PAGED_CODE();
 
@@ -253,7 +253,7 @@ PAGEABLE auto try_connect(wsk::SOCKET *sock, const ADDRINFOEXW &ai, void*)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto connect(_Inout_ device_ctx_ext &ext)
+PAGED auto connect(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -274,7 +274,7 @@ PAGEABLE auto connect(_Inout_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
+PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
@@ -313,7 +313,7 @@ struct device_ctx_ext_ptr
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
+PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
 {
         PAGED_CODE();
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, serial %s", r.host, r.service, r.busid, r.serial);
@@ -354,7 +354,7 @@ PAGEABLE void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugin_hardware(_In_ WDFREQUEST Request)
+PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
@@ -373,7 +373,7 @@ PAGEABLE auto plugin_hardware(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto plugout_hardware(_In_ WDFREQUEST Request)
+PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
@@ -399,7 +399,7 @@ PAGEABLE auto plugout_hardware(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
+PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
@@ -434,7 +434,7 @@ PAGEABLE auto get_imported_devices(_In_ WDFREQUEST Request)
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGEABLE void IoDeviceControl(
+PAGED void IoDeviceControl(
         _In_ WDFQUEUE Queue,
         _In_ WDFREQUEST Request,
         _In_ size_t OutputBufferLength,
@@ -488,7 +488,7 @@ PAGEABLE void IoDeviceControl(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
+PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 

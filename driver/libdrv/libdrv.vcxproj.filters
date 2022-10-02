@@ -15,7 +15,7 @@
     <ClInclude Include="ch11.h" />
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="mdl_cpp.h" />
-    <ClInclude Include="pageable.h" />
+    <ClInclude Include="codeseg.h" />
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
     <ClInclude Include="strutil.h" />

@@ -15,7 +15,7 @@
 #include <libdrv\usbd_helper.h>
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
+PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
 
@@ -29,7 +29,7 @@ PAGEABLE NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void 
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len)
+PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
 
@@ -43,7 +43,7 @@ PAGEABLE NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
+PAGED err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
 {
         PAGED_CODE();
         op_common r;
@@ -70,7 +70,7 @@ PAGEABLE err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
+PAGED NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
 {
         PAGED_CODE();
 
@@ -180,7 +180,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE void usbip::close_socket(_Inout_ SOCKET* &sock)
+PAGED void usbip::close_socket(_Inout_ SOCKET* &sock)
 {
         PAGED_CODE();
 

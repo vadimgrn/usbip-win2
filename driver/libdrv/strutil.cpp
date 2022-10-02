@@ -55,7 +55,7 @@ void libdrv_free(void *data)
 */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
+PAGED NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
 {
         PAGED_CODE();
 
@@ -67,7 +67,7 @@ PAGEABLE NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ans
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGEABLE NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
         ANSI_STRING s{ 0, len, dest };
