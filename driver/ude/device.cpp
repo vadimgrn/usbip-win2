@@ -6,6 +6,7 @@
 #include "trace.h"
 #include "device.tmh"
 
+#include "device_queue.h"
 #include "context.h"
 #include "network.h"
 #include "vhci.h"
@@ -108,43 +109,6 @@ NTSTATUS device_set_function_suspend_and_wake(
         TraceDbg("vhci %04x, dev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
                   ptr04x(vhci), ptr04x(dev), Interface, FunctionPower);
 
-        return STATUS_SUCCESS;
-}
-
-_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
-{
-        TraceDbg("queue %04x, request %04x", ptr04x(queue), ptr04x(request));
-        WdfRequestComplete(request, STATUS_CANCELLED);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_device_queue(_In_ UDECXUSBDEVICE dev)
-{
-        PAGED_CODE();
-
-        WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchManual);
-        cfg.EvtIoCanceledOnQueue = canceled_on_queue;
-        cfg.PowerManaged = WdfFalse;
-
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Device queue %04x cleanup", ptr04x(obj)); };
-        attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
-        attrs.ParentObject = dev;
-
-        auto &ctx = *get_device_ctx(dev);
-
-        if (auto err = WdfIoQueueCreate(ctx.vhci, &cfg, &attrs, &ctx.queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
-        }
-
-        TraceDbg("dev %04x, queue %04x", ptr04x(dev), ptr04x(ctx.queue));
         return STATUS_SUCCESS;
 }
 
@@ -338,7 +302,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
                 ext->ctx = ctx;
         }
 
-        if (auto err = create_device_queue(dev)) {
+        if (auto err = create_queue(dev)) {
                 return err;
         }
 

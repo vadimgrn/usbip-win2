@@ -4,14 +4,12 @@
 
 #pragma once
 
-#include <wdm.h>
+#include <libdrv\codeseg.h>
 #include <wdf.h>
 
 #include <usb.h>
 #include <wdfusb.h>
 #include <UdeCx.h>
-
-#include <libdrv\codeseg.h>
 
 #include <initguid.h>
 #include <usbip\vhci.h>
@@ -99,7 +97,7 @@ struct endpoint_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // queue must be owned by endpoint
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

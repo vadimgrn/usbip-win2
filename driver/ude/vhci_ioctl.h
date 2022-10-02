@@ -4,10 +4,8 @@
 
 #pragma once
 
-#include <wdm.h>
-#include <wdf.h>
-
 #include <libdrv\codeseg.h>
+#include <wdf.h>
 
 namespace usbip::vhci
 {

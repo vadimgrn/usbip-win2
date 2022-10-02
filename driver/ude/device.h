@@ -4,14 +4,12 @@
 
 #pragma once
 
-#include <wdm.h>
+#include <libdrv\codeseg.h>
 #include <wdf.h>
 
 #include <usb.h>
 #include <wdfusb.h>
 #include <UdeCx.h>
-
-#include <libdrv\codeseg.h>
 
 namespace usbip
 {
