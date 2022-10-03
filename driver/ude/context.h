@@ -100,19 +100,22 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
 
 
-enum irp_status_t : SHORT { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
+enum irp_status_t : LONG { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
 
 /*
  * Device context for WDFREQUEST.
  */
 struct request_ctx
 {
-        irp_status_t status;
-        bool use_handle;
+        request_ctx(seqnum_t n) : seqnum(n) {}
+        request_ctx(USBD_PIPE_HANDLE h) : use_handle(true), handle(h) {}
+
+        irp_status_t status = ST_NONE;
+        bool use_handle{};
         union {
-                USBD_PIPE_HANDLE handle;
+                USBD_PIPE_HANDLE handle{}; // size is larger than seqnum_t
                 seqnum_t seqnum;
-        };        
+        };   
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
@@ -121,8 +124,8 @@ inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ irp_status_t status
 {
         NT_ASSERT(status != ST_NONE);
         NT_ASSERT(status != ST_IRP_NULL);
-        static_assert(sizeof(ctx.status) == sizeof(SHORT));
-        return InterlockedCompareExchange16(reinterpret_cast<SHORT*>(&ctx.status), status, ST_NONE);
+        static_assert(sizeof(ctx.status) == sizeof(LONG));
+        return InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, ST_NONE);
 }
 
 _IRQL_requires_same_

@@ -416,7 +416,7 @@ NTSTATUS control_transfer(
 
         TraceDbg("Forwarded %04x", ptr04x(request));
 
-        if (auto req = device::dequeue(endp.device, 1)) {
+        if (auto req = device::dequeue_request(endp.device, 1)) {
                 TraceDbg("Dequeued %04x", ptr04x(req));
                 UdecxUrbComplete(req, USBD_STATUS_NOT_SUPPORTED);
         } else if (auto err = WdfIoQueueRetrieveNextRequest(queue, &request)) {
