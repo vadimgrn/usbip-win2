@@ -7,10 +7,6 @@
 #include <wdm.h>
 #include <wdf.h>
 
-#include <usb.h>
-#include <wdfusb.h>
-#include <UdeCx.h>
-
 #include <usbip\proto.h>
 #include <libdrv\mdl_cpp.h>
 
@@ -21,7 +17,7 @@ struct wsk_context
 {
         // transient data
 
-        UDECXUSBDEVICE device;
+        WDFREQUEST request;
         IRP *irp; // can be NULL, see send_cmd_unlink
         Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer(MDL)
 
@@ -37,6 +33,7 @@ struct wsk_context
         ULONG isoc_alloc_cnt;
         bool is_isoc;
 };
+
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -66,5 +63,36 @@ inline auto number_of_packets(_In_ const wsk_context &ctx)
 {
         return ctx.mdl_isoc.size()/sizeof(*ctx.isoc);
 }
+
+class wsk_context_ptr 
+{
+public:
+        wsk_context_ptr(ULONG NumberOfPackets) : m_ptr(alloc_wsk_context(NumberOfPackets)) {}
+        ~wsk_context_ptr () { free(m_ptr, false); }
+
+        wsk_context_ptr(const wsk_context_ptr&) = delete;
+        wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;
+
+        wsk_context_ptr(wsk_context_ptr&&) = default;
+        wsk_context_ptr& operator =(wsk_context_ptr&&) = default;
+
+        explicit operator bool() const { return m_ptr; }
+        auto operator !() const { return !m_ptr; }
+
+        auto operator ->() const { return m_ptr; }
+        auto& operator *() const { return *m_ptr; }
+
+        auto get() const { return m_ptr; }
+
+        auto release() 
+        { 
+                auto tmp = m_ptr;
+                m_ptr = nullptr; 
+                return tmp;
+        }
+
+private:
+        wsk_context *m_ptr{};
+};
 
 } // namespace usbip

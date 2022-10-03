@@ -8,11 +8,13 @@
 
 #include "context.h"
 #include "wsk_context.h"
-#include "vhci.h"
 #include "device.h"
 #include "device_queue.h"
 #include "proto.h"
+#include "network.h"
 
+#include <libdrv\pdu.h>
+#include <libdrv\wsk_cpp.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
 
@@ -25,20 +27,165 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_device(_In_ WDFREQUEST request)
+{
+        auto queue = WdfRequestGetIoQueue(request);
+        auto endp = *get_queue_ctx(queue);
+        return get_endpoint_ctx(endp)->device;
+}
+
+/*
+ * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
+ *
+ * In general, you must not touch IRP that was put in Cancel-Safe Queue because it can be canceled at any moment.
+ * You should remove IRP from the CSQ and then use it. BUT you can access IRP if you shure it is alive.
+ *
+ * To avoid copying of URB's transfer buffer, it must not be completed until this handler will be called.
+ * This means that:
+ * 1.CompleteCanceledIrp must not complete IRP if it's called before send_complete because WskSend can still access
+ *   IRP transfer buffer.
+ * 2.WskReceive must not complete IRP if it's called before send_complete because send_complete modifies get_status(irp).
+ * 3.CompleteCanceledIrp and WskReceive are mutually exclusive because IRP is dequeued from the CSQ.
+ * 4.Thus, send_complete can run concurrently with CompleteCanceledIrp or WskReceive.
+ * 
+ * @see wsk_receive.cpp, complete 
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS send_complete(
+        _In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+{
+        auto ctx = static_cast<wsk_context*>(Context);
+
+        auto irp = ctx->irp; // nullptr for send_cmd_unlink
+        auto &req_ctx = *get_request_ctx(ctx->request);
+
+        auto old_status = irp ? atomic_set_status(req_ctx, ST_SEND_COMPLETE) : ST_IRP_NULL;
+        auto &st = wsk_irp->IoStatus;
+
+        TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!",
+                  ptr04x(wsk_irp), st.Status, st.Information, old_status);
+
+        if (!irp) {
+                // nothing to do
+        } else if (NT_SUCCESS(st.Status)) { // request has sent
+                switch (old_status) {
+                case ST_RECV_COMPLETE: {
+                        auto urb = (URB*)URB_FROM_IRP(irp);
+                        auto urb_st = urb->UrbHeader.Status;
+                        TraceDbg("Complete irp %04x, %s, %!STATUS!, Information %#Ix",
+                                  ptr04x(irp), get_usbd_status(urb_st), 
+                                  irp->IoStatus.Status, irp->IoStatus.Information);
+
+                        UdecxUrbComplete(ctx->request, urb_st);
+                }
+                        break;
+                case ST_IRP_CANCELED:
+                        UdecxUrbCompleteWithNtStatus(ctx->request, STATUS_CANCELLED);
+                        break;
+                }
+        } else if (auto victim = device::dequeue_request(get_device(ctx->request), req_ctx.seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+                NT_ASSERT(victim == ctx->request);
+                UdecxUrbCompleteWithNtStatus(victim, STATUS_UNSUCCESSFUL);
+        } else if (old_status == ST_IRP_CANCELED) {
+                UdecxUrbCompleteWithNtStatus(ctx->request, STATUS_CANCELLED);
+        }
+
+        if (st.Status == STATUS_FILE_FORCED_CLOSED) {
+                auto dev = get_device(ctx->request);
+                device::schedule_destroy(dev);
+        }
+
+        free(ctx, true);
+        return StopCompletion;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ const URB *transfer_buffer)
+{
+        NT_ASSERT(!ctx.mdl_buf);
+
+        if (transfer_buffer && is_transfer_direction_out(ctx.hdr)) { // TransferFlags can have wrong direction
+                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, usbip::URB_BUF_LEN, ctx.is_isoc, IoReadAccess, *transfer_buffer)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
+                        return err;
+                }
+        }
+
+        ctx.mdl_hdr.next(ctx.mdl_buf); // always replace tie from previous call
+
+        if (ctx.is_isoc) {
+                NT_ASSERT(ctx.mdl_isoc);
+                byteswap(ctx.isoc, number_of_packets(ctx));
+                auto t = tail(ctx.mdl_hdr); // ctx.mdl_buf can be a chain
+                t->Next = ctx.mdl_isoc.get();
+        }
+
+        buf.Mdl = ctx.mdl_hdr.get();
+        buf.Offset = 0;
+        buf.Length = get_total_size(ctx.hdr);
+
+        NT_ASSERT(usbip::verify(buf, ctx.is_isoc));
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto send(
+        _In_ WDFREQUEST request, 
+        _In_ device_ctx &dev,
+        _In_ wsk_context_ptr &ctx, 
+        _Inout_opt_ const URB *transfer_buffer = nullptr, _In_ bool log_setup = true)
+{
+        WSK_BUF buf;
+
+        if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
+                return err;
+        } else {
+                char str[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "irp %04x -> %Iu%s",
+                        ptr04x(ctx->irp), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
+        }
+
+        if (ctx->irp) {
+                auto &req_ctx = *get_request_ctx(request);
+                req_ctx.seqnum = ctx->hdr.base.seqnum;
+                NT_ASSERT(req_ctx.status == ST_NONE);
+
+                if (auto err = WdfRequestForwardToIoQueue(request, dev.queue)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
+                        return err;
+                }
+        }
+
+        byteswap_header(ctx->hdr, swap_dir::host2net);
+
+        auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
+        IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
+
+        auto err = send(dev.ext->sock, &buf, WSK_FLAG_NODELAY, wsk_irp);
+        NT_ASSERT(err != STATUS_NOT_SUPPORTED);
+
+        TraceWSK("wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), err);
+        return STATUS_PENDING;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto new_wsk_context(
-        _In_ UDECXUSBDEVICE device,
-        _Inout_ request_ctx &req,
-        _Inout_opt_ IRP *irp,
+        _In_ WDFREQUEST request,
+        _In_opt_ IRP *irp,
         _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE(),
         _In_ ULONG NumberOfPackets = 0)
 {
         if (irp) {
-                req.handle = handle;
+                get_request_ctx(request)->handle = handle;
         }
 
-        auto ctx = alloc_wsk_context(NumberOfPackets);
+        auto ctx = wsk_context_ptr(NumberOfPackets);
         if (ctx) {
-                ctx->device = device;
+                ctx->request = request;
                 ctx->irp = irp;
         }
 
@@ -409,30 +556,26 @@ NTSTATUS control_transfer(
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
-        auto &req_ctx = *get_request_ctx(request);
-
-        auto ctx = new_wsk_context(endp.device, req_ctx, irp, r.PipeHandle);
+        auto ctx = new_wsk_context(request, irp, r.PipeHandle);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto &dev_ctx = *get_device_ctx(endp.device);
+        auto &dev = *get_device_ctx(endp.device);
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev_ctx, endp, r.TransferFlags, r.TransferBufferLength)) {
-                free(ctx, false);
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength)) {
                 return err;
         }
 
         if (is_transfer_direction_out(ctx->hdr) != is_transfer_dir_out(urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
                 Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
-                free(ctx, false);
                 return STATUS_INVALID_PARAMETER;
         }
 
         static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
 
-        return STATUS_SUCCESS; //send(ctx, &urb);
+        return send(request, dev, ctx, &urb);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
