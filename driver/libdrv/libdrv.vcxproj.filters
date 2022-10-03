@@ -32,6 +32,7 @@
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="wdfutils.h" />
+    <ClInclude Include="ch9.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

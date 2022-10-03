@@ -13,14 +13,10 @@ namespace
 
 using namespace usbip;
 
-auto operator ==(_In_ const request_ctx &a, _In_ const request_ctx &b)
+inline auto operator ==(_In_ const request_ctx &r, _In_ const request_ctx &crit)
 {
-        if (a.use_handle != b.use_handle) {
-                return false;
-        }
-
-        return a.use_handle ? a.handle == b.handle : 
-                              a.seqnum == b.seqnum;
+        return crit.search_handle ? r.handle == crit.handle : 
+                                    r.seqnum == crit.seqnum;
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)

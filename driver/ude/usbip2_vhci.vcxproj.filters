@@ -33,6 +33,7 @@
     <ClInclude Include="device_ioctl.h" />
     <ClInclude Include="wsk_context.h" />
     <ClInclude Include="device_queue.h" />
+    <ClInclude Include="proto.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -47,6 +48,7 @@
     <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="wsk_context.cpp" />
     <ClCompile Include="device_queue.cpp" />
+    <ClCompile Include="proto.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_vhci.inf" />

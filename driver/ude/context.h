@@ -90,17 +90,13 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
-
-        // from USB_ENDPOINT_DESCRIPTOR
-        UCHAR bEndpointAddress;
-        UCHAR bInterval;
+        USB_ENDPOINT_DESCRIPTOR descriptor;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
 
-
-enum irp_status_t : LONG { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
+enum irp_status_t : INT16 { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
 
 /*
  * Device context for WDFREQUEST.
@@ -108,15 +104,14 @@ enum irp_status_t : LONG { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_C
 struct request_ctx
 {
         request_ctx(seqnum_t n) : seqnum(n) {}
-        request_ctx(USBD_PIPE_HANDLE h) : use_handle(true), handle(h) {}
+        request_ctx(USBD_PIPE_HANDLE h) : search_handle(true), handle(h) {}
 
+        seqnum_t seqnum{};
         irp_status_t status = ST_NONE;
-        bool use_handle{};
-        union {
-                USBD_PIPE_HANDLE handle{}; // size is larger than seqnum_t
-                seqnum_t seqnum;
-        };   
+        bool search_handle{};
+        USBD_PIPE_HANDLE handle{};
 };
+static_assert(sizeof(request_ctx) == 16);
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -124,8 +119,8 @@ inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ irp_status_t status
 {
         NT_ASSERT(status != ST_NONE);
         NT_ASSERT(status != ST_IRP_NULL);
-        static_assert(sizeof(ctx.status) == sizeof(LONG));
-        return InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, ST_NONE);
+        static_assert(sizeof(ctx.status) == sizeof(INT16));
+        return InterlockedCompareExchange16(reinterpret_cast<INT16*>(&ctx.status), status, ST_NONE);
 }
 
 _IRQL_requires_same_

@@ -151,13 +151,8 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 {
         PAGED_CODE();
 
-        UCHAR bEndpointAddress = USB_DEFAULT_ENDPOINT_ADDRESS;
-        UCHAR bInterval{};
-
-        if (auto d = data->EndpointDescriptor) {
-                bEndpointAddress = d->bEndpointAddress;
-                bInterval = d->bInterval;
-        }
+        auto epd = data->EndpointDescriptor;
+        auto bEndpointAddress = epd ? epd->bEndpointAddress : UCHAR(USB_DEFAULT_ENDPOINT_ADDRESS);
 
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, bEndpointAddress);
 
@@ -178,17 +173,16 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 
         if (auto ctx = get_endpoint_ctx(endp)) {
                 ctx->device = dev;
-                ctx->bEndpointAddress = bEndpointAddress;
-                ctx->bInterval = bInterval;
+                if (epd) {
+                        ctx->descriptor = *epd;
+                }
         }
 
         if (auto err = create_endpoint_queue(endp)) {
                 return err;
         }
 
-        TraceDbg("dev %04x, endp %04x{bEndpointAddress %#x, bInterval %d}", ptr04x(dev), ptr04x(endp), 
-                  bEndpointAddress, bInterval);
-
+        TraceDbg("dev %04x, endp %04x{bEndpointAddress %#x}", ptr04x(dev), ptr04x(endp), bEndpointAddress);
         return STATUS_SUCCESS;
 }
 

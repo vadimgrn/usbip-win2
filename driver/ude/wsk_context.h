@@ -4,6 +4,13 @@
 
 #pragma once
 
+#include <wdm.h>
+#include <wdf.h>
+
+#include <usb.h>
+#include <wdfusb.h>
+#include <UdeCx.h>
+
 #include <usbip\proto.h>
 #include <libdrv\mdl_cpp.h>
 
@@ -14,6 +21,7 @@ struct wsk_context
 {
         // transient data
 
+        UDECXUSBDEVICE device;
         IRP *irp; // can be NULL, see send_cmd_unlink
         Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer(MDL)
 

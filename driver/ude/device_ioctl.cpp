@@ -7,11 +7,14 @@
 #include "device_ioctl.tmh"
 
 #include "context.h"
+#include "wsk_context.h"
 #include "vhci.h"
 #include "device.h"
 #include "device_queue.h"
+#include "proto.h"
 
 #include <libdrv\dbgcommon.h>
+#include <libdrv\usbd_helper.h>
 
 #include <usbioctl.h>
 
@@ -20,24 +23,27 @@ namespace
 
 using namespace usbip;
 
-/*
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto new_wsk_context(_In_ const endpoint_ctx &endp, _Inout_opt_ IRP *irp, _In_ ULONG NumberOfPackets = 0)
+auto new_wsk_context(
+        _In_ UDECXUSBDEVICE device,
+        _Inout_ request_ctx &req,
+        _Inout_opt_ IRP *irp,
+        _In_ USBD_PIPE_HANDLE handle = USBD_PIPE_HANDLE(),
+        _In_ ULONG NumberOfPackets = 0)
 {
         if (irp) {
-                get_pipe_handle(irp) = handle;
+                req.handle = handle;
         }
 
         auto ctx = alloc_wsk_context(NumberOfPackets);
         if (ctx) {
-                ctx->vpdo = &vpdo;
+                ctx->device = device;
                 ctx->irp = irp;
         }
 
         return ctx;
 }
-*/
 
 using urb_function_t = NTSTATUS (WDFREQUEST, IRP*, URB&, const endpoint_ctx&);
 
@@ -403,38 +409,16 @@ NTSTATUS control_transfer(
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
-        if (auto ctx = get_request_ctx(request)) {
-                ctx->seqnum = 1;
-        }
+        auto &req_ctx = *get_request_ctx(request);
 
-        auto queue = get_device_ctx(endp.device)->queue;
-
-        if (auto err = WdfRequestForwardToIoQueue(request, queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
-                return err;
-        }
-
-        TraceDbg("Forwarded %04x", ptr04x(request));
-
-        if (auto req = device::dequeue_request(endp.device, 1)) {
-                TraceDbg("Dequeued %04x", ptr04x(req));
-                UdecxUrbComplete(req, USBD_STATUS_NOT_SUPPORTED);
-        } else if (auto err = WdfIoQueueRetrieveNextRequest(queue, &request)) {
-                TraceDbg("Not found, retrieve %!STATUS!", err);
-        } else {
-                TraceDbg("Retrieved %04x", ptr04x(request));
-                UdecxUrbComplete(request, USBD_STATUS_NOT_SUPPORTED);
-        }
-
-        return STATUS_PENDING;
-
-/*
-        auto ctx = new_wsk_context(vpdo, irp, r.PipeHandle);
+        auto ctx = new_wsk_context(endp.device, req_ctx, irp, r.PipeHandle);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(vpdo, ctx->hdr, r.PipeHandle, r.TransferFlags, r.TransferBufferLength)) {
+        auto &dev_ctx = *get_device_ctx(endp.device);
+
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev_ctx, endp, r.TransferFlags, r.TransferBufferLength)) {
                 free(ctx, false);
                 return err;
         }
@@ -448,8 +432,7 @@ NTSTATUS control_transfer(
         static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
 
-        return send(ctx, &urb);
-*/
+        return STATUS_SUCCESS; //send(ctx, &urb);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
