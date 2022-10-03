@@ -69,46 +69,6 @@ PAGED err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_cod
         return ERR_NONE;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ URB *transfer_buffer)
-{
-        PAGED_CODE();
-
-        usbip::Mdl mdl_hdr(&hdr, sizeof(hdr));
-
-        if (auto err = mdl_hdr.prepare_paged(IoReadAccess)) {
-                Trace(TRACE_LEVEL_ERROR, "prepare_paged %!STATUS!", err);
-                return err;
-        }
-
-        usbip::Mdl mdl_buf;
-
-        if (transfer_buffer && is_transfer_direction_out(hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(mdl_buf, URB_BUF_LEN, false, IoReadAccess, *transfer_buffer)) {
-                        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
-                        return err;
-                }
-                mdl_hdr.next(mdl_buf);
-        }
-
-        WSK_BUF buf{ mdl_hdr.get(), 0, get_total_size(hdr) };
-        NT_ASSERT(verify(buf, false));
-
-        {
-                char str[DBG_USBIP_HDR_BUFSZ];
-                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", buf.Length, dbg_usbip_hdr(str, sizeof(str), &hdr, true));
-        }
-
-        byteswap_header(hdr, swap_dir::host2net);
-
-        if (auto err = send(sock, &buf, WSK_FLAG_NODELAY)) {
-                Trace(TRACE_LEVEL_ERROR, "Send %!STATUS!", err);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
 /*
  * URB must have TransferBuffer* members.
  * TransferBuffer && TransferBufferMDL can be both not NULL for bulk/int at least.

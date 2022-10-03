@@ -88,6 +88,7 @@ usbip: info: bind device on busid 3-2: complete
 
 ### Install USB/IP
 - Download and run an installer from [releases](https://github.com/vadimgrn/usbip-win2/releases)
+- Some antivirus programs issue a false positive alarm for the installer, this is a known issue for installers built by InnoSetup
 
 ### Use usbip.exe to attach remote device(s)
 - Query available USB devices on the server

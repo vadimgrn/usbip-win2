@@ -7,7 +7,6 @@
 #include <libdrv\codeseg.h>
 #include <libdrv\mdl_cpp.h>
 #include <libdrv\wsk_cpp.h>
-#include <libdrv\pdu.h>
 
 #include <usbip\consts.h>
 
@@ -31,9 +30,6 @@ PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _I
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED err_t recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status);
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS send_cmd(_Inout_ SOCKET *sock, _Inout_ usbip_header &hdr, _Inout_opt_ _URB *transfer_buffer = nullptr);
 
 enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 
