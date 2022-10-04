@@ -13,10 +13,10 @@ namespace
 
 using namespace usbip;
 
-inline auto operator ==(_In_ const request_ctx &r, _In_ const request_ctx &crit)
+auto matches(_In_ WDFREQUEST request, _In_ const device::request_search &crit)
 {
-        return crit.search_handle ? r.handle == crit.handle : 
-                                    r.seqnum == crit.seqnum;
+        return crit.use_queue ? crit.queue == WdfRequestGetIoQueue(request) :
+                                crit.seqnum == get_request_ctx(request)->seqnum;
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
@@ -24,8 +24,17 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
 {
-        TraceDbg("queue %04x, request %04x", ptr04x(queue), ptr04x(request));
-        WdfRequestComplete(request, STATUS_CANCELLED);
+        auto &req_ctx = *get_request_ctx(request);
+
+        auto old_status = atomic_set_status(req_ctx, REQ_CANCELED);
+        TraceDbg("queue %04x, request %04x, %!irp_status_t!", ptr04x(queue), ptr04x(request), old_status);
+
+        if (old_status == REQ_SEND_COMPLETE) {
+                UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
+        } else {
+                NT_ASSERT(old_status != REQ_RECV_COMPLETE);
+        }
+
 }
 
 } // namespace
@@ -61,7 +70,7 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const request_ctx &crit)
+WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const request_search &crit)
 {
         for (WDFREQUEST prev{}, cur{}; ; prev = cur) {
 
@@ -72,7 +81,7 @@ WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const reques
 
                 switch (st) {
                 case STATUS_SUCCESS:
-                        if (*get_request_ctx(cur) == crit) {
+                        if (matches(cur, crit)) {
                                 st = WdfIoQueueRetrieveFoundRequest(queue, cur, &prev);
                                 WdfObjectDereference(cur);
 
@@ -102,7 +111,7 @@ WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const reques
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST usbip::device::dequeue_request(_In_ UDECXUSBDEVICE dev, _In_ const request_ctx &crit)
+WDFREQUEST usbip::device::dequeue_request(_In_ UDECXUSBDEVICE dev, _In_ const request_search &crit)
 {
         auto queue = get_device_ctx(dev)->queue;
         return dequeue_request(queue, crit);

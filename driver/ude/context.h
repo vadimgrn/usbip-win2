@@ -96,31 +96,28 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
 
-enum irp_status_t : INT16 { ST_NONE, ST_SEND_COMPLETE, ST_RECV_COMPLETE, ST_IRP_CANCELED, ST_IRP_NULL };
+enum request_status : LONG { REQ_NONE, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 
 /*
  * Device context for WDFREQUEST.
+ * It's OK to get a context for request that the driver doesn't own if it isn't completed.
  */
 struct request_ctx
 {
-        request_ctx(seqnum_t n) : seqnum(n) {}
-        request_ctx(USBD_PIPE_HANDLE h) : search_handle(true), handle(h) {}
-
-        seqnum_t seqnum{};
-        irp_status_t status = ST_NONE;
-        bool search_handle{};
-        USBD_PIPE_HANDLE handle{};
+        seqnum_t seqnum;
+        request_status status;
 };
-static_assert(sizeof(request_ctx) == 16);
+static_assert(sizeof(request_ctx) == 8);
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ irp_status_t status)
+inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ request_status status)
 {
-        NT_ASSERT(status != ST_NONE);
-        NT_ASSERT(status != ST_IRP_NULL);
-        static_assert(sizeof(ctx.status) == sizeof(INT16));
-        return InterlockedCompareExchange16(reinterpret_cast<INT16*>(&ctx.status), status, ST_NONE);
+        NT_ASSERT(status != REQ_NONE);
+        NT_ASSERT(status != REQ_NO_HANDLE);
+        static_assert(sizeof(ctx.status) == sizeof(LONG));
+        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_NONE);
+        return static_cast<request_status>(oldval);
 }
 
 _IRQL_requires_same_

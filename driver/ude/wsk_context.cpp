@@ -173,7 +173,7 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
                 return;
         }
 
-        ctx->irp = nullptr;
+        ctx->request = WDF_NO_HANDLE;
         ctx->mdl_buf.reset();
 
         if (reuse) {
@@ -181,6 +181,14 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
         }
 
         ExFreeToLookasideListEx(&g_lookaside, ctx);
+}
+
+usbip::wsk_context_ptr::wsk_context_ptr(WDFREQUEST request, ULONG NumberOfPackets) :
+        m_ptr(alloc_wsk_context(NumberOfPackets)) 
+{
+        if (m_ptr) {
+                m_ptr->request = request;
+        }
 }
 
 auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ptr) -> wsk_context_ptr&
@@ -192,7 +200,7 @@ auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ptr) -> wsk_context_pt
 void usbip::wsk_context_ptr::reset(wsk_context *ptr)
 {
         if (m_ptr != ptr) {
-                free(m_ptr, false);
+                free(m_ptr, m_reuse);
                 m_ptr = ptr;
         }
 }

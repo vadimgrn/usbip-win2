@@ -17,8 +17,7 @@ struct wsk_context
 {
         // transient data
 
-        WDFREQUEST request;
-        IRP *irp; // can be NULL, see send_cmd_unlink
+        WDFREQUEST request; // WDF_NO_HANDLE for send_cmd_unlink
         Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer(MDL)
 
         // preallocated data
@@ -67,8 +66,10 @@ inline auto number_of_packets(_In_ const wsk_context &ctx)
 class wsk_context_ptr 
 {
 public:
-        wsk_context_ptr(ULONG NumberOfPackets) : m_ptr(alloc_wsk_context(NumberOfPackets)) {}
-        ~wsk_context_ptr () { reset(); }
+        wsk_context_ptr(WDFREQUEST request, ULONG NumberOfPackets = 0);
+        wsk_context_ptr(wsk_context *ptr) : m_ptr(ptr), m_reuse(true) {}
+
+        ~wsk_context_ptr () { free(m_ptr, m_reuse); }
 
         wsk_context_ptr(const wsk_context_ptr&) = delete;
         wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;
@@ -84,11 +85,12 @@ public:
 
         auto get() const { return m_ptr; }
 
-        void reset(wsk_context *ptr = nullptr);
+        void reset(wsk_context *ptr = nullptr); // FIXME: take into account m_reuse
         wsk_context* release();
 
 private:
         wsk_context *m_ptr{};
+        bool m_reuse{};
 };
 
 } // namespace usbip
