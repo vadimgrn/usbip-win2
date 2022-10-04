@@ -182,3 +182,24 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
 
         ExFreeToLookasideListEx(&g_lookaside, ctx);
 }
+
+auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ptr) -> wsk_context_ptr&
+{
+        reset(ptr.release());
+        return *this;
+}
+
+void usbip::wsk_context_ptr::reset(wsk_context *ptr)
+{
+        if (m_ptr != ptr) {
+                free(m_ptr, false);
+                m_ptr = ptr;
+        }
+}
+
+wsk_context* usbip::wsk_context_ptr::release()
+{ 
+        auto tmp = m_ptr;
+        m_ptr = nullptr; 
+        return tmp;
+}

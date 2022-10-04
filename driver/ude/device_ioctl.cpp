@@ -107,7 +107,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
         NT_ASSERT(!ctx.mdl_buf);
 
         if (transfer_buffer && is_transfer_direction_out(ctx.hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, usbip::URB_BUF_LEN, ctx.is_isoc, IoReadAccess, *transfer_buffer)) {
+                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, ctx.is_isoc, IoReadAccess, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                         return err;
                 }
@@ -126,7 +126,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
         buf.Offset = 0;
         buf.Length = get_total_size(ctx.hdr);
 
-        NT_ASSERT(usbip::verify(buf, ctx.is_isoc));
+        NT_ASSERT(verify(buf, ctx.is_isoc));
         return STATUS_SUCCESS;
 }
 

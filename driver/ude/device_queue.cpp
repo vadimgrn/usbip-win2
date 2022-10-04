@@ -63,8 +63,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const request_ctx &crit)
 {
-        NT_ASSERT(crit.handle);
-
         for (WDFREQUEST prev{}, cur{}; ; prev = cur) {
 
                 auto st = WdfIoQueueFindRequest(queue, prev, WDF_NO_HANDLE, nullptr, &cur);

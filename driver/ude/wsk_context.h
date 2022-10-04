@@ -68,13 +68,13 @@ class wsk_context_ptr
 {
 public:
         wsk_context_ptr(ULONG NumberOfPackets) : m_ptr(alloc_wsk_context(NumberOfPackets)) {}
-        ~wsk_context_ptr () { free(m_ptr, false); }
+        ~wsk_context_ptr () { reset(); }
 
         wsk_context_ptr(const wsk_context_ptr&) = delete;
         wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;
 
-        wsk_context_ptr(wsk_context_ptr&&) = default;
-        wsk_context_ptr& operator =(wsk_context_ptr&&) = default;
+        wsk_context_ptr(wsk_context_ptr&& ptr) : m_ptr(ptr.release()) {}
+        wsk_context_ptr& operator =(wsk_context_ptr&& ptr);
 
         explicit operator bool() const { return m_ptr; }
         auto operator !() const { return !m_ptr; }
@@ -84,12 +84,8 @@ public:
 
         auto get() const { return m_ptr; }
 
-        auto release() 
-        { 
-                auto tmp = m_ptr;
-                m_ptr = nullptr; 
-                return tmp;
-        }
+        void reset(wsk_context *ptr = nullptr);
+        wsk_context* release();
 
 private:
         wsk_context *m_ptr{};
