@@ -11,6 +11,8 @@
 #include "network.h"
 #include "vhci.h"
 #include "device_ioctl.h"
+#include "wsk_context.h"
+#include "wsk_receive.h"
 
 #include <libdrv\dbgcommon.h>
 
@@ -53,9 +55,13 @@ void NTAPI device_destroy(_In_ WDFOBJECT Object)
         auto dev = static_cast<UDECXUSBDEVICE>(Object);
         TraceDbg("dev %04x", ptr04x(dev));
 
-        if (auto ctx = get_device_ctx(dev)) {
-                free(ctx->ext);
+        auto &ctx = *get_device_ctx(dev);
+
+        if (auto wi = ctx.workitem) {
+                IoFreeWorkItem(wi);
         }
+
+        free(ctx.ext);
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -71,7 +77,7 @@ void device_cleanup(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         vhci::forget_device(dev);
-        close_socket(ctx.ext->sock);
+        close_socket(ctx.socket());
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
@@ -136,7 +142,7 @@ PAGED auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
-        *get_queue_ctx(queue) = endp;
+        get_endpoint(queue) = endp;
 
         UdecxUsbEndpointSetWdfIoQueue(endp, queue); // PASSIVE_LEVEL
 
@@ -260,6 +266,33 @@ PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
         return init;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
+{
+        PAGED_CODE();
+
+        auto devobj = WdfDeviceWdmGetDeviceObject(ctx.vhci);
+        ctx.workitem = IoAllocateWorkItem(devobj);
+        if (!ctx.workitem) {
+                Trace(TRACE_LEVEL_ERROR, "IoAllocateWorkItem error");
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (auto err = device::create_queue(dev)) {
+                return err;
+        }
+
+        if (auto wsk = alloc_wsk_context(0)) {
+                wsk->device = dev;
+                sched_receive_usbip_header(wsk);
+        } else {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        return STATUS_SUCCESS;
+}
+
 } // namespace
 
 
@@ -290,13 +323,13 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
                 return err;
         }
 
-        if (auto ctx = get_device_ctx(dev)) {
-                ctx->vhci = vhci;
-                ctx->ext = ext;
-                ext->ctx = ctx;
-        }
+        auto &ctx = *get_device_ctx(dev);
 
-        if (auto err = create_queue(dev)) {
+        ctx.vhci = vhci;
+        ctx.ext = ext;
+        ext->ctx = &ctx;
+
+        if (auto err = init_device(dev, ctx)) {
                 return err;
         }
 

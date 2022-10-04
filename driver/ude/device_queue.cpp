@@ -13,6 +13,8 @@ namespace
 
 using namespace usbip;
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto matches(_In_ WDFREQUEST request, _In_ const device::request_search &crit)
 {
         return crit.use_queue ? crit.queue == WdfRequestGetIoQueue(request) :
@@ -72,6 +74,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const request_search &crit)
 {
+        NT_ASSERT(crit.queue); // largest in union
+
         for (WDFREQUEST prev{}, cur{}; ; prev = cur) {
 
                 auto st = WdfIoQueueFindRequest(queue, prev, WDF_NO_HANDLE, nullptr, &cur);

@@ -30,7 +30,9 @@ struct request_search
         union {
                 WDFQUEUE queue{};
                 seqnum_t seqnum;
+                static_assert(sizeof(queue) >= sizeof(seqnum));
         };
+
         bool use_queue{};
 };
 

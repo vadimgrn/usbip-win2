@@ -7,6 +7,10 @@
 #include <wdm.h>
 #include <wdf.h>
 
+#include <usb.h>
+#include <wdfusb.h>
+#include <UdeCx.h>
+
 #include <usbip\proto.h>
 #include <libdrv\mdl_cpp.h>
 
@@ -17,8 +21,9 @@ struct wsk_context
 {
         // transient data
 
+        UDECXUSBDEVICE device; // can be obtained from WDFREQUEST, but it is optional
         WDFREQUEST request; // WDF_NO_HANDLE for send_cmd_unlink
-        Mdl mdl_buf; // describes URB_FROM_IRP(irp)->TransferBuffer(MDL)
+        Mdl mdl_buf; // describes URB_FROM_IRP()->TransferBuffer(MDL)
 
         // preallocated data
 
@@ -66,31 +71,30 @@ inline auto number_of_packets(_In_ const wsk_context &ctx)
 class wsk_context_ptr 
 {
 public:
-        wsk_context_ptr(WDFREQUEST request, ULONG NumberOfPackets = 0);
-        wsk_context_ptr(wsk_context *ptr) : m_ptr(ptr), m_reuse(true) {}
+        wsk_context_ptr(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
+        wsk_context_ptr(wsk_context *ptr) : m_reuse(true), m_ctx(ptr) {}
 
-        ~wsk_context_ptr () { free(m_ptr, m_reuse); }
+        ~wsk_context_ptr () { free(m_ctx, m_reuse); }
 
         wsk_context_ptr(const wsk_context_ptr&) = delete;
         wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;
 
-        wsk_context_ptr(wsk_context_ptr&& ptr) : m_ptr(ptr.release()) {}
-        wsk_context_ptr& operator =(wsk_context_ptr&& ptr);
+        wsk_context_ptr(wsk_context_ptr&& ctx) : m_reuse(ctx.m_reuse), m_ctx(ctx.release()) {}
+        wsk_context_ptr& operator =(wsk_context_ptr&& ctx);
 
-        explicit operator bool() const { return m_ptr; }
-        auto operator !() const { return !m_ptr; }
+        explicit operator bool() const { return m_ctx; }
+        auto operator !() const { return !m_ctx; }
 
-        auto operator ->() const { return m_ptr; }
-        auto& operator *() const { return *m_ptr; }
+        auto operator ->() const { return m_ctx; }
+        auto& operator *() const { return *m_ctx; }
 
-        auto get() const { return m_ptr; }
-
-        void reset(wsk_context *ptr = nullptr); // FIXME: take into account m_reuse
-        wsk_context* release();
+        wsk_context *release();
 
 private:
-        wsk_context *m_ptr{};
         bool m_reuse{};
+        wsk_context *m_ctx{};
+
+        void reset(wsk_context *ctx, bool reuse);
 };
 
 } // namespace usbip

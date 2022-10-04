@@ -25,15 +25,6 @@ namespace
 
 using namespace usbip;
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_device(_In_ WDFREQUEST request)
-{
-        auto queue = WdfRequestGetIoQueue(request);
-        auto endp = *get_queue_ctx(queue);
-        return get_endpoint_ctx(endp)->device;
-}
-
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  *
@@ -95,16 +86,15 @@ NTSTATUS send_complete(
                         UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
                         break;
                 }
-        } else if (auto victim = device::dequeue_request(get_device(request), req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+        } else if (auto victim = device::dequeue_request(ctx->device, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == request);
                 UdecxUrbCompleteWithNtStatus(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == REQ_CANCELED) {
                 UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
         }
 
-        if (st.Status == STATUS_FILE_FORCED_CLOSED && request) { // FIXME: must not depend on request
-                auto dev = get_device(request);
-                device::schedule_destroy(dev);
+        if (st.Status == STATUS_FILE_FORCED_CLOSED) {
+                device::schedule_destroy(ctx->device);
         }
 
         return StopCompletion;
@@ -158,9 +148,10 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
 
         if (auto req = ctx->request) {
                 auto &req_ctx = *get_request_ctx(req);
-
                 req_ctx.seqnum = ctx->hdr.base.seqnum;
-                NT_ASSERT(req_ctx.status == REQ_NONE);
+
+                NT_ASSERT(is_valid_seqnum(req_ctx.seqnum));
+                NT_ASSERT(req_ctx.status == REQ_INIT);
 
                 if (auto err = WdfRequestForwardToIoQueue(req, dev.queue)) {
                         Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
@@ -173,7 +164,7 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
-        auto err = send(dev.ext->sock, &buf, WSK_FLAG_NODELAY, wsk_irp);
+        auto err = send(dev.socket(), &buf, WSK_FLAG_NODELAY, wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
         TraceWSK("wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), err);
@@ -545,7 +536,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
 
         auto &dev = *get_device_ctx(endp.device);
 
-        wsk_context_ptr ctx(request);
+        wsk_context_ptr ctx(endp.device, request);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -827,7 +818,7 @@ void NTAPI usbip::device::internal_device_control(
                 return;
         }
 
-        auto endp = *get_queue_ctx(Queue);
+        auto endp = get_endpoint(Queue);
         auto st = submit_urb(Request, endp);
 
         if (st != STATUS_PENDING) {

@@ -38,7 +38,7 @@ struct vhci_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
-
+struct wsk_context;
 struct device_ctx;
 
 /*
@@ -74,13 +74,19 @@ struct device_ctx_ext
 struct device_ctx
 {
         device_ctx_ext *ext; // must be free-d
+        auto& socket() const { return ext->sock; }
 
         WDFDEVICE vhci; // parent
-        WDFQUEUE queue; // for server's response
+        WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
+        _IO_WORKITEM *workitem;
 
         int port; // vhci_ctx.devices[port - 1], unique device id, this is not roothub's port number
         seqnum_t seqnum; // @see next_seqnum
         bool destroyed;
+
+        using received_fn = NTSTATUS (wsk_context&);
+        received_fn *received;
+        size_t receive_size;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
@@ -96,7 +102,12 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
 
-enum request_status : LONG { REQ_NONE, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
+inline auto& get_endpoint(_In_ WDFQUEUE queue)
+{
+        return *get_queue_ctx(queue);
+}
+
+enum request_status : LONG { REQ_INIT, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 
 /*
  * Device context for WDFREQUEST.
@@ -113,10 +124,10 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ request_status status)
 {
-        NT_ASSERT(status != REQ_NONE);
+        NT_ASSERT(status != REQ_INIT);
         NT_ASSERT(status != REQ_NO_HANDLE);
         static_assert(sizeof(ctx.status) == sizeof(LONG));
-        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_NONE);
+        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_INIT);
         return static_cast<request_status>(oldval);
 }
 

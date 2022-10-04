@@ -183,31 +183,37 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
         ExFreeToLookasideListEx(&g_lookaside, ctx);
 }
 
-usbip::wsk_context_ptr::wsk_context_ptr(WDFREQUEST request, ULONG NumberOfPackets) :
-        m_ptr(alloc_wsk_context(NumberOfPackets)) 
+usbip::wsk_context_ptr::wsk_context_ptr(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets) :
+        m_ctx(alloc_wsk_context(NumberOfPackets)) 
 {
-        if (m_ptr) {
-                m_ptr->request = request;
+        NT_ASSERT(device);
+
+        if (m_ctx) {
+                m_ctx->device = device;
+                m_ctx->request = request;
         }
 }
 
-auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ptr) -> wsk_context_ptr&
+auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ctx) -> wsk_context_ptr&
 {
-        reset(ptr.release());
+        auto reuse = ctx.m_reuse;
+        reset(ctx.release(), reuse);
         return *this;
 }
 
-void usbip::wsk_context_ptr::reset(wsk_context *ptr)
+void usbip::wsk_context_ptr::reset(wsk_context *ctx, bool reuse)
 {
-        if (m_ptr != ptr) {
-                free(m_ptr, m_reuse);
-                m_ptr = ptr;
+        if (m_ctx != ctx) {
+                free(m_ctx, m_reuse);
+                m_reuse = reuse;
+                m_ctx = ctx;
         }
 }
 
 wsk_context* usbip::wsk_context_ptr::release()
 { 
-        auto tmp = m_ptr;
-        m_ptr = nullptr; 
+        auto tmp = m_ctx;
+        m_ctx = nullptr; 
         return tmp;
 }
