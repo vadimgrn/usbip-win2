@@ -7,21 +7,20 @@
 #include <wdm.h>
 #include <wdf.h>
 
-#include <usb.h>
-#include <wdfusb.h>
-#include <UdeCx.h>
-
 #include <usbip\proto.h>
 #include <libdrv\mdl_cpp.h>
 
 namespace usbip
 {
 
+struct device_ctx;
+
 struct wsk_context
 {
+        device_ctx *dev_ctx; // UDECXUSBDEVICE can be obtained from WDFREQUEST, but it is optional
+
         // transient data
 
-        UDECXUSBDEVICE device; // can be obtained from WDFREQUEST, but it is optional
         WDFREQUEST request; // WDF_NO_HANDLE for send_cmd_unlink
         Mdl mdl_buf; // describes URB_FROM_IRP()->TransferBuffer(MDL)
 
@@ -48,13 +47,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void delete_wsk_context_list();
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wsk_context *alloc_wsk_context(_In_ ULONG NumberOfPackets);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_opt_ wsk_context *ctx, _In_ bool reuse);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void reuse(_In_ wsk_context &ctx)
@@ -71,10 +64,10 @@ inline auto number_of_packets(_In_ const wsk_context &ctx)
 class wsk_context_ptr 
 {
 public:
-        wsk_context_ptr(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
-        wsk_context_ptr(wsk_context *ptr) : m_reuse(true), m_ctx(ptr) {}
+        wsk_context_ptr(_In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
+        wsk_context_ptr(wsk_context *ptr, bool reuse) : m_reuse(reuse), m_ctx(ptr) {}
 
-        ~wsk_context_ptr () { free(m_ctx, m_reuse); }
+        ~wsk_context_ptr();
 
         wsk_context_ptr(const wsk_context_ptr&) = delete;
         wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;
@@ -89,12 +82,11 @@ public:
         auto& operator *() const { return *m_ctx; }
 
         wsk_context *release();
+        void reset(wsk_context *ctx, bool reuse);
 
 private:
         bool m_reuse{};
         wsk_context *m_ctx{};
-
-        void reset(wsk_context *ctx, bool reuse);
 };
 
 } // namespace usbip

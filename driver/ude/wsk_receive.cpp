@@ -347,20 +347,6 @@ NTSTATUS usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
 	return err;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usb_reset_port(const usbip_header_ret_submit &ret)
-{
-	auto err = ret.status;
-	auto win_err = to_windows_status(err);
-
-	if (win_err == EndpointStalled) { // control pipe stall is not an error, see urb_select_interface
-		Trace(TRACE_LEVEL_WARNING, "Ignoring EP0 %s, usbip status %d", get_usbd_status(win_err), err);
-		err = 0;
-	}
-
-	return err ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
-}
-
 /*
  * @see device_ioctl.cpp, send_complete 
  */
@@ -385,12 +371,9 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 		TraceDbg("Complete req %04x, %s, %!STATUS!, Information %#Ix", 
 			  ptr04x(request), get_usbd_status(urb_st), status, irp_st.Information);
 
-		if (!status) {
+		if (NT_SUCCESS(status)) {
 			UdecxUrbComplete(request, urb_st);
 		} else {
-			if (status == STATUS_CANCELLED) {
-				irp_st.Information = 0;
-			}
 			UdecxUrbCompleteWithNtStatus(request, status);
 		}
 	}
@@ -409,17 +392,16 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 
 	auto irp = WdfRequestWdmGetIrp(request);
 	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
+		
 	auto st = STATUS_INVALID_PARAMETER;
 
-	switch (auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode) {
-	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		st = usb_submit_urb(ctx, *static_cast<URB*>(URB_FROM_IRP(irp)));
-		break;
-	case IOCTL_INTERNAL_USB_RESET_PORT:
-		st = usb_reset_port(get_ret_submit(ctx));
-		break;
-	default:
-		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", internal_device_control_name(ioctl), ioctl);
+	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+		auto urb = (URB*)URB_FROM_IRP(irp);
+		st = usb_submit_urb(ctx, *urb);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", 
+			internal_device_control_name(ioctl), ioctl);
 	}
 
 	complete(request, st);
@@ -543,8 +525,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-	wsk_context_ptr ctx = static_cast<wsk_context*>(Context); // destructor must call free(ptr, true)
-	auto &dev = *get_device_ctx(ctx->device);
+	wsk_context_ptr ctx(static_cast<wsk_context*>(Context), true);
+	auto &dev = *ctx->dev_ctx;
 
 	auto &st = wsk_irp->IoStatus;
 	TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu", ptr04x(wsk_irp), st.Status, st.Information);
@@ -571,8 +553,9 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	}
 	NT_ASSERT(!ctx->request);
 
-	TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(ctx->device), NT_SUCCESS(st.Status) ? err : st.Status);
-	device::schedule_destroy(ctx->device);
+	auto device = get_device(ctx->dev_ctx);
+	TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(device), NT_SUCCESS(st.Status) ? err : st.Status);
+	device::schedule_destroy(device);
 
 	return StopCompletion;
 }
@@ -584,7 +567,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_context &ctx)
 {
-	auto &dev = *get_device_ctx(ctx.device);
+	auto &dev = *ctx.dev_ctx;
 
 	NT_ASSERT(verify(buf, ctx.is_isoc));
 	dev.receive_size = buf.Length; // checked by verify()
@@ -667,7 +650,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 	auto &hdr = ctx.hdr; // request must be completed
 
 	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? 
-		      device::dequeue_request(ctx.device, hdr.base.seqnum) : WDF_NO_HANDLE;
+		      device::dequeue_request(ctx.dev_ctx->queue, hdr.base.seqnum) : WDF_NO_HANDLE;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
@@ -744,6 +727,20 @@ void receive_usbip_header(_In_ DEVICE_OBJECT*, _In_opt_ void *Context)
 } // namespace
 
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
+{
+	auto ext = static_cast<device_ctx_ext*>(SocketContext);
+
+	if (auto dev = get_device(ext->ctx)) {
+		Trace(TRACE_LEVEL_INFORMATION, "dev %04x, Flags %#lx", ptr04x(dev), Flags);
+		device::schedule_destroy(dev);
+	}
+
+	return STATUS_SUCCESS;
+}
+
  /*
   * A WSK application should not call new WSK functions in the context of the IoCompletion routine. 
   * Doing so may result in recursive calls and exhaust the kernel mode stack. 
@@ -755,21 +752,5 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::sched_receive_usbip_header(_In_ wsk_context *ctx)
 {
 	const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-
-	auto dev = get_device_ctx(ctx->device);
-	IoQueueWorkItem(dev->workitem, receive_usbip_header, QueueType, ctx);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
-{
-	auto ext = static_cast<device_ctx_ext*>(SocketContext);
-
-	if (auto dev = get_device(ext)) {
-		Trace(TRACE_LEVEL_INFORMATION, "dev %04x, Flags %#lx", ptr04x(dev), Flags);
-		device::schedule_destroy(dev);
-	}
-
-	return STATUS_SUCCESS;
+	IoQueueWorkItem(ctx->dev_ctx->workitem, receive_usbip_header, QueueType, ctx);
 }

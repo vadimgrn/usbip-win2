@@ -2,7 +2,7 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "wdfutils.h"
+#include "wdf_cpp.h"
 
 wdf::ObjectRef::ObjectRef(WDFOBJECT handle, bool add_ref) :
         m_handle(handle) 

@@ -46,7 +46,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS send_complete(
         _In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-        wsk_context_ptr ctx = static_cast<wsk_context*>(Context); // destructor must call free(ptr, true)
+        wsk_context_ptr ctx(static_cast<wsk_context*>(Context), true);
         auto request = ctx->request;
 
         request_ctx *req_ctx{};
@@ -69,15 +69,16 @@ NTSTATUS send_complete(
                 case REQ_RECV_COMPLETE: 
                 {
                         auto irp = WdfRequestWdmGetIrp(request);
+                        auto &irp_st = irp->IoStatus;
+
+                        NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
+                        NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
+
                         auto urb = (URB*)URB_FROM_IRP(irp);
                         auto urb_st = urb->UrbHeader.Status;
                         
-                        NT_ASSERT(WdfRequestGetStatus(request) == irp->IoStatus.Status);
-                        NT_ASSERT(WdfRequestGetInformation(request) == irp->IoStatus.Information);
-
                         TraceDbg("Complete req %04x, %s, %!STATUS!, Information %#Ix",
-                                  ptr04x(request), get_usbd_status(urb_st), 
-                                  irp->IoStatus.Status, irp->IoStatus.Information);
+                                  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
 
                         UdecxUrbComplete(request, urb_st);
                 }
@@ -86,7 +87,7 @@ NTSTATUS send_complete(
                         UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
                         break;
                 }
-        } else if (auto victim = device::dequeue_request(ctx->device, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+        } else if (auto victim = device::dequeue_request(ctx->dev_ctx->queue, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == request);
                 UdecxUrbCompleteWithNtStatus(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == REQ_CANCELED) {
@@ -94,7 +95,8 @@ NTSTATUS send_complete(
         }
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
-                device::schedule_destroy(ctx->device);
+                auto dev = get_device(ctx->dev_ctx);
+                device::schedule_destroy(dev);
         }
 
         return StopCompletion;
@@ -536,7 +538,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
 
         auto &dev = *get_device_ctx(endp.device);
 
-        wsk_context_ptr ctx(endp.device, request);
+        wsk_context_ptr ctx(&dev, request);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }

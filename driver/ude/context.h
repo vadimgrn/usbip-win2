@@ -78,7 +78,6 @@ struct device_ctx
 
         WDFDEVICE vhci; // parent
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
-        _IO_WORKITEM *workitem;
 
         int port; // vhci_ctx.devices[port - 1], unique device id, this is not roothub's port number
         seqnum_t seqnum; // @see next_seqnum
@@ -87,8 +86,16 @@ struct device_ctx
         using received_fn = NTSTATUS (wsk_context&);
         received_fn *received;
         size_t receive_size;
+
+        _IO_WORKITEM *workitem;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
+
+inline auto get_device(_In_ device_ctx *ctx)
+{
+        NT_ASSERT(ctx);
+        return ctx ? static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx)) : WDF_NO_HANDLE;
+}
 
 /*
 * Device context for UDECXUSBENDPOINT.
@@ -159,14 +166,5 @@ PAGED NTSTATUS create_device_ctx_ext(_Outptr_ device_ctx_ext* &d, _In_ const vhc
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void free(_In_ device_ctx_ext *ext);
-
-_IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
-inline auto get_device(_In_ device_ctx_ext *ext)
-{
-        NT_ASSERT(ext);
-        auto ctx = ext->ctx;
-        return static_cast<UDECXUSBDEVICE>(ctx ? WdfObjectContextGetObject(ctx) : WDF_NO_HANDLE);
-}
 
 } // namespace usbip

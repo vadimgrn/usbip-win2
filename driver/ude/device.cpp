@@ -273,6 +273,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
         PAGED_CODE();
 
         auto devobj = WdfDeviceWdmGetDeviceObject(ctx.vhci);
+
         ctx.workitem = IoAllocateWorkItem(devobj);
         if (!ctx.workitem) {
                 Trace(TRACE_LEVEL_ERROR, "IoAllocateWorkItem error");
@@ -283,14 +284,12 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
                 return err;
         }
 
-        if (auto wsk = alloc_wsk_context(0)) {
-                wsk->device = dev;
-                sched_receive_usbip_header(wsk);
-        } else {
-                return STATUS_INSUFFICIENT_RESOURCES;
+        if (auto wsk = wsk_context_ptr(&ctx, WDF_NO_HANDLE)) {
+                sched_receive_usbip_header(wsk.release());
+                return STATUS_SUCCESS;
         }
 
-        return STATUS_SUCCESS;
+        return STATUS_INSUFFICIENT_RESOURCES;
 }
 
 } // namespace
@@ -396,7 +395,5 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
         WdfObjectReference(dev);
 
         WdfWorkItemEnqueue(wi);
-
-        static_assert(NT_SUCCESS(STATUS_PENDING));
-        return STATUS_PENDING;
+        return STATUS_SUCCESS;
 }

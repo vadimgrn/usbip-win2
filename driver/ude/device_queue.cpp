@@ -112,11 +112,3 @@ WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const reques
                 }
         }
 }
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST usbip::device::dequeue_request(_In_ UDECXUSBDEVICE dev, _In_ const request_search &crit)
-{
-        auto queue = get_device_ctx(dev)->queue;
-        return dequeue_request(queue, crit);
-}

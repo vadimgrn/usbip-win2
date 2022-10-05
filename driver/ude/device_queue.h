@@ -7,8 +7,6 @@
 #include <libdrv\codeseg.h>
 #include <usbip\proto.h>
 
-#include "context.h"
-
 #include <wdf.h>
 
 #include <usb.h>
@@ -42,10 +40,6 @@ struct request_search
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST dequeue_request(_In_ WDFQUEUE queue, _In_ const request_search &crit);
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST dequeue_request(_In_ UDECXUSBDEVICE dev, _In_ const request_search &crit);
 
 // @see WdfIoQueueRetrieveNextRequest
 
