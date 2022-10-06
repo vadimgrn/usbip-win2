@@ -75,6 +75,7 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
  * If use ExFreeToLookasideListEx in case of error, next ExAllocateFromLookasideListEx will return the same pointer.
  * free_function_ex is used instead in hope that next object in the LookasideList may have required buffer.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto alloc_wsk_context(_In_ ULONG NumberOfPackets)
 {
@@ -89,26 +90,6 @@ auto alloc_wsk_context(_In_ ULONG NumberOfPackets)
         }
 
         return ctx;
-}
-
-/*
- * alloc_wsk_context set ctx->is_isoc, it's safe do not clear it.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void free_wsk_context(_In_opt_ wsk_context *ctx, _In_ bool reuse)
-{
-        if (!ctx) {
-                return;
-        }
-
-        ctx->request = WDF_NO_HANDLE;
-        ctx->mdl_buf.reset();
-
-        if (reuse) {
-                ::reuse(*ctx);
-        }
-
-        ExFreeToLookasideListEx(&g_lookaside, ctx);
 }
 
 } // namespace
@@ -144,6 +125,44 @@ void usbip::delete_wsk_context_list()
         }
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto usbip::alloc_wsk_context(
+        _In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets) -> wsk_context*
+{
+        NT_ASSERT(dev_ctx);
+
+        auto ctx = ::alloc_wsk_context(NumberOfPackets);
+        if (ctx) {
+                ctx->dev_ctx = dev_ctx;
+                ctx->request = request;
+        }
+
+        return ctx;
+}
+
+/*
+ * alloc_wsk_context set ctx->is_isoc, it's safe do not clear it.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
+{
+        if (!ctx) {
+                return;
+        }
+
+        ctx->request = WDF_NO_HANDLE;
+        ctx->mdl_buf.reset();
+
+        if (reuse) {
+                ::reuse(*ctx);
+        }
+
+        ExFreeToLookasideListEx(&g_lookaside, ctx);
+}
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
 {
@@ -183,22 +202,6 @@ NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         return STATUS_SUCCESS;
 }
 
-usbip::wsk_context_ptr::wsk_context_ptr(
-        _In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets) :
-        m_ctx(alloc_wsk_context(NumberOfPackets)) 
-{
-        NT_ASSERT(dev_ctx);
-        if (m_ctx) {
-                m_ctx->dev_ctx = dev_ctx;
-                m_ctx->request = request;
-        }
-}
-
-usbip::wsk_context_ptr::~wsk_context_ptr() 
-{ 
-        free_wsk_context(m_ctx, m_reuse);
-}
-
 auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ctx) -> wsk_context_ptr&
 {
         auto reuse = ctx.m_reuse;
@@ -209,7 +212,7 @@ auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ctx) -> wsk_context_pt
 void usbip::wsk_context_ptr::reset(wsk_context *ctx, bool reuse)
 {
         if (m_ctx != ctx) {
-                free_wsk_context(m_ctx, m_reuse);
+                free(m_ctx, m_reuse);
                 m_reuse = reuse;
                 m_ctx = ctx;
         }

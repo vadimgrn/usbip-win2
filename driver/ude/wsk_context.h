@@ -46,15 +46,28 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void delete_wsk_context_list();
 
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+wsk_context *alloc_wsk_context(_In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void free(_In_opt_ wsk_context *ctx, _In_ bool reuse);
+
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void reuse(_In_ wsk_context &ctx)
 {
         IoReuseIrp(ctx.wsk_irp, STATUS_UNSUCCESSFUL);
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto number_of_packets(_In_ const wsk_context &ctx)
 {
@@ -64,10 +77,11 @@ inline auto number_of_packets(_In_ const wsk_context &ctx)
 class wsk_context_ptr 
 {
 public:
-        wsk_context_ptr(_In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
-        wsk_context_ptr(wsk_context *ptr, bool reuse) : m_reuse(reuse), m_ctx(ptr) {}
+        template<typename... Args>
+        wsk_context_ptr(Args&&... args) : m_ctx(alloc_wsk_context(args...)) {}
 
-        ~wsk_context_ptr();
+        wsk_context_ptr(wsk_context *ptr, bool reuse) : m_reuse(reuse), m_ctx(ptr) {}
+        ~wsk_context_ptr() { free(m_ctx, m_reuse); }
 
         wsk_context_ptr(const wsk_context_ptr&) = delete;
         wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;

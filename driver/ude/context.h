@@ -83,11 +83,11 @@ struct device_ctx
         seqnum_t seqnum; // @see next_seqnum
         bool destroyed;
 
+        // for WSK receive
+        WDFWORKITEM recv_hdr;
         using received_fn = NTSTATUS (wsk_context&);
         received_fn *received;
         size_t receive_size;
-
-        _IO_WORKITEM *workitem;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
@@ -157,6 +157,13 @@ constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
         return (busnum << 16) | devnum;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void sched_receive_usbip_header(_In_ device_ctx &ctx)
+{
+        WdfWorkItemEnqueue(ctx.recv_hdr);
 }
 
 _IRQL_requires_same_

@@ -4,16 +4,16 @@
 
 #pragma once
 
-#include <ntdef.h>
+#include <libdrv\codeseg.h>
 
 namespace usbip
 {
 
-struct wsk_context;
+struct device_ctx;
 
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void sched_receive_usbip_header(_In_ wsk_context *ctx);
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS init_receive_usbip_header(_In_ device_ctx &ctx);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

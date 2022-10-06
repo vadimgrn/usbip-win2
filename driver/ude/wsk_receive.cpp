@@ -28,6 +28,27 @@ namespace
 
 using namespace usbip;
 
+using workitem_ctx = wsk_context*;
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx);
+
+inline auto& get_wsk_context(_In_ WDFWORKITEM wi)
+{
+	return *get_workitem_ctx(wi);
+}
+
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
+{
+	auto wi = static_cast<WDFWORKITEM>(Object);
+	TraceDbg("%04x", ptr04x(wi));
+
+	if (auto ctx = get_wsk_context(wi)) {
+		free(ctx, true);
+	}
+}
+
 constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
 {
 	return  actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength ? 
@@ -525,37 +546,38 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
-	wsk_context_ptr ctx(static_cast<wsk_context*>(Context), true);
-	auto &dev = *ctx->dev_ctx;
+	auto &ctx = *static_cast<wsk_context*>(Context);
+	auto &dev = *ctx.dev_ctx;
 
 	auto &st = wsk_irp->IoStatus;
 	TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu", ptr04x(wsk_irp), st.Status, st.Information);
 
 	auto ok = NT_SUCCESS(st.Status);
 
-	auto err = ok && st.Information == dev.receive_size ? dev.received(*ctx) :
+	auto err = ok && st.Information == dev.receive_size ? dev.received(ctx) :
 		   ok ? STATUS_RECEIVE_PARTIAL : 
 		   st.Status; // has nonzero severity code
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
-		sched_receive_usbip_header(ctx.release());
+		sched_receive_usbip_header(dev);
 		[[fallthrough]];
 	case RECV_MORE_DATA_REQUIRED:
 		return StopCompletion;
 	}
 
 	if (dev.received == free_drain_buffer) { // ctx.request is a drain buffer
-		free_drain_buffer(*ctx);
-	} else if (auto &req = ctx->request) {
+		free_drain_buffer(ctx);
+	} else if (auto &req = ctx.request) {
 		NT_ASSERT(dev.received != ret_submit); // never fails
 		complete(req, STATUS_CANCELLED);
 	}
-	NT_ASSERT(!ctx->request);
+	NT_ASSERT(!ctx.request);
 
-	auto device = get_device(ctx->dev_ctx);
-	TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(device), NT_SUCCESS(st.Status) ? err : st.Status);
-	device::schedule_destroy(device);
+	if (auto handle = get_device(&dev)) {
+		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(handle), NT_SUCCESS(st.Status) ? err : st.Status);
+		device::schedule_destroy(handle);
+	}
 
 	return StopCompletion;
 }
@@ -703,12 +725,19 @@ auto validate_header(_Inout_ usbip_header &hdr)
 	return ok;
 }
 
-_Function_class_(IO_WORKITEM_ROUTINE)
-_IRQL_requires_(PASSIVE_LEVEL)
+/*
+ * A WSK application should not call new WSK functions in the context of the IoCompletion routine. 
+ * Doing so may result in recursive calls and exhaust the kernel mode stack. 
+ * When executing at IRQL = DISPATCH_LEVEL, this can also lead to starvation of other threads.
+ *
+ * For this reason work queue is used here, but reading of payload does not use it and it's OK.
+ */
+_Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
-void receive_usbip_header(_In_ DEVICE_OBJECT*, _In_opt_ void *Context)
+_IRQL_requires_max_(PASSIVE_LEVEL)
+void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
-	auto &ctx = *static_cast<wsk_context*>(Context);
+	auto &ctx = *get_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
 	ctx.mdl_buf.reset();
@@ -728,6 +757,33 @@ void receive_usbip_header(_In_ DEVICE_OBJECT*, _In_opt_ void *Context)
 
 
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
+{
+	WDF_WORKITEM_CONFIG cfg;
+	WDF_WORKITEM_CONFIG_INIT(&cfg, receive_usbip_header);
+	cfg.AutomaticSerialization = false;
+
+	WDF_OBJECT_ATTRIBUTES attrs;
+	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, workitem_ctx);
+	attrs.SynchronizationScope = WdfSynchronizationScopeNone;
+	attrs.EvtDestroyCallback = workitem_destroy;
+	attrs.ParentObject = get_device(&ctx);
+
+	if (auto err = WdfWorkItemCreate(&cfg, &attrs, &ctx.recv_hdr)) {
+		Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
+		return err;
+	}
+
+	if (auto ptr = alloc_wsk_context(&ctx, WDF_NO_HANDLE)) {
+		get_wsk_context(ctx.recv_hdr) = ptr;
+		return STATUS_SUCCESS;
+	}
+
+	return STATUS_INSUFFICIENT_RESOURCES;
+}
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
 {
@@ -739,18 +795,4 @@ NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flag
 	}
 
 	return STATUS_SUCCESS;
-}
-
- /*
-  * A WSK application should not call new WSK functions in the context of the IoCompletion routine. 
-  * Doing so may result in recursive calls and exhaust the kernel mode stack. 
-  * When executing at IRQL = DISPATCH_LEVEL, this can also lead to starvation of other threads.
-  *
-  * For this reason work queue is used here, but reading of payload does not use it and it's OK.
-  */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::sched_receive_usbip_header(_In_ wsk_context *ctx)
-{
-	const auto QueueType = static_cast<WORK_QUEUE_TYPE>(CustomPriorityWorkQueue + LOW_REALTIME_PRIORITY);
-	IoQueueWorkItem(ctx->dev_ctx->workitem, receive_usbip_header, QueueType, ctx);
 }

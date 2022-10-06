@@ -80,10 +80,15 @@ NTSTATUS send_complete(
                         TraceDbg("Complete req %04x, %s, %!STATUS!, Information %#Ix",
                                   ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
 
-                        UdecxUrbComplete(request, urb_st);
+                        if (NT_SUCCESS(irp_st.Status)) { // FIXME: can WdfRequestComplete be used?
+                                UdecxUrbComplete(request, urb_st);
+                        } else {
+                                UdecxUrbCompleteWithNtStatus(request, irp_st.Status);
+                        }
                 }
                         break;
                 case REQ_CANCELED:
+                        WdfRequestSetInformation(request, 0);
                         UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
                         break;
                 }
@@ -91,12 +96,13 @@ NTSTATUS send_complete(
                 NT_ASSERT(victim == request);
                 UdecxUrbCompleteWithNtStatus(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == REQ_CANCELED) {
+                WdfRequestSetInformation(request, 0);
                 UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
         }
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
-                auto dev = get_device(ctx->dev_ctx);
-                device::schedule_destroy(dev);
+                auto handle = get_device(ctx->dev_ctx);
+                device::schedule_destroy(handle);
         }
 
         return StopCompletion;

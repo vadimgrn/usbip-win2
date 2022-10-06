@@ -56,11 +56,6 @@ void NTAPI device_destroy(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         auto &ctx = *get_device_ctx(dev);
-
-        if (auto wi = ctx.workitem) {
-                IoFreeWorkItem(wi);
-        }
-
         free(ctx.ext);
 }
 
@@ -272,24 +267,16 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
 {
         PAGED_CODE();
 
-        auto devobj = WdfDeviceWdmGetDeviceObject(ctx.vhci);
-
-        ctx.workitem = IoAllocateWorkItem(devobj);
-        if (!ctx.workitem) {
-                Trace(TRACE_LEVEL_ERROR, "IoAllocateWorkItem error");
-                return STATUS_INSUFFICIENT_RESOURCES;
+        if (auto err = init_receive_usbip_header(ctx)) {
+                return err;
         }
 
         if (auto err = device::create_queue(dev)) {
                 return err;
         }
 
-        if (auto wsk = wsk_context_ptr(&ctx, WDF_NO_HANDLE)) {
-                sched_receive_usbip_header(wsk.release());
-                return STATUS_SUCCESS;
-        }
-
-        return STATUS_INSUFFICIENT_RESOURCES;
+        sched_receive_usbip_header(ctx);
+        return STATUS_SUCCESS;
 }
 
 } // namespace
