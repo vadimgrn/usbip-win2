@@ -84,10 +84,10 @@ struct device_ctx
         bool destroyed;
 
         // for WSK receive
-        WDFWORKITEM recv_hdr;
         using received_fn = NTSTATUS (wsk_context&);
         received_fn *received;
         size_t receive_size;
+        WDFWORKITEM recv_hdr;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
@@ -96,6 +96,8 @@ inline auto get_device(_In_ device_ctx *ctx)
         NT_ASSERT(ctx);
         return ctx ? static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx)) : WDF_NO_HANDLE;
 }
+
+WDF_DECLARE_CONTEXT_TYPE(UDECXUSBDEVICE); // WdfObjectGet_UDECXUSBDEVICE
 
 /*
 * Device context for UDECXUSBENDPOINT.
@@ -107,12 +109,14 @@ struct endpoint_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBENDPOINT, get_queue_ctx); // endpoint's queue
+
+WDF_DECLARE_CONTEXT_TYPE(UDECXUSBENDPOINT); // WdfObjectGet_UDECXUSBENDPOINT
 
 inline auto& get_endpoint(_In_ WDFQUEUE queue)
 {
-        return *get_queue_ctx(queue);
+        return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
+
 
 enum request_status : LONG { REQ_INIT, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 

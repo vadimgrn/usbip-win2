@@ -21,8 +21,6 @@ namespace
 
 using namespace usbip;
 
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(UDECXUSBDEVICE, get_workitem_ctx);
-
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED auto to_udex_speed(_In_ usb_device_speed speed)
@@ -358,7 +356,7 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
 {
         auto func = [] (auto WorkItem)
         {
-                if (auto dev = *get_workitem_ctx(WorkItem)) {
+                if (auto dev = *WdfObjectGet_UDECXUSBDEVICE(WorkItem)) {
                         destroy(dev);
                         WdfObjectDereference(dev);
                 }
@@ -378,7 +376,7 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
                 return err;
         }
 
-        *get_workitem_ctx(wi) = dev;
+        *WdfObjectGet_UDECXUSBDEVICE(wi) = dev;
         WdfObjectReference(dev);
 
         WdfWorkItemEnqueue(wi);

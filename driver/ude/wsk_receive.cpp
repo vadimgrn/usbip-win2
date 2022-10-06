@@ -28,12 +28,12 @@ namespace
 
 using namespace usbip;
 
-using workitem_ctx = wsk_context*;
-WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx);
+using ptr_wsk_context = wsk_context*;
+WDF_DECLARE_CONTEXT_TYPE(ptr_wsk_context); // WdfObjectGet_ptr_wsk_context
 
-inline auto& get_wsk_context(_In_ WDFWORKITEM wi)
+inline auto& get_ptr_wsk_context(_In_ WDFWORKITEM wi)
 {
-	return *get_workitem_ctx(wi);
+	return *WdfObjectGet_ptr_wsk_context(wi);
 }
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
@@ -44,7 +44,7 @@ void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
 	auto wi = static_cast<WDFWORKITEM>(Object);
 	TraceDbg("%04x", ptr04x(wi));
 
-	if (auto ctx = get_wsk_context(wi)) {
+	if (auto ctx = get_ptr_wsk_context(wi)) {
 		free(ctx, true);
 	}
 }
@@ -55,6 +55,7 @@ constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
 		STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
 {
@@ -63,6 +64,7 @@ auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
 	return err;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 {
@@ -71,9 +73,28 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	return hdr.u.ret_submit;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+URB *get_urb(_In_ WDFREQUEST request)
+{
+	auto irp = WdfRequestWdmGetIrp(request);
+	auto stack = IoGetCurrentIrpStackLocation(irp);
+	auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
+
+	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+		return static_cast<URB*>(URB_FROM_IRP(irp));
+	}
+
+	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB_SUBMIT_URB expected, got %s(%#x)", 
+		internal_device_control_name(ioctl), ioctl);
+
+	return nullptr;
+}
+
 /*
  * EP0 stall is not an error, control endpoint cannot stall.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_configuration(_In_ wsk_context&, _Inout_ URB&)
 {
@@ -89,6 +110,7 @@ NTSTATUS urb_select_configuration(_In_ wsk_context&, _Inout_ URB&)
  *
  * See: drivers/usb/core/message.c, usb_set_interface, usb_clear_halt.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_interface(_In_ wsk_context &, _Inout_ URB &)
 {
@@ -99,6 +121,7 @@ NTSTATUS urb_select_interface(_In_ wsk_context &, _Inout_ URB &)
  * A request can read descriptor header or full descriptor to obtain its real size.
  * F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_control_descriptor_request(_In_ wsk_context &, _Inout_ URB &)
 {
@@ -119,6 +142,7 @@ NTSTATUS urb_control_descriptor_request(_In_ wsk_context &, _Inout_ URB &)
  * <linux>/drivers/usb/usbip/stub_tx.c, stub_send_ret_submit
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ ULONG length, 
 	_In_ const usbip_iso_packet_descriptor* sd)
@@ -200,6 +224,7 @@ auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ U
  * If BSOD happen, this call should be used
  * make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, false, IoModifyAccess, urb)
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
 {
@@ -214,12 +239,14 @@ auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
 /*
  * Layout: transfer buffer(IN only), usbip_iso_packet_descriptor[].
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_isoch_transfer(_In_ wsk_context &, _Inout_ URB &)
 {
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
@@ -230,12 +257,14 @@ NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		assign(tr.TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_success(_In_ wsk_context&, _Inout_ URB&)
 {
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_function_unexpected(_In_ wsk_context&, _Inout_ URB &urb)
 {
@@ -339,38 +368,9 @@ urb_function_t* const urb_functions[] =
 };
 
 /*
-if (urb.UrbHeader.Status == EndpointStalled && ctx.irp) {
-	if (auto handle = get_pipe_handle(ctx.irp)) { // except default control pipe
-		if (auto err = clear_endpoint_stall(*ctx.vpdo, handle, nullptr)) {
-			Trace(TRACE_LEVEL_ERROR, "clear_endpoint_stall %!STATUS!", err);
-		}	
-	}
-}
-*/
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
-{
-	{
-		auto &ret = get_ret_submit(ctx);
-		urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-	}
-
-	auto func = urb.UrbHeader.Function;
-	auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
-
-	auto err = pfunc ? pfunc(ctx, urb) : STATUS_INVALID_PARAMETER;
-
-	if (err && !urb.UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err)
-		urb.UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
-		TraceDbg("Set USBD_STATUS=%s because return is %!STATUS!", get_usbd_status(urb.UrbHeader.Status), err);
-	}
-
-	return err;
-}
-
-/*
  * @see device_ioctl.cpp, send_complete 
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 {
@@ -402,33 +402,38 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	request = nullptr;
 }
 
-enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
-
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_Function_class_(device_ctx::received_fn)
-NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
+void usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
-	auto &request = ctx.request;
-	NT_ASSERT(request);
-
-	auto irp = WdfRequestWdmGetIrp(request);
-	auto stack = IoGetCurrentIrpStackLocation(irp);
-	auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
-		
-	auto st = STATUS_INVALID_PARAMETER;
-
-	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		auto urb = (URB*)URB_FROM_IRP(irp);
-		st = usb_submit_urb(ctx, *urb);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", 
-			internal_device_control_name(ioctl), ioctl);
+	{
+		auto &ret = get_ret_submit(ctx);
+		urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 	}
 
-	complete(request, st);
-	return RECV_NEXT_USBIP_HDR;
+	auto func = urb.UrbHeader.Function;
+	auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
+
+	auto st = pfunc ? pfunc(ctx, urb) : STATUS_INVALID_PARAMETER;
+	complete(ctx.request, st);
 }
 
+enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
+
+_Function_class_(device_ctx::received_fn)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
+{
+	if (auto urb = get_urb(ctx.request)) {
+		usb_submit_urb(ctx, *urb);
+		return RECV_NEXT_USBIP_HDR;
+	}
+
+	return STATUS_INVALID_PARAMETER;
+}
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto make_mdl_chain(_In_ wsk_context &ctx)
 {
@@ -460,6 +465,7 @@ auto make_mdl_chain(_In_ wsk_context &ctx)
  * a) DIR_IN: any type of transfer, [transfer_buffer] OR|AND [usbip_iso_packet_descriptor...]
  * b) DIR_OUT: ISOCH, <usbip_iso_packet_descriptor...>
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb)
 {
@@ -503,23 +509,7 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 	return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-URB *get_urb(_In_ WDFREQUEST request)
-{
-	auto irp = WdfRequestWdmGetIrp(request);
-	auto stack = IoGetCurrentIrpStackLocation(irp);
-	auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
-
-	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		return static_cast<URB*>(URB_FROM_IRP(irp));
-	}
-
-	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB_SUBMIT_URB expected, got %s(%#x)", 
-		internal_device_control_name(ioctl), ioctl);
-
-	return nullptr;
-}
-
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto alloc_drain_buffer(_Inout_ wsk_context &ctx, _In_ size_t length)
 {  
@@ -528,8 +518,9 @@ inline auto alloc_drain_buffer(_Inout_ wsk_context &ctx, _In_ size_t length)
 	return buf = (WDFREQUEST)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, length, POOL_TAG); 
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(device_ctx::received_fn)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS free_drain_buffer(_Inout_ wsk_context &ctx)
 {  
 	auto &buf = ctx.request;
@@ -608,6 +599,7 @@ void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	TraceWSK("wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), err);
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
@@ -636,6 +628,7 @@ NTSTATUS drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 	return RECV_MORE_DATA_REQUIRED;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
@@ -665,8 +658,9 @@ NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
  * 2) if USBIP_CMD_UNLINK is after USBIP_RET_SUBMIT status is 0
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
-_IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(device_ctx::received_fn)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 {
 	auto &hdr = ctx.hdr; // request must be completed
@@ -692,6 +686,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 	return RECV_NEXT_USBIP_HDR;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto validate_header(_Inout_ usbip_header &hdr)
 {
@@ -737,7 +732,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
-	auto &ctx = *get_wsk_context(WorkItem);
+	auto &ctx = *get_ptr_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
 	ctx.mdl_buf.reset();
@@ -765,7 +760,7 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 	cfg.AutomaticSerialization = false;
 
 	WDF_OBJECT_ATTRIBUTES attrs;
-	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, workitem_ctx);
+	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, ptr_wsk_context);
 	attrs.SynchronizationScope = WdfSynchronizationScopeNone;
 	attrs.EvtDestroyCallback = workitem_destroy;
 	attrs.ParentObject = get_device(&ctx);
@@ -776,7 +771,7 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 	}
 
 	if (auto ptr = alloc_wsk_context(&ctx, WDF_NO_HANDLE)) {
-		get_wsk_context(ctx.recv_hdr) = ptr;
+		get_ptr_wsk_context(ctx.recv_hdr) = ptr;
 		return STATUS_SUCCESS;
 	}
 
