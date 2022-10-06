@@ -46,22 +46,25 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength)
 {
 	auto &epd = endp.descriptor;
-	bool ep0 = TransferFlags & USBD_DEFAULT_PIPE_TRANSFER;
+	auto ep0 = epd.bEndpointAddress == USB_DEFAULT_ENDPOINT_ADDRESS; // default control pipe
 
-	if (ep0 && epd.bEndpointAddress != USB_DEFAULT_ENDPOINT_ADDRESS) {
+	if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !ep0) {
 		Trace(TRACE_LEVEL_ERROR, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and "
 			                 "bEndpointAddress(%#x)", epd.bEndpointAddress);
 
 		return STATUS_INVALID_PARAMETER;
 	}
 	
-	TransferFlags = fix_transfer_flags(TransferFlags, epd);
+	if (!ep0) { // ep0 is bidirectional
+		TransferFlags = fix_transfer_flags(TransferFlags, epd);
+	}
+
 	auto dir_in = IsTransferDirectionIn(TransferFlags); // many URBs don't have PipeHandle
 
 	if (auto r = &hdr.base) {
 		r->command = USBIP_CMD_SUBMIT;
 		r->seqnum = next_seqnum(dev, dir_in);
-		r->devid = dev.ext->dev.devid;
+		r->devid = dev.devid();
 		r->direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
 		r->ep = usb_endpoint_num(epd);
 	}
@@ -85,7 +88,7 @@ void usbip::set_cmd_unlink_usbip_header(
 	auto &r = hdr.base;
 
 	r.command = USBIP_CMD_UNLINK;
-	r.devid = dev.ext->dev.devid;
+	r.devid = dev.devid();
 	r.direction = USBIP_DIR_OUT;
 	r.seqnum = next_seqnum(dev, r.direction);
 	r.ep = 0;

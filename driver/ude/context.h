@@ -28,7 +28,7 @@ namespace usbip
 {
 
 /*
- * Device context for WDFDEVICE, Virtual Host Controller Interface.
+ * Context space for WDFDEVICE, Virtual Host Controller Interface.
  * Parent is WDFDRIVER.
  */
 struct vhci_ctx
@@ -69,12 +69,14 @@ struct device_ctx_ext
 };
 
 /*
- * Device context for UDECXUSBDEVICE.
+ * Context space for UDECXUSBDEVICE.
  */
 struct device_ctx
 {
         device_ctx_ext *ext; // must be free-d
+
         auto& socket() const { return ext->sock; }
+        auto devid() const { return ext->dev.devid; }
 
         WDFDEVICE vhci; // parent
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
@@ -84,10 +86,10 @@ struct device_ctx
         bool destroyed;
 
         // for WSK receive
+        WDFWORKITEM recv_hdr;
         using received_fn = NTSTATUS (wsk_context&);
         received_fn *received;
         size_t receive_size;
-        WDFWORKITEM recv_hdr;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
@@ -100,8 +102,8 @@ inline auto get_device(_In_ device_ctx *ctx)
 WDF_DECLARE_CONTEXT_TYPE(UDECXUSBDEVICE); // WdfObjectGet_UDECXUSBDEVICE
 
 /*
-* Device context for UDECXUSBENDPOINT.
-*/
+ * Context space for UDECXUSBENDPOINT.
+ */
 struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
@@ -121,7 +123,7 @@ inline auto& get_endpoint(_In_ WDFQUEUE queue)
 enum request_status : LONG { REQ_INIT, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 
 /*
- * Device context for WDFREQUEST.
+ * Context space for WDFREQUEST.
  * It's OK to get a context for request that the driver doesn't own if it isn't completed.
  */
 struct request_ctx

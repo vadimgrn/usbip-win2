@@ -59,7 +59,7 @@ NTSTATUS send_complete(
 
         auto &st = wsk_irp->IoStatus;
 
-        TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu, %!irp_status_t!",
+        TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu, %!request_status!",
                   ptr04x(wsk_irp), st.Status, st.Information, old_status);
 
         if (!request) {
@@ -77,7 +77,7 @@ NTSTATUS send_complete(
                         auto urb = (URB*)URB_FROM_IRP(irp);
                         auto urb_st = urb->UrbHeader.Status;
                         
-                        TraceDbg("Complete req %04x, %s, %!STATUS!, Information %#Ix",
+                        TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix",
                                   ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
 
                         if (NT_SUCCESS(irp_st.Status)) { // FIXME: can WdfRequestComplete be used?
@@ -175,7 +175,7 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         auto err = send(dev.socket(), &buf, WSK_FLAG_NODELAY, wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
-        TraceWSK("wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), err);
+        TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, err);
         return STATUS_PENDING;
 }
 
@@ -554,7 +554,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
         }
 
         if (is_transfer_direction_out(ctx->hdr) != is_transfer_dir_out(urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
-                Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in TransferFlags/PipeHandle and SetupPacket");
+                Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in usbip_header and SetupPacket");
                 return STATUS_INVALID_PARAMETER;
         }
 

@@ -39,8 +39,10 @@ inline auto& get_ptr_wsk_context(_In_ WDFWORKITEM wi)
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
+PAGED void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
 {
+	PAGED_CODE();
+
 	auto wi = static_cast<WDFWORKITEM>(Object);
 	TraceDbg("%04x", ptr04x(wi));
 
@@ -253,6 +255,8 @@ NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 	auto &ret = get_ret_submit(ctx);
 	auto &tr = AsUrbTransfer(urb);
 
+	TraceUrb("%!BIN!", WppBinary(tr.TransferBuffer, USHORT(tr.TransferBufferLength)));
+
 	return  tr.TransferBufferLength == ULONG(ret.actual_length) ? STATUS_SUCCESS : // set by prepare_wsk_mdl
 		assign(tr.TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 }
@@ -389,7 +393,7 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	NT_ASSERT(old_status != REQ_CANCELED);
 
 	if (old_status == REQ_SEND_COMPLETE) {
-		TraceDbg("Complete req %04x, %s, %!STATUS!, Information %#Ix", 
+		TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix", 
 			  ptr04x(request), get_usbd_status(urb_st), status, irp_st.Information);
 
 		if (NT_SUCCESS(status)) {
@@ -399,23 +403,29 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 		}
 	}
 
-	request = nullptr;
+	request = WDF_NO_HANDLE;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
+auto usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
-	{
-		auto &ret = get_ret_submit(ctx);
-		urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-	}
+	auto &ret = get_ret_submit(ctx);
+	auto &usbd_st = urb.UrbHeader.Status;
+
+	usbd_st = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
 	auto func = urb.UrbHeader.Function;
 	auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
 
-	auto st = pfunc ? pfunc(ctx, urb) : STATUS_INVALID_PARAMETER;
-	complete(ctx.request, st);
+	auto err = pfunc ? pfunc(ctx, urb) : STATUS_INVALID_PARAMETER;
+
+	if (err && !urb.UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err)
+		urb.UrbHeader.Status =  err == STATUS_CANCELLED ? USBD_STATUS_CANCELED : USBD_STATUS_INVALID_PARAMETER;
+		TraceDbg("Set USBD_STATUS=%s because return is %!STATUS!", get_usbd_status(usbd_st), err);
+	}
+
+	return err;
 }
 
 enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
@@ -425,12 +435,14 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
+	auto st = STATUS_INVALID_PARAMETER;
+
 	if (auto urb = get_urb(ctx.request)) {
-		usb_submit_urb(ctx, *urb);
-		return RECV_NEXT_USBIP_HDR;
+		st = usb_submit_urb(ctx, *urb);
 	}
 
-	return STATUS_INVALID_PARAMETER;
+	complete(ctx.request, st);
+	return RECV_NEXT_USBIP_HDR;
 }
 
 _IRQL_requires_same_
@@ -541,7 +553,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto &dev = *ctx.dev_ctx;
 
 	auto &st = wsk_irp->IoStatus;
-	TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu", ptr04x(wsk_irp), st.Status, st.Information);
+	TraceWSK("%!STATUS!, Information %Iu", st.Status, st.Information);
 
 	auto ok = NT_SUCCESS(st.Status);
 
@@ -596,7 +608,7 @@ void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	auto err = receive(dev.socket(), &buf, WSK_FLAG_WAITALL, wsk_irp);
 	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
-	TraceWSK("wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), err);
+	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, err);
 }
 
 _IRQL_requires_same_
@@ -730,8 +742,9 @@ auto validate_header(_Inout_ usbip_header &hdr)
 _Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
+PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
+	PAGED_CODE();
 	auto &ctx = *get_ptr_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle

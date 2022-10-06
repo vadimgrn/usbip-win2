@@ -29,7 +29,7 @@ void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
         auto &req_ctx = *get_request_ctx(request);
 
         auto old_status = atomic_set_status(req_ctx, REQ_CANCELED);
-        TraceDbg("queue %04x, request %04x, %!irp_status_t!", ptr04x(queue), ptr04x(request), old_status);
+        TraceDbg("queue %04x, request %04x, %!request_status!", ptr04x(queue), ptr04x(request), old_status);
 
         if (old_status == REQ_SEND_COMPLETE) {
                 UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
