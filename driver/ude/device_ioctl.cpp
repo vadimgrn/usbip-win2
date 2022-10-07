@@ -548,14 +548,11 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
+        
+        auto dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength, &dir_out)) {
                 return err;
-        }
-
-        if (is_transfer_direction_out(ctx->hdr) != is_transfer_dir_out(urb.UrbControlTransfer)) { // TransferFlags can have wrong direction
-                Trace(TRACE_LEVEL_ERROR, "Transfer direction differs in usbip_header and SetupPacket");
-                return STATUS_INVALID_PARAMETER;
         }
 
         static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));

@@ -3,8 +3,6 @@
 #include <usbip\proto.h>
 #include <usbip\ch9.h>
 
-#include <stdbool.h>
-
 #include <ntddk.h>
 #include <usbdi.h>
 
@@ -21,12 +19,12 @@ inline auto to_windows_status_isoch(int usbip_status) { return to_windows_status
 ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in);
 UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in);
 
-inline bool IsTransferDirectionIn(ULONG TransferFlags)
+constexpr auto IsTransferDirectionIn(ULONG TransferFlags)
 {
 	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_IN;
 }
 
-inline bool IsTransferDirectionOut(ULONG TransferFlags)
+constexpr auto IsTransferDirectionOut(ULONG TransferFlags)
 {
 	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
 }
@@ -39,24 +37,23 @@ inline bool is_transfer_dir_in(const _URB_CONTROL_TRANSFER &r)
 	return pkt.bmRequestType.B & USB_DIR_IN; // C: bmRequestType.Dir, C++: bmRequestType.s.Dir
 }
 
-inline bool is_transfer_dir_out(const _URB_CONTROL_TRANSFER &r)
+inline auto is_transfer_dir_out(const _URB_CONTROL_TRANSFER &r)
 {
 	static_assert(!USB_DIR_OUT);
 	return !is_transfer_dir_in(r);
 }
 
-inline bool is_transfer_direction_in(const usbip_header &h)
+constexpr auto is_transfer_direction_in(const usbip_header &h)
 {
 	return h.base.direction == USBIP_DIR_IN;
 }
 
-inline bool is_transfer_direction_out(const usbip_header &h)
+constexpr auto is_transfer_direction_out(const usbip_header &h)
 {
 	return h.base.direction == USBIP_DIR_OUT;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto is_isoch(_In_ const URB &urb)
+constexpr auto is_isoch(_In_ const URB &urb)
 {
 	auto f = urb.UrbHeader.Function;
 	return  f == URB_FUNCTION_ISOCH_TRANSFER || 

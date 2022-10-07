@@ -4,32 +4,30 @@
 
 #include "context.h"
 
-#include <libdrv\usbd_helper.h>
 #include <libdrv\ch9.h>
+#include <libdrv\usbd_helper.h>
 
 namespace
 {
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ const USB_ENDPOINT_DESCRIPTOR &epd)
+auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
 {
-	auto out = usb_endpoint_dir_out(epd);
-
-	if (IsTransferDirectionOut(TransferFlags) == out) {
+	if (IsTransferDirectionOut(TransferFlags) == dir_out) {
 		return TransferFlags;
 	}
 
-	TraceDbg("Fix direction in TransferFlags(%#lx) to %s", TransferFlags, out ? "OUT" : "IN");
+	TraceDbg("Fix direction in TransferFlags(%#lx) to %s", TransferFlags, dir_out ? "OUT" : "IN");
 
 	const ULONG in_flags = USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
 
-	if (out) {
+	if (dir_out) {
 		TransferFlags &= ~in_flags;
 	} else {
 		TransferFlags |= in_flags;
 	}
 
-	NT_ASSERT(IsTransferDirectionOut(TransferFlags) == out);
+	NT_ASSERT(IsTransferDirectionOut(TransferFlags) == dir_out);
 	return TransferFlags;
 }
 
@@ -38,39 +36,45 @@ auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ const USB_ENDPOINT_DESCRI
 
 /*
  * Direction in TransferFlags can be invalid for bulk transfer at least.
- * Always use direction from PipeHandle if URB has one.
+ * Always use direction from endpoint descriptor except for control pipe where setup packet has direction.
+ * 
+ * Default control pipe is bidirectional, direction in setup packet must be used instead of descriptor.
+ * FIXME: are there exist non-default unidirectional control pipes?
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::set_cmd_submit_usbip_header(
 	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const endpoint_ctx &endp,
-	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength)
+	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_opt_ bool *setup_dir_out)
 {
 	auto &epd = endp.descriptor;
-	auto ep0 = epd.bEndpointAddress == USB_DEFAULT_ENDPOINT_ADDRESS; // default control pipe
 
-	if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !ep0) {
+	if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !usb_default_control_pipe(epd)) {
 		Trace(TRACE_LEVEL_ERROR, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and "
 			                 "bEndpointAddress(%#x)", epd.bEndpointAddress);
 
 		return STATUS_INVALID_PARAMETER;
 	}
 	
-	if (!ep0) { // ep0 is bidirectional
-		TransferFlags = fix_transfer_flags(TransferFlags, epd);
+	if (setup_dir_out && usb_endpoint_type(epd) != UsbdPipeTypeControl) {
+		Trace(TRACE_LEVEL_ERROR, "setup_dir_out(%d) passed for %!USBD_PIPE_TYPE!", 
+			                  *setup_dir_out, usb_endpoint_type(epd));
+
+		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto dir_in = IsTransferDirectionIn(TransferFlags); // many URBs don't have PipeHandle
+	auto dir_out = setup_dir_out ? *setup_dir_out : usb_endpoint_dir_out(epd);
+	TransferFlags = fix_transfer_flags(TransferFlags, dir_out); // many URBs don't have PipeHandle
 
 	if (auto r = &hdr.base) {
 		r->command = USBIP_CMD_SUBMIT;
-		r->seqnum = next_seqnum(dev, dir_in);
+		r->seqnum = next_seqnum(dev, !dir_out);
 		r->devid = dev.devid();
-		r->direction = dir_in ? USBIP_DIR_IN : USBIP_DIR_OUT;
+		r->direction = dir_out ? USBIP_DIR_OUT : USBIP_DIR_IN;
 		r->ep = usb_endpoint_num(epd);
 	}
 
 	if (auto r = &hdr.u.cmd_submit) {
-		r->transfer_flags = to_linux_flags(TransferFlags, dir_in);
+		r->transfer_flags = to_linux_flags(TransferFlags, !dir_out);
 		r->transfer_buffer_length = TransferBufferLength;
 		r->start_frame = 0;
 		r->number_of_packets = 0; // FIXME: -1 if non-isoch
