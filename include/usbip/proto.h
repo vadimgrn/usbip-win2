@@ -19,6 +19,11 @@ enum { USBIP_MAX_ISO_PACKETS = 1024 };
 
 const INT32 number_of_packets_non_isoch = -1; // see protocol for USBIP_CMD_SUBMIT/USBIP_RET_SUBMIT
 
+inline bool is_valid_number_of_packets(int number_of_packets)
+{
+	return number_of_packets >= 0 && number_of_packets <= USBIP_MAX_ISO_PACKETS;
+}
+
 typedef UINT32 seqnum_t;
 
 #include <PSHPACK1.H>
@@ -124,7 +129,7 @@ struct usbip_header {
 	} u;
 };
 
-static_assert(sizeof(struct usbip_header) == 48, "assert");
+static_assert(sizeof(usbip_header) == 48);
 
 /* the same as usb_iso_packet_descriptor but packed for pdu */
 struct usbip_iso_packet_descriptor {

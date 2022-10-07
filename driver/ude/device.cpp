@@ -15,6 +15,7 @@
 #include "wsk_receive.h"
 
 #include <libdrv\dbgcommon.h>
+#include <libdrv\ch9.h>
 
 namespace
 {
@@ -172,8 +173,13 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 
         if (auto ctx = get_endpoint_ctx(endp)) {
                 ctx->device = dev;
+                auto &d = ctx->descriptor;
                 if (epd) {
-                        ctx->descriptor = *epd;
+                        d = *epd;
+                } else { // default control pipe
+                        d.bLength = sizeof(d);
+                        d.bDescriptorType = USB_ENDPOINT_DESCRIPTOR_TYPE;
+                        NT_ASSERT(d.bEndpointAddress == USB_DEFAULT_ENDPOINT_ADDRESS);
                 }
         }
 
@@ -181,7 +187,16 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
                 return err;
         }
 
-        TraceDbg("dev %04x, endp %04x{bEndpointAddress %#x}", ptr04x(dev), ptr04x(endp), bEndpointAddress);
+        if (epd) {
+                TraceDbg("dev %04x, endp %04x{Address %#x: %s %s[%d]}", ptr04x(dev), ptr04x(endp), 
+                          bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(*epd)),
+                          usb_endpoint_dir_out(*epd) ? "Out" : "In", 
+                          usb_endpoint_num(*epd));
+        } else { // default control pipe
+                TraceDbg("dev %04x, endp %04x{Address %#x: %s In/Out[0]}", ptr04x(dev), ptr04x(endp), 
+                          bEndpointAddress, usbd_pipe_type_str(UsbdPipeTypeControl));
+        }
+
         return STATUS_SUCCESS;
 }
 
