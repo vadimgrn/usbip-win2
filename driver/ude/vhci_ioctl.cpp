@@ -478,14 +478,6 @@ PAGED void IoDeviceControl(
 } // namespace
 
 
-/*
- * The framework sets the SynchronizationScope value of framework driver objects to WdfSynchronizationScopeNone. 
- * It sets the SynchronizationScope value of framework device objects and framework queue objects 
- * to WdfSynchronizationScopeInheritFromParent. 
- * 
- * attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // spinlock acquiring raises IRQL to DPC
- * attrs.ExecutionLevel = WdfExecutionLevelPassive;
- */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)

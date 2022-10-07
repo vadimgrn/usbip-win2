@@ -28,12 +28,12 @@ namespace
 
 using namespace usbip;
 
-using ptr_wsk_context = wsk_context*;
-WDF_DECLARE_CONTEXT_TYPE(ptr_wsk_context); // WdfObjectGet_ptr_wsk_context
+using PWSK_CONTEXT = wsk_context*;
+WDF_DECLARE_CONTEXT_TYPE(PWSK_CONTEXT); // WdfObjectGet_PWSK_CONTEXT
 
-inline auto& get_ptr_wsk_context(_In_ WDFWORKITEM wi)
+inline auto& get_wsk_context(_In_ WDFWORKITEM wi)
 {
-	return *WdfObjectGet_ptr_wsk_context(wi);
+	return *WdfObjectGet_PWSK_CONTEXT(wi);
 }
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
@@ -46,7 +46,7 @@ PAGED void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
 	auto wi = static_cast<WDFWORKITEM>(Object);
 	TraceDbg("%04x", ptr04x(wi));
 
-	if (auto ctx = get_ptr_wsk_context(wi)) {
+	if (auto ctx = get_wsk_context(wi)) {
 		free(ctx, true);
 	}
 }
@@ -745,7 +745,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
 	PAGED_CODE();
-	auto &ctx = *get_ptr_wsk_context(WorkItem);
+	auto &ctx = *get_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
 	ctx.mdl_buf.reset();
@@ -772,9 +772,8 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 	WDF_WORKITEM_CONFIG_INIT(&cfg, receive_usbip_header);
 	cfg.AutomaticSerialization = false;
 
-	WDF_OBJECT_ATTRIBUTES attrs;
-	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, ptr_wsk_context);
-	attrs.SynchronizationScope = WdfSynchronizationScopeNone;
+	WDF_OBJECT_ATTRIBUTES attrs; // WdfSynchronizationScopeNone is inherited from the driver object
+	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, PWSK_CONTEXT);
 	attrs.EvtDestroyCallback = workitem_destroy;
 	attrs.ParentObject = get_device(&ctx);
 
@@ -784,7 +783,7 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 	}
 
 	if (auto ptr = alloc_wsk_context(&ctx, WDF_NO_HANDLE)) {
-		get_ptr_wsk_context(ctx.recv_hdr) = ptr;
+		get_wsk_context(ctx.recv_hdr) = ptr;
 		return STATUS_SUCCESS;
 	}
 

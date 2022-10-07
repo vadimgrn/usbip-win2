@@ -55,8 +55,8 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
-        attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
+        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Device queue %04x cleanup", ptr04x(obj)); };
+//      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoCanceledOnQueue is used only
         attrs.ParentObject = dev;
 
         auto &ctx = *get_device_ctx(dev);

@@ -124,7 +124,7 @@ PAGED auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBENDPOINT);
         attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
-        attrs.SynchronizationScope = WdfSynchronizationScopeQueue;
+//      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoInternalDeviceControl is used only
         attrs.ParentObject = endp;
 
         auto dev = get_endpoint_ctx(endp)->device;
@@ -365,6 +365,7 @@ NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
 
         WDF_WORKITEM_CONFIG cfg;
         WDF_WORKITEM_CONFIG_INIT(&cfg, func);
+        cfg.AutomaticSerialization = false;
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
