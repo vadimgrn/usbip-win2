@@ -357,7 +357,7 @@ PAGED void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(dev), ctx.port);
 
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // PASSIVE_LEVEL
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // FIXME: really PASSIVE_LEVEL?
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(dev), err);
         }
 

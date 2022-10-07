@@ -780,11 +780,11 @@ urb_function_t* const urb_functions[] =
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
+auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp));
-
+        
         auto func = urb.UrbHeader.Function;
         auto &ctx = *get_endpoint_ctx(endp);
 
@@ -824,7 +824,7 @@ void NTAPI usbip::device::internal_device_control(
         }
 
         auto endp = get_endpoint(Queue);
-        auto st = submit_urb(Request, endp);
+        auto st = usb_submit_urb(Request, endp);
 
         if (st != STATUS_PENDING) {
                 TraceDbg("%!STATUS!", st);

@@ -127,25 +127,6 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto init_context(_In_ WDFDEVICE vhci)
-{
-        PAGED_CODE();
-        auto &ctx = *get_vhci_ctx(vhci);
-
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.ParentObject = vhci;
-
-        if (auto err = WdfSpinLockCreate(&attrs, &ctx.devices_lock)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
@@ -180,7 +161,7 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
         }
 
         using func_t = NTSTATUS(WDFDEVICE);
-        func_t *functions[] { init_context, create_interfaces, add_usbdevice_emulation, vhci::create_default_queue };
+        func_t *functions[] { create_interfaces, add_usbdevice_emulation, vhci::create_default_queue };
 
         for (auto f: functions) {
                 if (auto err = f(vhci)) {
@@ -199,14 +180,15 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
-
         auto &dev_ctx = *get_device_ctx(dev);
-        auto &vhci_ctx = *get_vhci_ctx(dev_ctx.vhci); 
+
+        auto vhci = dev_ctx.vhci;
+        auto &vhci_ctx = *get_vhci_ctx(vhci); 
 
         auto &port = dev_ctx.port;
         NT_ASSERT(!port);
 
-        WdfSpinLockAcquire(vhci_ctx.devices_lock);
+        WdfObjectAcquireLock(vhci);
 
         for (int i = 0; i < ARRAYSIZE(vhci_ctx.devices); ++i) {
                 auto &handle = vhci_ctx.devices[i];
@@ -218,7 +200,7 @@ PAGED int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
                 }
         }
 
-        WdfSpinLockRelease(vhci_ctx.devices_lock);
+        WdfObjectReleaseLock(vhci);
 
         if (port) {
                 TraceDbg("dev %04x, port %d", ptr04x(dev), port);
@@ -232,14 +214,15 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE dev)
 {
         auto &dev_ctx = *get_device_ctx(dev);
-        auto &vhci_ctx = *get_vhci_ctx(dev_ctx.vhci); 
+
+        auto vhci = dev_ctx.vhci;
+        auto &vhci_ctx = *get_vhci_ctx(vhci); 
 
         auto &port = dev_ctx.port;
-
         int old_port = 0;
         bool removed = false;
 
-        WdfSpinLockAcquire(vhci_ctx.devices_lock);
+        WdfObjectAcquireLock(vhci);
         if (port) {
                 old_port = port;
                 removed = true;
@@ -253,7 +236,7 @@ void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE dev)
                 port = 0;
                 static_assert(!is_valid_port(0));
         }
-        WdfSpinLockRelease(vhci_ctx.devices_lock);
+        WdfObjectReleaseLock(vhci);
 
         if (removed) {
                 TraceDbg("dev %04x, port %ld", ptr04x(dev), old_port);
@@ -271,14 +254,14 @@ wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
         }
 
         auto &ctx = *get_vhci_ctx(vhci);
-        WdfSpinLockAcquire(ctx.devices_lock);
+        WdfObjectAcquireLock(vhci);
 
         if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
                 dev.reset(handle); // adds reference
         }
 
-        WdfSpinLockRelease(ctx.devices_lock);
+        WdfObjectReleaseLock(vhci);
         return dev;
 }
 
