@@ -14,6 +14,8 @@
 #include "network.h"
 
 #include <libdrv\pdu.h>
+#include <libdrv\ch9.h>
+#include <libdrv\usb_util.h>
 #include <libdrv\wsk_cpp.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
@@ -490,6 +492,7 @@ NTSTATUS select_configuration(_In_ WDFREQUEST, _In_ URB &urb, _In_ const endpoin
 
         UCHAR value = cd ? cd->bConfigurationValue : 0;
         TraceUrb("bConfigurationValue %d", value);
+
         return STATUS_NOT_IMPLEMENTED;
 }
 
@@ -563,7 +566,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx&)
+NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
         auto &r = urb.UrbBulkOrInterruptTransfer;
 
@@ -576,7 +579,25 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
                         r.TransferBufferLength, func);
         }
 
-        return STATUS_NOT_IMPLEMENTED;
+        auto type = usb_endpoint_type(endp.descriptor);
+
+        if (!(type == UsbdPipeTypeBulk || type == UsbdPipeTypeInterrupt)) {
+                Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        auto &dev = *get_device_ctx(endp.device);
+
+        wsk_context_ptr ctx(&dev, request);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength)) {
+                return err;
+        }
+
+        return STATUS_NOT_IMPLEMENTED; // send(ctx, dev, &urb);
 }
 
 /*
@@ -800,6 +821,45 @@ auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 
 } // namespace
 
+
+/*
+ * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
+ * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::select_configuration(
+        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
+{
+        auto irp = WdfRequestWdmGetIrp(request);
+
+        NT_ASSERT(IoGetCurrentIrpStackLocation(irp)->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL);
+        NT_ASSERT(DeviceIoControlCode(irp) == IOCTL_INTERNAL_USBEX_SUBMIT_URB);
+        NT_ASSERT(static_cast<URB*>(URB_FROM_IRP(irp))->UrbHeader.Function == URB_FUNCTION_SELECT_CONFIGURATION);
+
+        auto &dev_ctx = *get_device_ctx(dev);
+        auto &endp = *get_endpoint_ctx(dev_ctx.ep0);
+
+        wsk_context_ptr ctx(&dev_ctx, request);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
+        bool dir_out = true;
+
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev_ctx, endp, TransferFlags, 0, &dir_out)) {
+                return err;
+        }
+
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt.bRequest = USB_REQUEST_SET_CONFIGURATION;
+        pkt.wValue.W = ConfigurationValue;
+        NT_ASSERT(!pkt.wIndex.W);
+        NT_ASSERT(!pkt.wLength);
+
+        return ::send(ctx, dev_ctx, nullptr, true);
+}
 
 /*
  * IRP_MJ_INTERNAL_DEVICE_CONTROL 

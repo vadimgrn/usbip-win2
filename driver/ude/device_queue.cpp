@@ -26,9 +26,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
 {
-        auto &req_ctx = *get_request_ctx(request);
+        auto &ctx = *get_request_ctx(request);
 
-        auto old_status = atomic_set_status(req_ctx, REQ_CANCELED);
+        auto old_status = atomic_set_status(ctx, REQ_CANCELED);
         TraceDbg("queue %04x, request %04x, %!request_status!", ptr04x(queue), ptr04x(request), old_status);
 
         if (old_status == REQ_SEND_COMPLETE) {
@@ -55,7 +55,7 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Device queue %04x cleanup", ptr04x(obj)); };
+        attrs.EvtCleanupCallback = [] (auto) { TraceDbg("Device queue cleanup"); };
 //      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoCanceledOnQueue is used only
         attrs.ParentObject = dev;
 

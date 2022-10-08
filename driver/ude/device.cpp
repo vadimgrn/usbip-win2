@@ -114,7 +114,7 @@ NTSTATUS device_set_function_suspend_and_wake(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
+PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT endp)
 {
         PAGED_CODE();
 
@@ -131,16 +131,13 @@ PAGED auto create_endpoint_queue(_In_ UDECXUSBENDPOINT endp)
         auto dev = get_endpoint_ctx(endp)->device;
         auto vhci = get_device_ctx(dev)->vhci;
 
-        WDFQUEUE queue;
         if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, &queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
         get_endpoint(queue) = endp;
 
-        UdecxUsbEndpointSetWdfIoQueue(endp, queue); // PASSIVE_LEVEL
-
-        TraceDbg("dev %04x, endp %04x, queue %04x", ptr04x(dev), ptr04x(endp), ptr04x(queue));
+        UdecxUsbEndpointSetWdfIoQueue(endp, queue);
         return STATUS_SUCCESS;
 }
 
@@ -151,7 +148,7 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
 {
         PAGED_CODE();
 
-        auto epd = data->EndpointDescriptor;
+        auto epd = data->EndpointDescriptor; // NULL if default control pipe is adding
         auto bEndpointAddress = epd ? epd->bEndpointAddress : UCHAR(USB_DEFAULT_ENDPOINT_ADDRESS);
 
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, bEndpointAddress);
@@ -178,22 +175,25 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
                 ctx.descriptor = *epd;
         } else {
                 auto &d = ctx.descriptor;
+
                 d.bLength = sizeof(d);
                 d.bDescriptorType = USB_ENDPOINT_DESCRIPTOR_TYPE;
                 NT_ASSERT(usb_default_control_pipe(d));
+
+                get_device_ctx(dev)->ep0 = endp;
         }
 
-        if (auto err = create_endpoint_queue(endp)) {
+        WDFQUEUE queue;
+
+        if (auto err = create_endpoint_queue(queue, endp)) {
                 return err;
-        }
-
-        {
+        } else {
                 auto &d = ctx.descriptor;
-                TraceDbg("dev %04x, endp %04x{Address %#x: %s %s[%d], Interval %d}", 
+                TraceDbg("dev %04x, endp %04x{Address %#x: %s %s[%d], Interval %d}, queue %04x", 
                         ptr04x(dev), ptr04x(endp), d.bEndpointAddress, 
                         usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", 
-                        usb_endpoint_num(d), d.bInterval);
+                        usb_endpoint_num(d), d.bInterval, ptr04x(queue));
         }
 
         return STATUS_SUCCESS;
@@ -214,27 +214,30 @@ _IRQL_requires_same_
 void endpoints_configure(
         _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
-        auto st = STATUS_NOT_IMPLEMENTED; 
+        auto st = STATUS_SUCCESS; 
 
         switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize:
                 TraceDbg("dev %04x, ToConfigure[%lu]%!BIN!", ptr04x(dev), params->EndpointsToConfigureCount, 
                           WppBinary(params->EndpointsToConfigure,
                                     USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
-                st = STATUS_SUCCESS;
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
                           WppBinary(params->ReleasedEndpoints, 
                                     USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
-                st = STATUS_SUCCESS;
+//              for (ULONG i = 0; i < params->ReleasedEndpointsCount; ++i) {
+//                      WdfObjectDelete(params->ReleasedEndpoints[i]);
+//              }
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
-                TraceDbg("dev %04x, bConfigurationValue %d", ptr04x(dev), params->NewConfigurationValue);
+                TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), params->NewConfigurationValue);
+                st = device::select_configuration(dev, request, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
                 TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", 
                           ptr04x(dev), params->InterfaceNumber, params->NewInterfaceSetting);
+                st = STATUS_NOT_IMPLEMENTED;
                 break;
         }
 

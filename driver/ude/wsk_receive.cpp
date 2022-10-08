@@ -14,6 +14,7 @@
 #include "urbtransfer.h"
 #include "network.h"
 #include "driver.h"
+#include "device_ioctl.h"
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
@@ -80,26 +81,23 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 URB *get_urb(_In_ WDFREQUEST request)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
-	auto stack = IoGetCurrentIrpStackLocation(irp);
-	auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
+	auto ioctl = DeviceIoControlCode(irp);
 
-	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB || ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB) {
 		return static_cast<URB*>(URB_FROM_IRP(irp));
 	}
 
-	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB_SUBMIT_URB expected, got %s(%#x)", 
+	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB[EX]_SUBMIT_URB expected, got %s(%#x)", 
 		internal_device_control_name(ioctl), ioctl);
 
 	return nullptr;
 }
 
-/*
- * EP0 stall is not an error, control endpoint cannot stall.
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_select_configuration(_In_ wsk_context&, _Inout_ URB&)
 {
+	TraceUrb("DONE");
 	return STATUS_SUCCESS;
 }
 
@@ -435,10 +433,38 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
+	auto irp = WdfRequestWdmGetIrp(ctx.request);
 	auto st = STATUS_INVALID_PARAMETER;
 
-	if (auto urb = get_urb(ctx.request)) {
-		st = usb_submit_urb(ctx, *urb);
+	switch (auto ioctl = DeviceIoControlCode(irp)) {
+	case IOCTL_INTERNAL_USB_SUBMIT_URB:
+		if (auto urb = get_urb(ctx.request)) {
+			st = usb_submit_urb(ctx, *urb);
+		}
+		break;
+	case IOCTL_INTERNAL_USBEX_SUBMIT_URB:
+	{
+		auto &ret = get_ret_submit(ctx);
+
+		auto &irp_st = irp->IoStatus.Status;
+		irp_st = ret.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
+
+		auto &req_ctx = *get_request_ctx(ctx.request);
+
+		auto old_status = atomic_set_status(req_ctx, REQ_RECV_COMPLETE);
+		NT_ASSERT(old_status != REQ_CANCELED);
+
+		TraceDbg("Select configuration %d, %!request_status!", ret.status, old_status);
+
+		if (old_status == REQ_SEND_COMPLETE) {
+			WdfRequestComplete(ctx.request, irp_st);
+		}
+	}
+	ctx.request = WDF_NO_HANDLE;
+	return RECV_NEXT_USBIP_HDR;
+	default:
+		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", 
+			internal_device_control_name(ioctl), ioctl);
 	}
 
 	complete(ctx.request, st);

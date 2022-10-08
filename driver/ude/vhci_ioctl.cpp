@@ -494,10 +494,12 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         attrs.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); };
         attrs.ParentObject = vhci;
 
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, nullptr)) {
+        WDFQUEUE queue;
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, &queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
 
+        TraceDbg("%04x", ptr04x(queue));
         return STATUS_SUCCESS;
 }

@@ -44,7 +44,7 @@ auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::set_cmd_submit_usbip_header(
 	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const endpoint_ctx &endp,
-	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_opt_ bool *setup_dir_out)
+	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_opt_ const bool *setup_dir_out)
 {
 	auto &epd = endp.descriptor;
 
