@@ -238,7 +238,9 @@ void endpoints_configure(
                 break;
         }
 
-        WdfRequestComplete(request, st);
+        if (st != STATUS_PENDING) {
+                WdfRequestComplete(request, st);
+        }
 }
 
 _IRQL_requires_same_
@@ -342,11 +344,9 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
  * 2.Call WdfObjectDelete to destroy it.
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
 {
-        PAGED_CODE();
-
         auto &ctx = *get_device_ctx(dev);
         static_assert(sizeof(ctx.destroyed) == sizeof(CHAR));
 
@@ -357,43 +357,9 @@ PAGED void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(dev), ctx.port);
 
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // FIXME: really PASSIVE_LEVEL?
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(dev), err);
         }
 
         WdfObjectDelete(dev);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::schedule_destroy(_In_ UDECXUSBDEVICE dev)
-{
-        auto func = [] (auto WorkItem)
-        {
-                if (auto dev = *WdfObjectGet_UDECXUSBDEVICE(WorkItem)) {
-                        destroy(dev);
-                        WdfObjectDereference(dev);
-                }
-                WdfObjectDelete(WorkItem); // can be omitted
-        };
-
-        WDF_WORKITEM_CONFIG cfg;
-        WDF_WORKITEM_CONFIG_INIT(&cfg, func);
-        cfg.AutomaticSerialization = false;
-
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
-        attrs.ParentObject = dev;
-
-        WDFWORKITEM wi{};
-        if (auto err = WdfWorkItemCreate(&cfg, &attrs, &wi)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
-                return err;
-        }
-
-        *WdfObjectGet_UDECXUSBDEVICE(wi) = dev;
-        WdfObjectReference(dev);
-
-        WdfWorkItemEnqueue(wi);
-        return STATUS_SUCCESS;
 }

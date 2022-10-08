@@ -577,9 +577,9 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	}
 	NT_ASSERT(!ctx.request);
 
-	if (auto handle = get_device(&dev)) {
-		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(handle), NT_SUCCESS(st.Status) ? err : st.Status);
-		device::schedule_destroy(handle);
+	if (auto hdev = get_device(&dev)) {
+		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(hdev), NT_SUCCESS(st.Status) ? err : st.Status);
+		device::destroy(hdev);
 	}
 
 	return StopCompletion;
@@ -741,10 +741,11 @@ auto validate_header(_Inout_ usbip_header &hdr)
  */
 _Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
 	PAGED_CODE();
+
 	auto &ctx = *get_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
@@ -768,6 +769,8 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 {
+	PAGED_CODE();
+
 	WDF_WORKITEM_CONFIG cfg;
 	WDF_WORKITEM_CONFIG_INIT(&cfg, receive_usbip_header);
 	cfg.AutomaticSerialization = false;
@@ -798,7 +801,7 @@ NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flag
 
 	if (auto dev = get_device(ext->ctx)) {
 		Trace(TRACE_LEVEL_INFORMATION, "dev %04x, Flags %#lx", ptr04x(dev), Flags);
-		device::schedule_destroy(dev);
+		device::destroy(dev);
 	}
 
 	return STATUS_SUCCESS;

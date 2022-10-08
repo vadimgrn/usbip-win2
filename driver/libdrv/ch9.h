@@ -31,8 +31,18 @@ constexpr bool usb_endpoint_dir_out(const USB_ENDPOINT_DESCRIPTOR &epd)
 	return USB_ENDPOINT_DIRECTION_OUT(epd.bEndpointAddress);
 }
 
+/*
+ * Default control pipe doesn't have descriptor, but zeroed descriptor 
+ * has bEndpointAddress|bmAttributes that match expectations.
+ */
 constexpr auto usb_default_control_pipe(const USB_ENDPOINT_DESCRIPTOR &epd)
 {
-	return  epd.bEndpointAddress == USB_DEFAULT_ENDPOINT_ADDRESS && 
+	return  epd.bLength >= sizeof(epd) &&
+		epd.bDescriptorType == USB_ENDPOINT_DESCRIPTOR_TYPE &&
+		epd.bEndpointAddress == USB_DEFAULT_ENDPOINT_ADDRESS &&
 		usb_endpoint_type(epd) == UsbdPipeTypeControl;
 }
+
+static_assert(usb_default_control_pipe(
+	USB_ENDPOINT_DESCRIPTOR{sizeof(USB_ENDPOINT_DESCRIPTOR), 
+				USB_ENDPOINT_DESCRIPTOR_TYPE}));

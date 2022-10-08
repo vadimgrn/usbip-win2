@@ -102,7 +102,7 @@ NTSTATUS send_complete(
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
                 auto dev = get_device(ctx->dev_ctx);
-                device::schedule_destroy(dev);
+                device::destroy(dev);
         }
 
         return StopCompletion;
