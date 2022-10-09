@@ -14,7 +14,7 @@
 #include "urbtransfer.h"
 #include "network.h"
 #include "driver.h"
-#include "device_ioctl.h"
+#include "ioctl.h"
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
@@ -76,21 +76,20 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	return hdr.u.ret_submit;
 }
 
+inline auto check_urb(_In_ IRP *irp)
+{
+	auto ioctl = DeviceIoControlCode(irp);
+	return  ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB ||
+		ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-URB *get_urb(_In_ WDFREQUEST request)
+auto& get_urb(_In_ WDFREQUEST request)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
-	auto ioctl = DeviceIoControlCode(irp);
-
-	if (ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB || ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB) {
-		return static_cast<URB*>(URB_FROM_IRP(irp));
-	}
-
-	Trace(TRACE_LEVEL_ERROR, "IOCTL_INTERNAL_USB[EX]_SUBMIT_URB expected, got %s(%#x)", 
-		internal_device_control_name(ioctl), ioctl);
-
-	return nullptr;
+	NT_ASSERT(check_urb(irp));
+	return *urb_from_irp(irp);
 }
 
 _IRQL_requires_same_
@@ -382,7 +381,7 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
 	NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
 
-	auto urb = (URB*)URB_FROM_IRP(irp);
+	auto urb = urb_from_irp(irp);
 	auto urb_st = urb->UrbHeader.Status;
 
 	auto &req_ctx = *get_request_ctx(request);
@@ -404,28 +403,6 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	request = WDF_NO_HANDLE;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto usb_submit_urb(_In_ wsk_context &ctx, _Inout_ URB &urb)
-{
-	auto &ret = get_ret_submit(ctx);
-	auto &usbd_st = urb.UrbHeader.Status;
-
-	usbd_st = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-
-	auto func = urb.UrbHeader.Function;
-	auto pfunc = func < ARRAYSIZE(urb_functions) ? urb_functions[func] : nullptr;
-
-	auto err = pfunc ? pfunc(ctx, urb) : STATUS_INVALID_PARAMETER;
-
-	if (err && !urb.UrbHeader.Status) { // it's OK if (urb->UrbHeader.Status && !err)
-		urb.UrbHeader.Status =  err == STATUS_CANCELLED ? USBD_STATUS_CANCELED : USBD_STATUS_INVALID_PARAMETER;
-		TraceDbg("Set USBD_STATUS=%s because return is %!STATUS!", get_usbd_status(usbd_st), err);
-	}
-
-	return err;
-}
-
 enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
 
 _Function_class_(device_ctx::received_fn)
@@ -433,38 +410,20 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
-	auto irp = WdfRequestWdmGetIrp(ctx.request);
-	auto st = STATUS_INVALID_PARAMETER;
+	auto &urb = get_urb(ctx.request);
 
-	switch (auto ioctl = DeviceIoControlCode(irp)) {
-	case IOCTL_INTERNAL_USB_SUBMIT_URB:
-		if (auto urb = get_urb(ctx.request)) {
-			st = usb_submit_urb(ctx, *urb);
-		}
-		break;
-	case IOCTL_INTERNAL_USBEX_SUBMIT_URB:
 	{
 		auto &ret = get_ret_submit(ctx);
-
-		auto &irp_st = irp->IoStatus.Status;
-		irp_st = ret.status ? STATUS_UNSUCCESSFUL : STATUS_SUCCESS;
-
-		auto &req_ctx = *get_request_ctx(ctx.request);
-
-		auto old_status = atomic_set_status(req_ctx, REQ_RECV_COMPLETE);
-		NT_ASSERT(old_status != REQ_CANCELED);
-
-		TraceDbg("Select configuration %d, %!request_status!", ret.status, old_status);
-
-		if (old_status == REQ_SEND_COMPLETE) {
-			WdfRequestComplete(ctx.request, irp_st);
-		}
+		urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 	}
-	ctx.request = WDF_NO_HANDLE;
-	return RECV_NEXT_USBIP_HDR;
-	default:
-		Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#08lX)", 
-			internal_device_control_name(ioctl), ioctl);
+
+	auto st = STATUS_SUCCESS;
+	auto &req = *get_request_ctx(ctx.request);
+
+	if (!req.urb_function_select) { // IOCTL_INTERNAL_USB_SUBMIT_URB
+		auto idx = urb.UrbHeader.Function;
+		auto func = idx < ARRAYSIZE(urb_functions) ? urb_functions[idx] : nullptr;
+		st = func ? func(ctx, urb) : STATUS_INVALID_PARAMETER;
 	}
 
 	complete(ctx.request, st);
@@ -670,14 +629,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
-	auto urb = get_urb(ctx.request);
-	if (!urb) {
-		return STATUS_INVALID_PARAMETER;
-	}
-
+	auto &urb = get_urb(ctx.request);
 	WSK_BUF buf{ nullptr, 0, length };
 
-	if (auto err = prepare_wsk_mdl(buf.Mdl, ctx, *urb)) {
+	if (auto err = prepare_wsk_mdl(buf.Mdl, ctx, urb)) {
 		NT_ASSERT(err != RECV_MORE_DATA_REQUIRED);
 		Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
 		return err;
@@ -701,9 +656,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 {
-	auto &hdr = ctx.hdr; // request must be completed
+	auto &hdr = ctx.hdr;
 
-	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? 
+	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? // request must be completed
 		      device::dequeue_request(ctx.dev_ctx->queue, hdr.base.seqnum) : WDF_NO_HANDLE;
 
 	{

@@ -12,6 +12,7 @@
 #include "device_queue.h"
 #include "proto.h"
 #include "network.h"
+#include "ioctl.h"
 
 #include <libdrv\pdu.h>
 #include <libdrv\ch9.h>
@@ -19,8 +20,6 @@
 #include <libdrv\wsk_cpp.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
-
-#include <usbioctl.h>
 
 namespace
 {
@@ -76,7 +75,7 @@ NTSTATUS send_complete(
                         NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
                         NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
 
-                        auto urb = (URB*)URB_FROM_IRP(irp);
+                        auto urb = urb_from_irp(irp);
                         auto urb_st = urb->UrbHeader.Status;
                         
                         TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix",
@@ -90,7 +89,6 @@ NTSTATUS send_complete(
                 }
                         break;
                 case REQ_CANCELED:
-                        WdfRequestSetInformation(request, 0);
                         UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
                         break;
                 }
@@ -98,7 +96,6 @@ NTSTATUS send_complete(
                 NT_ASSERT(victim == request);
                 UdecxUrbCompleteWithNtStatus(victim, STATUS_UNSUCCESSFUL);
         } else if (old_status == REQ_CANCELED) {
-                WdfRequestSetInformation(request, 0);
                 UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
         }
 
@@ -585,7 +582,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
                 Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
                 return STATUS_INVALID_PARAMETER;
         }
-
+/*
         auto &dev = *get_device_ctx(endp.device);
 
         wsk_context_ptr ctx(&dev, request);
@@ -597,7 +594,9 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
                 return err;
         }
 
-        return STATUS_NOT_IMPLEMENTED; // send(ctx, dev, &urb);
+        return send(ctx, dev, &urb);
+*/
+        return STATUS_NOT_IMPLEMENTED;
 }
 
 /*
@@ -804,7 +803,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 {
         auto irp = WdfRequestWdmGetIrp(request);
-        auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp));
+        auto &urb = *urb_from_irp(irp);
         
         auto func = urb.UrbHeader.Function;
         auto &ctx = *get_endpoint_ctx(endp);
@@ -819,27 +818,52 @@ auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
         return STATUS_NOT_IMPLEMENTED;
 }
 
-} // namespace
+/*
+ * FIXME: not sure that this request really has URB. 
+ */
+auto check_urb(_In_ WDFREQUEST request, _In_ USHORT Function)
+{
+        auto irp = WdfRequestWdmGetIrp(request);
+        auto stack = IoGetCurrentIrpStackLocation(irp);
+        auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
 
+        auto ok = stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && 
+                  ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB;
+
+        if (!ok) {
+                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#x)", 
+                        internal_device_control_name(ioctl), ioctl);
+                return STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        auto urb = urb_from_irp(irp);
+        auto func = urb->UrbHeader.Function;
+
+        if (func != Function) {
+                Trace(TRACE_LEVEL_ERROR, "%s expected, got %s(%#x)", 
+                        urb_function_str(Function), urb_function_str(func), func);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        return STATUS_SUCCESS;
+}
 
 /*
  * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
  * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::select_configuration(
-        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
+auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG params)
 {
-        auto irp = WdfRequestWdmGetIrp(request);
+        if (auto ctx = get_request_ctx(request)) {
+                ctx->urb_function_select = true;
+        }
 
-        NT_ASSERT(IoGetCurrentIrpStackLocation(irp)->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL);
-        NT_ASSERT(DeviceIoControlCode(irp) == IOCTL_INTERNAL_USBEX_SUBMIT_URB);
-        NT_ASSERT(static_cast<URB*>(URB_FROM_IRP(irp))->UrbHeader.Function == URB_FUNCTION_SELECT_CONFIGURATION);
+        auto &dev = *get_device_ctx(device);
+        auto &endp = *get_endpoint_ctx(dev.ep0);
 
-        auto &dev_ctx = *get_device_ctx(dev);
-        auto &endp = *get_endpoint_ctx(dev_ctx.ep0);
-
-        wsk_context_ptr ctx(&dev_ctx, request);
+        wsk_context_ptr ctx(&dev, request);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -847,18 +871,58 @@ NTSTATUS usbip::device::select_configuration(
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
         bool dir_out = true;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev_ctx, endp, TransferFlags, 0, &dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, TransferFlags, 0, &dir_out)) {
                 return err;
         }
 
+        bool iface = params >> 16; 
+
         auto &pkt = get_submit_setup(ctx->hdr);
-        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt.bRequest = USB_REQUEST_SET_CONFIGURATION;
-        pkt.wValue.W = ConfigurationValue;
-        NT_ASSERT(!pkt.wIndex.W);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | UCHAR(iface ? USB_RECIP_INTERFACE : USB_RECIP_DEVICE);
+        pkt.bRequest = iface ? USB_REQUEST_SET_INTERFACE : USB_REQUEST_SET_CONFIGURATION;
         NT_ASSERT(!pkt.wLength);
 
-        return ::send(ctx, dev_ctx, nullptr, true);
+        if (iface) {
+                pkt.wValue.W = UCHAR(params >> 8); // Alternative Setting
+                pkt.wIndex.W = UCHAR(params); // Interface
+        } else {
+                pkt.wValue.W = UCHAR(params); // Configuration Value
+                NT_ASSERT(!pkt.wIndex.W);
+        }
+
+        return ::send(ctx, dev, nullptr, true);
+}
+
+} // namespace
+
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::select_configuration(
+        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
+{
+        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), ConfigurationValue);
+
+        if (auto err = check_urb(request, URB_FUNCTION_SELECT_CONFIGURATION)) {
+                return err;
+        }
+
+        return do_select(dev, request, ConfigurationValue);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::select_interface(
+        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR InterfaceNumber, _In_ UCHAR InterfaceSetting)
+{
+        TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", ptr04x(dev), InterfaceNumber, InterfaceSetting);
+
+        if (auto err = check_urb(request, URB_FUNCTION_SELECT_INTERFACE)) {
+                return err;
+        }
+
+        auto params = (1UL << 16) | (InterfaceSetting << 8) | InterfaceNumber;
+        return do_select(dev, request, params);
 }
 
 /*

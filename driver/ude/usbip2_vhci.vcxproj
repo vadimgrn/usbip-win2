@@ -34,6 +34,7 @@
     <ClInclude Include="context.h" />
     <ClInclude Include="device_ioctl.h" />
     <ClInclude Include="device_queue.h" />
+    <ClInclude Include="ioctl.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="urbtransfer.h" />

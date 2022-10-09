@@ -130,8 +130,9 @@ struct request_ctx
 {
         seqnum_t seqnum;
         request_status status;
+        bool urb_function_select; // configuration/interface
 };
-static_assert(sizeof(request_ctx) == 8);
+static_assert(sizeof(request_ctx) == 12);
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -34,6 +34,7 @@
     <ClInclude Include="wsk_context.h" />
     <ClInclude Include="device_queue.h" />
     <ClInclude Include="proto.h" />
+    <ClInclude Include="ioctl.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />

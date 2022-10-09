@@ -47,7 +47,7 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI device_destroy(_In_ WDFOBJECT Object)
+PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
@@ -61,7 +61,7 @@ void NTAPI device_destroy(_In_ WDFOBJECT Object)
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void device_cleanup(_In_ WDFOBJECT Object)
+PAGED void device_cleanup(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
@@ -144,7 +144,7 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
+PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
 {
         PAGED_CODE();
 
@@ -184,12 +184,13 @@ NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_
         }
 
         WDFQUEUE queue;
-
         if (auto err = create_endpoint_queue(queue, endp)) {
                 return err;
-        } else {
+        }
+
+        {
                 auto &d = ctx.descriptor;
-                TraceDbg("dev %04x, endp %04x{Address %#x: %s %s[%d], Interval %d}, queue %04x", 
+                TraceDbg("dev %04x, endp %04x{Address %#04x: %s %s[%d], Interval %d}, queue %04x", 
                         ptr04x(dev), ptr04x(endp), d.bEndpointAddress, 
                         usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", 
@@ -226,18 +227,12 @@ void endpoints_configure(
                 TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
                           WppBinary(params->ReleasedEndpoints, 
                                     USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
-//              for (ULONG i = 0; i < params->ReleasedEndpointsCount; ++i) {
-//                      WdfObjectDelete(params->ReleasedEndpoints[i]);
-//              }
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
-                TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), params->NewConfigurationValue);
                 st = device::select_configuration(dev, request, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
-                TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", 
-                          ptr04x(dev), params->InterfaceNumber, params->NewInterfaceSetting);
-                st = STATUS_NOT_IMPLEMENTED;
+                st = device::select_interface(dev, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
         }
 
