@@ -5,11 +5,20 @@
 #pragma once
 
 #include <libdrv\codeseg.h>
+#include <wdf.h>
+
+#include <usb.h>
+#include <wdfusb.h>
+#include <UdeCx.h>
 
 namespace usbip
 {
 
 struct device_ctx;
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void complete(_In_ WDFREQUEST request);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

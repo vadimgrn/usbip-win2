@@ -408,28 +408,15 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 {
-	auto irp = WdfRequestWdmGetIrp(request);
-	auto &irp_st = irp->IoStatus;
+	if (auto irp = WdfRequestWdmGetIrp(request)) {
+		irp->IoStatus.Status = status; // request can be completed by send_complete()
+	}
 
-	NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
-	NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
+	auto &ctx = *get_request_ctx(request);
+	auto old_status = atomic_set_status(ctx, REQ_RECV_COMPLETE);
 
-	irp_st.Status = status; // request can be completed by send_complete()
-
-	auto &req_ctx = *get_request_ctx(request);
-
-	if (auto old_status = atomic_set_status(req_ctx, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
-		auto urb = urb_from_irp(irp);
-		auto urb_st = urb->UrbHeader.Status; // must be set earlier
-
-		TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix", 
-			  ptr04x(request), get_usbd_status(urb_st), status, irp_st.Information);
-
-		if (NT_SUCCESS(status)) {
-			UdecxUrbComplete(request, urb_st);
-		} else {
-			UdecxUrbCompleteWithNtStatus(request, status);
-		}
+	if (old_status == REQ_SEND_COMPLETE) {
+		usbip::complete(request);
 	} else {
 		NT_ASSERT(old_status != REQ_CANCELED);
 	}
@@ -779,6 +766,29 @@ PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 
 } // namespace
 
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::complete(_In_ WDFREQUEST request)
+{
+	auto irp = WdfRequestWdmGetIrp(request);
+	const auto &irp_st = irp->IoStatus;
+
+	NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
+	NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
+
+	auto urb = urb_from_irp(irp);
+	auto urb_st = urb->UrbHeader.Status;
+
+	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %#Ix",
+		  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
+
+	if (NT_SUCCESS(irp_st.Status)) {
+		UdecxUrbComplete(request, urb_st);
+	} else {
+		UdecxUrbCompleteWithNtStatus(request, irp_st.Status);
+	}
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

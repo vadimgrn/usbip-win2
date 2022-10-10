@@ -13,6 +13,7 @@
 #include "proto.h"
 #include "network.h"
 #include "ioctl.h"
+#include "wsk_receive.h"
 
 #include <libdrv\pdu.h>
 #include <libdrv\ch9.h>
@@ -50,12 +51,15 @@ NTSTATUS send_complete(
         wsk_context_ptr ctx(static_cast<wsk_context*>(Context), true);
         auto request = ctx->request;
 
-        request_ctx *req_ctx{};
-        auto old_status = REQ_NO_HANDLE;
+        request_ctx *req_ctx;
+        request_status old_status;
 
         if (request) { // NULL for send_cmd_unlink
                 req_ctx = get_request_ctx(request);
                 old_status = atomic_set_status(*req_ctx, REQ_SEND_COMPLETE);
+        } else {
+                req_ctx = nullptr;
+                old_status = REQ_NO_HANDLE;
         }
 
         auto &st = wsk_irp->IoStatus;
@@ -67,26 +71,8 @@ NTSTATUS send_complete(
                 // nothing to do
         } else if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
-                case REQ_RECV_COMPLETE: 
-                {
-                        auto irp = WdfRequestWdmGetIrp(request);
-                        const auto &irp_st = irp->IoStatus;
-
-                        NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
-                        NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
-
-                        auto urb = urb_from_irp(irp);
-                        auto urb_st = urb->UrbHeader.Status;
-                        
-                        TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix",
-                                  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
-
-                        if (NT_SUCCESS(irp_st.Status)) {
-                                UdecxUrbComplete(request, urb_st);
-                        } else {
-                                UdecxUrbCompleteWithNtStatus(request, irp_st.Status);
-                        }
-                }
+                case REQ_RECV_COMPLETE:
+                        complete(request);
                         break;
                 case REQ_CANCELED:
                         UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
