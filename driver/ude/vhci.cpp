@@ -177,7 +177,7 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
+PAGED int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
         auto &dev_ctx = *get_device_ctx(dev);
@@ -190,7 +190,7 @@ PAGED int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
 
         WdfObjectAcquireLock(vhci);
 
-        for (int i = 0; i < ARRAYSIZE(vhci_ctx.devices); ++i) {
+        for (auto i = dev_ctx.speed() < USB_SPEED_SUPER ? 0 : USB2_PORTS; i < ARRAYSIZE(vhci_ctx.devices); ++i) {
                 auto &handle = vhci_ctx.devices[i];
                 if (!handle) {
                         WdfObjectReference(handle = dev);
@@ -211,7 +211,7 @@ PAGED int usbip::vhci::remember_device(_In_ UDECXUSBDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::vhci::forget_device(_In_ UDECXUSBDEVICE dev)
+void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
 {
         auto &dev_ctx = *get_device_ctx(dev);
 

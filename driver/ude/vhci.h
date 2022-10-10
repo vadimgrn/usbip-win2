@@ -29,7 +29,7 @@ namespace usbip::vhci
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int remember_device(_In_ UDECXUSBDEVICE dev);
+PAGED int claim_roothub_port(_In_ UDECXUSBDEVICE devs);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -37,7 +37,7 @@ wdf::ObjectRef find_device(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void forget_device(_In_ UDECXUSBDEVICE dev);
+void reclaim_roothub_port(_In_ UDECXUSBDEVICE dev);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

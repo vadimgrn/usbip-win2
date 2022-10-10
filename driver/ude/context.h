@@ -76,12 +76,13 @@ struct device_ctx
 
         auto& socket() const { return ext->sock; }
         auto devid() const { return ext->dev.devid; }
+        auto speed() const { return ext->dev.speed; }
 
         WDFDEVICE vhci; // parent
         UDECXUSBENDPOINT ep0; // default control pipe
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
 
-        int port; // vhci_ctx.devices[port - 1], unique device id, this is not roothub's port number
+        int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
         bool destroyed;
 

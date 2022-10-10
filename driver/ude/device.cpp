@@ -70,7 +70,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         TraceDbg("dev %04x", ptr04x(dev));
 
-        vhci::forget_device(dev);
+        vhci::reclaim_roothub_port(dev);
         close_socket(ctx.socket());
 }
 
