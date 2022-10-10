@@ -240,19 +240,52 @@ auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_isoch_transfer(_In_ wsk_context &, _Inout_ URB &)
+NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
-	return STATUS_SUCCESS;
+	auto &ret = get_ret_submit(ctx);
+	auto cnt = ret.number_of_packets;
+
+	auto &r = urb.UrbIsochronousTransfer;
+	r.ErrorCount = ret.error_count;
+
+	if (cnt && cnt == ret.error_count) {
+		r.Hdr.Status = USBD_STATUS_ISOCH_REQUEST_FAILED;
+	}
+
+	if (r.TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
+		r.StartFrame = ret.start_frame;
+	}
+
+	if (cnt >= 0 && ULONG(cnt) == r.NumberOfPackets) {
+		NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
+		byteswap(ctx.isoc, cnt);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r.NumberOfPackets);
+		return STATUS_INVALID_PARAMETER;
+	}
+
+	char *buf{};
+
+	if (is_transfer_direction_in(ctx.hdr)) { // TransferFlags can have wrong direction
+		buf = (char*)get_transfer_buffer(r.TransferBuffer, r.TransferBufferMDL);
+		if (!buf) {
+			return STATUS_INSUFFICIENT_RESOURCES;
+		}
+	}
+
+	return fill_isoc_data(r, buf, ret.actual_length, ctx.isoc);
 }
 
+/*
+ * UdecxUrbRetrieveBuffer(ctx.request, &buf, &len);
+ * UdecxUrbSetBytesCompleted(ctx.request, ret.actual_length);
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 {
 	auto &ret = get_ret_submit(ctx);
 	auto &tr = AsUrbTransfer(urb);
-
-	TraceUrb("%!BIN!", WppBinary(tr.TransferBuffer, USHORT(tr.TransferBufferLength)));
 
 	return  tr.TransferBufferLength == ULONG(ret.actual_length) ? STATUS_SUCCESS : // set by prepare_wsk_mdl
 		assign(tr.TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
@@ -381,15 +414,14 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
 	NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
 
-	auto urb = urb_from_irp(irp);
-	auto urb_st = urb->UrbHeader.Status;
+	irp_st.Status = status; // request can be completed by send_complete()
 
 	auto &req_ctx = *get_request_ctx(request);
 
-	auto old_status = atomic_set_status(req_ctx, REQ_RECV_COMPLETE);
-	NT_ASSERT(old_status != REQ_CANCELED);
+	if (auto old_status = atomic_set_status(req_ctx, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
+		auto urb = urb_from_irp(irp);
+		auto urb_st = urb->UrbHeader.Status; // must be set earlier
 
-	if (old_status == REQ_SEND_COMPLETE) {
 		TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix", 
 			  ptr04x(request), get_usbd_status(urb_st), status, irp_st.Information);
 
@@ -398,6 +430,8 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 		} else {
 			UdecxUrbCompleteWithNtStatus(request, status);
 		}
+	} else {
+		NT_ASSERT(old_status != REQ_CANCELED);
 	}
 
 	request = WDF_NO_HANDLE;

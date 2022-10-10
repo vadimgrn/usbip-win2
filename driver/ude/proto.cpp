@@ -55,15 +55,10 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 		return STATUS_INVALID_PARAMETER;
 	}
 	
-	if (setup_dir_out && usb_endpoint_type(epd) != UsbdPipeTypeControl) {
-		Trace(TRACE_LEVEL_ERROR, "setup_dir_out(%d) passed for %!USBD_PIPE_TYPE!", 
-			                  *setup_dir_out, usb_endpoint_type(epd));
-
-		return STATUS_INVALID_PARAMETER;
-	}
-
+	NT_ASSERT(bool(setup_dir_out) == (usb_endpoint_type(epd) == UsbdPipeTypeControl));
 	auto dir_out = setup_dir_out ? *setup_dir_out : usb_endpoint_dir_out(epd);
-	TransferFlags = fix_transfer_flags(TransferFlags, dir_out); // many URBs don't have PipeHandle
+
+	TransferFlags = fix_transfer_flags(TransferFlags, dir_out);
 
 	if (auto r = &hdr.base) {
 		r->command = USBIP_CMD_SUBMIT;

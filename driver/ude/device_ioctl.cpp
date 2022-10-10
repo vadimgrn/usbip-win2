@@ -70,7 +70,7 @@ NTSTATUS send_complete(
                 case REQ_RECV_COMPLETE: 
                 {
                         auto irp = WdfRequestWdmGetIrp(request);
-                        auto &irp_st = irp->IoStatus;
+                        const auto &irp_st = irp->IoStatus;
 
                         NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
                         NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
@@ -81,7 +81,7 @@ NTSTATUS send_complete(
                         TraceDbg("Complete req %04x, USBD_%s, %!STATUS!, Information %#Ix",
                                   ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
 
-                        if (NT_SUCCESS(irp_st.Status)) { // FIXME: can WdfRequestComplete be used?
+                        if (NT_SUCCESS(irp_st.Status)) {
                                 UdecxUrbComplete(request, urb_st);
                         } else {
                                 UdecxUrbCompleteWithNtStatus(request, irp_st.Status);
@@ -141,7 +141,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         _Inout_opt_ const URB *transfer_buffer = nullptr,
-        _In_ bool log_setup = true)
+        _In_ bool log_setup = false)
 {
         WSK_BUF buf;
 
@@ -558,7 +558,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
         static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
 
-        return send(ctx, dev, &urb);
+        return send(ctx, dev, &urb, true);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -582,7 +582,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
                 Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
                 return STATUS_INVALID_PARAMETER;
         }
-/*
+
         auto &dev = *get_device_ctx(endp.device);
 
         wsk_context_ptr ctx(&dev, request);
@@ -595,8 +595,36 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
         }
 
         return send(ctx, dev, &urb);
-*/
-        return STATUS_NOT_IMPLEMENTED;
+}
+
+/*
+ * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
+{
+        ULONG length = 0;
+
+        for (ULONG i = 0; i < r.NumberOfPackets; ++d) {
+
+                auto offset = r.IsoPacket[i].Offset;
+                auto next_offset = ++i < r.NumberOfPackets ? r.IsoPacket[i].Offset : r.TransferBufferLength;
+
+                if (next_offset >= offset && next_offset <= r.TransferBufferLength) {
+                        d->offset = offset;
+                        d->length = next_offset - offset;
+                        d->actual_length = 0;
+                        d->status = 0;
+                        length += d->length;
+                } else {
+                        Trace(TRACE_LEVEL_ERROR, "[%lu] next_offset(%lu) >= offset(%lu) && next_offset <= r.TransferBufferLength(%lu)",
+                                i, next_offset, offset, r.TransferBufferLength);
+                        return STATUS_INVALID_PARAMETER;
+                }
+        }
+
+        NT_ASSERT(length == r.TransferBufferLength);
+        return STATUS_SUCCESS;
 }
 
 /*
@@ -604,7 +632,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx&)
+NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
         auto &r = urb.UrbIsochronousTransfer;
 
@@ -621,7 +649,35 @@ NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpo
                         func);
         }
 
-        return STATUS_NOT_IMPLEMENTED;
+        auto type = usb_endpoint_type(endp.descriptor);
+
+        if (type != UsbdPipeTypeIsochronous) {
+                Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        auto &dev = *get_device_ctx(endp.device);
+
+        wsk_context_ptr ctx(&dev, request, r.NumberOfPackets);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, 
+                               r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
+                return err;
+        }
+
+        if (auto err = repack(ctx->isoc, r)) {
+                return err;
+        }
+
+        if (auto cmd = &ctx->hdr.u.cmd_submit) {
+                cmd->start_frame = r.StartFrame;
+                cmd->number_of_packets = r.NumberOfPackets;
+        }
+
+        return send(ctx, dev, &urb);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -825,7 +881,7 @@ auto check_urb(_In_ WDFREQUEST request, _In_ USHORT Function)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto stack = IoGetCurrentIrpStackLocation(irp);
-        auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode;
+        auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode; // DeviceIoControlCode(irp)
 
         auto ok = stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && 
                   ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB;
