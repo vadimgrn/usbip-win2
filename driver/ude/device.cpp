@@ -71,7 +71,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         vhci::reclaim_roothub_port(dev);
-        close_socket(ctx.socket());
+        close_socket(ctx.sock());
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)

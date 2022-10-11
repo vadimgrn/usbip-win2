@@ -277,7 +277,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
-        auto speed = get_device_ctx(dev)->speed();
 
         port = vhci::claim_roothub_port(dev);
         if (!port) {
@@ -285,11 +284,13 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
                 return ERR_PORTFULL;
         }
 
+        auto speed = get_device_ctx(dev)->speed();
+
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS options; 
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
 
-        auto &num = speed < USB_SPEED_SUPER ? options.Usb20PortNumber : options.Usb30PortNumber;
-        num = port;
+        auto &portnum = speed < USB_SPEED_SUPER ? options.Usb20PortNumber : options.Usb30PortNumber;
+        portnum = port;
 
         if (auto err = UdecxUsbDevicePlugIn(dev, &options)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);

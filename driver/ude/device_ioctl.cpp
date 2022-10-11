@@ -157,7 +157,7 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
-        auto err = send(dev.socket(), &buf, WSK_FLAG_NODELAY, wsk_irp);
+        auto err = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
         TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, err);
@@ -863,7 +863,7 @@ auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 /*
  * FIXME: not sure that this request really has URB. 
  */
-auto check_urb(_In_ WDFREQUEST request, _In_ USHORT Function)
+auto verify_urb(_In_ WDFREQUEST request, _In_ USHORT Function)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto stack = IoGetCurrentIrpStackLocation(irp);
@@ -945,7 +945,7 @@ NTSTATUS usbip::device::select_configuration(
 {
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), ConfigurationValue);
 
-        if (auto err = check_urb(request, URB_FUNCTION_SELECT_CONFIGURATION)) {
+        if (auto err = verify_urb(request, URB_FUNCTION_SELECT_CONFIGURATION)) {
                 return err;
         }
 
@@ -959,7 +959,7 @@ NTSTATUS usbip::device::select_interface(
 {
         TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", ptr04x(dev), InterfaceNumber, InterfaceSetting);
 
-        if (auto err = check_urb(request, URB_FUNCTION_SELECT_INTERFACE)) {
+        if (auto err = verify_urb(request, URB_FUNCTION_SELECT_INTERFACE)) {
                 return err;
         }
 

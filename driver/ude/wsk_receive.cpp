@@ -22,7 +22,6 @@
 #include <libdrv\pdu.h>
 
 #include <usb.h>
-#include <usbioctl.h>
 
 namespace
 {
@@ -74,22 +73,6 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	auto &hdr = ctx.hdr;
 	NT_ASSERT(hdr.base.command == USBIP_RET_SUBMIT);
 	return hdr.u.ret_submit;
-}
-
-inline auto check_urb(_In_ IRP *irp)
-{
-	auto ioctl = DeviceIoControlCode(irp);
-	return  ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB ||
-		ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto& get_urb(_In_ WDFREQUEST request)
-{
-	auto irp = WdfRequestWdmGetIrp(request);
-	NT_ASSERT(check_urb(irp));
-	return *urb_from_irp(irp);
 }
 
 _IRQL_requires_same_
@@ -401,7 +384,8 @@ urb_function_t* const urb_functions[] =
 	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
 };
 
-/*
+/* 
+ * UrbHeader.Status must be set before this call.
  * @see device_ioctl.cpp, send_complete 
  */
 _IRQL_requires_same_
@@ -413,9 +397,8 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	}
 
 	auto &ctx = *get_request_ctx(request);
-	auto old_status = atomic_set_status(ctx, REQ_RECV_COMPLETE);
-
-	if (old_status == REQ_SEND_COMPLETE) {
+	
+	if (auto old_status = atomic_set_status(ctx, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
 		usbip::complete(request);
 	} else {
 		NT_ASSERT(old_status != REQ_CANCELED);
@@ -439,9 +422,8 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 	}
 
 	auto st = STATUS_SUCCESS;
-	auto &req = *get_request_ctx(ctx.request);
 
-	if (!req.urb_function_select) { // IOCTL_INTERNAL_USB_SUBMIT_URB
+	if (auto req = get_request_ctx(ctx.request); !req->urb_function_select) { // IOCTL_INTERNAL_USB_SUBMIT_URB
 		auto idx = urb.UrbHeader.Function;
 		auto func = idx < ARRAYSIZE(urb_functions) ? urb_functions[idx] : nullptr;
 		st = func ? func(ctx, urb) : STATUS_INVALID_PARAMETER;
@@ -611,7 +593,7 @@ void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	auto wsk_irp = ctx.wsk_irp; // do not access ctx or wsk_irp after send
 	IoSetCompletionRoutine(wsk_irp, on_receive, &ctx, true, true, true);
 
-	auto err = receive(dev.socket(), &buf, WSK_FLAG_WAITALL, wsk_irp);
+	auto err = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, wsk_irp);
 	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
 	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, err);
@@ -767,6 +749,10 @@ PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 } // namespace
 
 
+
+/*
+ * IoStatus.Status and UrbHeader.Status must be assigned before this call.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::complete(_In_ WDFREQUEST request)
@@ -780,7 +766,7 @@ void usbip::complete(_In_ WDFREQUEST request)
 	auto urb = urb_from_irp(irp);
 	auto urb_st = urb->UrbHeader.Status;
 
-	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %#Ix",
+	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %#Id",
 		  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
 
 	if (NT_SUCCESS(irp_st.Status)) {

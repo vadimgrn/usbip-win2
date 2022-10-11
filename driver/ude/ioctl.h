@@ -5,7 +5,7 @@
 #pragma once
 
 #include <wdm.h>
-#include <usbiodef.h>
+#include <usbioctl.h>
 
 namespace usbip
 {
@@ -27,9 +27,25 @@ inline auto DeviceIoControlCode(_In_ IRP *irp)
         return stack->Parameters.DeviceIoControl.IoControlCode;
 }
 
+inline auto has_urb(_In_ IRP *irp)
+{
+	auto ioctl = DeviceIoControlCode(irp);
+	return  ioctl == IOCTL_INTERNAL_USB_SUBMIT_URB ||
+		ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB; // FIXME: really has?
+}
+
 inline auto urb_from_irp(_In_ IRP *irp)
 {
+	NT_ASSERT(has_urb(irp));
 	return static_cast<URB*>(URB_FROM_IRP(irp));
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto& get_urb(_In_ WDFREQUEST request)
+{
+	auto irp = WdfRequestWdmGetIrp(request);
+	return *urb_from_irp(irp);
 }
 
 } // namespace usbip

@@ -29,7 +29,7 @@ namespace usbip::vhci
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int claim_roothub_port(_In_ UDECXUSBDEVICE devs);
+PAGED int claim_roothub_port(_In_ UDECXUSBDEVICE dev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

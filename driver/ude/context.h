@@ -74,7 +74,7 @@ struct device_ctx
 {
         device_ctx_ext *ext; // must be free-d
 
-        auto& socket() const { return ext->sock; }
+        auto& sock() const { return ext->sock; }
         auto devid() const { return ext->dev.devid; }
         auto speed() const { return ext->dev.speed; }
 
