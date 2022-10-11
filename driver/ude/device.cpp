@@ -78,8 +78,36 @@ _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
 _IRQL_requires_same_
 void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
 {
-        TraceDbg("%04x IMPLEMENT ME", ptr04x(endp));
+        Trace(TRACE_LEVEL_WARNING, "%04x IMPLEMENT ME", ptr04x(endp));
         WdfRequestComplete(request, STATUS_SUCCESS);
+}
+
+_Function_class_(EVT_WDF_IO_QUEUE_STATE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void NTAPI purge_complete(_In_ WDFQUEUE queue, _In_ WDFCONTEXT)
+{
+        auto endp = get_endpoint(queue);
+        TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
+        UdecxUsbEndpointPurgeComplete(endp);
+}
+
+_Function_class_(EVT_UDECX_USB_ENDPOINT_PURGE)
+_IRQL_requires_same_
+void endpoint_purge(_In_ UDECXUSBENDPOINT endp)
+{
+        auto queue = get_endpoint_ctx(endp)->queue;
+        TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
+        WdfIoQueuePurge(queue, purge_complete, WDF_NO_CONTEXT);
+}
+
+_Function_class_(EVT_UDECX_USB_ENDPOINT_START)
+_IRQL_requires_same_
+void endpoint_start(_In_ UDECXUSBENDPOINT endp)
+{
+        auto queue = get_endpoint_ctx(endp)->queue;
+        TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
+        WdfIoQueueStart(queue);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
@@ -155,6 +183,9 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
 
         UDECX_USB_ENDPOINT_CALLBACKS cb;
         UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, endpoint_reset);
+        cb.EvtUsbEndpointStart = endpoint_start;
+        cb.EvtUsbEndpointPurge = endpoint_purge;
+
         UdecxUsbEndpointInitSetCallbacks(data->UdecxUsbEndpointInit, &cb);
 
         WDF_OBJECT_ATTRIBUTES attrs;
@@ -183,8 +214,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
                 get_device_ctx(dev)->ep0 = endp;
         }
 
-        WDFQUEUE queue;
-        if (auto err = create_endpoint_queue(queue, endp)) {
+        if (auto err = create_endpoint_queue(ctx.queue, endp)) {
                 return err;
         }
 
@@ -194,7 +224,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
                         ptr04x(dev), ptr04x(endp), d.bEndpointAddress, 
                         usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", 
-                        usb_endpoint_num(d), d.bInterval, ptr04x(queue));
+                        usb_endpoint_num(d), d.bInterval, ptr04x(ctx.queue));
         }
 
         return STATUS_SUCCESS;
