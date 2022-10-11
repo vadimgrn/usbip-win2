@@ -175,6 +175,9 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
 } // namespace
 
 
+/*
+ * usb2.0 devices don't work in usb3.x ports, and visa versa, tested.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
@@ -188,9 +191,12 @@ PAGED int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
         auto &port = dev_ctx.port;
         NT_ASSERT(!port);
 
+        auto [begin, end] = get_port_range(dev_ctx.speed());
+
         WdfObjectAcquireLock(vhci);
 
-        for (auto i = dev_ctx.speed() < USB_SPEED_SUPER ? 0 : USB2_PORTS; i < ARRAYSIZE(vhci_ctx.devices); ++i) {
+        for (auto i = begin; i < end; ++i) {
+                NT_ASSERT(i < ARRAYSIZE(vhci_ctx.devices));
                 auto &handle = vhci_ctx.devices[i];
                 if (!handle) {
                         WdfObjectReference(handle = dev);

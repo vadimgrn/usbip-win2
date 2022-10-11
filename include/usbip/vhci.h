@@ -29,6 +29,21 @@ constexpr auto is_valid_port(int port)
         return port > 0 && port <= TOTAL_PORTS;
 }
 
+inline auto get_port_range(_In_ usb_device_speed speed)
+{
+        struct{ int begin;  int end; } r;
+
+        if (speed < USB_SPEED_SUPER) {
+                r.begin = 0;
+                r.end = USB2_PORTS;
+        } else {
+                r.begin = USB2_PORTS;
+                r.end = TOTAL_PORTS;
+        }
+
+        return r;
+}
+
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
