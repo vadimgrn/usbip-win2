@@ -7,6 +7,7 @@
 #include "device_queue.tmh"
 
 #include "context.h"
+#include "device_ioctl.h"
 
 namespace
 {
@@ -26,17 +27,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
 {
-        auto &ctx = *get_request_ctx(request);
-
-        auto old_status = atomic_set_status(ctx, REQ_CANCELED);
-        TraceDbg("queue %04x, request %04x, %!request_status!", ptr04x(queue), ptr04x(request), old_status);
-
-        if (old_status == REQ_SEND_COMPLETE) {
-                UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
-        } else {
-                NT_ASSERT(old_status != REQ_RECV_COMPLETE);
-        }
-
+        auto dev = get_device(queue);
+        TraceDbg("dev %04x, queue %04x, request %04x", ptr04x(dev), ptr04x(queue), ptr04x(request));
+        device::send_cmd_unlink(dev, request);
 }
 
 } // namespace
@@ -54,7 +47,7 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
         cfg.PowerManaged = WdfFalse;
 
         WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
         attrs.EvtCleanupCallback = [] (auto queue) { TraceDbg("Device queue %04x cleanup", ptr04x(queue)); };
 //      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoCanceledOnQueue is used only
         attrs.ParentObject = dev;
@@ -65,6 +58,9 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
+
+        get_device(ctx.queue) = dev;
+        WdfObjectReference(ctx.queue); // see device_cleanup
 
         TraceDbg("dev %04x, queue %04x", ptr04x(dev), ptr04x(ctx.queue));
         return STATUS_SUCCESS;

@@ -938,6 +938,49 @@ auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG p
 } // namespace
 
 
+ /*
+  * There is a race condition between IRP cancelation and RET_SUBMIT.
+  * Sequence of events:
+  * 1.IRP is waiting for RET_SUBMIT in CSQ.
+  * 2.An upper driver cancels IRP.
+  * 3.IRP is removed from CSQ, IO_CSQ_COMPLETE_CANCELED_IRP callback is called.
+  * 4.The callback inserts IRP into a list of unlinked IRPs (this step is imaginary).
+  *
+  * RET_SUBMIT can be received
+  * a)Before #3 - normal case, IRP will be dequeued from CSQ.
+  * b)Before #4 - IRP will not be found in CSQ and the list.
+  * c)After #4 - IRP will be found in the list.
+  *
+  * Case b) is unavoidable because CSQ library calls IO_CSQ_COMPLETE_CANCELED_IRP after releasing a lock.
+  * For that reason the cancellation logic is simplified and list of unlinked IRPs is not used.
+  * RET_SUBMIT and RET_INLINK must be ignored if IRP is not found (IRP was cancelled and completed).
+  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
+{
+        auto &dev = *get_device_ctx(device);
+        auto &req = *get_request_ctx(request);
+
+        TraceDbg("dev %04x, req %04x, seqnum %u", ptr04x(device), ptr04x(request), req.seqnum);
+
+        if (!dev.sock()) {
+                TraceDbg("Socket is closed");
+        } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
+                set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
+                ::send(ctx, dev); // ignore error
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, req %04x, seqnum %u, wsk_context_ptr error", 
+                                          ptr04x(device), ptr04x(request), req.seqnum);
+        }
+
+        if (auto old_status = atomic_set_status(req, REQ_CANCELED); old_status == REQ_SEND_COMPLETE) {
+                UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
+        } else {
+                NT_ASSERT(old_status != REQ_RECV_COMPLETE);
+        }
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::select_configuration(

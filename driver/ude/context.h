@@ -100,8 +100,6 @@ inline auto get_device(_In_ device_ctx *ctx)
         return ctx ? static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx)) : WDF_NO_HANDLE;
 }
 
-WDF_DECLARE_CONTEXT_TYPE(UDECXUSBDEVICE); // WdfObjectGet_UDECXUSBDEVICE
-
 /*
  * Context space for UDECXUSBENDPOINT.
  */
@@ -113,14 +111,17 @@ struct endpoint_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
-
 WDF_DECLARE_CONTEXT_TYPE(UDECXUSBENDPOINT); // WdfObjectGet_UDECXUSBENDPOINT
-
 inline auto& get_endpoint(_In_ WDFQUEUE queue)
 {
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
 
+WDF_DECLARE_CONTEXT_TYPE(UDECXUSBDEVICE); // WdfObjectGet_UDECXUSBDEVICE
+inline auto& get_device(_In_ WDFQUEUE queue)
+{
+        return *WdfObjectGet_UDECXUSBDEVICE(queue);
+}
 
 enum request_status : LONG { REQ_INIT, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 

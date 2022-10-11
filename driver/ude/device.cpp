@@ -58,6 +58,9 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         free(ctx.ext);
 }
 
+/*
+ * The socket is closed, there is no concurrency with send_complete from device_ioctl.cpp
+ */
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -72,6 +75,12 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         vhci::reclaim_roothub_port(dev);
         close_socket(ctx.sock());
+
+        for (WDFREQUEST req; NT_SUCCESS(WdfIoQueueRetrieveNextRequest(ctx.queue, &req)); ) {
+                UdecxUrbCompleteWithNtStatus(req, STATUS_CANCELLED); // see device::send_cmd_unlink
+        }
+
+        WdfObjectDereference(ctx.queue);
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)

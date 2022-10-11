@@ -766,7 +766,7 @@ void usbip::complete(_In_ WDFREQUEST request)
 	auto urb = urb_from_irp(irp);
 	auto urb_st = urb->UrbHeader.Status;
 
-	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %#Id",
+	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %Iu",
 		  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
 
 	if (NT_SUCCESS(irp_st.Status)) {
