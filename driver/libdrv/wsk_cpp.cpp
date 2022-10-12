@@ -271,27 +271,21 @@ PAGED auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG fla
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
-        static LONG64 cnt;
-        auto cur = InterlockedIncrement64(&cnt);
+        struct anon{};
+        ConcurrencyCheck<anon> chk;
 
         NT_ASSERT(sock);
-        auto ret = sock->Connection->WskSend(sock->Self, buffer, flags, irp);
-
-        NT_ASSERT(InterlockedIncrement64(&cnt) == cur + 1);
-        return ret;
+        return sock->Connection->WskSend(sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
-        static LONG64 cnt;
-        auto cur = InterlockedIncrement64(&cnt);
+        struct anon{};
+        ConcurrencyCheck<anon> chk;
 
         NT_ASSERT(sock);
-        auto ret = sock->Connection->WskReceive(sock->Self, buffer, flags, irp);
-
-        NT_ASSERT(InterlockedIncrement64(&cnt) == cur + 1);
-        return ret;
+        return sock->Connection->WskReceive(sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)

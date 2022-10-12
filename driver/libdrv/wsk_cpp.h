@@ -137,4 +137,15 @@ size_t size(_In_opt_ const WSK_DATA_INDICATION *di);
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto size(_In_ const WSK_DATA_INDICATION &di) { return size(&di); }
 
+template<typename Tag>
+class ConcurrencyCheck
+{
+public:
+        ~ConcurrencyCheck() { NT_ASSERT(InterlockedIncrement64(&count) == cur + 1); }
+
+private:
+        static inline LONG64 count;
+        LONG64 cur = InterlockedIncrement64(&count);
+};
+
 } // namespace wsk
