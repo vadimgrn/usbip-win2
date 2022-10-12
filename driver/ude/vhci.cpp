@@ -194,6 +194,7 @@ PAGED int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
         auto [begin, end] = get_port_range(dev_ctx.speed());
 
         WdfObjectAcquireLock(vhci);
+        NT_ASSERT(KeGetCurrentIrql() >= DISPATCH_LEVEL); // spinlock must be used
 
         for (auto i = begin; i < end; ++i) {
                 NT_ASSERT(i < ARRAYSIZE(vhci_ctx.devices));
@@ -229,6 +230,8 @@ void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
         bool removed = false;
 
         WdfObjectAcquireLock(vhci);
+        NT_ASSERT(KeGetCurrentIrql() >= DISPATCH_LEVEL); // spinlock must be used
+
         if (port) {
                 old_port = port;
                 removed = true;
@@ -242,6 +245,7 @@ void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
                 port = 0;
                 static_assert(!is_valid_port(0));
         }
+
         WdfObjectReleaseLock(vhci);
 
         if (removed) {
@@ -260,7 +264,9 @@ wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
         }
 
         auto &ctx = *get_vhci_ctx(vhci);
+
         WdfObjectAcquireLock(vhci);
+        NT_ASSERT(KeGetCurrentIrql() >= DISPATCH_LEVEL); // spinlock must be used
 
         if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
