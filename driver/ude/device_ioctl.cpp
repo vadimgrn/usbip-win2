@@ -844,8 +844,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 {
-        auto irp = WdfRequestWdmGetIrp(request);
-        auto &urb = *urb_from_irp(irp);
+        auto &urb = get_urb(request);
         
         auto func = urb.UrbHeader.Function;
         auto &ctx = *get_endpoint_ctx(endp);
@@ -860,31 +859,20 @@ auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
         return STATUS_NOT_IMPLEMENTED;
 }
 
-/*
- * FIXME: not sure that this request really has URB. 
- */
-auto verify_urb(_In_ WDFREQUEST request, _In_ USHORT Function)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto verify_select(_In_ WDFREQUEST request)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto stack = IoGetCurrentIrpStackLocation(irp);
-        auto ioctl = stack->Parameters.DeviceIoControl.IoControlCode; // DeviceIoControlCode(irp)
+        auto ioctl = DeviceIoControlCode(stack);
 
         auto ok = stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && 
-                  ioctl == IOCTL_INTERNAL_USBEX_SUBMIT_URB;
+                  ioctl == IOCTL_INTERNAL_USBEX_SELECT;
 
         if (!ok) {
-                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#x)", 
-                        internal_device_control_name(ioctl), ioctl);
+                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#x)", internal_device_control_name(ioctl), ioctl);
                 return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        auto urb = urb_from_irp(irp);
-        auto func = urb->UrbHeader.Function;
-
-        if (func != Function) {
-                Trace(TRACE_LEVEL_ERROR, "%s expected, got %s(%#x)", 
-                        urb_function_str(Function), urb_function_str(func), func);
-                return STATUS_INVALID_PARAMETER;
         }
 
         return STATUS_SUCCESS;
@@ -898,10 +886,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG params)
 {
-        if (auto ctx = get_request_ctx(request)) {
-                ctx->urb_function_select = true;
-        }
-
         auto &dev = *get_device_ctx(device);
         auto &endp = *get_endpoint_ctx(dev.ep0);
 
@@ -988,7 +972,7 @@ NTSTATUS usbip::device::select_configuration(
 {
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), ConfigurationValue);
 
-        if (auto err = verify_urb(request, URB_FUNCTION_SELECT_CONFIGURATION)) {
+        if (auto err = verify_select(request)) {
                 return err;
         }
 
@@ -1002,7 +986,7 @@ NTSTATUS usbip::device::select_interface(
 {
         TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", ptr04x(dev), InterfaceNumber, InterfaceSetting);
 
-        if (auto err = verify_urb(request, URB_FUNCTION_SELECT_INTERFACE)) {
+        if (auto err = verify_select(request)) {
                 return err;
         }
 

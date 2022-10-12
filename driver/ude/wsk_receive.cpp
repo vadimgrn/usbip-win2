@@ -396,9 +396,9 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 		irp->IoStatus.Status = status; // request can be completed by send_complete()
 	}
 
-	auto &ctx = *get_request_ctx(request);
+	auto &req = *get_request_ctx(request);
 	
-	if (auto old_status = atomic_set_status(ctx, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
+	if (auto old_status = atomic_set_status(req, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
 		usbip::complete(request);
 	} else {
 		NT_ASSERT(old_status != REQ_CANCELED);
@@ -414,19 +414,18 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
-	auto &urb = get_urb(ctx.request);
-
-	{
-		auto &ret = get_ret_submit(ctx);
-		urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-	}
-
+	auto &ret = get_ret_submit(ctx);
 	auto st = STATUS_SUCCESS;
 
-	if (auto req = get_request_ctx(ctx.request); !req->urb_function_select) { // IOCTL_INTERNAL_USB_SUBMIT_URB
-		auto idx = urb.UrbHeader.Function;
+	if (auto urb = try_get_urb(ctx.request)) { // IOCTL_INTERNAL_USB_SUBMIT_URB
+		urb->UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
+
+		auto idx = urb->UrbHeader.Function;
 		auto func = idx < ARRAYSIZE(urb_functions) ? urb_functions[idx] : nullptr;
-		st = func ? func(ctx, urb) : STATUS_INVALID_PARAMETER;
+
+		st = func ? func(ctx, *urb) : STATUS_INVALID_PARAMETER;
+	} else if (ret.status) {
+		st = STATUS_UNSUCCESSFUL;
 	}
 
 	complete(ctx.request, st);
@@ -632,7 +631,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
-	auto &urb = get_urb(ctx.request);
+	auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
 	WSK_BUF buf{ nullptr, 0, length };
 
 	if (auto err = prepare_wsk_mdl(buf.Mdl, ctx, urb)) {
@@ -763,8 +762,14 @@ void usbip::complete(_In_ WDFREQUEST request)
 	NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
 	NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
 
-	auto urb = urb_from_irp(irp);
-	auto urb_st = urb->UrbHeader.Status;
+	if (!has_urb(irp)) {
+		TraceDbg("req %04x, %!STATUS!, Information %Iu", ptr04x(request), irp_st.Status, irp_st.Information);
+		WdfRequestComplete(request, irp_st.Status);
+		return;
+	}
+
+	auto &urb = *urb_from_irp(irp);
+	auto urb_st = urb.UrbHeader.Status;
 
 	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %Iu",
 		  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
