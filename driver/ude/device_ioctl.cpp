@@ -17,6 +17,7 @@
 
 #include <libdrv\pdu.h>
 #include <libdrv\ch9.h>
+#include <libdrv\ch11.h>
 #include <libdrv\usb_util.h>
 #include <libdrv\wsk_cpp.h>
 #include <libdrv\dbgcommon.h>
@@ -887,7 +888,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG params)
 {
         auto &dev = *get_device_ctx(device);
-        auto &endp = *get_endpoint_ctx(dev.ep0);
+        auto &ep0 = *get_endpoint_ctx(dev.ep0);
 
         wsk_context_ptr ctx(&dev, request);
         if (!ctx) {
@@ -897,7 +898,7 @@ auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG p
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
         bool dir_out = true;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, TransferFlags, 0, &dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, &dir_out)) {
                 return err;
         }
 
@@ -992,6 +993,73 @@ NTSTATUS usbip::device::select_interface(
 
         auto params = (1UL << 16) | (InterfaceSetting << 8) | InterfaceNumber;
         return do_select(dev, request, params);
+}
+
+/*
+ * @see <linux>/drivers/usb/core/message.c, usb_clear_halt
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request)
+{
+        auto &endp = *get_endpoint_ctx(endpoint);
+        auto &dev = *get_device_ctx(endp.device);
+        auto &ep0 = *get_endpoint_ctx(dev.ep0);
+
+        wsk_context_ptr ctx(&dev, request);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
+        bool dir_out = true;
+
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, &dir_out)) {
+                return err;
+        }
+
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
+        pkt.bRequest = USB_REQUEST_CLEAR_FEATURE;
+        pkt.wValue.W = USB_FEATURE_ENDPOINT_STALL;
+        pkt.wIndex.W = endp.descriptor.bEndpointAddress;
+
+        return ::send(ctx, dev, nullptr, true);
+}
+
+/*
+ * Call usb_reset_device on Linux side - warn interface drivers and perform a USB port reset.
+ * @see <linux>/drivers/usb/usbip/stub_rx.c, is_reset_device_cmd, tweak_reset_device_cmd
+ * @see <linux>/drivers/usb/usbip/vhci_hcd.c, vhci_hub_control
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
+{
+        auto &dev = *get_device_ctx(device);
+        auto &ep0 = *get_endpoint_ctx(dev.ep0);
+
+        wsk_context_ptr ctx(&dev, request);
+        if (!ctx) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
+        bool dir_out = true;
+
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, &dir_out)) {
+                return err;
+        }
+
+        auto &pkt = get_submit_setup(ctx->hdr);
+        pkt.bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
+        pkt.bRequest = USB_REQUEST_SET_FEATURE;
+        pkt.wValue.W = USB_PORT_FEAT_RESET;
+
+        NT_ASSERT(dev.port >= 1);
+        pkt.wIndex.W = static_cast<USHORT>(dev.port); // meaningless for a server which ignores it
+
+        return ::send(ctx, dev, nullptr, true);
 }
 
 /*

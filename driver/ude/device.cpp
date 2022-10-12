@@ -83,12 +83,17 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         WdfObjectDereference(ctx.queue);
 }
 
+
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
 _IRQL_requires_same_
 void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
 {
-        Trace(TRACE_LEVEL_WARNING, "%04x IMPLEMENT ME", ptr04x(endp));
-        WdfRequestComplete(request, STATUS_SUCCESS);
+        TraceDbg("endp %04x, req %04x", ptr04x(endp), ptr04x(request));
+
+        if (auto err = device::clear_endpoint_stall(endp, request)) {
+                Trace(TRACE_LEVEL_ERROR, "endp %04x, %!STATUS!", ptr04x(endp), err);
+                WdfRequestComplete(request, err);
+        }
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_STATE)
@@ -296,9 +301,7 @@ PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
 
         cb.EvtUsbDeviceLinkPowerEntry = device_d0_entry;
         cb.EvtUsbDeviceLinkPowerExit = device_d0_exit;
-
         cb.EvtUsbDeviceSetFunctionSuspendAndWake = device_set_function_suspend_and_wake; // required for USB 3 devices
-//      cb.EvtUsbDeviceReset = nullptr;
 
         cb.EvtUsbDeviceDefaultEndpointAdd = default_endpoint_add;
         cb.EvtUsbDeviceEndpointAdd = endpoint_add;

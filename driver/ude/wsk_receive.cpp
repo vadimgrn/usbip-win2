@@ -748,7 +748,6 @@ PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 } // namespace
 
 
-
 /*
  * IoStatus.Status and UrbHeader.Status must be assigned before this call.
  */
