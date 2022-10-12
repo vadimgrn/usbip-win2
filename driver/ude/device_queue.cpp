@@ -60,7 +60,7 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
         }
 
         get_device(ctx.queue) = dev;
-        WdfObjectReference(ctx.queue); // see device_cleanup
+        WdfObjectReference(ctx.queue); // see cancel_pending_requests
 
         TraceDbg("dev %04x, queue %04x", ptr04x(dev), ptr04x(ctx.queue));
         return STATUS_SUCCESS;

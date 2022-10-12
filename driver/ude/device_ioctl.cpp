@@ -72,18 +72,19 @@ NTSTATUS send_complete(
                 // nothing to do
         } else if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
-                case REQ_RECV_COMPLETE:
-                        complete(request);
+                case REQ_RECV_COMPLETE: 
+                        // ret_submit() set URB.UrbHeader.Status, atomic_complete set IRP.IoStatus.Status
+                        complete(request, WdfRequestGetStatus(request));
                         break;
                 case REQ_CANCELED:
-                        UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
+                        complete(request, STATUS_CANCELLED);
                         break;
                 }
         } else if (auto victim = device::dequeue_request(ctx->dev_ctx->queue, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == request);
-                UdecxUrbCompleteWithNtStatus(victim, STATUS_UNSUCCESSFUL);
+                complete(victim, st.Status);
         } else if (old_status == REQ_CANCELED) {
-                UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
+                complete(request, STATUS_CANCELLED);
         }
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
@@ -162,6 +163,8 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
         TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, err);
+        
+        static_assert(NT_SUCCESS(STATUS_PENDING));
         return STATUS_PENDING;
 }
 
@@ -672,7 +675,6 @@ _Function_class_(urb_function_t)
 NTSTATUS function_deprecated(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx&)
 {
         TraceUrb("req %04x, %s not supported", ptr04x(request), urb_function_str(urb.UrbHeader.Function));
-
         UdecxUrbComplete(request, USBD_STATUS_NOT_SUPPORTED);
         return STATUS_PENDING;
 }
@@ -960,7 +962,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
         }
 
         if (auto old_status = atomic_set_status(req, REQ_CANCELED); old_status == REQ_SEND_COMPLETE) {
-                UdecxUrbCompleteWithNtStatus(request, STATUS_CANCELLED);
+                complete(request, STATUS_CANCELLED);
         } else {
                 NT_ASSERT(old_status != REQ_RECV_COMPLETE);
         }

@@ -11,6 +11,7 @@
 #include "device.h"
 #include "wsk_receive.h"
 #include "network.h"
+#include "ioctl.h"
 
 #include <libdrv\dbgcommon.h>
 #include <libdrv\mdl_cpp.h>
@@ -466,6 +467,7 @@ PAGED void IoDeviceControl(
                 st = get_imported_devices(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
+                NT_ASSERT(!has_urb(Request));
                 if (NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), &PVOID(hdr), nullptr))) {
                         TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), hdr->UsbUserRequest);
                 }

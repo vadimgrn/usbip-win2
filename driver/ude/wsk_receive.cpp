@@ -390,7 +390,7 @@ urb_function_t* const urb_functions[] =
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
+void atomic_complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 {
 	if (auto irp = WdfRequestWdmGetIrp(request)) {
 		irp->IoStatus.Status = status; // request can be completed by send_complete()
@@ -399,7 +399,7 @@ void complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	auto &req = *get_request_ctx(request);
 	
 	if (auto old_status = atomic_set_status(req, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
-		usbip::complete(request);
+		complete(request, status);
 	} else {
 		NT_ASSERT(old_status != REQ_CANCELED);
 	}
@@ -428,7 +428,7 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 		st = STATUS_UNSUCCESSFUL;
 	}
 
-	complete(ctx.request, st);
+	atomic_complete(ctx.request, st);
 	return RECV_NEXT_USBIP_HDR;
 }
 
@@ -545,8 +545,8 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto ok = NT_SUCCESS(st.Status);
 
 	auto err = ok && st.Information == dev.receive_size ? dev.received(ctx) :
-		   ok ? STATUS_RECEIVE_PARTIAL : 
-		   st.Status; // has nonzero severity code
+		  !ok ? st.Status :
+		   st.Information ? STATUS_RECEIVE_PARTIAL : STATUS_CONNECTION_DISCONNECTED;
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
@@ -560,7 +560,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 		free_drain_buffer(ctx);
 	} else if (auto &req = ctx.request) {
 		NT_ASSERT(dev.received != ret_submit); // never fails
-		complete(req, STATUS_CANCELLED);
+		atomic_complete(req, STATUS_CANCELLED);
 	}
 	NT_ASSERT(!ctx.request);
 
@@ -748,35 +748,30 @@ PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 } // namespace
 
 
-/*
- * IoStatus.Status and UrbHeader.Status must be assigned before this call.
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::complete(_In_ WDFREQUEST request)
+void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
-	const auto &irp_st = irp->IoStatus;
 
-	NT_ASSERT(WdfRequestGetStatus(request) == irp_st.Status);
-	NT_ASSERT(WdfRequestGetInformation(request) == irp_st.Information);
+	auto info = irp->IoStatus.Information;
+	NT_ASSERT(info == WdfRequestGetInformation(request));
 
 	if (!has_urb(irp)) {
-		TraceDbg("req %04x, %!STATUS!, Information %Iu", ptr04x(request), irp_st.Status, irp_st.Information);
-		WdfRequestComplete(request, irp_st.Status);
+		TraceDbg("req %04x, %!STATUS!, Information %#Ix", ptr04x(request), status, info);
+		WdfRequestComplete(request, status);
 		return;
 	}
 
 	auto &urb = *urb_from_irp(irp);
 	auto urb_st = urb.UrbHeader.Status;
 
-	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %Iu",
-		  ptr04x(request), get_usbd_status(urb_st), irp_st.Status, irp_st.Information);
+	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %#Ix", ptr04x(request), get_usbd_status(urb_st), status, info);
 
-	if (NT_SUCCESS(irp_st.Status)) {
+	if (NT_SUCCESS(status)) {
 		UdecxUrbComplete(request, urb_st);
 	} else {
-		UdecxUrbCompleteWithNtStatus(request, irp_st.Status);
+		UdecxUrbCompleteWithNtStatus(request, status);
 	}
 }
 

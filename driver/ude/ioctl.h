@@ -32,11 +32,21 @@ inline auto DeviceIoControlCode(_In_ IRP *irp)
         return DeviceIoControlCode(stack);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto has_urb(_In_ IRP *irp)
 {
 	auto stack = IoGetCurrentIrpStackLocation(irp);
 	return  stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && 
 		DeviceIoControlCode(stack) == IOCTL_INTERNAL_USB_SUBMIT_URB;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto has_urb(_In_ WDFREQUEST request)
+{
+	auto irp = WdfRequestWdmGetIrp(request);
+	return has_urb(irp);
 }
 
 inline auto urb_from_irp(_In_ IRP *irp)

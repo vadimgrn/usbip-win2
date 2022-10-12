@@ -14,7 +14,7 @@ struct device_ctx;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete(_In_ WDFREQUEST request);
+void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

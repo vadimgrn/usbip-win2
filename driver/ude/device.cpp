@@ -13,6 +13,7 @@
 #include "device_ioctl.h"
 #include "wsk_context.h"
 #include "wsk_receive.h"
+#include "ioctl.h"
 
 #include <libdrv\ch9.h>
 #include <libdrv\dbgcommon.h>
@@ -44,6 +45,24 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
         }
 }
 
+/*
+ * The socket is closed, there is no concurrency with send_complete from device_ioctl.cpp
+ * @see device::send_cmd_unlink
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
+{
+        PAGED_CODE();
+        NT_ASSERT(!dev.sock());
+
+        for (WDFREQUEST request; NT_SUCCESS(WdfIoQueueRetrieveNextRequest(dev.queue, &request)); ) {
+                complete(request, STATUS_CANCELLED);
+        }
+
+        WdfObjectDereference(dev.queue); // see device::create_queue
+}
+
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -58,9 +77,6 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         free(ctx.ext);
 }
 
-/*
- * The socket is closed, there is no concurrency with send_complete from device_ioctl.cpp
- */
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -74,25 +90,22 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         vhci::reclaim_roothub_port(dev);
+
         close_socket(ctx.sock());
-
-        for (WDFREQUEST req; NT_SUCCESS(WdfIoQueueRetrieveNextRequest(ctx.queue, &req)); ) {
-                UdecxUrbCompleteWithNtStatus(req, STATUS_CANCELLED); // see device::send_cmd_unlink
-        }
-
-        WdfObjectDereference(ctx.queue);
+        cancel_pending_requests(ctx);
 }
-
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
 _IRQL_requires_same_
 void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
 {
+        NT_ASSERT(!has_urb(request));
         TraceDbg("endp %04x, req %04x", ptr04x(endp), ptr04x(request));
 
-        if (auto err = device::clear_endpoint_stall(endp, request)) {
-                Trace(TRACE_LEVEL_ERROR, "endp %04x, %!STATUS!", ptr04x(endp), err);
-                WdfRequestComplete(request, err);
+        auto st = device::clear_endpoint_stall(endp, request);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "endp %04x, %!STATUS!", ptr04x(endp), st);
+                WdfRequestComplete(request, st);
         }
 }
 
@@ -129,7 +142,7 @@ _IRQL_requires_same_
 NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev)
 {
         TraceDbg("vhci %04x, dev %04x", ptr04x(vhci), ptr04x(dev));
-        return STATUS_SUCCESS;
+        return STATUS_NOT_IMPLEMENTED;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_EXIT)
@@ -137,7 +150,7 @@ _IRQL_requires_same_
 NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
 {
         TraceDbg("vhci %04x, dev %04x, %!UDECX_USB_DEVICE_WAKE_SETTING!", ptr04x(vhci), ptr04x(dev), WakeSetting);
-        return STATUS_SUCCESS;
+        return STATUS_NOT_IMPLEMENTED;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_SET_FUNCTION_SUSPEND_AND_WAKE)
@@ -151,7 +164,7 @@ NTSTATUS device_set_function_suspend_and_wake(
         TraceDbg("vhci %04x, dev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
                   ptr04x(vhci), ptr04x(dev), Interface, FunctionPower);
 
-        return STATUS_SUCCESS;
+        return STATUS_NOT_IMPLEMENTED;
 }
 
 _IRQL_requires_same_
@@ -259,6 +272,7 @@ _IRQL_requires_same_
 void endpoints_configure(
         _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
+        NT_ASSERT(!has_urb(request));
         auto st = STATUS_SUCCESS; 
 
         switch (params->ConfigureType) {
