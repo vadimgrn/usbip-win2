@@ -259,6 +259,7 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 	return fill_isoc_data(r, buf, ret.actual_length, ctx.isoc);
 }
 
+
 /*
  * UdecxUrbRetrieveBuffer(ctx.request, &buf, &len);
  * UdecxUrbSetBytesCompleted(ctx.request, ret.actual_length);
@@ -272,6 +273,34 @@ NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
 	return  tr.TransferBufferLength == ULONG(ret.actual_length) ? STATUS_SUCCESS : // set by prepare_wsk_mdl
 		assign(tr.TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS control_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
+{
+	if (auto err = urb_with_transfer_buffer(ctx, urb)) {
+		return err;
+	}
+
+	auto &r = AsUrbTransfer(urb);
+	const USB_COMMON_DESCRIPTOR *dsc{};
+
+	static_assert(USBD_TRANSFER_DIRECTION_IN);
+	const ULONG ep0_in = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
+
+	auto maybe_descr = (r.TransferFlags & ep0_in) == ep0_in && r.TransferBufferLength >= sizeof(*dsc);
+	if (!maybe_descr) {
+		return STATUS_SUCCESS;
+	}
+
+	dsc = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr());
+	if (dsc) { // MmGetSystemAddressForMdlSafe can fail
+		TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", dsc->bLength, dsc->bDescriptorType, 
+			  WppBinary(dsc, USHORT(r.TransferBufferLength)));
+	}
+
+	return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -306,7 +335,7 @@ urb_function_t* const urb_functions[] =
 	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
 	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
 
-	urb_with_transfer_buffer, // URB_FUNCTION_CONTROL_TRANSFER
+	control_transfer, // URB_FUNCTION_CONTROL_TRANSFER
 	urb_with_transfer_buffer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
 	urb_isoch_transfer,
 
@@ -366,7 +395,7 @@ urb_function_t* const urb_functions[] =
 
 	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
 	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
-	urb_with_transfer_buffer, // URB_FUNCTION_CONTROL_TRANSFER_EX
+	control_transfer, // URB_FUNCTION_CONTROL_TRANSFER_EX
 
 	nullptr, // URB_FUNCTION_RESERVE_0X0033
 	nullptr, // URB_FUNCTION_RESERVE_0X0034
