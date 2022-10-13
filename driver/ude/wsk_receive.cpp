@@ -743,6 +743,7 @@ auto validate_header(_Inout_ usbip_header &hdr)
 	return ok;
 }
 
+
 /*
  * A WSK application should not call new WSK functions in the context of the IoCompletion routine. 
  * Doing so may result in recursive calls and exhaust the kernel mode stack. 
@@ -752,11 +753,9 @@ auto validate_header(_Inout_ usbip_header &hdr)
  */
 _Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
+_IRQL_requires_(PASSIVE_LEVEL) // do not define as PAGED, lambda "received" must be resident
+void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
-	PAGED_CODE();
-
 	auto &ctx = *get_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
@@ -765,7 +764,7 @@ PAGED void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 	ctx.mdl_hdr.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, sizeof(ctx.hdr) };
 
-	auto received = [] (auto &ctx)
+	auto received = [] (auto &ctx) // inherits PAGED from the function, can be called on DISPATCH_LEVEL
 	{
 		return validate_header(ctx.hdr) ? ret_command(ctx) : STATUS_INVALID_PARAMETER;
 	};
