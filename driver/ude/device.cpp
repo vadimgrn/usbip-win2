@@ -56,8 +56,16 @@ PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
         PAGED_CODE();
         NT_ASSERT(!dev.sock());
 
-        for (WDFREQUEST request; NT_SUCCESS(WdfIoQueueRetrieveNextRequest(dev.queue, &request)); ) {
-                complete(request, STATUS_CANCELLED);
+        for (NTSTATUS err{}; !err; ) {
+                switch (WDFREQUEST request;  err = WdfIoQueueRetrieveNextRequest(dev.queue, &request)) {
+                case STATUS_SUCCESS:
+                        complete(request, STATUS_CANCELLED);
+                        break;
+                case STATUS_NO_MORE_ENTRIES:
+                        break;
+                default:
+                        Trace(TRACE_LEVEL_ERROR, "WdfIoQueueRetrieveNextRequest %!STATUS!", err);
+                }
         }
 
         WdfObjectDereference(dev.queue); // see device::create_queue
