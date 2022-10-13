@@ -881,13 +881,10 @@ auto verify_select(_In_ WDFREQUEST request)
         return STATUS_SUCCESS;
 }
 
-/*
- * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
- * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG params)
+auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, 
+        _In_ UCHAR bmRequestType, _In_ UCHAR bRequest, _In_ USHORT wValue, _In_ USHORT wIndex)
 {
         auto &dev = *get_device_ctx(device);
         auto &ep0 = *get_endpoint_ctx(dev.ep0);
@@ -903,22 +900,42 @@ auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG p
                 return err;
         }
 
-        bool iface = params >> 16; 
-
         auto &pkt = get_submit_setup(ctx->hdr);
-        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | UCHAR(iface ? USB_RECIP_INTERFACE : USB_RECIP_DEVICE);
-        pkt.bRequest = iface ? USB_REQUEST_SET_INTERFACE : USB_REQUEST_SET_CONFIGURATION;
+        pkt.bmRequestType.B = bmRequestType;
+        NT_ASSERT(pkt.bmRequestType.s.Dir == BMREQUEST_HOST_TO_DEVICE);
+        pkt.bRequest = bRequest;
+        pkt.wValue.W = wValue;
+        pkt.wIndex.W = wIndex;
         NT_ASSERT(!pkt.wLength);
 
+        return ::send(ctx, dev, nullptr, true);
+}
+
+/*
+ * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
+ * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG params)
+{
+        bool iface = params >> 16; 
+
+        UCHAR bmRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | UCHAR(iface ? USB_RECIP_INTERFACE : USB_RECIP_DEVICE);
+        UCHAR bRequest = iface ? USB_REQUEST_SET_INTERFACE : USB_REQUEST_SET_CONFIGURATION;
+
+        USHORT wValue;
+        USHORT wIndex;
+
         if (iface) {
-                pkt.wValue.W = UCHAR(params >> 8); // Alternative Setting
-                pkt.wIndex.W = UCHAR(params); // Interface
+                wValue = UCHAR(params >> 8); // Alternative Setting
+                wIndex = UCHAR(params); // Interface
         } else {
-                pkt.wValue.W = UCHAR(params); // Configuration Value
-                NT_ASSERT(!pkt.wIndex.W);
+                wValue = UCHAR(params); // Configuration Value
+                wIndex = 0;
         }
 
-        return ::send(ctx, dev, nullptr, true);
+        return send_ep0_out(device, request, bmRequestType, bRequest, wValue, wIndex);
 }
 
 } // namespace
@@ -1004,27 +1021,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request)
 {
         auto &endp = *get_endpoint_ctx(endpoint);
-        auto &dev = *get_device_ctx(endp.device);
-        auto &ep0 = *get_endpoint_ctx(dev.ep0);
-
-        wsk_context_ptr ctx(&dev, request);
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, setup_dir::out())) {
-                return err;
-        }
-
-        auto &pkt = get_submit_setup(ctx->hdr);
-        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT;
-        pkt.bRequest = USB_REQUEST_CLEAR_FEATURE;
-        pkt.wValue.W = USB_FEATURE_ENDPOINT_STALL;
-        pkt.wIndex.W = endp.descriptor.bEndpointAddress;
-
-        return ::send(ctx, dev, nullptr, true);
+        auto addr = endp.descriptor.bEndpointAddress;
+        
+        return send_ep0_out(endp.device, request, 
+                USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT,
+                USB_REQUEST_CLEAR_FEATURE, USB_FEATURE_ENDPOINT_STALL, addr);
 }
 
 /*
@@ -1037,28 +1038,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
 {
         auto &dev = *get_device_ctx(device);
-        auto &ep0 = *get_endpoint_ctx(dev.ep0);
-
-        wsk_context_ptr ctx(&dev, request);
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, setup_dir::out())) {
-                return err;
-        }
-
-        auto &pkt = get_submit_setup(ctx->hdr);
-        pkt.bmRequestType.B = USB_RT_PORT; // USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER
-        pkt.bRequest = USB_REQUEST_SET_FEATURE;
-        pkt.wValue.W = USB_PORT_FEAT_RESET;
 
         NT_ASSERT(dev.port >= 1);
-        pkt.wIndex.W = static_cast<USHORT>(dev.port); // meaningless for a server which ignores it
+        auto port = static_cast<USHORT>(dev.port); // meaningless for a server which ignores it
 
-        return ::send(ctx, dev, nullptr, true);
+        static_assert(USB_RT_PORT == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER));
+
+        return send_ep0_out(device, request, 
+                USB_RT_PORT, USB_REQUEST_SET_FEATURE, USB_PORT_FEAT_RESET, port);
 }
 
 /*
