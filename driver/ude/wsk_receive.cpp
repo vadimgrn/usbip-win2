@@ -259,7 +259,6 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 	return fill_isoc_data(r, buf, ret.actual_length, ctx.isoc);
 }
 
-
 /*
  * UdecxUrbRetrieveBuffer(ctx.request, &buf, &len);
  * UdecxUrbSetBytesCompleted(ctx.request, ret.actual_length);

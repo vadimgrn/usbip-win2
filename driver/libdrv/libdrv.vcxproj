@@ -139,6 +139,7 @@
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="codeseg.h" />
+    <ClInclude Include="lock.h" />
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
     <ClInclude Include="strutil.h" />

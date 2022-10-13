@@ -34,6 +34,7 @@ namespace usbip
 struct vhci_ctx
 {
         UDECXUSBDEVICE devices[vhci::TOTAL_PORTS]; // do not access directly, functions must be used
+        KSPIN_LOCK lock;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
