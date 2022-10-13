@@ -191,10 +191,9 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
  * usb2.0 devices don't work in usb3.x ports, and visa versa, tested.
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
 {
-        PAGED_CODE();
         auto &dev_ctx = *get_device_ctx(dev);
 
         auto vhci = dev_ctx.vhci;
@@ -205,7 +204,7 @@ PAGED int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
 
         auto [begin, end] = get_port_range(dev_ctx.speed());
 
-        Lock lck(vhci_ctx.lock);
+        Lock lck(vhci_ctx.lock); // function must be resident, do not use PAGED
 
         for (auto i = begin; i < end; ++i) {
                 NT_ASSERT(i < ARRAYSIZE(vhci_ctx.devices));
