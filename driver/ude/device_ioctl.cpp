@@ -539,9 +539,9 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
         
-        auto dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
+        setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength, &dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength, dir_out)) {
                 return err;
         }
 
@@ -898,9 +898,8 @@ auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG p
         }
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-        bool dir_out = true;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, &dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, setup_dir::out())) {
                 return err;
         }
 
@@ -1014,9 +1013,8 @@ NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In
         }
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-        bool dir_out = true;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, &dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, setup_dir::out())) {
                 return err;
         }
 
@@ -1047,9 +1045,8 @@ NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST r
         }
 
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-        bool dir_out = true;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, &dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, setup_dir::out())) {
                 return err;
         }
 

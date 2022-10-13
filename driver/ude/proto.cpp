@@ -44,7 +44,7 @@ auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::set_cmd_submit_usbip_header(
 	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const endpoint_ctx &endp,
-	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_opt_ const bool *setup_dir_out)
+	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_ setup_dir setup_out)
 {
 	auto &epd = endp.descriptor;
 
@@ -55,8 +55,8 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 		return STATUS_INVALID_PARAMETER;
 	}
 	
-	NT_ASSERT(bool(setup_dir_out) == (usb_endpoint_type(epd) == UsbdPipeTypeControl));
-	auto dir_out = setup_dir_out ? *setup_dir_out : usb_endpoint_dir_out(epd);
+	NT_ASSERT(bool(setup_out) == (usb_endpoint_type(epd) == UsbdPipeTypeControl));
+	auto dir_out = setup_out ? *setup_out : usb_endpoint_dir_out(epd);
 
 	TransferFlags = fix_transfer_flags(TransferFlags, dir_out);
 
