@@ -441,7 +441,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 
 	if (auto hdev = get_device(&dev)) {
 		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(hdev), NT_ERROR(st.Status) ? st.Status : err);
-		device::plugout_and_delete(hdev);
+		device::sched_plugout_and_delete(hdev);
 	}
 
 	return StopCompletion;
@@ -685,7 +685,7 @@ NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flag
 
 	if (auto dev = get_device(ext->ctx)) {
 		Trace(TRACE_LEVEL_INFORMATION, "dev %04x, Flags %#lx", ptr04x(dev), Flags);
-		device::plugout_and_delete(dev);
+		device::sched_plugout_and_delete(dev);
 	}
 
 	return STATUS_SUCCESS;

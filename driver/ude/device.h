@@ -24,7 +24,11 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext);
 
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void plugout_and_delete(_In_ UDECXUSBDEVICE dev);
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void plugout_and_delete(_In_ UDECXUSBDEVICE dev);
+NTSTATUS sched_plugout_and_delete(_In_ UDECXUSBDEVICE dev);
 
 } // namespace usbip::device
