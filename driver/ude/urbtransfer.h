@@ -26,6 +26,11 @@ struct UrbTransfer
 
 bool has_transfer_buffer(_In_ const URB &urb);
 
+inline auto TryAsUrbTransfer(_In_ URB *urb) 
+{ 
+	return has_transfer_buffer(*urb) ? reinterpret_cast<UrbTransfer*>(urb) : nullptr; 
+}
+
 inline auto& AsUrbTransfer(_In_ URB &urb) 
 { 
 	NT_ASSERT(has_transfer_buffer(urb));

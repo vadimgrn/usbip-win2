@@ -75,41 +75,6 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	return hdr.u.ret_submit;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_select_configuration(_In_ wsk_context&, _Inout_ URB&)
-{
-	TraceUrb("DONE");
-	return STATUS_SUCCESS;
-}
-
-/*
- * usb_set_interface can return -EPIPE, especially if a device's interface has only one altsetting.
- *
- * Note that control and isochronous endpoints don't halt, although control
- * endpoints report "protocol stall" (for unsupported requests) using the
- * same status code used to report a true stall.
- *
- * See: drivers/usb/core/message.c, usb_set_interface, usb_clear_halt.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_select_interface(_In_ wsk_context &, _Inout_ URB &)
-{
-	return STATUS_SUCCESS;
-}
-
-/*
- * A request can read descriptor header or full descriptor to obtain its real size.
- * F.e. configuration descriptor is 9 bytes, but the full size is stored in wTotalLength.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_control_descriptor_request(_In_ wsk_context &, _Inout_ URB &)
-{
-	return STATUS_SUCCESS;
-}
-
 /*
  * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == actual_length,
  * src->offset is ignored for that reason.
@@ -259,31 +224,11 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 	return fill_isoc_data(r, buf, ret.actual_length, ctx.isoc);
 }
 
-/*
- * UdecxUrbRetrieveBuffer(ctx.request, &buf, &len);
- * UdecxUrbSetBytesCompleted(ctx.request, ret.actual_length);
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_with_transfer_buffer(_In_ wsk_context &ctx, _Inout_ URB &urb)
+void log_transfer_buffer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
 {
-	auto &ret = get_ret_submit(ctx);
-	auto &tr = AsUrbTransfer(urb);
-
-	return  tr.TransferBufferLength == ULONG(ret.actual_length) ? STATUS_SUCCESS : // set by prepare_wsk_mdl
-		assign(tr.TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS control_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
-{
-	if (auto err = urb_with_transfer_buffer(ctx, urb)) {
-		return err;
-	}
-
 	const USB_COMMON_DESCRIPTOR *dsc{};
-	auto &r = urb.UrbControlTransfer;
 
 	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
 		   is_transfer_dir_in(r) &&
@@ -297,119 +242,19 @@ NTSTATUS control_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 				  WppBinary(dsc, static_cast<USHORT>(min(dsc->bLength, r.TransferBufferLength))));
 		}
 	}
-
-	return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_function_success(_In_ wsk_context&, _Inout_ URB&)
+void log_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
 {
-	return STATUS_SUCCESS;
+	switch (urb.UrbHeader.Function) {
+	case URB_FUNCTION_CONTROL_TRANSFER_EX:
+	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
+		static_assert(sizeof(urb.UrbControlTransfer) == sizeof(urb.UrbControlTransferEx));
+		log_transfer_buffer(ctx, static_cast<const _URB_CONTROL_TRANSFER&>(urb.UrbControlTransfer));
+	}
 }
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_function_unexpected(_In_ wsk_context&, _Inout_ URB &urb)
-{
-	auto func = urb.UrbHeader.Function;
-	Trace(TRACE_LEVEL_ERROR, "%s(%#04x) must never be called", urb_function_str(func), func);
-
-	return STATUS_INTERNAL_ERROR;
-}
-
-using urb_function_t = NTSTATUS(_In_ wsk_context&, _Inout_ URB&);
-
-urb_function_t* const urb_functions[] =
-{
-	urb_select_configuration,
-	urb_select_interface,
-	urb_function_unexpected, // URB_FUNCTION_ABORT_PIPE, urb_pipe_request
-
-	urb_function_unexpected, // URB_FUNCTION_TAKE_FRAME_LENGTH_CONTROL
-	urb_function_unexpected, // URB_FUNCTION_RELEASE_FRAME_LENGTH_CONTROL
-
-	urb_function_unexpected, // URB_FUNCTION_GET_FRAME_LENGTH
-	urb_function_unexpected, // URB_FUNCTION_SET_FRAME_LENGTH
-	urb_function_unexpected, // URB_FUNCTION_GET_CURRENT_FRAME_NUMBER
-
-	control_transfer, // URB_FUNCTION_CONTROL_TRANSFER
-	urb_with_transfer_buffer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER
-	urb_isoch_transfer,
-
-	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_DEVICE
-	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_DEVICE
-
-	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_DEVICE, urb_control_feature_request
-	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_INTERFACE, urb_control_feature_request
-	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_ENDPOINT, urb_control_feature_request
-
-	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_DEVICE, urb_control_feature_request
-	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_INTERFACE, urb_control_feature_request
-	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_ENDPOINT, urb_control_feature_request
-
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_DEVICE
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_INTERFACE
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_ENDPOINT
-
-	nullptr, // URB_FUNCTION_RESERVED_0X0016
-
-	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_DEVICE
-	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_INTERFACE
-	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_ENDPOINT
-
-	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_DEVICE
-	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_INTERFACE
-	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_ENDPOINT
-
-	nullptr, // URB_FUNCTION_RESERVE_0X001D
-
-	urb_function_success, // URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL, urb_pipe_request
-
-	urb_with_transfer_buffer, // URB_FUNCTION_CLASS_OTHER
-	urb_with_transfer_buffer, // URB_FUNCTION_VENDOR_OTHER
-
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_STATUS_FROM_OTHER
-
-	urb_function_success, // URB_FUNCTION_SET_FEATURE_TO_OTHER, urb_control_feature_request
-	urb_function_success, // URB_FUNCTION_CLEAR_FEATURE_TO_OTHER, urb_control_feature_request
-
-	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_ENDPOINT
-	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_ENDPOINT
-
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_CONFIGURATION
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_INTERFACE
-
-	urb_control_descriptor_request, // URB_FUNCTION_GET_DESCRIPTOR_FROM_INTERFACE
-	urb_control_descriptor_request, // URB_FUNCTION_SET_DESCRIPTOR_TO_INTERFACE
-
-	urb_with_transfer_buffer, // URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR
-
-	nullptr, // URB_FUNCTION_RESERVE_0X002B
-	nullptr, // URB_FUNCTION_RESERVE_0X002C
-	nullptr, // URB_FUNCTION_RESERVE_0X002D
-	nullptr, // URB_FUNCTION_RESERVE_0X002E
-	nullptr, // URB_FUNCTION_RESERVE_0X002F
-
-	urb_function_unexpected, // URB_FUNCTION_SYNC_RESET_PIPE, urb_pipe_request
-	urb_function_unexpected, // URB_FUNCTION_SYNC_CLEAR_STALL, urb_pipe_request
-	control_transfer, // URB_FUNCTION_CONTROL_TRANSFER_EX
-
-	nullptr, // URB_FUNCTION_RESERVE_0X0033
-	nullptr, // URB_FUNCTION_RESERVE_0X0034
-
-	urb_function_unexpected, // URB_FUNCTION_OPEN_STATIC_STREAMS
-	urb_function_unexpected, // URB_FUNCTION_CLOSE_STATIC_STREAMS, urb_pipe_request
-	urb_with_transfer_buffer, // URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL
-	urb_isoch_transfer, // URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL
-
-	nullptr, // 0x0039
-	nullptr, // 0x003A
-	nullptr, // 0x003B
-	nullptr, // 0x003C
-
-	urb_function_unexpected // URB_FUNCTION_GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS
-};
 
 /* 
  * UrbHeader.Status must be set before this call.
@@ -445,12 +290,16 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 	auto st = STATUS_SUCCESS;
 
 	if (auto urb = try_get_urb(ctx.request)) { // IOCTL_INTERNAL_USB_SUBMIT_URB
+
 		urb->UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
-		auto idx = urb->UrbHeader.Function;
-		auto func = idx < ARRAYSIZE(urb_functions) ? urb_functions[idx] : nullptr;
+		if (auto tr = TryAsUrbTransfer(urb)) { // see UdecxUrbRetrieveBuffer, UdecxUrbSetBytesCompleted
+			if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
+				st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+			}
+			log_transfer_buffer(ctx, *urb);
+		}
 
-		st = func ? func(ctx, *urb) : STATUS_INVALID_PARAMETER;
 	} else if (ret.status) {
 		st = STATUS_UNSUCCESSFUL;
 	}
