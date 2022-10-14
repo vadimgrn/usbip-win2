@@ -85,7 +85,8 @@ struct device_ctx
 
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
-        bool destroyed;
+        
+        volatile bool destroyed;
 
         // for WSK receive
         WDFWORKITEM recv_hdr;

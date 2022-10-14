@@ -394,7 +394,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
         if (r->port <= 0) {
                 vhci::destroy_all_devices(vhci);
         } else if (auto dev = vhci::find_device(vhci, r->port)) {
-                device::destroy(dev.get<UDECXUSBDEVICE>());
+                device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
                 err = STATUS_NO_SUCH_DEVICE;

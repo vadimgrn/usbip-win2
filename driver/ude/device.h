@@ -25,6 +25,6 @@ PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ devic
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void destroy(_In_ UDECXUSBDEVICE dev);
+void plugout_and_delete(_In_ UDECXUSBDEVICE dev);
 
 } // namespace usbip::device

@@ -287,7 +287,7 @@ PAGED void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
                 if (auto dev = find_device(vhci, port)) {
-                        device::destroy(dev.get<UDECXUSBDEVICE>());
+                        device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
                 }
         }
 }

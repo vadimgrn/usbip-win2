@@ -407,13 +407,13 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
+void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE dev)
 {
         auto &ctx = *get_device_ctx(dev);
         static_assert(sizeof(ctx.destroyed) == sizeof(CHAR));
 
-        if (InterlockedExchange8(reinterpret_cast<CHAR*>(&ctx.destroyed), true)) {
-                TraceDbg("dev %04x was already destroyed, port %d", ptr04x(dev), ctx.port);
+        if (InterlockedExchange8(PCHAR(&ctx.destroyed), true)) {
+                TraceDbg("dev %04x is destroyed", ptr04x(dev));
                 return;
         }
 
@@ -422,6 +422,6 @@ void usbip::device::destroy(_In_ UDECXUSBDEVICE dev)
         if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(dev), err);
         }
-
-        WdfObjectDelete(dev);
+        
+//      WdfObjectDelete(dev);
 }
