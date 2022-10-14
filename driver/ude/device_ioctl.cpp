@@ -101,7 +101,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
 {
         NT_ASSERT(!ctx.mdl_buf);
 
-        if (transfer_buffer && is_transfer_direction_out(ctx.hdr)) { // TransferFlags can have wrong direction
+        if (transfer_buffer && is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
                 if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, ctx.is_isoc, IoReadAccess, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                         return err;
@@ -902,12 +902,12 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request,
 
         auto &pkt = get_submit_setup(ctx->hdr);
         pkt.bmRequestType.B = bmRequestType;
-        NT_ASSERT(pkt.bmRequestType.s.Dir == BMREQUEST_HOST_TO_DEVICE);
         pkt.bRequest = bRequest;
         pkt.wValue.W = wValue;
         pkt.wIndex.W = wIndex;
         NT_ASSERT(!pkt.wLength);
 
+        NT_ASSERT(is_transfer_dir_out(pkt));
         return ::send(ctx, dev, nullptr, true);
 }
 

@@ -28,7 +28,7 @@
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - x86 build is removed
 - Server (stub driver) is removed
-- UDE client driver is removed, WDM driver is superseded it
+- UDE driver is removed, it is superseded by WDM driver
 - Client (UDE driver)
   - Significantly refactored and improved
   - The core of the driver was rewritten from scratch

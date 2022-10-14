@@ -249,7 +249,7 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
 	char *buf{};
 
-	if (is_transfer_direction_in(ctx.hdr)) { // TransferFlags can have wrong direction
+	if (is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
 		buf = (char*)get_transfer_buffer(r.TransferBuffer, r.TransferBufferMDL);
 		if (!buf) {
 			return STATUS_INSUFFICIENT_RESOURCES;
@@ -282,21 +282,20 @@ NTSTATUS control_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		return err;
 	}
 
-	auto &r = AsUrbTransfer(urb);
 	const USB_COMMON_DESCRIPTOR *dsc{};
+	auto &r = urb.UrbControlTransfer;
 
-	static_assert(USBD_TRANSFER_DIRECTION_IN);
-	const ULONG ep0_in = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN;
+	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
+		   is_transfer_dir_in(r) &&
+		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+		   r.TransferBufferLength >= sizeof(*dsc);
 
-	auto maybe_descr = (r.TransferFlags & ep0_in) == ep0_in && r.TransferBufferLength >= sizeof(*dsc);
-	if (!maybe_descr) {
-		return STATUS_SUCCESS;
-	}
-
-	dsc = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr());
-	if (dsc) { // MmGetSystemAddressForMdlSafe can fail
-		TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", dsc->bLength, dsc->bDescriptorType, 
-			  WppBinary(dsc, USHORT(r.TransferBufferLength)));
+	if (ok) {
+		dsc = static_cast<decltype(dsc)>(ctx.mdl_buf.sysaddr());
+		if (dsc) { // MmGetSystemAddressForMdlSafe can fail
+			TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", dsc->bLength, dsc->bDescriptorType, 
+				  WppBinary(dsc, static_cast<USHORT>(min(dsc->bLength, r.TransferBufferLength))));
+		}
 	}
 
 	return STATUS_SUCCESS;
@@ -509,7 +508,7 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 		return err;
 	}
 
-	auto dir_out = is_transfer_direction_out(ctx.hdr); // TransferFlags can have wrong direction
+	auto dir_out = is_transfer_dir_out(ctx.hdr); // TransferFlags can have wrong direction
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload
@@ -570,11 +569,10 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto &st = wsk_irp->IoStatus;
 	TraceWSK("%!STATUS!, Information %Iu", st.Status, st.Information);
 
-	auto ok = NT_SUCCESS(st.Status);
-
-	auto err = ok && st.Information == dev.receive_size ? dev.received(ctx) :
-		  !ok ? st.Status :
-		   st.Information ? STATUS_RECEIVE_PARTIAL : STATUS_CONNECTION_DISCONNECTED;
+	auto err = NT_ERROR(st.Status) ? st.Status :
+		   st.Information == dev.receive_size ? dev.received(ctx) :
+		   st.Information ? STATUS_RECEIVE_PARTIAL : 
+		   STATUS_CONNECTION_DISCONNECTED; // EOF, server called shutdown()
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
@@ -593,7 +591,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	NT_ASSERT(!ctx.request);
 
 	if (auto hdev = get_device(&dev)) {
-		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(hdev), NT_SUCCESS(st.Status) ? err : st.Status);
+		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(hdev), NT_ERROR(st.Status) ? st.Status : err);
 		device::destroy(hdev);
 	}
 
@@ -753,7 +751,7 @@ auto validate_header(_Inout_ usbip_header &hdr)
  */
 _Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL) // do not define as PAGED, lambda "received" must be resident
+_IRQL_requires_max_(DISPATCH_LEVEL) // do not define as PAGED, lambda "received" must be resident
 void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 {
 	auto &ctx = *get_wsk_context(WorkItem);

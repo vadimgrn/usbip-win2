@@ -29,26 +29,48 @@ constexpr auto IsTransferDirectionOut(ULONG TransferFlags)
 	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
 }
 
-inline bool is_transfer_dir_in(const _URB_CONTROL_TRANSFER &r)
+constexpr auto is_transfer_dir_in(const USB_DEFAULT_PIPE_SETUP_PACKET &r)
 {
-	auto &pkt = *reinterpret_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(r.SetupPacket);
-
-	static_assert(USB_DIR_IN);
-	return pkt.bmRequestType.B & USB_DIR_IN; // C: bmRequestType.Dir, C++: bmRequestType.s.Dir
+	return r.bmRequestType.s.Dir == BMREQUEST_DEVICE_TO_HOST;
 }
 
-inline auto is_transfer_dir_out(const _URB_CONTROL_TRANSFER &r)
+constexpr auto is_transfer_dir_out(const USB_DEFAULT_PIPE_SETUP_PACKET &r)
 {
-	static_assert(!USB_DIR_OUT);
-	return !is_transfer_dir_in(r);
+	return r.bmRequestType.s.Dir == BMREQUEST_HOST_TO_DEVICE;
 }
 
-constexpr auto is_transfer_direction_in(const usbip_header &h)
+template<typename Transfer>
+inline auto& get_setup_packet(Transfer &r)
+{
+	return reinterpret_cast<USB_DEFAULT_PIPE_SETUP_PACKET&>(r.SetupPacket);
+}
+
+template<typename Transfer>
+inline auto& get_setup_packet(const Transfer &r)
+{
+	return reinterpret_cast<const USB_DEFAULT_PIPE_SETUP_PACKET&>(r.SetupPacket);
+}
+
+template<typename Transfer>
+inline auto is_transfer_dir_in(const Transfer &r)
+{
+	auto &pkt = get_setup_packet(r);
+	return is_transfer_dir_in(pkt);
+}
+
+template<typename Transfer>
+inline auto is_transfer_dir_out(const Transfer &r)
+{
+	auto &pkt = get_setup_packet(r);
+	return is_transfer_dir_out(pkt);
+}
+
+constexpr auto is_transfer_dir_in(const usbip_header &h)
 {
 	return h.base.direction == USBIP_DIR_IN;
 }
 
-constexpr auto is_transfer_direction_out(const usbip_header &h)
+constexpr auto is_transfer_dir_out(const usbip_header &h)
 {
 	return h.base.direction == USBIP_DIR_OUT;
 }
