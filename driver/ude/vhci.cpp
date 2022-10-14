@@ -81,7 +81,7 @@ NTSTATUS query_usb_capability(
         const GUID* supported[] = {
                 &GUID_USB_CAPABILITY_CHAINED_MDLS, 
                 &GUID_USB_CAPABILITY_SELECTIVE_SUSPEND, // class extension reports it as supported without invoking the callback
-                &GUID_USB_CAPABILITY_FUNCTION_SUSPEND,
+//              &GUID_USB_CAPABILITY_FUNCTION_SUSPEND,
                 &GUID_USB_CAPABILITY_DEVICE_CONNECTION_HIGH_SPEED_COMPATIBLE, 
                 &GUID_USB_CAPABILITY_DEVICE_CONNECTION_SUPER_SPEED_COMPATIBLE 
         };

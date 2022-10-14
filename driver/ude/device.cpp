@@ -67,8 +67,6 @@ PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
                         Trace(TRACE_LEVEL_ERROR, "WdfIoQueueRetrieveNextRequest %!STATUS!", err);
                 }
         }
-
-        WdfObjectDereference(dev.queue); // see device::create_queue
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
@@ -82,6 +80,8 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         auto &ctx = *get_device_ctx(dev);
+
+        WdfObjectDelete(ctx.queue); // see device::create_queue
         free(ctx.ext);
 }
 
