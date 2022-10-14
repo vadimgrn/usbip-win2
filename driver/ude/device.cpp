@@ -83,6 +83,8 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 
         WdfObjectDelete(ctx.queue); // see device::create_queue
         free(ctx.ext);
+
+        TraceDbg("dev %04x destroyed", ptr04x(dev));
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -400,10 +402,8 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
 }
 
 /*
- * UDECXUSBDEVICE must be destroyed in two steps:
- * 1.Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
- *   A device will be plugged out from a hub, but not destroyed.
- * 2.Call WdfObjectDelete to destroy it.
+ * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
+ * A device will be plugged out from a hub, destroy can be delayed slightly.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -424,8 +424,6 @@ PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE dev)
         if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // caught BSOD on DISPATCH_LEVEL
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(dev), err);
         }
-        
-//      WdfObjectDelete(dev);
 }
 
 _IRQL_requires_same_
@@ -451,7 +449,11 @@ NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE dev)
 
         WDFWORKITEM wi{};
         if (auto err = WdfWorkItemCreate(&cfg, &attrs, &wi)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
+                if (err == STATUS_DELETE_PENDING) {
+                        TraceDbg("%!STATUS!", err);
+                } else {
+                        Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
+                }
                 return err;
         }
 

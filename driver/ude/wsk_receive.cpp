@@ -226,33 +226,32 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void log_transfer_buffer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
+void log(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
 {
-	const USB_COMMON_DESCRIPTOR *dsc{};
-
 	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
 		   is_transfer_dir_in(r) &&
 		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
-		   r.TransferBufferLength >= sizeof(*dsc);
+		   r.TransferBufferLength >= sizeof(USB_COMMON_DESCRIPTOR);
 
-	if (ok) {
-		dsc = static_cast<decltype(dsc)>(ctx.mdl_buf.sysaddr());
-		if (dsc) { // MmGetSystemAddressForMdlSafe can fail
-			TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", dsc->bLength, dsc->bDescriptorType, 
-				  WppBinary(dsc, static_cast<USHORT>(min(dsc->bLength, r.TransferBufferLength))));
-		}
+	if (!ok) {
+		return;
+	}
+	
+	if (auto d = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr())) { // MmGetSystemAddressForMdlSafe can fail
+		TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", d->bLength, d->bDescriptorType, 
+			  WppBinary(d, static_cast<USHORT>(min(d->bLength, r.TransferBufferLength))));
 	}
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void log_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
+void log_with_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
 {
 	switch (urb.UrbHeader.Function) {
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
 		static_assert(sizeof(urb.UrbControlTransfer) == sizeof(urb.UrbControlTransferEx));
-		log_transfer_buffer(ctx, static_cast<const _URB_CONTROL_TRANSFER&>(urb.UrbControlTransfer));
+		log(ctx, static_cast<const _URB_CONTROL_TRANSFER&>(urb.UrbControlTransfer));
 	}
 }
 
@@ -297,7 +296,7 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 			if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
 				st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 			}
-			log_transfer_buffer(ctx, *urb);
+			log_with_transfer_buffer(ctx, *urb);
 		}
 
 	} else if (ret.status) {
@@ -668,6 +667,8 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 		Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
 		return err;
 	}
+
+	TraceDbg("workitem %04x", ptr04x(ctx.recv_hdr));
 
 	if (auto ptr = alloc_wsk_context(&ctx, WDF_NO_HANDLE)) {
 		get_wsk_context(ctx.recv_hdr) = ptr;
