@@ -15,11 +15,18 @@ namespace usbip
  * The following codes are valid only if passed as in the icControlCode parameter 
  * for IRP_MJ_INTERNAL_DEVICE_CONTROL.
  */
-enum : USHORT { USBEX_SUBMIT_URB = USB_RESERVED_USER_BASE + 13 }; // Function
+enum : USHORT {  // Function
+	USBEX_BASE = USB_RESERVED_USER_BASE,
+	USBEX_CFG_INIT = USBEX_BASE + 5, // UdecxEndpointsConfigureTypeDeviceInitialize
+	USBEX_CFG_CHANGE = USBEX_BASE + 13, // UdecxEndpointsConfigureTypeDeviceConfigurationChange, UdecxEndpointsConfigureTypeInterfaceSettingChange
+};
 
 enum : ULONG { // see IOCTL_INTERNAL_USB_SUBMIT_URB
-        IOCTL_INTERNAL_USBEX_SELECT = CTL_CODE(FILE_DEVICE_USBEX, USBEX_SUBMIT_URB, METHOD_NEITHER, FILE_ANY_ACCESS)
+        IOCTL_INTERNAL_USBEX_CFG_INIT   = CTL_CODE(FILE_DEVICE_USBEX, USBEX_CFG_INIT,   METHOD_NEITHER, FILE_ANY_ACCESS),
+	IOCTL_INTERNAL_USBEX_CFG_CHANGE = CTL_CODE(FILE_DEVICE_USBEX, USBEX_CFG_CHANGE, METHOD_NEITHER, FILE_ANY_ACCESS)
 };
+static_assert(IOCTL_INTERNAL_USBEX_CFG_INIT   == 0x491017);
+static_assert(IOCTL_INTERNAL_USBEX_CFG_CHANGE == 0x491037);
 
 inline auto DeviceIoControlCode(_In_ _IO_STACK_LOCATION *stack)
 {

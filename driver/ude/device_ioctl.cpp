@@ -361,21 +361,21 @@ auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto verify_select(_In_ WDFREQUEST request)
+auto verify_select(_In_ WDFREQUEST request, _In_ ULONG expected_ioctl)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto stack = IoGetCurrentIrpStackLocation(irp);
         auto ioctl = DeviceIoControlCode(stack);
 
-        auto ok = stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && 
-                  ioctl == IOCTL_INTERNAL_USBEX_SELECT;
-
-        if (!ok) {
-                Trace(TRACE_LEVEL_ERROR, "Unexpected IoControlCode %s(%#x)", internal_device_control_name(ioctl), ioctl);
-                return STATUS_INVALID_DEVICE_REQUEST;
+        if (stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && ioctl == expected_ioctl) {
+                return STATUS_SUCCESS;
         }
+        
+        Trace(TRACE_LEVEL_ERROR, "IoControlCode %s(%#x) expected, got %s(%#x)", 
+                        internal_device_control_name(expected_ioctl), expected_ioctl,
+                        internal_device_control_name(ioctl), ioctl);
 
-        return STATUS_SUCCESS;
+        return STATUS_INVALID_DEVICE_REQUEST;
 }
 
 _IRQL_requires_same_
@@ -484,11 +484,11 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::set_configuration(
-        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
+        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue)
 {
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), ConfigurationValue);
 
-        if (auto err = verify_select(request)) {
+        if (auto err = verify_select(request, ioctl)) {
                 return err;
         }
 
@@ -502,7 +502,7 @@ NTSTATUS usbip::device::set_interface(
 {
         TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", ptr04x(dev), InterfaceNumber, InterfaceSetting);
 
-        if (auto err = verify_select(request)) {
+        if (auto err = verify_select(request, IOCTL_INTERNAL_USBEX_CFG_CHANGE)) {
                 return err;
         }
 

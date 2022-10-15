@@ -668,7 +668,7 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 		return err;
 	}
 
-	TraceDbg("workitem %04x", ptr04x(ctx.recv_hdr));
+	TraceDbg("wsk workitem %04x", ptr04x(ctx.recv_hdr));
 
 	if (auto ptr = alloc_wsk_context(&ctx, WDF_NO_HANDLE)) {
 		get_wsk_context(ctx.recv_hdr) = ptr;

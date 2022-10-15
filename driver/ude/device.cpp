@@ -144,6 +144,9 @@ void endpoint_start(_In_ UDECXUSBENDPOINT endp)
         TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
         WdfIoQueueStart(queue);
 
+/*
+ * @see UDECX_WDF_DEVICE_CONFIG.UDECX_WDF_DEVICE_RESET_ACTION, default is UdecxWdfDeviceResetActionResetEachUsbDevice. 
+ */
 _Function_class_(EVT_UDECX_USB_DEVICE_POST_ENUMERATION_RESET)
 _IRQL_requires_same_
 inline void device_reset(
@@ -309,6 +312,7 @@ void endpoints_configure(
                 TraceDbg("dev %04x, ToConfigure[%lu]%!BIN!", ptr04x(dev), params->EndpointsToConfigureCount, 
                           WppBinary(params->EndpointsToConfigure,
                                     USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
+                st = device::set_configuration(dev, request, IOCTL_INTERNAL_USBEX_CFG_INIT, 1);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
@@ -316,7 +320,7 @@ void endpoints_configure(
                                     USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
-                st = device::set_configuration(dev, request, params->NewConfigurationValue);
+                st = device::set_configuration(dev, request, IOCTL_INTERNAL_USBEX_CFG_CHANGE, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
                 st = device::set_interface(dev, request, params->InterfaceNumber, params->NewInterfaceSetting);
@@ -427,7 +431,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
 
 /*
  * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
- * A device will be plugged out from a hub, destroy can be delayed slightly.
+ * A device will be plugged out from a hub, delete can be delayed slightly.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
