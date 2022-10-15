@@ -297,10 +297,10 @@ void endpoints_configure(
                                     USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
-                st = device::select_configuration(dev, request, params->NewConfigurationValue);
+                st = device::set_configuration(dev, request, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
-                st = device::select_interface(dev, request, params->InterfaceNumber, params->NewInterfaceSetting);
+                st = device::set_interface(dev, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
         }
 
@@ -412,10 +412,10 @@ PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE dev)
         PAGED_CODE();
 
         auto &ctx = *get_device_ctx(dev);
-        static_assert(sizeof(ctx.destroyed) == sizeof(CHAR));
+        static_assert(sizeof(ctx.unplugged) == sizeof(CHAR));
 
-        if (InterlockedExchange8(PCHAR(&ctx.destroyed), true)) {
-                TraceDbg("dev %04x is destroyed", ptr04x(dev));
+        if (InterlockedExchange8(PCHAR(&ctx.unplugged), true)) {
+                TraceDbg("dev %04x is already unplugged", ptr04x(dev));
                 return;
         }
 
@@ -432,9 +432,8 @@ NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE dev)
 {
         auto func = [] (auto WorkItem)
         {
-                if (auto dev = *WdfObjectGet_UDECXUSBDEVICE(WorkItem)) {
+                if (auto dev = (UDECXUSBDEVICE)WdfWorkItemGetParentObject(WorkItem)) {
                         plugout_and_delete(dev);
-                        WdfObjectDereference(dev);
                 }
                 WdfObjectDelete(WorkItem); // can be omitted
         };
@@ -444,21 +443,18 @@ NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE dev)
         cfg.AutomaticSerialization = false;
 
         WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
+        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
         attrs.ParentObject = dev;
 
         WDFWORKITEM wi{};
         if (auto err = WdfWorkItemCreate(&cfg, &attrs, &wi)) {
                 if (err == STATUS_DELETE_PENDING) {
-                        TraceDbg("%!STATUS!", err);
+                        TraceDbg("dev %04x %!STATUS!", ptr04x(dev), err);
                 } else {
                         Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
                 }
                 return err;
         }
-
-        *WdfObjectGet_UDECXUSBDEVICE(wi) = dev;
-        WdfObjectReference(dev);
 
         WdfWorkItemEnqueue(wi);
         return STATUS_SUCCESS;

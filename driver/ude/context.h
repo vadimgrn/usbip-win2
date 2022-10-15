@@ -86,7 +86,7 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
         
-        volatile bool destroyed;
+        volatile bool unplugged;
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
@@ -125,7 +125,7 @@ inline auto& get_device(_In_ WDFQUEUE queue)
         return *WdfObjectGet_UDECXUSBDEVICE(queue);
 }
 
-enum request_status : LONG { REQ_INIT, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
+enum request_status : LONG { REQ_ZEROED, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 
 /*
  * Context space for WDFREQUEST.
@@ -142,10 +142,10 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ request_status status)
 {
-        NT_ASSERT(status != REQ_INIT);
+        NT_ASSERT(status != REQ_ZEROED);
         NT_ASSERT(status != REQ_NO_HANDLE);
         static_assert(sizeof(ctx.status) == sizeof(LONG));
-        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_INIT);
+        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_ZEROED);
         return static_cast<request_status>(oldval);
 }
 

@@ -146,7 +146,7 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
                 req_ctx.seqnum = ctx->hdr.base.seqnum;
 
                 NT_ASSERT(is_valid_seqnum(req_ctx.seqnum));
-                NT_ASSERT(req_ctx.status == REQ_INIT);
+                NT_ASSERT(req_ctx.status == REQ_ZEROED);
 
                 if (auto err = WdfRequestForwardToIoQueue(req, dev.queue)) {
                         Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
@@ -483,7 +483,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::select_configuration(
+NTSTATUS usbip::device::set_configuration(
         _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
 {
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), ConfigurationValue);
@@ -497,7 +497,7 @@ NTSTATUS usbip::device::select_configuration(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::select_interface(
+NTSTATUS usbip::device::set_interface(
         _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR InterfaceNumber, _In_ UCHAR InterfaceSetting)
 {
         TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", ptr04x(dev), InterfaceNumber, InterfaceSetting);
