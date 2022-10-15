@@ -51,7 +51,7 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
+inline PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
 {
         PAGED_CODE();
         NT_ASSERT(!dev.sock());
@@ -83,8 +83,6 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 
         WdfObjectDelete(ctx.queue); // see device::create_queue
         free(ctx.ext);
-
-        TraceDbg("dev %04x destroyed", ptr04x(dev));
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -102,7 +100,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         vhci::reclaim_roothub_port(dev);
 
         close_socket(ctx.sock());
-        cancel_pending_requests(ctx);
+        WdfIoQueuePurge(ctx.queue, WDF_NO_EVENT_CALLBACK, WDF_NO_CONTEXT); // cancel_pending_requests(ctx);
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
