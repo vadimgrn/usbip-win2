@@ -39,6 +39,9 @@ void vhci_cleanup(_In_ WDFOBJECT Object)
         vhci::destroy_all_devices(vhci);
 }
 
+using init_func_t = NTSTATUS(WDFDEVICE);
+
+_Function_class_(init_func_t)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 auto init_context(_In_ WDFDEVICE vhci)
@@ -48,6 +51,7 @@ auto init_context(_In_ WDFDEVICE vhci)
         return STATUS_SUCCESS;
 }
 
+_Function_class_(init_func_t)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 auto create_interfaces(_In_ WDFDEVICE vhci)
@@ -99,6 +103,9 @@ NTSTATUS query_usb_capability(
         return st;
 }
 
+/*
+ * Drivers for USB devices must not specify IdleCanWakeFromS0. 
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
@@ -110,7 +117,7 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
         WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnp_power);
 
         WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS idle_settings;
-        WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleUsbSelectiveSuspend); // IdleCanWakeFromS0
+        WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleCannotWakeFromS0);
 
         WDF_OBJECT_ATTRIBUTES request_attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&request_attrs, request_ctx);
@@ -136,6 +143,7 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
         return STATUS_SUCCESS;
 }
 
+_Function_class_(init_func_t)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
@@ -171,9 +179,8 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
                 return err;
         }
 
-        using func_t = NTSTATUS(WDFDEVICE);
-        func_t *functions[] { init_context, create_interfaces, add_usbdevice_emulation, 
-                              vhci::create_default_queue };
+        init_func_t* const functions[] { init_context, create_interfaces, add_usbdevice_emulation, 
+                                         vhci::create_default_queue };
 
         for (auto f: functions) {
                 if (auto err = f(vhci)) {
