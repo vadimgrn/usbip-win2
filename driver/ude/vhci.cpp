@@ -111,11 +111,11 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
-
+/*
         WDF_PNPPOWER_EVENT_CALLBACKS pnp_power;
         WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnp_power);
         WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnp_power);
-
+*/
         WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS idle_settings;
         WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleCannotWakeFromS0);
 

@@ -111,7 +111,7 @@ void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
         TraceDbg("endp %04x, req %04x", ptr04x(endp), ptr04x(request));
 
         auto st = device::clear_endpoint_stall(endp, request);
-        if (NT_ERROR(st)) {
+        if (st != STATUS_PENDING) {
                 Trace(TRACE_LEVEL_ERROR, "endp %04x, %!STATUS!", ptr04x(endp), st);
                 WdfRequestComplete(request, st);
         }
@@ -143,22 +143,43 @@ void endpoint_start(_In_ UDECXUSBENDPOINT endp)
         auto queue = get_endpoint_ctx(endp)->queue;
         TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
         WdfIoQueueStart(queue);
+
+_Function_class_(EVT_UDECX_USB_DEVICE_POST_ENUMERATION_RESET)
+_IRQL_requires_same_
+inline void device_reset(
+        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ BOOLEAN AllDevicesReset)
+{
+        if (AllDevicesReset) {
+                Trace(TRACE_LEVEL_ERROR, "vhci %04x, dev %04x, AllDevicesReset(true) is not supported", 
+                                          ptr04x(vhci), ptr04x(dev));
+
+                WdfRequestComplete(request, STATUS_NOT_SUPPORTED);
+                return;
+        }
+
+        TraceDbg("dev %04x", ptr04x(dev));
+
+        auto st = device::reset_port(dev, request);
+        if (st != STATUS_PENDING) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, reset port %!STATUS!", ptr04x(dev), st);
+                WdfRequestComplete(request, st);
+        }
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
-NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev)
+inline NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev)
 {
         TraceDbg("vhci %04x, dev %04x", ptr04x(vhci), ptr04x(dev));
-        return STATUS_NOT_IMPLEMENTED;
+        return STATUS_SUCCESS;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_EXIT)
 _IRQL_requires_same_
-NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
+inline NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
 {
         TraceDbg("vhci %04x, dev %04x, %!UDECX_USB_DEVICE_WAKE_SETTING!", ptr04x(vhci), ptr04x(dev), WakeSetting);
-        return STATUS_NOT_IMPLEMENTED;
+        return STATUS_SUCCESS;
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_SET_FUNCTION_SUSPEND_AND_WAKE)
@@ -172,7 +193,7 @@ NTSTATUS device_set_function_suspend_and_wake(
         TraceDbg("vhci %04x, dev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
                   ptr04x(vhci), ptr04x(dev), Interface, FunctionPower);
 
-        return STATUS_NOT_IMPLEMENTED;
+        return STATUS_NOT_SUPPORTED;
 }
 
 _IRQL_requires_same_
@@ -321,10 +342,15 @@ PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
         UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS cb;
         UDECX_USB_DEVICE_CALLBACKS_INIT(&cb);
 
-        cb.EvtUsbDeviceLinkPowerEntry = device_d0_entry;
-        cb.EvtUsbDeviceLinkPowerExit = device_d0_exit;
-        cb.EvtUsbDeviceSetFunctionSuspendAndWake = device_set_function_suspend_and_wake; // required for USB 3 devices
+//      cb.EvtUsbDeviceLinkPowerEntry = device_d0_entry; // required if the device supports USB remote wake
+//      cb.EvtUsbDeviceLinkPowerExit = device_d0_exit;
+        
+        if (speed >= UdecxUsbSuperSpeed) { // required for USB 3 devices
+                cb.EvtUsbDeviceSetFunctionSuspendAndWake = device_set_function_suspend_and_wake;
+        }
 
+//      cb.EvtUsbDeviceReset = device_reset; // server returns EPIPE always
+        
         cb.EvtUsbDeviceDefaultEndpointAdd = default_endpoint_add;
         cb.EvtUsbDeviceEndpointAdd = endpoint_add;
         cb.EvtUsbDeviceEndpointsConfigure = endpoints_configure;
