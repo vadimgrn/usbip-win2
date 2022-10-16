@@ -45,30 +45,6 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
         }
 }
 
-/*
- * The socket is closed, there is no concurrency with send_complete from device_ioctl.cpp
- * @see device::send_cmd_unlink
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
-{
-        PAGED_CODE();
-        NT_ASSERT(!dev.sock());
-
-        for (NTSTATUS err{}; !err; ) {
-                switch (WDFREQUEST request; err = WdfIoQueueRetrieveNextRequest(dev.queue, &request)) {
-                case STATUS_SUCCESS:
-                        complete(request, STATUS_CANCELLED);
-                        break;
-                case STATUS_NO_MORE_ENTRIES:
-                        break;
-                default:
-                        Trace(TRACE_LEVEL_ERROR, "WdfIoQueueRetrieveNextRequest %!STATUS!", err);
-                }
-        }
-}
-
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -80,8 +56,6 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         auto &ctx = *get_device_ctx(dev);
-
-        WdfObjectDelete(ctx.queue); // see device::create_queue
         free(ctx.ext);
 }
 
@@ -99,7 +73,8 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         vhci::reclaim_roothub_port(dev);
         close_socket(ctx.sock());
-        cancel_pending_requests(ctx);
+
+        NT_ASSERT(WDF_IO_QUEUE_PURGED(WdfIoQueueGetState(ctx.queue, nullptr, nullptr)));
 }
 
 /*
@@ -142,16 +117,6 @@ void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
         }
 }
 
-_Function_class_(EVT_WDF_IO_QUEUE_STATE)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI purge_complete(_In_ WDFQUEUE queue, _In_ WDFCONTEXT)
-{
-        auto endp = get_endpoint(queue);
-        TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
-        UdecxUsbEndpointPurgeComplete(endp);
-}
-
 _Function_class_(EVT_UDECX_USB_ENDPOINT_PURGE)
 _IRQL_requires_same_
 void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
@@ -164,6 +129,12 @@ void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
         while (auto request = device::dequeue_request(dev, endp.queue)) {
                 device::send_cmd_unlink(endp.device, request);
         }
+
+        auto purge_complete = [] (auto queue, auto) // EVT_WDF_IO_QUEUE_STATE
+        { 
+                auto endp = get_endpoint(queue);
+                UdecxUsbEndpointPurgeComplete(endp);
+        };
 
         WdfIoQueuePurge(endp.queue, purge_complete, WDF_NO_CONTEXT);
 }
@@ -250,7 +221,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
 
         UDECX_USB_ENDPOINT_CALLBACKS cb;
         UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, endpoint_reset);
-        cb.EvtUsbEndpointStart = endpoint_start;
+        cb.EvtUsbEndpointStart = endpoint_start; // does not work without it
         cb.EvtUsbEndpointPurge = endpoint_purge;
 
         UdecxUsbEndpointInitSetCallbacks(data->UdecxUsbEndpointInit, &cb);

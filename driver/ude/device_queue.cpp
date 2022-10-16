@@ -51,7 +51,7 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBDEVICE);
         attrs.EvtCleanupCallback = [] (auto queue) { TraceDbg("Device queue %04x cleanup", ptr04x(queue)); };
 //      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoCanceledOnQueue is used only
-        attrs.ParentObject = ctx.vhci; // see cancel_pending_requests
+        attrs.ParentObject = dev;
 
         if (auto err = WdfIoQueueCreate(ctx.vhci, &cfg, &attrs, &ctx.queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
