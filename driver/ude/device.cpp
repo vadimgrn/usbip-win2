@@ -51,13 +51,13 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-inline PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
+PAGED void cancel_pending_requests(_Inout_ device_ctx &dev)
 {
         PAGED_CODE();
         NT_ASSERT(!dev.sock());
 
         for (NTSTATUS err{}; !err; ) {
-                switch (WDFREQUEST request;  err = WdfIoQueueRetrieveNextRequest(dev.queue, &request)) {
+                switch (WDFREQUEST request; err = WdfIoQueueRetrieveNextRequest(dev.queue, &request)) {
                 case STATUS_SUCCESS:
                         complete(request, STATUS_CANCELLED);
                         break;
@@ -98,9 +98,34 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         TraceDbg("dev %04x", ptr04x(dev));
 
         vhci::reclaim_roothub_port(dev);
-
         close_socket(ctx.sock());
-        WdfIoQueuePurge(ctx.queue, WDF_NO_EVENT_CALLBACK, WDF_NO_CONTEXT); // cancel_pending_requests(ctx);
+        cancel_pending_requests(ctx);
+}
+
+/*
+ * @see UDECX_WDF_DEVICE_CONFIG.UDECX_WDF_DEVICE_RESET_ACTION, 
+ *      default is UdecxWdfDeviceResetActionResetEachUsbDevice. 
+ */
+_Function_class_(EVT_UDECX_USB_DEVICE_POST_ENUMERATION_RESET)
+_IRQL_requires_same_
+inline void device_reset(
+        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ BOOLEAN AllDevicesReset)
+{
+        if (AllDevicesReset) {
+                Trace(TRACE_LEVEL_ERROR, "vhci %04x, dev %04x, AllDevicesReset(true) is not supported", 
+                        ptr04x(vhci), ptr04x(dev));
+
+                WdfRequestComplete(request, STATUS_NOT_SUPPORTED);
+                return;
+        }
+
+        TraceDbg("dev %04x", ptr04x(dev));
+
+        auto st = device::reset_port(dev, request);
+        if (st != STATUS_PENDING) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, reset port %!STATUS!", ptr04x(dev), st);
+                WdfRequestComplete(request, st);
+        }
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
@@ -129,11 +154,18 @@ void NTAPI purge_complete(_In_ WDFQUEUE queue, _In_ WDFCONTEXT)
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_PURGE)
 _IRQL_requires_same_
-void endpoint_purge(_In_ UDECXUSBENDPOINT endp)
+void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
 {
-        auto queue = get_endpoint_ctx(endp)->queue;
-        TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
-        WdfIoQueuePurge(queue, purge_complete, WDF_NO_CONTEXT);
+        auto &endp = *get_endpoint_ctx(endpoint);
+        auto &dev = *get_device_ctx(endp.device);
+
+        TraceDbg("dev %04x, endp %04x, queue %04x", ptr04x(endp.device), ptr04x(endpoint), ptr04x(endp.queue));
+
+        while (auto request = device::dequeue_request(dev, endp.queue)) {
+                device::send_cmd_unlink(endp.device, request);
+        }
+
+        WdfIoQueuePurge(endp.queue, purge_complete, WDF_NO_CONTEXT);
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_START)
@@ -143,30 +175,6 @@ void endpoint_start(_In_ UDECXUSBENDPOINT endp)
         auto queue = get_endpoint_ctx(endp)->queue;
         TraceDbg("endp %04x, queue %04x", ptr04x(endp), ptr04x(queue));
         WdfIoQueueStart(queue);
-
-/*
- * @see UDECX_WDF_DEVICE_CONFIG.UDECX_WDF_DEVICE_RESET_ACTION, default is UdecxWdfDeviceResetActionResetEachUsbDevice. 
- */
-_Function_class_(EVT_UDECX_USB_DEVICE_POST_ENUMERATION_RESET)
-_IRQL_requires_same_
-inline void device_reset(
-        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ BOOLEAN AllDevicesReset)
-{
-        if (AllDevicesReset) {
-                Trace(TRACE_LEVEL_ERROR, "vhci %04x, dev %04x, AllDevicesReset(true) is not supported", 
-                                          ptr04x(vhci), ptr04x(dev));
-
-                WdfRequestComplete(request, STATUS_NOT_SUPPORTED);
-                return;
-        }
-
-        TraceDbg("dev %04x", ptr04x(dev));
-
-        auto st = device::reset_port(dev, request);
-        if (st != STATUS_PENDING) {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, reset port %!STATUS!", ptr04x(dev), st);
-                WdfRequestComplete(request, st);
-        }
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
@@ -305,6 +313,10 @@ void endpoints_configure(
         _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
         NT_ASSERT(!has_urb(request));
+
+        TraceDbg("dev %04x, EndpointsToConfigureCount %lu, ReleasedEndpointsCount %lu", 
+                  ptr04x(dev), params->EndpointsToConfigureCount, params->ReleasedEndpointsCount);
+
         auto st = STATUS_SUCCESS; 
 
         switch (params->ConfigureType) {
@@ -312,7 +324,6 @@ void endpoints_configure(
                 TraceDbg("dev %04x, ToConfigure[%lu]%!BIN!", ptr04x(dev), params->EndpointsToConfigureCount, 
                           WppBinary(params->EndpointsToConfigure,
                                     USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
-                st = device::set_configuration(dev, request, IOCTL_INTERNAL_USBEX_CFG_INIT, 1);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 

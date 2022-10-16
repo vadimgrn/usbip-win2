@@ -535,7 +535,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 	auto &hdr = ctx.hdr;
 
 	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? // request must be completed
-		      device::dequeue_request(ctx.dev_ctx->queue, hdr.base.seqnum) : WDF_NO_HANDLE;
+		      device::dequeue_request(*ctx.dev_ctx, hdr.base.seqnum) : WDF_NO_HANDLE;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];

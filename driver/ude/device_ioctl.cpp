@@ -80,7 +80,7 @@ NTSTATUS send_complete(
                         complete(request, STATUS_CANCELLED);
                         break;
                 }
-        } else if (auto victim = device::dequeue_request(ctx->dev_ctx->queue, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+        } else if (auto victim = device::dequeue_request(*ctx->dev_ctx, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == request);
                 complete(victim, st.Status);
         } else if (old_status == REQ_CANCELED) {

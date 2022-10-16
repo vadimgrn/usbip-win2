@@ -66,13 +66,13 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const request_search &crit)
+WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const request_search &crit)
 {
         NT_ASSERT(crit.queue); // largest in union
 
         for (WDFREQUEST prev{}, cur{}; ; prev = cur) {
 
-                auto st = WdfIoQueueFindRequest(queue, prev, WDF_NO_HANDLE, nullptr, &cur);
+                auto st = WdfIoQueueFindRequest(dev.queue, prev, WDF_NO_HANDLE, nullptr, &cur);
                 if (prev) {
                         WdfObjectDereference(prev);
                 }
@@ -80,7 +80,7 @@ WDFREQUEST usbip::device::dequeue_request(_In_ WDFQUEUE queue, _In_ const reques
                 switch (st) {
                 case STATUS_SUCCESS:
                         if (matches(cur, crit)) {
-                                st = WdfIoQueueRetrieveFoundRequest(queue, cur, &prev);
+                                st = WdfIoQueueRetrieveFoundRequest(dev.queue, cur, &prev);
                                 WdfObjectDereference(cur);
 
                                 switch (st) {

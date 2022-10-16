@@ -13,6 +13,11 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
+namespace usbip
+{
+        struct device_ctx;
+}
+
 namespace usbip::device
 {
 
@@ -39,7 +44,7 @@ struct request_search
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST dequeue_request(_In_ WDFQUEUE queue, _In_ const request_search &crit);
+WDFREQUEST dequeue_request(_In_ device_ctx &dev, _In_ const request_search &crit);
 
 // @see WdfIoQueueRetrieveNextRequest
 
