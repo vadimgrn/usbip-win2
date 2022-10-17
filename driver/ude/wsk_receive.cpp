@@ -677,17 +677,3 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 
 	return STATUS_INSUFFICIENT_RESOURCES;
 }
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::WskDisconnectEvent(_In_opt_ PVOID SocketContext, _In_ ULONG Flags)
-{
-	auto ext = static_cast<device_ctx_ext*>(SocketContext);
-
-	if (auto dev = get_device(ext->ctx)) {
-		Trace(TRACE_LEVEL_INFORMATION, "dev %04x, Flags %#lx", ptr04x(dev), Flags);
-		device::sched_plugout_and_delete(dev);
-	}
-
-	return STATUS_SUCCESS;
-}

@@ -9,7 +9,6 @@
 #include "context.h"
 #include "vhci.h"
 #include "device.h"
-#include "wsk_receive.h"
 #include "network.h"
 #include "ioctl.h"
 
@@ -160,11 +159,6 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
                 d->speed = static_cast<usb_device_speed>(dev.speed);
         }
 
-        if (auto err = event_callback_control(ext.sock, WSK_EVENT_DISCONNECT, false)) {
-                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
-                return make_error(ERR_NETWORK);
-        }
-
         return make_error(ERR_NONE);
 }
 
@@ -264,10 +258,8 @@ PAGED auto connect(_Inout_ device_ctx_ext &ext)
                 return ERR_NETWORK;
         }
 
-        static const WSK_CLIENT_CONNECTION_DISPATCH dispatch{ nullptr, WskDisconnectEvent };
-
         NT_ASSERT(!ext.sock);
-        ext.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &ext, &dispatch, ai, try_connect, nullptr);
+        ext.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &ext, nullptr, ai, try_connect, nullptr);
 
         wsk::free(ai);
         return ext.sock ? ERR_NONE : ERR_NETWORK;

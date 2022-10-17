@@ -144,22 +144,18 @@ PAGED void usbip::close_socket(_Inout_ SOCKET* &sock)
 {
         PAGED_CODE();
 
-        if (!sock) {
+        auto socket = (SOCKET*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&sock), nullptr);
+        if (!socket) {
                 return;
         }
 
-        if (auto err = event_callback_control(sock, WSK_EVENT_DISABLE | WSK_EVENT_DISCONNECT, true)) {
-                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
-        }
-
-        if (auto err = disconnect(sock)) {
+        if (auto err = disconnect(socket)) {
                 Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
         }
 
-        if (auto err = close(sock)) {
+        if (auto err = close(socket)) {
                 Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
         }
 
-        sock = nullptr;
 }
 
