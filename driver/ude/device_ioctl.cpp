@@ -191,6 +191,16 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
+        auto transfer_buffer_length = r.TransferBufferLength;
+
+        if (auto pkt = &get_setup_packet(r)) {
+                if (transfer_buffer_length > pkt->wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
+                        transfer_buffer_length = pkt->wLength; // usb_submit_urb checks for equality
+                } else if (transfer_buffer_length < pkt->wLength) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+        }
+
         auto &dev = *get_device_ctx(endp.device);
 
         wsk_context_ptr ctx(&dev, request);
@@ -200,7 +210,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
         
         setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength, dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, transfer_buffer_length, dir_out)) {
                 return err;
         }
 
