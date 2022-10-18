@@ -174,6 +174,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
+        NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeControl);
+
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
@@ -212,6 +214,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
+        NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeBulk || 
+                  usb_endpoint_type(endp.descriptor) == UsbdPipeTypeInterrupt);
+
         auto &r = urb.UrbBulkOrInterruptTransfer;
 
         {
@@ -221,13 +226,6 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
                         r.TransferBufferLength, func);
-        }
-
-        auto type = usb_endpoint_type(endp.descriptor);
-
-        if (!(type == UsbdPipeTypeBulk || type == UsbdPipeTypeInterrupt)) {
-                Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
-                return STATUS_INVALID_PARAMETER;
         }
 
         auto &dev = *get_device_ctx(endp.device);
@@ -281,6 +279,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
+        NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeIsochronous);
         auto &r = urb.UrbIsochronousTransfer;
 
         {
@@ -296,10 +295,9 @@ NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpo
                         func);
         }
 
-        auto type = usb_endpoint_type(endp.descriptor);
-
-        if (type != UsbdPipeTypeIsochronous) {
-                Trace(TRACE_LEVEL_ERROR, "%!USBD_PIPE_TYPE!", type);
+        if (r.NumberOfPackets > USBIP_MAX_ISO_PACKETS) {
+                Trace(TRACE_LEVEL_ERROR, "NumberOfPackets(%lu) > %d (USBIP protocol violation)", 
+                        r.NumberOfPackets, USBIP_MAX_ISO_PACKETS);
                 return STATUS_INVALID_PARAMETER;
         }
 

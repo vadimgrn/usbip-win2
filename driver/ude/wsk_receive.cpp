@@ -569,6 +569,8 @@ auto validate_header(_Inout_ usbip_header &hdr)
 		auto &ret = hdr.u.ret_submit;
 		if (ret.number_of_packets == number_of_packets_non_isoch) {
 			ret.number_of_packets = 0;
+		} else if (!is_valid_number_of_packets(ret.number_of_packets)) {
+			return false;
 		}
 	}	break;
 	case USBIP_RET_UNLINK:

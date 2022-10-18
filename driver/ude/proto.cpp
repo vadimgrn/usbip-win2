@@ -72,7 +72,7 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 		r->transfer_flags = to_linux_flags(TransferFlags, !dir_out);
 		r->transfer_buffer_length = TransferBufferLength;
 		r->start_frame = 0;
-		r->number_of_packets = 0; // FIXME: -1 if non-isoch
+		r->number_of_packets = number_of_packets_non_isoch;
 		r->interval = epd.bInterval;
 		RtlZeroMemory(r->setup, sizeof(r->setup));
 	}
