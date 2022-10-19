@@ -191,12 +191,13 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
                         usb_setup_pkt_str(buf_setup, sizeof(buf_setup), r.SetupPacket));
         }
 
-        auto transfer_buffer_length = r.TransferBufferLength;
+        auto buf_len = r.TransferBufferLength;
 
         if (auto pkt = &get_setup_packet(r)) {
-                if (transfer_buffer_length > pkt->wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
-                        transfer_buffer_length = pkt->wLength; // usb_submit_urb checks for equality
-                } else if (transfer_buffer_length < pkt->wLength) {
+                if (buf_len > pkt->wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
+                        buf_len = pkt->wLength; // usb_submit_urb checks for equality
+                } else if (buf_len < pkt->wLength) {
+                        Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu) < wLength(%d)", buf_len, pkt->wLength);
                         return STATUS_INVALID_PARAMETER;
                 }
         }
@@ -210,7 +211,7 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
         
         setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, transfer_buffer_length, dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, buf_len, dir_out)) {
                 return err;
         }
 
@@ -230,7 +231,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
         auto &r = urb.UrbBulkOrInterruptTransfer;
 
         {
-                auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : " ";
+                auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", MDL" : "\n";
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu%s",
@@ -293,7 +294,7 @@ NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpo
         auto &r = urb.UrbIsochronousTransfer;
 
         {
-                const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", chained mdl" : ".";
+                const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", MDL" : "\n";
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle),
@@ -306,8 +307,8 @@ NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpo
         }
 
         if (r.NumberOfPackets > USBIP_MAX_ISO_PACKETS) {
-                Trace(TRACE_LEVEL_ERROR, "NumberOfPackets(%lu) > %d (USBIP protocol violation)", 
-                        r.NumberOfPackets, USBIP_MAX_ISO_PACKETS);
+                Trace(TRACE_LEVEL_ERROR, "NumberOfPackets(%lu) > USBIP_MAX_ISO_PACKETS(%d)", 
+                                          r.NumberOfPackets, USBIP_MAX_ISO_PACKETS);
                 return STATUS_INVALID_PARAMETER;
         }
 

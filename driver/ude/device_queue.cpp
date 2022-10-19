@@ -28,7 +28,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void NTAPI canceled_on_queue(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
 {
         auto dev = get_device(queue);
-        TraceDbg("dev %04x, queue %04x, request %04x", ptr04x(dev), ptr04x(queue), ptr04x(request));
+        TraceDbg("dev %04x, request %04x", ptr04x(dev), ptr04x(request));
         device::send_cmd_unlink(dev, request);
 }
 
@@ -69,8 +69,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const request_search &crit)
 {
         NT_ASSERT(crit.queue); // largest in union
+        NT_ASSERT(crit.queue != dev.queue);
 
-        for (WDFREQUEST prev{}, cur{}; ; prev = cur) {
+        for (WDFREQUEST prev{}, cur; ; prev = cur) {
 
                 auto st = WdfIoQueueFindRequest(dev.queue, prev, WDF_NO_HANDLE, nullptr, &cur);
                 if (prev) {
@@ -86,7 +87,7 @@ WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const reque
                                 switch (st) {
                                 case STATUS_SUCCESS:
                                         return prev;
-                                case STATUS_NOT_FOUND: // "cur" was canceled and removed from queue
+                                case STATUS_NOT_FOUND: // cur was canceled and removed from queue
                                         cur = WDF_NO_HANDLE; // restart the loop
                                         break;
                                 default:
@@ -95,7 +96,7 @@ WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const reque
                                 }
                         }
                         break;
-                case STATUS_NOT_FOUND: // "prev" was canceled and removed from queue
+                case STATUS_NOT_FOUND: // prev was canceled and removed from queue
                         NT_ASSERT(!cur); // restart the loop
                         break;
                 case STATUS_NO_MORE_ENTRIES: // not found
