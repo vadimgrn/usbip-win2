@@ -39,12 +39,4 @@ private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void ObjectDeleteSafe(_In_ WDFOBJECT Object)
-{
-        if (Object) {
-                WdfObjectDelete(Object);
-        }
-}
-
 } // namespace wdf

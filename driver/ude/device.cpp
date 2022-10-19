@@ -285,27 +285,30 @@ void endpoints_configure(
 {
         NT_ASSERT(!has_urb(request));
 
-        TraceDbg("dev %04x, EndpointsToConfigureCount %lu, ReleasedEndpointsCount %lu", 
-                  ptr04x(dev), params->EndpointsToConfigureCount, params->ReleasedEndpointsCount);
+        TraceDbg("dev %04x, ToConfigure[%lu]%!BIN!", ptr04x(dev), params->EndpointsToConfigureCount, 
+                WppBinary(params->EndpointsToConfigure,
+                        USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
+
+        TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
+                WppBinary(params->EndpointsToConfigure, 
+                        USHORT(params->ReleasedEndpointsCount*sizeof(*params->EndpointsToConfigure))));
+
+        TraceDbg("dev %04x, ReleasedEndpoints[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
+                WppBinary(params->ReleasedEndpoints, 
+                        USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
 
         auto st = STATUS_SUCCESS; 
 
         switch (params->ConfigureType) {
-        case UdecxEndpointsConfigureTypeDeviceInitialize:
-                TraceDbg("dev %04x, ToConfigure[%lu]%!BIN!", ptr04x(dev), params->EndpointsToConfigureCount, 
-                          WppBinary(params->EndpointsToConfigure,
-                                    USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
-                break;
-        case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
-                TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
-                          WppBinary(params->ReleasedEndpoints, 
-                                    USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
-                break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
                 st = device::set_configuration(dev, request, IOCTL_INTERNAL_USBEX_CFG_CHANGE, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
                 st = device::set_interface(dev, request, params->InterfaceNumber, params->NewInterfaceSetting);
+                break;
+        case UdecxEndpointsConfigureTypeDeviceInitialize: // reserved for internal use
+                break;
+        case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 break;
         }
 

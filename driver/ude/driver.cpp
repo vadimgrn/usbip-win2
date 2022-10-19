@@ -34,36 +34,6 @@ PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 	WPP_CLEANUP(drvobj);
 }
 
-/*
- * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
- * The default setting of zero causes the IFR to log errors, warnings, and informational events.
- * Set to one to add verbose output to the log.
- *
- * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
- */
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-CS_INIT auto set_ifr_verbose()
-{
-	PAGED_CODE();
-
-	WDFKEY key;
-	if (auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_WRITE, WDF_NO_OBJECT_ATTRIBUTES, &key)) {
-		return err;
-	}
-
-	DECLARE_CONST_UNICODE_STRING(name, L"VerboseOn");
-	ULONG value;
-
-	auto err = WdfRegistryQueryULong(key, &name, &value);
-	if (err == STATUS_OBJECT_NAME_NOT_FOUND) { // set if value does not exist
-		err = WdfRegistryAssignULong(key, &name, 1);
-	}
-
-	WdfRegistryClose(key);
-	return err;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING *RegistryPath)
@@ -103,6 +73,13 @@ CS_INIT auto init()
 } // namespace
 
 
+/*
+ * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
+ * The default setting of zero causes the IFR to log errors, warnings, and informational events.
+ * Set to one to add verbose output to the log.
+ *
+ * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
+ */
 _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -112,14 +89,10 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNI
 
 	if (auto err = driver_create(DriverObject, RegistryPath)) {
 		return err;
-        } else {
-		err = set_ifr_verbose();
-		WPP_INIT_TRACING(DriverObject, RegistryPath);
-		if (err) {
-			Trace(TRACE_LEVEL_ERROR, "set_ifr_verbose %!STATUS!", err);
-		}
 	}
 
+	WPP_INIT_TRACING(DriverObject, RegistryPath);
 	Trace(TRACE_LEVEL_INFORMATION, "RegistryPath '%!USTR!'", RegistryPath);
+
 	return init();
 }

@@ -103,6 +103,26 @@ NTSTATUS query_usb_capability(
         return st;
 }
 
+_Function_class_(EVT_WDF_DEVICE_D0_EXIT)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE TargetState)
+{
+        PAGED_CODE();
+        TraceDbg("TargetState %!WDF_POWER_DEVICE_STATE!", TargetState);
+        return STATUS_SUCCESS;
+}
+
+_Function_class_(EVT_WDF_DEVICE_D0_ENTRY)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE PreviousState)
+{
+        PAGED_CODE();
+        TraceDbg("PreviousState %!WDF_POWER_DEVICE_STATE!", PreviousState);
+        return STATUS_SUCCESS;
+}
+
 /*
  * Drivers for USB devices must not specify IdleCanWakeFromS0. 
  */
@@ -111,14 +131,21 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 {
         PAGED_CODE();
-/*
+
         WDF_PNPPOWER_EVENT_CALLBACKS pnp_power;
         WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnp_power);
+        pnp_power.EvtDeviceD0Exit = vhci_d0_exit;
+        pnp_power.EvtDeviceD0Entry = vhci_d0_entry;
         WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnp_power);
-*/
-        WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS idle_settings;
-        WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleCannotWakeFromS0);
+/*
+        WDF_POWER_POLICY_EVENT_CALLBACKS power_policy;
+        WDF_POWER_POLICY_EVENT_CALLBACKS_INIT(&power_policy);
+        WdfDeviceInitSetPowerPolicyEventCallbacks(DeviceInit, &power_policy);
 
+        WDF_REMOVE_LOCK_OPTIONS lock_opts;
+        WDF_REMOVE_LOCK_OPTIONS_INIT(&lock_opts, 0);
+        WdfDeviceInitSetRemoveLockOptions(DeviceInit, &lock_opts);
+*/
         WDF_OBJECT_ATTRIBUTES request_attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&request_attrs, request_ctx);
         WdfDeviceInitSetRequestAttributes(DeviceInit, &request_attrs);
@@ -164,6 +191,50 @@ PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
         return STATUS_SUCCESS;
 }
 
+_Function_class_(init_func_t)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto configure(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        {
+                WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS idle_settings;
+                WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleCannotWakeFromS0);
+
+                if (auto err = WdfDeviceAssignS0IdleSettings(vhci, &idle_settings)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceAssignS0IdleSettings %!STATUS!", err);
+                        return err;
+                }
+        }
+
+/*
+        {
+                WDF_DEVICE_POWER_POLICY_WAKE_SETTINGS wake;
+                WDF_DEVICE_POWER_POLICY_WAKE_SETTINGS_INIT(&wake);
+                wake.
+
+                if (auto err = WdfDeviceAssignSxWakeSettings(vhci, &wake)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceAssignSxWakeSettings %!STATUS!", err);
+                        return err;
+                }
+        }
+
+        {
+                WDF_DEVICE_POWER_CAPABILITIES caps;
+                WDF_DEVICE_POWER_CAPABILITIES_INIT(&caps);
+                WdfDeviceSetPowerCapabilities(vhci, &caps);
+        }
+
+        {
+                WDF_DEVICE_PNP_CAPABILITIES caps;
+                WDF_DEVICE_PNP_CAPABILITIES_INIT(&caps);
+                WdfDeviceSetPnpCapabilities(vhci, &caps);
+        }
+*/
+        return STATUS_SUCCESS;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
@@ -179,8 +250,8 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *DeviceInit)
                 return err;
         }
 
-        init_func_t* const functions[] { init_context, create_interfaces, add_usbdevice_emulation, 
-                                         vhci::create_default_queue };
+        init_func_t* const functions[] { init_context, configure, create_interfaces, 
+                                         add_usbdevice_emulation, vhci::create_default_queue };
 
         for (auto f: functions) {
                 if (auto err = f(vhci)) {
@@ -299,6 +370,10 @@ PAGED void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
         }
 }
 
+/*
+ * Drivers cannot call WdfObjectDelete to delete WDFDEVICE.
+ * WdfObjectDelete: Attempt to Delete an Object Which does not allow WdfDeleteObject, STATUS_CANNOT_DELETE.
+ */
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -311,8 +386,8 @@ PAGED NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *De
         }
 
         WDFDEVICE vhci{};
-        if (auto err = create_vhci(vhci, DeviceInit)) {
-                wdf::ObjectDeleteSafe(vhci);
+        if (auto err = create_vhci(vhci, DeviceInit)) { 
+                // the framework handles deletion of WDFDEVICE
                 return err;
         }
 
