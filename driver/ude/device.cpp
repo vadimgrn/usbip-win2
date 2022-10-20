@@ -258,7 +258,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
 
         {
                 auto &d = ctx.descriptor;
-                TraceDbg("dev %04x, endp %04x{Address %#04x: %s %s[%d], Interval %d}, queue %04x", 
+                TraceDbg("dev %04x, endp %04x{Address %#02x: %s %s[%d], Interval %d}, queue %04x", 
                         ptr04x(dev), ptr04x(endp), d.bEndpointAddress, 
                         usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", 
@@ -307,8 +307,10 @@ void endpoints_configure(
                 st = device::set_interface(dev, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
         case UdecxEndpointsConfigureTypeDeviceInitialize: // reserved for internal use
+                TraceDbg("DeviceInitialize");
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
+                TraceDbg("EndpointsReleasedOnly");
                 break;
         }
 

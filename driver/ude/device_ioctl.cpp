@@ -53,20 +53,23 @@ NTSTATUS send_complete(
         auto request = ctx->request;
 
         request_ctx *req_ctx;
+        seqnum_t seqnum;
         request_status old_status;
 
         if (request) { // NULL for send_cmd_unlink
                 req_ctx = get_request_ctx(request);
+                seqnum = req_ctx->seqnum;
                 old_status = atomic_set_status(*req_ctx, REQ_SEND_COMPLETE);
         } else {
                 req_ctx = nullptr;
+                seqnum = 0;
                 old_status = REQ_NO_HANDLE;
         }
 
         auto &st = wsk_irp->IoStatus;
 
-        TraceWSK("wsk irp %04x, %!STATUS!, Information %Iu, %!request_status!",
-                  ptr04x(wsk_irp), st.Status, st.Information, old_status);
+        TraceWSK("wsk irp %04x, seqnum %u, %!STATUS!, Information %Iu, %!request_status!", 
+                  ptr04x(wsk_irp), seqnum, st.Status, st.Information, old_status);
 
         if (!request) {
                 // nothing to do
@@ -80,7 +83,7 @@ NTSTATUS send_complete(
                         complete(request, STATUS_CANCELLED);
                         break;
                 }
-        } else if (auto victim = device::dequeue_request(*ctx->dev_ctx, req_ctx->seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+        } else if (auto victim = device::dequeue_request(*ctx->dev_ctx, seqnum)) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == request);
                 complete(victim, st.Status);
         } else if (old_status == REQ_CANCELED) {
@@ -127,7 +130,7 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send(_In_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
+auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
         WSK_BUF buf;
@@ -477,7 +480,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
         auto &dev = *get_device_ctx(device);
         auto &req = *get_request_ctx(request);
 
-        TraceDbg("dev %04x, req %04x, seqnum %u", ptr04x(device), ptr04x(request), req.seqnum);
+        TraceDbg("dev %04x, seqnum %u", ptr04x(device), req.seqnum);
 
         if (!dev.sock()) {
                 TraceDbg("Socket is closed");
@@ -485,8 +488,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
                 set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
         } else {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, req %04x, seqnum %u, wsk_context_ptr error", 
-                                          ptr04x(device), ptr04x(request), req.seqnum);
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, seqnum %u, wsk_context_ptr error", ptr04x(device), req.seqnum);
         }
 
         if (auto old_status = atomic_set_status(req, REQ_CANCELED); old_status == REQ_SEND_COMPLETE) {

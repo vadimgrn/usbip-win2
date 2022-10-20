@@ -628,13 +628,14 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
+	auto seqnum = get_request_ctx(request)->seqnum;
 	auto irp = WdfRequestWdmGetIrp(request);
 
 	auto info = irp->IoStatus.Information;
 	NT_ASSERT(info == WdfRequestGetInformation(request));
 
 	if (!has_urb(irp)) {
-		TraceDbg("req %04x, %!STATUS!, Information %#Ix", ptr04x(request), status, info);
+		TraceDbg("seqnum %u, %!STATUS!, Information %#Ix", seqnum, status, info);
 		WdfRequestComplete(request, status);
 		return;
 	}
@@ -642,7 +643,7 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	auto &urb = *urb_from_irp(irp);
 	auto urb_st = urb.UrbHeader.Status;
 
-	TraceDbg("req %04x, USBD_%s, %!STATUS!, Information %#Ix", ptr04x(request), get_usbd_status(urb_st), status, info);
+	TraceDbg("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", seqnum, get_usbd_status(urb_st), status, info);
 
 	if (NT_SUCCESS(status)) {
 		UdecxUrbComplete(request, urb_st);
