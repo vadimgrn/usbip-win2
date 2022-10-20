@@ -135,8 +135,9 @@ struct request_ctx
 {
         seqnum_t seqnum;
         request_status status;
+        UDECXUSBENDPOINT endpoint;
 };
-static_assert(sizeof(request_ctx) == 8);
+static_assert(sizeof(request_ctx) == 16);
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

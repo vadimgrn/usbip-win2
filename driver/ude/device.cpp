@@ -126,7 +126,7 @@ void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
 
         TraceDbg("dev %04x, endp %04x, queue %04x", ptr04x(endp.device), ptr04x(endpoint), ptr04x(endp.queue));
 
-        while (auto request = device::dequeue_request(dev, endp.queue)) {
+        while (auto request = device::dequeue_request(dev, endpoint)) {
                 device::send_cmd_unlink(endp.device, request);
         }
 

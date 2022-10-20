@@ -415,7 +415,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto &dev = *ctx.dev_ctx;
 
 	auto &st = wsk_irp->IoStatus;
-	TraceWSK("%!STATUS!, Information %Iu", st.Status, st.Information);
+	TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(ctx.request), st.Status, st.Information);
 
 	auto err = NT_ERROR(st.Status) ? st.Status :
 		   st.Information == dev.receive_size ? dev.received(ctx) :

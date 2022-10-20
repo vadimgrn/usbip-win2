@@ -127,9 +127,8 @@ auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ c
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
-        _Inout_opt_ const URB *transfer_buffer = nullptr,
-        _In_ bool log_setup = false)
+auto send(_In_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
+        _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
         WSK_BUF buf;
 
@@ -141,12 +140,16 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
                         ptr04x(ctx->request), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
+        NT_ASSERT(bool(ctx->request) == bool(endpoint));
+
         if (auto req = ctx->request) {
                 auto &req_ctx = *get_request_ctx(req);
-                req_ctx.seqnum = ctx->hdr.base.seqnum;
 
+                req_ctx.seqnum = ctx->hdr.base.seqnum;
                 NT_ASSERT(is_valid_seqnum(req_ctx.seqnum));
+
                 NT_ASSERT(req_ctx.status == REQ_ZEROED);
+                req_ctx.endpoint = endpoint;
 
                 if (auto err = WdfRequestForwardToIoQueue(req, dev.queue)) {
                         Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
@@ -168,11 +171,12 @@ auto send(_In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         return STATUS_PENDING;
 }
 
-using urb_function_t = NTSTATUS (WDFREQUEST, URB&, const endpoint_ctx&);
+using urb_function_t = NTSTATUS (UDECXUSBENDPOINT, WDFREQUEST, URB&, const endpoint_ctx&);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
+NTSTATUS control_transfer(
+        _In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeControl);
 
@@ -218,12 +222,13 @@ NTSTATUS control_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const end
         static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
         RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
 
-        return send(ctx, dev, &urb, true);
+        return send(endpoint, ctx, dev, true, &urb);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
+NTSTATUS bulk_or_interrupt_transfer(
+        _In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeBulk || 
                   usb_endpoint_type(endp.descriptor) == UsbdPipeTypeInterrupt);
@@ -231,7 +236,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
         auto &r = urb.UrbBulkOrInterruptTransfer;
 
         {
-                auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", MDL" : "\n";
+                auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
 
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu%s",
@@ -250,7 +255,7 @@ NTSTATUS bulk_or_interrupt_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_
                 return err;
         }
 
-        return send(ctx, dev, &urb);
+        return send(endpoint, ctx, dev, false, &urb);
 }
 
 /*
@@ -288,13 +293,14 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
+NTSTATUS isoch_transfer(
+        _In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeIsochronous);
         auto &r = urb.UrbIsochronousTransfer;
 
         {
-                const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", MDL" : "\n";
+                const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
                 char buf[USBD_TRANSFER_FLAGS_BUFBZ];
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle),
@@ -333,15 +339,15 @@ NTSTATUS isoch_transfer(_In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpo
                 cmd->number_of_packets = r.NumberOfPackets;
         }
 
-        return send(ctx, dev, &urb);
+        return send(endpoint, ctx, dev, false, &urb);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
+auto usb_submit_urb(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request)
 {
         auto &urb = get_urb(request);
-        auto &ctx = *get_endpoint_ctx(endp);
+        auto &endp = *get_endpoint_ctx(endpoint);
 
         urb_function_t *handler{};
 
@@ -360,12 +366,12 @@ auto usb_submit_urb(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endp)
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "%s(%#04x), dev %04x, endp %04x", urb_function_str(func), func, 
-                                          ptr04x(ctx.device), ptr04x(endp));
+                                          ptr04x(endp.device), ptr04x(endpoint));
 
                 return STATUS_NOT_SUPPORTED;
         }
 
-        return handler(request, urb, ctx);
+        return handler(endpoint, request, urb, endp);
 }
 
 _IRQL_requires_same_
@@ -414,7 +420,7 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request,
         NT_ASSERT(!pkt.wLength);
 
         NT_ASSERT(is_transfer_dir_out(pkt));
-        return ::send(ctx, dev, nullptr, true);
+        return ::send(dev.ep0, ctx, dev, true);
 }
 
 /*
@@ -477,7 +483,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
                 TraceDbg("Socket is closed");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
                 set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
-                ::send(ctx, dev); // ignore error
+                ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
         } else {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, req %04x, seqnum %u, wsk_context_ptr error", 
                                           ptr04x(device), ptr04x(request), req.seqnum);
@@ -577,7 +583,7 @@ void NTAPI usbip::device::internal_device_control(
         }
 
         auto endp = get_endpoint(Queue);
-        auto st = usb_submit_urb(Request, endp);
+        auto st = usb_submit_urb(endp, Request);
 
         if (st != STATUS_PENDING) {
                 TraceDbg("%!STATUS!", st);

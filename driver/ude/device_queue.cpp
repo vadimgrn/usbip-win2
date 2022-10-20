@@ -18,8 +18,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto matches(_In_ WDFREQUEST request, _In_ const device::request_search &crit)
 {
-        return crit.use_queue ? crit.queue == WdfRequestGetIoQueue(request) :
-                                crit.seqnum == get_request_ctx(request)->seqnum;
+        auto &req = *get_request_ctx(request);
+        return crit.use_endp? crit.endpoint == req.endpoint : 
+                              crit.seqnum == req.seqnum;
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
@@ -68,8 +69,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const request_search &crit)
 {
-        NT_ASSERT(crit.queue); // largest in union
-        NT_ASSERT(crit.queue != dev.queue);
+        NT_ASSERT(crit.endpoint); // largest in union
 
         for (WDFREQUEST prev{}, cur; ; prev = cur) {
 

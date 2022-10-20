@@ -27,16 +27,16 @@ PAGED NTSTATUS create_queue(_In_ UDECXUSBDEVICE dev);
 
 struct request_search
 {
-        request_search(WDFQUEUE q) : queue(q), use_queue(true) {}
-        request_search(seqnum_t n) : queue(reinterpret_cast<WDFQUEUE>(static_cast<uintptr_t>(n))) {}
+        request_search(UDECXUSBENDPOINT endp) : endpoint(endp), use_endp(true) {}
+        request_search(seqnum_t n) : endpoint(reinterpret_cast<UDECXUSBENDPOINT>(static_cast<uintptr_t>(n))) {}
 
         union {
-                WDFQUEUE queue{};
+                UDECXUSBENDPOINT endpoint{};
                 seqnum_t seqnum;
-                static_assert(sizeof(queue) >= sizeof(seqnum));
+                static_assert(sizeof(endpoint) >= sizeof(seqnum));
         };
 
-        bool use_queue{};
+        bool use_endp{};
 };
 
 /*
