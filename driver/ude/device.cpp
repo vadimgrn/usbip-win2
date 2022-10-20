@@ -286,16 +286,8 @@ void endpoints_configure(
         NT_ASSERT(!has_urb(request));
 
         TraceDbg("dev %04x, ToConfigure[%lu]%!BIN!", ptr04x(dev), params->EndpointsToConfigureCount, 
-                WppBinary(params->EndpointsToConfigure,
-                        USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
-
-        TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
-                WppBinary(params->EndpointsToConfigure, 
-                        USHORT(params->ReleasedEndpointsCount*sizeof(*params->EndpointsToConfigure))));
-
-        TraceDbg("dev %04x, ReleasedEndpoints[%lu]%!BIN!", ptr04x(dev), params->ReleasedEndpointsCount, 
-                WppBinary(params->ReleasedEndpoints, 
-                        USHORT(params->ReleasedEndpointsCount*sizeof(*params->ReleasedEndpoints))));
+                  WppBinary(params->EndpointsToConfigure,
+                            USHORT(params->EndpointsToConfigureCount*sizeof(*params->EndpointsToConfigure))));
 
         auto st = STATUS_SUCCESS; 
 
@@ -312,6 +304,12 @@ void endpoints_configure(
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("EndpointsReleasedOnly");
                 break;
+        }
+
+        for (ULONG i = 0; i < params->ReleasedEndpointsCount; ++i) {
+                auto endp = params->ReleasedEndpoints[i];
+                TraceDbg("dev %04x, delete released endp %04x", ptr04x(dev), ptr04x(endp));
+                WdfObjectDelete(endp);
         }
 
         if (st != STATUS_PENDING) {
