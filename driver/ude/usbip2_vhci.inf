@@ -33,15 +33,8 @@ usbip2_vhci.sys = 1,,
 CopyFiles=@usbip2_vhci.sys
 
 [vhci_Device.NT.HW]
-AddReg=vhci_AddReg
 Include=machine.inf
 Needs=PciD3ColdSupported
-
-[vhci_AddReg]
-; By default, USBDevice class uses iProduct descriptor to name the device in
-; Device Manager on Windows 8 and higher.
-; Uncomment for this device to use %DisplayName% on Windows 8 and higher:
-; HKR,,FriendlyName,,%DisplayName%
 
 ;-------------- Service installation
 [vhci_Device.NT.Services]
@@ -55,6 +48,12 @@ StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_vhci.sys ; Driver package isolation
 Dependencies   = ucx01000, udecx
+AddReg         = vhci_AddReg
+
+[vhci_AddReg]
+HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
+HKR,Parameters\Wdf,VerifierOn,0x00010001,1
+HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
 SPSVCINST_ASSOCSERVICE= 0x00000002
