@@ -226,7 +226,25 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void log(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
+auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
+{
+	auto cd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, src.wTotalLength, POOL_TAG);
+	if (!cd) {
+		Trace(TRACE_LEVEL_ERROR, "Failed to allocate wTotalLength %d", src.wTotalLength);
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	if (dest) {
+		ExFreePoolWithTag(dest, POOL_TAG);
+	}
+
+	RtlCopyMemory(dest = cd, &src, src.wTotalLength);
+	return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
 {
 	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
 		   is_transfer_dir_in(r) &&
@@ -234,25 +252,53 @@ void log(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
 		   r.TransferBufferLength >= sizeof(USB_COMMON_DESCRIPTOR);
 
 	if (!ok) {
-		return;
+		return STATUS_SUCCESS;
 	}
 	
-	if (auto d = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr())) { // MmGetSystemAddressForMdlSafe can fail
-		TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", d->bLength, d->bDescriptorType, 
-			  WppBinary(d, static_cast<USHORT>(min(d->bLength, r.TransferBufferLength))));
+	auto descr = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr());
+	if (!descr) { // MmGetSystemAddressForMdlSafe can fail
+		return STATUS_INSUFFICIENT_RESOURCES;
 	}
+
+	auto descr_len = min(descr->bLength, r.TransferBufferLength);
+	
+	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", descr->bLength, descr->bDescriptorType, 
+		  WppBinary(descr, static_cast<USHORT>(descr_len)));
+
+	switch (descr->bDescriptorType) {
+	case USB_DEVICE_DESCRIPTOR_TYPE:
+	{
+		auto &dd = *reinterpret_cast<USB_DEVICE_DESCRIPTOR*>(descr);
+		if (descr_len == sizeof(dd) && dd.bLength == descr_len) {
+			ctx.dev_ctx->descriptor = dd;
+		}
+	}
+		break;
+	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
+	{
+		auto &cd = *reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR*>(descr);
+		if (descr_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == descr_len) {
+			return save_config(ctx.dev_ctx->actconfig, cd);
+		}
+	}
+	        break;
+	}
+
+	return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void log_with_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
+auto look_in_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
 {
 	switch (urb.UrbHeader.Function) {
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
 		static_assert(sizeof(urb.UrbControlTransfer) == sizeof(urb.UrbControlTransferEx));
-		log(ctx, static_cast<const _URB_CONTROL_TRANSFER&>(urb.UrbControlTransfer));
+		return post_control_transfer(ctx, static_cast<const _URB_CONTROL_TRANSFER&>(urb.UrbControlTransfer));
 	}
+
+	return STATUS_SUCCESS;
 }
 
 /* 
@@ -296,7 +342,9 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 			if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
 				st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 			}
-			log_with_transfer_buffer(ctx, *urb);
+			if (!st) {
+				st = look_in_transfer_buffer(ctx, *urb);
+			}
 		}
 
 	} else if (ret.status) {
