@@ -89,8 +89,9 @@ struct device_ctx
 
         USB_DEVICE_DESCRIPTOR descriptor;
         USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-        UCHAR cur_intf_num;
-        UCHAR cur_intf_alt;
+
+//      UCHAR bInterfaceNumber;
+//      UCHAR bAlternateSetting;
 
         // for WSK receive
         WDFWORKITEM recv_hdr;

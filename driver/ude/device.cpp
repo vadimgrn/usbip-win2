@@ -53,16 +53,16 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
-        auto device = static_cast<UDECXUSBDEVICE>(Object);
-        auto &dev = *get_device_ctx(device);
+        auto dev = static_cast<UDECXUSBDEVICE>(Object);
+        TraceDbg("dev %04x", ptr04x(dev));
 
-        TraceDbg("dev %04x", ptr04x(device));
+        auto &ctx = *get_device_ctx(dev);
 
-        if (auto ptr = dev.actconfig) {
+        if (auto ptr = ctx.actconfig) {
                 ExFreePoolWithTag(ptr, POOL_TAG);
         }
 
-        free(dev.ext);
+        free(ctx.ext);
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -319,6 +319,7 @@ void endpoints_configure(
         }
 
         if (st != STATUS_PENDING) {
+                TraceDbg("%!STATUS!", st);
                 WdfRequestComplete(request, st);
         }
 }

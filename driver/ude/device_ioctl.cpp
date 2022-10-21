@@ -76,8 +76,7 @@ NTSTATUS send_complete(
         } else if (NT_SUCCESS(st.Status)) { // request has sent
                 switch (old_status) {
                 case REQ_RECV_COMPLETE: 
-                        // ret_submit() set URB.UrbHeader.Status, atomic_complete set IRP.IoStatus.Status
-                        complete(request, WdfRequestGetStatus(request));
+                        complete(request);
                         break;
                 case REQ_CANCELED:
                         complete(request, STATUS_CANCELLED);
@@ -133,6 +132,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
+        if (dev.unplugged) {
+                return STATUS_DEVICE_REMOVED;
+        }
+
         WSK_BUF buf;
 
         if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
@@ -174,12 +177,13 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
         return STATUS_PENDING;
 }
 
-using urb_function_t = NTSTATUS (UDECXUSBENDPOINT, WDFREQUEST, URB&, const endpoint_ctx&);
+using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, const endpoint_ctx&, WDFREQUEST, URB&);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS control_transfer(
-        _In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
+        _In_ WDFREQUEST request, _In_ URB &urb)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeControl);
 
@@ -209,8 +213,6 @@ NTSTATUS control_transfer(
                 }
         }
 
-        auto &dev = *get_device_ctx(endp.device);
-
         wsk_context_ptr ctx(&dev, request);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -231,7 +233,8 @@ NTSTATUS control_transfer(
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS bulk_or_interrupt_transfer(
-        _In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
+        _In_ WDFREQUEST request, _In_ URB &urb)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeBulk || 
                   usb_endpoint_type(endp.descriptor) == UsbdPipeTypeInterrupt);
@@ -246,8 +249,6 @@ NTSTATUS bulk_or_interrupt_transfer(
                         ptr04x(request), ptr04x(r.PipeHandle), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
                         r.TransferBufferLength, func);
         }
-
-        auto &dev = *get_device_ctx(endp.device);
 
         wsk_context_ptr ctx(&dev, request);
         if (!ctx) {
@@ -297,7 +298,8 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS isoch_transfer(
-        _In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request, _In_ URB &urb, _In_ const endpoint_ctx &endp)
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
+        _In_ WDFREQUEST request, _In_ URB &urb)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeIsochronous);
         auto &r = urb.UrbIsochronousTransfer;
@@ -320,8 +322,6 @@ NTSTATUS isoch_transfer(
                                           r.NumberOfPackets, USBIP_MAX_ISO_PACKETS);
                 return STATUS_INVALID_PARAMETER;
         }
-
-        auto &dev = *get_device_ctx(endp.device);
 
         wsk_context_ptr ctx(&dev, request, r.NumberOfPackets);
         if (!ctx) {
@@ -347,11 +347,10 @@ NTSTATUS isoch_transfer(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto usb_submit_urb(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request)
+auto usb_submit_urb(
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp, _In_ WDFREQUEST request)
 {
         auto &urb = get_urb(request);
-        auto &endp = *get_endpoint_ctx(endpoint);
-
         urb_function_t *handler{};
 
         switch (auto func = urb.UrbHeader.Function) {
@@ -374,7 +373,7 @@ auto usb_submit_urb(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request)
                 return STATUS_NOT_SUPPORTED;
         }
 
-        return handler(endpoint, request, urb, endp);
+        return handler(dev, endpoint, endp, request, urb);
 }
 
 _IRQL_requires_same_
@@ -482,8 +481,8 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
 
         TraceDbg("dev %04x, seqnum %u", ptr04x(device), req.seqnum);
 
-        if (!dev.sock()) {
-                TraceDbg("Socket is closed");
+        if (dev.unplugged) {
+                TraceDbg("Unplugged");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
                 set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
@@ -578,14 +577,22 @@ void NTAPI usbip::device::internal_device_control(
         if (IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB) {
                 auto st = STATUS_INVALID_DEVICE_REQUEST;
                 Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), 
-                        IoControlCode, st);
+                                          IoControlCode, st);
 
                 WdfRequestComplete(Request, st);
                 return;
         }
 
-        auto endp = get_endpoint(Queue);
-        auto st = usb_submit_urb(endp, Request);
+        auto endpoint = get_endpoint(Queue);
+        auto &endp = *get_endpoint_ctx(endpoint);
+        auto &dev = *get_device_ctx(endp.device);
+
+        if (dev.unplugged) {
+                UdecxUrbComplete(Request, USBD_STATUS_DEVICE_GONE); 
+                return;
+        }
+
+        auto st = usb_submit_urb(dev, endpoint, endp, Request);
 
         if (st != STATUS_PENDING) {
                 TraceDbg("%!STATUS!", st);

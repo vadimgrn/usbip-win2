@@ -228,8 +228,12 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
 {
-	auto cd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED|POOL_FLAG_UNINITIALIZED, src.wTotalLength, POOL_TAG);
-	if (!cd) {
+	auto cd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED,
+		                                                 src.wTotalLength, POOL_TAG);
+
+	if (cd) {
+		RtlCopyMemory(cd, &src, src.wTotalLength);
+	} else {
 		Trace(TRACE_LEVEL_ERROR, "Failed to allocate wTotalLength %d", src.wTotalLength);
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
@@ -238,7 +242,7 @@ auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CON
 		ExFreePoolWithTag(dest, POOL_TAG);
 	}
 
-	RtlCopyMemory(dest = cd, &src, src.wTotalLength);
+	dest = cd;
 	return STATUS_SUCCESS;
 }
 
@@ -289,7 +293,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto look_in_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
+auto post_process_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
 {
 	switch (urb.UrbHeader.Function) {
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
@@ -343,7 +347,7 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 				st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 			}
 			if (!st) {
-				st = look_in_transfer_buffer(ctx, *urb);
+				st = post_process_transfer_buffer(ctx, *urb);
 			}
 		}
 
@@ -468,7 +472,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto err = NT_ERROR(st.Status) ? st.Status :
 		   st.Information == dev.receive_size ? dev.received(ctx) :
 		   st.Information ? STATUS_RECEIVE_PARTIAL : 
-		   STATUS_CONNECTION_DISCONNECTED; // EOF, server called shutdown()
+		   RECV_NEXT_USBIP_HDR; // STATUS_CONNECTION_RESET; // EOF?
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
@@ -690,6 +694,10 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 
 	auto &urb = *urb_from_irp(irp);
 	auto urb_st = urb.UrbHeader.Status;
+
+	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
+		urb_st = USBD_STATUS_CANCELED; // FIXME: is that really required?
+	}
 
 	TraceDbg("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", seqnum, get_usbd_status(urb_st), status, info);
 
