@@ -18,6 +18,9 @@
 
 #include <libdrv\ch9.h>
 #include <libdrv\dbgcommon.h>
+#include <libdrv\usbdsc.h>
+
+//#include <usbdlib.h>
 
 namespace
 {
@@ -213,10 +216,34 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void test(USB_CONFIGURATION_DESCRIPTOR *cd)
+{
+        PAGED_CODE();
+
+        auto f = [] (auto &ifd, auto ctx)
+        {
+                TraceDbg("bInterfaceNumber %d, bAlternateSetting %d, bNumEndpoints %d",
+                          ifd.bInterfaceNumber, ifd.bAlternateSetting, ifd.bNumEndpoints);
+                
+                auto f = [] (auto idx, auto &epd, auto)
+                {
+                        TraceDbg("%!usb_descriptor_type! #%d, Address %#x, bmAttributes %#x",
+                                epd.bDescriptorType, idx, epd.bEndpointAddress, epd.bmAttributes);
+                        return STATUS_SUCCESS;
+                };
+                
+                return for_each_endpoint(static_cast<USB_CONFIGURATION_DESCRIPTOR*>(ctx), &ifd, f, nullptr);
+        };
+
+        for_each_interface(cd, f, cd);
+}
+
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
+PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
 {
         PAGED_CODE();
 
@@ -235,7 +262,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
         attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Endpoint %04x cleanup", ptr04x(obj)); }; 
-        attrs.ParentObject = dev;
+        attrs.ParentObject = device;
 
         UDECXUSBENDPOINT endp;
         if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attrs, &endp)) {
@@ -243,11 +270,16 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
                 return err;
         }
 
+        auto &dev = *get_device_ctx(device);
+
         auto &ctx = *get_endpoint_ctx(endp);
-        ctx.device = dev;
+        ctx.device = device;
 
         if (epd) {
                 ctx.descriptor = *epd;
+                if (auto cfg = dev.actconfig) {
+                        test(cfg);
+                }
         } else {
                 auto &d = ctx.descriptor;
 
@@ -255,7 +287,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
                 d.bDescriptorType = USB_ENDPOINT_DESCRIPTOR_TYPE;
                 NT_ASSERT(usb_default_control_pipe(d));
 
-                get_device_ctx(dev)->ep0 = endp;
+                dev.ep0 = endp;
         }
 
         if (auto err = create_endpoint_queue(ctx.queue, endp)) {
@@ -265,7 +297,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_ENDPOINT_INI
         {
                 auto &d = ctx.descriptor;
                 TraceDbg("dev %04x, endp %04x{Address %#02x: %s %s[%d], Interval %d}, queue %04x", 
-                        ptr04x(dev), ptr04x(endp), d.bEndpointAddress, 
+                        ptr04x(device), ptr04x(endp), d.bEndpointAddress, 
                         usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", 
                         usb_endpoint_num(d), d.bInterval, ptr04x(ctx.queue));

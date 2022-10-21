@@ -20,6 +20,7 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\wsk_cpp.h>
 #include <libdrv\pdu.h>
+#include <libdrv\usbdsc.h>
 
 #include <usb.h>
 
@@ -228,6 +229,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
 {
+	if (dest && dest->wTotalLength == src.wTotalLength && RtlEqualMemory(dest, &src, src.wTotalLength)) {
+		return STATUS_SUCCESS;
+	}
+
 	auto cd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED,
 		                                                 src.wTotalLength, POOL_TAG);
 
@@ -243,6 +248,10 @@ auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CON
 	}
 
 	dest = cd;
+
+	TraceDbg("Configuration #%d descriptor saved, wTotalLength %d, bNumInterfaces %d", 
+		  dest->bConfigurationValue, dest->wTotalLength, dest->bNumInterfaces);
+
 	return STATUS_SUCCESS;
 }
 
@@ -264,17 +273,22 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	auto descr_len = min(descr->bLength, r.TransferBufferLength);
+	auto descr_len = USHORT(r.TransferBufferLength);
 	
 	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", descr->bLength, descr->bDescriptorType, 
-		  WppBinary(descr, static_cast<USHORT>(descr_len)));
+		  WppBinary(descr, descr_len));
 
 	switch (descr->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 	{
-		auto &dd = *reinterpret_cast<USB_DEVICE_DESCRIPTOR*>(descr);
-		if (descr_len == sizeof(dd) && dd.bLength == descr_len) {
-			ctx.dev_ctx->descriptor = dd;
+		auto &src = *reinterpret_cast<USB_DEVICE_DESCRIPTOR*>(descr);
+		if (descr_len == sizeof(src) && src.bLength == descr_len) {
+			NT_ASSERT(is_valid(src));
+			auto &dest = ctx.dev_ctx->descriptor;
+			if (!RtlEqualMemory(&dest, &src, sizeof(src))) {
+				dest = src;
+				TraceDbg("Device descriptor saved, bNumConfigurations %d", dest.bNumConfigurations);
+			}
 		}
 	}
 		break;
@@ -282,6 +296,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 	{
 		auto &cd = *reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR*>(descr);
 		if (descr_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == descr_len) {
+			NT_ASSERT(is_valid(cd));
 			return save_config(ctx.dev_ctx->actconfig, cd);
 		}
 	}

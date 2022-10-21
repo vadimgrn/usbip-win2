@@ -14,7 +14,7 @@ USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB
 	return USBD_ParseDescriptors(dsc_conf, dsc_conf->wTotalLength, start, type);
 }
 
-USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num, UCHAR alt_setting)
+USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, LONG intf_num, LONG alt_setting)
 {
 	NT_ASSERT(dsc_conf);
 	return USBD_ParseConfigurationDescriptorEx(dsc_conf, dsc_conf, intf_num, alt_setting, -1, -1, -1);
@@ -23,7 +23,7 @@ USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, 
 /*
  * @return number of alternate settings for given interface
  */
-int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_num)
+int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, LONG intf_num)
 {
 	int cnt = 0;
 	void *from = dsc_conf;
@@ -36,9 +36,23 @@ int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, UCHAR intf_n
 	return cnt;
 }
 
-NTSTATUS for_each_endpoint(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn &func, void *data)
+NTSTATUS for_each_interface(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, for_each_iface_fn func, void *data)
 {
-	auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(iface);
+	int cnt = 0;
+
+	for (auto ifd = dsc_find_intf(cfg, -1, -1); ifd; ifd = dsc_find_next_intf(cfg, ifd), ++cnt) {
+		if (auto err = func(*ifd, data)) {
+			return err;
+		}
+	}
+
+	return cnt >= cfg->bNumInterfaces ? STATUS_SUCCESS : STATUS_NO_MORE_MATCHES;
+}
+
+NTSTATUS for_each_endpoint(
+	USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data)
+{
+	auto cur = (USB_COMMON_DESCRIPTOR*)iface;
 
 	for (int i = 0; i < iface->bNumEndpoints; ++i) {
 

@@ -121,6 +121,9 @@ struct endpoint_ctx
         UDECXUSBDEVICE device; // parent
         USB_ENDPOINT_DESCRIPTOR descriptor;
         WDFQUEUE queue; // child
+
+        UCHAR bInterfaceNumber;
+        UCHAR bAlternateSetting;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
