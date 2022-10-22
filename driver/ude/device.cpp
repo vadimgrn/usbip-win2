@@ -20,8 +20,6 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbdsc.h>
 
-//#include <usbdlib.h>
-
 namespace
 {
 
@@ -234,10 +232,10 @@ PAGED void test(USB_CONFIGURATION_DESCRIPTOR *cd)
                         return STATUS_SUCCESS;
                 };
                 
-                return for_each_endpoint(static_cast<USB_CONFIGURATION_DESCRIPTOR*>(ctx), &ifd, f, nullptr);
+                return usbdlib::for_each_endp(static_cast<USB_CONFIGURATION_DESCRIPTOR*>(ctx), &ifd, f, nullptr);
         };
 
-        for_each_interface(cd, f, cd);
+        usbdlib::for_each_intf(cd, f, cd);
 }
 
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)

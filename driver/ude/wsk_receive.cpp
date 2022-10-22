@@ -283,7 +283,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 	{
 		auto &src = *reinterpret_cast<USB_DEVICE_DESCRIPTOR*>(descr);
 		if (descr_len == sizeof(src) && src.bLength == descr_len) {
-			NT_ASSERT(is_valid(src));
+			NT_ASSERT(usbdlib::is_valid(src));
 			auto &dest = ctx.dev_ctx->descriptor;
 			if (!RtlEqualMemory(&dest, &src, sizeof(src))) {
 				dest = src;
@@ -296,7 +296,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 	{
 		auto &cd = *reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR*>(descr);
 		if (descr_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == descr_len) {
-			NT_ASSERT(is_valid(cd));
+			NT_ASSERT(usbdlib::is_valid(cd));
 			return save_config(ctx.dev_ctx->actconfig, cd);
 		}
 	}

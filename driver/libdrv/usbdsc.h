@@ -3,6 +3,9 @@
 #include <ntddk.h>
 #include <usbdi.h>
 
+namespace usbdlib
+{
+
 enum : UCHAR { MS_OS_STRING_DESC_INDEX = 0xEE };
 
 struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
@@ -19,27 +22,26 @@ bool is_valid(const USB_CONFIGURATION_DESCRIPTOR &d);
 bool is_valid(const USB_STRING_DESCRIPTOR &d);
 bool is_valid(const USB_OS_STRING_DESCRIPTOR &d);
 
-inline auto dsc_next(USB_COMMON_DESCRIPTOR *d)
+inline auto next_descr(USB_COMMON_DESCRIPTOR *d)
 {
 	void *end = d ? (char*)d + d->bLength : nullptr;
 	return static_cast<USB_COMMON_DESCRIPTOR*>(end);
 }
 
-USB_COMMON_DESCRIPTOR *dsc_find_next(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_COMMON_DESCRIPTOR *from, int type);
+USB_COMMON_DESCRIPTOR *find_next_descr(
+	USB_CONFIGURATION_DESCRIPTOR *cfg, LONG type, USB_COMMON_DESCRIPTOR *prev = nullptr);
 
-inline auto dsc_find_next_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, USB_INTERFACE_DESCRIPTOR *from)
-{
-	return (USB_INTERFACE_DESCRIPTOR*)dsc_find_next(dsc_conf, (USB_COMMON_DESCRIPTOR*)from, USB_INTERFACE_DESCRIPTOR_TYPE);
-}
+USB_INTERFACE_DESCRIPTOR *find_next_intf(
+	USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *prev = nullptr, 
+	LONG intf_num = -1, LONG alt_setting = -1, LONG _class = -1, LONG subclass = -1, LONG proto = -1);
 
-USB_INTERFACE_DESCRIPTOR *dsc_find_intf(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, LONG intf_num, LONG alt_setting);
-int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *dsc_conf, LONG intf_num);
+int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG intf_num);
 
 using for_each_iface_fn = NTSTATUS (const USB_INTERFACE_DESCRIPTOR&, void*);
-NTSTATUS for_each_interface(USB_CONFIGURATION_DESCRIPTOR *cfg, for_each_iface_fn func, void *data);
+NTSTATUS for_each_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, for_each_iface_fn func, void *data);
 
 using for_each_ep_fn = NTSTATUS (int, const USB_ENDPOINT_DESCRIPTOR&, void*);
-NTSTATUS for_each_endpoint(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data);
+NTSTATUS for_each_endp(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data);
 
 inline auto get_string(USB_STRING_DESCRIPTOR &d)
 {
@@ -52,3 +54,5 @@ inline void terminate_by_zero(_Inout_ USB_STRING_DESCRIPTOR &d)
 {
 	*reinterpret_cast<wchar_t*>((char*)&d + d.bLength) = L'\0';
 }
+
+} // namespace usbdlib
