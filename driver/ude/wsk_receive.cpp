@@ -487,7 +487,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto err = NT_ERROR(st.Status) ? st.Status :
 		   st.Information == dev.receive_size ? dev.received(ctx) :
 		   st.Information ? STATUS_RECEIVE_PARTIAL : 
-		   RECV_NEXT_USBIP_HDR; // STATUS_CONNECTION_RESET; // EOF?
+		   STATUS_CONNECTION_RESET; // EOF
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:

@@ -50,18 +50,19 @@ NTSTATUS usbdlib::for_each_intf(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, for_each
 	int cnt = 0;
 
 	for (USB_COMMON_DESCRIPTOR *cur{}; bool(cur = find_next_descr(cfg, USB_INTERFACE_DESCRIPTOR_TYPE, cur)); ++cnt) {
-		if (auto err = func(reinterpret_cast<USB_INTERFACE_DESCRIPTOR&>(*cur), data)) {
+		if (auto err = func(*reinterpret_cast<USB_INTERFACE_DESCRIPTOR*>(cur), data)) {
 			return err;
 		}
 	}
 
 	auto ret = cnt >= cfg->bNumInterfaces ? STATUS_SUCCESS : STATUS_NO_MORE_MATCHES;
 	NT_ASSERT(!ret);
+
 	return ret;
 }
 
 NTSTATUS usbdlib::for_each_endp(
-	USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data)
+	USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data)
 {
 	auto cur = (USB_COMMON_DESCRIPTOR*)iface;
 
@@ -79,6 +80,33 @@ NTSTATUS usbdlib::for_each_endp(
 	}
 
 	return STATUS_SUCCESS;
+}
+
+USB_INTERFACE_DESCRIPTOR* usbdlib::find_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_ENDPOINT_DESCRIPTOR &epd)
+{
+	struct Context
+	{
+		USB_CONFIGURATION_DESCRIPTOR *cfg;
+		const USB_ENDPOINT_DESCRIPTOR &epd;
+		USB_INTERFACE_DESCRIPTOR *ifd;
+	} ctx {cfg, epd};
+
+	auto f = [] (auto &ifd, auto ctx)
+	{
+		auto args = reinterpret_cast<Context*>(ctx);
+		args->ifd = &ifd;
+
+		auto f = [] (auto /*idx*/, auto &epd, auto ctx)
+		{
+			auto args = reinterpret_cast<Context*>(ctx);
+			return epd == args->epd ? STATUS_PENDING : STATUS_SUCCESS;
+		};
+
+		return for_each_endp(args->cfg, &ifd, f, ctx);
+	};
+
+	auto ret = for_each_intf(cfg, f, &ctx);
+	return ret == STATUS_PENDING ? ctx.ifd : nullptr;
 }
 
 bool usbdlib::is_valid(const USB_DEVICE_DESCRIPTOR &d)

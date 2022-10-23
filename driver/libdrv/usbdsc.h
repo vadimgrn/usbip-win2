@@ -37,11 +37,13 @@ USB_INTERFACE_DESCRIPTOR *find_next_intf(
 
 int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG intf_num);
 
-using for_each_iface_fn = NTSTATUS (const USB_INTERFACE_DESCRIPTOR&, void*);
+USB_INTERFACE_DESCRIPTOR* find_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_ENDPOINT_DESCRIPTOR &epd);
+
+using for_each_iface_fn = NTSTATUS (USB_INTERFACE_DESCRIPTOR&, void*);
 NTSTATUS for_each_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, for_each_iface_fn func, void *data);
 
-using for_each_ep_fn = NTSTATUS (int, const USB_ENDPOINT_DESCRIPTOR&, void*);
-NTSTATUS for_each_endp(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data);
+using for_each_ep_fn = NTSTATUS (int, USB_ENDPOINT_DESCRIPTOR&, void*);
+NTSTATUS for_each_endp(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *iface, for_each_ep_fn func, void *data);
 
 inline auto get_string(USB_STRING_DESCRIPTOR &d)
 {
@@ -53,6 +55,16 @@ inline auto get_string(USB_STRING_DESCRIPTOR &d)
 inline void terminate_by_zero(_Inout_ USB_STRING_DESCRIPTOR &d)
 {
 	*reinterpret_cast<wchar_t*>((char*)&d + d.bLength) = L'\0';
+}
+
+inline auto operator == (const USB_ENDPOINT_DESCRIPTOR &a, const USB_ENDPOINT_DESCRIPTOR &b)
+{
+	return a.bLength == b.bLength && RtlEqualMemory(&a, &b, b.bLength);
+}
+
+inline auto operator != (const USB_ENDPOINT_DESCRIPTOR &a, const USB_ENDPOINT_DESCRIPTOR &b)
+{
+	return !(a == b);
 }
 
 } // namespace usbdlib

@@ -89,9 +89,7 @@ struct device_ctx
 
         USB_DEVICE_DESCRIPTOR descriptor;
         USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-
-//      UCHAR bInterfaceNumber;
-//      UCHAR bAlternateSetting;
+        UCHAR AlternateSetting[32]; // [descriptor.bNumInterfaces]
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
@@ -122,8 +120,8 @@ struct endpoint_ctx
         USB_ENDPOINT_DESCRIPTOR descriptor;
         WDFQUEUE queue; // child
 
-        UCHAR bInterfaceNumber;
-        UCHAR bAlternateSetting;
+        UCHAR InterfaceNumber; // interface that endpoint belongs to
+        UCHAR AlternateSetting;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
