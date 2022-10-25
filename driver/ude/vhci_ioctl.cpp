@@ -152,7 +152,6 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
         log(dev);
 
         if (auto d = &ext.dev) {
-                d->status = SDEV_ST_USED;
                 d->vendor = dev.idVendor;
                 d->product = dev.idProduct;
                 d->devid = make_devid(static_cast<UINT16>(dev.busnum), static_cast<UINT16>(dev.devnum));

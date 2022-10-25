@@ -56,7 +56,6 @@ void dump_usb_interface(usbip_usb_interface*);
 void dump_usb_device(usbip_usb_device*);
 
 const char *usbip_speed_string(usb_device_speed speed);
-const char *usbip_status_string(usbip_device_status status);
 
 std::string usbip_names_get_product(const UsbIds &ids, uint16_t vendor, uint16_t product);
 std::string usbip_names_get_class(const UsbIds &ids, uint8_t class_, uint8_t subclass, uint8_t protocol);

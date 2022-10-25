@@ -29,11 +29,7 @@ namespace
 
 int usbip_vhci_imported_device_dump(const usbip::vhci::ioctl_imported_dev &d)
 {
-        if (d.status == VDEV_ST_NULL || d.status == VDEV_ST_NOTASSIGNED) {
-                return 0;
-        }
-
-        printf("Port %02d: <%s> at %s\n", d.port, usbip_status_string(d.status), usbip_speed_string(d.speed));
+        printf("Port %02d: Device in Use at %s\n", d.port, usbip_speed_string(d.speed));
 
         auto product_name = usbip_names_get_product(get_ids(), d.vendor, d.product);
         printf("       %s\n", product_name.c_str());

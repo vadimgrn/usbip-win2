@@ -69,15 +69,14 @@ struct ioctl_plugin
 
 struct ioctl_imported_dev_data
 {
-        usbip_device_status status;
-
-        UINT16 vendor;
-        UINT16 product;
-
         UINT32 devid;
         static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
         usb_device_speed speed;
+        static_assert(sizeof(speed) == 4);
+
+        UINT16 vendor;
+        UINT16 product;
 };
 
 struct ioctl_imported_dev : ioctl_plugin, ioctl_imported_dev_data {};

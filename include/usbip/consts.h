@@ -27,26 +27,6 @@ enum err_t
 
 static_assert(!ERR_NONE);
 
-enum usbip_device_status
-{
-	/* dev status unknown. */
-	DEV_ST_UNKNOWN,
-
-	/* sdev is available. */
-	SDEV_ST_AVAILABLE,
-	/* sdev is now used. */
-	SDEV_ST_USED,
-	/* sdev is unusable because of a fatal error. */
-	SDEV_ST_ERROR,
-
-	/* vdev does not connect a remote device. */
-	VDEV_ST_NULL,
-	/* vdev is used, but the USB address is not assigned yet */
-	VDEV_ST_NOTASSIGNED,
-	VDEV_ST_USED,
-	VDEV_ST_ERROR
-};
-
 enum 
 { 
         USBIP_VERSION = 0x111, 

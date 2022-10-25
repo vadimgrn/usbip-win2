@@ -40,37 +40,8 @@ const speed_string speed_strings[] =
         {}
 };
 
-struct portst_string 
-{
-        usbip_device_status status;
-        const char *desc;
-};
-
-const portst_string portst_strings[] = 
-{
-        { SDEV_ST_AVAILABLE,	"Device Available" },
-        { SDEV_ST_USED,		"Device in Use" },
-        { SDEV_ST_ERROR,	"Device Error"},
-        { VDEV_ST_NULL,		"Port Available"},
-        { VDEV_ST_NOTASSIGNED,	"Port Initializing"},
-        { VDEV_ST_USED,		"Port in Use"},
-        { VDEV_ST_ERROR,	"Port Error"},
-        {}
-};
-
 } // namespace
 
-
-const char *usbip_status_string(usbip_device_status status)
-{
-        for (auto &i: portst_strings) {
-                if (i.status == status) {
-                        return i.desc;
-                }
-        }
-
-	return "Unknown Status";
-}
 
 const char *usbip_speed_string(usb_device_speed speed)
 {
