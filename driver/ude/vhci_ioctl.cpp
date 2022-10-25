@@ -152,10 +152,17 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
         log(dev);
 
         if (auto d = &ext.dev) {
-                d->vendor = dev.idVendor;
-                d->product = dev.idProduct;
                 d->devid = make_devid(static_cast<UINT16>(dev.busnum), static_cast<UINT16>(dev.devnum));
                 d->speed = static_cast<usb_device_speed>(dev.speed);
+
+                d->idVendor = dev.idVendor;
+                d->idProduct = dev.idProduct;
+
+                d->DeviceClass = dev.bDeviceClass;
+                d->DeviceSubClass = dev.bDeviceSubClass;
+                d->DeviceProtocol = dev.bDeviceProtocol;
+
+                d->NumConfigurations = dev.bNumConfigurations;
         }
 
         return make_error(ERR_NONE);

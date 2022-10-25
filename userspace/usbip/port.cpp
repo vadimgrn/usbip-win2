@@ -29,9 +29,9 @@ namespace
 
 int usbip_vhci_imported_device_dump(const usbip::vhci::ioctl_imported_dev &d)
 {
-        printf("Port %02d: Device in Use at %s\n", d.port, usbip_speed_string(d.speed));
+        printf("Port %02d: device in use at %s\n", d.port, usbip_speed_string(d.speed));
 
-        auto product_name = usbip_names_get_product(get_ids(), d.vendor, d.product);
+        auto product_name = usbip_names_get_product(get_ids(), d.idVendor, d.idProduct);
         printf("       %s\n", product_name.c_str());
 
         printf("%10s -> usbip://%s:%s/%s\n", " ", d.host, d.service, d.busid);

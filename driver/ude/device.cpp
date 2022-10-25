@@ -47,6 +47,58 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
         }
 }
 
+
+/*
+Enumeration of USB Composite Devices.
+
+The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
+if the device meets the following requirements:
+* The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
+or the class (bDeviceClass), bDeviceSubClass, and bDeviceProtocol fields
+of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
+in USB Interface Association Descriptor.
+* The device must have multiple interfaces.
+* The device must have a single configuration.
+
+The bus driver also checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol fields of the device descriptor. 
+If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
+identifier (ID) of USB\COMPOSITE for the PDO.
+*/
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto is_composite(_In_ const device_ctx &dev, _In_ UCHAR NumInterfaces)
+{
+        UINT8 Class;
+        UINT8 SubClass;
+        UINT8 Protocol;
+        UINT8 NumConfigurations;
+
+        if (auto &dd = dev.descriptor; usbdlib::is_valid(dd)) {
+                Class = dd.bDeviceClass;
+                SubClass = dd.bDeviceSubClass;
+                Protocol = dd.bDeviceProtocol;
+                NumConfigurations = dd.bNumConfigurations;
+        } else {
+                auto &r = dev.ext->dev;
+
+                Class = r.DeviceClass;
+                SubClass = r.DeviceSubClass;
+                Protocol = r.DeviceProtocol;
+                NumConfigurations = r.NumConfigurations;
+        }
+
+        bool ok = Class == USB_DEVICE_CLASS_RESERVED || // generic composite device
+                (Class == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
+                        SubClass == 0x02 &&
+                        Protocol == 0x01); // IAD composite device
+
+        if (auto cfg = dev.actconfig) {
+                NumInterfaces = cfg->bNumInterfaces;
+        }
+
+        return ok && NumConfigurations == 1 && NumInterfaces > 1;
+}
+
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -369,11 +421,11 @@ void endpoints_configure(
                 st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_CHANGE, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeDeviceInitialize: // reserved for internal use
-        {
                 TraceDbg("DeviceInitialize");
-                auto cfg = dev.actconfig ? dev.actconfig->bConfigurationValue : UCHAR(1);
-                st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, cfg);
-        }
+                if (is_composite(dev, 2)) { // UDEX does not set configuration for composite device
+                        NT_ASSERT(!dev.actconfig);
+                        st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, UCHAR(1));
+                }
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, Released[%lu]%!BIN!", ptr04x(device), params->ReleasedEndpointsCount, 
