@@ -11,12 +11,19 @@
 #include "device.h"
 #include "network.h"
 #include "ioctl.h"
+#include "proto.h"
+#include "driver.h"
+
+#include <usbip\proto_op.h>
 
 #include <libdrv\dbgcommon.h>
 #include <libdrv\mdl_cpp.h>
 #include <libdrv\strutil.h>
-
-#include <usbip\proto_op.h>
+#include <libdrv\usbd_helper.h>
+#include <libdrv\usb_util.h>
+#include <libdrv\usbdsc.h>
+#include <libdrv\pdu.h>
+#include <libdrv\ch9.h>
 
 #include <ntstrsafe.h>
 #include <ws2def.h>
@@ -32,15 +39,60 @@ static_assert(sizeof(vhci::ioctl_plugin::host) == NI_MAXHOST);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-inline void log(const usbip_usb_device &d)
+PAGED void log(_In_ const usbip_usb_device &d)
 {
-        Trace(TRACE_LEVEL_VERBOSE, "usbip_usb_device(path '%s', busid %s, busnum %d, devnum %d, %!usb_device_speed!,"
+        PAGED_CODE();
+        TraceDbg("usbip_usb_device(path '%s', busid %s, busnum %d, devnum %d, %!usb_device_speed!,"
                 "vid %#x, pid %#x, rev %#x, class/sub/proto %x/%x/%x, "
                 "bConfigurationValue %d, bNumConfigurations %d, bNumInterfaces %d)", 
                 d.path, d.busid, d.busnum, d.devnum, d.speed, 
                 d.idVendor, d.idProduct, d.bcdDevice,
                 d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, 
                 d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGED void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
+{
+        PAGED_CODE();
+        TraceDbg("DeviceDescriptor(bLength %d, %!usb_descriptor_type!, bcdUSB %#x, "
+                "bDeviceClass %#x, bDeviceSubClass %#x, bDeviceProtocol %#x, bMaxPacketSize0 %d, "
+                "idVendor %#x, idProduct %#x, bcdDevice %#x, "
+                "iManufacturer %d, iProduct %d, iSerialNumber %d, "
+                "bNumConfigurations %d)",
+                d.bLength, d.bDescriptorType, d.bcdUSB,
+                d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, d.bMaxPacketSize0,
+                d.idVendor, d.idProduct, d.bcdDevice,
+                d.iManufacturer, d.iProduct, d.iSerialNumber,
+                d.bNumConfigurations);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGED void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
+{
+        PAGED_CODE();
+        TraceDbg("ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu(%#x), "
+                "bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
+                d.bLength, d.bDescriptorType, d.wTotalLength, d.wTotalLength,
+                d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto is_same_device(_In_ const usbip_usb_device &dev, _In_ const USB_DEVICE_DESCRIPTOR &dsc)
+{
+        PAGED_CODE();
+        return  dev.idVendor == dsc.idVendor &&
+                dev.idProduct == dsc.idProduct &&
+                dev.bcdDevice == dsc.bcdDevice &&
+
+                dev.bDeviceClass == dsc.bDeviceClass &&
+                dev.bDeviceSubClass == dsc.bDeviceSubClass &&
+                dev.bDeviceProtocol == dsc.bDeviceProtocol &&
+
+                dev.bNumConfigurations == dsc.bNumConfigurations;
 }
 
 _IRQL_requires_same_
@@ -133,7 +185,187 @@ PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
+PAGED auto init_req_get_descr(
+        _Out_ usbip_header &hdr, _In_ device_ctx &dev, 
+        _In_ UCHAR type, _In_ UCHAR index, _In_ USHORT lang_id, _In_ USHORT TransferBufferLength)
+{
+        PAGED_CODE();
+        NT_ASSERT(!dev.ep0); // is not created yet
+
+        const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_SHORT_TRANSFER_OK | USBD_TRANSFER_DIRECTION_IN;
+
+        if (auto err = set_cmd_submit_usbip_header(hdr, dev, EP0, TransferFlags, TransferBufferLength, setup_dir::in())) {
+                return false;
+        }
+
+        auto &pkt = get_submit_setup(hdr);
+        pkt.bmRequestType.B = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
+        pkt.bRequest = USB_REQUEST_GET_DESCRIPTOR;
+        pkt.wValue.W = USB_DESCRIPTOR_MAKE_TYPE_AND_INDEX(type, index);
+        pkt.wIndex.W = lang_id; // Zero or Language ID for string descriptor
+        pkt.wLength = TransferBufferLength;
+
+        return true;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto read_descr_hdr(
+        _In_ device_ctx &dev, _In_ UCHAR type, _In_ UCHAR index, _In_ USHORT lang_id, 
+        _Inout_ USHORT &TransferBufferLength)
+{
+        PAGED_CODE();
+
+        usbip_header hdr{};
+        if (!init_req_get_descr(hdr, dev, type, index, lang_id, TransferBufferLength)) {
+                return ERR_GENERAL;
+        }
+
+        char buf[DBG_USBIP_HDR_BUFSZ];
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "OUT %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, true));
+
+        byteswap_header(hdr, swap_dir::host2net);
+
+        if (auto err = send(dev.sock(), memory::stack, &hdr, sizeof(hdr))) {
+                Trace(TRACE_LEVEL_ERROR, "Send header of %!usb_descriptor_type! %!STATUS!", type, err);
+                return ERR_NETWORK;
+        }
+
+        if (auto err = recv(dev.sock(), memory::stack, &hdr, sizeof(hdr))) {
+                Trace(TRACE_LEVEL_ERROR, "Recv header of %!usb_descriptor_type! %!STATUS!", type, err);
+                return ERR_NETWORK;
+        }
+
+        byteswap_header(hdr, swap_dir::net2host);
+        TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "IN %Iu%s", get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, true));
+
+        auto &b = hdr.base;
+        if (!(b.command == USBIP_RET_SUBMIT && extract_num(b.seqnum) == dev.seqnum)) {
+                return ERR_PROTOCOL;
+        }
+
+        auto &ret = hdr.u.ret_submit;
+        auto actual_length = static_cast<USHORT>(ret.actual_length);
+
+        if (actual_length <= TransferBufferLength) {
+                TransferBufferLength = actual_length;
+        } else {
+                TransferBufferLength = 0;
+                return ERR_GENERAL;
+        }
+
+        return ret.status ? ERR_GENERAL : ERR_NONE;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto read_descr(
+        _In_ device_ctx &dev, _In_ UCHAR type, _In_ UCHAR index, _In_ USHORT lang_id, 
+        _In_ memory pool, _Out_ void *dest, _Inout_ USHORT &len)
+{
+        PAGED_CODE();
+
+        if (auto err = read_descr_hdr(dev, type, index, lang_id, len)) {
+                return err;
+        }
+
+        if (auto err = recv(dev.sock(), pool, dest, len)) {
+                Trace(TRACE_LEVEL_ERROR, "%!usb_descriptor_type!, length %d -> %!STATUS!", type, len, err);
+                return ERR_NETWORK;
+        }
+
+        return ERR_NONE;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto read_device_descr(_In_ device_ctx &dev)
+{
+        PAGED_CODE();
+
+        USHORT len = sizeof(dev.descriptor);
+
+        if (auto err = read_descr(dev, USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, memory::nonpaged, &dev.descriptor, len)) {
+                return err;
+        }
+
+        return len == sizeof(dev.descriptor) && usbdlib::is_valid(dev.descriptor) ? ERR_NONE : ERR_GENERAL;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto read_config_descr(
+        _Inout_ device_ctx &dev, _In_ memory pool, _Out_ USB_CONFIGURATION_DESCRIPTOR *cd, _Inout_ USHORT &len)
+{
+        PAGED_CODE();
+        NT_ASSERT(len >= sizeof(*cd));
+
+        if (auto err = read_descr(dev, USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pool, cd, len)) {
+                return err;
+        }
+
+        return len >= sizeof(*cd) && usbdlib::is_valid(*cd) ? ERR_NONE : ERR_GENERAL;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto read_config_descr(_In_ device_ctx &dev)
+{
+        PAGED_CODE();
+
+        USB_CONFIGURATION_DESCRIPTOR cd{};
+        USHORT len = sizeof(cd);
+
+        if (auto err = read_config_descr(dev, memory::stack, &cd, len)) {
+                return err;
+        }
+
+        log(cd);
+        len = cd.wTotalLength;
+
+        NT_ASSERT(!dev.actconfig);
+        dev.actconfig = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, 
+                                                                       len, POOL_TAG);
+
+        if (!dev.actconfig) {
+                return ERR_GENERAL;
+        }
+
+        if (auto err = read_config_descr(dev, memory::nonpaged, dev.actconfig, len)) {
+                return err;
+        }
+
+        return len == cd.wTotalLength ? ERR_NONE : ERR_GENERAL;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto fetch_descriptors(_In_ device_ctx &dev, _In_ const usbip_usb_device &udev)
+{
+        PAGED_CODE();
+
+        if (auto err = read_device_descr(dev)) {
+                return err;
+        }
+
+        log(dev.descriptor);
+
+        if (!is_same_device(udev, dev.descriptor)) {
+                Trace(TRACE_LEVEL_ERROR, "USB_DEVICE_DESCRIPTOR mismatches op_import_reply.udev");
+                return ERR_GENERAL;
+        }
+
+        if (auto err = read_config_descr(dev)) {
+                return err;
+        }
+
+        TraceDbg("USB_CONFIGURATION_DESCRIPTOR: %!BIN!", WppBinary(dev.actconfig, dev.actconfig->wTotalLength));
+        return ERR_NONE;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto import_remote_device(_Out_ usbip_usb_device &dev, _Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
@@ -148,21 +380,14 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
                 return err;
         }
 
-        auto &dev = reply.udev;
+        dev = reply.udev;
         log(dev);
 
         if (auto d = &ext.dev) {
                 d->devid = make_devid(static_cast<UINT16>(dev.busnum), static_cast<UINT16>(dev.devnum));
                 d->speed = static_cast<usb_device_speed>(dev.speed);
-
-                d->idVendor = dev.idVendor;
-                d->idProduct = dev.idProduct;
-
-                d->DeviceClass = dev.bDeviceClass;
-                d->DeviceSubClass = dev.bDeviceSubClass;
-                d->DeviceProtocol = dev.bDeviceProtocol;
-
-                d->NumConfigurations = dev.bNumConfigurations;
+                d->vendor = dev.idVendor;
+                d->product = dev.idProduct;
         }
 
         return make_error(ERR_NONE);
@@ -317,6 +542,25 @@ struct device_ctx_ext_ptr
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto start_device(_In_ int &port, _In_ UDECXUSBDEVICE device, _In_ const usbip_usb_device &udev)
+{
+        PAGED_CODE();
+        auto &dev = *get_device_ctx(device);
+
+        if (auto err = fetch_descriptors(dev, udev)) {
+                return err;
+        }
+
+        if (auto err = plugin(port, device)) {
+                return err;
+        }
+
+        sched_receive_usbip_header(dev);
+        return ERR_NONE;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
 {
         PAGED_CODE();
@@ -338,7 +582,8 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
 
         Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
 
-        if (bool(error = import_remote_device(*ext.ptr))) {
+        usbip_usb_device udev;
+        if (bool(error = import_remote_device(udev, *ext.ptr))) {
                 return;
         }
 
@@ -348,7 +593,7 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
         }
         ext.release(); // now dev owns it
 
-        if (auto err = plugin(r.port, dev)) {
+        if (auto err = start_device(r.port, dev, udev)) {
                 error = make_error(err);
                 WdfObjectDelete(dev); // UdecxUsbDevicePlugIn failed or was not called
         } else {

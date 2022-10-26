@@ -47,64 +47,6 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
         }
 }
 
-
-/*
- * Enumeration of USB Composite Devices.
- * 
- * A) The bus driver checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol fields of the device descriptor.  
- *    If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
- *    identifier (ID) of USB\COMPOSITE for the PDO.
- * 
- * B) The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
- *    if the device meets the following requirements:
- *    1.The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
- *      or the class (bDeviceClass), bDeviceSubClass, and bDeviceProtocol fields
- *      of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
- *      in USB Interface Association Descriptor.
- *    2.The device must have multiple interfaces.
- *    3.The device must have a single configuration.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto is_composite(_In_ const device_ctx &dev, _In_ UCHAR NumInterfaces)
-{
-        UINT8 Class;
-        UINT8 SubClass;
-        UINT8 Protocol;
-        UINT8 NumConfigurations;
-
-        if (auto &dd = dev.descriptor; usbdlib::is_valid(dd)) {
-                Class = dd.bDeviceClass;
-                SubClass = dd.bDeviceSubClass;
-                Protocol = dd.bDeviceProtocol;
-                NumConfigurations = dd.bNumConfigurations;
-        } else {
-                auto &r = dev.ext->dev;
-
-                Class = r.DeviceClass;
-                SubClass = r.DeviceSubClass;
-                Protocol = r.DeviceProtocol;
-                NumConfigurations = r.NumConfigurations;
-        }
-
-        if (!(Class || SubClass || Protocol)) { // case A
-                return true;
-        }
-
-        // case B
-
-        bool ok = Class == USB_DEVICE_CLASS_RESERVED || // generic composite device
-                 (Class == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
-                  SubClass == 0x02 && // common class
-                  Protocol == 0x01); // IAD composite device
-
-        if (auto cfg = dev.actconfig) {
-                NumInterfaces = cfg->bNumInterfaces;
-        }
-
-        return ok && NumConfigurations == 1 && NumInterfaces > 1;
-}
-
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -320,12 +262,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                         }
                 }
         } else {
-                auto &d = ctx.descriptor;
-
-                d.bLength = sizeof(d);
-                d.bDescriptorType = USB_ENDPOINT_DESCRIPTOR_TYPE;
-                NT_ASSERT(usb_default_control_pipe(d));
-
+                ctx.descriptor = EP0;
                 dev.ep0 = endp;
         }
 
@@ -407,6 +344,9 @@ auto interface_setting_change(
         return device::set_interface(device, request, ifnum, altnum);
 }
 
+/*
+ * UDEX does not set configuration for composite devices.
+ */
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
 _IRQL_requires_same_
 void endpoints_configure(
@@ -428,9 +368,10 @@ void endpoints_configure(
                 break;
         case UdecxEndpointsConfigureTypeDeviceInitialize: // reserved for internal use
                 TraceDbg("DeviceInitialize");
-                if (is_composite(dev, 2)) { // UDEX does not set configuration for composite device
-                        NT_ASSERT(!dev.actconfig);
-                        st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, UCHAR(1));
+                NT_ASSERT(dev.actconfig);
+                if (usbdlib::is_composite(dev.descriptor, *dev.actconfig)) {
+                        auto cfg = dev.actconfig->bConfigurationValue;
+                        st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, cfg);
                 }
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
@@ -505,7 +446,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
                 return err;
         }
 
-        sched_receive_usbip_header(ctx);
         return STATUS_SUCCESS;
 }
 

@@ -43,6 +43,26 @@ constexpr auto usb_default_control_pipe(const USB_ENDPOINT_DESCRIPTOR &epd)
 		usb_endpoint_type(epd) == UsbdPipeTypeControl;
 }
 
-static_assert(usb_default_control_pipe(
-	USB_ENDPOINT_DESCRIPTOR{sizeof(USB_ENDPOINT_DESCRIPTOR), 
-				USB_ENDPOINT_DESCRIPTOR_TYPE}));
+constexpr USB_ENDPOINT_DESCRIPTOR EP0{ sizeof(EP0), USB_ENDPOINT_DESCRIPTOR_TYPE };
+static_assert(usb_default_control_pipe(EP0));
+
+inline auto operator ==(const USB_COMMON_DESCRIPTOR &a, const USB_COMMON_DESCRIPTOR &b)
+{
+	return a.bLength == b.bLength && RtlEqualMemory(&a, &b, b.bLength);
+}
+
+inline auto operator !=(const USB_COMMON_DESCRIPTOR &a, const USB_COMMON_DESCRIPTOR &b)
+{
+	return !(a == b);
+}
+
+inline auto operator ==(const USB_CONFIGURATION_DESCRIPTOR &a, const USB_CONFIGURATION_DESCRIPTOR &b)
+{
+	return  a.wTotalLength == b.wTotalLength &&
+		RtlEqualMemory(&a, &b, b.wTotalLength);
+}
+
+inline auto operator !=(const USB_CONFIGURATION_DESCRIPTOR &a, const USB_CONFIGURATION_DESCRIPTOR &b)
+{
+	return !(a == b);
+}

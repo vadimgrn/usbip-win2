@@ -89,7 +89,7 @@ struct device_ctx
 
         USB_DEVICE_DESCRIPTOR descriptor;
         USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-        UCHAR AlternateSetting[32]; // [descriptor.bNumInterfaces]
+        UCHAR AlternateSetting[32]; // [actconfig->bNumInterfaces]
 
         // for WSK receive
         WDFWORKITEM recv_hdr;

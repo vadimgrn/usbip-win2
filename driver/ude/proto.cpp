@@ -43,11 +43,9 @@ auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::set_cmd_submit_usbip_header(
-	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const endpoint_ctx &endp,
+	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const USB_ENDPOINT_DESCRIPTOR &epd,
 	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_ setup_dir setup_out)
 {
-	auto &epd = endp.descriptor;
-
 	if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !usb_default_control_pipe(epd)) {
 		Trace(TRACE_LEVEL_ERROR, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and "
 			                 "bEndpointAddress(%#x)", epd.bEndpointAddress);

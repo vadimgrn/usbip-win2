@@ -57,6 +57,10 @@ inline void terminate_by_zero(_Inout_ USB_STRING_DESCRIPTOR &d)
 	*reinterpret_cast<wchar_t*>((char*)&d + d.bLength) = L'\0';
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool is_composite(_In_ const USB_DEVICE_DESCRIPTOR &dd, _In_ const USB_CONFIGURATION_DESCRIPTOR &cd);
+
 inline auto operator == (const USB_ENDPOINT_DESCRIPTOR &a, const USB_ENDPOINT_DESCRIPTOR &b)
 {
 	return a.bLength == b.bLength && RtlEqualMemory(&a, &b, b.bLength);

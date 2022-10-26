@@ -75,14 +75,8 @@ struct ioctl_imported_dev_data
         usb_device_speed speed;
         static_assert(sizeof(speed) == 4);
 
-        UINT16 idVendor;
-        UINT16 idProduct;
-
-        UINT8 DeviceClass;
-        UINT8 DeviceSubClass;
-        UINT8 DeviceProtocol;
-
-        UINT8 NumConfigurations;
+        UINT16 vendor;
+        UINT16 product;
 };
 
 struct ioctl_imported_dev : ioctl_plugin, ioctl_imported_dev_data {};

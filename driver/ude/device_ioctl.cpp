@@ -220,7 +220,7 @@ NTSTATUS control_transfer(
         
         setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, buf_len, dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, buf_len, dir_out)) {
                 return err;
         }
 
@@ -255,7 +255,7 @@ NTSTATUS bulk_or_interrupt_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, r.TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, r.TransferBufferLength)) {
                 return err;
         }
 
@@ -328,7 +328,7 @@ NTSTATUS isoch_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp, 
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, 
                                r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
                 return err;
         }
@@ -401,16 +401,16 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request,
         _In_ UCHAR bmRequestType, _In_ UCHAR bRequest, _In_ USHORT wValue, _In_ USHORT wIndex)
 {
         auto &dev = *get_device_ctx(device);
-        auto &ep0 = *get_endpoint_ctx(dev.ep0);
 
         wsk_context_ptr ctx(&dev, request);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
+        auto &ep0 = *get_endpoint_ctx(dev.ep0);
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0, TransferFlags, 0, setup_dir::out())) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0.descriptor, TransferFlags, 0, setup_dir::out())) {
                 return err;
         }
 

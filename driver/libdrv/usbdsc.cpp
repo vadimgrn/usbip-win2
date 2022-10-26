@@ -134,3 +134,39 @@ bool usbdlib::is_valid(const USB_OS_STRING_DESCRIPTOR &d)
 		d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && 
 		RtlEqualMemory(d.Signature, L"MSFT100", sizeof(d.Signature));
 }
+
+/*
+ * Enumeration of USB Composite Devices.
+ * 
+ * The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
+ * if the device meets the following requirements:
+ * 1.The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
+ *   or the class (bDeviceClass), bDeviceSubClass, and bDeviceProtocol fields
+ *   of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
+ *   in USB Interface Association Descriptor.
+ * 2.The device must have multiple interfaces.
+ * 3.The device must have a single configuration.
+ *
+ * The bus driver checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol fields of the device descriptor.  
+ * If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
+ * identifier (ID) of USB\COMPOSITE for the PDO.
+ * 
+ * P.S. FIXME: zero class/sub/proto matches flash drives which are not composite devices, so it is not used.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbdlib::is_composite(_In_ const USB_DEVICE_DESCRIPTOR &dd, _In_ const USB_CONFIGURATION_DESCRIPTOR &cd)
+{
+	NT_ASSERT(is_valid(dd));
+	NT_ASSERT(is_valid(cd));
+
+	if (!(dd.bNumConfigurations == 1 && cd.bNumInterfaces > 1)) {
+		return false;
+	}
+
+	return dd.bDeviceClass == USB_DEVICE_CLASS_RESERVED || // generic composite device
+	      (dd.bDeviceClass == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
+	       dd.bDeviceSubClass == 0x02 && // common class
+	       dd.bDeviceProtocol == 0x01); // IAD composite device
+}
+
