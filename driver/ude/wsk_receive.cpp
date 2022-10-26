@@ -482,12 +482,12 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	auto &dev = *ctx.dev_ctx;
 
 	auto &st = wsk_irp->IoStatus;
-	TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(ctx.request), st.Status, st.Information);
+//	TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(req), st.Status, st.Information);
 
 	auto err = NT_ERROR(st.Status) ? st.Status :
 		   st.Information == dev.receive_size ? dev.received(ctx) :
 		   st.Information ? STATUS_RECEIVE_PARTIAL : 
-		   STATUS_CONNECTION_RESET; // EOF
+		   STATUS_CONNECTION_RESET; // STATUS_CONNECTION_DISCONNECTED, server's stub_rx_loop is finished
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
@@ -536,7 +536,7 @@ void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	auto err = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, wsk_irp);
 	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
 
-	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, err);
+//	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, err);
 }
 
 _IRQL_requires_same_

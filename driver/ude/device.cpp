@@ -49,21 +49,21 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
 
 
 /*
-Enumeration of USB Composite Devices.
-
-The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
-if the device meets the following requirements:
-* The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
-or the class (bDeviceClass), bDeviceSubClass, and bDeviceProtocol fields
-of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
-in USB Interface Association Descriptor.
-* The device must have multiple interfaces.
-* The device must have a single configuration.
-
-The bus driver also checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol fields of the device descriptor. 
-If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
-identifier (ID) of USB\COMPOSITE for the PDO.
-*/
+ * Enumeration of USB Composite Devices.
+ * 
+ * A) The bus driver checks the bDeviceClass, bDeviceSubClass and bDeviceProtocol fields of the device descriptor.  
+ *    If these fields are zero, the device is a composite device, and the bus driver reports an extra compatible
+ *    identifier (ID) of USB\COMPOSITE for the PDO.
+ * 
+ * B) The bus driver also reports a compatible identifier (ID) of USB\COMPOSITE,
+ *    if the device meets the following requirements:
+ *    1.The device class field of the device descriptor (bDeviceClass) must contain a value of zero,
+ *      or the class (bDeviceClass), bDeviceSubClass, and bDeviceProtocol fields
+ *      of the device descriptor must have the values 0xEF, 0x02 and 0x01 respectively, as explained
+ *      in USB Interface Association Descriptor.
+ *    2.The device must have multiple interfaces.
+ *    3.The device must have a single configuration.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto is_composite(_In_ const device_ctx &dev, _In_ UCHAR NumInterfaces)
@@ -87,10 +87,16 @@ auto is_composite(_In_ const device_ctx &dev, _In_ UCHAR NumInterfaces)
                 NumConfigurations = r.NumConfigurations;
         }
 
+        if (!(Class || SubClass || Protocol)) { // case A
+                return true;
+        }
+
+        // case B
+
         bool ok = Class == USB_DEVICE_CLASS_RESERVED || // generic composite device
-                (Class == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
-                        SubClass == 0x02 &&
-                        Protocol == 0x01); // IAD composite device
+                 (Class == USB_DEVICE_CLASS_MISCELLANEOUS && // 0xEF
+                  SubClass == 0x02 && // common class
+                  Protocol == 0x01); // IAD composite device
 
         if (auto cfg = dev.actconfig) {
                 NumInterfaces = cfg->bNumInterfaces;
