@@ -61,14 +61,4 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool is_composite(_In_ const USB_DEVICE_DESCRIPTOR &dd, _In_ const USB_CONFIGURATION_DESCRIPTOR &cd);
 
-inline auto operator == (const USB_ENDPOINT_DESCRIPTOR &a, const USB_ENDPOINT_DESCRIPTOR &b)
-{
-	return a.bLength == b.bLength && RtlEqualMemory(&a, &b, b.bLength);
-}
-
-inline auto operator != (const USB_ENDPOINT_DESCRIPTOR &a, const USB_ENDPOINT_DESCRIPTOR &b)
-{
-	return !(a == b);
-}
-
 } // namespace usbdlib

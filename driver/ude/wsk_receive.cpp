@@ -21,6 +21,7 @@
 #include <libdrv\wsk_cpp.h>
 #include <libdrv\pdu.h>
 #include <libdrv\usbdsc.h>
+#include <libdrv\ch9.h>
 
 #include <usb.h>
 
@@ -229,7 +230,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
 {
-	if (dest && dest->wTotalLength == src.wTotalLength && RtlEqualMemory(dest, &src, src.wTotalLength)) {
+	if (dest && *dest == src) {
 		return STATUS_SUCCESS;
 	}
 
@@ -285,7 +286,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		if (descr_len == sizeof(src) && src.bLength == descr_len) {
 			NT_ASSERT(usbdlib::is_valid(src));
 			auto &dest = ctx.dev_ctx->descriptor;
-			if (!RtlEqualMemory(&dest, &src, sizeof(src))) {
+			if (dest != src) {
 				dest = src;
 				TraceDbg("Device descriptor saved, bNumConfigurations %d", dest.bNumConfigurations);
 			}

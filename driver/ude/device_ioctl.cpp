@@ -500,15 +500,19 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::set_configuration(
-        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue)
+        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue)
 {
-        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(dev), ConfigurationValue);
+        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
 
         if (auto err = verify_select(request, ioctl)) {
                 return err;
         }
 
-        return do_select(dev, request, ConfigurationValue);
+        if (auto dev = get_device_ctx(device)) {
+                RtlFillMemory(dev->AlternateSetting, sizeof(dev->AlternateSetting), -1);
+        }
+
+        return do_select(device, request, ConfigurationValue);
 }
 
 _IRQL_requires_same_

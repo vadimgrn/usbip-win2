@@ -1,4 +1,5 @@
 #include "usbdsc.h"
+#include "ch9.h"
 
 extern "C" {
 #include <usbdlib.h>

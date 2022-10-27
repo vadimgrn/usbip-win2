@@ -106,7 +106,7 @@ NTSTATUS query_usb_capability(
 _Function_class_(EVT_WDF_DEVICE_D0_EXIT)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE TargetState)
+PAGED inline NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE TargetState)
 {
         PAGED_CODE();
         TraceDbg("TargetState %!WDF_POWER_DEVICE_STATE!", TargetState);
@@ -116,7 +116,7 @@ PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE Ta
 _Function_class_(EVT_WDF_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE PreviousState)
+PAGED inline NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE PreviousState)
 {
         PAGED_CODE();
         TraceDbg("PreviousState %!WDF_POWER_DEVICE_STATE!", PreviousState);
@@ -134,8 +134,8 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *DeviceInit)
 
         WDF_PNPPOWER_EVENT_CALLBACKS pnp_power;
         WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&pnp_power);
-        pnp_power.EvtDeviceD0Exit = vhci_d0_exit;
-        pnp_power.EvtDeviceD0Entry = vhci_d0_entry;
+//      pnp_power.EvtDeviceD0Exit = vhci_d0_exit;
+//      pnp_power.EvtDeviceD0Entry = vhci_d0_entry;
         WdfDeviceInitSetPnpPowerEventCallbacks(DeviceInit, &pnp_power);
 /*
         WDF_POWER_POLICY_EVENT_CALLBACKS power_policy;
