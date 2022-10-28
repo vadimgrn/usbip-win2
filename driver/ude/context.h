@@ -142,8 +142,17 @@ struct request_ctx
         seqnum_t seqnum;
         request_status status;
         UDECXUSBENDPOINT endpoint;
+
+        using pre_complete_fn = void(request_ctx&, device_ctx&, NTSTATUS);
+        pre_complete_fn *pre_complete;
+
+        union {
+                struct {
+                        UCHAR InterfaceNumber;
+                        UCHAR AlternateSetting;
+                } set_intf;
+        } pre_complete_args;
 };
-static_assert(sizeof(request_ctx) == 16);
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

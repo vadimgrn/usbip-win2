@@ -518,16 +518,43 @@ NTSTATUS usbip::device::set_configuration(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::set_interface(
-        _In_ UDECXUSBDEVICE dev, _In_ WDFREQUEST request, _In_ UCHAR InterfaceNumber, _In_ UCHAR InterfaceSetting)
+        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
 {
-        TraceDbg("dev %04x, bInterfaceNumber %d, bAlternateSetting %d", ptr04x(dev), InterfaceNumber, InterfaceSetting);
+        TraceDbg("dev %04x, InterfaceNumber %d, AlternateSetting %d", ptr04x(device), InterfaceNumber, AlternateSetting);
 
         if (auto err = verify_select(request, IOCTL_INTERNAL_USBEX_CFG_CHANGE)) {
                 return err;
         }
 
-        auto params = (1UL << 16) | (InterfaceSetting << 8) | InterfaceNumber;
-        return do_select(dev, request, params);
+        auto &dev = *get_device_ctx(device);
+
+        if (InterfaceNumber >= ARRAYSIZE(dev.AlternateSetting)) {
+                Trace(TRACE_LEVEL_ERROR, "InterfaceNumber %d >= device_ctx.AlternateSetting[%d]", 
+                                          InterfaceNumber, ARRAYSIZE(dev.AlternateSetting));
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (dev.AlternateSetting[InterfaceNumber] == AlternateSetting) {
+                return STATUS_SUCCESS;
+        }
+
+        if (auto req = get_request_ctx(request)) {
+                req->pre_complete = [] (auto &req, auto &dev, auto status)
+                {
+                        if (NT_SUCCESS(status)) {
+                                auto &r = req.pre_complete_args.set_intf;
+                                dev.AlternateSetting[r.InterfaceNumber] = r.AlternateSetting;
+                        }
+                };
+
+                if (auto r = &req->pre_complete_args.set_intf) {
+                        r->InterfaceNumber = InterfaceNumber;
+                        r->AlternateSetting = AlternateSetting;
+                }
+        }
+
+        auto params = (1UL << 16) | (AlternateSetting << 8) | InterfaceNumber;
+        return do_select(device, request, params);
 }
 
 /*

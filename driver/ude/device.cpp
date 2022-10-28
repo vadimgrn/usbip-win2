@@ -298,30 +298,16 @@ auto interface_setting_change(
         auto ifnum = params.InterfaceNumber;
         auto altnum = params.NewInterfaceSetting;
 
-        TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", ptr04x(device), ifnum, altnum); 
-
         if (dev.actconfig && params.EndpointsToConfigureCount) {
-
                 auto &endp = *get_endpoint_ctx(*params.EndpointsToConfigure); 
-
-                if (!(ifnum == endp.InterfaceNumber && altnum == endp.AlternateSetting)) {
+                auto matches = ifnum == endp.InterfaceNumber && altnum == endp.AlternateSetting;
+                if (!matches) {
                         TraceDbg("Correction %d.%d -> %d.%d", ifnum, altnum, endp.InterfaceNumber, endp.AlternateSetting);
                         ifnum = endp.InterfaceNumber;
                         altnum = endp.AlternateSetting;
                 }
         }
 
-        if (ifnum >= ARRAYSIZE(dev.AlternateSetting)) {
-                Trace(TRACE_LEVEL_ERROR, "InterfaceNumber %d >= AlternateSetting[%d]", ifnum, ARRAYSIZE(dev.AlternateSetting));
-                return STATUS_INVALID_PARAMETER;
-        }
-
-        auto &cur_altnum = dev.AlternateSetting[ifnum];
-        if (cur_altnum == altnum) {
-                return STATUS_SUCCESS;
-        }
-
-        cur_altnum = altnum;
         return device::set_interface(device, request, ifnum, altnum);
 }
 
