@@ -37,7 +37,7 @@ constexpr bool usb_endpoint_dir_out(const USB_ENDPOINT_DESCRIPTOR &epd)
  */
 constexpr auto usb_default_control_pipe(const USB_ENDPOINT_DESCRIPTOR &epd)
 {
-	return  epd.bLength >= sizeof(epd) &&
+	return  epd.bLength == sizeof(epd) &&
 		epd.bDescriptorType == USB_ENDPOINT_DESCRIPTOR_TYPE &&
 		epd.bEndpointAddress == USB_DEFAULT_ENDPOINT_ADDRESS &&
 		usb_endpoint_type(epd) == UsbdPipeTypeControl;
