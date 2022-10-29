@@ -93,16 +93,16 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ ULONG length, 
-	_In_ const usbip_iso_packet_descriptor* sd)
+auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ UCHAR *buffer, _In_ ULONG length, 
+	_In_ const usbip_iso_packet_descriptor *src)
 {
+	NT_ASSERT(length <= r.TransferBufferLength);
 	auto dir_out = !buffer;
-	auto sd_offset = length;
 
-	auto dd = r.IsoPacket + r.NumberOfPackets - 1;
-	sd += r.NumberOfPackets - 1;
+	for (auto i = LONG64(r.NumberOfPackets) - 1; i >= 0; --i) { // set dd.Status and dd.Length
 
-	for (auto i = r.NumberOfPackets; i; --i, --sd, --dd) { // set dd.Status and dd.Length
+		auto sd = src + i;
+		auto dd = r.IsoPacket + i;
 
 		dd->Status = sd->status ? to_windows_status_isoch(sd->status) : USBD_STATUS_SUCCESS;
 
@@ -125,21 +125,10 @@ auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ U
 			return STATUS_INVALID_PARAMETER;
 		}
 
-		if (sd_offset >= sd->actual_length) {
-			sd_offset -= sd->actual_length;
+		if (length >= sd->actual_length) {
+			length -= sd->actual_length;
 		} else {
-			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) >= actual_length(%u)", sd_offset, sd->actual_length);
-			return STATUS_INVALID_PARAMETER;
-		}
-
-		if (sd_offset > dd->Offset) {// source buffer has no gaps
-			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) > dst.Offset(%lu)", sd_offset, dd->Offset);
-			return STATUS_INVALID_PARAMETER;
-		}
-
-		if (sd_offset + sd->actual_length > length) {
-			Trace(TRACE_LEVEL_ERROR, "sd_offset(%lu) + actual_length(%u) > length(%lu)", 
-				sd_offset, sd->actual_length, length);
+			Trace(TRACE_LEVEL_ERROR, "length(%lu) >= actual_length(%u)", length, sd->actual_length);
 			return STATUS_INVALID_PARAMETER;
 		}
 
@@ -148,18 +137,21 @@ auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ U
 				dd->Offset, sd->actual_length, r.TransferBufferLength);
 			return STATUS_INVALID_PARAMETER;
 		}
+		
+		if (dd->Offset < length) { // source buffer has no gaps
+			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) < length(%lu)", dd->Offset, length);
+			return STATUS_INVALID_PARAMETER;
+		}
 
-		if (dd->Offset > sd_offset) {
-			RtlMoveMemory(buffer + dd->Offset, buffer + sd_offset, sd->actual_length);
-		} else { // buffer is filled without gaps from the beginning
-			NT_ASSERT(dd->Offset == sd_offset);
+		if (dd->Offset > length) {
+			RtlMoveMemory(buffer + dd->Offset, buffer + length, sd->actual_length);
 		}
 
 		dd->Length = sd->actual_length;
 	}
 
-	if (!dir_out && sd_offset) {
-		Trace(TRACE_LEVEL_ERROR, "SUM(actual_length) != actual_length(%lu), delta is %lu", length, sd_offset);
+	if (length && !dir_out) {
+		Trace(TRACE_LEVEL_ERROR, "SUM(actual_length) != actual_length, delta is %lu", length);
 		return STATUS_INVALID_PARAMETER; 
 	}
 
@@ -167,32 +159,12 @@ auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ char *buffer, _In_ U
 }
 
 /*
- * ctx.mdl_buf can't be used, it describes actual_length instead of TransferBufferLength.
- * Try TransferBufferMDL first because it is locked-down and to obey URB_FUNCTION_XXX_USING_CHAINED_MDL.
- * 
- * If BSOD happen, this call should be used
- * make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, false, IoModifyAccess, urb)
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_transfer_buffer(_In_ void *TransferBuffer, _In_ MDL *TransferBufferMDL)
-{
-	if (auto buf = TransferBufferMDL) {
-		return MmGetSystemAddressForMdlSafe(buf, LowPagePriority | MdlMappingNoExecute);
-	}
-
-	NT_ASSERT(TransferBuffer); // make_transfer_buffer_mdl checks it before payload receive
-	return TransferBuffer;
-}
-
-/*
  * Layout: transfer buffer(IN only), usbip_iso_packet_descriptor[].
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
+auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &ret, _Inout_ URB &urb)
 {
-	auto &ret = get_ret_submit(ctx);
 	auto cnt = ret.number_of_packets;
 
 	auto &r = urb.UrbIsochronousTransfer;
@@ -214,16 +186,18 @@ NTSTATUS urb_isoch_transfer(_In_ wsk_context &ctx, _Inout_ URB &urb)
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	char *buf{};
+	UCHAR *buffer{};
 
 	if (is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
-		buf = (char*)get_transfer_buffer(r.TransferBuffer, r.TransferBufferMDL);
-		if (!buf) {
-			return STATUS_INSUFFICIENT_RESOURCES;
+		ULONG length; // ctx.mdl_buf describes actual_length instead of TransferBufferLength
+		if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
+			Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
+			return err;
 		}
+		NT_ASSERT(length == r.TransferBufferLength);
 	}
 
-	return fill_isoc_data(r, buf, ret.actual_length, ctx.isoc);
+	return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
 }
 
 _IRQL_requires_same_
@@ -260,30 +234,33 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
 {
+	ULONG dsc_len;
+	USB_COMMON_DESCRIPTOR *dsc; // ctx.mdl_buf.sysaddr() can be used too
+
 	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
 		   is_transfer_dir_in(r) &&
 		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
-		   r.TransferBufferLength >= sizeof(USB_COMMON_DESCRIPTOR);
+		   r.TransferBufferLength >= sizeof(*dsc);
 
 	if (!ok) {
 		return STATUS_SUCCESS;
 	}
 	
-	auto descr = static_cast<USB_COMMON_DESCRIPTOR*>(ctx.mdl_buf.sysaddr());
-	if (!descr) { // MmGetSystemAddressForMdlSafe can fail
-		return STATUS_INSUFFICIENT_RESOURCES;
+	if (auto err = UdecxUrbRetrieveBuffer(ctx.request, reinterpret_cast<PUCHAR*>(&dsc), &dsc_len)) {
+		Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
+		return err;
 	}
 
-	auto descr_len = USHORT(r.TransferBufferLength);
-	
-	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", descr->bLength, descr->bDescriptorType, 
-		  WppBinary(descr, descr_len));
+	NT_ASSERT(dsc_len == r.TransferBufferLength);
 
-	switch (descr->bDescriptorType) {
+	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", dsc->bLength, dsc->bDescriptorType, 
+		  WppBinary(dsc, USHORT(dsc_len)));
+
+	switch (dsc->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 	{
-		auto &src = *reinterpret_cast<USB_DEVICE_DESCRIPTOR*>(descr);
-		if (descr_len == sizeof(src) && src.bLength == descr_len) {
+		auto &src = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
+		if (dsc_len == sizeof(src) && src.bLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(src));
 			auto &dest = ctx.dev_ctx->descriptor;
 			if (dest != src) {
@@ -295,8 +272,8 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		break;
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 	{
-		auto &cd = *reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR*>(descr);
-		if (descr_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == descr_len) {
+		auto &cd = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
+		if (dsc_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(cd));
 			return save_config(ctx.dev_ctx->actconfig, cd);
 		}
@@ -346,11 +323,21 @@ void atomic_complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 
 enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
 
+/*
+ * ctx.mdl_buf describes part (actual_length) of full TransferBuffer(MDL)[TransferBufferLength].
+ * For ISOCH IN transfer this buffer must be modified because network data has no gaps and it must be rearranged, 
+ * see fill_isoc_data. If call mdl_buf.reset() after such rearrangement, false positive 
+ * SPECIAL_POOL_DETECTED_MEMORY_CORRUPTION can happen, because bytes[actual_length...TransferBufferLength] 
+ * after mdl_buf endeed could be modified. Verifier.exe detects in IoFreeMDL that
+ * "caller is freeing an address where bytes after the end of the allocation have been overwritten", false positive.
+ */
 _Function_class_(device_ctx::received_fn)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
+	ctx.mdl_buf.reset(); // free MDL before altering the buffer to avoid SPECIAL_POOL_DETECTED_MEMORY_CORRUPTION
+
 	auto &ret = get_ret_submit(ctx);
 	auto st = STATUS_SUCCESS;
 
@@ -358,7 +345,9 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 
 		urb->UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
-		if (auto tr = TryAsUrbTransfer(urb)) { // see UdecxUrbRetrieveBuffer, UdecxUrbSetBytesCompleted
+		if (is_isoch(*urb)) {
+			isoch_transfer(ctx, ret, *urb);
+		} else if (auto tr = TryAsUrbTransfer(urb)) { // see UdecxUrbRetrieveBuffer, UdecxUrbSetBytesCompleted
 			if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
 				st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 			}
@@ -676,7 +665,7 @@ void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 	auto &ctx = *get_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
-	ctx.mdl_buf.reset();
+	NT_ASSERT(!ctx.mdl_buf);
 
 	ctx.mdl_hdr.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, sizeof(ctx.hdr) };
