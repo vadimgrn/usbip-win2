@@ -154,7 +154,7 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
                 req_ctx.seqnum = ctx->hdr.base.seqnum;
                 NT_ASSERT(is_valid_seqnum(req_ctx.seqnum));
 
-                NT_ASSERT(req_ctx.status == REQ_ZEROED);
+                NT_ASSERT(req_ctx.status == REQ_ZERO);
                 req_ctx.endpoint = endpoint;
 
                 if (auto err = WdfRequestForwardToIoQueue(req, dev.queue)) {
@@ -508,8 +508,13 @@ NTSTATUS usbip::device::set_configuration(
                 return err;
         }
 
-        if (auto dev = get_device_ctx(device)) {
-                RtlFillMemory(dev->AlternateSetting, sizeof(dev->AlternateSetting), -1);
+        if (auto req = get_request_ctx(request)) {
+                req->pre_complete = [] (auto&, auto &dev, auto status)
+                {
+                        if (NT_SUCCESS(status)) {
+                                reset_alternate_setting(dev);
+                        }
+                };
         }
 
         return do_select(device, request, ConfigurationValue);
@@ -543,7 +548,9 @@ NTSTATUS usbip::device::set_interface(
                 {
                         if (NT_SUCCESS(status)) {
                                 auto &r = req.pre_complete_args.set_intf;
-                                dev.AlternateSetting[r.InterfaceNumber] = r.AlternateSetting;
+                                auto &altnum = dev.AlternateSetting[r.InterfaceNumber];
+                                TraceDbg("AlternateSetting[%d]=%d -> %d", r.InterfaceNumber, altnum, r.AlternateSetting);
+                                altnum = r.AlternateSetting;
                         }
                 };
 

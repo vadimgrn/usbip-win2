@@ -112,6 +112,11 @@ inline auto& get_device(_In_ WDFQUEUE queue) // for device_ctx.queue
         return *WdfObjectGet_UDECXUSBDEVICE(queue);
 }
 
+inline void reset_alternate_setting(_In_ device_ctx &ctx)
+{
+        RtlFillMemory(ctx.AlternateSetting, sizeof(ctx.AlternateSetting), -1);
+}
+
 /*
  * Context space for UDECXUSBENDPOINT.
  */
@@ -133,7 +138,7 @@ inline auto& get_endpoint(_In_ WDFQUEUE queue) // use get_device() for device_ct
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
 
-enum request_status : LONG { REQ_ZEROED, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
+enum request_status : LONG { REQ_ZERO, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 
 /*
  * Context space for WDFREQUEST.
@@ -160,10 +165,10 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ request_status status)
 {
-        NT_ASSERT(status != REQ_ZEROED);
+        NT_ASSERT(status != REQ_ZERO);
         NT_ASSERT(status != REQ_NO_HANDLE);
         static_assert(sizeof(ctx.status) == sizeof(LONG));
-        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_ZEROED);
+        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_ZERO);
         return static_cast<request_status>(oldval);
 }
 

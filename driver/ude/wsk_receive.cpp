@@ -424,7 +424,7 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 		return err;
 	}
 
-	auto dir_out = is_transfer_dir_out(ctx.hdr); // TransferFlags can have wrong direction
+	auto dir_out = is_transfer_dir_out(ctx.hdr);
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload

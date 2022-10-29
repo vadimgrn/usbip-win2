@@ -273,8 +273,8 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         {
                 auto &d = ctx.descriptor;
-                TraceDbg("dev %04x, %d.%d, endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, Interval %d}, "
-                         "queue %04x%!BIN!", 
+                TraceDbg("dev %04x, intf %d.%d, endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, "
+                         "Interval %d}, queue %04x%!BIN!", 
                         ptr04x(device), ctx.InterfaceNumber, ctx.AlternateSetting, ptr04x(endp),
                         d.bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", usb_endpoint_num(d), 
@@ -294,6 +294,20 @@ PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPO
         return endpoint_add(dev, &data);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto intf_has_endpoint(
+        _In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ USB_INTERFACE_DESCRIPTOR *ifd, _In_ UCHAR EndpointAddress)
+{
+        auto f = [] (auto, auto &epd, auto ctx)
+        {
+                auto addr = *static_cast<UCHAR*>(ctx);
+                return epd.bEndpointAddress == addr ? STATUS_PENDING : STATUS_SUCCESS;
+        };
+
+        return usbdlib::for_each_endp(cfg, ifd, f, &EndpointAddress) == STATUS_PENDING;
+}
+
 /*
  * All endpoints to configure belongs to the same interface, so the first is used for check. 
  */
@@ -307,9 +321,16 @@ auto interface_setting_change(
         auto altnum = params.NewInterfaceSetting;
 
         if (dev.actconfig && params.EndpointsToConfigureCount) {
+
+                auto ifd = usbdlib::find_next_intf(dev.actconfig, nullptr, ifnum, altnum);
+                if (!ifd) {
+                        Trace(TRACE_LEVEL_ERROR, "Interface descriptor %d.%d not found", ifnum, altnum);
+                        return STATUS_INVALID_PARAMETER;
+                }
+
                 auto &endp = *get_endpoint_ctx(*params.EndpointsToConfigure); 
-                auto matches = ifnum == endp.InterfaceNumber && altnum == endp.AlternateSetting;
-                if (!matches) {
+
+                if (!intf_has_endpoint(dev.actconfig, ifd, endp.descriptor.bEndpointAddress)) {
                         TraceDbg("Correction %d.%d -> %d.%d", ifnum, altnum, endp.InterfaceNumber, endp.AlternateSetting);
                         ifnum = endp.InterfaceNumber;
                         altnum = endp.AlternateSetting;
@@ -345,8 +366,8 @@ void endpoints_configure(
         auto &dev = *get_device_ctx(device);
         auto st = STATUS_SUCCESS;
 
-        if (dev.unplugged) {
-                TraceDbg("Unplugged"); // UDECXUSBDEVICE can no longer be used
+        if (dev.unplugged) { // UDECXUSBDEVICE can no longer be used
+                TraceDbg("%!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged", params->ConfigureType);
         } else switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
                 TraceDbg("DeviceInitialize");
@@ -367,7 +388,7 @@ void endpoints_configure(
                 for (ULONG i = 0; i < params->ReleasedEndpointsCount; ++i) {
                         auto endp = params->ReleasedEndpoints[i];
                         TraceDbg("dev %04x, delete released endp %04x", ptr04x(device), ptr04x(endp));
-                        WdfObjectDelete(endp);
+                        WdfObjectDelete(endp); // causes BSOD sometimes
                 }
                 */
                 break;
@@ -421,6 +442,8 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
 {
         PAGED_CODE();
+
+        reset_alternate_setting(ctx);
 
         if (auto err = init_receive_usbip_header(ctx)) {
                 return err;
