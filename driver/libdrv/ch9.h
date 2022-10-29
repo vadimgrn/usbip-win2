@@ -1,7 +1,18 @@
 #pragma once
 
 #include <ntdef.h>
+#include <wdm.h>
 #include <usb.h>
+
+/*
+ * Audio extension, these two are _only_ in audio endpoints.
+ */
+struct USB_ENDPOINT_DESCRIPTOR_AUDIO : USB_ENDPOINT_DESCRIPTOR 
+{
+	UCHAR bRefresh;
+	UCHAR bSynchAddress;
+};
+static_assert(sizeof(USB_ENDPOINT_DESCRIPTOR_AUDIO) == sizeof(USB_ENDPOINT_DESCRIPTOR) + 2);
 
 /**
  * @return 0 to 15
@@ -68,8 +79,7 @@ inline auto operator !=(const USB_DEVICE_DESCRIPTOR &a, const USB_DEVICE_DESCRIP
 
 inline auto operator ==(const USB_CONFIGURATION_DESCRIPTOR &a, const USB_CONFIGURATION_DESCRIPTOR &b)
 {
-	return  a.wTotalLength == b.wTotalLength &&
-		RtlEqualMemory(&a, &b, b.wTotalLength);
+	return a.wTotalLength == b.wTotalLength && RtlEqualMemory(&a, &b, b.wTotalLength);
 }
 
 inline auto operator !=(const USB_CONFIGURATION_DESCRIPTOR &a, const USB_CONFIGURATION_DESCRIPTOR &b)

@@ -5,14 +5,15 @@
 #pragma once
 
 #include <libdrv\codeseg.h>
+#include <libdrv\ch9.h>
 #include <wdf.h>
 
-#include <usb.h>
 #include <wdfusb.h>
 #include <UdeCx.h>
 
 #include <initguid.h>
 #include <usbip\vhci.h>
+
 
 /*
  * Macro WDF_TYPE_NAME_TO_TYPE_INFO (see WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE)
@@ -117,8 +118,9 @@ inline auto& get_device(_In_ WDFQUEUE queue) // for device_ctx.queue
 struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
-        USB_ENDPOINT_DESCRIPTOR descriptor;
         WDFQUEUE queue; // child
+
+        USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor; // larger than USB_ENDPOINT_DESCRIPTOR
 
         UCHAR InterfaceNumber; // interface that endpoint belongs to
         UCHAR AlternateSetting;

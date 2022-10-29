@@ -244,20 +244,27 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         auto &ctx = *get_endpoint_ctx(endp);
 
         ctx.device = device;
-        ctx.descriptor = epd;
 
-        if (auto &dev = *get_device_ctx(device); epd == EP0) {
-                dev.ep0 = endp;
-        } else if (!dev.actconfig) {
-                NT_ASSERT(!ctx.InterfaceNumber);
-                NT_ASSERT(!ctx.AlternateSetting);
-        } else if (auto ifd = usbdlib::find_intf(dev.actconfig, epd)) {
-                ctx.InterfaceNumber = ifd->bInterfaceNumber;
-                ctx.AlternateSetting = ifd->bAlternateSetting;
+        if (auto &dev = *get_device_ctx(device); auto epd_len = data->EndpointDescriptorBufferLength) {
+
+                NT_ASSERT(epd.bLength == epd_len);
+                NT_ASSERT(sizeof(ctx.descriptor) >= epd_len);
+                RtlCopyMemory(&ctx.descriptor, &epd, epd_len);
+
+                if (!dev.actconfig) {
+                        NT_ASSERT(!ctx.InterfaceNumber);
+                        NT_ASSERT(!ctx.AlternateSetting);
+                } else if (auto ifd = usbdlib::find_intf(dev.actconfig, epd)) {
+                        ctx.InterfaceNumber = ifd->bInterfaceNumber;
+                        ctx.AlternateSetting = ifd->bAlternateSetting;
+                } else {
+                        Trace(TRACE_LEVEL_ERROR, "dev %04x, interface not found for endpoint%!BIN!", 
+                                                  ptr04x(device), WppBinary(&epd, epd.bLength));
+                        return STATUS_INVALID_PARAMETER;
+                }
         } else {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, interface not found for endpoint%!BIN!", 
-                        ptr04x(device), WppBinary(&epd, sizeof(epd)));
-                return STATUS_INVALID_PARAMETER;
+                static_cast<USB_ENDPOINT_DESCRIPTOR&>(ctx.descriptor) = epd;
+                dev.ep0 = endp;
         }
 
         if (auto err = create_endpoint_queue(ctx.queue, endp)) {
@@ -266,11 +273,12 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         {
                 auto &d = ctx.descriptor;
-                TraceDbg("dev %04x, %d.%d, endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, Interval %d}, queue %04x", 
+                TraceDbg("dev %04x, %d.%d, endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, Interval %d}, "
+                         "queue %04x%!BIN!", 
                         ptr04x(device), ctx.InterfaceNumber, ctx.AlternateSetting, ptr04x(endp),
                         d.bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", usb_endpoint_num(d), 
-                        d.wMaxPacketSize, d.bInterval, ptr04x(ctx.queue));
+                        d.wMaxPacketSize, d.bInterval, ptr04x(ctx.queue), WppBinary(&d, d.bLength));
         }
 
         return STATUS_SUCCESS;
