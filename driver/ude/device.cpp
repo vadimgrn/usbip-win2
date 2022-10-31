@@ -324,7 +324,7 @@ auto interface_setting_change(
 
                 auto ifd = usbdlib::find_next_intf(dev.actconfig, nullptr, ifnum, altnum);
                 if (!ifd) {
-                        Trace(TRACE_LEVEL_ERROR, "Interface descriptor %d.%d not found", ifnum, altnum);
+                        Trace(TRACE_LEVEL_ERROR, "Interface %d.%d descriptor not found", ifnum, altnum);
                         return STATUS_INVALID_PARAMETER;
                 }
 

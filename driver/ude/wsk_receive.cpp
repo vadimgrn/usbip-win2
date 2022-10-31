@@ -323,21 +323,11 @@ void atomic_complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 
 enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
 
-/*
- * ctx.mdl_buf describes part (actual_length) of full TransferBuffer(MDL)[TransferBufferLength].
- * For ISOCH IN transfer this buffer must be modified because network data has no gaps and it must be rearranged, 
- * see fill_isoc_data. If call mdl_buf.reset() after such rearrangement, false positive 
- * SPECIAL_POOL_DETECTED_MEMORY_CORRUPTION can happen, because bytes[actual_length...TransferBufferLength] 
- * after mdl_buf endeed could be modified. Verifier.exe detects in IoFreeMDL that
- * "caller is freeing an address where bytes after the end of the allocation have been overwritten", false positive.
- */
 _Function_class_(device_ctx::received_fn)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
-	ctx.mdl_buf.reset(); // free MDL before altering the buffer to avoid SPECIAL_POOL_DETECTED_MEMORY_CORRUPTION
-
 	auto &ret = get_ret_submit(ctx);
 	auto st = STATUS_SUCCESS;
 
@@ -400,13 +390,13 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb)
 {
-	if (!has_transfer_buffer(urb)) {
+	auto tr = TryAsUrbTransfer(&urb);
+	if (!tr) {
 		auto fn = urb.UrbHeader.Function;
 		Trace(TRACE_LEVEL_ERROR, "%s(%#x) does not have TransferBuffer", urb_function_str(fn), fn);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto &tr = AsUrbTransfer(urb);
 	auto &ret = get_ret_submit(ctx);
 
 	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
@@ -417,14 +407,14 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload
-		fail = check(tr.TransferBufferLength, ret.actual_length); // do not change buffer length
+		fail = check(tr->TransferBufferLength, ret.actual_length); // do not change buffer length
 	} else { // actual_length MUST be assigned, must not have payload for OUT
-		fail = assign(tr.TransferBufferLength, ret.actual_length) || dir_out; 
+		fail = assign(tr->TransferBufferLength, ret.actual_length) || dir_out; 
 	}
 
-	if (fail || !tr.TransferBufferLength) {
+	if (fail || !tr->TransferBufferLength) {
 		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
-			tr.TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
+			tr->TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
@@ -665,7 +655,7 @@ void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 	auto &ctx = *get_wsk_context(WorkItem);
 
 	NT_ASSERT(!ctx.request); // must be completed and zeroed on every cycle
-	NT_ASSERT(!ctx.mdl_buf);
+	ctx.mdl_buf.reset();
 
 	ctx.mdl_hdr.next(nullptr);
 	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, sizeof(ctx.hdr) };

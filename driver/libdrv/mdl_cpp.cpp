@@ -16,15 +16,14 @@ usbip::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Lengt
  * Impossible to build partial MDL for a chain, only for THIS SourceMdl.
  */
 usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) :
-        Mdl(nullptr, Length)
+        Mdl((char*)MmGetMdlVirtualAddress(SourceMdl) + Offset, Length)
 {
         NT_ASSERT(!SourceMdl->Next);
         NT_ASSERT(Offset + Length <= MmGetMdlByteCount(SourceMdl)); // usbip::size(SourceMdl)
 
         if (m_mdl) {
                 NT_ASSERT(!partial());
-                auto addr = (char*)MmGetMdlVirtualAddress(SourceMdl) + Offset;
-                IoBuildPartialMdl(SourceMdl, m_mdl, addr, Length);
+                IoBuildPartialMdl(SourceMdl, m_mdl, vaddr(), Length);
                 NT_ASSERT(partial());
         }
 }
