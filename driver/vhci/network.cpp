@@ -164,18 +164,22 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
         auto head = r.TransferBufferMDL;
         auto len = size(head); // can be a chain
 
+        auto st = STATUS_SUCCESS;
+
         if (len < r.TransferBufferLength) { // must describe full buffer
-                return STATUS_BUFFER_TOO_SMALL;
+                st = STATUS_BUFFER_TOO_SMALL;
         } else if (len == mdl_size || (len > mdl_size && !mdl_chain)) { // WSK_BUF.Length will cut extra length
                 NT_VERIFY(mdl = Mdl(head));
-                return STATUS_SUCCESS;
         } else if (!head->Next) { // build partial MDL
                 mdl = Mdl(head, 0, mdl_size);
-                return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
         } else if (auto buf = MmGetSystemAddressForMdlSafe(head, LowPagePriority | MdlMappingNoExecute)) {
                 // IoBuildPartialMdl doesn't treat SourceMdl as a chain and can't be used
-                return make(buf, false); // if use MmGetMdlVirtualAddress(head) -> IRQL_NOT_LESS_OR_EQUAL
-        } else {
-                return STATUS_INSUFFICIENT_RESOURCES;
+                st = make(buf, false); // if use MmGetMdlVirtualAddress(head) -> IRQL_NOT_LESS_OR_EQUAL
         }
+
+        if (!mdl && NT_SUCCESS(st)) {
+                st = STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        return st;
 }
