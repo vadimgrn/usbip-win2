@@ -15,7 +15,7 @@
   * @see is_valid_seqnum
   */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-seqnum_t usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in)
+seqnum_t usbip::next_seqnum(_Inout_ device_ctx_ext &dev, _In_ bool dir_in)
 {
 	static_assert(!USBIP_DIR_OUT);
 	static_assert(USBIP_DIR_IN);
@@ -77,6 +77,10 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
 
         NT_ASSERT(ext);
         NT_ASSERT(!ext->sock);
+
+        if (auto ptr = ext->actconfig) {
+                ExFreePoolWithTag(ptr, POOL_TAG);
+        }
 
         libdrv_free(ext->busid);
         RtlFreeUnicodeString(&ext->node_name);

@@ -17,7 +17,7 @@ struct device_ctx;
 
 struct wsk_context
 {
-        device_ctx *dev_ctx; // UDECXUSBDEVICE can be obtained from WDFREQUEST, but it is optional
+        device_ctx *dev; // UDECXUSBDEVICE can be obtained from WDFREQUEST, but it is optional
 
         // transient data
 
@@ -49,7 +49,7 @@ void delete_wsk_context_list();
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wsk_context *alloc_wsk_context(_In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
+wsk_context *alloc_wsk_context(_In_ device_ctx *dev, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets = 0);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

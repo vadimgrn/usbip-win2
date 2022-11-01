@@ -8,7 +8,7 @@ struct _USB_ENDPOINT_DESCRIPTOR;
 namespace usbip
 {
 
-struct device_ctx;
+struct device_ctx_ext;
 
 class setup_dir
 {
@@ -45,10 +45,10 @@ static_assert(*setup_dir::out());
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS set_cmd_submit_usbip_header(
-	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const _USB_ENDPOINT_DESCRIPTOR &epd,
+	_Out_ usbip_header &hdr, _Inout_ device_ctx_ext &ext, _In_ const _USB_ENDPOINT_DESCRIPTOR &epd,
 	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength = 0, _In_ setup_dir setup_dir_out = setup_dir());
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void set_cmd_unlink_usbip_header(_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ seqnum_t seqnum_unlink);
+void set_cmd_unlink_usbip_header(_Out_ usbip_header &hdr, _Inout_ device_ctx_ext &ext, _In_ seqnum_t seqnum_unlink);
 
 } // namespace usbip

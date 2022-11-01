@@ -82,7 +82,7 @@ NTSTATUS send_complete(
                         complete(request, STATUS_CANCELLED);
                         break;
                 }
-        } else if (auto victim = device::dequeue_request(*ctx->dev_ctx, seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+        } else if (auto victim = device::dequeue_request(*ctx->dev, seqnum)) { // ctx->hdr.base.seqnum is in network byte order
                 NT_ASSERT(victim == request);
                 complete(victim, st.Status);
         } else if (old_status == REQ_CANCELED) {
@@ -90,8 +90,8 @@ NTSTATUS send_complete(
         }
 
         if (st.Status == STATUS_FILE_FORCED_CLOSED) {
-                auto dev = get_device(ctx->dev_ctx);
-                device::sched_plugout_and_delete(dev);
+                auto hdev = get_device(ctx->dev);
+                device::sched_plugout_and_delete(hdev);
         }
 
         return StopCompletion;
@@ -203,14 +203,13 @@ NTSTATUS control_transfer(
         }
 
         auto buf_len = r.TransferBufferLength;
+        auto &pkt = get_setup_packet(r); // see UdecxUrbRetrieveControlSetupPacket
 
-        if (auto pkt = &get_setup_packet(r)) {
-                if (buf_len > pkt->wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
-                        buf_len = pkt->wLength; // usb_submit_urb checks for equality
-                } else if (buf_len < pkt->wLength) {
-                        Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu) < wLength(%d)", buf_len, pkt->wLength);
-                        return STATUS_INVALID_PARAMETER;
-                }
+        if (buf_len > pkt.wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
+                buf_len = pkt.wLength; // usb_submit_urb checks for equality
+        } else if (buf_len < pkt.wLength) {
+                Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu) < wLength(%d)", buf_len, pkt.wLength);
+                return STATUS_INVALID_PARAMETER;
         }
 
         wsk_context_ptr ctx(&dev, request);
@@ -220,12 +219,12 @@ NTSTATUS control_transfer(
         
         setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, buf_len, dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, endp.descriptor, r.TransferFlags, buf_len, dir_out)) {
                 return err;
         }
 
-        static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(r.SetupPacket));
-        RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, r.SetupPacket, sizeof(r.SetupPacket));
+        static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(pkt));
+        RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, &pkt, sizeof(pkt));
 
         return send(endpoint, ctx, dev, true, &urb);
 }
@@ -255,7 +254,7 @@ NTSTATUS bulk_or_interrupt_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, endp.descriptor, r.TransferFlags, r.TransferBufferLength)) {
                 return err;
         }
 
@@ -328,7 +327,7 @@ NTSTATUS isoch_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, 
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, endp.descriptor, 
                                r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
                 return err;
         }
@@ -410,7 +409,7 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request,
         auto &ep0 = *get_endpoint_ctx(dev.ep0);
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0.descriptor, TransferFlags, 0, setup_dir::out())) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, ep0.descriptor, TransferFlags, 0, setup_dir::out())) {
                 return err;
         }
 
@@ -484,7 +483,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
         if (dev.unplugged) {
                 TraceDbg("Unplugged");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
-                set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
+                set_cmd_unlink_usbip_header(ctx->hdr, *dev.ext, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
         } else {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, seqnum %u, wsk_context_ptr error", ptr04x(device), req.seqnum);

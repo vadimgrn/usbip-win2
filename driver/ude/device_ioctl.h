@@ -44,5 +44,4 @@ void NTAPI internal_device_control(
         _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode);
 
-
 } // namespace usbip::device

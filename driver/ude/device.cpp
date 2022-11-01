@@ -15,6 +15,7 @@
 #include "wsk_context.h"
 #include "wsk_receive.h"
 #include "ioctl.h"
+#include "vhci_ioctl.h"
 
 #include <libdrv\ch9.h>
 #include <libdrv\dbgcommon.h>
@@ -54,16 +55,12 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
-        auto dev = static_cast<UDECXUSBDEVICE>(Object);
-        TraceDbg("dev %04x", ptr04x(dev));
+        auto hdev = static_cast<UDECXUSBDEVICE>(Object);
+        TraceDbg("dev %04x", ptr04x(hdev));
 
-        auto &ctx = *get_device_ctx(dev);
-
-        if (auto ptr = ctx.actconfig) {
-                ExFreePoolWithTag(ptr, POOL_TAG);
+        if (auto dev = get_device_ctx(hdev)) {
+                free(dev->ext);
         }
-
-        free(ctx.ext);
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -244,6 +241,8 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         auto &ctx = *get_endpoint_ctx(endp);
 
         ctx.device = device;
+        ctx.InterfaceNumber = UCHAR(-1);
+        ctx.AlternateSetting = UCHAR(-1);
 
         if (auto &dev = *get_device_ctx(device); auto epd_len = data->EndpointDescriptorBufferLength) {
 
@@ -251,10 +250,9 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 NT_ASSERT(sizeof(ctx.descriptor) >= epd_len);
                 RtlCopyMemory(&ctx.descriptor, &epd, epd_len);
 
-                if (!dev.actconfig) {
-                        NT_ASSERT(!ctx.InterfaceNumber);
-                        NT_ASSERT(!ctx.AlternateSetting);
-                } else if (auto ifd = usbdlib::find_intf(dev.actconfig, epd)) {
+                if (auto cfg = dev.actconfig(); !cfg) {
+                        //
+                } else if (auto ifd = usbdlib::find_intf(cfg, epd)) {
                         ctx.InterfaceNumber = ifd->bInterfaceNumber;
                         ctx.AlternateSetting = ifd->bAlternateSetting;
                 } else {
@@ -305,7 +303,8 @@ auto intf_has_endpoint(
                 return epd.bEndpointAddress == addr ? STATUS_PENDING : STATUS_SUCCESS;
         };
 
-        return usbdlib::for_each_endp(cfg, ifd, f, &EndpointAddress) == STATUS_PENDING;
+        auto ret = usbdlib::for_each_endp(cfg, ifd, f, &EndpointAddress);
+        return ret == STATUS_PENDING;
 }
 
 /*
@@ -320,9 +319,9 @@ auto interface_setting_change(
         auto ifnum = params.InterfaceNumber;
         auto altnum = params.NewInterfaceSetting;
 
-        if (dev.actconfig && params.EndpointsToConfigureCount) {
+        if (auto cfg = dev.actconfig(); cfg && params.EndpointsToConfigureCount) {
 
-                auto ifd = usbdlib::find_next_intf(dev.actconfig, nullptr, ifnum, altnum);
+                auto ifd = usbdlib::find_next_intf(cfg, nullptr, ifnum, altnum);
                 if (!ifd) {
                         Trace(TRACE_LEVEL_ERROR, "Interface %d.%d descriptor not found", ifnum, altnum);
                         return STATUS_INVALID_PARAMETER;
@@ -330,7 +329,7 @@ auto interface_setting_change(
 
                 auto &endp = *get_endpoint_ctx(*params.EndpointsToConfigure); 
 
-                if (!intf_has_endpoint(dev.actconfig, ifd, endp.descriptor.bEndpointAddress)) {
+                if (!intf_has_endpoint(cfg, ifd, endp.descriptor.bEndpointAddress)) {
                         TraceDbg("Correction %d.%d -> %d.%d", ifnum, altnum, endp.InterfaceNumber, endp.AlternateSetting);
                         ifnum = endp.InterfaceNumber;
                         altnum = endp.AlternateSetting;
@@ -371,9 +370,8 @@ void endpoints_configure(
         } else switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
                 TraceDbg("DeviceInitialize");
-                if (dev.actconfig && usbdlib::is_composite(dev.descriptor, *dev.actconfig)) {
-                        auto cfg = dev.actconfig->bConfigurationValue;
-                        st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, cfg);
+                if (auto cfg = dev.actconfig(); cfg && usbdlib::is_composite(dev.descriptor(), *cfg)) {
+                        st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, cfg->bConfigurationValue);
                 }
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
@@ -402,15 +400,41 @@ void endpoints_configure(
         }
 }
 
+/*
+ * _UDECXUSBDEVICE_INIT* must be freed if UdecxUsbDeviceCreate fails.
+ * UdecxUsbDeviceInitFree must not be called on success, Udecx does that itself.
+ */
+struct device_init_ptr
+{
+        device_init_ptr(WDFDEVICE vhci) : ptr(UdecxUsbDeviceInitAllocate(vhci)) {}
+        ~device_init_ptr() {
+                if (ptr) {
+                        UdecxUsbDeviceInitFree(ptr);
+                }
+        }
+
+        device_init_ptr(const device_init_ptr&) = delete;
+        device_init_ptr& operator=(const device_init_ptr&) = delete;
+
+        explicit operator bool() const { return ptr; }
+        auto operator !() const { return !ptr; }
+
+        auto release() { ptr = nullptr; }
+
+        _UDECXUSBDEVICE_INIT *ptr{};
+};
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
+PAGED auto prepare_init(
+        _In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ext, _In_ const usbip_usb_device &udev)
 {
         PAGED_CODE();
+        NT_ASSERT(init);
 
-        auto init = UdecxUsbDeviceInitAllocate(vhci);
-        if (!init) {
-                return init;
+        if (auto err = add_descriptors(init, ext, udev)) {
+                Trace(TRACE_LEVEL_ERROR, "add_descriptors %!STATUS!", err);
+                return err;
         }
 
         UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS cb;
@@ -419,6 +443,8 @@ PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
 //      cb.EvtUsbDeviceLinkPowerEntry = device_d0_entry; // required if the device supports USB remote wake
 //      cb.EvtUsbDeviceLinkPowerExit = device_d0_exit;
         
+        auto speed = to_udex_speed(ext.dev.speed);
+
         if (speed >= UdecxUsbSuperSpeed) { // required for USB 3 devices
                 cb.EvtUsbDeviceSetFunctionSuspendAndWake = device_set_function_suspend_and_wake;
         }
@@ -434,7 +460,7 @@ PAGED auto create_init(_In_ WDFDEVICE vhci, _In_ UDECX_USB_DEVICE_SPEED speed)
         UdecxUsbDeviceInitSetSpeed(init, speed);
         UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
 
-        return init;
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -461,17 +487,15 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
+PAGED NTSTATUS usbip::device::create(
+        _Out_ UDECXUSBDEVICE &dev, _In_ const usbip_usb_device &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
 
-        NT_ASSERT(ext);
-        auto speed = to_udex_speed(ext->dev.speed);
-
-        auto init = create_init(vhci, speed); // must be freed if UdecxUsbDeviceCreate fails
-        if (!init) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceInitAllocate error");
-                return STATUS_INSUFFICIENT_RESOURCES;
+        device_init_ptr init(vhci);
+        if (auto err = init ? prepare_init(init.ptr, *ext, udev) : STATUS_INSUFFICIENT_RESOURCES) {
+                Trace(TRACE_LEVEL_ERROR, "UDECXUSBDEVICE_INIT %!STATUS!", err);
+                return err;
         }
 
         WDF_OBJECT_ATTRIBUTES attrs;
@@ -480,12 +504,12 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
         attrs.EvtDestroyCallback = device_destroy;
         attrs.ParentObject = vhci; // FIXME: by default?
 
-        if (auto err = UdecxUsbDeviceCreate(&init, &attrs, &dev)) {
+        if (auto err = UdecxUsbDeviceCreate(&init.ptr, &attrs, &dev)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
-                UdecxUsbDeviceInitFree(init); // must never be called if success, Udecx does that itself
                 return err;
         }
 
+        init.release();
         auto &ctx = *get_device_ctx(dev);
 
         ctx.vhci = vhci;

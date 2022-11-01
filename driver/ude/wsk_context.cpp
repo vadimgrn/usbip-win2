@@ -128,13 +128,13 @@ void usbip::delete_wsk_context_list()
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usbip::alloc_wsk_context(
-        _In_ device_ctx *dev_ctx, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets) -> wsk_context*
+        _In_ device_ctx *dev, _In_opt_ WDFREQUEST request, _In_ ULONG NumberOfPackets) -> wsk_context*
 {
-        NT_ASSERT(dev_ctx);
+        NT_ASSERT(dev);
 
         auto ctx = ::alloc_wsk_context(NumberOfPackets);
         if (ctx) {
-                ctx->dev_ctx = dev_ctx;
+                ctx->dev = dev;
                 ctx->request = request;
         }
 

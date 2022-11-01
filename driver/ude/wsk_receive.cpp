@@ -262,7 +262,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		auto &src = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
 		if (dsc_len == sizeof(src) && src.bLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(src));
-			auto &dest = ctx.dev_ctx->descriptor;
+			auto &dest = ctx.dev->descriptor();
 			if (dest != src) {
 				dest = src;
 				TraceDbg("Device descriptor saved, bNumConfigurations %d", dest.bNumConfigurations);
@@ -275,7 +275,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		auto &cd = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		if (dsc_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(cd));
-			return save_config(ctx.dev_ctx->actconfig, cd);
+			return save_config(ctx.dev->ext->actconfig, cd);
 		}
 	}
 	        break;
@@ -459,10 +459,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
 	auto &ctx = *static_cast<wsk_context*>(Context);
-	auto &dev = *ctx.dev_ctx;
+	auto &dev = *ctx.dev;
 
 	auto &st = wsk_irp->IoStatus;
-//	TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(req), st.Status, st.Information);
+	if (st.Status) {
+		TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(ctx.request), st.Status, st.Information);
+	}
 
 	auto err = NT_ERROR(st.Status) ? st.Status :
 		   st.Information == dev.receive_size ? dev.received(ctx) :
@@ -500,7 +502,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_context &ctx)
 {
-	auto &dev = *ctx.dev_ctx;
+	auto &dev = *ctx.dev;
 
 	NT_ASSERT(verify(buf, ctx.is_isoc));
 	dev.receive_size = buf.Length; // checked by verify()
@@ -582,7 +584,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 	auto &hdr = ctx.hdr;
 
 	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? // request must be completed
-		      device::dequeue_request(*ctx.dev_ctx, hdr.base.seqnum) : WDF_NO_HANDLE;
+		      device::dequeue_request(*ctx.dev, hdr.base.seqnum) : WDF_NO_HANDLE;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
