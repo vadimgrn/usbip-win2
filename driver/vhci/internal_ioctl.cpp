@@ -773,6 +773,12 @@ NTSTATUS isoch_transfer(vpdo_dev_t &vpdo, IRP *irp, URB &urb)
                 return STATUS_INVALID_PARAMETER;
         }
 
+        if (r.NumberOfPackets > USBIP_MAX_ISO_PACKETS) {
+                Trace(TRACE_LEVEL_ERROR, "NumberOfPackets(%lu) > USBIP_MAX_ISO_PACKETS(%d)", 
+                        r.NumberOfPackets, USBIP_MAX_ISO_PACKETS);
+                return STATUS_INVALID_PARAMETER;
+        }
+
         auto ctx = new_wsk_context(vpdo, irp, r.PipeHandle, r.NumberOfPackets);
         if (!ctx) {
                 return STATUS_INSUFFICIENT_RESOURCES;

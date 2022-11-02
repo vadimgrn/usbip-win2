@@ -135,7 +135,7 @@ size_t get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr)
 	}
 
 	isoc = reinterpret_cast<usbip_iso_packet_descriptor*>(buf_end);
-	return cnt;
+	return cnt == number_of_packets_non_isoch ? 0 : cnt;
 }
 
 size_t get_total_size(const usbip_header &hdr) 

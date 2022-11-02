@@ -72,7 +72,7 @@ NTSTATUS set_cmd_submit_usbip_header(
 		r->transfer_flags = to_linux_flags(TransferFlags, dir_in);
 		r->transfer_buffer_length = TransferBufferLength;
 		r->start_frame = 0;
-		r->number_of_packets = 0; // doesn't work if number_of_packets_non_isoch, see usbip protocol
+		r->number_of_packets = number_of_packets_non_isoch;
 		r->interval = get_endpoint_interval(PipeHandle);
 		RtlZeroMemory(r->setup, sizeof(r->setup));
 	}
