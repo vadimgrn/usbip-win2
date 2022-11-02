@@ -51,8 +51,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,9,3,1
- PRODUCTVERSION 0,9,3,1
+ FILEVERSION 0,9,3,2
+ PRODUCTVERSION 0,9,3,2
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -69,12 +69,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "usbip-win2"
             VALUE "FileDescription", "usbip for usbip-win2"
-            VALUE "FileVersion", "0.9.3.1"
+            VALUE "FileVersion", "0.9.3.2"
             VALUE "InternalName", "usbip.exe"
             VALUE "LegalCopyright", "Copyright (C) 2022 usbip-win2 project"
             VALUE "OriginalFilename", "usbip.exe"
             VALUE "ProductName", "usbip-win2"
-            VALUE "ProductVersion", "0.9.3.1"
+            VALUE "ProductVersion", "0.9.3.2"
         END
     END
     BLOCK "VarFileInfo"
