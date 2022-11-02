@@ -15,8 +15,6 @@
 #include "wsk_context.h"
 #include "internal_ioctl.h"
 
-#include <ntstrsafe.h>
-
 namespace
 {
 
@@ -83,78 +81,6 @@ PAGEABLE void DriverUnload(_In_ DRIVER_OBJECT *drvobj)
         WPP_CLEANUP(drvobj);
 }
 
-/*
-* Set only if such value does not exist.
-*/
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-PAGEABLE NTSTATUS set_verbose_on(HANDLE h)
-{
-	PAGED_CODE();
-
-	UNICODE_STRING name;
-	RtlInitUnicodeString(&name, L"VerboseOn");
-
-	ULONG len = 0;
-	KEY_VALUE_PARTIAL_INFORMATION info;
-
-	NTSTATUS st = ZwQueryValueKey(h, &name, KeyValuePartialInformation, &info, sizeof(info), &len);
-
-	if (st == STATUS_OBJECT_NAME_NOT_FOUND) {
-		DWORD val = 1;
-		st = ZwSetValueKey(h, &name, 0, REG_DWORD, &val, sizeof(val));
-	} else {
-		NT_ASSERT(!st);
-	}
-
-	return st;
-}
-
-/*
-* Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
-* The default setting of zero causes the IFR to log errors, warnings, and informational events.
-* Set to one to add verbose output to the log.
-*
-* reg add "HKLM\SYSTEM\ControlSet001\Services\usbip_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
-*/
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-PAGEABLE NTSTATUS set_ifr_verbose(const UNICODE_STRING *RegistryPath)
-{
-	PAGED_CODE();
-
-	UNICODE_STRING params;
-	RtlInitUnicodeString(&params, L"\\Parameters");
-
-	UNICODE_STRING path;
-	path.Length = 0;
-	path.MaximumLength = RegistryPath->Length + params.Length;
-	path.Buffer = (PWCH)ExAllocatePool2(POOL_FLAG_PAGED|POOL_FLAG_UNINITIALIZED, path.MaximumLength + sizeof(*path.Buffer), USBIP_VHCI_POOL_TAG);
-
-	if (!path.Buffer) {
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	NTSTATUS err = RtlUnicodeStringCopy(&path, RegistryPath);
-	NT_ASSERT(!err);
-
-	err = RtlUnicodeStringCat(&path, &params);
-	NT_ASSERT(!err);
-
-	OBJECT_ATTRIBUTES attrs;
-	InitializeObjectAttributes(&attrs, &path, OBJ_KERNEL_HANDLE, nullptr, nullptr);
-
-	HANDLE h = nullptr;
-	err = ZwCreateKey(&h, KEY_WRITE, &attrs, 0, nullptr, 0, nullptr);
-	if (!err) {
-		err = set_verbose_on(h);
-		ZwClose(h);
-	}
-
-	ExFreePoolWithTag(path.Buffer, USBIP_VHCI_POOL_TAG);
-	return err;
-}
-
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGEABLE auto save_registry_path(const UNICODE_STRING *RegistryPath)
@@ -205,14 +131,7 @@ extern "C" NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_STRING 
 {
 	PAGED_CODE();
 
-	auto st = set_ifr_verbose(RegistryPath);
 	WPP_INIT_TRACING(drvobj, RegistryPath);
-	if (st) {
-		Trace(TRACE_LEVEL_CRITICAL, "Can't set IFR parameter: %!STATUS!", st);
-                DriverUnload(drvobj);
-                return st;
-	}
-
 	TraceMsg("%04x", ptr4log(drvobj));
 
 	if (auto err = init_lookaside_lists()) {

@@ -30,12 +30,6 @@ usbip2_vhci.sys = 1
 [usbip_vhci_Device.NT$ARCH$]
 CopyFiles=@usbip2_vhci.sys
 
-[usbip_vhci_Device.NT$ARCH$.HW]
-AddReg=usbip_vhci_Device_AddReg
-
-[usbip_vhci_Device_AddReg]
-HKR,,DeviceCharacteristics,0x10001,0x0100         ; Use same security checks on relative opens
-
 [usbip_vhci_Device.NT$ARCH$.Services]
 AddService = %ServiceName%,%SPSVCINST_ASSOCSERVICE%, usbip_vhci_Service_Inst
 
@@ -47,6 +41,11 @@ StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %12%\usbip2_vhci.sys
 LoadOrderGroup = "Extended Base"
+AddReg         = usbip_vhci_AddReg
+
+[usbip_vhci_AddReg]
+HKR,,DeviceCharacteristics,0x10001,0x0100 ; Use same security checks on relative opens
+HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
 
 [Strings]
 ServiceName = "usbip2_vhci"
