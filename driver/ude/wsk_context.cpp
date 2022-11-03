@@ -67,7 +67,7 @@ void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T
                 return nullptr;
         }
 
-        TraceWSK("-> %04x", ptr04x(ctx));
+        TraceWSK("%04x", ptr04x(ctx));
         return ctx;
 }
 

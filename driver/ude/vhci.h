@@ -19,7 +19,7 @@ namespace usbip
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *DeviceInit);
+PAGED NTSTATUS DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init);
 
 } // namespace usbip
 

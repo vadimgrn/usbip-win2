@@ -152,25 +152,52 @@ void endpoint_start(_In_ UDECXUSBENDPOINT endp)
         WdfIoQueueStart(queue);
 }
 
+/*
+ * Bring the device from low power state and enter working state.
+ * The power request may be completed asynchronously by returning STATUS_PENDING, 
+ * and then later completing it by calling UdecxUsbDeviceLinkPowerExitComplete 
+ * with the actual completion code.
+ */
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
-inline NTSTATUS device_d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev)
+NTSTATUS d0_entry(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev)
 {
         TraceDbg("vhci %04x, dev %04x", ptr04x(vhci), ptr04x(dev));
         return STATUS_SUCCESS;
 }
 
+/*
+ * Send the virtual USB device to a low power state.
+ * The power request may be completed asynchronously by returning STATUS_PENDING, 
+ * and then later calling UdecxUsbDeviceLinkPowerExitComplete with the actual completion code.
+ * @see UdecxUsbDeviceSignalWake, UdecxUsbDeviceSignalFunctionWake
+ */
 _Function_class_(EVT_UDECX_USB_DEVICE_D0_EXIT)
 _IRQL_requires_same_
-inline NTSTATUS device_d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
+NTSTATUS d0_exit(_In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE dev, _In_ UDECX_USB_DEVICE_WAKE_SETTING WakeSetting)
 {
         TraceDbg("vhci %04x, dev %04x, %!UDECX_USB_DEVICE_WAKE_SETTING!", ptr04x(vhci), ptr04x(dev), WakeSetting);
+        
+        switch (WakeSetting) {
+        case UdecxUsbDeviceWakeDisabled:
+                break;
+        case UdecxUsbDeviceWakeEnabled:
+                NT_ASSERT(get_device_ctx(dev)->speed() < USB_SPEED_SUPER);
+                break;
+        case UdecxUsbDeviceWakeNotApplicable: // SuperSpeed device
+                NT_ASSERT(get_device_ctx(dev)->speed() >= USB_SPEED_SUPER);
+                break;
+        }
+
         return STATUS_SUCCESS;
 }
 
+/*
+ * @see UdecxUsbDeviceSignalFunctionWake
+ */
 _Function_class_(EVT_UDECX_USB_DEVICE_SET_FUNCTION_SUSPEND_AND_WAKE)
 _IRQL_requires_same_
-NTSTATUS device_set_function_suspend_and_wake(
+NTSTATUS function_suspend_and_wake(
         _In_ WDFDEVICE vhci, 
         _In_ UDECXUSBDEVICE dev, 
         _In_ ULONG Interface, 
@@ -179,7 +206,18 @@ NTSTATUS device_set_function_suspend_and_wake(
         TraceDbg("vhci %04x, dev %04x, Interface %lu, %!UDECX_USB_DEVICE_FUNCTION_POWER!", 
                   ptr04x(vhci), ptr04x(dev), Interface, FunctionPower);
 
-        return STATUS_NOT_SUPPORTED;
+        NT_ASSERT(get_device_ctx(dev)->speed() >= USB_SPEED_SUPER);
+
+        switch (FunctionPower) {
+        case UdecxUsbDeviceFunctionNotSuspended:
+                break;
+        case UdecxUsbDeviceFunctionSuspendedCannotWake:
+                break;
+        case UdecxUsbDeviceFunctionSuspendedCanWake:
+                break;
+        }
+
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -381,14 +419,7 @@ void endpoints_configure(
                 st = interface_setting_change(dev, device, request, *params);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
-                TraceDbg("EndpointsReleasedOnly");
-                /*
-                for (ULONG i = 0; i < params->ReleasedEndpointsCount; ++i) {
-                        auto endp = params->ReleasedEndpoints[i];
-                        TraceDbg("dev %04x, delete released endp %04x", ptr04x(device), ptr04x(endp));
-                        WdfObjectDelete(endp); // causes BSOD sometimes
-                }
-                */
+                TraceDbg("EndpointsReleasedOnly"); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD
                 break;
         }
 
@@ -407,7 +438,9 @@ void endpoints_configure(
 struct device_init_ptr
 {
         device_init_ptr(WDFDEVICE vhci) : ptr(UdecxUsbDeviceInitAllocate(vhci)) {}
-        ~device_init_ptr() {
+
+        ~device_init_ptr() 
+        {
                 if (ptr) {
                         UdecxUsbDeviceInitFree(ptr);
                 }
@@ -419,7 +452,7 @@ struct device_init_ptr
         explicit operator bool() const { return ptr; }
         auto operator !() const { return !ptr; }
 
-        auto release() { ptr = nullptr; }
+        void release() { ptr = nullptr; }
 
         _UDECXUSBDEVICE_INIT *ptr{};
 };
@@ -440,13 +473,11 @@ PAGED auto prepare_init(
         UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS cb;
         UDECX_USB_DEVICE_CALLBACKS_INIT(&cb);
 
-//      cb.EvtUsbDeviceLinkPowerEntry = device_d0_entry; // required if the device supports USB remote wake
-//      cb.EvtUsbDeviceLinkPowerExit = device_d0_exit;
+        cb.EvtUsbDeviceLinkPowerEntry = d0_entry; // required if the device supports USB remote wake
+        cb.EvtUsbDeviceLinkPowerExit = d0_exit;
         
-        auto speed = to_udex_speed(ext.dev.speed);
-
-        if (speed >= UdecxUsbSuperSpeed) { // required for USB 3 devices
-                cb.EvtUsbDeviceSetFunctionSuspendAndWake = device_set_function_suspend_and_wake;
+        if (ext.dev.speed >= USB_SPEED_SUPER) { // required
+                cb.EvtUsbDeviceSetFunctionSuspendAndWake = function_suspend_and_wake;
         }
 
 //      cb.EvtUsbDeviceReset = device_reset; // server returns EPIPE always
@@ -457,9 +488,10 @@ PAGED auto prepare_init(
 
         UdecxUsbDeviceInitSetStateChangeCallbacks(init, &cb);
 
+        auto speed = to_udex_speed(ext.dev.speed);
         UdecxUsbDeviceInitSetSpeed(init, speed);
-        UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
 
+        UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
         return STATUS_SUCCESS;
 }
 
