@@ -32,6 +32,21 @@ auto make_hwid_multiz(LPCWSTR hwid)
         return s;
 }
 
+void prompt_reboot()
+{
+        switch (auto ret = SetupPromptReboot(nullptr, nullptr, false)) {
+        case SPFILEQ_REBOOT_IN_PROGRESS:
+                printf("Rebooting...\n");
+                break;
+        case SPFILEQ_REBOOT_RECOMMENDED:
+                printf("Reboot is recommended\n");
+                break;
+        default:
+                assert(ret == -1);
+                fprintf(stderr, "SetupPromptReboot error %#lx\n", GetLastError());
+        }
+}
+
 /*
  * @param infpath must be an absolute path
  * @see devcon hwids "USBIP\*"
@@ -85,8 +100,8 @@ auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
                 return EXIT_FAILURE;
         }
 
-        if ((reboot_required || RebootRequired) && SetupPromptReboot(nullptr, nullptr, false) < 0 ) {
-                fprintf(stderr, "SetupPromptReboot error %#lx\n", GetLastError());
+        if (reboot_required || RebootRequired) {
+                prompt_reboot();
         }
 
         return EXIT_SUCCESS;
