@@ -32,6 +32,21 @@ auto make_hwid_multiz(LPCWSTR hwid)
         return s;
 }
 
+void prompt_reboot()
+{
+        switch (auto ret = SetupPromptReboot(nullptr, nullptr, false)) {
+        case SPFILEQ_REBOOT_IN_PROGRESS:
+                printf("Rebooting...\n");
+                break;
+        case SPFILEQ_REBOOT_RECOMMENDED:
+                printf("Reboot is recommended\n");
+                break;
+        default:
+                assert(ret == -1);
+                fprintf(stderr, "SetupPromptReboot error %#lx\n", GetLastError());
+        }
+}
+
 /*
  * @param infpath must be an absolute path
  * @see devcon hwids "USBIP\*"
@@ -60,7 +75,7 @@ auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
         auto hwid_multiz = make_hwid_multiz(hwid);
 
         if (!SetupDiSetDeviceRegistryProperty(dev_list.get(), &dev_data, SPDRP_HARDWAREID, 
-                reinterpret_cast<const BYTE*>(hwid_multiz.data()), DWORD(hwid_multiz.size()*sizeof(*hwid_multiz.data())))) {
+                reinterpret_cast<const BYTE*>(hwid_multiz.data()), DWORD(hwid_multiz.length()*sizeof(*hwid_multiz.data())))) {
                 fprintf(stderr, "SetupDiSetDeviceRegistryProperty error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
         }
@@ -70,13 +85,23 @@ auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
                 return EXIT_FAILURE;
         }
 
-        BOOL reboot{};
+        SP_DEVINSTALL_PARAMS params{ .cbSize = sizeof(params) };
+        if (!SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
+                fprintf(stderr, "SetupDiGetDeviceInstallParams error %#lx\n", GetLastError());
+                return EXIT_FAILURE;
+        }
+        auto reboot_required = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
 
-        if (!UpdateDriverForPlugAndPlayDevices(nullptr, hwid, infpath.c_str(), INSTALLFLAG_FORCE, &reboot)) {
+        // the same as "pnputil /add-driver usbip2_vhci.inf /install"
+
+        BOOL RebootRequired;
+        if (!UpdateDriverForPlugAndPlayDevices(nullptr, hwid, infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
                 fprintf(stderr, "UpdateDriverForPlugAndPlayDevices error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
-        } else if (reboot) {
-                printf("System reboot is required\n");
+        }
+
+        if (reboot_required || RebootRequired) {
+                prompt_reboot();
         }
 
         return EXIT_SUCCESS;
@@ -87,7 +112,7 @@ void usage(const std::wstring &program)
         const char fmt[] = 
 "Usage: %S <command> <arg>...\n"
 "Commands:\n"
-"install <inf> <hwid>\tinstall a device/node and its driver\n";                
+"install <inf> <hwid>\tinstall a device node and its driver\n";                
 
         printf(fmt, program.c_str());
 }
@@ -95,7 +120,7 @@ void usage(const std::wstring &program)
 } // namespace
 
 
-int wmain(int argc, wchar_t* argv[])
+int wmain(int argc, wchar_t* argv[]) // _tmain if include <tchar.h>
 {
         if (argc >= 2) {
                 auto cmd = std::wstring_view(argv[1]);
