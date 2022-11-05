@@ -34,6 +34,7 @@
     <ClInclude Include="wdf_cpp.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="lock.h" />
+    <ClInclude Include="pair.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

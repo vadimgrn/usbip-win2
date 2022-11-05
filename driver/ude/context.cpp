@@ -89,3 +89,15 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
 
         ExFreePoolWithTag(ext, POOL_TAG);
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::set_intf_endpoints(_Inout_ device_ctx &dev, _In_ UCHAR InterfaceNumber, _In_ bool has_endpoints)
+{
+        NT_ASSERT(InterfaceNumber < 64);
+        auto had = has_endpoints ? InterlockedBitTestAndSet64  (&dev.intf_endpoints, InterfaceNumber) :
+                                   InterlockedBitTestAndReset64(&dev.intf_endpoints, InterfaceNumber);
+
+        TraceDbg("Interface #%d has endpoints: %d for previous AlternateSetting, %d for current", 
+                  InterfaceNumber, had, has_endpoints);
+}

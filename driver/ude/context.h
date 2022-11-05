@@ -6,8 +6,8 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\ch9.h>
-#include <wdf.h>
 
+#include <wdf.h>
 #include <wdfusb.h>
 #include <UdeCx.h>
 
@@ -93,7 +93,7 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         volatile bool unplugged;
 
-        UCHAR AlternateSetting[32]; // [actconfig->bNumInterfaces]
+        LONG64 intf_endpoints; // bits, does current AlternateSetting for InterfaceNumber have endpoints?
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
@@ -115,11 +115,6 @@ inline auto& get_device(_In_ WDFQUEUE queue) // for device_ctx.queue
         return *WdfObjectGet_UDECXUSBDEVICE(queue);
 }
 
-inline void reset_alternate_setting(_In_ device_ctx &ctx)
-{
-        RtlFillMemory(ctx.AlternateSetting, sizeof(ctx.AlternateSetting), -1);
-}
-
 /*
  * Context space for UDECXUSBENDPOINT.
  */
@@ -130,7 +125,7 @@ struct endpoint_ctx
 
         USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor; // larger than USB_ENDPOINT_DESCRIPTOR
 
-        UCHAR InterfaceNumber; // interface that endpoint belongs to
+        UCHAR InterfaceNumber; // that endpoint belongs to
         UCHAR AlternateSetting;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
@@ -159,7 +154,7 @@ struct request_ctx
         union {
                 struct {
                         UCHAR InterfaceNumber;
-                        UCHAR AlternateSetting;
+                        UCHAR NumEndpoints;
                 } set_intf;
         } pre_complete_args;
 };
@@ -210,5 +205,15 @@ PAGED NTSTATUS create_device_ctx_ext(_Outptr_ device_ctx_ext* &d, _In_ const vhc
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void free(_In_ device_ctx_ext *ext);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void set_intf_endpoints(_Inout_ device_ctx &dev, _In_ UCHAR InterfaceNumber, _In_ bool has_endpoints);
+
+inline bool get_intf_endpoints(_Inout_ device_ctx &dev, _In_ UCHAR InterfaceNumber)
+{
+        NT_ASSERT(InterfaceNumber < 64);
+        return BitTest64(&dev.intf_endpoints, InterfaceNumber);
+}
 
 } // namespace usbip
