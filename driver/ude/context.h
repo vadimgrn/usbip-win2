@@ -81,8 +81,8 @@ struct device_ctx
 {
         device_ctx_ext *ext; // must be free-d
 
-        auto& sock() const { return ext->sock; }
         auto& descriptor() const { return ext->descriptor; }
+        auto sock() const { return ext->sock; }
         auto actconfig() const { return ext->actconfig; }
         auto speed() const { return ext->dev.speed; }
 

@@ -136,10 +136,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
-        if (dev.unplugged) {
-                return STATUS_DEVICE_REMOVED;
-        }
-
         WSK_BUF buf;
 
         if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
@@ -542,8 +538,8 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
 
         TraceDbg("dev %04x, seqnum %u", ptr04x(device), req.seqnum);
 
-        if (dev.unplugged) {
-                TraceDbg("Unplugged");
+        if (!dev.sock()) {
+                TraceDbg("Socket is closed");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
                 set_cmd_unlink_usbip_header(ctx->hdr, *dev.ext, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
