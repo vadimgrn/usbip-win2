@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <wdm.h>
-#include <wdf.h>
+#include <libdrv/wdf_cpp.h>
 
 #include <usbip\proto.h>
 #include <libdrv\mdl_cpp.h>

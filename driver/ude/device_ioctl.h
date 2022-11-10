@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <wdm.h>
-#include <wdf.h>
+#include <libdrv/wdf_cpp.h>
 
 #include <usb.h>
 #include <wdfusb.h>

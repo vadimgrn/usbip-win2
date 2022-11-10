@@ -579,7 +579,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
         PAGED_CODE();
 
         vhci::ioctl_plugin *r{};
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)) {
                 return err;
         }
 
@@ -598,7 +598,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
         PAGED_CODE();
 
         vhci::ioctl_plugout *r{};
-        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), &PVOID(r), nullptr)) {
+        if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)) {
                 return err;
         }
 
@@ -625,7 +625,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 
         size_t buf_sz = 0;
         vhci::ioctl_imported_dev *result{};
-        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*result), &PVOID(result), &buf_sz)) {
+        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*result), reinterpret_cast<PVOID*>(&result), &buf_sz)) {
                 return err;
         }
 
@@ -682,7 +682,7 @@ PAGED void IoDeviceControl(
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
-                if (NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), &PVOID(hdr), nullptr))) {
+                if (NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), reinterpret_cast<PVOID*>(&hdr), nullptr))) {
                         TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), hdr->UsbUserRequest);
                 }
                 [[fallthrough]];

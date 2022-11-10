@@ -4,6 +4,15 @@
 
 #pragma once
 
+/*
+ * warning C4471: '_WDF_REQUEST_TYPE': a forward declaration of an unscoped enumeration 
+ * must have an underlying type.
+ * P.S. Set C++ "All Options"/AdditionalOptions: /Zc:__cplusplus
+ */
+#if __cplusplus > 201703L
+  enum _WDF_REQUEST_TYPE : int;
+#endif
+
 #include <wdm.h>
 #include <wdf.h>
 

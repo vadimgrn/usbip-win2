@@ -6,8 +6,8 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\ch9.h>
+#include <libdrv/wdf_cpp.h>
 
-#include <wdf.h>
 #include <wdfusb.h>
 #include <UdeCx.h>
 
