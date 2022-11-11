@@ -5,6 +5,12 @@
 #pragma once
 
 //
+// Defining control guids, including this is required to happen before
+// including the tmh file (if the WppRecorder API is used)
+//
+#include <WppRecorder.h>
+
+//
 // Define the tracing flags.
 //
 // Tracing GUID - ed18c9c5-8322-48ae-bf78-d01d898a1562

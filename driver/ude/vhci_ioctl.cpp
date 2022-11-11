@@ -706,7 +706,7 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchParallel);
+        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
         cfg.EvtIoDeviceControl = IoDeviceControl;
         cfg.PowerManaged = WdfFalse;
 

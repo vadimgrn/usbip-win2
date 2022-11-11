@@ -224,30 +224,30 @@ NTSTATUS function_suspend_and_wake(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT endp)
+PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT endpoint)
 {
         PAGED_CODE();
-
+        
         WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel);
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential?
         cfg.EvtIoInternalDeviceControl = device::internal_device_control;
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBENDPOINT);
         attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
 //      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoInternalDeviceControl is used only
-        attrs.ParentObject = endp;
+        attrs.ParentObject = endpoint;
 
-        auto dev = get_endpoint_ctx(endp)->device;
-        auto vhci = get_device_ctx(dev)->vhci;
+        auto &endp = *get_endpoint_ctx(endpoint);
+        auto &dev = *get_device_ctx(endp.device); 
 
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, &queue)) {
+        if (auto err = WdfIoQueueCreate(dev.vhci, &cfg, &attrs, &queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
-        get_endpoint(queue) = endp;
+        get_endpoint(queue) = endpoint;
 
-        UdecxUsbEndpointSetWdfIoQueue(endp, queue);
+        UdecxUsbEndpointSetWdfIoQueue(endpoint, queue);
         return STATUS_SUCCESS;
 }
 

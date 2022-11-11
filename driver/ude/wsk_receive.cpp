@@ -689,7 +689,9 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	NT_ASSERT(info == WdfRequestGetInformation(request));
 
 	if (!has_urb(irp)) {
-		TraceDbg("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
+		if (status) {
+			TraceDbg("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
+		}
 		WdfRequestComplete(request, status);
 		return;
 	}
@@ -701,8 +703,10 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is that really required?
 	}
 
-	TraceDbg("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
-		  req.seqnum, get_usbd_status(urb_st), status, info);
+	if (status || urb_st) {
+		TraceDbg("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
+			req.seqnum, get_usbd_status(urb_st), status, info);
+	}
 
 	if (NT_SUCCESS(status)) {
 		UdecxUrbComplete(request, urb_st);
