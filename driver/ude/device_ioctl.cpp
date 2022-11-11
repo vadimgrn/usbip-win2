@@ -219,7 +219,7 @@ NTSTATUS control_transfer(
         
         setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, endp.descriptor, r.TransferFlags, buf_len, dir_out)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, buf_len, dir_out)) {
                 return err;
         }
 
@@ -270,7 +270,7 @@ NTSTATUS bulk_or_interrupt_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, endp.descriptor, r.TransferFlags, r.TransferBufferLength)) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, r.TransferBufferLength)) {
                 return err;
         }
 
@@ -347,7 +347,7 @@ NTSTATUS isoch_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, endp.descriptor, 
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, 
                                r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
                 return err;
         }
@@ -432,7 +432,7 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request,
         auto &ep0 = *get_endpoint_ctx(dev.ep0);
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, *dev.ext, ep0.descriptor, TransferFlags, 0, setup_dir::out())) {
+        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0.descriptor, TransferFlags, 0, setup_dir::out())) {
                 return err;
         }
 
@@ -541,7 +541,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
         if (!dev.sock()) {
                 TraceDbg("Socket is closed");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
-                set_cmd_unlink_usbip_header(ctx->hdr, *dev.ext, req.seqnum);
+                set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
         } else {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, seqnum %u, wsk_context_ptr error", ptr04x(device), req.seqnum);
@@ -586,9 +586,8 @@ NTSTATUS usbip::device::set_interface(
         _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
 {
         auto &dev = *get_device_ctx(device);
-        auto cfg = dev.actconfig();
 
-        auto ifd = usbdlib::find_next_intf(cfg, nullptr, InterfaceNumber, AlternateSetting);
+        auto ifd = usbdlib::find_next_intf(dev.actconfig, nullptr, InterfaceNumber, AlternateSetting);
         if (!ifd) {
                 TraceDbg("dev %04x, interface %d.%d descriptor not found", ptr04x(device), InterfaceNumber, AlternateSetting);
                 return STATUS_INVALID_PARAMETER;

@@ -12,12 +12,9 @@
 #include "network.h"
 #include "vhci.h"
 #include "device_ioctl.h"
-#include "wsk_context.h"
 #include "wsk_receive.h"
 #include "ioctl.h"
-#include "vhci_ioctl.h"
 
-#include <libdrv\ch9.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbdsc.h>
 
@@ -58,8 +55,14 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         auto hdev = static_cast<UDECXUSBDEVICE>(Object);
         TraceDbg("dev %04x", ptr04x(hdev));
 
-        if (auto dev = get_device_ctx(hdev)) {
-                free(dev->ext);
+        auto &dev = *get_device_ctx(hdev);
+
+        if (auto ptr = dev.actconfig) {
+                ExFreePoolWithTag(ptr, POOL_TAG);
+        }
+
+        if (auto ptr = dev.ext) {
+                free(ptr);
         }
 }
 
@@ -229,7 +232,7 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         PAGED_CODE();
         
         WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential?
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential for EP0?
         cfg.EvtIoInternalDeviceControl = device::internal_device_control;
 
         WDF_OBJECT_ATTRIBUTES attrs;
@@ -288,9 +291,9 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 NT_ASSERT(sizeof(ctx.descriptor) >= epd_len);
                 RtlCopyMemory(&ctx.descriptor, &epd, epd_len);
 
-                if (auto cfg = dev.actconfig(); !cfg) {
+                if (!dev.actconfig) {
                         //
-                } else if (auto ifd = usbdlib::find_intf(cfg, epd); !ifd) {
+                } else if (auto ifd = usbdlib::find_intf(dev.actconfig, epd); !ifd) {
                         Trace(TRACE_LEVEL_ERROR, "dev %04x, interface not found for endpoint%!BIN!", 
                                                   ptr04x(device), WppBinary(&epd, epd.bLength));
                         return STATUS_INVALID_PARAMETER;
@@ -301,7 +304,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                         ctx.InterfaceNumber = ifd->bInterfaceNumber;
                         ctx.AlternateSetting = ifd->bAlternateSetting;
 
-                        auto cnt = usbdlib::get_intf_num_altsetting(cfg, ifd->bInterfaceNumber);
+                        auto cnt = usbdlib::get_intf_num_altsetting(dev.actconfig, ifd->bInterfaceNumber);
                         set_intf_endpoints(dev, ifd->bInterfaceNumber, cnt == 1); // otherwise current AlternateSetting is unknown
                 }
         } else {
@@ -367,7 +370,7 @@ void endpoints_configure(
         } else switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
                 TraceDbg("DeviceInitialize");
-                if (auto cfg = dev.actconfig(); cfg && usbdlib::is_composite(dev.descriptor(), *cfg)) {
+                if (auto cfg = dev.actconfig; cfg && usbdlib::is_composite(dev.descriptor, *cfg)) {
                         st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, cfg->bConfigurationValue);
                 }
                 break;
@@ -418,16 +421,10 @@ struct device_init_ptr
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto prepare_init(
-        _In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ext, _In_ const usbip_usb_device &udev)
+PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ext)
 {
         PAGED_CODE();
         NT_ASSERT(init);
-
-        if (auto err = add_descriptors(init, ext, udev)) {
-                Trace(TRACE_LEVEL_ERROR, "add_descriptors %!STATUS!", err);
-                return err;
-        }
 
         UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS cb;
         UDECX_USB_DEVICE_CALLBACKS_INIT(&cb);
@@ -476,13 +473,12 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(
-        _Out_ UDECXUSBDEVICE &dev, _In_ const usbip_usb_device &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
+PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
 
         device_init_ptr init(vhci);
-        if (auto err = init ? prepare_init(init.ptr, *ext, udev) : STATUS_INSUFFICIENT_RESOURCES) {
+        if (auto err = init ? prepare_init(init.ptr, *ext) : STATUS_INSUFFICIENT_RESOURCES) {
                 Trace(TRACE_LEVEL_ERROR, "UDECXUSBDEVICE_INIT %!STATUS!", err);
                 return err;
         }

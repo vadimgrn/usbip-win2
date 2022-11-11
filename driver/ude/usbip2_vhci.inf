@@ -5,7 +5,7 @@
 [Version]
 Signature="$WINDOWS NT$"
 Class=USB
-ClassGuid={36FC9E60-C465-11CF-8056-444553540000}
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; USB host controllers and USB hubs
 Provider=%Manufacturer%
 CatalogFile=usbip2_vhci.cat
 PnpLockDown=1
@@ -38,7 +38,7 @@ Needs=PciD3ColdSupported
 
 ;-------------- Service installation
 [vhci_Device.NT.Services]
-AddService = usbip2_vhci,%SPSVCINST_ASSOCSERVICE%, vhci_Service_Inst
+AddService = usbip2_vhci,2,vhci_Service_Inst
 
 ; -------------- vhci driver install sections
 [vhci_Service_Inst]
@@ -56,6 +56,5 @@ HKR,Parameters\Wdf,VerifierOn,0x00010001,1
 HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
-SPSVCINST_ASSOCSERVICE= 0x00000002
 Manufacturer="USBIP-WIN2"
-DisplayName="USBIP2 USB 3.X Virtual Host Controller" ; for device and service
+DisplayName="USBIP2-WIN2 USB 3.X Emulated Host Controller" ; for device and service

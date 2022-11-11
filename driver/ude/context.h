@@ -57,12 +57,7 @@ struct device_ctx;
 struct device_ctx_ext
 {
         device_ctx *ctx;
-
         wsk::SOCKET *sock;
-        seqnum_t seqnum; // @see next_seqnum
-
-        USB_DEVICE_DESCRIPTOR descriptor;
-        USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
 
         // from vhci::ioctl_plugin
         PSTR busid;
@@ -81,10 +76,9 @@ struct device_ctx
 {
         device_ctx_ext *ext; // must be free-d
 
-        auto& descriptor() const { return ext->descriptor; }
         auto sock() const { return ext->sock; }
-        auto actconfig() const { return ext->actconfig; }
         auto speed() const { return ext->dev.speed; }
+        auto devid() const { return ext->dev.devid; }
 
         WDFDEVICE vhci; // parent
         UDECXUSBENDPOINT ep0; // default control pipe
@@ -93,7 +87,11 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         volatile bool unplugged;
 
+        USB_DEVICE_DESCRIPTOR descriptor;
+        USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
         LONG64 intf_endpoints; // bits, does current AlternateSetting for InterfaceNumber have endpoints?
+
+        seqnum_t seqnum; // @see next_seqnum
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
@@ -180,7 +178,7 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-seqnum_t next_seqnum(_Inout_ device_ctx_ext &dev, _In_ bool dir_in);
+seqnum_t next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in);
 
 constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
 constexpr auto extract_dir(seqnum_t seqnum) { return usbip_dir(seqnum & 1); }

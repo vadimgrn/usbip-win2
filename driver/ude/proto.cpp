@@ -43,7 +43,7 @@ auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::set_cmd_submit_usbip_header(
-	_Out_ usbip_header &hdr, _Inout_ device_ctx_ext &ext, _In_ const USB_ENDPOINT_DESCRIPTOR &epd,
+	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ const USB_ENDPOINT_DESCRIPTOR &epd,
 	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_ setup_dir setup_out)
 {
 	if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !usb_default_control_pipe(epd)) {
@@ -60,8 +60,8 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 
 	if (auto r = &hdr.base) {
 		r->command = USBIP_CMD_SUBMIT;
-		r->seqnum = next_seqnum(ext, !dir_out);
-		r->devid = ext.dev.devid;
+		r->seqnum = next_seqnum(dev, !dir_out);
+		r->devid = dev.devid();
 		r->direction = dir_out ? USBIP_DIR_OUT : USBIP_DIR_IN;
 		r->ep = usb_endpoint_num(epd);
 	}
@@ -80,14 +80,14 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::set_cmd_unlink_usbip_header(
-	_Out_ usbip_header &hdr, _Inout_ device_ctx_ext &ext, _In_ seqnum_t seqnum_unlink)
+	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ seqnum_t seqnum_unlink)
 {
 	auto &r = hdr.base;
 
 	r.command = USBIP_CMD_UNLINK;
-	r.devid = ext.dev.devid;
+	r.devid = dev.devid();
 	r.direction = USBIP_DIR_OUT;
-	r.seqnum = next_seqnum(ext, r.direction);
+	r.seqnum = next_seqnum(dev, r.direction);
 	r.ep = 0;
 
 	NT_ASSERT(is_valid_seqnum(seqnum_unlink));

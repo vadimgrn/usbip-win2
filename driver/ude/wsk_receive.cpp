@@ -53,6 +53,32 @@ PAGED void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
 	}
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
+{
+	TraceDbg("DeviceDescriptor(bLength %d, %!usb_descriptor_type!, bcdUSB %#x, "
+		"bDeviceClass %#x, bDeviceSubClass %#x, bDeviceProtocol %#x, bMaxPacketSize0 %d, "
+		"idVendor %#x, idProduct %#x, bcdDevice %#x, "
+		"iManufacturer %d, iProduct %d, iSerialNumber %d, "
+		"bNumConfigurations %d)",
+		d.bLength, d.bDescriptorType, d.bcdUSB,
+		d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, d.bMaxPacketSize0,
+		d.idVendor, d.idProduct, d.bcdDevice,
+		d.iManufacturer, d.iProduct, d.iSerialNumber,
+		d.bNumConfigurations);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
+{
+	TraceDbg("ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu(%#x), "
+		 "bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
+		d.bLength, d.bDescriptorType, d.wTotalLength, d.wTotalLength,
+		d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
+}
+
 constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
 {
 	return  actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength ? 
@@ -223,9 +249,7 @@ auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CON
 	}
 
 	dest = cd;
-
-	TraceDbg("Configuration #%d descriptor saved, wTotalLength %d, bNumInterfaces %d", 
-		  dest->bConfigurationValue, dest->wTotalLength, dest->bNumInterfaces);
+	log(*dest);
 
 	return STATUS_SUCCESS;
 }
@@ -262,10 +286,10 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		auto &src = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
 		if (dsc_len == sizeof(src) && src.bLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(src));
-			auto &dest = ctx.dev->descriptor();
+			auto &dest = ctx.dev->descriptor;
 			if (dest != src) {
 				dest = src;
-				TraceDbg("Device descriptor saved, bNumConfigurations %d", dest.bNumConfigurations);
+				log(dest);
 			}
 		}
 	}
@@ -275,7 +299,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		auto &cd = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		if (dsc_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(cd));
-			return save_config(ctx.dev->ext->actconfig, cd);
+			return save_config(ctx.dev->actconfig, cd);
 		}
 	}
 	        break;

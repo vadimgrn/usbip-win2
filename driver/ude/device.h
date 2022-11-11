@@ -11,8 +11,6 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
-struct usbip_usb_device;
-
 namespace usbip
 {
         struct device_ctx_ext;
@@ -23,7 +21,7 @@ namespace usbip::device
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ const usbip_usb_device &udev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext);
+PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
