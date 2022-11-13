@@ -89,7 +89,6 @@ struct device_ctx
 
         USB_DEVICE_DESCRIPTOR descriptor;
         USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-        LONG64 intf_endpoints; // bits, does current AlternateSetting for InterfaceNumber have endpoints?
 
         seqnum_t seqnum; // @see next_seqnum
 
@@ -104,7 +103,7 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 inline auto get_device(_In_ device_ctx *ctx)
 {
         NT_ASSERT(ctx);
-        return ctx ? static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx)) : WDF_NO_HANDLE;
+        return static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx));
 }
 
 WDF_DECLARE_CONTEXT_TYPE(UDECXUSBDEVICE); // WdfObjectGet_UDECXUSBDEVICE
@@ -125,6 +124,7 @@ struct endpoint_ctx
 
         UCHAR InterfaceNumber; // that endpoint belongs to
         UCHAR AlternateSetting;
+        bool multisetting; // InterfaceNumber has several AlternateSetting
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
@@ -145,16 +145,6 @@ struct request_ctx
         seqnum_t seqnum;
         request_status status;
         UDECXUSBENDPOINT endpoint;
-
-        using pre_complete_fn = void(request_ctx&, device_ctx&, NTSTATUS);
-        pre_complete_fn *pre_complete;
-
-        union {
-                struct {
-                        UCHAR InterfaceNumber;
-                        UCHAR NumEndpoints;
-                } set_intf;
-        } pre_complete_args;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
@@ -203,15 +193,5 @@ PAGED NTSTATUS create_device_ctx_ext(_Outptr_ device_ctx_ext* &d, _In_ const vhc
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void free(_In_ device_ctx_ext *ext);
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void set_intf_endpoints(_Inout_ device_ctx &dev, _In_ UCHAR InterfaceNumber, _In_ bool has_endpoints);
-
-inline bool get_intf_endpoints(_Inout_ device_ctx &dev, _In_ UCHAR InterfaceNumber)
-{
-        NT_ASSERT(InterfaceNumber < 64);
-        return BitTest64(&dev.intf_endpoints, InterfaceNumber);
-}
 
 } // namespace usbip

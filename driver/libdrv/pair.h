@@ -38,14 +38,14 @@ struct pair
         T2 second{};
 };
 
-template<typename T1, typename T2>
-inline auto operator ==(const pair<T1, T2> &a, const pair<T1, T2> &b)
+template<typename T1, typename T2, typename U1, typename U2>
+inline auto operator ==(const pair<T1, T2> &a, const pair<U1, U2> &b)
 {
         return a.first == b.first && a.second == b.second;
 }
 
-template<typename T1, typename T2>
-inline auto operator !=(const pair<T1, T2> &a, const pair<T1, T2> &b)
+template<typename T1, typename T2, typename U1, typename U2>
+inline auto operator !=(const pair<T1, T2> &a, const pair<U1, U2> &b)
 {
         return !(a == b);
 }

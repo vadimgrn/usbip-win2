@@ -292,20 +292,15 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 RtlCopyMemory(&ctx.descriptor, &epd, epd_len);
 
                 if (!dev.actconfig) {
-                        //
-                } else if (auto ifd = usbdlib::find_intf(dev.actconfig, epd); !ifd) {
-                        Trace(TRACE_LEVEL_ERROR, "dev %04x, interface not found for endpoint%!BIN!", 
-                                                  ptr04x(device), WppBinary(&epd, epd.bLength));
-                        return STATUS_INVALID_PARAMETER;
-                } else if (ifd->bInterfaceNumber >= 8*sizeof(dev.intf_endpoints)) {
-                        Trace(TRACE_LEVEL_ERROR, "InterfaceNumber %d is too large to index LONG64", ifd->bInterfaceNumber);
-                        return STATUS_INVALID_PARAMETER;
-                } else {
+                        TraceDbg("Has no active configuration");
+                } else if (auto ifd = usbdlib::find_intf(dev.actconfig, epd)) {
                         ctx.InterfaceNumber = ifd->bInterfaceNumber;
                         ctx.AlternateSetting = ifd->bAlternateSetting;
-
-                        auto cnt = usbdlib::get_intf_num_altsetting(dev.actconfig, ifd->bInterfaceNumber);
-                        set_intf_endpoints(dev, ifd->bInterfaceNumber, cnt == 1); // otherwise current AlternateSetting is unknown
+                        ctx.multisetting = usbdlib::get_intf_num_altsetting(dev.actconfig, ifd->bInterfaceNumber) > 1;
+                } else {
+                        Trace(TRACE_LEVEL_ERROR, "dev %04x, interface not found for endpoint%!BIN!", 
+                                ptr04x(device), WppBinary(&epd, epd.bLength));
+                        return STATUS_INVALID_PARAMETER;
                 }
         } else {
                 static_cast<USB_ENDPOINT_DESCRIPTOR&>(ctx.descriptor) = epd;
@@ -318,9 +313,9 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         {
                 auto &d = ctx.descriptor;
-                TraceDbg("dev %04x, intf %d.%d, endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, "
+                TraceDbg("dev %04x, intf %d.%d[%c], endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, "
                          "Interval %d}, queue %04x%!BIN!", 
-                        ptr04x(device), ctx.InterfaceNumber, ctx.AlternateSetting,
+                        ptr04x(device), ctx.InterfaceNumber, ctx.AlternateSetting, ctx.multisetting ? 'N' : '1',
                         ptr04x(endp), d.bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", usb_endpoint_num(d), d.wMaxPacketSize, 
                         d.bInterval, ptr04x(ctx.queue), WppBinary(&d, d.bLength));
@@ -339,14 +334,67 @@ PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPO
         return endpoint_add(dev, &data);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto has_ifnum(_In_ UDECXUSBENDPOINT *v, _In_ ULONG n, _In_ UCHAR InterfaceNumber)
+{
+        for (ULONG i = 0; i < n; ++i) {
+                if (auto endp = get_endpoint_ctx(v[i]); endp->InterfaceNumber == InterfaceNumber) {
+                        return true;
+                }
+        }
+
+        return false;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto set_interface(
+        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ const UDECX_ENDPOINTS_CONFIGURE_PARAMS &p)
+{
+        for (ULONG i = 0; i < p.ReleasedEndpointsCount; ++i) {
+                auto &endp = *get_endpoint_ctx(p.ReleasedEndpoints[i]);
+
+                auto ok = endp.multisetting && 
+                        !(endp.InterfaceNumber == p.InterfaceNumber || 
+                          has_ifnum(p.EndpointsToConfigure, p.EndpointsToConfigureCount, endp.InterfaceNumber));
+
+                if (ok) {
+                        auto st = device::set_interface(device, WDF_NO_HANDLE, 0, endp.InterfaceNumber, 0);
+                        if (NT_ERROR(st)) {
+                                return st;
+                        }
+                }
+        }
+
+        auto altnum = p.NewInterfaceSetting;
+
+        for (ULONG i = 0; i < p.EndpointsToConfigureCount; ++i) {
+                if (auto &endp = *get_endpoint_ctx(p.EndpointsToConfigure[i]); !endp.multisetting) {
+                        // continue;
+                } else if (endp.InterfaceNumber == p.InterfaceNumber) {
+                        altnum = max(altnum, endp.AlternateSetting);
+                } else if (auto st = device::set_interface(device, WDF_NO_HANDLE, 0, 
+                                             endp.InterfaceNumber, endp.AlternateSetting); NT_ERROR(st)) {
+                        return st;
+                }
+        }
+
+        if (altnum != p.NewInterfaceSetting) {
+                TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d -> %d", ptr04x(device), 
+                          p.InterfaceNumber, p.NewInterfaceSetting, altnum);
+        }
+
+        return device::set_interface(device, request, IOCTL_INTERNAL_USBEX_CFG_CHANGE, p.InterfaceNumber, altnum);
+}
+
 /*
- * UDEX does not set configuration for composite devices.
- *
  * If InterfaceSettingChange is called after UdecxUsbDevicePlugOutAndDelete, WDFREQUEST will be completed 
  * with error status. In such case UDECXUSBDEVICE will not be destroyed and the driver can't be unloaded.
  */
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
 _IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void endpoints_configure(
         _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
@@ -369,19 +417,17 @@ void endpoints_configure(
                 TraceDbg("%!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged", params->ConfigureType);
         } else switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
-                TraceDbg("DeviceInitialize");
-                if (auto cfg = dev.actconfig; cfg && usbdlib::is_composite(dev.descriptor, *cfg)) {
-                        st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_INIT, cfg->bConfigurationValue);
-                }
+                TraceDbg("DeviceInitialize %04x", ptr04x(device));
+                st = device::set_first_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_CHANGE);
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
                 st = device::set_configuration(device, request, IOCTL_INTERNAL_USBEX_CFG_CHANGE, params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
-                st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
+                st = set_interface(device, request, *params);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
-                TraceDbg("EndpointsReleasedOnly"); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD
+                TraceDbg("dev %04x, EndpointsReleasedOnly", ptr04x(device)); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD
                 break;
         }
 

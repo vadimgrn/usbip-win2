@@ -15,6 +15,7 @@
 #include "network.h"
 #include "driver.h"
 #include "ioctl.h"
+#include "device_ioctl.h"
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
@@ -228,8 +229,9 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
+auto save_config(_In_ device_ctx *dev, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
 {
+	auto &dest = dev->actconfig;
 	if (dest && *dest == src) {
 		return STATUS_SUCCESS;
 	}
@@ -250,6 +252,10 @@ auto save_config(_Inout_ USB_CONFIGURATION_DESCRIPTOR* &dest, _In_ const USB_CON
 
 	dest = cd;
 	log(*dest);
+
+	if (auto device = get_device(dev)) {
+		device::set_first_configuration(device, WDF_NO_HANDLE, 0);
+	}
 
 	return STATUS_SUCCESS;
 }
@@ -299,7 +305,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		auto &cd = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		if (dsc_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(cd));
-			return save_config(ctx.dev->actconfig, cd);
+			return save_config(ctx.dev, cd);
 		}
 	}
 	        break;
@@ -700,12 +706,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
 	auto &req = *get_request_ctx(request);
-
-	if (auto f = req.pre_complete) {
-		auto &endp = *get_endpoint_ctx(req.endpoint);
-		auto &dev = *get_device_ctx(endp.device);
-		f(req, dev, status);
-	}
 
 	auto irp = WdfRequestWdmGetIrp(request);
 
