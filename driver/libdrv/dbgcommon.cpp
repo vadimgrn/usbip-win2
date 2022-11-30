@@ -478,8 +478,8 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 					bmrequest_recipient(r->bmRequestType),
 					brequest_str(r->bRequest),
 					r->bRequest,
-					r->wValue,
-					r->wIndex, 
+					r->wValue.W,
+					r->wIndex.W, 
 					r->wLength,
 					r->wLength);
 

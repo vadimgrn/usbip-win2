@@ -120,7 +120,7 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _Inout_ UCHAR *buffer, _In_ ULONG length, 
+auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ ULONG length, 
 	_In_ const usbip_iso_packet_descriptor *src)
 {
 	NT_ASSERT(length <= r.TransferBufferLength);
@@ -420,6 +420,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb)
 {
+	mdl = nullptr;
+
 	auto tr = TryAsUrbTransfer(&urb);
 	if (!tr) {
 		auto fn = urb.UrbHeader.Function;

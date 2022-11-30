@@ -100,7 +100,7 @@ NTSTATUS send_complete(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto prepare_wsk_buf(_Out_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ const URB *transfer_buffer)
+auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_ const URB *transfer_buffer)
 {
         NT_ASSERT(!ctx.mdl_buf);
 
@@ -136,7 +136,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
-        WSK_BUF buf;
+        WSK_BUF buf{};
 
         if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
                 return err;
@@ -380,7 +380,7 @@ auto usb_submit_urb(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, 
+auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, 
         _In_ UCHAR bmRequestType, _In_ UCHAR bRequest, _In_ USHORT wValue, _In_ USHORT wIndex)
 {
         auto &dev = *get_device_ctx(device);
@@ -435,7 +435,7 @@ auto verify_select(_In_ WDFREQUEST request, _In_ ULONG expected_ioctl)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl, _In_ ULONG params)
+auto do_select(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, _In_ ULONG params)
 {
         if (!request) {
                 NT_ASSERT(!ioctl);
@@ -471,7 +471,7 @@ auto do_select(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG i
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::set_first_configuration(
-        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl)
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl)
 {
         auto &dev = *get_device_ctx(device);
         auto cfg = dev.actconfig;
@@ -483,7 +483,7 @@ NTSTATUS usbip::device::set_first_configuration(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::set_configuration(
-        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue)
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue)
 {
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
         return do_select(device, request, ioctl, ConfigurationValue);
@@ -495,7 +495,7 @@ NTSTATUS usbip::device::set_configuration(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::set_interface(
-        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl, 
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, 
         _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
 {
         TraceDbg("dev %04x, %d.%d", ptr04x(device), InterfaceNumber, AlternateSetting);

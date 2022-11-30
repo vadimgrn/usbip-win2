@@ -53,7 +53,7 @@ MDL* usbip::Mdl::release()
         return m;
 }
 
-void usbip::Mdl::reset(_In_ MDL *mdl, _In_ MDL *tail)
+void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_opt_ MDL *tail)
 {
         if (m_mdl) {
                 if (managed()) {
@@ -82,7 +82,7 @@ NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
         return locked() ? STATUS_SUCCESS : STATUS_LOCK_NOT_GRANTED;
 }
 
-void usbip::Mdl::next(_In_ MDL *m)
+void usbip::Mdl::next(_In_opt_ MDL *m)
 { 
         if (m_mdl) {
                 m_mdl->Next = m; 
@@ -154,7 +154,7 @@ void* usbip::Mdl::sysaddr(_In_ ULONG Priority)
         return m_mdl ? MmGetSystemAddressForMdlSafe(m_mdl, Priority) : nullptr; 
 }
 
-size_t usbip::size(_In_ const MDL *mdl)
+size_t usbip::size(_In_opt_ const MDL *mdl)
 {
         size_t total = 0;
 
@@ -165,7 +165,7 @@ size_t usbip::size(_In_ const MDL *mdl)
         return total;
 }
 
-MDL *usbip::tail(_In_ MDL *mdl)
+MDL *usbip::tail(_In_opt_ MDL *mdl)
 {
         for ( ; mdl && mdl->Next; mdl = mdl->Next);
         return mdl;

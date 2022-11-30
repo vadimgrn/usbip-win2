@@ -29,7 +29,7 @@ using namespace usbip;
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void vhci_cleanup(_In_ WDFOBJECT Object)
+PAGED void vhci_cleanup(_In_ WDFOBJECT Object)
 {
         PAGED_CODE(); // WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE
 
@@ -44,7 +44,7 @@ using init_func_t = NTSTATUS(WDFDEVICE);
 _Function_class_(init_func_t)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-auto init_context(_In_ WDFDEVICE vhci)
+PAGED auto init_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
         KeInitializeSpinLock(&get_vhci_ctx(vhci)->lock);
@@ -54,7 +54,7 @@ auto init_context(_In_ WDFDEVICE vhci)
 _Function_class_(init_func_t)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-auto create_interfaces(_In_ WDFDEVICE vhci)
+PAGED auto create_interfaces(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 

@@ -9,17 +9,28 @@
 class Lock
 {
 public:
-        Lock(KSPIN_LOCK &lock) { KeAcquireInStackQueuedSpinLock(&lock, &m_hlock); }
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_raises_(DISPATCH_LEVEL)
+        Lock(_Inout_ KSPIN_LOCK &lock) 
+        { 
+                KeAcquireInStackQueuedSpinLock(&lock, &m_hlock); 
+                NT_ASSERT(acquired());
+        }
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         ~Lock() { release(); }
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void release()
         {
-                if (InterlockedExchange8(&m_acquired, false)) {
+                if (acquired()) {
                         KeReleaseInStackQueuedSpinLock(&m_hlock); 
+                        m_hlock.LockQueue.Lock = 0;
+                        NT_ASSERT(!acquired());
                 }
         }
 
 private:
-        KLOCK_QUEUE_HANDLE m_hlock{};
-        CHAR m_acquired = true;
+        KLOCK_QUEUE_HANDLE m_hlock;
+        bool acquired() const { return m_hlock.LockQueue.Lock; }
 };

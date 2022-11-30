@@ -29,7 +29,7 @@ PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *da
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len)
+PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
 
@@ -43,10 +43,10 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *d
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status)
+PAGED err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Inout_ op_status_t &status)
 {
         PAGED_CODE();
-        op_common r;
+        op_common r{};
 
         if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
@@ -85,7 +85,7 @@ PAGED err_t usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_cod
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::make_transfer_buffer_mdl(
-        _Out_ Mdl &mdl, _In_ ULONG mdl_size, _In_ bool mdl_chain, _In_ LOCK_OPERATION Operation, _In_ const URB &urb)
+        _Inout_ Mdl &mdl, _In_ ULONG mdl_size, _In_ bool mdl_chain, _In_ LOCK_OPERATION Operation, _In_ const URB &urb)
 {
         NT_ASSERT(!mdl);
         auto &r = AsUrbTransfer(urb);

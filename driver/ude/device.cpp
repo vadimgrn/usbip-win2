@@ -522,6 +522,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
+        dev = WDF_NO_HANDLE;
 
         device_init_ptr init(vhci);
         if (auto err = init ? prepare_init(init.ptr, *ext) : STATUS_INSUFFICIENT_RESOURCES) {

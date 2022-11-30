@@ -100,7 +100,7 @@ auto alloc_wsk_context(_In_ ULONG NumberOfPackets)
  * For this reason ExFreeToLookasideListEx always calls L.FreeEx instead of InterlockedPushEntrySList.
  */
 _IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::init_wsk_context_list(_In_ ULONG tag)
 {
         if (g_initialized) {

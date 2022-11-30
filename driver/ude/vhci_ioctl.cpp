@@ -43,7 +43,7 @@ PAGED void log(_In_ const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void fill(_Out_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
+PAGED void fill(_Inout_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
         auto &src = *ctx.ext;
@@ -84,7 +84,7 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
 
         struct {
                 op_common hdr{ USBIP_VERSION, OP_REQ_IMPORT, ST_OK };
-                op_import_request body;
+                op_import_request body{};
         } req;
 
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
@@ -99,7 +99,7 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
+PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Inout_ op_import_reply &reply)
 {
         PAGED_CODE();
 
@@ -349,7 +349,7 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
                 return;
         }
 
-        UDECXUSBDEVICE dev{};
+        UDECXUSBDEVICE dev;
         if (NT_ERROR(device::create(dev, vhci, ext.ptr))) {
                 return;
         }
@@ -414,28 +414,25 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
-        size_t buf_sz = 0;
-        vhci::ioctl_imported_dev *result{};
-        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*result), reinterpret_cast<PVOID*>(&result), &buf_sz)) {
+        size_t buf_sz;
+        vhci::ioctl_imported_dev *buf;
+        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*buf), reinterpret_cast<PVOID*>(&buf), &buf_sz)) {
                 return err;
         }
 
-        auto cnt = buf_sz/sizeof(*result);
-        int result_cnt = 0;
-
         auto vhci = get_vhci(Request);
+        int idx = 0;
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices) && cnt; ++port) {
+        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices) && idx < buf_sz/sizeof(*buf); ++port) {
                 if (auto dev = vhci::find_device(vhci, port)) {
                         auto &ctx = *get_device_ctx(dev.get());
-                        fill(result[result_cnt++], ctx);
-                        --cnt;
+                        fill(buf[idx++], ctx);
                 }
         }
 
-        TraceDbg("%d device(s) reported", result_cnt);
+        TraceDbg("%d device(s) reported", idx);
 
-        WdfRequestSetInformation(Request, result_cnt*sizeof(*result));
+        WdfRequestSetInformation(Request, idx*sizeof(*buf));
         return STATUS_SUCCESS;
 }
 

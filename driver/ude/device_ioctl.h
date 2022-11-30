@@ -19,16 +19,16 @@ void send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS set_configuration(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue);
+NTSTATUS set_configuration(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS set_first_configuration(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl);
+NTSTATUS set_first_configuration(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS set_interface(
-        _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ ULONG ioctl, 
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, 
         _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting);
 
 _IRQL_requires_same_

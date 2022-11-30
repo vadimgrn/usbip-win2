@@ -54,8 +54,8 @@ int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG intf_num);
 
 USB_INTERFACE_DESCRIPTOR* find_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_ENDPOINT_DESCRIPTOR &epd);
 
-using for_each_intf_alt_fn = NTSTATUS (USB_INTERFACE_DESCRIPTOR&, void*);
-NTSTATUS for_each_intf_alt(USB_CONFIGURATION_DESCRIPTOR *cfg, for_each_intf_alt_fn func, void *data);
+using for_each_intf_alt_fn = NTSTATUS (_In_ USB_INTERFACE_DESCRIPTOR&, _In_opt_ void*);
+NTSTATUS for_each_intf_alt(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ for_each_intf_alt_fn func, _In_opt_ void *data);
 
 using for_each_ep_fn = NTSTATUS (int, USB_ENDPOINT_DESCRIPTOR&, void*);
 NTSTATUS for_each_endp(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *ifd, for_each_ep_fn func, void *data);

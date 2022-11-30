@@ -33,7 +33,7 @@ struct SOCKET;
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS socket(
-        _Outptr_ SOCKET* &sock,
+        _Out_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
         _In_ ULONG Protocol,
@@ -106,7 +106,7 @@ PAGED NTSTATUS set_keepalive(_In_ SOCKET *sock, int idle = 0, int cnt = 0, int i
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS getaddrinfo(
-        _Outptr_ ADDRINFOEXW* &Result,
+        _Out_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
         _In_opt_ ADDRINFOEXW *Hints);

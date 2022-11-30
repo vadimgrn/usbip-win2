@@ -50,7 +50,7 @@ int usbdlib::get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG int
 /*
  * For each pair bInterfaceNumber/bAlternateSetting.
  */
-NTSTATUS usbdlib::for_each_intf_alt(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, for_each_intf_alt_fn func, void *data)
+NTSTATUS usbdlib::for_each_intf_alt(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ for_each_intf_alt_fn func, _In_opt_ void *data)
 {
 	int cnt = 0;
 

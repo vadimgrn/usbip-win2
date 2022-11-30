@@ -26,15 +26,15 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Out_ void *data, _In_ ULONG len);
+PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED err_t recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Out_ op_status_t &status);
+PAGED err_t recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code, _Inout_ op_status_t &status);
 
 enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS make_transfer_buffer_mdl(_Out_ Mdl &mdl, _In_ ULONG mdl_size, _In_ bool mdl_chain, _In_ LOCK_OPERATION Operation, 
+NTSTATUS make_transfer_buffer_mdl(_Inout_ Mdl &mdl, _In_ ULONG mdl_size, _In_ bool mdl_chain, _In_ LOCK_OPERATION Operation, 
                                   _In_ const _URB& urb);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)

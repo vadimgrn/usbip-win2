@@ -11,8 +11,8 @@ namespace usbip
 
 enum class memory { nonpaged, paged, stack = paged };
 
-MDL *tail(_In_ MDL *mdl);
-size_t size(_In_ const MDL *mdl);
+MDL *tail(_In_opt_ MDL *mdl);
+size_t size(_In_opt_ const MDL *mdl);
 
 /*
  * Usage:
@@ -23,7 +23,7 @@ size_t size(_In_ const MDL *mdl);
 class Mdl
 {
 public:
-        explicit Mdl(_In_ MDL *m = nullptr) : m_tail(tail(m)), m_mdl(m) {}
+        explicit Mdl(_In_opt_ MDL *m = nullptr) : m_tail(tail(m)), m_mdl(m) {}
         Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
         Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length);
 
@@ -53,7 +53,7 @@ public:
         void unprepare();
 
         auto next() const { return m_mdl ? m_mdl->Next : nullptr; }
-        void next(_In_ MDL *m);
+        void next(_In_opt_ MDL *m);
         auto& next(_Inout_ Mdl &m) { next(m.get()); return m; }
 
 private:
@@ -61,7 +61,7 @@ private:
         MDL *m_mdl{};
 
         MDL *release();
-        void reset(_In_ MDL *mdl, _In_ MDL *tail);
+        void reset(_In_opt_ MDL *mdl, _In_opt_ MDL *tail);
 
         auto managed() const { return !m_tail; }
         bool nonmanaged() const { return m_tail; }

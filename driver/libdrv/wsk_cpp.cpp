@@ -40,7 +40,7 @@ public:
         auto irp() const { NT_ASSERT(*this); return m_irp; }
 
         _IRQL_requires_max_(APC_LEVEL)
-        NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
+        PAGED NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         void reset();
@@ -50,7 +50,7 @@ private:
         KEVENT m_completion_event;
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        static NTSTATUS completion(_In_ PDEVICE_OBJECT, _In_ PIRP, _In_reads_opt_(_Inexpressible_("varies")) PVOID Context);
+        static NTSTATUS completion(_In_ PDEVICE_OBJECT, _In_ PIRP, _In_ PVOID Context);
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         void set_completetion_routine()
@@ -97,18 +97,17 @@ void socket_async_context::reset()
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS socket_async_context::completion(
-        _In_ PDEVICE_OBJECT, _In_ PIRP irp, _In_reads_opt_(_Inexpressible_("varies")) PVOID Context)
+NTSTATUS socket_async_context::completion(_In_ PDEVICE_OBJECT, _In_ PIRP irp, _In_ PVOID Context)
 {
         if (irp->PendingReturned) {
-                KeSetEvent(static_cast<KEVENT*>(Context), IO_NETWORK_INCREMENT, false);
+                KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
         }
 
         return StopCompletion;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
+PAGED NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
 {
         PAGED_CODE();
         NT_ASSERT(*this);
@@ -199,7 +198,7 @@ namespace
 {
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto alloc_socket(_Outptr_ wsk::SOCKET* &sock)
+auto alloc_socket(_Out_ wsk::SOCKET* &sock)
 {
 	sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(wsk::SOCKET), WSK_POOL_TAG);
 	if (!sock) {
@@ -320,7 +319,7 @@ PAGED NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG 
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS wsk::getaddrinfo(
-        _Outptr_ ADDRINFOEXW* &Result,
+        _Out_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
         _In_opt_ ADDRINFOEXW *Hints)
@@ -364,7 +363,7 @@ PAGED void wsk::free(_In_opt_ ADDRINFOEXW *AddrInfo)
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS wsk::socket(
-        _Outptr_ SOCKET* &sock,
+        _Out_ SOCKET* &sock,
         _In_ ADDRESS_FAMILY AddressFamily,
         _In_ USHORT SocketType,
         _In_ ULONG Protocol,
@@ -463,6 +462,10 @@ PAGED NTSTATUS wsk::control(
         _Out_opt_ SIZE_T *OutputSizeReturnedIrp)
 {
         PAGED_CODE();
+
+        if (OutputSizeReturnedIrp) {
+                *OutputSizeReturnedIrp = 0;
+        }
 
         socket_async_context ctx;
         if (!ctx && use_irp) {

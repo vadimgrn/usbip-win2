@@ -14,6 +14,7 @@
   * First bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN).
   * @see is_valid_seqnum
   */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 seqnum_t usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in)
 {
@@ -32,7 +33,7 @@ seqnum_t usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::create_device_ctx_ext(_Outptr_ device_ctx_ext* &ext, _In_ const vhci::ioctl_plugin &r)
+PAGED NTSTATUS usbip::create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ const vhci::ioctl_plugin &r)
 {
         PAGED_CODE();
 
