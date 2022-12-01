@@ -131,7 +131,7 @@
       <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
     </DriverSign>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);usbd.lib;usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib;$(DDK_LIB_PATH)netio.lib</AdditionalDependencies>
@@ -150,7 +150,7 @@
       <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
     </DriverSign>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);usbd.lib;usbdex.lib;ntstrsafe.lib;$(DDK_LIB_PATH)\wdmsec.lib;$(DDK_LIB_PATH)netio.lib</AdditionalDependencies>
