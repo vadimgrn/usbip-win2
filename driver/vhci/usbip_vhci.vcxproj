@@ -161,7 +161,7 @@
       </Command>
     </PostBuildEvent>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
     </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -194,7 +194,7 @@
       </Command>
     </PostBuildEvent>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
     </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
