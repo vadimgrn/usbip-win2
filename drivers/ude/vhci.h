@@ -11,8 +11,6 @@
 #include <wdfusb.h>
 #include <UdeCx.h>
 
-#include <libdrv\wdf_cpp.h>
-
 namespace usbip
 {
 

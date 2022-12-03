@@ -65,7 +65,7 @@
     <None Include="setup.iss" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\driver\package\package.vcxproj">
+    <ProjectReference Include="..\..\drivers\package\package.vcxproj">
       <Project>{b7b9ac6f-45cc-4c98-9136-3d6e8f50ad1c}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>

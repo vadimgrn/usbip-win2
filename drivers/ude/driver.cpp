@@ -73,13 +73,6 @@ CS_INIT auto init()
 } // namespace
 
 
-/*
- * Configure Inflight Trace Recorder (IFR) parameter "VerboseOn".
- * The default setting of zero causes the IFR to log errors, warnings, and informational events.
- * Set to one to add verbose output to the log.
- *
- * reg add "HKLM\SYSTEM\ControlSet001\Services\usbip2_vhci\Parameters" /v VerboseOn /t REG_DWORD /d 1 /f
- */
 _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

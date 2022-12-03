@@ -51,6 +51,8 @@ Dependencies   = ucx01000, udecx
 AddReg         = vhci_AddReg
 
 [vhci_AddReg]
+; Inflight Trace Recorder (IFR) parameter "VerboseOn".
+; The default setting of zero causes the IFR to log errors, warnings, and informational events
 HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
 HKR,Parameters\Wdf,VerifierOn,0x00010001,1
 HKR,Parameters\Wdf,VerboseOn,0x00010001,1
