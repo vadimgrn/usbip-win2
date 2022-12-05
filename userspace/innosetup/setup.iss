@@ -26,9 +26,11 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define InfFile "usbip2_vhci.inf"
 #define HWID_ROOT "ROOT\USBIP2_VHCI"
-#define TestCert "USBIP Test"
+#define InfFile "usbip2_vhci.inf"
+#define CertFile "usbip_test.pfx"
+#define CertName "USBIP Test"
+#define CertPwd "usbip"
 
 [Setup]
 AppName={#ProductName}
@@ -48,6 +50,7 @@ LicenseFile={#SolutionDir + "LICENSE"}
 AppId={{#AppGUID}
 OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
+SolidCompression=yes
 DisableWelcomePage=no
 WizardSmallImageFile=usbip-small.bmp
 WizardImageFile=usbip-logo.bmp
@@ -65,7 +68,7 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall
 Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy
-Source: {#SolutionDir + "drivers\usbip_test.pfx"}; DestDir: "{tmp}"
+Source: {#SolutionDir + "drivers\"}{#CertFile}; DestDir: "{tmp}"
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"
@@ -81,20 +84,18 @@ Name: modifypath; Description: "&Add to PATH environment variable for all users"
 
 [Run]
 
-Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
-Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
+; certutil -store root | findstr "USBIP Test"
 
-; Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#InfFile} /install"; WorkingDir: "{tmp}"; Flags: runhidden
 Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\{#InfFile} {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
 ; @see devcon hwids "*USBIP*"
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveRootDevice"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_ROOT} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_ROOT} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDriver"; Flags: runhidden
 
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden
 
 [Code]
 

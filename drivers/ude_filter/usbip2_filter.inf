@@ -32,28 +32,18 @@ usbip2_filter.sys = 1,,
 [filter_Device.NT]
 CopyFiles=@usbip2_filter.sys
 
-;-------------- Upper Filter installation
-
-[filter_Device.NT.Filters]
-AddFilter=usbip2_filter,0,filter_Filter_Inst
-
-[filter_Filter_Inst]
-FilterPosition = Upper
-
-;-------------- Service installation
 [filter_Device.NT.Services]
-AddService = usbip2_filter,2,filter_Service_Inst
+AddService = usbip2_filter,2,filter_Device_Service_Inst
 
-; -------------- filter driver install sections
-[filter_Service_Inst]
+[filter_Device_Service_Inst]
 DisplayName    = %DisplayName%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
-StartType      = 0               ; SERVICE_BOOT_START
+StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_filter.sys ; Driver package isolation
-AddReg         = filter_AddReg
+AddReg         = filter_Device_Service_AddReg
 
-[filter_AddReg]
+[filter_Device_Service_AddReg]
 ; Inflight Trace Recorder (IFR) parameter "VerboseOn".
 ; The default setting of zero causes the IFR to log errors, warnings, and informational events
 HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE

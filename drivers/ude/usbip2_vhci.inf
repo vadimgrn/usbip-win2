@@ -19,10 +19,6 @@ DefaultDestDir = 13 ; Driver package isolation
 [SourceDisksFiles]
 usbip2_vhci.sys = 1,,
 
-;*****************************************
-; Install Section
-;*****************************************
-
 [Manufacturer]
 %Manufacturer%=Standard,NT$ARCH$.10.0 ; for Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
 
@@ -36,21 +32,25 @@ CopyFiles=@usbip2_vhci.sys
 Include=machine.inf
 Needs=PciD3ColdSupported
 
-;-------------- Service installation
-[vhci_Device.NT.Services]
-AddService = usbip2_vhci,2,vhci_Service_Inst
+[vhci_Device.NT.Filters]
+AddFilter = usbip2_filter,0,vhci_Device_Filter_Inst
 
-; -------------- vhci driver install sections
-[vhci_Service_Inst]
+[vhci_Device_Filter_Inst]
+FilterPosition = Upper
+
+[vhci_Device.NT.Services]
+AddService = usbip2_vhci,2,vhci_Device_Service_Inst
+
+[vhci_Device_Service_Inst]
 DisplayName    = %DisplayName%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_vhci.sys ; Driver package isolation
-Dependencies   = ucx01000, udecx
-AddReg         = vhci_AddReg
+Dependencies   = ucx01000, udecx, FltMgr, usbip2_filter
+AddReg         = vhci_Device_Service_AddReg
 
-[vhci_AddReg]
+[vhci_Device_Service_AddReg]
 ; Inflight Trace Recorder (IFR) parameter "VerboseOn".
 ; The default setting of zero causes the IFR to log errors, warnings, and informational events
 HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
