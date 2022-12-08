@@ -26,8 +26,12 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define HWID_ROOT "ROOT\USBIP2_VHCI"
-#define InfFile "usbip2_vhci.inf"
+#define HWID_VHCI "ROOT\USBIP_WIN2\VHCI"
+#define InfFileVHCI "usbip2_vhci.inf"
+
+#define HWID_Filter "ROOT\USBIP_WIN2\FILTER"
+#define InfFileFilter "usbip2_filter.inf"
+
 #define CertFile "usbip_test.pfx"
 #define CertName "USBIP Test"
 #define CertPwd "usbip"
@@ -87,13 +91,14 @@ Name: modifypath; Description: "&Add to PATH environment variable for all users"
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 ; certutil -store root | findstr "USBIP Test"
 
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\{#InfFile} {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#InfFileFilter} /install"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\{#InfFileVHCI} {#HWID_VHCI}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-; @see devcon hwids "*USBIP*"
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_ROOT} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDriver"; Flags: runhidden
+; @see devcon hwids "ROOT\USBIP_WIN2\*"
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_VHCI} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_VHCI} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDriver"; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden
 

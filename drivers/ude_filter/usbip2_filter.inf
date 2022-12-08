@@ -4,8 +4,8 @@
 
 [Version]
 Signature="$WINDOWS NT$"
-Class=USB
-ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; USB host controllers and USB hubs
+Class=System
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
 Provider=%Manufacturer%
 CatalogFile=usbip2_filer.cat
 PnpLockDown=1
@@ -14,7 +14,7 @@ PnpLockDown=1
 DefaultDestDir = 13 ; Driver package isolation
 
 [SourceDisksNames]
-1 = "USBIP2 Upper Filter Installation Disk #1",,,""
+1 = "USBIP-WIN2 Upper Filter Installation Disk",,,""
 
 [SourceDisksFiles]
 usbip2_filter.sys = 1,,
@@ -27,7 +27,7 @@ usbip2_filter.sys = 1,,
 %Manufacturer%=Standard,NT$ARCH$.10.0 ; for Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
 
 [Standard.NT$ARCH$.10.0]
-%DisplayName%=filter_Device, ROOT\USBIP2_FILTER
+%DisplayName%=filter_Device, ROOT\USBIP_WIN2\FILTER
 
 [filter_Device.NT]
 CopyFiles=@usbip2_filter.sys

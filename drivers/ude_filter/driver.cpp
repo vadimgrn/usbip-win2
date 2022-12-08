@@ -28,7 +28,7 @@ PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 	PAGED_CODE();
 
 	auto drv = static_cast<WDFDRIVER>(Object);
-	Trace(TRACE_LEVEL_INFORMATION, "driver %04x", ptr04x(drv));
+	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(drv));
 
 	auto drvobj = WdfDriverWdmGetDriverObject(drv);
 	WPP_CLEANUP(drvobj);
@@ -81,7 +81,6 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED NTSTATUS NTAPI device_add(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
-	Trace(TRACE_LEVEL_INFORMATION, "\n");
 
 	WdfFdoInitSetFilter(init);
 	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_UNKNOWN);
@@ -95,6 +94,7 @@ PAGED NTSTATUS NTAPI device_add(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 		return err;
 	}
 
+	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(dev));
 	return queue_create(dev);
 }
 
