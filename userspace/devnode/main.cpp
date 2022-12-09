@@ -12,7 +12,7 @@
 #include <libusbip\setupdi.h>
 
 /*
-* See: devcon utility, cmd_install/cmd_remove.
+* See: devcon utility
 * https://github.com/microsoft/Windows-driver-samples/tree/master/setup/devcon
 */
 
@@ -49,7 +49,8 @@ void prompt_reboot()
 
 /*
  * @param infpath must be an absolute path
- * @see devcon hwids "USBIP\*"
+ * @see devcon, cmd_install/cmd_remove
+ * @see devcon hwids ROOT\USBIP_WIN2\*
  */
 auto install_devnode_and_driver(const std::wstring &infpath, LPCWSTR hwid)
 {

@@ -25,12 +25,7 @@
 #define Company GetFileCompany(ExePath)
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
-
-#define HWID_VHCI "ROOT\USBIP_WIN2\VHCI"
-#define InfFileVHCI "usbip2_vhci.inf"
-
-#define HWID_Filter "ROOT\USBIP_WIN2\FILTER"
-#define InfFileFilter "usbip2_filter.inf"
+#define VhciHwid "ROOT\USBIP_WIN2\VHCI"
 
 #define CertFile "usbip_test.pfx"
 #define CertName "USBIP Test"
@@ -89,17 +84,13 @@ Name: modifypath; Description: "&Add to PATH environment variable for all users"
 [Run]
 
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
-; certutil -store root | findstr "USBIP Test"
-
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#InfFileFilter} /install"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\{#InfFileVHCI} {#HWID_VHCI}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip2_filter.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_vhci.inf {#VhciHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-; @see devcon hwids "ROOT\USBIP_WIN2\*"
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_VHCI} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m {#HWID_VHCI} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDriver"; Flags: runhidden
-
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#VhciHwid} /subtree"; RunOnceId: "RemoveDeviceVhci"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /M /P /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden
 
 [Code]

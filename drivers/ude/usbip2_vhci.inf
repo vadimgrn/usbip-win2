@@ -32,12 +32,6 @@ CopyFiles=@usbip2_vhci.sys
 Include=machine.inf
 Needs=PciD3ColdSupported
 
-[vhci_Device.NT.Filters]
-AddFilter = usbip2_filter,0,vhci_Device_Filter_Inst
-
-[vhci_Device_Filter_Inst]
-FilterPosition = Upper
-
 [vhci_Device.NT.Services]
 AddService = usbip2_vhci,2,vhci_Device_Service_Inst
 
@@ -47,7 +41,7 @@ ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_vhci.sys ; Driver package isolation
-Dependencies   = ucx01000, udecx, FltMgr, usbip2_filter
+Dependencies   = ucx01000, udecx
 AddReg         = vhci_Device_Service_AddReg
 
 [vhci_Device_Service_AddReg]
@@ -58,5 +52,5 @@ HKR,Parameters\Wdf,VerifierOn,0x00010001,1
 HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
-Manufacturer="USBIP-WIN2"
+Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
 DisplayName="USBIP-WIN2 USB 3.X Emulated Host Controller" ; for device and service

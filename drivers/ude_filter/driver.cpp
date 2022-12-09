@@ -8,6 +8,7 @@
 #include "driver.tmh"
 
 #include <libdrv\codeseg.h>
+#include <libdrv\dbgcommon.h>
 #include <libdrv/wdf_cpp.h>
 
 namespace
@@ -40,10 +41,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void NTAPI internal_device_control(
 	_In_ WDFQUEUE queue,
 	_In_ WDFREQUEST request, 
-	[[maybe_unused]] _In_ size_t OutputBufferLength, 
-	[[maybe_unused]] _In_ size_t InputBufferLength, 
-	[[maybe_unused]] _In_ ULONG IoControlCode)
+	_In_ size_t OutputBufferLength, 
+	_In_ size_t InputBufferLength, 
+	_In_ ULONG IoControlCode)
 {
+	TraceDbg("OutputBufferLength %Iu, InputBufferLength %Iu, %s(%#lx)", 
+		  OutputBufferLength, InputBufferLength, internal_device_control_name(IoControlCode), IoControlCode);
+
 	auto dev = WdfIoQueueGetDevice(queue);
 	// auto ctx = get_filter_ctx(dev);
 
@@ -67,11 +71,13 @@ PAGED auto NTAPI queue_create(_In_ WDFDEVICE dev)
 	WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchParallel);
 	cfg.EvtIoInternalDeviceControl = internal_device_control;
 
-	if (auto err = WdfIoQueueCreate(dev, &cfg, WDF_NO_OBJECT_ATTRIBUTES, nullptr)) {
+	WDFQUEUE queue;
+	if (auto err = WdfIoQueueCreate(dev, &cfg, WDF_NO_OBJECT_ATTRIBUTES, &queue)) {
 		Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
 		return err;
 	}
 
+	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(queue));
 	return STATUS_SUCCESS;
 }
 
