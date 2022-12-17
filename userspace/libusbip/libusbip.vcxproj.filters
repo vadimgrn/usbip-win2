@@ -33,6 +33,7 @@
     <ClInclude Include="usb_ids.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
+    <ClInclude Include="hkey.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

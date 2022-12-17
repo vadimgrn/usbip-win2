@@ -121,6 +121,7 @@
     <ClInclude Include="generic_handle.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="getopt.h" />
+    <ClInclude Include="hkey.h" />
     <ClInclude Include="setupdi.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="network.h" />
