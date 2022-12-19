@@ -25,12 +25,24 @@ usbip2_filter.sys = 1,,
 CopyFiles = @usbip2_filter.sys
 AddReg = usbip2_filter_AddReg 
 
+[DefaultUninstall.NT$ARCH$]
+LegacyUninstall=1
+DelReg = usbip2_filter_DelReg
+
 [usbip2_filter_AddReg]
-; append this service to existing REG_MULTI_SZ list
-HKLM,System\CurrentControlSet\Control\Class\%ClassGuid%,"UpperFilters",0x00010008,"usbip2_filter"
+; 0x00010000 (FLG_ADDREG_TYPE_MULTI_SZ) | 0x00000008 (FLG_ADDREG_APPEND)
+HKLM,%Classes%\%ClassGuid%,UpperFilters,0x00010008,usbip2_filter
+
+[usbip2_filter_DelReg]
+; 0x00018002 FLG_DELREG_MULTI_SZ_DELSTRING
+HKLM,%Classes%\%ClassGuid%,UpperFilters,0x00018002,usbip2_filter
 
 [DefaultInstall.NT$ARCH$.Services]
 AddService = usbip2_filter,2,usbip2_filter_Service_Inst
+
+[DefaultUninstall.NT$ARCH$.Services]
+; 0x00000200 (SPSVCINST_STOPSERVICE)
+DelService = usbip2_filter,0x00000200
 
 [usbip2_filter_Service_Inst]
 DisplayName    = %DisplayName%
@@ -38,7 +50,6 @@ ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_filter.sys ; Driver package isolation
-Dependencies   = FltMgr
 AddReg         = usbip2_filter_Service_AddReg
 
 [usbip2_filter_Service_AddReg]
@@ -50,5 +61,7 @@ HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
 Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
-DisplayName="USBIP-WIN2 Upper Filter" ; for device and service
+DisplayName="USBIP Upper Filter" ; for device and service
+Classes="System\CurrentControlSet\Control\Class"
 ClassGuid="{36FC9E60-C465-11CF-8056-444553540000}" ; USB host controllers and USB hubs
+
