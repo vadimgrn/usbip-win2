@@ -289,7 +289,7 @@ PAGED NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG fla
         SIZE_T actual = 0;
         auto err = transfer(sock, buffer, flags, actual, true);
 
-        if (!err && actual != buffer->Length) {
+        if (NT_SUCCESS(err) && actual != buffer->Length) {
                 err = STATUS_PARTIAL_COPY;
         }
 
@@ -310,7 +310,7 @@ PAGED NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG 
 
         if (actual) {
                 *actual = received;
-        } else if (!err && received != buffer->Length) {
+        } else if (NT_SUCCESS(err) && received != buffer->Length) {
                 err = STATUS_PARTIAL_COPY;
         }
 
@@ -440,7 +440,9 @@ PAGED NTSTATUS wsk::control_client(
         auto err = WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer,
                                     OutputSize, OutputBuffer, OutputSizeReturned, ctx.irp());
 
-        if (!ctx.wait_for_completion(err) && OutputSizeReturned) {
+        ctx.wait_for_completion(err);
+
+        if (NT_SUCCESS(err) && OutputSizeReturned) {
                 *OutputSizeReturned = ctx.irp()->IoStatus.Information;
         }
 
@@ -479,7 +481,7 @@ PAGED NTSTATUS wsk::control(
 
         if (use_irp) {
                 ctx.wait_for_completion(err);
-                if (OutputSizeReturnedIrp) {
+                if (NT_SUCCESS(err) && OutputSizeReturnedIrp) {
                         *OutputSizeReturnedIrp = ctx.irp()->IoStatus.Information;
                 }
         }
