@@ -45,7 +45,7 @@ CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING
 	attrs.EvtCleanupCallback = driver_cleanup;
 
 	WDF_DRIVER_CONFIG cfg;
-	WDF_DRIVER_CONFIG_INIT(&cfg, DriverDeviceAdd);
+	WDF_DRIVER_CONFIG_INIT(&cfg, DeviceAdd);
 	cfg.DriverPoolTag = POOL_TAG;
 
 	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, nullptr);

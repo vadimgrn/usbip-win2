@@ -53,4 +53,4 @@ HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
 Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
-DisplayName="USBIP USB 3.X Emulated Host Controller" ; for device and service
+DisplayName="USBIP 3.X Emulated Host Controller" ; for device and service

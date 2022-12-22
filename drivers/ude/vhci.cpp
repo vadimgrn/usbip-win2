@@ -377,7 +377,7 @@ PAGED void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::DriverDeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
+PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
         PAGED_CODE();
 

@@ -1,6 +1,4 @@
 # uninstall
-devcon classfilter usb upper
-devcon hwids ROOT\USBIP_WIN2\*
 devcon classfilter usb upper !usbip2_filter
 pnputil /remove-device /deviceid "ROOT\USBIP_WIN2\VHCI" /subtree
 FOR /f %P IN ('findstr /M /L "Manufacturer=\"USBIP-WIN2\"" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
@@ -10,7 +8,13 @@ del /Q "C:\Program Files\usbip-win2"
 # query
 
 devcon classfilter usb upper
+pnputil /enum-devices /deviceid "USB\ROOT_HUB30" /stack
+
+devcon hwids ROOT\USBIP_WIN2\*
 pnputil /enum-devices /deviceid "ROOT\USBIP_WIN2\VHCI" /stack /properties
+
+pnputil /enum-classes /class usb /services
+pnputil /enum-drivers /class usb /files
 
 # install 
 

@@ -19,7 +19,6 @@
     <ClCompile Include="usb_util.cpp" />
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
-    <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -151,7 +150,6 @@
     <ClInclude Include="usbd_helper.h" />
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wdf_cpp.h" />
-    <ClInclude Include="wdm_cpp.h" />
     <ClInclude Include="wsk_cpp.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

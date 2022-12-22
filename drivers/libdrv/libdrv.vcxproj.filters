@@ -10,7 +10,6 @@
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
-    <ClCompile Include="wdm_cpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -36,7 +35,6 @@
     <ClInclude Include="ch9.h" />
     <ClInclude Include="lock.h" />
     <ClInclude Include="pair.h" />
-    <ClInclude Include="wdm_cpp.h" />
     <ClInclude Include="unique_ptr.h" />
   </ItemGroup>
   <ItemGroup>

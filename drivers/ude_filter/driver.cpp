@@ -3,13 +3,12 @@
  */
 
 #include "driver.h"
-#include <wdm.h>
+#include <libdrv\codeseg.h>
 #include "trace.h"
 #include "driver.tmh"
 
-#include <libdrv\codeseg.h>
+#include <libdrv\wdf_cpp.h>
 #include <libdrv\dbgcommon.h>
-#include <libdrv/wdf_cpp.h>
 
 namespace
 {
@@ -81,6 +80,58 @@ PAGED auto NTAPI queue_create(_In_ WDFDEVICE dev)
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto is_root_hub30(_In_ WDFDEVICE_INIT *init)
+{
+	PAGED_CODE();
+
+	WDFMEMORY mem;
+	if (auto err = WdfFdoInitAllocAndQueryProperty(init, DevicePropertyHardwareID, 
+		                                       PagedPool, WDF_NO_OBJECT_ATTRIBUTES, &mem)) {
+		Trace(TRACE_LEVEL_ERROR, "WdfFdoInitAllocAndQueryProperty(HardwareID) %!STATUS!", err);
+		return false;
+	}
+
+	size_t buf_sz;
+	auto buf = (WCHAR*)WdfMemoryGetBuffer(mem, &buf_sz);
+
+	const UNICODE_STRING hwid { 
+		.Length = USHORT(buf_sz) - 2*sizeof(WCHAR), // REG_MULTI_SZ
+		.MaximumLength = USHORT(buf_sz), 
+		.Buffer = buf
+	};
+
+	TraceDbg("HardwareID='%!USTR!'", &hwid);
+
+	DECLARE_CONST_UNICODE_STRING(root_hub30, L"USB\\ROOT_HUB30"); // FIXME: find constant in headers
+	bool equal = RtlEqualUnicodeString(&hwid, &root_hub30, true);
+
+	WdfObjectDelete(mem);
+	return equal;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED bool is_above_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
+{
+	PAGED_CODE();
+
+	auto pdo = WdfFdoInitWdmGetPhysicalDevice(init);
+	if (!pdo) {
+		Trace(TRACE_LEVEL_ERROR, "WdfFdoInitWdmGetPhysicalDevice error");
+		return false;
+	}
+
+	auto drv = pdo->DriverObject;
+	auto name = &drv->DriverName;
+
+	TraceDbg("DriverName '%!USTR!'", name);
+
+	DECLARE_CONST_UNICODE_STRING(vhci, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
+	return RtlEqualUnicodeString(name, &vhci, true);
+}
+
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -88,8 +139,13 @@ PAGED NTSTATUS NTAPI device_add(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
 
+	if (!(is_root_hub30(init) && is_above_usbip2_vhci(init))) {
+		TraceDbg("Skip this device");
+		return STATUS_SUCCESS;
+	}
+
 	WdfFdoInitSetFilter(init);
-	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_UNKNOWN);
+	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_UNKNOWN); // FILE_DEVICE_USBEX
 
 	WDF_OBJECT_ATTRIBUTES attrs;
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, filter_ctx);

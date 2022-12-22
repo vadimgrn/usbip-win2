@@ -1,7 +1,7 @@
 *~
 *.aps
-*.etl
 *.vcxproj.user
 /.vs
 x64
 /packages
+/bin/usbip2-*.*
