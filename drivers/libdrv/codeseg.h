@@ -9,3 +9,10 @@
   #define PAGED
   #define CS_INIT
 #endif
+
+namespace libdrv
+{
+
+const ULONG pooltag = 'VRDL';
+
+} // namespace libdrv

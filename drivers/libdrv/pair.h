@@ -5,26 +5,37 @@
 #pragma once
 
 template<typename T1, typename T2>
+inline void swap(T1 &a, T2 &b)
+{
+        T1 tmp(a);
+        a = b; // std::move is not available
+        b = tmp;
+}
+
+template<typename T1, typename T2>
 struct pair
 {
-        pair() = default;
+        using first_type = T1;
+        using second_type = T2;
+
+        constexpr pair() = default;
 
         pair(const T1 &x, const T2 &y) : first(x), second(y) {}
 
         template<typename X, typename Y>
         pair(const X &x, const Y &y) : first(x), second(y) {}
 
-        pair(const pair &p) : first(p.first), second(p.second) {}
+        pair(const pair&) = default;
+        pair& operator =(const pair&) = default;
+
+        pair(pair&&) = default;
+        pair& operator =(pair&&) = default;
 
         template<typename X, typename Y>
         pair(const pair<X, Y> &p) : first(p.first), second(p.second) {}
 
-        auto& operator =(const pair &p)
-        {
-                first = p.first;
-                second = p.second;
-                return *this;
-        }
+        template<typename X, typename Y>
+        pair(pair<X, Y>&& p) : first(p.first), second(p.second) {}
 
         template<typename X, typename Y>
         auto& operator =(const pair<X, Y> &p)
@@ -32,6 +43,27 @@ struct pair
                 first = p.first;
                 second = p.second;
                 return *this;
+        }
+
+        template<typename X, typename Y>
+        auto& operator =(pair<X, Y>&& p)
+        {
+                first = p.first;
+                second = p.second;
+                return *this;
+        }
+
+        void swap(pair &p)
+        {
+                ::swap(first, p.first);
+                ::swap(second, p.second);
+        }
+
+        template<typename X, typename Y>
+        void swap(pair<X, Y> &p)
+        {
+                ::swap(first, p.first);
+                ::swap(second, p.second);
         }
 
         T1 first{};
@@ -48,4 +80,10 @@ template<typename T1, typename T2, typename U1, typename U2>
 inline auto operator !=(const pair<T1, T2> &a, const pair<U1, U2> &b)
 {
         return !(a == b);
+}
+
+template<typename T1, typename T2, typename U1, typename U2>
+inline void swap(pair<T1, T2> &a, pair<U1, U2> &b)
+{
+        a.swap(b);
 }
