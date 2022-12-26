@@ -4,13 +4,13 @@
  * @see https://github.com/desowin/usbpcap/tree/master/USBPcapDriver
  */
 
-#include "driver.h"
 #include <ntifs.h>
+
+#include "driver.h"
 #include "trace.h"
 #include "driver.tmh"
 
 #include <libdrv\codeseg.h>
-#include <libdrv\buffer.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\wdf_cpp.h>
 
@@ -100,7 +100,7 @@ PAGED bool is_upper_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
 		return false;
 	}
 
-	libdrv::buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024);
+	buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024);
 	if (!buf) {
 		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", buf.size());
 		return false;
@@ -160,7 +160,7 @@ CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, device_add);
-	cfg.DriverPoolTag = POOL_TAG;
+	cfg.DriverPoolTag = pooltag;
 
 	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, nullptr);
 }

@@ -9,19 +9,17 @@
 namespace libdrv
 {
 
-const ULONG pooltag = 'VRDL';
-
+template<ULONG PoolTag>
 class buffer
 {
 public:
+        enum { pooltag = PoolTag };
+
         constexpr buffer() = default;
 
-        buffer(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag = pooltag) :
-                m_ptr(ExAllocatePool2(Flags, NumberOfBytes, Tag), Tag),
+        buffer(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes) :
+                m_ptr(ExAllocatePool2(Flags, NumberOfBytes, m_ptr.pooltag)),
                 m_size(NumberOfBytes) {}
-
-        buffer(const buffer&) = delete;
-        buffer& operator=(const buffer&) = delete;
 
         buffer(buffer&&) = default;
         buffer& operator=(buffer&&) = default;
@@ -30,7 +28,6 @@ public:
         auto operator!() const { return !m_ptr; }
 
         auto size() const { return m_ptr ? m_size : 0; }
-        auto tag() const { return m_ptr.tag(); }
         auto get() const { return m_ptr.get(); }
 
         template<typename T>
@@ -43,12 +40,13 @@ public:
         }
 
 private:
-        unique_ptr m_ptr;
+        unique_ptr<pooltag> m_ptr;
         SIZE_T m_size{};
 };
 
 
-inline void swap(buffer &a, buffer &b)
+template<ULONG PoolTag>
+inline void swap(buffer<PoolTag> &a, buffer<PoolTag> &b)
 {
         a.swap(b);
 }

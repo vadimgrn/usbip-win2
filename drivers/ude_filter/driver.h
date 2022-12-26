@@ -4,11 +4,14 @@
 
 #pragma once
 
-#include <ntdef.h>
+#include <libdrv\buffer.h>
 
 namespace usbip
 {
 
-const ULONG POOL_TAG = 'RTLF';
+const ULONG pooltag = 'RTLF';
+
+using unique_ptr = libdrv::unique_ptr<pooltag>;
+using buffer = libdrv::buffer<pooltag>;
 
 } // namespace usbip

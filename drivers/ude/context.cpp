@@ -37,7 +37,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ con
 {
         PAGED_CODE();
 
-        ext = (device_ctx_ext*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ext), POOL_TAG);
+        ext = (device_ctx_ext*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ext), pooltag);
         if (!ext) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate device_ctx_ext");
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -84,5 +84,5 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
         RtlFreeUnicodeString(&ext->service_name);
         RtlFreeUnicodeString(&ext->serial);
 
-        ExFreePoolWithTag(ext, POOL_TAG);
+        ExFreePoolWithTag(ext, pooltag);
 }

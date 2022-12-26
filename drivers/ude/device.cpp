@@ -58,7 +58,7 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         auto &dev = *get_device_ctx(hdev);
 
         if (auto ptr = dev.actconfig) {
-                ExFreePoolWithTag(ptr, POOL_TAG);
+                ExFreePoolWithTag(ptr, pooltag);
         }
 
         if (auto ptr = dev.ext) {

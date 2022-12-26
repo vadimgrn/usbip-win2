@@ -10,6 +10,8 @@
 namespace
 {
 
+const ULONG pooltag = 'VRDL';
+
 inline auto RtlStringCchLength(PCSTR  s, size_t *len) { return RtlStringCchLengthA(s, NTSTRSAFE_MAX_CCH, len); }
 inline auto RtlStringCchLength(PCWSTR s, size_t *len) { return RtlStringCchLengthW(s, NTSTRSAFE_MAX_CCH, len); }
 
@@ -25,7 +27,7 @@ inline T *do_strdup(POOL_FLAGS Flags, const T *str)
         auto sz = ++len*sizeof(*str);
         Flags |= POOL_FLAG_UNINITIALIZED;
 
-        auto s = (T*)ExAllocatePool2(Flags, sz, libdrv::pooltag);
+        auto s = (T*)ExAllocatePool2(Flags, sz, pooltag);
         if (s) {
                 RtlCopyMemory(s, str, sz);
         }

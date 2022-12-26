@@ -237,7 +237,7 @@ auto save_config(_In_ device_ctx *dev, _In_ const USB_CONFIGURATION_DESCRIPTOR &
 	}
 
 	auto cd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED,
-		                                                 src.wTotalLength, POOL_TAG);
+		                                                 src.wTotalLength, pooltag);
 
 	if (cd) {
 		RtlCopyMemory(cd, &src, src.wTotalLength);
@@ -247,7 +247,7 @@ auto save_config(_In_ device_ctx *dev, _In_ const USB_CONFIGURATION_DESCRIPTOR &
 	}
 
 	if (dest) {
-		ExFreePoolWithTag(dest, POOL_TAG);
+		ExFreePoolWithTag(dest, pooltag);
 	}
 
 	dest = cd;
@@ -468,7 +468,7 @@ inline auto alloc_drain_buffer(_Inout_ wsk_context &ctx, _In_ size_t length)
 {  
 	auto &buf = ctx.request;
 	NT_ASSERT(!buf);
-	return buf = (WDFREQUEST)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, length, POOL_TAG); 
+	return buf = (WDFREQUEST)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, length, pooltag); 
 }
 
 _Function_class_(device_ctx::received_fn)
@@ -479,7 +479,7 @@ NTSTATUS free_drain_buffer(_Inout_ wsk_context &ctx)
 	auto &buf = ctx.request;
 	NT_ASSERT(buf);
 
-	ExFreePoolWithTag(buf, POOL_TAG);
+	ExFreePoolWithTag(buf, pooltag);
 	buf = WDF_NO_HANDLE;
 
 	return RECV_NEXT_USBIP_HDR;

@@ -46,7 +46,7 @@ CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DeviceAdd);
-	cfg.DriverPoolTag = POOL_TAG;
+	cfg.DriverPoolTag = pooltag;
 
 	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, nullptr);
 }
@@ -57,7 +57,7 @@ CS_INIT auto init()
 {
 	PAGED_CODE();
 
-	if (auto err = init_wsk_context_list(POOL_TAG)) {
+	if (auto err = init_wsk_context_list(pooltag)) {
 		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", err);
 		return err;
 	}

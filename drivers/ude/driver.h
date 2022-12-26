@@ -9,6 +9,6 @@
 namespace usbip
 {
 
-const ULONG POOL_TAG = 'ICHV';
+const ULONG pooltag = 'ICHV';
 
 } // namespace usbip
