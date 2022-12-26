@@ -36,6 +36,7 @@
     <ClInclude Include="lock.h" />
     <ClInclude Include="pair.h" />
     <ClInclude Include="unique_ptr.h" />
+    <ClInclude Include="buffer.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

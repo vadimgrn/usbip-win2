@@ -20,10 +20,10 @@ struct pair
 
         constexpr pair() = default;
 
-        pair(const T1 &x, const T2 &y) : first(x), second(y) {}
+        constexpr pair(const T1 &x, const T2 &y) : first(x), second(y) {}
 
         template<typename X, typename Y>
-        pair(const X &x, const Y &y) : first(x), second(y) {}
+        constexpr pair(const X &x, const Y &y) : first(x), second(y) {}
 
         pair(const pair&) = default;
         pair& operator =(const pair&) = default;
@@ -32,10 +32,10 @@ struct pair
         pair& operator =(pair&&) = default;
 
         template<typename X, typename Y>
-        pair(const pair<X, Y> &p) : first(p.first), second(p.second) {}
+        constexpr pair(const pair<X, Y> &p) : first(p.first), second(p.second) {}
 
         template<typename X, typename Y>
-        pair(pair<X, Y>&& p) : first(p.first), second(p.second) {}
+        constexpr pair(pair<X, Y>&& p) : first(p.first), second(p.second) {}
 
         template<typename X, typename Y>
         auto& operator =(const pair<X, Y> &p)

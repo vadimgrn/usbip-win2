@@ -7,21 +7,21 @@
 #include "pair.h"
 #include <wdm.h>
 
+namespace libdrv
+{
+
 class unique_ptr
 {
         using data = pair<void*, ULONG>;
 public:
-        unique_ptr() = default;
+        constexpr unique_ptr() = default;
         unique_ptr(data::first_type ptr, data::second_type tag) : m_pair(ptr, tag) {}
         
-        unique_ptr(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag) :
-                m_pair(ExAllocatePool2(Flags, NumberOfBytes, Tag), Tag) {}
-
         auto tag() const { return m_pair.second; }
         auto get() const { return m_pair.first; }
 
         template<typename T>
-        auto get() const { return static_cast<T*>(m_pair.first); }
+        auto get() const { return static_cast<T*>(get()); }
 
         ~unique_ptr() 
         { 
@@ -73,3 +73,5 @@ inline void swap(unique_ptr &a, unique_ptr &b)
 {
         a.swap(b);
 }
+
+} // namespace libdrv
