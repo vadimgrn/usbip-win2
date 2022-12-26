@@ -43,7 +43,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ con
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        ext->busid = libdrv_strdup(POOL_FLAG_NON_PAGED, r.busid);
+        ext->busid = libdrv::strdup(POOL_FLAG_NON_PAGED, r.busid);
         if (!ext->busid) {
                 Trace(TRACE_LEVEL_ERROR, "Copy '%s' error", r.busid);
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -61,7 +61,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ con
         for (auto &[ustr, ansi]: v) {
                 if (!*ansi) {
                         // RtlInitUnicodeString(&uni, nullptr); // the same as zeroed memory
-                } else if (auto err = to_unicode_str(ustr, ansi)) {
+                } else if (auto err = libdrv::to_unicode_str(ustr, ansi)) {
                         Trace(TRACE_LEVEL_ERROR, "to_unicode_str('%s') %!STATUS!", ansi, err);
                         return err;
                 }
@@ -79,7 +79,7 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
         NT_ASSERT(ext);
         NT_ASSERT(!ext->sock);
 
-        libdrv_free(ext->busid);
+        libdrv::free(ext->busid);
         RtlFreeUnicodeString(&ext->node_name);
         RtlFreeUnicodeString(&ext->service_name);
         RtlFreeUnicodeString(&ext->serial);

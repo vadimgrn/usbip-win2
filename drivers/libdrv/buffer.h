@@ -9,14 +9,16 @@
 namespace libdrv
 {
 
+const ULONG pooltag = 'VRDL';
+
 class buffer
 {
 public:
         constexpr buffer() = default;
 
-        buffer(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag) :
-                m_size(NumberOfBytes),
-                m_ptr(ExAllocatePool2(Flags, NumberOfBytes, Tag), Tag) {}
+        buffer(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag = pooltag) :
+                m_ptr(ExAllocatePool2(Flags, NumberOfBytes, Tag), Tag),
+                m_size(NumberOfBytes) {}
 
         buffer(const buffer&) = delete;
         buffer& operator=(const buffer&) = delete;
@@ -34,9 +36,21 @@ public:
         template<typename T>
         auto get() const { return m_ptr.get<T>(); }
 
+        void swap(buffer &b)
+        {
+                m_ptr.swap(b.m_ptr);
+                ::swap(m_size, b.m_size);
+        }
+
 private:
-        SIZE_T m_size{};
         unique_ptr m_ptr;
+        SIZE_T m_size{};
 };
+
+
+inline void swap(buffer &a, buffer &b)
+{
+        a.swap(b);
+}
 
 } // namespace libdrv

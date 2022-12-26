@@ -1,4 +1,10 @@
+/*
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "strutil.h"
+#include "buffer.h"
+
 #include <ntstrsafe.h>
 
 namespace
@@ -8,7 +14,7 @@ inline auto RtlStringCchLength(PCSTR  s, size_t *len) { return RtlStringCchLengt
 inline auto RtlStringCchLength(PCWSTR s, size_t *len) { return RtlStringCchLengthW(s, NTSTRSAFE_MAX_CCH, len); }
 
 template<typename T>
-inline T *strdup(POOL_FLAGS Flags, const T *str)
+inline T *do_strdup(POOL_FLAGS Flags, const T *str)
 {
         size_t len = 0;
         auto st = RtlStringCchLength(str, &len);
@@ -30,20 +36,20 @@ inline T *strdup(POOL_FLAGS Flags, const T *str)
 } // namespace
 
 
-LPSTR libdrv_strdup(POOL_FLAGS Flags, LPCSTR str)
+LPSTR libdrv::strdup(POOL_FLAGS Flags, LPCSTR str)
 {
-        return strdup(Flags, str);
+        return do_strdup(Flags, str);
 }
 
-LPWSTR libdrv_strdup(POOL_FLAGS Flags, LPCWSTR str)
+LPWSTR libdrv::strdup(POOL_FLAGS Flags, LPCWSTR str)
 {
-        return strdup(Flags, str);
+        return do_strdup(Flags, str);
 }
 
-void libdrv_free(void *data)
+void libdrv::free(void *data)
 {
 	if (data) {
-		ExFreePoolWithTag(data, libdrv::pooltag);
+		ExFreePoolWithTag(data, pooltag);
 	}
 }
 
@@ -53,7 +59,7 @@ void libdrv_free(void *data)
 */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
+PAGED NTSTATUS libdrv::to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
 {
         PAGED_CODE();
 
@@ -65,7 +71,7 @@ PAGED NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS libdrv::to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
         ANSI_STRING s{ 0, len, dest };
@@ -74,7 +80,7 @@ PAGED NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED USHORT strrchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
+PAGED USHORT libdrv::strrchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
 {
         PAGED_CODE();
 

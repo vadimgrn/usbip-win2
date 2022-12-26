@@ -65,7 +65,7 @@ PAGED void fill(_Inout_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ct
         };
 
         for (auto &[ansi, ansi_sz, ustr]: v) {
-                if (auto err = to_ansi_str(ansi, ansi_sz, ustr)) {
+                if (auto err = libdrv::to_ansi_str(ansi, ansi_sz, ustr)) {
                         Trace(TRACE_LEVEL_ERROR, "to_ansi_str('%!USTR!') %!STATUS!", &ustr, err);
                 }
         }

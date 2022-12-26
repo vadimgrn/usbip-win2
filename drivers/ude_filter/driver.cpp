@@ -86,10 +86,11 @@ PAGED auto NTAPI queue_create(_In_ WDFDEVICE dev)
 
 /*
  * DRIVER_OBJECT.DriverName is an undocumented member and can't be used.
+ * Do not check that init's HardwareID is "USB\ROOT_HUB30" because upper usbip2_vhci can be nothing else.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED bool is_above_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
+PAGED bool is_upper_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
 
@@ -99,7 +100,7 @@ PAGED bool is_above_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
 		return false;
 	}
 
-	libdrv::buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024, POOL_TAG);
+	libdrv::buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024);
 	if (!buf) {
 		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", buf.size());
 		return false;
@@ -126,13 +127,13 @@ PAGED NTSTATUS NTAPI device_add(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
 
-	if (!is_above_usbip2_vhci(init)) {
+	if (!is_upper_usbip2_vhci(init)) {
 		TraceDbg("Skip this device");
 		return STATUS_SUCCESS;
 	}
 
-	WdfFdoInitSetFilter(init);
-	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_UNKNOWN); // FILE_DEVICE_USBEX
+	WdfFdoInitSetFilter(init); // init is a USBHUB3 above our emulated HCI
+	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_CONTROLLER);
 
 	WDF_OBJECT_ATTRIBUTES attrs;
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, filter_ctx);
