@@ -72,6 +72,7 @@
       <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <AdditionalOptions>/kernel /Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -86,6 +87,7 @@
       <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <AdditionalOptions>/kernel /Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -105,6 +107,9 @@
     <ProjectReference Include="..\libdrv\libdrv.vcxproj">
       <Project>{27ab4325-4980-4634-9818-ae6bd61de532}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom_wpp.ini" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

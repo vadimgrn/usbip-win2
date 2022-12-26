@@ -27,18 +27,19 @@ AddReg = usbip2_filter_AddReg
 
 [DefaultUninstall.NT$ARCH$]
 LegacyUninstall=1
+DelFiles = @usbip2_filter.sys
 DelReg = usbip2_filter_DelReg
 
 [usbip2_filter_AddReg]
 ; 0x00010000 (FLG_ADDREG_TYPE_MULTI_SZ) | 0x00000008 (FLG_ADDREG_APPEND)
-HKLM,%Classes%\%ClassGuid%,UpperFilters,0x00010008,usbip2_filter
+HKLM, %Classes%\%ClassGuid%, UpperFilters, 0x00010008, usbip2_filter
 
 [usbip2_filter_DelReg]
 ; 0x00018002 FLG_DELREG_MULTI_SZ_DELSTRING
-HKLM,%Classes%\%ClassGuid%,UpperFilters,0x00018002,usbip2_filter
+HKLM, %Classes%\%ClassGuid%, UpperFilters, 0x00018002, usbip2_filter
 
 [DefaultInstall.NT$ARCH$.Services]
-AddService = usbip2_filter,2,usbip2_filter_Service_Inst
+AddService = usbip2_filter,,usbip2_filter_Service_Inst
 
 [DefaultUninstall.NT$ARCH$.Services]
 ; 0x00000200 (SPSVCINST_STOPSERVICE)

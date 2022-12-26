@@ -13,6 +13,9 @@ class unique_ptr
 public:
         unique_ptr() = default;
         unique_ptr(data::first_type ptr, data::second_type tag) : m_pair(ptr, tag) {}
+        
+        unique_ptr(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag) :
+                m_pair(ExAllocatePool2(Flags, NumberOfBytes, Tag), Tag) {}
 
         auto tag() const { return m_pair.second; }
         auto get() const { return m_pair.first; }

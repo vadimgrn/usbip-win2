@@ -72,3 +72,20 @@ PAGED NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE
         return RtlUnicodeStringToAnsiString(&s, &src, false);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED USHORT strrchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
+{
+        PAGED_CODE();
+
+        LONG cch = s.Length/sizeof(ch);
+
+        for (auto i = cch - 1; i >= 0; --i) {
+                if (s.Buffer[i] == ch) {
+                        return USHORT(i + 1);
+                }
+        }
+
+        return 0;
+}
+

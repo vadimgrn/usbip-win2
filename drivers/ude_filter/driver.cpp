@@ -1,14 +1,18 @@
 /*
  * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * 
+ * @see https://github.com/desowin/usbpcap/tree/master/USBPcapDriver
  */
 
 #include "driver.h"
-#include <libdrv\codeseg.h>
+#include <ntifs.h>
 #include "trace.h"
 #include "driver.tmh"
 
-#include <libdrv\wdf_cpp.h>
+#include <libdrv\codeseg.h>
+#include <libdrv\unique_ptr.h>
 #include <libdrv\dbgcommon.h>
+#include <libdrv\wdf_cpp.h>
 
 namespace
 {
@@ -82,35 +86,47 @@ PAGED auto NTAPI queue_create(_In_ WDFDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto is_root_hub30(_In_ WDFDEVICE_INIT *init)
+PAGED auto is_equal(
+	_In_ WDFDEVICE_INIT *init, _In_ DEVICE_REGISTRY_PROPERTY property, _In_ bool multi_sz,
+	_In_ const UNICODE_STRING &expected, _In_ bool CaseInSensitive)
 {
 	PAGED_CODE();
 
 	WDFMEMORY mem;
-	if (auto err = WdfFdoInitAllocAndQueryProperty(init, DevicePropertyHardwareID, 
-		                                       PagedPool, WDF_NO_OBJECT_ATTRIBUTES, &mem)) {
-		Trace(TRACE_LEVEL_ERROR, "WdfFdoInitAllocAndQueryProperty(HardwareID) %!STATUS!", err);
+	if (auto err = WdfFdoInitAllocAndQueryProperty(init, property, PagedPool, WDF_NO_OBJECT_ATTRIBUTES, &mem)) {
+		Trace(TRACE_LEVEL_ERROR, "WdfFdoInitAllocAndQueryProperty(%!DEVICE_REGISTRY_PROPERTY!) %!STATUS!", 
+			                  property, err);
 		return false;
 	}
 
 	size_t buf_sz;
 	auto buf = (WCHAR*)WdfMemoryGetBuffer(mem, &buf_sz);
 
-	const UNICODE_STRING hwid { 
-		.Length = USHORT(buf_sz) - 2*sizeof(WCHAR), // REG_MULTI_SZ
+	const UNICODE_STRING str {
+		.Length = USHORT(buf_sz) - (1 + multi_sz)*sizeof(*buf),
 		.MaximumLength = USHORT(buf_sz), 
 		.Buffer = buf
 	};
 
-	TraceDbg("HardwareID='%!USTR!'", &hwid);
+	TraceDbg("%!DEVICE_REGISTRY_PROPERTY!='%!USTR!'", property, &str);
 
-	DECLARE_CONST_UNICODE_STRING(root_hub30, L"USB\\ROOT_HUB30"); // FIXME: find constant in headers
-	bool equal = RtlEqualUnicodeString(&hwid, &root_hub30, true);
-
+	bool equal = RtlEqualUnicodeString(&str, &expected, CaseInSensitive);
 	WdfObjectDelete(mem);
 	return equal;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto is_root_hub30(_In_ WDFDEVICE_INIT *init)
+{
+	PAGED_CODE();
+	DECLARE_CONST_UNICODE_STRING(root_hub30, L"USB\\ROOT_HUB30"); // REG_MULTI_SZ
+	return is_equal(init, DevicePropertyHardwareID, true, root_hub30, true);
+}
+
+/*
+ * DRIVER_OBJECT.DriverName can't be used, it's an undocumented member.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED bool is_above_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
@@ -123,13 +139,26 @@ PAGED bool is_above_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
 		return false;
 	}
 
-	auto drv = pdo->DriverObject;
-	auto name = &drv->DriverName;
+	const SIZE_T buf_sz = 1024;
 
-	TraceDbg("DriverName '%!USTR!'", name);
+	unique_ptr buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, buf_sz, POOL_TAG);
+	if (!buf) {
+		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", buf_sz);
+		return false;
+	}
+
+	auto info = buf.get<OBJECT_NAME_INFORMATION>();
+
+	ULONG actual_sz;
+	if (auto err = ObQueryNameString(pdo->DriverObject, info, buf_sz, &actual_sz)) {
+		Trace(TRACE_LEVEL_ERROR, "ObQueryNameString %!STATUS!", err);
+		return false;
+	}
+
+	TraceDbg("DriverName '%!USTR!'", &info->Name);
 
 	DECLARE_CONST_UNICODE_STRING(vhci, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
-	return RtlEqualUnicodeString(name, &vhci, true);
+	return RtlEqualUnicodeString(&info->Name, &vhci, true);
 }
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
@@ -139,7 +168,7 @@ PAGED NTSTATUS NTAPI device_add(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
 
-	if (!(is_root_hub30(init) && is_above_usbip2_vhci(init))) {
+	if (!(is_above_usbip2_vhci(init) && is_root_hub30(init))) {
 		TraceDbg("Skip this device");
 		return STATUS_SUCCESS;
 	}
