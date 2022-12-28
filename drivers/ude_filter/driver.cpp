@@ -86,11 +86,44 @@ PAGED auto NTAPI queue_create(_In_ WDFDEVICE dev)
 
 /*
  * DRIVER_OBJECT.DriverName is an undocumented member and can't be used.
- * Do not check that init's HardwareID is "USB\ROOT_HUB30" because upper usbip2_vhci can be nothing else.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED bool is_upper_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
+PAGED bool driver_name_equal(
+	_In_ DRIVER_OBJECT *driver, _In_ const UNICODE_STRING &expected, _In_ bool CaseInSensitive)
+{
+	PAGED_CODE();
+
+	buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024);
+	if (!buf) {
+		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", buf.size());
+		return false;
+	}
+
+	auto info = buf.get<OBJECT_NAME_INFORMATION>();
+
+	ULONG actual_sz;
+	if (auto err = ObQueryNameString(driver, info, ULONG(buf.size()), &actual_sz)) {
+		Trace(TRACE_LEVEL_ERROR, "ObQueryNameString %!STATUS!", err);
+		return false;
+	}
+
+	TraceDbg("DriverName '%!USTR!'", &info->Name);
+	return RtlEqualUnicodeString(&info->Name, &expected, CaseInSensitive);
+}
+
+/*
+ * Do not check that HardwareID is "USB\ROOT_HUB30" because above usbip2_vhci can be nothing else.
+ * 
+ * for (auto cur = IoGetAttachedDeviceReference(pdo); cur; ) { // @see IoGetDeviceAttachmentBaseRef
+ * 	auto lower = IoGetLowerDeviceObject(cur);
+ *	ObDereferenceObject(cur);
+ *	cur = lower;
+ * }
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto is_abobe_vhci(_In_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
 
@@ -100,24 +133,8 @@ PAGED bool is_upper_usbip2_vhci(_In_ WDFDEVICE_INIT *init)
 		return false;
 	}
 
-	buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024);
-	if (!buf) {
-		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", buf.size());
-		return false;
-	}
-
-	auto drv = buf.get<OBJECT_NAME_INFORMATION>();
-
-	ULONG actual_sz;
-	if (auto err = ObQueryNameString(pdo->DriverObject, drv, ULONG(buf.size()), &actual_sz)) {
-		Trace(TRACE_LEVEL_ERROR, "ObQueryNameString %!STATUS!", err);
-		return false;
-	}
-
-	TraceDbg("DriverName '%!USTR!'", &drv->Name);
-
 	DECLARE_CONST_UNICODE_STRING(vhci, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
-	return RtlEqualUnicodeString(&drv->Name, &vhci, true);
+	return driver_name_equal(pdo->DriverObject, vhci, true);
 }
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
@@ -127,13 +144,13 @@ PAGED NTSTATUS NTAPI device_add(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
 	PAGED_CODE();
 
-	if (!is_upper_usbip2_vhci(init)) {
+	if (!is_abobe_vhci(init)) {
 		TraceDbg("Skip this device");
 		return STATUS_SUCCESS;
 	}
 
 	WdfFdoInitSetFilter(init); // init is a USBHUB3 above our emulated HCI
-	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_CONTROLLER);
+	WdfDeviceInitSetDeviceType(init, FILE_DEVICE_UNKNOWN);
 
 	WDF_OBJECT_ATTRIBUTES attrs;
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, filter_ctx);
