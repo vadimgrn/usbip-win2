@@ -14,8 +14,8 @@
     <ProjectReference Include="..\ude\usbip2_vhci.vcxproj">
       <Project>{3a3812ce-3370-4b5f-829d-43433267b154}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\ude_filter\usbip2_filter.vcxproj">
-      <Project>{9f1ab283-fd02-4064-924f-c3c8a555a07b}</Project>
+    <ProjectReference Include="..\ude_filter\ude_filter.vcxproj">
+      <Project>{f40cf5cc-4395-4958-b248-25a2bf91d735}</Project>
     </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">

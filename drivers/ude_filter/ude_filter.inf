@@ -65,4 +65,3 @@ Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drive
 DisplayName="USBIP Upper Filter" ; for device and service
 Classes="System\CurrentControlSet\Control\Class"
 ClassGuid="{36FC9E60-C465-11CF-8056-444553540000}" ; USB host controllers and USB hubs
-

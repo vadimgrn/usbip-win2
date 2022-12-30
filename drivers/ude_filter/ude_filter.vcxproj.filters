@@ -2,15 +2,19 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="driver.cpp" />
+    <ClCompile Include="device.cpp" />
+    <ClCompile Include="pnp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="driver.h" />
     <ClInclude Include="trace.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Inf Include="usbip2_filter.inf" />
+    <ClInclude Include="device.h" />
+    <ClInclude Include="pnp.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="ude_filter.inf" />
   </ItemGroup>
 </Project>

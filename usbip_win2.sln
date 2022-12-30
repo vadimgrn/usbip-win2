@@ -12,7 +12,6 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "package", "drivers\package\package.vcxproj", "{B7B9AC6F-45CC-4C98-9136-3D6E8F50AD1C}"
 	ProjectSection(ProjectDependencies) = postProject
 		{3A3812CE-3370-4B5F-829D-43433267B154} = {3A3812CE-3370-4B5F-829D-43433267B154}
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B} = {9F1AB283-FD02-4064-924F-C3C8A555A07B}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "innosetup", "userspace\innosetup\innosetup.vcxproj", "{0B54108E-9FB0-45EA-B252-CEBC68A5CCF0}"
@@ -24,10 +23,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\devnod
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_vhci", "drivers\ude\usbip2_vhci.vcxproj", "{3A3812CE-3370-4B5F-829D-43433267B154}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_filter", "drivers\ude_filter\usbip2_filter.vcxproj", "{9F1AB283-FD02-4064-924F-C3C8A555A07B}"
-	ProjectSection(ProjectDependencies) = postProject
-		{27AB4325-4980-4634-9818-AE6BD61DE532} = {27AB4325-4980-4634-9818-AE6BD61DE532}
-	EndProjectSection
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_filter", "drivers\ude_filter\ude_filter.vcxproj", "{F40CF5CC-4395-4958-B248-25A2BF91D735}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -69,12 +65,12 @@ Global
 		{3A3812CE-3370-4B5F-829D-43433267B154}.Release|x64.ActiveCfg = Release|x64
 		{3A3812CE-3370-4B5F-829D-43433267B154}.Release|x64.Build.0 = Release|x64
 		{3A3812CE-3370-4B5F-829D-43433267B154}.Release|x64.Deploy.0 = Release|x64
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B}.Debug|x64.ActiveCfg = Debug|x64
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B}.Debug|x64.Build.0 = Debug|x64
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B}.Debug|x64.Deploy.0 = Debug|x64
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B}.Release|x64.ActiveCfg = Release|x64
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B}.Release|x64.Build.0 = Release|x64
-		{9F1AB283-FD02-4064-924F-C3C8A555A07B}.Release|x64.Deploy.0 = Release|x64
+		{F40CF5CC-4395-4958-B248-25A2BF91D735}.Debug|x64.ActiveCfg = Debug|x64
+		{F40CF5CC-4395-4958-B248-25A2BF91D735}.Debug|x64.Build.0 = Debug|x64
+		{F40CF5CC-4395-4958-B248-25A2BF91D735}.Debug|x64.Deploy.0 = Debug|x64
+		{F40CF5CC-4395-4958-B248-25A2BF91D735}.Release|x64.ActiveCfg = Release|x64
+		{F40CF5CC-4395-4958-B248-25A2BF91D735}.Release|x64.Build.0 = Release|x64
+		{F40CF5CC-4395-4958-B248-25A2BF91D735}.Release|x64.Deploy.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
