@@ -8,6 +8,6 @@ tracelog.exe -stop %NAME%-fltr
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-vhci.txt %NAME%-vhci.etl
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-fltr.txt %NAME%-fltr.etl
 
-sed -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-vhci.txt
-sed -i "s/`anonymous namespace':://" %NAME%-vhci.txt
+sed -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-*.txt
+sed -i "s/`anonymous namespace':://" %NAME%-*.txt
 rm sed*

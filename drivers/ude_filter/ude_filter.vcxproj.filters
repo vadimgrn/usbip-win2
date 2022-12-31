@@ -4,12 +4,14 @@
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="pnp.cpp" />
+    <ClCompile Include="irp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="driver.h" />
     <ClInclude Include="trace.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="pnp.h" />
+    <ClInclude Include="irp.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />

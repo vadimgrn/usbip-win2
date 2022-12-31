@@ -1,8 +1,8 @@
 /*
-* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
-* 
-* @see https://github.com/desowin/usbpcap/tree/master/USBPcapDriver
-*/
+ * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * 
+ * @see https://github.com/desowin/usbpcap/tree/master/USBPcapDriver
+ */
 
 #include "driver.h"
 #include "trace.h"
