@@ -36,6 +36,7 @@
     </SupportsPackaging>
     <TargetVersion>Windows10</TargetVersion>
     <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -47,6 +48,7 @@
     </SupportsPackaging>
     <TargetVersion>Windows10</TargetVersion>
     <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
