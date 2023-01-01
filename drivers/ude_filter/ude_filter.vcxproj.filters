@@ -17,6 +17,6 @@
     <None Include="custom_wpp.ini" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="ude_filter.inf" />
+    <Inf Include="usbip2_filter.inf" />
   </ItemGroup>
 </Project>
