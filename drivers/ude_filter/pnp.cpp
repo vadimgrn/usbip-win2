@@ -17,7 +17,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	PAGED_CODE();
 	
-	auto &fltr = get_device_ext(devobj);
+	auto &fltr = *get_filter_ext(devobj);
 	NTSTATUS st;
 
 	switch (auto stack = IoGetCurrentIrpStackLocation(irp); stack->MinorFunction) {

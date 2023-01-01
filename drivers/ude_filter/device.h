@@ -9,17 +9,18 @@
 namespace usbip
 {
 
-struct device_ext
+struct filter_ext
 {
-	DEVICE_OBJECT *self; // @see get_device_ext
-	DEVICE_OBJECT *lower; // @see IoAttachDeviceToDeviceStack
+	DEVICE_OBJECT *self; // back pointer to the Filter Device Object for which this is the extension
+//	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
+	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
 };
 
 
-inline auto& get_device_ext(_In_ DEVICE_OBJECT *devobj)
+inline auto get_filter_ext(_In_ DEVICE_OBJECT *devobj)
 { 
 	NT_ASSERT(devobj);
-	return *static_cast<device_ext*>(devobj->DeviceExtension); 
+	return static_cast<filter_ext*>(devobj->DeviceExtension); 
 }
 
 _Function_class_(DRIVER_ADD_DEVICE)
@@ -35,7 +36,7 @@ NTSTATUS dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED void destroy(_Inout_ device_ext &fltr);
+PAGED void destroy(_Inout_ filter_ext &fltr);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
