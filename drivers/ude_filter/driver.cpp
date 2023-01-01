@@ -8,6 +8,7 @@
 #include "trace.h"
 #include "driver.tmh"
 
+#include "irp.h"
 #include "device.h"
 #include "pnp.h"
 
@@ -31,22 +32,16 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 {
-	if (auto stack = IoGetCurrentIrpStackLocation(irp)) {
-		TraceDbg("%!pnpmj!, %!pnpmn!", stack->MajorFunction, stack->MinorFunction);
+	if (auto &lower = get_device_ext(devobj).lower) {
+		return ForwardIrpAsync(lower, irp);
 	}
 
-	if (auto lower = get_device_ext(devobj).lower) {
-		IoSkipCurrentIrpStackLocation(irp);
-		return IoCallDriver(lower, irp);
-	}
+	auto &stack = *IoGetCurrentIrpStackLocation(irp);
 
 	auto err = STATUS_INVALID_DEVICE_REQUEST;
-	Trace(TRACE_LEVEL_ERROR, "%!STATUS!", err);
+	Trace(TRACE_LEVEL_ERROR, "%!pnpmj!.%!pnpmn! %!STATUS!", stack.MajorFunction, stack.MinorFunction, err);
 
-	irp->IoStatus.Status = err;
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-	return err;
+	return CompleteRequest(irp, err);
 }
 
 } // namespace
