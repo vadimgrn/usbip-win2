@@ -33,6 +33,7 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS usbip::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	PAGED_CODE();
+	NT_ASSERT(devobj);
 
 	KEVENT evt;
 	KeInitializeEvent(&evt, NotificationEvent, false);
@@ -54,6 +55,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::ForwardIrpAsync(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
+	NT_ASSERT(devobj);
 	IoSkipCurrentIrpStackLocation(irp);
 	return IoCallDriver(devobj, irp);
 }
@@ -69,12 +71,14 @@ NTSTATUS usbip::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::CompleteRequestAsCancelled(_In_ IRP *irp)
+NTSTATUS usbip::CompleteRequestAsCancelled(_In_ IRP *irp)
 {
 	TraceDbg("%04x", ptr04x(irp));
+	auto st = STATUS_CANCELLED;
 
-	irp->IoStatus.Status = STATUS_CANCELLED;
+	irp->IoStatus.Status = st;
 	irp->IoStatus.Information = 0;
 
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	return st;
 }

@@ -14,6 +14,8 @@ struct filter_ext
 	DEVICE_OBJECT *self; // back pointer to the Filter Device Object for which this is the extension
 //	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
 	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
+
+	IO_REMOVE_LOCK remove_lock;
 };
 
 
@@ -33,6 +35,10 @@ _Function_class_(DRIVER_DISPATCH)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+NTSTATUS dispatch_lower_nolock(_In_ filter_ext &fltr, _Inout_ IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_

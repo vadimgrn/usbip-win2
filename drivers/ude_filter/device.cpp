@@ -11,6 +11,8 @@
 #include "irp.h"
 #include "driver.h"
 
+#include <libdrv\remove_lock.h>
+
 #include <wdmsec.h>
 #include <initguid.h>
 
@@ -67,6 +69,16 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 
 	DECLARE_CONST_UNICODE_STRING(vhci, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
 	return driver_name_equal(pdo->DriverObject, vhci, true);
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED auto init(_Inout_ filter_ext &fltr)
+{
+	PAGED_CODE();
+
+	IoInitializeRemoveLock(&fltr.remove_lock, pooltag, 0, 0);
+	return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -147,6 +159,12 @@ PAGED NTSTATUS usbip::add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT 
 		return err;
 	}
 
+	if (auto err = init(*fltr)) {
+		Trace(TRACE_LEVEL_ERROR, "init %!STATUS!", err);
+		destroy(*fltr);
+		return err;
+	}
+
 	{
 		auto &Flags = fido->Flags;
 		Flags |= lower->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE);
@@ -173,20 +191,34 @@ PAGED void usbip::destroy(_Inout_ filter_ext &fltr)
 	IoDeleteDevice(fltr.self);
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+NTSTATUS usbip::dispatch_lower_nolock(_In_ filter_ext &fltr, _Inout_ IRP *irp)
+{
+	if (auto &lower = fltr.lower) {
+		return ForwardIrpAsync(lower, irp);
+	}
+
+	auto &stack = *IoGetCurrentIrpStackLocation(irp);
+
+	TraceDbg("MajorFunction %#x, MinorFunction %#x, lower DEVICE_OBJECT is NULL", 
+		stack.MajorFunction, stack.MinorFunction);
+
+	return CompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
+}
+
 _Function_class_(DRIVER_DISPATCH)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 NTSTATUS usbip::dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 {
-	if (auto fltr = get_filter_ext(devobj); auto &lower = fltr->lower) {
-		return ForwardIrpAsync(lower, irp);
+	auto &fltr = *get_filter_ext(devobj);
+
+	libdrv::RemoveLockGuard lck(fltr.remove_lock);
+	if (auto err = lck.acquired()) {
+		Trace(TRACE_LEVEL_ERROR, "%!STATUS!", err);
+		return CompleteRequest(irp, err);
 	}
 
-	auto err = STATUS_INVALID_DEVICE_REQUEST;
-	auto &stack = *IoGetCurrentIrpStackLocation(irp);
-
-	Trace(TRACE_LEVEL_ERROR, "MajorFunction %#x, MinorFunction %#x, %!STATUS!", 
-		                  stack.MajorFunction, stack.MinorFunction, err);
-
-	return CompleteRequest(irp, err);
+	return dispatch_lower_nolock(fltr, irp);
 }
