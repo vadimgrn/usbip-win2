@@ -9,6 +9,9 @@
 namespace usbip
 {
 
+/*
+ * Common for hub and device filters. 
+ */
 struct filter_ext
 {
 	DEVICE_OBJECT *self; // back pointer to the Filter Device Object for which this is the extension
@@ -16,9 +19,13 @@ struct filter_ext
 	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
 
 	IO_REMOVE_LOCK remove_lock;
-	DEVICE_RELATIONS *children;
-};
+	
+	// device only
+	IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
 
+	// hub only
+	DEVICE_RELATIONS *previous;
+};
 
 inline auto get_filter_ext(_In_ DEVICE_OBJECT *devobj)
 { 
@@ -26,11 +33,25 @@ inline auto get_filter_ext(_In_ DEVICE_OBJECT *devobj)
 	return static_cast<filter_ext*>(devobj->DeviceExtension); 
 }
 
+inline auto is_hub(_In_ const filter_ext &f)
+{
+	return !f.parent_remove_lock;
+}
+
+inline bool is_device(_In_ const filter_ext &f)
+{
+	return f.parent_remove_lock;
+}
+
 _Function_class_(DRIVER_ADD_DEVICE)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-_When_(return>=0, _Kernel_clear_do_init_(__yes))
 PAGED NTSTATUS add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo);
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+_When_(return>=0, _Kernel_clear_do_init_(__yes))
+PAGED NTSTATUS do_add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo, _In_opt_ filter_ext *parent);
 
 _Function_class_(DRIVER_DISPATCH)
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -39,11 +60,11 @@ NTSTATUS dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-NTSTATUS dispatch_lower_nolock(_In_ filter_ext &fltr, _Inout_ IRP *irp);
+NTSTATUS dispatch_lower_nolock(_In_ filter_ext &f, _Inout_ IRP *irp);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED void destroy(_Inout_ filter_ext &fltr);
+PAGED void destroy(_Inout_ filter_ext &f);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

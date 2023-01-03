@@ -61,22 +61,22 @@ PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *de
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED void query_bus_relations(_Inout_ DEVICE_RELATIONS* &old_rel, _In_ const DEVICE_RELATIONS &rel)
+PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATIONS &rel)
 {
 	PAGED_CODE();
 
 	for (ULONG i = 0; i < rel.Count; ++i) {
-		auto obj = rel.Objects[i];
-		if (!(old_rel && contains(*old_rel, obj))) {
-			TraceDbg("Newly added %04x", ptr04x(obj));
+		auto pdo = rel.Objects[i];
+		if (!(f.previous && contains(*f.previous, pdo))) {
+			do_add_device(f.self->DriverObject, pdo, &f);
 		}
 	}
 
-	if (old_rel) {
-		ExFreePoolWithTag(old_rel, pooltag);
+	if (auto ptr = f.previous) {
+		ExFreePoolWithTag(ptr, pooltag);
 	}
 
-	old_rel = rel.Count ? clone(rel) : nullptr;
+	f.previous = rel.Count ? clone(rel) : nullptr;
 }
 
 /*
@@ -87,7 +87,7 @@ PAGED void query_bus_relations(_Inout_ DEVICE_RELATIONS* &old_rel, _In_ const DE
 */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED auto query_bus_relations(_In_ filter_ext &fltr, _In_ IRP *irp)
+PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
 	PAGED_CODE();
 
@@ -96,7 +96,7 @@ PAGED auto query_bus_relations(_In_ filter_ext &fltr, _In_ IRP *irp)
 
 	if (NT_SUCCESS(st)) {
 		if (auto r = reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information)) {
-			query_bus_relations(fltr.children, *r);
+			query_bus_relations(fltr, *r);
 		}
 	}
 
