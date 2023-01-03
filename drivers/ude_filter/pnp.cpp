@@ -45,13 +45,13 @@ PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *devobj)
+PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *obj)
 {
 	PAGED_CODE();
-	NT_ASSERT(devobj);
+	NT_ASSERT(obj);
 
 	for (ULONG i = 0; i < r.Count; ++i) {
-		if (r.Objects[i] == devobj) {
+		if (r.Objects[i] == obj) {
 			return true;
 		}
 	}
@@ -61,13 +61,14 @@ PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *de
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATIONS &rel)
+PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATIONS &r)
 {
 	PAGED_CODE();
 
-	for (ULONG i = 0; i < rel.Count; ++i) {
-		auto pdo = rel.Objects[i];
+	for (ULONG i = 0; i < r.Count; ++i) {
+		auto pdo = r.Objects[i];
 		if (!(f.previous && contains(*f.previous, pdo))) {
+			TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
 			do_add_device(f.self->DriverObject, pdo, &f);
 		}
 	}
@@ -76,7 +77,7 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
 		ExFreePoolWithTag(ptr, pooltag);
 	}
 
-	f.previous = rel.Count ? clone(rel) : nullptr;
+	f.previous = r.Count ? clone(r) : nullptr;
 }
 
 /*
@@ -90,6 +91,7 @@ _IRQL_requires_same_
 PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
 	PAGED_CODE();
+	NT_ASSERT(is_hub(fltr));
 
 	auto st = ForwardIrpAndWait(fltr.lower, irp);
 	TraceDbg("%!STATUS!", st);
@@ -126,18 +128,18 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_REMOVE_DEVICE: // a driver must set Irp->IoStatus.Status to STATUS_SUCCESS
 		st = ForwardIrpAsync(fltr.lower, irp);
-		Trace(TRACE_LEVEL_INFORMATION, "REMOVE_DEVICE %!STATUS! (must be SUCCESS)", st);
+		TraceDbg("REMOVE_DEVICE(%04x) %!STATUS! (must be SUCCESS)", ptr04x(devobj), st);
 		lck.release_and_wait();
 		destroy(fltr);
 		break;
 	case IRP_MN_QUERY_DEVICE_RELATIONS:
-		if (stack.Parameters.QueryDeviceRelations.Type == BusRelations) {
+		if (stack.Parameters.QueryDeviceRelations.Type == BusRelations && is_hub(fltr)) {
 			st = query_bus_relations(fltr, irp);
 			break;
 		}
 		[[fallthrough]];
 	default:
-		st = dispatch_lower_nolock(fltr, irp);
+		st = ForwardIrpAsync(fltr.lower, irp);
 	}
 
 	return st;

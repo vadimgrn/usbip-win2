@@ -8,10 +8,7 @@
 #include "trace.h"
 #include "device.tmh"
 
-#include "irp.h"
 #include "driver.h"
-
-#include <libdrv\remove_lock.h>
 
 #include <wdmsec.h>
 #include <initguid.h>
@@ -23,6 +20,26 @@ using namespace usbip;
 
 DEFINE_GUID(GUID_SD_USBIP2_FILTER,
 	0x8d7b540b, 0x77f8, 0x4942, 0x92, 0x8c, 0x77, 0xa9, 0x7a, 0xa1, 0x96, 0x40);
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
+{
+	PAGED_CODE();
+
+	IoInitializeRemoveLock(&f.remove_lock, pooltag, 0, 0);
+
+	if (!parent) {
+		//
+	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, 0)) {
+		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
+		return err;
+	} else {
+		f.parent_remove_lock = lck;
+	}
+
+	return STATUS_SUCCESS;
+}
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -88,26 +105,6 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 	return driver_name_equal(pdo->DriverObject, vhci, true);
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
-{
-	PAGED_CODE();
-
-	IoInitializeRemoveLock(&f.remove_lock, pooltag, 0, 0);
-
-	if (!parent) {
-		//
-	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, 0)) {
-		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
-		return err;
-	} else {
-		f.parent_remove_lock = lck;
-	}
-
-	return STATUS_SUCCESS;
-}
-
 } // namespace
 
 
@@ -147,43 +144,12 @@ PAGED void* usbip::GetDeviceProperty(
 	return nullptr;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-NTSTATUS usbip::dispatch_lower_nolock(_In_ filter_ext &f, _Inout_ IRP *irp)
-{
-	if (auto &lower = f.lower) {
-		return ForwardIrpAsync(lower, irp);
-	}
-
-	auto &stack = *IoGetCurrentIrpStackLocation(irp);
-
-	TraceDbg("MajorFunction %#x, MinorFunction %#x, lower DEVICE_OBJECT is NULL", 
-		stack.MajorFunction, stack.MinorFunction);
-
-	return CompleteRequest(irp, STATUS_INVALID_DEVICE_REQUEST);
-}
-
-_Function_class_(DRIVER_DISPATCH)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-NTSTATUS usbip::dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
-{
-	auto &fltr = *get_filter_ext(devobj);
-
-	libdrv::RemoveLockGuard lck(fltr.remove_lock);
-	if (auto err = lck.acquired()) {
-		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
-		return CompleteRequest(irp, err);
-	}
-
-	return dispatch_lower_nolock(fltr, irp);
-}
-
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED void usbip::destroy(_Inout_ filter_ext &f)
 {
 	PAGED_CODE();
+	TraceDbg("FiDO %04x, lower %04x", ptr04x(f.self), ptr04x(f.lower));
 
 	if (auto &target = f.lower) {
 		IoDetachDevice(target);
@@ -208,9 +174,9 @@ PAGED NTSTATUS usbip::do_add_device(
 	filter_ext *fltr{};
 	DEVICE_OBJECT *fido{}; // Filter Device Object
 
-	if (auto err = IoCreateDeviceSecure(drvobj, sizeof(*fltr), nullptr, type, props,
-		false, &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX,
-		&GUID_SD_USBIP2_FILTER, &fido)) {
+	if (auto err = IoCreateDeviceSecure(drvobj, sizeof(*fltr), nullptr, type, props, false, 
+		                            &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RWX_RES_RWX,
+		                            &GUID_SD_USBIP2_FILTER, &fido)) {
 		Trace(TRACE_LEVEL_ERROR, "IoCreateDeviceSecure %!STATUS!", err);
 		return err;
 	}
@@ -220,7 +186,6 @@ PAGED NTSTATUS usbip::do_add_device(
 //	fltr->pdo = pdo;
 
 	if (auto err = init(*fltr, parent)) {
-		Trace(TRACE_LEVEL_ERROR, "init %!STATUS!", err);
 		destroy(*fltr);
 		return err;
 	}

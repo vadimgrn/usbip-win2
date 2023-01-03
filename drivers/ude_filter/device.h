@@ -53,15 +53,6 @@ _IRQL_requires_same_
 _When_(return>=0, _Kernel_clear_do_init_(__yes))
 PAGED NTSTATUS do_add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *pdo, _In_opt_ filter_ext *parent);
 
-_Function_class_(DRIVER_DISPATCH)
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-NTSTATUS dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-NTSTATUS dispatch_lower_nolock(_In_ filter_ext &f, _Inout_ IRP *irp);
-
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED void destroy(_Inout_ filter_ext &f);
