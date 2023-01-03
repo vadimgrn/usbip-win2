@@ -12,13 +12,9 @@ namespace libdrv
 class RemoveLockGuard
 {
 public:
-        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock) : m_lock(&lock) 
-        {
-                if (auto err = IoAcquireRemoveLock(m_lock, nullptr)) {
-                        NT_ASSERT(err == STATUS_DELETE_PENDING);
-                        m_lock = nullptr;
-                }
-        }
+        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock) : 
+                m_result(IoAcquireRemoveLock(&lock, nullptr)),
+                m_lock(NT_SUCCESS(m_result) ? &lock : nullptr) {}
 
         ~RemoveLockGuard() 
         {
@@ -27,7 +23,10 @@ public:
                 }
         }
 
-        auto acquired() const { return m_lock ? STATUS_SUCCESS : STATUS_DELETE_PENDING; }
+        RemoveLockGuard(const RemoveLockGuard&) = delete;
+        RemoveLockGuard& operator =(const RemoveLockGuard&) = delete;
+
+        auto acquired() const { return m_result; }
 
         void release_and_wait()
         {
@@ -37,11 +36,9 @@ public:
                 }
         }
 
-        RemoveLockGuard(const RemoveLockGuard&) = delete;
-        RemoveLockGuard& operator =(const RemoveLockGuard&) = delete;
-
 private:
-        IO_REMOVE_LOCK *m_lock{};
+        NTSTATUS m_result;
+        IO_REMOVE_LOCK *m_lock;
 };
 
 } // namespace libdrv

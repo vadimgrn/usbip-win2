@@ -24,6 +24,18 @@ using namespace usbip;
 DEFINE_GUID(GUID_SD_USBIP2_FILTER,
 	0x8d7b540b, 0x77f8, 0x4942, 0x92, 0x8c, 0x77, 0xa9, 0x7a, 0xa1, 0x96, 0x40);
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED void free(_Inout_ filter_ext &fltr)
+{
+	PAGED_CODE();
+
+	if (auto &ptr = fltr.children) {
+		ExFreePoolWithTag(ptr, pooltag);
+		ptr = nullptr;
+	}
+}
+
 /*
  * DRIVER_OBJECT.DriverName is an undocumented member and can't be used.
  */
@@ -188,6 +200,7 @@ PAGED void usbip::destroy(_Inout_ filter_ext &fltr)
 		target = nullptr;
 	}
 
+	free(fltr);
 	IoDeleteDevice(fltr.self);
 }
 
@@ -216,7 +229,7 @@ NTSTATUS usbip::dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 
 	libdrv::RemoveLockGuard lck(fltr.remove_lock);
 	if (auto err = lck.acquired()) {
-		Trace(TRACE_LEVEL_ERROR, "%!STATUS!", err);
+		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
 

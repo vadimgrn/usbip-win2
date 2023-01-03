@@ -16,6 +16,7 @@ struct filter_ext
 	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
 
 	IO_REMOVE_LOCK remove_lock;
+	DEVICE_RELATIONS *children;
 };
 
 

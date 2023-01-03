@@ -6,8 +6,9 @@
 #include "trace.h"
 #include "pnp.tmh"
 
-#include "irp.h"
+#include "driver.h"
 #include "device.h"
+#include "irp.h"
 
 #include <libdrv\remove_lock.h>
 
@@ -15,6 +16,68 @@ namespace
 {
 
 using namespace usbip;
+
+constexpr auto SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
+{
+	return sizeof(DEVICE_RELATIONS) + (cnt ? --cnt*sizeof(*DEVICE_RELATIONS::Objects) : 0);
+}
+static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
+static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
+static_assert(SizeOf_DEVICE_RELATIONS(2)  > sizeof(DEVICE_RELATIONS));
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
+{
+	PAGED_CODE();
+
+	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
+	auto dst = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, sz, pooltag);
+
+	if (dst) {
+		RtlCopyMemory(dst, &src, sz);
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
+	}
+
+	return dst;
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *devobj)
+{
+	PAGED_CODE();
+	NT_ASSERT(devobj);
+
+	for (ULONG i = 0; i < r.Count; ++i) {
+		if (r.Objects[i] == devobj) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED void query_bus_relations(_Inout_ DEVICE_RELATIONS* &old_rel, _In_ const DEVICE_RELATIONS &rel)
+{
+	PAGED_CODE();
+
+	for (ULONG i = 0; i < rel.Count; ++i) {
+		auto obj = rel.Objects[i];
+		if (!(old_rel && contains(*old_rel, obj))) {
+			TraceDbg("Newly added %04x", ptr04x(obj));
+		}
+	}
+
+	if (old_rel) {
+		ExFreePoolWithTag(old_rel, pooltag);
+	}
+
+	old_rel = rel.Count ? clone(rel) : nullptr;
+}
 
 /*
  * After we forward the request, the bus driver have created or deleted
@@ -32,10 +95,8 @@ PAGED auto query_bus_relations(_In_ filter_ext &fltr, _In_ IRP *irp)
 	TraceDbg("%!STATUS!", st);
 
 	if (NT_SUCCESS(st)) {
-		auto &r = *reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information);
-		for (ULONG i = 0; i < r.Count; ++i) {
-			auto pdo = r.Objects[i];
-			TraceDbg("#%lu pdo %04x", i, ptr04x(pdo));
+		if (auto r = reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information)) {
+			query_bus_relations(fltr.children, *r);
 		}
 	}
 
@@ -56,7 +117,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	libdrv::RemoveLockGuard lck(fltr.remove_lock);
 	if (auto err = lck.acquired()) {
-		Trace(TRACE_LEVEL_ERROR, "%!STATUS!", err);
+		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
 	
