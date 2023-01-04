@@ -85,7 +85,7 @@ PAGED bool driver_name_equal(
 		return false;
 	}
 
-	TraceDbg("%04x, DriverName '%!USTR!'", ptr04x(driver), &info->Name);
+	TraceDbg("DriverName '%!USTR!'", &info->Name);
 	return RtlEqualUnicodeString(&info->Name, &expected, CaseInSensitive);
 }
 
@@ -104,8 +104,8 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 {
 	PAGED_CODE();
 
-	DECLARE_CONST_UNICODE_STRING(vhci, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
-	return driver_name_equal(pdo->DriverObject, vhci, true);
+	DECLARE_CONST_UNICODE_STRING(name, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
+	return driver_name_equal(pdo->DriverObject, name, true);
 }
 
 } // namespace

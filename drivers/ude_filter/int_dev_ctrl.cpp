@@ -23,6 +23,26 @@ inline auto get_ioctl(_In_ IRP *irp)
 	return stack->Parameters.DeviceIoControl.IoControlCode;
 }
 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+void select_configuration(_In_ DEVICE_OBJECT *devobj, _In_ const _URB_SELECT_CONFIGURATION &r)
+{
+	auto cd = r.ConfigurationDescriptor; // nullptr if unconfigured
+	UCHAR value = cd ? cd->bConfigurationValue : 0;
+
+	TraceDbg("dev %04x, ConfigurationHandle %04x, bConfigurationValue %d", 
+		  ptr04x(devobj), ptr04x(r.ConfigurationHandle), value);
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+void select_iterface(_In_ DEVICE_OBJECT *devobj, _In_ const _URB_SELECT_INTERFACE &r)
+{
+	auto &iface = r.Interface;
+	TraceDbg("dev %04x, ConfigurationHandle %04x, InterfaceNumber %d, AlternateSetting %d", 
+		  ptr04x(devobj), ptr04x(r.ConfigurationHandle), iface.InterfaceNumber, iface.AlternateSetting);
+}
+
 } // namespace
 
 
@@ -41,8 +61,15 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	}
 
 	if (!fltr.is_hub && get_ioctl(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp));
-		TraceDbg("%04x, %s", ptr04x(devobj), urb_function_str(urb.UrbHeader.Function));
+
+		switch (auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp)); urb.UrbHeader.Function) {
+		case URB_FUNCTION_SELECT_INTERFACE:
+			select_iterface(devobj, urb.UrbSelectInterface);
+			break;
+		case URB_FUNCTION_SELECT_CONFIGURATION:
+			select_configuration(devobj, urb.UrbSelectConfiguration);
+			break;
+		}
 	}
 
 	return ForwardIrp(fltr, irp);
