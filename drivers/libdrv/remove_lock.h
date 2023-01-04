@@ -1,6 +1,6 @@
 /*
-* Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
-*/
+ * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
 
 #pragma once
 
@@ -30,10 +30,9 @@ public:
 
         void release_and_wait()
         {
-                if (m_lock) {
-                        IoReleaseRemoveLockAndWait(m_lock, nullptr);
-                        m_lock = nullptr;
-                }
+                NT_ASSERT(m_lock);
+                IoReleaseRemoveLockAndWait(m_lock, nullptr);
+                m_lock = nullptr;
         }
 
 private:

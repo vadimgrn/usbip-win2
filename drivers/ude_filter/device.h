@@ -15,32 +15,27 @@ namespace usbip
 struct filter_ext
 {
 	DEVICE_OBJECT *self; // back pointer to the Filter Device Object for which this is the extension
-//	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
+	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
 	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
 
 	IO_REMOVE_LOCK remove_lock;
 	
-	// device only
-	IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
+	union {
+		struct {
+			DEVICE_RELATIONS *previous; // children
+		} hub; // is_hub == true
 
-	// hub only
-	DEVICE_RELATIONS *previous;
+		struct {
+			IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
+		} dev; // is_hub == false
+	};
+	bool is_hub;
 };
 
 inline auto get_filter_ext(_In_ DEVICE_OBJECT *devobj)
 { 
 	NT_ASSERT(devobj);
 	return static_cast<filter_ext*>(devobj->DeviceExtension); 
-}
-
-inline auto is_hub(_In_ const filter_ext &f)
-{
-	return !f.parent_remove_lock;
-}
-
-inline bool is_device(_In_ const filter_ext &f)
-{
-	return f.parent_remove_lock;
 }
 
 _Function_class_(DRIVER_ADD_DEVICE)

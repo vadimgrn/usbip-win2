@@ -65,19 +65,22 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
 {
 	PAGED_CODE();
 
+	NT_ASSERT(f.is_hub);
+	auto &previous = f.hub.previous;
+
 	for (ULONG i = 0; i < r.Count; ++i) {
 		auto pdo = r.Objects[i];
-		if (!(f.previous && contains(*f.previous, pdo))) {
+		if (!(previous && contains(*previous, pdo))) {
 			TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
 			do_add_device(f.self->DriverObject, pdo, &f);
 		}
 	}
 
-	if (auto ptr = f.previous) {
+	if (auto ptr = previous) {
 		ExFreePoolWithTag(ptr, pooltag);
 	}
 
-	f.previous = r.Count ? clone(r) : nullptr;
+	previous = r.Count ? clone(r) : nullptr;
 }
 
 /*
@@ -91,7 +94,6 @@ _IRQL_requires_same_
 PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
 	PAGED_CODE();
-	NT_ASSERT(is_hub(fltr));
 
 	auto st = ForwardIrpAndWait(fltr.lower, irp);
 	TraceDbg("%!STATUS!", st);
@@ -126,14 +128,14 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	NTSTATUS st;
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
-	case IRP_MN_REMOVE_DEVICE: // a driver must set Irp->IoStatus.Status to STATUS_SUCCESS
+	case IRP_MN_REMOVE_DEVICE:
 		st = ForwardIrpAsync(fltr.lower, irp);
 		TraceDbg("REMOVE_DEVICE(%04x) %!STATUS! (must be SUCCESS)", ptr04x(devobj), st);
 		lck.release_and_wait();
 		destroy(fltr);
 		break;
 	case IRP_MN_QUERY_DEVICE_RELATIONS:
-		if (stack.Parameters.QueryDeviceRelations.Type == BusRelations && is_hub(fltr)) {
+		if (fltr.is_hub && stack.Parameters.QueryDeviceRelations.Type == BusRelations) {
 			st = query_bus_relations(fltr, irp);
 			break;
 		}
