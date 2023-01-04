@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <ntifs.h>
@@ -50,15 +50,13 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 
 	if (f.is_hub) {
 		auto &hub = f.hub;
-		if (auto &ptr = hub.previous) {
+		if (auto ptr = hub.previous) {
 			ExFreePoolWithTag(ptr, pooltag);
-			ptr = nullptr;
 		}
 	} else {
 		auto &dev = f.dev;
-		if (auto &ptr = dev.parent_remove_lock) {
-			IoReleaseRemoveLock(ptr, 0);
-			ptr = nullptr;
+		if (auto lck = dev.parent_remove_lock) {
+			IoReleaseRemoveLock(lck, 0);
 		}
 	}
 }
@@ -87,7 +85,7 @@ PAGED bool driver_name_equal(
 		return false;
 	}
 
-	TraceDbg("DriverName '%!USTR!'", &info->Name);
+	TraceDbg("%04x, DriverName '%!USTR!'", ptr04x(driver), &info->Name);
 	return RtlEqualUnicodeString(&info->Name, &expected, CaseInSensitive);
 }
 
@@ -113,48 +111,12 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 } // namespace
 
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void* usbip::GetDeviceProperty(
-	_In_ DEVICE_OBJECT *devobj, _In_ DEVICE_REGISTRY_PROPERTY prop, 
-	_Inout_ NTSTATUS &error, _Inout_ ULONG &ResultLength)
-{
-	PAGED_CODE();
-
-	if (!ResultLength) {
-		ResultLength = 1024;
-	}
-	
-	auto alloc = [] (auto len) { return ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, len, pooltag); };
-
-	for (auto buf = alloc(ResultLength); buf; ) {
-
-		error = IoGetDeviceProperty(devobj, prop, ResultLength, buf, &ResultLength);
-
-		switch (error) {
-		case STATUS_SUCCESS:
-			return buf;
-		case STATUS_BUFFER_TOO_SMALL:
-			ExFreePoolWithTag(buf, pooltag);
-			buf = alloc(ResultLength);
-			break;
-		default:
-			TraceDbg("%!DEVICE_REGISTRY_PROPERTY! %!STATUS!", prop, error);
-			ExFreePoolWithTag(buf, pooltag);
-			return nullptr;
-		}
-	}
-
-	error = STATUS_INSUFFICIENT_RESOURCES;
-	return nullptr;
-}
-
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED void usbip::destroy(_Inout_ filter_ext &f)
 {
 	PAGED_CODE();
-	TraceDbg("FiDO %04x, pdo %04x, lower %04x", ptr04x(f.self), ptr04x(f.pdo), ptr04x(f.lower));
+	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(f.self));
 
 	if (auto &target = f.lower) {
 		IoDetachDevice(target);
@@ -208,8 +170,7 @@ PAGED NTSTATUS usbip::do_add_device(
 		return err;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, PDO %04x, lower PDO %04x", 
-		ptr04x(fido), ptr04x(pdo), ptr04x(lower));
+	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x, lower %04x", ptr04x(fido), ptr04x(pdo), ptr04x(lower));
 
 	{
 		auto &Flags = fido->Flags;
@@ -226,6 +187,7 @@ _IRQL_requires_same_
 PAGED NTSTATUS usbip::add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT *hub_or_hci_pdo)
 {
 	PAGED_CODE();
+	Trace(TRACE_LEVEL_INFORMATION, "drv %04x, pdo %04x", ptr04x(drvobj), ptr04x(hub_or_hci_pdo));
 
 	if (!is_abobe_vhci(hub_or_hci_pdo)) {
 		TraceDbg("Skip this device");

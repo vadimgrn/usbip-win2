@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "pnp.h"
@@ -91,16 +91,16 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
 */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
+PAGED auto query_bus_relations(_Inout_ filter_ext &f, _In_ IRP *irp)
 {
 	PAGED_CODE();
 
-	auto st = ForwardIrpAndWait(fltr.lower, irp);
+	auto st = ForwardIrpAndWait(f.lower, irp);
 	TraceDbg("%!STATUS!", st);
 
 	if (NT_SUCCESS(st)) {
 		if (auto r = reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information)) {
-			query_bus_relations(fltr, *r);
+			query_bus_relations(f, *r);
 		}
 	}
 
@@ -108,6 +108,7 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 }
 
 } // namespace
+
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -130,7 +131,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_REMOVE_DEVICE:
 		st = ForwardIrpAsync(fltr.lower, irp);
-		TraceDbg("REMOVE_DEVICE(%04x) %!STATUS! (must be SUCCESS)", ptr04x(devobj), st);
+		TraceDbg("REMOVE_DEVICE %04x, %!STATUS!", ptr04x(devobj), st);
 		lck.release_and_wait();
 		destroy(fltr);
 		break;

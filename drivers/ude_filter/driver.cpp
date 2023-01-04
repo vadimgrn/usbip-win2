@@ -9,8 +9,9 @@
 #include "driver.tmh"
 
 #include "device.h"
-#include "pnp.h"
 #include "irp.h"
+#include "pnp.h"
+#include "int_dev_ctrl.h"
 
 #include <libdrv\remove_lock.h>
 
@@ -66,5 +67,7 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_S
 	}
 
 	drvobj->MajorFunction[IRP_MJ_PNP] = pnp;
+	drvobj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = int_dev_ctrl;
+
 	return STATUS_SUCCESS;
 }

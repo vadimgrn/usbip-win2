@@ -5,6 +5,7 @@
     <ClCompile Include="device.cpp" />
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="irp.cpp" />
+    <ClCompile Include="int_dev_ctrl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="driver.h" />
@@ -12,6 +13,7 @@
     <ClInclude Include="device.h" />
     <ClInclude Include="pnp.h" />
     <ClInclude Include="irp.h" />
+    <ClInclude Include="int_dev_ctrl.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />
