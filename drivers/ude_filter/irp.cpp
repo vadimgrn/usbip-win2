@@ -53,7 +53,7 @@ PAGED NTSTATUS usbip::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::ForwardIrpAsync(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
+NTSTATUS usbip::ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	NT_ASSERT(devobj);
 	IoSkipCurrentIrpStackLocation(irp);
@@ -67,18 +67,4 @@ NTSTATUS usbip::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
 	irp->IoStatus.Status = status;
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 	return status;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::CompleteRequestAsCancelled(_In_ IRP *irp)
-{
-	TraceDbg("%04x", ptr04x(irp));
-	auto st = STATUS_CANCELLED;
-
-	irp->IoStatus.Status = st;
-	irp->IoStatus.Information = 0;
-
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
-	return st;
 }

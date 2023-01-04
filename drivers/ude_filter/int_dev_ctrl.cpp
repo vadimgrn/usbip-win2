@@ -6,7 +6,6 @@
 #include "trace.h"
 #include "int_dev_ctrl.tmh"
 
-#include "device.h"
 #include "irp.h"
 
 #include <libdrv\remove_lock.h>
@@ -46,5 +45,5 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		TraceDbg("%04x, %s", ptr04x(devobj), urb_function_str(urb.UrbHeader.Function));
 	}
 
-	return ForwardIrpAsync(fltr.lower, irp);
+	return ForwardIrp(fltr, irp);
 }

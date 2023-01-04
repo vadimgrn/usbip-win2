@@ -7,7 +7,6 @@
 #include "pnp.tmh"
 
 #include "driver.h"
-#include "device.h"
 #include "irp.h"
 
 #include <libdrv\remove_lock.h>
@@ -76,11 +75,19 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
 		}
 	}
 
-	if (auto ptr = previous) {
-		ExFreePoolWithTag(ptr, pooltag);
-	}
+	auto set_previous = [&previous] (auto ptr) 
+	{
+		if (previous) {
+			ExFreePoolWithTag(previous, pooltag);
+		}
+		previous = ptr;
+	};
 
-	previous = r.Count ? clone(r) : nullptr;
+	if (!r.Count) {
+		set_previous(nullptr);
+	} else if (auto ptr = clone(r)) {
+		set_previous(ptr);
+	}
 }
 
 /*
@@ -88,16 +95,14 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
  * a child device object. When bus driver created one (or more), this is the PDO
  * of our target device, we create and attach a filter object to it.
  * Note that we only attach the last detected USB device on it's Hub.
-*/
+ */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED auto query_bus_relations(_Inout_ filter_ext &f, _In_ IRP *irp)
 {
 	PAGED_CODE();
 
-	auto st = ForwardIrpAndWait(f.lower, irp);
-	TraceDbg("%!STATUS!", st);
-
+	auto st = ForwardIrpAndWait(f, irp);
 	if (NT_SUCCESS(st)) {
 		if (auto r = reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information)) {
 			query_bus_relations(f, *r);
@@ -130,7 +135,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_REMOVE_DEVICE:
-		st = ForwardIrpAsync(fltr.lower, irp);
+		st = ForwardIrp(fltr, irp);
 		TraceDbg("REMOVE_DEVICE %04x, %!STATUS!", ptr04x(devobj), st);
 		lck.release_and_wait();
 		destroy(fltr);
@@ -142,7 +147,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		}
 		[[fallthrough]];
 	default:
-		st = ForwardIrpAsync(fltr.lower, irp);
+		st = ForwardIrp(fltr, irp);
 	}
 
 	return st;

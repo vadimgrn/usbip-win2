@@ -8,7 +8,6 @@
 #include "trace.h"
 #include "driver.tmh"
 
-#include "device.h"
 #include "irp.h"
 #include "pnp.h"
 #include "int_dev_ctrl.h"
@@ -43,7 +42,7 @@ auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	return ForwardIrpAsync(f.lower, irp);
+	return ForwardIrp(f, irp);
 }
 
 } // namespace
