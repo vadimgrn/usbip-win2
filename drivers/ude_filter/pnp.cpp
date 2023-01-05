@@ -112,6 +112,26 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &f, _In_ IRP *irp)
 	return CompleteRequest(irp, st);
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED auto remove_device(_In_ IRP *irp, _In_ libdrv::RemoveLockGuard &lock, _Inout_ filter_ext &fltr)
+{
+	PAGED_CODE();
+	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
+
+	if (auto &handle = fltr.dev.usbd) {
+		USBD_CloseHandle(handle); // must be called before sending the IRP down the USB driver stack
+		handle = nullptr;
+	}
+
+	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
+
+	lock.release_and_wait();
+	destroy(fltr);
+
+	return st;
+}
+
 } // namespace
 
 
@@ -135,10 +155,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_REMOVE_DEVICE:
-		st = ForwardIrp(fltr, irp);
-		TraceDbg("REMOVE_DEVICE %04x, %!STATUS!", ptr04x(devobj), st);
-		lck.release_and_wait();
-		destroy(fltr);
+		st = remove_device(irp, lck, fltr);
 		break;
 	case IRP_MN_QUERY_DEVICE_RELATIONS:
 		if (fltr.is_hub && stack.Parameters.QueryDeviceRelations.Type == BusRelations) {

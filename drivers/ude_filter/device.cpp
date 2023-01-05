@@ -49,6 +49,8 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 		}
 	} else {
 		auto &dev = f.dev;
+		NT_ASSERT(!dev.usbd); // @see IRP_MN_REMOVE_DEVICE
+
 		if (auto lck = dev.parent_remove_lock) {
 			IoReleaseRemoveLock(lck, 0);
 		}
@@ -79,7 +81,7 @@ PAGED bool driver_name_equal(
 		return false;
 	}
 
-	TraceDbg("DriverName '%!USTR!'", &info->Name);
+	TraceDbg("'%!USTR!'", &info->Name);
 	return RtlEqualUnicodeString(&info->Name, &expected, CaseInSensitive);
 }
 
@@ -112,7 +114,7 @@ PAGED void usbip::destroy(_Inout_ filter_ext &f)
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(f.self));
 
-	if (auto &target = f.lower) {
+	if (auto &target = f.target) {
 		IoDetachDevice(target);
 		target = nullptr;
 	}
@@ -170,23 +172,32 @@ PAGED NTSTATUS usbip::do_add_device(
 		return err;
 	}
 
-	auto &lower = fltr->lower; // FDO or another FiDO
+	auto &target = fltr->target; // FDO or another FiDO
 
-	lower = IoAttachDeviceToDeviceStack(fido, pdo); // object to which fido was attached
-	if (!lower) {
+	target = IoAttachDeviceToDeviceStack(fido, pdo); // object to which fido was attached
+	if (!target) {
 		auto err = STATUS_NO_SUCH_DEVICE;
 		Trace(TRACE_LEVEL_ERROR, "IoAttachDeviceToDeviceStack %!STATUS!", err);
 		destroy(*fltr);
 		return err;
 	}
 
-	fido->DeviceType = lower->DeviceType;
-	fido->Characteristics = lower->Characteristics; 
+	fido->DeviceType = target->DeviceType;
+	fido->Characteristics = target->Characteristics; 
+	fido->Flags |= target->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE | DO_POWER_INRUSH);
 
-	fido->Flags |= lower->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE | DO_POWER_INRUSH);
+	if (fltr->is_hub) {
+		//
+	} else if (auto &dev = fltr->dev;
+		   auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, pooltag, &dev.usbd)) {
+		Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
+		destroy(*fltr);
+		return err;
+	}
+
+	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x, target %04x", ptr04x(fido), ptr04x(pdo), ptr04x(target));
+
 	fido->Flags &= ~DO_DEVICE_INITIALIZING;
-
-	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x, lower %04x", ptr04x(fido), ptr04x(pdo), ptr04x(lower));
 	return STATUS_SUCCESS;
 }
 

@@ -9,7 +9,6 @@
 #include "irp.h"
 #include <libdrv\remove_lock.h>
 
-#include <usb.h>
 #include <usbioctl.h>
 
 namespace

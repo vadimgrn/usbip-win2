@@ -6,6 +6,12 @@
 
 #include <libdrv\codeseg.h>
 
+#include <usb.h>
+
+extern "C" {
+  #include <usbdlib.h>
+}
+
 namespace usbip
 {
 
@@ -15,11 +21,11 @@ namespace usbip
 struct filter_ext
 {
 	DEVICE_OBJECT *self; // back pointer to the Filter Device Object for which this is the extension
-	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
+	DEVICE_OBJECT *target; // = IoAttachDeviceToDeviceStack(self, pdo); next lower object in the device stack
 	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
 
 	IO_REMOVE_LOCK remove_lock;
-	
+
 	union {
 		struct {
 			DEVICE_RELATIONS *previous; // children
@@ -27,6 +33,7 @@ struct filter_ext
 
 		struct {
 			IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
+			USBD_HANDLE usbd;
 		} dev; // is_hub == false
 	};
 	bool is_hub;

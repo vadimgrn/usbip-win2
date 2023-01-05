@@ -15,7 +15,7 @@ NTSTATUS ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 inline auto ForwardIrp(_In_ filter_ext &f, _In_ IRP *irp)
 {
-        return ForwardIrp(f.lower, irp);
+        return ForwardIrp(f.target, irp);
 }
 
 _IRQL_requires_same_
@@ -24,7 +24,7 @@ PAGED NTSTATUS ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 inline auto ForwardIrpAndWait(_In_ filter_ext &f, _In_ IRP *irp)
 {
-        return ForwardIrpAndWait(f.lower, irp);
+        return ForwardIrpAndWait(f.target, irp);
 }
 
 _IRQL_requires_same_
