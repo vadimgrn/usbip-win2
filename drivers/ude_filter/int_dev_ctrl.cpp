@@ -7,9 +7,7 @@
 #include "int_dev_ctrl.tmh"
 
 #include "irp.h"
-
 #include <libdrv\remove_lock.h>
-#include <libdrv\dbgcommon.h>
 
 #include <usb.h>
 #include <usbioctl.h>

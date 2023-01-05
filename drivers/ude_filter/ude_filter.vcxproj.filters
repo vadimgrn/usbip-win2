@@ -16,9 +16,6 @@
     <ClInclude Include="int_dev_ctrl.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="custom_wpp.ini" />
-  </ItemGroup>
-  <ItemGroup>
     <Inf Include="usbip2_filter.inf" />
   </ItemGroup>
 </Project>

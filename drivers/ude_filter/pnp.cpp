@@ -75,18 +75,18 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
 		}
 	}
 
-	auto set_previous = [&previous] (auto ptr) 
+	auto assign = [] (auto &ptr, auto addr) 
 	{
-		if (previous) {
-			ExFreePoolWithTag(previous, pooltag);
+		if (ptr) {
+			ExFreePoolWithTag(ptr, pooltag);
 		}
-		previous = ptr;
+		ptr = addr;
 	};
 
 	if (!r.Count) {
-		set_previous(nullptr);
-	} else if (auto ptr = clone(r)) {
-		set_previous(ptr);
+		assign(previous, nullptr);
+	} else if (auto ptr = clone(r)) { // leave as is in case of an error
+		assign(previous, ptr);
 	}
 }
 

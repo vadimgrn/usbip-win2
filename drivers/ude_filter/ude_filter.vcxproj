@@ -65,12 +65,13 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <WppEnabled>true</WppEnabled>
       <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
+      <WppAdditionalConfigurationFile>
+      </WppAdditionalConfigurationFile>
       <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -84,12 +85,13 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <WppEnabled>true</WppEnabled>
       <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
+      <WppAdditionalConfigurationFile>
+      </WppAdditionalConfigurationFile>
       <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Wdmsec.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -112,14 +114,6 @@
     <ClInclude Include="pnp.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="trace.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="custom_wpp.ini" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\libdrv\libdrv.vcxproj">
-      <Project>{27ab4325-4980-4634-9818-ae6bd61de532}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

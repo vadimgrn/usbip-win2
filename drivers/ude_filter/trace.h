@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -57,5 +57,6 @@ inline auto ptr04x(const void *ptr) // use format "%04x"
 // begin_wpp config
 // FUNC Trace{FLAGS=FLAG_GENERAL}(LEVEL, MSG, ...);
 // FUNC TraceEvents(LEVEL, FLAGS, MSG, ...);
+// FUNC TraceDbg{LEVEL=TRACE_LEVEL_VERBOSE, FLAGS=FLAG_DBG}(MSG, ...);
 // end_wpp
 //

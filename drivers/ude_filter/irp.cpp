@@ -1,10 +1,8 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "irp.h"
-#include "trace.h"
-#include "irp.tmh"
 
 namespace
 {

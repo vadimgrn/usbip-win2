@@ -15,8 +15,8 @@ namespace usbip
 struct filter_ext
 {
 	DEVICE_OBJECT *self; // back pointer to the Filter Device Object for which this is the extension
-	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
 	DEVICE_OBJECT *lower; // the result of IoAttachDeviceToDeviceStack(self, pdo)
+	DEVICE_OBJECT *pdo; // the second argument of DRIVER_ADD_DEVICE
 
 	IO_REMOVE_LOCK remove_lock;
 	
