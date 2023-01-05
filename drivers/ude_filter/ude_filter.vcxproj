@@ -67,7 +67,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAdditionalConfigurationFile>
       </WppAdditionalConfigurationFile>
-      <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
@@ -87,7 +87,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAdditionalConfigurationFile>
       </WppAdditionalConfigurationFile>
-      <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
@@ -114,6 +114,11 @@
     <ClInclude Include="pnp.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="trace.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\libdrv\libdrv.vcxproj">
+      <Project>{27ab4325-4980-4634-9818-ae6bd61de532}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

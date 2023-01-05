@@ -109,7 +109,8 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &f, _In_ IRP *irp)
 		}
 	}
 
-	return CompleteRequest(irp, st);
+	CompleteRequest(irp);
+	return st;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -154,6 +155,10 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	NTSTATUS st;
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
+	case IRP_MN_START_DEVICE:
+		st = ForwardIrpAndWait(fltr, irp); // must be started after lower device objects
+		CompleteRequest(irp);
+		break;
 	case IRP_MN_REMOVE_DEVICE:
 		st = remove_device(irp, lck, fltr);
 		break;

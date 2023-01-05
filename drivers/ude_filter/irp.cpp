@@ -3,6 +3,8 @@
  */
 
 #include "irp.h"
+#include "trace.h"
+#include "irp.tmh"
 
 namespace
 {
@@ -24,6 +26,8 @@ NTSTATUS on_completion(
 
 
 /*
+ * A caller must complete the IRP after this call because IRP completion is stopped 
+ * by returning StopCompletion from CompletionRoutine.
  * @see IoForwardIrpSynchronously
  */
 _IRQL_requires_same_
@@ -37,7 +41,11 @@ PAGED NTSTATUS usbip::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 	KeInitializeEvent(&evt, NotificationEvent, false);
 
 	IoCopyCurrentIrpStackLocationToNext(irp);
-	IoSetCompletionRoutine(irp, on_completion, &evt, true, true, true);
+	
+	if (auto err = IoSetCompletionRoutineEx(devobj, irp, on_completion, &evt, true, true, true)) {
+		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
+		return err;
+	}
 
 	auto status = IoCallDriver(devobj, irp);
 
@@ -63,6 +71,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
 {
 	irp->IoStatus.Status = status;
-	IoCompleteRequest(irp, IO_NO_INCREMENT);
+	CompleteRequest(irp);
 	return status;
 }
