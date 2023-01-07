@@ -65,7 +65,6 @@ void init(_Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool cfg_or_if, _In_ UCHAR val
 	}
 
 	r.TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-	r.Timeout = 5000; // milliseconds
 	
 	auto &pkt = get_setup_packet(r);
 	pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | 
@@ -79,12 +78,10 @@ void init(_Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool cfg_or_if, _In_ UCHAR val
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS on_completion(
-	_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS on_set_request(
+	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
-	NT_ASSERT(devobj->AttachedDevice == fltr.self);
-
 	auto urb = argv<0, URB>(irp);
 
 	TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", 
@@ -98,7 +95,7 @@ NTSTATUS on_completion(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void send_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, _In_ UCHAR index)
+void send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, _In_ UCHAR index)
 {
 	auto &target = fltr.target;
 
@@ -113,7 +110,7 @@ void send_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, 
 	next_stack->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
 	get_ioctl(irp.get(), next_stack) = IOCTL_INTERNAL_USB_SUBMIT_URB;
 
-	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_completion, &fltr, true, true, true)) {
+	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_set_request, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
 		return;
 	}
@@ -142,7 +139,7 @@ void send_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, 
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void post_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
+void send_set_config(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
 	auto cd = r.ConfigurationDescriptor; // null if unconfigured
 	UCHAR value = cd ? cd->bConfigurationValue : 0;
@@ -150,12 +147,12 @@ void post_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION
 	TraceDbg("dev %04x, ConfigurationHandle %04x, bConfigurationValue %d", 
 		  ptr04x(fltr.self), ptr04x(r.ConfigurationHandle), value);
 
-	send_request(fltr, true, value, 0);
+	send_set_request(fltr, true, value, 0);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void post_select_intf(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
+void send_set_interface(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
 {
 	auto &r = intf.Interface;
 
@@ -163,32 +160,50 @@ void post_select_intf(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &i
 		  ptr04x(fltr.self), ptr04x(intf.ConfigurationHandle),
 		  r.InterfaceNumber, r.AlternateSetting);
 
-	send_request(fltr, false, r.AlternateSetting, r.InterfaceNumber);
+	send_set_request(fltr, false, r.AlternateSetting, r.InterfaceNumber);
+}
+
+_Function_class_(IO_COMPLETION_ROUTINE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+{
+	auto &fltr = *static_cast<filter_ext*>(context);
+	auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp));
+
+	auto &hdr = urb.UrbHeader;
+	auto &func = hdr.Function;
+
+	if (auto st = irp->IoStatus.Status; !(NT_SUCCESS(st) && USBD_SUCCESS(hdr.Status))) {
+		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, %!STATUS!, USBD_STATUS_%s", 
+			ptr04x(fltr.self), urb_function_str(func), st, get_usbd_status(hdr.Status));
+
+	} else if (func == URB_FUNCTION_SELECT_INTERFACE) {
+		send_set_interface(fltr, urb.UrbSelectInterface);
+	} else {
+		NT_ASSERT(func == URB_FUNCTION_SELECT_CONFIGURATION);
+		send_set_config(fltr, urb.UrbSelectConfiguration);
+	}
+
+	if (irp->PendingReturned) {
+		IoMarkIrpPending(irp);
+	}
+
+	return ContinueCompletion;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto handle_select(_In_ filter_ext &fltr, _In_ IRP *irp, _In_ const URB &urb)
+auto handle_select(_In_ filter_ext &fltr, _In_ IRP *irp)
 {
-	auto &hdr = urb.UrbHeader;
-	auto &func = hdr.Function;
+	IoCopyCurrentIrpStackLocationToNext(irp);
 
-	auto st = ForwardIrpAndWait(fltr, irp);
-
-	if (!(NT_SUCCESS(st) && USBD_SUCCESS(hdr.Status))) {
-		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, %!STATUS!, USBD_STATUS_%s", 
-			ptr04x(fltr.self), urb_function_str(func), irp->IoStatus.Status, 
-			get_usbd_status(hdr.Status));
-
-	} else if (func == URB_FUNCTION_SELECT_INTERFACE) {
-		post_select_intf(fltr, urb.UrbSelectInterface);
-	} else {
-		NT_ASSERT(func == URB_FUNCTION_SELECT_CONFIGURATION);
-		post_select_cfg(fltr, urb.UrbSelectConfiguration);
+	if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, on_select, &fltr, true, true, true)) {
+		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
+		IoSkipCurrentIrpStackLocation(irp); // forward and forget
 	}
 
-	CompleteRequest(irp);
-	return st;
+	return IoCallDriver(fltr.target, irp);
 }
 
 } // namespace
@@ -210,10 +225,10 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	if (!fltr.is_hub && get_ioctl(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
 
-		switch (auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp)); urb.UrbHeader.Function) {
+		switch (auto urb = static_cast<URB*>(URB_FROM_IRP(irp)); urb->UrbHeader.Function) {
 		case URB_FUNCTION_SELECT_INTERFACE:
 		case URB_FUNCTION_SELECT_CONFIGURATION: 
-			return handle_select(fltr, irp, urb);
+			return handle_select(fltr, irp);
 		}
 	}
 
