@@ -6,8 +6,9 @@
 #include "trace.h"
 #include "int_dev_ctrl.tmh"
 
-#include "device.h"
 #include "irp.h"
+#include "device.h"
+#include "select.h"
 
 #include <usbip\ch9.h>
 #include <libdrv\remove_lock.h>
@@ -95,14 +96,14 @@ NTSTATUS on_set_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, _In_ UCHAR index)
+auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, _In_ UCHAR index)
 {
 	auto &target = fltr.target;
 
 	irp_ptr irp(target->StackSize, false);
 	if (!irp) {
 		Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp error");
-		return;
+		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
 	auto next_stack = IoGetNextIrpStackLocation(irp.get());
@@ -112,7 +113,7 @@ void send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 
 	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_set_request, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
-		return;
+		return err;
 	}
 
 	auto &usbd = fltr.dev.usbd;
@@ -120,46 +121,48 @@ void send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 	URB *urb{};
 	if (auto err = USBD_UrbAllocate(usbd, &urb)) {
 		Trace(TRACE_LEVEL_ERROR, "USBD_UrbAllocate %!STATUS!", err);
-		return;
+		return err;
 	}
 
 	USBD_AssignUrbToIoStackLocation(usbd, next_stack, urb);
-	argv<0>(irp.get()) = urb;
-
 	init(urb->UrbControlTransferEx, cfg_or_if, value, index);
+
 	TraceDbg("dev %04x, irp %04x", ptr04x(fltr.self), ptr04x(irp.get()));
 
-	if (auto st = IoCallDriver(target, irp.get()); NT_ERROR(st)) {
+	argv<0>(irp.get()) = urb;
+	auto st = IoCallDriver(target, irp.get());
+
+	if (NT_ERROR(st)) {
 		Trace(TRACE_LEVEL_ERROR, "IoCallDriver %!STATUS!", st);
 		USBD_UrbFree(usbd, urb);
 	} else {
 		irp.release();
 	}
+
+	return st;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void send_set_config(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
+void on_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
-	auto cd = r.ConfigurationDescriptor; // null if unconfigured
-	UCHAR value = cd ? cd->bConfigurationValue : 0;
+	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
 
-	TraceDbg("dev %04x, ConfigurationHandle %04x, bConfigurationValue %d", 
-		  ptr04x(fltr.self), ptr04x(r.ConfigurationHandle), value);
+	auto cd = r.ConfigurationDescriptor; // null if unconfigured
+	UCHAR value = cd ? cd->bConfigurationValue : 0; // FIXME: -1?
 
 	send_set_request(fltr, true, value, 0);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void send_set_interface(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
+void on_select_intf(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
 {
+	char buf[SELECT_INTERFACE_STR_BUFSZ];
+	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), intf));
+
 	auto &r = intf.Interface;
-
-	TraceDbg("dev %04x, ConfigurationHandle %04x, InterfaceNumber %d, AlternateSetting %d", 
-		  ptr04x(fltr.self), ptr04x(intf.ConfigurationHandle),
-		  r.InterfaceNumber, r.AlternateSetting);
-
 	send_set_request(fltr, false, r.AlternateSetting, r.InterfaceNumber);
 }
 
@@ -179,10 +182,10 @@ NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpress
 			ptr04x(fltr.self), urb_function_str(func), st, get_usbd_status(hdr.Status));
 
 	} else if (func == URB_FUNCTION_SELECT_INTERFACE) {
-		send_set_interface(fltr, urb.UrbSelectInterface);
+		on_select_intf(fltr, urb.UrbSelectInterface);
 	} else {
 		NT_ASSERT(func == URB_FUNCTION_SELECT_CONFIGURATION);
-		send_set_config(fltr, urb.UrbSelectConfiguration);
+		on_select_cfg(fltr, urb.UrbSelectConfiguration);
 	}
 
 	if (irp->PendingReturned) {
@@ -233,5 +236,4 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	}
 
 	return ForwardIrp(fltr, irp);
-
 }

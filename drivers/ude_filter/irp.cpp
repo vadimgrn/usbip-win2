@@ -26,8 +26,8 @@ NTSTATUS on_completion(
 
 
 /*
- * A caller must complete the IRP after this call because IRP completion is stopped 
- * by returning StopCompletion from CompletionRoutine.
+ * A caller must complete the IRP after this call because its completion 
+ * is stopped by returning StopCompletion from CompletionRoutine.
  * @see IoForwardIrpSynchronously
  */
 _IRQL_requires_same_
