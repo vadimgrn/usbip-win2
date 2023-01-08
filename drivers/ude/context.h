@@ -116,7 +116,7 @@ struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
         WDFQUEUE queue; // child
-        USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor; // larger than USB_ENDPOINT_DESCRIPTOR
+        USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 

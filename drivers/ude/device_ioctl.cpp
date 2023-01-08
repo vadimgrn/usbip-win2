@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device_ioctl.h"
@@ -513,9 +513,9 @@ NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST r
 _Function_class_(EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void NTAPI usbip::device::internal_device_control(
-        _In_ WDFQUEUE Queue, 
-        _In_ WDFREQUEST Request,
+void NTAPI usbip::device::internal_control(
+        _In_ WDFQUEUE queue, 
+        _In_ WDFREQUEST request,
         _In_ size_t /*OutputBufferLength*/,
         _In_ size_t /*InputBufferLength*/,
         _In_ ULONG IoControlCode)
@@ -525,23 +525,23 @@ void NTAPI usbip::device::internal_device_control(
                 Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), 
                                           IoControlCode, st);
 
-                WdfRequestComplete(Request, st);
+                WdfRequestComplete(request, st);
                 return;
         }
 
-        auto endpoint = get_endpoint(Queue);
+        auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
         auto &dev = *get_device_ctx(endp.device);
 
         if (dev.unplugged) {
-                UdecxUrbComplete(Request, USBD_STATUS_DEVICE_GONE); 
+                UdecxUrbComplete(request, USBD_STATUS_DEVICE_GONE); 
                 return;
         }
 
-        auto st = usb_submit_urb(dev, endpoint, endp, Request);
+        auto st = usb_submit_urb(dev, endpoint, endp, request);
 
         if (st != STATUS_PENDING) {
                 TraceDbg("%!STATUS!", st);
-                UdecxUrbCompleteWithNtStatus(Request, st);
+                UdecxUrbCompleteWithNtStatus(request, st);
         }
 }
