@@ -229,35 +229,6 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto save_config(_In_ device_ctx *dev, _In_ const USB_CONFIGURATION_DESCRIPTOR &src)
-{
-	auto &dest = dev->actconfig;
-	if (dest && *dest == src) {
-		return STATUS_SUCCESS;
-	}
-
-	auto cd = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED,
-		                                                 src.wTotalLength, pooltag);
-
-	if (cd) {
-		RtlCopyMemory(cd, &src, src.wTotalLength);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Failed to allocate wTotalLength %d", src.wTotalLength);
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	if (dest) {
-		ExFreePoolWithTag(dest, pooltag);
-	}
-
-	dest = cd;
-	log(*dest);
-
-	return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
 {
 	ULONG dsc_len;
@@ -285,14 +256,10 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 	switch (dsc->bDescriptorType) {
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 	{
-		auto &src = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
-		if (dsc_len == sizeof(src) && src.bLength == dsc_len) {
-			NT_ASSERT(usbdlib::is_valid(src));
-			auto &dest = ctx.dev->descriptor;
-			if (dest != src) {
-				dest = src;
-				log(dest);
-			}
+		auto &dd = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
+		if (dsc_len == sizeof(dd) && dd.bLength == dsc_len) {
+			NT_ASSERT(usbdlib::is_valid(dd));
+			log(dd);
 		}
 	}
 		break;
@@ -301,7 +268,7 @@ auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSF
 		auto &cd = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		if (dsc_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(cd));
-			return save_config(ctx.dev, cd);
+			log(cd);
 		}
 	}
 	        break;

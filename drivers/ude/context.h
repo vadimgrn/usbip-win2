@@ -87,9 +87,6 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         volatile bool unplugged;
 
-        USB_DEVICE_DESCRIPTOR descriptor;
-        USB_CONFIGURATION_DESCRIPTOR *actconfig; // NULL if unconfigured
-
         seqnum_t seqnum; // @see next_seqnum
 
         // for WSK receive

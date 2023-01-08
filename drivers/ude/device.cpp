@@ -51,16 +51,10 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
-        auto hdev = static_cast<UDECXUSBDEVICE>(Object);
-        TraceDbg("dev %04x", ptr04x(hdev));
+        auto device = static_cast<UDECXUSBDEVICE>(Object);
+        TraceDbg("dev %04x", ptr04x(device));
 
-        auto &dev = *get_device_ctx(hdev);
-
-        if (auto ptr = dev.actconfig) {
-                ExFreePoolWithTag(ptr, pooltag);
-        }
-
-        if (auto ptr = dev.ext) {
+        if (auto &dev = *get_device_ctx(device); auto ptr = dev.ext) {
                 free(ptr);
         }
 }
