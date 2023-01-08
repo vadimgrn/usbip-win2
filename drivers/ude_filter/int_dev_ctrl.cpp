@@ -8,6 +8,7 @@
 
 #include "irp.h"
 #include "select.h"
+#include "ioctl.h"
 
 #include <usbip\ch9.h>
 #include <libdrv\remove_lock.h>
@@ -98,7 +99,7 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 	auto next_stack = IoGetNextIrpStackLocation(irp.get());
 
 	next_stack->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
-	libdrv::DeviceIoControlCode(irp.get(), next_stack) = IOCTL_INTERNAL_USB_SUBMIT_URB;
+	libdrv::DeviceIoControlCode(next_stack) = IOCTL_INTERNAL_USBIP_SUBMIT_URB;
 
 	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_set_request, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);

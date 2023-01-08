@@ -24,6 +24,8 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
 
+#include <ude_filter\ioctl.h>
+
 namespace
 {
 
@@ -408,25 +410,6 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request,
         return ::send(dev.ep0, ctx, dev, true);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto verify_select(_In_ WDFREQUEST request, _In_ ULONG expected_ioctl)
-{
-        auto irp = WdfRequestWdmGetIrp(request);
-        auto stack = IoGetCurrentIrpStackLocation(irp);
-        auto ioctl = libdrv::DeviceIoControlCode(stack);
-
-        if (stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && ioctl == expected_ioctl) {
-                return STATUS_SUCCESS;
-        }
-
-        Trace(TRACE_LEVEL_ERROR, "IoControlCode %s(%#x) expected, got %s(%#x)", 
-                internal_device_control_name(expected_ioctl), expected_ioctl,
-                internal_device_control_name(ioctl), ioctl);
-
-        return STATUS_INVALID_DEVICE_REQUEST;
-}
-
 } // namespace
 
 
@@ -520,11 +503,13 @@ void NTAPI usbip::device::internal_control(
         _In_ size_t /*InputBufferLength*/,
         _In_ ULONG IoControlCode)
 {
-        if (IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB) {
+        switch (IoControlCode) {
+        case IOCTL_INTERNAL_USB_SUBMIT_URB:
+        case IOCTL_INTERNAL_USBIP_SUBMIT_URB:
+                break;
+        default:
                 auto st = STATUS_INVALID_DEVICE_REQUEST;
-                Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), 
-                                          IoControlCode, st);
-
+                TraceDbg("%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), IoControlCode, st);
                 WdfRequestComplete(request, st);
                 return;
         }

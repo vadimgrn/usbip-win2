@@ -195,7 +195,8 @@ PAGED NTSTATUS usbip::do_add_device(
 		return err;
 	}
 
-	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x, target %04x", ptr04x(fido), ptr04x(pdo), ptr04x(target));
+	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x (DeviceType %#lx), target %04x (DeviceType %#lx)", 
+		ptr04x(fido), ptr04x(pdo), pdo->DeviceType, ptr04x(target), target->DeviceType);
 
 	fido->Flags &= ~DO_DEVICE_INITIALIZING;
 	return STATUS_SUCCESS;

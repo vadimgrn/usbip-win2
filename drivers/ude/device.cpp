@@ -324,7 +324,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void endpoints_configure(
         _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
-        NT_ASSERT(!has_urb(request));
+        auto irp = WdfRequestWdmGetIrp(request);
+        auto stack = IoGetCurrentIrpStackLocation(irp);
+
+        NT_ASSERT(stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL);
+        NT_ASSERT(!libdrv::has_urb(stack));
 
         if (auto n = params->EndpointsToConfigureCount) {
                 TraceDbg("dev %04x, EndpointsToConfigure[%lu]%!BIN!", ptr04x(device), n, 
@@ -339,14 +343,17 @@ void endpoints_configure(
         if (auto &dev = *get_device_ctx(device); dev.unplugged) { // UDECXUSBDEVICE can no longer be used
                 TraceDbg("dev %04x, %!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged", 
                           ptr04x(device), params->ConfigureType);
-        } else switch (params->ConfigureType) {
+        } else switch (auto ioctl = libdrv::DeviceIoControlCode(stack); params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
+                NT_ASSERT(ioctl == IOCTL_INTERNAL_USBEX_CFG_INIT);
                 TraceDbg("dev %04x, DeviceInitialize", ptr04x(device));
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
+                NT_ASSERT(ioctl == IOCTL_INTERNAL_USBEX_CFG_CHANGE);
                 TraceDbg("dev %04x, NewConfigurationValue %d", ptr04x(device), params->NewConfigurationValue);
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
+                NT_ASSERT(ioctl == IOCTL_INTERNAL_USBEX_CFG_CHANGE);
                 TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", 
                           ptr04x(device), params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
