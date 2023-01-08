@@ -14,8 +14,7 @@
 #include <libdrv\remove_lock.h>
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
-
-#include <usbioctl.h>
+#include <libdrv\ioctl.h>
 
 namespace
 {
@@ -45,15 +44,6 @@ private:
 	IRP *m_irp;
 };
 
-
-auto& get_ioctl(_In_ IRP *irp, _In_ IO_STACK_LOCATION *stack = nullptr)
-{
-	if (!stack) {
-		stack = IoGetCurrentIrpStackLocation(irp);
-	}
-
-	return stack->Parameters.DeviceIoControl.IoControlCode;
-}
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
@@ -109,7 +99,7 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 	auto next_stack = IoGetNextIrpStackLocation(irp.get());
 
 	next_stack->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
-	get_ioctl(irp.get(), next_stack) = IOCTL_INTERNAL_USB_SUBMIT_URB;
+	libdrv::DeviceIoControlCode(irp.get(), next_stack) = IOCTL_INTERNAL_USB_SUBMIT_URB;
 
 	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_set_request, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
@@ -172,7 +162,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
-	auto &urb = *static_cast<URB*>(URB_FROM_IRP(irp));
+	auto &urb = *libdrv::urb_from_irp(irp);
 
 	auto &hdr = urb.UrbHeader;
 	auto &func = hdr.Function;
@@ -226,9 +216,9 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	if (!fltr.is_hub && get_ioctl(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+	if (!fltr.is_hub && libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
 
-		switch (auto urb = static_cast<URB*>(URB_FROM_IRP(irp)); urb->UrbHeader.Function) {
+		switch (auto urb = libdrv::urb_from_irp(irp); urb->UrbHeader.Function) {
 		case URB_FUNCTION_SELECT_INTERFACE:
 		case URB_FUNCTION_SELECT_CONFIGURATION: 
 			return handle_select(fltr, irp);

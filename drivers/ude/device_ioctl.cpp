@@ -414,7 +414,7 @@ auto verify_select(_In_ WDFREQUEST request, _In_ ULONG expected_ioctl)
 {
         auto irp = WdfRequestWdmGetIrp(request);
         auto stack = IoGetCurrentIrpStackLocation(irp);
-        auto ioctl = DeviceIoControlCode(stack);
+        auto ioctl = libdrv::DeviceIoControlCode(stack);
 
         if (stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && ioctl == expected_ioctl) {
                 return STATUS_SUCCESS;

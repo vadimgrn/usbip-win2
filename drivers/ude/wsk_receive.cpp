@@ -714,7 +714,7 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	auto info = irp->IoStatus.Information;
 	NT_ASSERT(info == WdfRequestGetInformation(request));
 
-	if (!has_urb(irp)) {
+	if (!libdrv::has_urb(irp)) {
 		if (status) {
 			TraceDbg("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
@@ -722,7 +722,7 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		return;
 	}
 
-	auto &urb = *urb_from_irp(irp);
+	auto &urb = *libdrv::urb_from_irp(irp);
 	auto urb_st = urb.UrbHeader.Status;
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {

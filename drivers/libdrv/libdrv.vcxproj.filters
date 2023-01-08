@@ -38,6 +38,7 @@
     <ClInclude Include="unique_ptr.h" />
     <ClInclude Include="buffer.h" />
     <ClInclude Include="remove_lock.h" />
+    <ClInclude Include="ioctl.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

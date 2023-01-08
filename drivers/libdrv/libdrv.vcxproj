@@ -140,6 +140,7 @@
     <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="dbgcommon.h" />
+    <ClInclude Include="ioctl.h" />
     <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="codeseg.h" />
     <ClInclude Include="lock.h" />

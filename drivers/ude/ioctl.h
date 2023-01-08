@@ -4,8 +4,7 @@
 
 #pragma once
 
-#include <wdm.h>
-#include <usbioctl.h>
+#include <libdrv\ioctl.h>
 
 namespace usbip
 {
@@ -28,37 +27,12 @@ enum : ULONG { // see IOCTL_INTERNAL_USB_SUBMIT_URB
 static_assert(IOCTL_INTERNAL_USBEX_CFG_INIT   == 0x491017);
 static_assert(IOCTL_INTERNAL_USBEX_CFG_CHANGE == 0x491037);
 
-inline auto DeviceIoControlCode(_In_ _IO_STACK_LOCATION *stack)
-{
-	return stack->Parameters.DeviceIoControl.IoControlCode;
-}
-
-inline auto DeviceIoControlCode(_In_ IRP *irp)
-{
-        auto stack = IoGetCurrentIrpStackLocation(irp);
-        return DeviceIoControlCode(stack);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto has_urb(_In_ IRP *irp)
-{
-	auto stack = IoGetCurrentIrpStackLocation(irp);
-	return  stack->MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL && 
-		DeviceIoControlCode(stack) == IOCTL_INTERNAL_USB_SUBMIT_URB;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto has_urb(_In_ WDFREQUEST request)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
-	return has_urb(irp);
-}
-
-inline auto urb_from_irp(_In_ IRP *irp)
-{
-	return static_cast<URB*>(URB_FROM_IRP(irp));
+	return libdrv::has_urb(irp);
 }
 
 _IRQL_requires_same_
@@ -66,7 +40,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto try_get_urb(_In_ WDFREQUEST request)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
-	return has_urb(irp) ? urb_from_irp(irp) : nullptr;
+	return libdrv::has_urb(irp) ? libdrv::urb_from_irp(irp) : nullptr;
 }
 
 _IRQL_requires_same_
@@ -74,8 +48,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_urb(_In_ WDFREQUEST request)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
-	NT_ASSERT(has_urb(irp));
-	return *urb_from_irp(irp);
+	NT_ASSERT(libdrv::has_urb(irp));
+	return *libdrv::urb_from_irp(irp);
 }
 
 } // namespace usbip
