@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -119,12 +119,7 @@ struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
         WDFQUEUE queue; // child
-
         USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor; // larger than USB_ENDPOINT_DESCRIPTOR
-
-        UCHAR InterfaceNumber; // that endpoint belongs to
-        UCHAR AlternateSetting;
-        bool multisetting; // InterfaceNumber has several AlternateSetting
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 

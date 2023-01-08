@@ -194,8 +194,8 @@ NTSTATUS control_transfer(
                 char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
                 char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
-                TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, Timeout %lu, %s",
-                        ptr04x(request), ptr04x(r.PipeHandle),
+                TraceUrb("req %04x, irp %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, Timeout %lu, %s",
+                        ptr04x(request), ptr04x(WdfRequestWdmGetIrp(request)), ptr04x(r.PipeHandle),
                         usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
                         r.TransferBufferLength,
                         urb.UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
@@ -427,82 +427,8 @@ auto verify_select(_In_ WDFREQUEST request, _In_ ULONG expected_ioctl)
         return STATUS_INVALID_DEVICE_REQUEST;
 }
 
-/*
- * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
- * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
- *
- * @param request can be WDF_NO_HANDLE
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto do_select(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, _In_ ULONG params)
-{
-        if (!request) {
-                NT_ASSERT(!ioctl);
-        } else if (auto err = verify_select(request, ioctl)) {
-                return err;
-        }
-
-        bool iface = params >> 16; 
-
-        UCHAR bmRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | UCHAR(iface ? USB_RECIP_INTERFACE : USB_RECIP_DEVICE);
-        UCHAR bRequest = iface ? USB_REQUEST_SET_INTERFACE : USB_REQUEST_SET_CONFIGURATION;
-
-        USHORT wValue;
-        USHORT wIndex;
-
-        if (iface) {
-                wValue = UCHAR(params >> 8); // Alternative Setting
-                wIndex = UCHAR(params); // Interface
-        } else {
-                wValue = UCHAR(params); // Configuration Value
-                wIndex = 0;
-        }
-
-        return send_ep0_out(device, request, bmRequestType, bRequest, wValue, wIndex);
-}
-
 } // namespace
 
-
-/*
- * UDEX does not set configuration for composite devices.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::set_first_configuration(
-        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl)
-{
-        auto &dev = *get_device_ctx(device);
-        auto cfg = dev.actconfig;
-
-        return  cfg && usbdlib::is_composite(dev.descriptor, *cfg) ? 
-                set_configuration(device, request, ioctl, cfg->bConfigurationValue) : STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::set_configuration(
-        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, _In_ UCHAR ConfigurationValue)
-{
-        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
-        return do_select(device, request, ioctl, ConfigurationValue);
-}
-
-/*
- * @param request can be WDF_NO_HANDLE
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::set_interface(
-        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG ioctl, 
-        _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
-{
-        TraceDbg("dev %04x, %d.%d", ptr04x(device), InterfaceNumber, AlternateSetting);
-
-        auto params = (1UL << 16) | (AlternateSetting << 8) | InterfaceNumber; 
-        return do_select(device, request, ioctl, params); // STATUS_PENDING on success
-}
 
  /*
   * There is a race condition between IRP cancelation and RET_SUBMIT.

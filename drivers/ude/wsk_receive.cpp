@@ -253,10 +253,6 @@ auto save_config(_In_ device_ctx *dev, _In_ const USB_CONFIGURATION_DESCRIPTOR &
 	dest = cd;
 	log(*dest);
 
-	if (auto device = get_device(dev)) {
-		device::set_first_configuration(device, WDF_NO_HANDLE, 0);
-	}
-
 	return STATUS_SUCCESS;
 }
 
