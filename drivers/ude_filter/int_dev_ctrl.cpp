@@ -7,7 +7,6 @@
 #include "int_dev_ctrl.tmh"
 
 #include "irp.h"
-#include "device.h"
 #include "select.h"
 
 #include <usbip\ch9.h>
@@ -73,7 +72,7 @@ NTSTATUS on_set_request(
 	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
-	auto urb = argv<0, URB>(irp);
+	auto urb = libdrv::argv<0, URB>(irp);
 
 	TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", 
 		  ptr04x(fltr.self), ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
@@ -119,7 +118,7 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 
 	TraceDbg("dev %04x, irp %04x", ptr04x(fltr.self), ptr04x(irp.get()));
 
-	argv<0>(irp.get()) = urb;
+	libdrv::argv<0>(irp.get()) = urb;
 	auto st = IoCallDriver(target, irp.get());
 
 	if (NT_ERROR(st)) {

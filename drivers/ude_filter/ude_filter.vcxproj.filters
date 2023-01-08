@@ -4,7 +4,6 @@
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="pnp.cpp" />
-    <ClCompile Include="irp.cpp" />
     <ClCompile Include="int_dev_ctrl.cpp" />
     <ClCompile Include="select.cpp" />
   </ItemGroup>
@@ -13,9 +12,9 @@
     <ClInclude Include="trace.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="pnp.h" />
-    <ClInclude Include="irp.h" />
     <ClInclude Include="int_dev_ctrl.h" />
     <ClInclude Include="select.h" />
+    <ClInclude Include="irp.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_filter.inf" />

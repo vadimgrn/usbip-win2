@@ -10,6 +10,7 @@
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
+    <ClCompile Include="irp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -39,6 +40,7 @@
     <ClInclude Include="buffer.h" />
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="ioctl.h" />
+    <ClInclude Include="irp.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

@@ -3,8 +3,6 @@
  */
 
 #include "irp.h"
-#include "trace.h"
-#include "irp.tmh"
 
 namespace
 {
@@ -32,7 +30,7 @@ NTSTATUS on_completion(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS usbip::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
+PAGED NTSTATUS libdrv::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	PAGED_CODE();
 	NT_ASSERT(devobj);
@@ -43,7 +41,6 @@ PAGED NTSTATUS usbip::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 	IoCopyCurrentIrpStackLocationToNext(irp);
 	
 	if (auto err = IoSetCompletionRoutineEx(devobj, irp, on_completion, &evt, true, true, true)) {
-		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
 		return err;
 	}
 
@@ -59,7 +56,7 @@ PAGED NTSTATUS usbip::ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *ir
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
+NTSTATUS libdrv::ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	NT_ASSERT(devobj);
 	IoSkipCurrentIrpStackLocation(irp);
@@ -68,7 +65,7 @@ NTSTATUS usbip::ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
+NTSTATUS libdrv::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
 {
 	irp->IoStatus.Status = status;
 	CompleteRequest(irp);
