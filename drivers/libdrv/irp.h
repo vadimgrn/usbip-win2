@@ -22,7 +22,7 @@ NTSTATUS ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS ForwardIrpAndWait(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
+PAGED NTSTATUS ForwardIrpSynchronously(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

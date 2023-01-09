@@ -3,7 +3,7 @@ UDE doesn't propagate SELECT_CONFIGURATION/SELECT_INTERFACE and this is a major 
 This driver fixes that. 
 
 Driver's class is "USB host controllers and USB hubs". 
-This means it's DRIVER_ADD_DEVICE routine will be called by PnP Manager for such PDO-s.
+This means its DRIVER_ADD_DEVICE routine will be called by PnP Manager for such PDO-s.
 The driver creates Filter Device Object for PDO of USB Root Hub 3.0 which is created above VHCI.
 
 It catches IRP_MJ_PNP -> IRP_MN_QUERY_DEVICE_RELATIONS for this hub.

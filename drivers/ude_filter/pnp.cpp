@@ -94,7 +94,7 @@ PAGED void query_bus_relations(_Inout_ filter_ext &f, _In_ const DEVICE_RELATION
  * After we forward the request, the bus driver have created or deleted
  * a child device object. When bus driver created one (or more), this is the PDO
  * of our target device, we create and attach a filter object to it.
- * Note that we only attach the last detected USB device on it's Hub.
+ * Note that we only attach the last detected USB device on it's hub.
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -102,7 +102,7 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &f, _In_ IRP *irp)
 {
 	PAGED_CODE();
 
-	auto st = ForwardIrpAndWait(f, irp);
+	auto st = ForwardIrpSynchronously(f, irp);
 	if (NT_SUCCESS(st)) {
 		if (auto r = reinterpret_cast<DEVICE_RELATIONS*>(irp->IoStatus.Information)) {
 			query_bus_relations(f, *r);
@@ -156,7 +156,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_START_DEVICE:
-		st = ForwardIrpAndWait(fltr, irp); // must be started after lower device objects
+		st = ForwardIrpSynchronously(fltr, irp); // must be started after lower device objects
 		CompleteRequest(irp);
 		break;
 	case IRP_MN_REMOVE_DEVICE:
