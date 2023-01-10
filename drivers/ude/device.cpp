@@ -278,13 +278,14 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         auto &ctx = *get_endpoint_ctx(endp);
         ctx.device = device;
 
-        if (auto &dev = *get_device_ctx(device); auto len = data->EndpointDescriptorBufferLength) {
+        if (auto len = data->EndpointDescriptorBufferLength) {
                 NT_ASSERT(epd.bLength == len);
                 NT_ASSERT(sizeof(ctx.descriptor) >= len);
                 RtlCopyMemory(&ctx.descriptor, &epd, len);
         } else {
+                NT_ASSERT(epd == EP0);
                 static_cast<USB_ENDPOINT_DESCRIPTOR&>(ctx.descriptor) = epd;
-                dev.ep0 = endp;
+                get_device_ctx(device)->ep0 = endp;
         }
 
         if (auto err = create_endpoint_queue(ctx.queue, endp)) {

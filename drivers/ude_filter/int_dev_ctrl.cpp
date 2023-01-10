@@ -44,6 +44,34 @@ private:
 	IRP *m_irp;
 };
 
+class urb_ptr
+{
+public:
+	urb_ptr(_In_ USBD_HANDLE handle) : m_handle(handle) { NT_ASSERT(m_handle); }
+
+	~urb_ptr()
+	{
+		if (m_urb) {
+			USBD_UrbFree(m_handle, m_urb);
+		}
+	}
+
+	auto alloc(_In_ IO_STACK_LOCATION *stack)
+	{
+		auto err = m_urb ? STATUS_ALREADY_INITIALIZED : USBD_UrbAllocate(m_handle, &m_urb); 
+		if (NT_SUCCESS(err)) {
+			USBD_AssignUrbToIoStackLocation(m_handle, stack, m_urb);
+		}
+		return err;
+	}
+
+	auto get() const { return m_urb; }
+	void release() { m_urb = nullptr; }
+
+private:
+	USBD_HANDLE m_handle{};
+	URB *m_urb{};
+};
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
@@ -52,7 +80,7 @@ void init(_Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool cfg_or_if, _In_ UCHAR val
 	if (auto h = &r.Hdr) {
 		h->Length = sizeof(r);
 		h->Function = URB_FUNCTION_CONTROL_TRANSFER_EX;
-		h->Status = USBD_STATUS_SUCCESS;
+		h->Status = USBD_STATUS_ERROR;
 	}
 
 	r.TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
@@ -106,26 +134,22 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 		return err;
 	}
 
-	auto &usbd = fltr.dev.usbd;
-
-	URB *urb{};
-	if (auto err = USBD_UrbAllocate(usbd, &urb)) {
+	urb_ptr urb(fltr.dev.usbd);
+	if (auto err = urb.alloc(next_stack)) {
 		Trace(TRACE_LEVEL_ERROR, "USBD_UrbAllocate %!STATUS!", err);
 		return err;
 	}
 
-	USBD_AssignUrbToIoStackLocation(usbd, next_stack, urb);
-	init(urb->UrbControlTransferEx, cfg_or_if, value, index);
+	init(urb.get()->UrbControlTransferEx, cfg_or_if, value, index);
+	TraceDbg("dev %04x, irp %04x, target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(target));
 
-	TraceDbg("dev %04x, irp %04x", ptr04x(fltr.self), ptr04x(irp.get()));
-
-	libdrv::argv<0>(irp.get()) = urb;
+	libdrv::argv<0>(irp.get()) = urb.get();
 	auto st = IoCallDriver(target, irp.get());
 
 	if (NT_ERROR(st)) {
 		Trace(TRACE_LEVEL_ERROR, "IoCallDriver %!STATUS!", st);
-		USBD_UrbFree(usbd, urb);
 	} else {
+		urb.release();
 		irp.release();
 	}
 
