@@ -108,7 +108,7 @@
     <ClCompile Include="pnp.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ioctl.h" />
+    <ClInclude Include="request.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="select.h" />
     <ClInclude Include="device.h" />

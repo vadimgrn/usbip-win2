@@ -317,7 +317,13 @@ PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPO
  * If InterfaceSettingChange is called after UdecxUsbDevicePlugOutAndDelete, WDFREQUEST will be completed 
  * with error status. In such case UDECXUSBDEVICE will not be destroyed and the driver can't be unloaded.
  *
- * UDEX does not set configuration for composite devices.
+ * UDEX does not call ConfigurationChange for composite devices.
+ * UDEX passes wrong InterfaceNumber, NewInterfaceSetting for InterfaceSettingChange.
+ * For that reasons the Upper Filter Driver is used that intercepts SELECT_CONFIGURATION, 
+ * SELECT_INTERFACE URBs and notifies this driver.
+ *
+ * @see ude_filter/int_dev_ctrl.cpp, int_dev_ctrl
+ * @see device_ioctl.cpp, control_transfer
  */
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE)
 _IRQL_requires_same_

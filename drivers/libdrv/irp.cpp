@@ -21,6 +21,7 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS libdrv::ForwardIrpSynchronously(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	PAGED_CODE();
+	NT_ASSERT(devobj);
 
 	auto &status = irp->IoStatus.Status;
 

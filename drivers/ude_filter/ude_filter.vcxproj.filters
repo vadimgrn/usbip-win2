@@ -15,7 +15,7 @@
     <ClInclude Include="int_dev_ctrl.h" />
     <ClInclude Include="select.h" />
     <ClInclude Include="irp.h" />
-    <ClInclude Include="ioctl.h" />
+    <ClInclude Include="request.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_filter.inf" />

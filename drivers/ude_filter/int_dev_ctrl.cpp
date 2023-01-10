@@ -8,7 +8,7 @@
 
 #include "irp.h"
 #include "select.h"
-#include "ioctl.h"
+#include "request.h"
 
 #include <usbip\ch9.h>
 #include <libdrv\remove_lock.h>
@@ -58,11 +58,11 @@ public:
 
 	auto alloc(_In_ IO_STACK_LOCATION *stack)
 	{
-		auto err = m_urb ? STATUS_ALREADY_INITIALIZED : USBD_UrbAllocate(m_handle, &m_urb); 
-		if (NT_SUCCESS(err)) {
+		auto st = m_urb ? STATUS_ALREADY_INITIALIZED : USBD_UrbAllocate(m_handle, &m_urb); 
+		if (NT_SUCCESS(st)) {
 			USBD_AssignUrbToIoStackLocation(m_handle, stack, m_urb);
 		}
-		return err;
+		return st;
 	}
 
 	auto get() const { return m_urb; }
@@ -73,48 +73,31 @@ private:
 	URB *m_urb{};
 };
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-void init(_Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool cfg_or_if, _In_ UCHAR value, _In_ UCHAR index)
-{
-	if (auto h = &r.Hdr) {
-		h->Length = sizeof(r);
-		h->Function = URB_FUNCTION_CONTROL_TRANSFER_EX;
-		h->Status = USBD_STATUS_ERROR;
-	}
-
-	r.TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
-	
-	auto &pkt = get_setup_packet(r);
-	pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | 
-		              UCHAR(cfg_or_if ? USB_RECIP_DEVICE : USB_RECIP_INTERFACE);
-
-	pkt.bRequest = cfg_or_if ? USB_REQUEST_SET_CONFIGURATION : USB_REQUEST_SET_INTERFACE;
-	pkt.wValue.W = value;
-	pkt.wIndex.W = index;
-}
-
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS on_set_request(
-	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+	_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
 	auto urb = libdrv::argv<0, URB>(irp);
 
-	TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", 
-		  ptr04x(fltr.self), ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
+	TraceDbg("dev %04x, irp %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
+		  ptr04x(irp), ptr04x(devobj), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
 
-	USBD_UrbFree(fltr.dev.usbd, urb);
+	if (auto &handle = fltr.dev.usbd) {
+		USBD_UrbFree(handle, urb);
+	} else {
+		NT_ASSERT(!"fltr.dev.usbd");
+	}
+	
 	IoFreeIrp(irp);
-
 	return StopCompletion;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR value, _In_ UCHAR index)
+auto send_set_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf)
 {
 	auto &target = fltr.target;
 
@@ -127,7 +110,7 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 	auto next_stack = IoGetNextIrpStackLocation(irp.get());
 
 	next_stack->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
-	libdrv::DeviceIoControlCode(next_stack) = IOCTL_INTERNAL_USBIP_SUBMIT_URB;
+	libdrv::DeviceIoControlCode(next_stack) = IOCTL_INTERNAL_USB_SUBMIT_URB;
 
 	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_set_request, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
@@ -140,8 +123,8 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 		return err;
 	}
 
-	init(urb.get()->UrbControlTransferEx, cfg_or_if, value, index);
-	TraceDbg("dev %04x, irp %04x, target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(target));
+	filter::pack_request_select(urb.get()->UrbControlTransferEx, value, index, cfg_or_intf);
+	TraceDbg("dev %04x, irp %04x -> target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.get();
 	auto st = IoCallDriver(target, irp.get());
@@ -156,6 +139,9 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ bool cfg_or_if, _In_ UCHAR val
 	return st;
 }
 
+/*
+ * @see drivers/usb/usbip/stub_rx.c, tweak_set_configuration_cmd
+ */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 void on_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
@@ -164,9 +150,9 @@ void on_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &
 	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
 
 	auto cd = r.ConfigurationDescriptor; // null if unconfigured
-	UCHAR value = cd ? cd->bConfigurationValue : 0; // FIXME: -1?
+	auto value = cd ? cd->bConfigurationValue : UCHAR(); // FIXME: can't pass -1 if unconfigured
 
-	send_set_request(fltr, true, value, 0);
+	send_set_request(fltr, value, 0, true);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -177,7 +163,7 @@ void on_select_intf(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &int
 	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), intf));
 
 	auto &r = intf.Interface;
-	send_set_request(fltr, false, r.AlternateSetting, r.InterfaceNumber);
+	send_set_request(fltr, r.AlternateSetting, r.InterfaceNumber, false);
 }
 
 _Function_class_(IO_COMPLETION_ROUTINE)
@@ -191,10 +177,9 @@ NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpress
 	auto &hdr = urb.UrbHeader;
 	auto &func = hdr.Function;
 
-	if (auto st = irp->IoStatus.Status; !(NT_SUCCESS(st) && USBD_SUCCESS(hdr.Status))) {
+	if (auto st = irp->IoStatus.Status; NT_ERROR(st) || USBD_ERROR(hdr.Status)) {
 		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, %!STATUS!, USBD_STATUS_%s", 
 			ptr04x(fltr.self), urb_function_str(func), st, get_usbd_status(hdr.Status));
-
 	} else if (func == URB_FUNCTION_SELECT_INTERFACE) {
 		on_select_intf(fltr, urb.UrbSelectInterface);
 	} else {

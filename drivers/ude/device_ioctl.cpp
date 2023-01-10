@@ -24,7 +24,7 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
 
-#include <ude_filter\ioctl.h>
+#include <ude_filter\request.h>
 
 namespace
 {
@@ -192,12 +192,17 @@ NTSTATUS control_transfer(
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
+        if (filter::is_request_select(r)) {
+                TraceDbg("req %04x from the upper filter, irp %04x", ptr04x(request), ptr04x(WdfRequestWdmGetIrp(request)));
+                filter::unpack_request_select(r);
+        }
+
         {
                 char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
                 char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
 
-                TraceUrb("req %04x, irp %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, Timeout %lu, %s",
-                        ptr04x(request), ptr04x(WdfRequestWdmGetIrp(request)), ptr04x(r.PipeHandle),
+                TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, Timeout %lu, %s",
+                        ptr04x(request), ptr04x(r.PipeHandle),
                         usbd_transfer_flags(buf_flags, sizeof(buf_flags), r.TransferFlags),
                         r.TransferBufferLength,
                         urb.UrbHeader.Function == URB_FUNCTION_CONTROL_TRANSFER_EX ? r.Timeout : 0,
@@ -205,7 +210,7 @@ NTSTATUS control_transfer(
         }
 
         auto buf_len = r.TransferBufferLength;
-        auto &pkt = get_setup_packet(r); // see UdecxUrbRetrieveControlSetupPacket
+        auto &pkt = get_setup_packet(r); // @see UdecxUrbRetrieveControlSetupPacket
 
         if (buf_len > pkt.wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
                 buf_len = pkt.wLength; // usb_submit_urb checks for equality
@@ -503,30 +508,23 @@ void NTAPI usbip::device::internal_control(
         _In_ size_t /*InputBufferLength*/,
         _In_ ULONG IoControlCode)
 {
-        switch (IoControlCode) {
-        case IOCTL_INTERNAL_USB_SUBMIT_URB:
-        case IOCTL_INTERNAL_USBIP_SUBMIT_URB:
-                break;
-        default:
+        if (IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB) {
                 auto st = STATUS_INVALID_DEVICE_REQUEST;
-                TraceDbg("%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), IoControlCode, st);
+                Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), 
+                                                                 IoControlCode, st);
                 WdfRequestComplete(request, st);
                 return;
         }
 
         auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
-        auto &dev = *get_device_ctx(endp.device);
-
-        if (dev.unplugged) {
-                UdecxUrbComplete(request, USBD_STATUS_DEVICE_GONE); 
-                return;
-        }
-
-        auto st = usb_submit_urb(dev, endpoint, endp, request);
-
-        if (st != STATUS_PENDING) {
-                TraceDbg("%!STATUS!", st);
+        
+        if (auto dev = get_device_ctx(endp.device); dev->unplugged) {
+                UdecxUrbComplete(request, USBD_STATUS_DEVICE_GONE);
+        } else if (auto st = usb_submit_urb(*dev, endpoint, endp, request); st != STATUS_PENDING) {
+                if (st) {
+                        TraceDbg("%!STATUS!", st);
+                }
                 UdecxUrbCompleteWithNtStatus(request, st);
         }
 }
