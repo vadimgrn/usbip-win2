@@ -166,7 +166,7 @@ rem rm sed*
   - Run following commands and copy the output
 ```
 !analyze -v
-!wdfkd.wdfsearchpath %TEMP%\usbip2-vhci
+!wdfkd.wdfsearchpath %TEMP%\usbip2
 !wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wdfkd.wdflogdump usbip2_vhci -d
 !wdfkd.wdflogdump usbip2_vhci -f
