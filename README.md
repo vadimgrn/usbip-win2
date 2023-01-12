@@ -4,7 +4,6 @@
 - **Is fully implemented**
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
 - Works with Linux USB/IP server at least for kernels 4.19 - 5.15
-- **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
@@ -14,8 +13,8 @@
 - Server must support USB/IP protocol v.1.1.1
 
 ## Key features
-- WDM driver is a USB/IP client
-- [Cancel-Safe IRP Queue](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/cancel-safe-irp-queues) is used
+- [UDE](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/developing-windows-drivers-for-emulated-usb-host-controllers-and-devices) driver is an USB/IP client
+- USB class upper filter driver usbip2_filter is used as companion for the UDE driver
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and does data exchange
   - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls
@@ -26,16 +25,13 @@
 - [System Worker Threads](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/system-worker-threads) are used to initiate receive operation
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
-- x86 build is removed
-- Server (stub driver) is removed
-- UDE driver is removed, it is superseded by WDM driver
-- Client (UDE driver)
-  - Significantly refactored and improved
-  - The core of the driver was rewritten from scratch
-  - attacher.exe (usbip_xfer.exe) is no longer used
+- Brand new UDE driver was written from scratch
+- InnoSetup installer is used for installation of drivers and userspace stuff
+- Windows 10 v.2004 or later is required
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
-- InnoSetup installer is used for installation of the driver and userspace stuff
+- Server (stub driver) is removed
+- x86 build is removed
 
 ## Build
 
@@ -117,37 +113,42 @@ port 1 is successfully detached
 - Disable test signing
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
-- If an uninstaller is corrupted
-  - Run these commands as Administrator and delete the folder "C:\Program Files\usbip-win2" after that
+- If an uninstaller is corrupted, run these commands as Administrator
 ```
-pnputil /remove-device /deviceid ROOT\USBIP2_VHCI /subtree
-FOR /F %P IN ('findstr /m ROOT\USBIP2_VHCI C:\Windows\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
+rem devcon classfilter usb upper !usbip2_filter
+"C:\Program Files\usbip-win2\classfilter" remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
+pnputil /remove-device /deviceid ROOT\USBIP_WIN2\VHCI /subtree
+FOR /f %P IN ('findstr /M /L "Manufacturer=\"USBIP-WIN2\"" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
+del /Q "C:\Program Files\usbip-win2"
 ```
 
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the Windows Driver Kit (WDK)
-- Use this tracing GUID for UDE driver
-  - `ed18c9c5-8322-48ae-bf78-d01d898a1562`
-- Install Debug build
-- Start a log session for UDE driver (copy commands to .bat file and run it)
+- Start log sessions for drivers (copy commands to .bat file and run it as Admin)
 ```
 @echo off
-set NAME=usbip2-vhci
-tracelog.exe -stop %NAME%
-tracelog.exe -start %NAME% -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%.etl -flag 0x1F -level 5
+set NAME=usbip2
+tracelog.exe -stop %NAME%-fltr
+tracelog.exe -stop %NAME%-vhci
+rm %NAME%-*.*
+tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
+tracelog.exe -start %NAME%-fltr -guid #90c336ed-69fb-43d6-b800-1552d72d200b -f %NAME%-fltr.etl -flag 0x3 -level 5
+tracelog.exe -start %NAME%-vhci -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%-vhci.etl -flag 0xF -level 5
 ```
 - Reproduce the issue
-- Stop the log session and get plain text log (copy commands to .bat file and run it)
+- Stop log sessions and get plain text logs (copy commands to .bat file and run it as Admin)
 ```
 @echo off
-set NAME=usbip2-vhci
+set NAME=usbip2
 set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
-tracelog.exe -stop %NAME%
-tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
-tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%.txt %NAME%.etl
-rem sed -i 's/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/' %NAME%.txt
+tracelog.exe -stop %NAME%-fltr
+tracelog.exe -stop %NAME%-vhci
+tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-fltr.txt %NAME%-fltr.etl
+tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-vhci.txt %NAME%-vhci.etl
+rem sed -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-*.txt
+rem sed -i "s/`anonymous namespace':://" %NAME%-*.txt
 rem rm sed*
 ```
 
@@ -158,7 +159,7 @@ rem rm sed*
   - Click on "Settings" in "Startup and Recovery"
   - "System failure", "Write debugging information", pick "Automatic Memory Dump" or "Kernel Memory Dump"
   - Check "Overwrite any existing file"
-- Start WPP tracing session for UDE driver as described in the previous topic
+- Start WPP tracing session for drivers as described in the previous topic
 - When BSOD has occured
   - Reboot PC if automatic reboot is not set
   - Run Windows debugger WinDbg.exe as Administrator
@@ -187,7 +188,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 9 10 11 12 14 15 16 18 20 24 26 33 34 35 36 /driver usbip2_vhci.sys
+verifier /rc 1 2 4 5 6 9 10 11 12 14 15 16 18 20 24 26 33 34 35 36 /driver usbip2_filter.sys usbip2_vhci.sys
 ```
 - Query driver statistics
 ```

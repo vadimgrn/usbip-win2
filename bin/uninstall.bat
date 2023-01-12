@@ -1,6 +1,6 @@
 # uninstall
 ..\classfilter remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
-pnputil /remove-device /deviceid "ROOT\USBIP_WIN2\VHCI" /subtree
+pnputil /remove-device /deviceid ROOT\USBIP_WIN2\VHCI /subtree
 FOR /f %P IN ('findstr /M /L "Manufacturer=\"USBIP-WIN2\"" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
 del /Q "C:\Program Files\usbip-win2"
 
