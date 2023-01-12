@@ -1,13 +1,12 @@
+; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;
 ; usbip2_filter.inf
-;
-; This is an upper-level class filter primitive driver.
-; Primitive drivers targeting only Windows 10 version 1903 or later.
+; Upper-level class filter primitive driver
 
 [Version]
 Signature="$WINDOWS NT$"
 Class=USB
-ClassGuid=%ClassGuid%
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; USB host controllers and USB hubs
 Provider=%Manufacturer%
 CatalogFile=usbip2_filter.cat
 PnpLockDown=1
@@ -23,27 +22,9 @@ usbip2_filter.sys = 1,,
 
 [DefaultInstall.NT$ARCH$] ; @see Creating a new primitive driver
 CopyFiles = @usbip2_filter.sys
-AddReg = usbip2_filter_AddReg 
-
-[DefaultUninstall.NT$ARCH$]
-LegacyUninstall=1
-DelFiles = @usbip2_filter.sys
-DelReg = usbip2_filter_DelReg
-
-[usbip2_filter_AddReg]
-; 0x00010000 (FLG_ADDREG_TYPE_MULTI_SZ) | 0x00000008 (FLG_ADDREG_APPEND)
-HKLM, %Classes%\%ClassGuid%, UpperFilters, 0x00010008, usbip2_filter
-
-[usbip2_filter_DelReg]
-; 0x00018002 FLG_DELREG_MULTI_SZ_DELSTRING
-HKLM, %Classes%\%ClassGuid%, UpperFilters, 0x00018002, usbip2_filter
 
 [DefaultInstall.NT$ARCH$.Services]
 AddService = usbip2_filter,,usbip2_filter_Service_Inst
-
-[DefaultUninstall.NT$ARCH$.Services]
-; 0x00000200 (SPSVCINST_STOPSERVICE)
-DelService = usbip2_filter,0x00000200
 
 [usbip2_filter_Service_Inst]
 DisplayName    = %DisplayName%
@@ -62,6 +43,4 @@ HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
 Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
-DisplayName="USBIP Upper Filter" ; for device and service
-Classes="System\CurrentControlSet\Control\Class"
-ClassGuid="{36FC9E60-C465-11CF-8056-444553540000}" ; USB host controllers and USB hubs
+DisplayName="USBIP Upper Class Filter" ; for device and service
