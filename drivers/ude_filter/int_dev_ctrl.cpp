@@ -76,14 +76,14 @@ private:
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS on_set_request(
-	_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS on_send_request(
+	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
 	auto urb = libdrv::argv<0, URB>(irp);
 
-	TraceDbg("dev %04x, irp %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
-		  ptr04x(irp), ptr04x(devobj), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
+	TraceDbg("dev %04x, urb %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
+		  ptr04x(urb), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
 
 	if (auto &handle = fltr.dev.usbd) {
 		USBD_UrbFree(handle, urb);
@@ -97,7 +97,7 @@ NTSTATUS on_set_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto send_set_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf)
+auto send_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf)
 {
 	auto &target = fltr.target;
 
@@ -112,7 +112,7 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index,
 	next_stack->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
 	libdrv::DeviceIoControlCode(next_stack) = IOCTL_INTERNAL_USB_SUBMIT_URB;
 
-	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_set_request, &fltr, true, true, true)) {
+	if (auto err = IoSetCompletionRoutineEx(target, irp.get(), on_send_request, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
 		return err;
 	}
@@ -124,7 +124,8 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index,
 	}
 
 	filter::pack_request_select(urb.get()->UrbControlTransferEx, value, index, cfg_or_intf);
-	TraceDbg("dev %04x, irp %04x -> target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(target));
+
+	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.get();
 	auto st = IoCallDriver(target, irp.get());
@@ -144,7 +145,7 @@ auto send_set_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index,
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void on_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
+void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
 	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
 	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
@@ -152,18 +153,18 @@ void on_select_cfg(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &
 	auto cd = r.ConfigurationDescriptor; // null if unconfigured
 	auto value = cd ? cd->bConfigurationValue : UCHAR(); // FIXME: can't pass -1 if unconfigured
 
-	send_set_request(fltr, value, 0, true);
+	send_request(fltr, value, 0, true);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void on_select_intf(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
+void select_interface(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
 {
 	char buf[SELECT_INTERFACE_STR_BUFSZ];
 	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), intf));
 
 	auto &r = intf.Interface;
-	send_set_request(fltr, r.AlternateSetting, r.InterfaceNumber, false);
+	send_request(fltr, r.AlternateSetting, r.InterfaceNumber, false);
 }
 
 _Function_class_(IO_COMPLETION_ROUTINE)
@@ -181,10 +182,10 @@ NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpress
 		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, %!STATUS!, USBD_STATUS_%s", 
 			ptr04x(fltr.self), urb_function_str(func), st, get_usbd_status(hdr.Status));
 	} else if (func == URB_FUNCTION_SELECT_INTERFACE) {
-		on_select_intf(fltr, urb.UrbSelectInterface);
+		select_interface(fltr, urb.UrbSelectInterface);
 	} else {
 		NT_ASSERT(func == URB_FUNCTION_SELECT_CONFIGURATION);
-		on_select_cfg(fltr, urb.UrbSelectConfiguration);
+		select_configuration(fltr, urb.UrbSelectConfiguration);
 	}
 
 	if (irp->PendingReturned) {

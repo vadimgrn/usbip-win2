@@ -314,6 +314,9 @@ PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPO
 }
 
 /*
+ * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
+ * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
+ *
  * If InterfaceSettingChange is called after UdecxUsbDevicePlugOutAndDelete, WDFREQUEST will be completed 
  * with error status. In such case UDECXUSBDEVICE will not be destroyed and the driver can't be unloaded.
  *
@@ -343,6 +346,8 @@ void endpoints_configure(
                           WppBinary(params->ReleasedEndpoints, USHORT(n*sizeof(*params->ReleasedEndpoints))));
         }
 
+        auto st = STATUS_SUCCESS;
+
         if (auto &dev = *get_device_ctx(device); dev.unplugged) { // UDECXUSBDEVICE can no longer be used
                 TraceDbg("dev %04x, %!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged", 
                           ptr04x(device), params->ConfigureType);
@@ -351,9 +356,11 @@ void endpoints_configure(
                 TraceDbg("dev %04x, DeviceInitialize", ptr04x(device));
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
-                TraceDbg("dev %04x, NewConfigurationValue %d", ptr04x(device), params->NewConfigurationValue);
+                st = device::set_configuration(device, request, params->NewConfigurationValue);
+                dev.skip_select_config = true;
                 break;
         case UdecxEndpointsConfigureTypeInterfaceSettingChange:
+                //st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", 
                           ptr04x(device), params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
@@ -362,7 +369,12 @@ void endpoints_configure(
                 break;
         }
 
-        WdfRequestComplete(request, STATUS_SUCCESS);
+        if (st != STATUS_PENDING) {
+                if (st) {
+                        TraceDbg("%!STATUS!", st);
+                }
+                WdfRequestComplete(request, st);
+        }
 }
 
 /*

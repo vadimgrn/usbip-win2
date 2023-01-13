@@ -192,9 +192,20 @@ NTSTATUS control_transfer(
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
+        auto &pkt = get_setup_packet(r); // @see UdecxUrbRetrieveControlSetupPacket
+
         if (filter::is_request_select(r)) {
-                TraceDbg("req %04x from the upper filter, irp %04x", ptr04x(request), ptr04x(WdfRequestWdmGetIrp(request)));
                 filter::unpack_request_select(r);
+                auto skip = dev.skip_select_config && pkt.bRequest == USB_REQUEST_SET_CONFIGURATION;
+
+                TraceDbg("Upper filter req %04x, urb %04x, {%s, wValue %d, wIndex %d}%s", 
+                          ptr04x(request),  ptr04x(&urb), brequest_str(pkt.bRequest), 
+                          pkt.wValue.W, pkt.wIndex.W, skip ? ", skip" : "\n");
+
+                if (skip) {
+                        urb.UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED; // URB_STATUS(&urb)
+                        return STATUS_NOT_SUPPORTED;
+                }
         }
 
         {
@@ -210,7 +221,6 @@ NTSTATUS control_transfer(
         }
 
         auto buf_len = r.TransferBufferLength;
-        auto &pkt = get_setup_packet(r); // @see UdecxUrbRetrieveControlSetupPacket
 
         if (buf_len > pkt.wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
                 buf_len = pkt.wLength; // usb_submit_urb checks for equality
@@ -415,8 +425,58 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request,
         return ::send(dev.ep0, ctx, dev, true);
 }
 
+/*
+ * @param request can be WDF_NO_HANDLE
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto do_select(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG params)
+{
+        bool iface = params >> 16; 
+
+        UCHAR bmRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | UCHAR(iface ? USB_RECIP_INTERFACE : USB_RECIP_DEVICE);
+        UCHAR bRequest = iface ? USB_REQUEST_SET_INTERFACE : USB_REQUEST_SET_CONFIGURATION;
+
+        USHORT wValue;
+        USHORT wIndex;
+
+        if (iface) {
+                wValue = UCHAR(params >> 8); // Alternative Setting
+                wIndex = UCHAR(params); // Interface
+        } else {
+                wValue = UCHAR(params); // Configuration Value
+                wIndex = 0;
+        }
+
+        return send_ep0_out(device, request, bmRequestType, bRequest, wValue, wIndex);
+}
+
 } // namespace
 
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::set_configuration(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
+{
+        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
+        return do_select(device, request, ConfigurationValue);
+}
+
+/*
+ * @param request can be WDF_NO_HANDLE
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::set_interface(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, 
+        _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
+{
+        TraceDbg("dev %04x, %d.%d", ptr04x(device), InterfaceNumber, AlternateSetting);
+
+        auto params = (1UL << 16) | (AlternateSetting << 8) | InterfaceNumber; 
+        return do_select(device, request, params); // STATUS_PENDING on success
+}
 
  /*
   * There is a race condition between IRP cancelation and RET_SUBMIT.
