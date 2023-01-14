@@ -93,6 +93,10 @@ _URB_SELECT_CONFIGURATION* clone(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_ _URB_SELECT_CONFIGURATION *ptr, _In_ ULONG pooltag);
+inline void free(_In_ _URB_SELECT_CONFIGURATION *ptr, _In_ ULONG pooltag)
+{
+	NT_ASSERT(ptr);
+	ExFreePoolWithTag(ptr, pooltag);
+}
 
 } // namespace libdrv
