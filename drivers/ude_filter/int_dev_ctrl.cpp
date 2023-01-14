@@ -7,7 +7,6 @@
 #include "int_dev_ctrl.tmh"
 
 #include "irp.h"
-#include "select.h"
 #include "request.h"
 #include "driver.h"
 
@@ -16,6 +15,7 @@
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\ioctl.h>
+#include <libdrv\select.h>
 
 namespace
 {
@@ -127,7 +127,7 @@ NTSTATUS on_send_request(
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 auto send_request(
-	_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf,
+	_In_ filter_ext &fltr, _In_ bool cfg_or_intf, 
 	_In_ void *TransferBuffer, _In_ ULONG TransferBufferLength)
 {
 	auto &target = fltr.target;
@@ -154,7 +154,7 @@ auto send_request(
 		return err;
 	}
 
-	filter::pack_request_select(urb.get()->UrbControlTransferEx, value, index, 
+	filter::pack_request_select(urb.get()->UrbControlTransferEx, 
 		                    cfg_or_intf, TransferBuffer, TransferBufferLength);
 
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
@@ -184,14 +184,11 @@ void select_configuration(_In_ filter_ext &fltr, _In_ _URB_SELECT_CONFIGURATION 
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
 	}
 
-	auto cd = r.ConfigurationDescriptor; // null if unconfigured
-	auto value = cd ? cd->bConfigurationValue : UCHAR(); // FIXME: can't pass -1 if unconfigured
-
 	unique_ptr buf = libdrv::clone(r, POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, unique_ptr::pooltag);
 
 	if (auto len = r.Hdr.Length; !buf) {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
-	} else if (NT_SUCCESS(send_request(fltr, value, 0, true, buf.get(), len))) {
+	} else if (NT_SUCCESS(send_request(fltr, true, buf.get(), len))) {
 		buf.release();
 	}
 }
@@ -209,8 +206,7 @@ void select_interface(_In_ filter_ext &fltr, _In_ _URB_SELECT_INTERFACE &r)
 
 	if (auto len = r.Hdr.Length; !buf) {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
-	} else if (auto &i = r.Interface; 
-		   NT_SUCCESS(send_request(fltr, i.AlternateSetting, i.InterfaceNumber, false, buf.get(), len))) {
+	} else if (NT_SUCCESS(send_request(fltr, false, buf.get(), len))) {
 		buf.release();
 	}
 }

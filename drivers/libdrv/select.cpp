@@ -3,10 +3,10 @@
  */
 
 #include "select.h"
-#include "trace.h"
-#include "select.tmh"
+#include "codeseg.h"
+#include "dbgcommon.h"
 
-#include <libdrv\dbgcommon.h>
+#include <ntstrsafe.h>
 
 namespace
 {

@@ -9,6 +9,9 @@
 namespace usbip::filter
 {
 
+namespace impl
+{
+
 /*
  * 9.4 Standard Device Requests
  * 9.4.14 Set Firmware Status
@@ -25,24 +28,7 @@ inline const USB_DEFAULT_PIPE_SETUP_PACKET setup_select =
         .wIndex{.W = MAXUSHORT}
 };
 
-namespace impl
-{
-
-const ULONG const_part = 0xFFFE'0000;
-
-inline ULONG pack(_In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf)
-{
-        static_assert(sizeof(ULONG) == 4);
-        return const_part | ULONG(cfg_or_intf << 16) | ULONG(index << 8) | value;
-}
-
-inline void unpack(_In_ ULONG packed, _Out_ USHORT &value, _Out_ USHORT &index, _Out_ bool &cfg_or_intf)
-{
-        NT_ASSERT((packed & const_part) == const_part);
-        value = static_cast<UCHAR>(packed);
-        index = static_cast<UCHAR>(packed >> 8);
-        cfg_or_intf = (packed >> 16) & 1;
-}
+const auto const_part = MAXULONG << 1;
 
 } // namespace impl
 
@@ -55,27 +41,39 @@ inline auto is_request_select(_In_ const _URB_CONTROL_TRANSFER_EX &r)
 
         return (r.Timeout & impl::const_part) == impl::const_part && 
                 r.TransferFlags == ULONG(USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT) &&
-                RtlEqualMemory(&pkt, &setup_select, sizeof(pkt));
+                RtlEqualMemory(&pkt, &impl::setup_select, sizeof(pkt));
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void pack_request_select(
-        _Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf,
+        _Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool cfg_or_intf,
         _In_ void *TransferBuffer, _In_ ULONG TransferBufferLength);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void unpack_request_select(_Inout_ _URB_CONTROL_TRANSFER_EX &r)
 {
-        auto &pkt = get_setup_packet(r);
-
-        bool cfg_or_intf;
-        impl::unpack(r.Timeout, pkt.wValue.W, pkt.wIndex.W, cfg_or_intf);
+        bool cfg_or_intf = r.Timeout & ~impl::const_part;
         r.Timeout = 0;
 
-        pkt.bmRequestType.s.Recipient = cfg_or_intf ? USB_RECIP_DEVICE : USB_RECIP_INTERFACE;
-        pkt.bRequest = cfg_or_intf ? USB_REQUEST_SET_CONFIGURATION : USB_REQUEST_SET_INTERFACE;
+        if (auto &pkt = get_setup_packet(r); cfg_or_intf) {
+                auto urb = reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
+                auto cd = urb->ConfigurationDescriptor; // null if unconfigured
+
+                pkt.bmRequestType.s.Recipient = USB_RECIP_DEVICE;
+                pkt.bRequest = USB_REQUEST_SET_CONFIGURATION;
+                pkt.wValue.W = cd ? cd->bConfigurationValue : 0; // FIXME: can't pass -1 if unconfigured
+                pkt.wIndex.W = 0;
+        } else {
+                auto urb = reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer);
+                auto &intf = urb->Interface;
+
+                pkt.bmRequestType.s.Recipient = USB_RECIP_INTERFACE;
+                pkt.bRequest = USB_REQUEST_SET_INTERFACE;
+                pkt.wValue.W = intf.AlternateSetting;
+                pkt.wIndex.W = intf.InterfaceNumber;
+        }
 }
 
 } // namespace usbip::filter

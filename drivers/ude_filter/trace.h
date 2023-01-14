@@ -44,12 +44,6 @@
 #define WPP_RECORDER_FLAGS_LEVEL_ARGS(flags, lvl) WPP_RECORDER_LEVEL_FLAGS_ARGS(lvl, flags)
 #define WPP_RECORDER_FLAGS_LEVEL_FILTER(flags, lvl) WPP_RECORDER_LEVEL_FLAGS_FILTER(lvl, flags)
 
-inline auto ptr04x(const void *ptr) // use format "%04x"
-{
-        auto n = reinterpret_cast<uintptr_t>(ptr);
-        return static_cast<UINT32>(n);
-}
-
 //
 // This comment block is scanned by the trace preprocessor to define our
 // Trace function.

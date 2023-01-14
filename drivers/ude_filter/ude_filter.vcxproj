@@ -102,7 +102,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="request.cpp" />
-    <ClCompile Include="select.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="int_dev_ctrl.cpp" />
@@ -111,7 +110,6 @@
   <ItemGroup>
     <ClInclude Include="request.h" />
     <ClInclude Include="irp.h" />
-    <ClInclude Include="select.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="driver.h" />
     <ClInclude Include="int_dev_ctrl.h" />

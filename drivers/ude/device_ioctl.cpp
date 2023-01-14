@@ -23,6 +23,7 @@
 #include <libdrv\usb_util.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
+#include <libdrv\select.h>
 
 #include <ude_filter\request.h>
 
@@ -196,12 +197,18 @@ NTSTATUS control_transfer(
 
         if (filter::is_request_select(r)) {
                 filter::unpack_request_select(r);
+
+                if (pkt.bRequest == USB_REQUEST_SET_CONFIGURATION) {
+                        auto req = reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
+                        char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), select_configuration_str(buf, sizeof(buf), req));
+                } else {
+                        auto req = reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer);
+                        char buf[SELECT_INTERFACE_STR_BUFSZ];
+                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), select_interface_str(buf, sizeof(buf), *req));
+                }
+
                 auto skip = dev.skip_select_config && pkt.bRequest == USB_REQUEST_SET_CONFIGURATION;
-
-                TraceDbg("Upper filter req %04x, urb %04x, {%s, wValue %d, wIndex %d}%s", 
-                          ptr04x(request),  ptr04x(&urb), brequest_str(pkt.bRequest), 
-                          pkt.wValue.W, pkt.wIndex.W, skip ? ", skip" : "\n");
-
                 if (skip) {
                         urb.UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED; // URB_STATUS(&urb)
                         return STATUS_NOT_SUPPORTED;

@@ -9,3 +9,9 @@
   #define PAGED
   #define CS_INIT
 #endif
+
+inline auto ptr04x(const void *ptr) // use format "%04x"
+{
+        auto n = reinterpret_cast<uintptr_t>(ptr);
+        return static_cast<UINT32>(n);
+}

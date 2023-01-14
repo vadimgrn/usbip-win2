@@ -6,6 +6,8 @@
 #include "trace.h"
 #include "wsk_context.tmh"
 
+#include <libdrv/codeseg.h>
+
 namespace
 {
 

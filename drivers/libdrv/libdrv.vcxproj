@@ -14,6 +14,7 @@
     <ClCompile Include="dbgcommon.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="mdl_cpp.cpp" />
+    <ClCompile Include="select.cpp" />
     <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
     <ClCompile Include="strutil.cpp" />
@@ -148,6 +149,7 @@
     <ClInclude Include="lock.h" />
     <ClInclude Include="pair.h" />
     <ClInclude Include="remove_lock.h" />
+    <ClInclude Include="select.h" />
     <ClInclude Include="unique_ptr.h" />
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
