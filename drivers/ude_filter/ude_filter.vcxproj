@@ -101,6 +101,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="request.cpp" />
     <ClCompile Include="select.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="driver.cpp" />

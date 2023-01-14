@@ -6,6 +6,7 @@
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="int_dev_ctrl.cpp" />
     <ClCompile Include="select.cpp" />
+    <ClCompile Include="request.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="driver.h" />

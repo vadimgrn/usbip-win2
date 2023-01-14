@@ -26,17 +26,16 @@ public:
                 }
         }
 
-        auto get() const { return m_ptr; }
-
-        template<typename T>
-        auto get() const { return static_cast<T*>(m_ptr); }
-
         explicit operator bool() const { return m_ptr; }
         auto operator!() const { return !m_ptr; }
 
+        template<typename T = void>
+        auto get() const { return static_cast<T*>(m_ptr); }
+
+        template<typename T = void>
         auto release()
         {
-                auto p = m_ptr;
+                auto p = get<T>();
                 m_ptr = nullptr;
                 return p;
         }

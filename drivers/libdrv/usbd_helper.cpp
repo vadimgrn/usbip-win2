@@ -1,5 +1,25 @@
 #include "usbd_helper.h"
 
+namespace
+{
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto clone(_In_ const USB_CONFIGURATION_DESCRIPTOR &r, _In_ POOL_FLAGS flags, _In_ ULONG pooltag)
+{
+	auto len = r.wTotalLength;
+
+	auto ptr = (USB_CONFIGURATION_DESCRIPTOR*)ExAllocatePool2(flags, len, pooltag);
+	if (ptr) {
+		RtlCopyMemory(ptr, &r, len);
+	}
+	
+	return ptr;
+}
+
+} // namespace
+
+
 /*
  * Linux error codes.
  * See: include/uapi/asm-generic/errno-base.h, include/uapi/asm-generic/errno.h
@@ -198,3 +218,39 @@ UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
 	return flags;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_URB_SELECT_CONFIGURATION* libdrv::clone(
+	_In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag)
+{
+	auto dst = (_URB_SELECT_CONFIGURATION*)ExAllocatePool2(flags, src.Hdr.Length, pooltag);
+	if (dst) {
+		RtlCopyMemory(dst, &src, src.Hdr.Length);
+	} else {
+		return nullptr;
+	}
+
+	if (!src.ConfigurationDescriptor) {
+		//
+	} else if (auto ptr = ::clone(*src.ConfigurationDescriptor, flags, pooltag)) {
+		dst->ConfigurationDescriptor = ptr;
+	} else {
+		ExFreePoolWithTag(dst, pooltag);
+		dst = nullptr;
+	}
+
+	return dst;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void libdrv::free(_In_ _URB_SELECT_CONFIGURATION *ptr, _In_ ULONG pooltag)
+{
+	NT_ASSERT(ptr);
+
+	if (auto cd = ptr->ConfigurationDescriptor) {
+		ExFreePoolWithTag(cd, pooltag);
+	}
+
+	ExFreePoolWithTag(ptr, pooltag);
+}

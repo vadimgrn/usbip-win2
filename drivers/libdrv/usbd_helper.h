@@ -81,3 +81,18 @@ constexpr auto is_isoch(_In_ const URB &urb)
 	return  f == URB_FUNCTION_ISOCH_TRANSFER || 
 		f == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
 }
+
+
+namespace libdrv
+{
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_URB_SELECT_CONFIGURATION* clone(
+	_In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void free(_In_ _URB_SELECT_CONFIGURATION *ptr, _In_ ULONG pooltag);
+
+} // namespace libdrv

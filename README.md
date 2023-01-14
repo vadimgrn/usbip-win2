@@ -14,7 +14,7 @@
 
 ## Key features
 - [UDE](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/developing-windows-drivers-for-emulated-usb-host-controllers-and-devices) driver is an USB/IP client
-- USB class upper filter driver usbip2_filter is used as companion for the UDE driver
+- USB class upper filter driver usbip2_filter is used as companion for UDE driver
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and does data exchange
   - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls

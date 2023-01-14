@@ -9,6 +9,7 @@
 #include "irp.h"
 #include "select.h"
 #include "request.h"
+#include "driver.h"
 
 #include <usbip\ch9.h>
 #include <libdrv\remove_lock.h>
@@ -73,6 +74,20 @@ private:
 	URB *m_urb{};
 };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto clone(_In_ const _URB_SELECT_INTERFACE &r, _In_ POOL_FLAGS Flags, _In_ ULONG PoolTag)
+{
+	auto len = r.Hdr.Length;
+
+	auto ptr = (_URB_SELECT_INTERFACE*)ExAllocatePool2(Flags, len, PoolTag);
+	if (ptr) {
+		RtlCopyMemory(ptr, &r, len);
+	}
+
+	return ptr;
+}
+
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -84,6 +99,20 @@ NTSTATUS on_send_request(
 
 	TraceDbg("dev %04x, urb %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
 		  ptr04x(urb), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
+
+	{
+		auto &r = urb->UrbControlTransferEx;
+		auto &pkt = get_setup_packet(r); 
+		
+		if (pkt.bRequest == USB_REQUEST_SET_CONFIGURATION) {
+			auto ptr = static_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
+			libdrv::free(ptr, unique_ptr::pooltag);
+		} else {
+			NT_ASSERT(pkt.bRequest == USB_REQUEST_SET_INTERFACE);
+			NT_ASSERT(r.TransferBuffer);
+			ExFreePoolWithTag(r.TransferBuffer, unique_ptr::pooltag);
+		}
+	}
 
 	if (auto &handle = fltr.dev.usbd) {
 		USBD_UrbFree(handle, urb);
@@ -97,7 +126,9 @@ NTSTATUS on_send_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto send_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf)
+auto send_request(
+	_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In_ bool cfg_or_intf,
+	_In_ void *TransferBuffer, _In_ ULONG TransferBufferLength)
 {
 	auto &target = fltr.target;
 
@@ -123,7 +154,8 @@ auto send_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In
 		return err;
 	}
 
-	filter::pack_request_select(urb.get()->UrbControlTransferEx, value, index, cfg_or_intf);
+	filter::pack_request_select(urb.get()->UrbControlTransferEx, value, index, 
+		                    cfg_or_intf, TransferBuffer, TransferBufferLength);
 
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
@@ -145,26 +177,42 @@ auto send_request(_In_ filter_ext &fltr, _In_ UCHAR value, _In_ UCHAR index, _In
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
+void select_configuration(_In_ filter_ext &fltr, _In_ _URB_SELECT_CONFIGURATION &r)
 {
-	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
+	{
+		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
+	}
 
 	auto cd = r.ConfigurationDescriptor; // null if unconfigured
 	auto value = cd ? cd->bConfigurationValue : UCHAR(); // FIXME: can't pass -1 if unconfigured
 
-	send_request(fltr, value, 0, true);
+	unique_ptr buf = libdrv::clone(r, POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, unique_ptr::pooltag);
+
+	if (auto len = r.Hdr.Length; !buf) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
+	} else if (NT_SUCCESS(send_request(fltr, value, 0, true, buf.get(), len))) {
+		buf.release();
+	}
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void select_interface(_In_ filter_ext &fltr, _In_ const _URB_SELECT_INTERFACE &intf)
+void select_interface(_In_ filter_ext &fltr, _In_ _URB_SELECT_INTERFACE &r)
 {
-	char buf[SELECT_INTERFACE_STR_BUFSZ];
-	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), intf));
+	{
+		char buf[SELECT_INTERFACE_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), r));
+	}
 
-	auto &r = intf.Interface;
-	send_request(fltr, r.AlternateSetting, r.InterfaceNumber, false);
+	unique_ptr buf = clone(r, POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, unique_ptr::pooltag);
+
+	if (auto len = r.Hdr.Length; !buf) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
+	} else if (auto &i = r.Interface; 
+		   NT_SUCCESS(send_request(fltr, i.AlternateSetting, i.InterfaceNumber, false, buf.get(), len))) {
+		buf.release();
+	}
 }
 
 _Function_class_(IO_COMPLETION_ROUTINE)
