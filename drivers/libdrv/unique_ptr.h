@@ -19,6 +19,9 @@ public:
         constexpr unique_ptr() = default;
         unique_ptr(void *ptr) : m_ptr(ptr) {}
 
+        unique_ptr(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes) :
+                m_ptr(ExAllocatePool2(Flags, NumberOfBytes, pooltag)) {}
+
         ~unique_ptr() 
         {
                 if (m_ptr) {
@@ -29,13 +32,14 @@ public:
         explicit operator bool() const { return m_ptr; }
         auto operator!() const { return !m_ptr; }
 
-        template<typename T = void>
+        auto get() const { return m_ptr; }
+
+        template<typename T>
         auto get() const { return static_cast<T*>(m_ptr); }
 
-        template<typename T = void>
         auto release()
         {
-                auto p = get<T>();
+                auto p = m_ptr;
                 m_ptr = nullptr;
                 return p;
         }

@@ -197,25 +197,3 @@ UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
 
 	return flags;
 }
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_URB_SELECT_CONFIGURATION* libdrv::clone(
-	_In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag)
-{
-	auto cd_len = src.ConfigurationDescriptor ? src.ConfigurationDescriptor->wTotalLength : 0;
-	auto len = src.Hdr.Length + cd_len;
-
-	auto dst = (_URB_SELECT_CONFIGURATION*)ExAllocatePool2(flags, len, pooltag);
-	if (dst) {
-		RtlCopyMemory(dst, &src, src.Hdr.Length);
-		if (cd_len) {
-			dst->ConfigurationDescriptor = 
-				reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR*>((char*)dst + src.Hdr.Length);
-
-			RtlCopyMemory(dst->ConfigurationDescriptor, src.ConfigurationDescriptor, cd_len);
-		}
-	}
-
-	return dst;
-}

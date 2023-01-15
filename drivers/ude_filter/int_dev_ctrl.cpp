@@ -74,19 +74,6 @@ private:
 	URB *m_urb{};
 };
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto clone(_In_ const _URB_SELECT_INTERFACE &r, _In_ POOL_FLAGS Flags, _In_ ULONG PoolTag)
-{
-	auto len = r.Hdr.Length;
-
-	auto ptr = (_URB_SELECT_INTERFACE*)ExAllocatePool2(Flags, len, PoolTag);
-	if (ptr) {
-		RtlCopyMemory(ptr, &r, len);
-	}
-
-	return ptr;
-}
 
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
@@ -100,24 +87,14 @@ NTSTATUS on_send_request(
 	TraceDbg("dev %04x, urb %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
 		  ptr04x(urb), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
 
-	{
-		auto &r = urb->UrbControlTransferEx;
-		auto &pkt = get_setup_packet(r); 
-		
-		if (pkt.bRequest == USB_REQUEST_SET_CONFIGURATION) {
-			auto ptr = static_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
-			libdrv::free(ptr, unique_ptr::pooltag);
-		} else {
-			NT_ASSERT(pkt.bRequest == USB_REQUEST_SET_INTERFACE);
-			NT_ASSERT(r.TransferBuffer);
-			ExFreePoolWithTag(r.TransferBuffer, unique_ptr::pooltag);
-		}
+	if (auto &r = urb->UrbControlTransferEx; r.TransferBuffer) {
+		ExFreePoolWithTag(r.TransferBuffer, unique_ptr::pooltag);
 	}
 
 	if (auto &handle = fltr.dev.usbd) {
 		USBD_UrbFree(handle, urb);
 	} else {
-		NT_ASSERT(!"fltr.dev.usbd");
+		NT_ASSERT(!"USBD_HANDLE is NULL");
 	}
 	
 	IoFreeIrp(irp);
@@ -126,9 +103,7 @@ NTSTATUS on_send_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto send_request(
-	_In_ filter_ext &fltr, _In_ bool cfg_or_intf, 
-	_In_ void *TransferBuffer, _In_ ULONG TransferBufferLength)
+auto send_request(_In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ bool cfg_or_intf)
 {
 	auto &target = fltr.target;
 
@@ -154,9 +129,7 @@ auto send_request(
 		return err;
 	}
 
-	filter::pack_request_select(urb.get()->UrbControlTransferEx, 
-		                    cfg_or_intf, TransferBuffer, TransferBufferLength);
-
+	filter::pack_request_select(urb.get()->UrbControlTransferEx, TransferBuffer, cfg_or_intf);
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.get();
@@ -180,15 +153,15 @@ _IRQL_requires_same_
 void select_configuration(_In_ filter_ext &fltr, _In_ _URB_SELECT_CONFIGURATION &r)
 {
 	{
-		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
+		char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
-
-	unique_ptr buf = libdrv::clone(r, POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, unique_ptr::pooltag);
-
-	if (auto len = r.Hdr.Length; !buf) {
+	
+	ULONG len{};
+	
+	if (unique_ptr buf = clone(len, r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag); !buf) {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
-	} else if (NT_SUCCESS(send_request(fltr, true, buf.get(), len))) {
+	} else if (NT_SUCCESS(send_request(fltr, buf.get(), true))) {
 		buf.release();
 	}
 }
@@ -198,15 +171,13 @@ _IRQL_requires_same_
 void select_interface(_In_ filter_ext &fltr, _In_ _URB_SELECT_INTERFACE &r)
 {
 	{
-		char buf[SELECT_INTERFACE_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), r));
+		char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_interface_str(buf, sizeof(buf), r));
 	}
 
-	unique_ptr buf = clone(r, POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, unique_ptr::pooltag);
-
-	if (auto len = r.Hdr.Length; !buf) {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
-	} else if (NT_SUCCESS(send_request(fltr, false, buf.get(), len))) {
+	if (unique_ptr buf = clone(r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag); !buf) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", r.Hdr.Length);
+	} else if (NT_SUCCESS(send_request(fltr, buf.get(), false))) {
 		buf.release();
 	}
 }

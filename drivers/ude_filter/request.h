@@ -41,14 +41,12 @@ inline auto is_request_select(_In_ const _URB_CONTROL_TRANSFER_EX &r)
 
         return (r.Timeout & impl::const_part) == impl::const_part && 
                 r.TransferFlags == ULONG(USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT) &&
-                RtlEqualMemory(&pkt, &impl::setup_select, sizeof(pkt));
+                pkt == impl::setup_select;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void pack_request_select(
-        _Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool cfg_or_intf,
-        _In_ void *TransferBuffer, _In_ ULONG TransferBufferLength);
+void pack_request_select(_Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ void *TransferBuffer, _In_ bool cfg_or_intf);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -74,6 +72,8 @@ inline void unpack_request_select(_Inout_ _URB_CONTROL_TRANSFER_EX &r)
                 pkt.wValue.W = intf.AlternateSetting;
                 pkt.wIndex.W = intf.InterfaceNumber;
         }
+
+        NT_ASSERT(!r.TransferBufferLength);
 }
 
 } // namespace usbip::filter

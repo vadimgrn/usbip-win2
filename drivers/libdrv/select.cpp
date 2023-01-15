@@ -77,7 +77,7 @@ void interfaces_str(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg)
+const char* libdrv::select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg)
 {
 	auto cd = cfg->ConfigurationDescriptor;
 	if (!cd) {
@@ -115,7 +115,7 @@ const char* usbip::select_configuration_str(char *buf, size_t len, const _URB_SE
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE &iface)
+const char* libdrv::select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE &iface)
 {
 	const char *result = buf;
 	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, 
@@ -126,4 +126,48 @@ const char* usbip::select_interface_str(char *buf, size_t len, const _URB_SELECT
 	}
 
 	return result && *result ? result : "select_interface_str error";
+}
+
+/*
+ * Use ExFreePoolWithTag to free the allocated memory.
+ * Do not deallocate _URB_SELECT_CONFIGURATION.ConfigurationDescriptor
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_URB_SELECT_CONFIGURATION* libdrv::clone(
+	_Out_ ULONG &size, _In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag)
+{
+	auto cd_len = src.ConfigurationDescriptor ? src.ConfigurationDescriptor->wTotalLength : 0;
+	size = src.Hdr.Length + cd_len;
+
+	auto dst = (_URB_SELECT_CONFIGURATION*)ExAllocatePool2(flags | POOL_FLAG_UNINITIALIZED, size, pooltag);
+	if (!dst) {
+		return dst;
+	}
+
+	RtlCopyMemory(dst, &src, src.Hdr.Length);
+
+	if (cd_len) {
+		dst->ConfigurationDescriptor = 
+			reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR*>((char*)dst + src.Hdr.Length);
+
+		RtlCopyMemory(dst->ConfigurationDescriptor, src.ConfigurationDescriptor, cd_len);
+	}
+
+	return dst;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_URB_SELECT_INTERFACE* libdrv::clone(
+	_In_ const _URB_SELECT_INTERFACE &r, _In_ POOL_FLAGS Flags, _In_ ULONG PoolTag)
+{
+	auto &len = r.Hdr.Length;
+
+	auto ptr = (_URB_SELECT_INTERFACE*)ExAllocatePool2(Flags | POOL_FLAG_UNINITIALIZED, len, PoolTag);
+	if (ptr) {
+		RtlCopyMemory(ptr, &r, len);
+	}
+
+	return ptr;
 }

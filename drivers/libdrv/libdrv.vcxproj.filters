@@ -38,7 +38,6 @@
     <ClInclude Include="lock.h" />
     <ClInclude Include="pair.h" />
     <ClInclude Include="unique_ptr.h" />
-    <ClInclude Include="buffer.h" />
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="irp.h" />

@@ -200,12 +200,14 @@ NTSTATUS control_transfer(
 
                 if (pkt.bRequest == USB_REQUEST_SET_CONFIGURATION) {
                         auto req = reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
-                        char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), select_configuration_str(buf, sizeof(buf), req));
+                        char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
+                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), 
+                                  libdrv::select_configuration_str(buf, sizeof(buf), req));
                 } else {
                         auto req = reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer);
-                        char buf[SELECT_INTERFACE_STR_BUFSZ];
-                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), select_interface_str(buf, sizeof(buf), *req));
+                        char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
+                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), 
+                                  libdrv::select_interface_str(buf, sizeof(buf), *req));
                 }
 
                 auto skip = dev.skip_select_config && pkt.bRequest == USB_REQUEST_SET_CONFIGURATION;

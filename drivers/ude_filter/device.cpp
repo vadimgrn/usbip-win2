@@ -67,16 +67,17 @@ PAGED bool driver_name_equal(
 {
 	PAGED_CODE();
 
-	buffer buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, 1024);
+	const auto buf_sz = 1024UL;
+	unique_ptr buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, buf_sz);
 	if (!buf) {
-		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", buf.size());
+		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", buf_sz);
 		return false;
 	}
 
 	auto info = buf.get<OBJECT_NAME_INFORMATION>();
 
 	ULONG actual_sz;
-	if (auto err = ObQueryNameString(driver, info, ULONG(buf.size()), &actual_sz)) {
+	if (auto err = ObQueryNameString(driver, info, buf_sz, &actual_sz)) {
 		Trace(TRACE_LEVEL_ERROR, "ObQueryNameString %!STATUS!", err);
 		return false;
 	}

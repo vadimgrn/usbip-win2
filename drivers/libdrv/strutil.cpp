@@ -3,8 +3,6 @@
  */
 
 #include "strutil.h"
-#include "buffer.h"
-
 #include <ntstrsafe.h>
 
 namespace
