@@ -70,7 +70,7 @@ struct device_ctx_ext
 };
 
 /*
- * Context space for UDECXUSBDEVICE.
+ * Context space for UDECXUSBDEVICE -  virtual (emulated) USB device.
  */
 struct device_ctx
 {
@@ -80,7 +80,7 @@ struct device_ctx
         auto speed() const { return ext->dev.speed; }
         auto devid() const { return ext->dev.devid; }
 
-        WDFDEVICE vhci; // parent
+        WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
         UDECXUSBENDPOINT ep0; // default control pipe
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
 

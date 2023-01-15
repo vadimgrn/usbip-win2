@@ -180,6 +180,30 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
         return STATUS_PENDING;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto upper_filter(_In_ UDECXUSBDEVICE device, _In_ device_ctx &dev, _Inout_ _URB_CONTROL_TRANSFER_EX &r)
+{
+        char buf[max(libdrv::SELECT_CONFIGURATION_STR_BUFSZ, libdrv::SELECT_INTERFACE_STR_BUFSZ)];
+
+        if (auto &pkt = get_setup_packet(r); pkt.bRequest == USB_REQUEST_SET_INTERFACE) {
+                auto req = reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer);
+                TraceDbg("dev %04x, %s", ptr04x(device), libdrv::select_interface_str(buf, sizeof(buf), *req));
+        } else {
+                NT_ASSERT(pkt.bRequest == USB_REQUEST_SET_CONFIGURATION);
+
+                auto req = reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
+                TraceDbg("dev %04x, %s", ptr04x(device), libdrv::select_configuration_str(buf, sizeof(buf), req));
+
+                if (dev.skip_select_config) {
+                        r.Hdr.Status = USBD_STATUS_NOT_SUPPORTED;
+                        return STATUS_NOT_SUPPORTED;
+                }
+        }
+
+        return STATUS_SUCCESS;
+}
+
 using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, const endpoint_ctx&, WDFREQUEST, URB&);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -193,27 +217,10 @@ NTSTATUS control_transfer(
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
-        auto &pkt = get_setup_packet(r); // @see UdecxUrbRetrieveControlSetupPacket
-
         if (filter::is_request_select(r)) {
                 filter::unpack_request_select(r);
-
-                if (pkt.bRequest == USB_REQUEST_SET_CONFIGURATION) {
-                        auto req = reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
-                        char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), 
-                                  libdrv::select_configuration_str(buf, sizeof(buf), req));
-                } else {
-                        auto req = reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer);
-                        char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
-                        TraceDbg("Upper filter -> dev %04x, %s", ptr04x(endp.device), 
-                                  libdrv::select_interface_str(buf, sizeof(buf), *req));
-                }
-
-                auto skip = dev.skip_select_config && pkt.bRequest == USB_REQUEST_SET_CONFIGURATION;
-                if (skip) {
-                        urb.UrbHeader.Status = USBD_STATUS_NOT_SUPPORTED; // URB_STATUS(&urb)
-                        return STATUS_NOT_SUPPORTED;
+                if (auto err = upper_filter(endp.device, dev, r)) {
+                        return err;
                 }
         }
 
@@ -230,6 +237,7 @@ NTSTATUS control_transfer(
         }
 
         auto buf_len = r.TransferBufferLength;
+        auto &pkt = get_setup_packet(r); // @see UdecxUrbRetrieveControlSetupPacket
 
         if (buf_len > pkt.wLength) { // see drivers/usb/core/urb.c, usb_submit_urb
                 buf_len = pkt.wLength; // usb_submit_urb checks for equality

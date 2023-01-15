@@ -349,8 +349,10 @@ void endpoints_configure(
         auto st = STATUS_SUCCESS;
 
         if (auto &dev = *get_device_ctx(device); dev.unplugged) { // UDECXUSBDEVICE can no longer be used
-                TraceDbg("dev %04x, %!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged", 
-                          ptr04x(device), params->ConfigureType);
+                TraceDbg("dev %04x, %!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged, "
+                         "NewConfigurationValue %d, InterfaceNumber %d, NewInterfaceSetting %d",
+                          ptr04x(device), params->ConfigureType, params->NewConfigurationValue,
+                          params->InterfaceNumber, params->NewInterfaceSetting);
         } else switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
                 TraceDbg("dev %04x, DeviceInitialize", ptr04x(device));
