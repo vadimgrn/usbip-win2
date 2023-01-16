@@ -30,6 +30,7 @@
     <DriverType>WDM</DriverType>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
@@ -39,6 +40,7 @@
     <DriverType>WDM</DriverType>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

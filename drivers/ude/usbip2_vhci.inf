@@ -33,6 +33,7 @@ Include=machine.inf
 Needs=PciD3ColdSupported
 
 [vhci_Device.NT.Services]
+; Flags: 0x00000002 (SPSVCINST_ASSOCSERVICE)
 AddService = usbip2_vhci,2,vhci_Device_Service_Inst
 
 [vhci_Device_Service_Inst]

@@ -86,6 +86,7 @@
     </KMDF_MINIMUM_VERSION_REQUIRED>
     <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
@@ -101,6 +102,7 @@
     </KMDF_MINIMUM_VERSION_REQUIRED>
     <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
+    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
