@@ -176,7 +176,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void sched_receive_usbip_header(_In_ device_ctx &ctx)
 {
-        WdfWorkItemEnqueue(ctx.recv_hdr);
+        if (!ctx.unplugged) [[likely]]
+            WdfWorkItemEnqueue(ctx.recv_hdr);
 }
 
 _IRQL_requires_same_
