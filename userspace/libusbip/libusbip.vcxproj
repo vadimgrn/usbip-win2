@@ -107,7 +107,7 @@
     <ClCompile Include="getopt.c" />
     <ClCompile Include="proto_op.cpp" />
     <ClCompile Include="setupdi.cpp" />
-    <ClCompile Include="util.cpp" />
+    <ClCompile Include="strconv.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="usb_ids.cpp" />
     <ClCompile Include="win_socket.cpp" />
@@ -123,7 +123,7 @@
     <ClInclude Include="getopt.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="setupdi.h" />
-    <ClInclude Include="util.h" />
+    <ClInclude Include="strconv.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="usb_ids.h" />
     <ClInclude Include="win_handle.h" />

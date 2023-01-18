@@ -28,7 +28,7 @@
 #include <libusbip\getopt.h>
 #include <libusbip\common.h>
 #include <libusbip\network.h>
-#include <libusbip\util.h>
+#include <libusbip\strconv.h>
 
 namespace
 {
@@ -94,7 +94,7 @@ int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
 {
 	assert(__argv[0] != argv[0]);
 
-	auto me = utf8_to_wchar(__argv[0]);
+	auto me = libusbip::utf8_to_wchar(__argv[0]);
 	FileVersion fv(me);
 
 	auto ver = fv.GetFileVersion();
