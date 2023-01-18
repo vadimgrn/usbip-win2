@@ -400,8 +400,6 @@ struct device_init_ptr
         explicit operator bool() const { return ptr; }
         auto operator !() const { return !ptr; }
 
-        void release() { ptr = nullptr; }
-
         _UDECXUSBDEVICE_INIT *ptr{};
 };
 
@@ -481,7 +479,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
                 return err;
         }
 
-        init.release();
+        NT_ASSERT(!init); // zeroed by UdecxUsbDeviceCreate
         auto &ctx = *get_device_ctx(dev);
 
         ctx.vhci = vhci;

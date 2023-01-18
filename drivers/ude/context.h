@@ -176,6 +176,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void sched_receive_usbip_header(_In_ device_ctx &ctx)
 {
+        NT_ASSERT(!ctx.unplugged); // recv_hdr can be already destroyed after UdecxUsbDevicePlugOutAndDelete
         WdfWorkItemEnqueue(ctx.recv_hdr);
 }
 

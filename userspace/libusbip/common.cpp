@@ -3,7 +3,7 @@
  */
 
 #include "common.h"
-#include "util.h"
+#include "strconv.h"
 
 #include <usbip\proto_op.h>
 #include <format>

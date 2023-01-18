@@ -466,7 +466,9 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
-		sched_receive_usbip_header(dev);
+		if (!dev.unplugged) { // FIXME: race condition with IOCTL_PLUGOUT_HARDWARE
+			sched_receive_usbip_header(dev);
+		}
 		[[fallthrough]];
 	case RECV_MORE_DATA_REQUIRED:
 		return StopCompletion;
