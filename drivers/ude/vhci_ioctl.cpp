@@ -459,13 +459,13 @@ PAGED void IoDeviceControl(
         auto complete = true;
 
         switch (IoControlCode) {
-        case vhci::IOCTL_PLUGIN_HARDWARE:
+        case vhci::ioctl::plugin_hardware:
                 st = plugin_hardware(Request);
                 break;
-        case vhci::IOCTL_PLUGOUT_HARDWARE:
+        case vhci::ioctl::plugout_hardware:
                 st = plugout_hardware(Request);
                 break;
-        case vhci::IOCTL_GET_IMPORTED_DEVICES:
+        case vhci::ioctl::get_imported_devices:
                 st = get_imported_devices(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:

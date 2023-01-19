@@ -3,7 +3,7 @@
 #include <guiddef.h>
 
 #ifdef _KERNEL_MODE
-  #include <ntddk.h>
+  #include <wdm.h>
 #else
   #include <windows.h>
   #include <winioctl.h>
@@ -47,15 +47,22 @@ inline auto get_port_range(_In_ usb_device_speed speed)
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
-constexpr auto IOCTL(int idx)
+enum class function { // 12 bit
+        plugin = 0x800, // values of less than 0x800 are reserved for Microsoft
+        plugout, 
+        get_imported_devices 
+};
+
+constexpr auto make_ioctl(function id)
 {
-        return CTL_CODE(FILE_DEVICE_BUS_EXTENDER, idx, METHOD_BUFFERED, FILE_READ_DATA);
+        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, 
+                        FILE_READ_DATA | FILE_WRITE_DATA);
 }
 
-enum {
-        IOCTL_PLUGIN_HARDWARE      = IOCTL(0),
-        IOCTL_PLUGOUT_HARDWARE     = IOCTL(1),
-        IOCTL_GET_IMPORTED_DEVICES = IOCTL(2),
+enum ioctl {
+        plugin_hardware      = make_ioctl(function::plugin),
+        plugout_hardware     = make_ioctl(function::plugout),
+        get_imported_devices = make_ioctl(function::get_imported_devices)
 };
 
 struct ioctl_plugin
