@@ -437,26 +437,23 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 }
 
 /*
- * IRP_MJ_DEVICE_CONTROL 
+ * IRP_MJ_DEVICE_CONTROL
  */
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void IoDeviceControl(
+void device_control(
         _In_ WDFQUEUE Queue,
         _In_ WDFREQUEST Request,
         _In_ size_t OutputBufferLength,
         _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode)
 {
-        PAGED_CODE();
-
         TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
                   device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
 
-        USBUSER_REQUEST_HEADER *hdr{};
-        auto st = STATUS_INVALID_DEVICE_REQUEST;
         auto complete = true;
+        auto st = STATUS_INVALID_DEVICE_REQUEST;
 
         switch (IoControlCode) {
         case vhci::ioctl::plugin_hardware:
@@ -470,8 +467,11 @@ PAGED void IoDeviceControl(
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
-                if (NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), reinterpret_cast<PVOID*>(&hdr), nullptr))) {
-                        TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), hdr->UsbUserRequest);
+                if (USBUSER_REQUEST_HEADER *hdr; 
+                    NT_SUCCESS(WdfRequestRetrieveInputBuffer(Request, sizeof(*hdr), 
+                                                             reinterpret_cast<PVOID*>(&hdr), nullptr))) {
+                        TraceDbg("USB_USER_REQUEST -> %s(%#08lX)", usbuser_request_name(hdr->UsbUserRequest), 
+                                  hdr->UsbUserRequest);
                 }
                 [[fallthrough]];
         default:
@@ -495,7 +495,7 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
-        cfg.EvtIoDeviceControl = IoDeviceControl;
+        cfg.EvtIoDeviceControl = device_control;
         cfg.PowerManaged = WdfFalse;
 
         WDF_OBJECT_ATTRIBUTES attrs;
