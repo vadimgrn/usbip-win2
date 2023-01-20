@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2001 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
 
 #include <windows.h>

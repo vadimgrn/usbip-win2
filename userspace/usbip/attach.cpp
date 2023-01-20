@@ -79,7 +79,7 @@ auto import_device(const char *host, const char *busid, const char *serial)
                 return make_error(ERR_DRIVER);
         }
 
-        if (!vhci::attach_device(hdev.get(), r)) {
+        if (!vhci::attach(hdev.get(), r)) {
                 return make_error(ERR_GENERAL);
         }
                

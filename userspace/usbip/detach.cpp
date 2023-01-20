@@ -49,7 +49,7 @@ int detach_port(const char *portstr)
 		return 2;
 	}
 
-	auto ret = vhci::detach_device(hdev.get(), port);
+	auto ret = vhci::detach(hdev.get(), port);
 	hdev.reset();
 
 	if (!ret) {

@@ -3,13 +3,10 @@
  * Copyright (C) 2022-2023 Vadym Hrynchyshyn
  */
 
-#include <spdlog\spdlog.h>
-
 #include "common.h"
-#include "strconv.h"
 
 #include <usbip\proto_op.h>
-#include <format>
+#include <spdlog\spdlog.h>
 
 namespace
 {

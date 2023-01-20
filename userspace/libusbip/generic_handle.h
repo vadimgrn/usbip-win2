@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
 
 namespace usbip

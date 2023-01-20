@@ -67,7 +67,7 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
         return v;
 }
 
-bool usbip::vhci::attach_device(HANDLE dev, ioctl_plugin &r)
+bool usbip::vhci::attach(HANDLE dev, ioctl_plugin &r)
 {
         DWORD BytesReturned; // must be set if the last arg is NULL
 
@@ -80,7 +80,7 @@ bool usbip::vhci::attach_device(HANDLE dev, ioctl_plugin &r)
         return ok;
 }
 
-int usbip::vhci::detach_device(HANDLE dev, int port)
+int usbip::vhci::detach(HANDLE dev, int port)
 {
         ioctl_plugout r{ port };
 

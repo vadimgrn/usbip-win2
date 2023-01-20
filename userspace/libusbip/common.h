@@ -5,11 +5,8 @@
 
 #pragma once
 
-#include <usbip\ch9.h>
-#include <usbip\consts.h>
-#include <usbip\proto.h>
-
 #include "usb_ids.h"
+#include <usbip\ch9.h>
 
 class UsbIds;
 
