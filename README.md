@@ -4,6 +4,7 @@
 - **Is fully implemented**
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
 - Works with Linux USB/IP server at least for kernels 4.19 - 5.15
+- **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
@@ -44,7 +45,6 @@
 - The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
 - SDK for Windows 11, version 22H2 (10.0.22621.0)
 - [WDK for Windows 11](https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk), version 22H2 (10.0.22621.0)
-- InnoSetup 6.2 or later
 
 ### Build Visual Studio solution
 - Open `usbip_win.sln`

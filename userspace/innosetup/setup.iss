@@ -97,8 +97,8 @@ Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_vhci.inf {#VhciHw
 
 [UninstallRun]
 
-Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#FilterClassGuid}"" {#FilterDriver}"; RunOnceId: "RemoveFromUpperFilters"; Flags: runhidden
 Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#VhciHwid} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#FilterClassGuid}"" {#FilterDriver}"; RunOnceId: "RemoveFromUpperFilters"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden
 
