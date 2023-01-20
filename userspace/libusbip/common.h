@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2022-2023 Vadym Hrynchyshyn
  */
 
 #pragma once
@@ -10,44 +11,7 @@
 
 #include "usb_ids.h"
 
-#include <cstdint>
-#include <cstdio>
-#include <string>
-
-extern bool usbip_use_stderr;
-extern bool usbip_use_debug;
-
-extern const char *usbip_progname;
-
 class UsbIds;
-
-#define pr_fmt(fmt)	"%s: %s: " fmt "\n", usbip_progname
-#define dbg_fmt(fmt)	pr_fmt("%s:%d:[%s] " fmt), "debug",	\
-		        strrchr(__FILE__, '\\') + 1, __LINE__, __func__
-
-#define err(fmt, ...)								\
-	do {									\
-		if (usbip_use_stderr) {						\
-			fprintf(stderr, pr_fmt(fmt), "error", ##__VA_ARGS__);	\
-		}								\
-	} while (0)
-
-#define info(fmt, ...)								\
-	do {									\
-		if (usbip_use_stderr) {						\
-			fprintf(stderr, pr_fmt(fmt), "info", ##__VA_ARGS__);	\
-		}								\
-	} while (0)
-
-#define dbg(fmt, ...)								\
-	do {									\
-		if (usbip_use_debug) {						\
-			if (usbip_use_stderr) {					\
-				fprintf(stderr, dbg_fmt(fmt), ##__VA_ARGS__);	\
-			}							\
-		}								\
-	} while (0)
-
 
 struct usbip_usb_interface;
 struct usbip_usb_device;

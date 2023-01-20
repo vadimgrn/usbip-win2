@@ -5,17 +5,17 @@
 #include <cassert>
 #include <string>
 
+#include <spdlog\spdlog.h>
+
 #include <initguid.h>
 #include "vhci.h"
 
 namespace
 {
 
-using namespace usbip;
-
 bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = get_intf_detail(dev_info, data, guid)) {
+        if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
@@ -59,7 +59,7 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
                 v.resize(BytesReturned / sizeof(v[0]));
                 result = true;
         } else {
-                dbg("DeviceIoControl error %#lx", GetLastError());
+                spdlog::error("DeviceIoControl error {:#x}", GetLastError());
                 v.clear();
                 result = false;
         }
@@ -73,7 +73,7 @@ bool usbip::vhci::attach_device(HANDLE dev, ioctl_plugin &r)
 
         auto ok = DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r, sizeof(r.port), &BytesReturned, nullptr);
         if (!ok) {
-                dbg("DeviceIoControl error %#lx", GetLastError());
+                spdlog::error("DeviceIoControl error {:#x}", GetLastError());
         }
  
         assert(BytesReturned == sizeof(r.port));
@@ -90,7 +90,7 @@ int usbip::vhci::detach_device(HANDLE dev, int port)
         }
 
         auto err = GetLastError();
-        dbg("DeviceIoControl error %#lx", err);
+        spdlog::error("DeviceIoControl error {:#x}", err);
 
         switch (err) {
         case ERROR_FILE_NOT_FOUND:

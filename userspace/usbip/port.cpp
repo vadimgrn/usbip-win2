@@ -2,6 +2,7 @@
  * Copyright (C) 2022 Vadym Hrynchyshyn
  *               2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
+ *               2022-2023 Vadym Hrynchyshyn
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +20,8 @@
 #include <libusbip\vhci.h>
 #include <libusbip\common.h>
 #include <libusbip\getopt.h>
+
+#include <spdlog\spdlog.h>
 
 #include <set>
 #include <sstream>
@@ -53,14 +56,14 @@ auto get_imported_devices(std::vector<vhci::ioctl_imported_dev> &devs)
 {
         auto hdev = vhci::open();
         if (!hdev) {
-                err("failed to open vhci driver");
+                spdlog::error("failed to open vhci device");
                 return 3;
         }
         
         bool ok = false;
         devs = vhci::get_imported_devs(hdev.get(), ok);
         if (!ok) {
-                err("failed to get imported devices information");
+                spdlog::error("failed to get imported devices information");
                 return 2;
         }
 
@@ -119,7 +122,7 @@ int usbip_port_show(int argc, char *argv[])
                 if ((std::istringstream(str) >> port) && vhci::is_valid_port(port)) {
                         ports.insert(port);
                 } else {
-                        err("invalid port: %s", str);
+                        spdlog::error("invalid port: {}", str);
                         usbip_port_usage();
                         return 1;
                 }

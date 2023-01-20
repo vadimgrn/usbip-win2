@@ -1,5 +1,5 @@
 #include "win_socket.h"
-#include "common.h"
+#include <spdlog\spdlog.h>
 
 namespace
 {
@@ -10,12 +10,12 @@ auto init_wsa() noexcept
         WSADATA	wsaData;
 
         if (auto err = WSAStartup(MAKEWORD(MINOR, MAJOR), &wsaData)) {
-                dbg("WSAStartup error %#x", err);
+                spdlog::error("WSAStartup error {:#x}", err);
                 return false;
         }
 
         if (!(LOBYTE(wsaData.wVersion) == MINOR && HIBYTE(wsaData.wVersion) == MAJOR)) {
-                dbg("cannot find a winsock %d.%d version", MAJOR, MINOR);
+                spdlog::error("cannot find a winsock {}.{} version", MAJOR, MINOR);
                 WSACleanup();
                 return false;
         }

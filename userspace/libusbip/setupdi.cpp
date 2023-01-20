@@ -1,5 +1,5 @@
 #include "setupdi.h"
-#include "common.h"
+#include <spdlog\spdlog.h>
 
 namespace
 {
@@ -16,7 +16,7 @@ auto traverse_dev_info(HDEVINFO dev_info, const usbip::walkfunc_t &walker)
 		} else {
 			auto err = GetLastError();
 			if (err != ERROR_NO_MORE_ITEMS) {
-				dbg("SetupDiEnumDeviceInfo error %#lx", err);
+				spdlog::error("SetupDiEnumDeviceInfo error {:#x}", err);
 			}
 			return false;
 		}
@@ -37,7 +37,7 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> usbip::get_intf_detail(
 	if (!SetupDiEnumDeviceInterfaces(dev_info, dev_info_data, &guid, 0, dev_interface_data.get())) {
 		auto err = GetLastError();
 		if (err != ERROR_NO_MORE_ITEMS) {
-			dbg("SetupDiEnumDeviceInterfaces error %#lx", err);
+			spdlog::error("SetupDiEnumDeviceInterfaces error {:#x}", err);
                 }
 		return dev_interface_detail;
 	}
@@ -46,7 +46,7 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> usbip::get_intf_detail(
         if (!SetupDiGetDeviceInterfaceDetail(dev_info, dev_interface_data.get(), nullptr, 0, &size, nullptr)) {
                 auto err = GetLastError();
                 if (err != ERROR_INSUFFICIENT_BUFFER) {
-                        dbg("SetupDiGetDeviceInterfaceDetail error %#lx", err);
+			spdlog::error("SetupDiGetDeviceInterfaceDetail error {:#x}", err);
 			return dev_interface_detail;
 		}
         }
@@ -57,7 +57,7 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> usbip::get_intf_detail(
 	dev_interface_detail->cbSize = sizeof(*dev_interface_detail);
 
 	if (!SetupDiGetDeviceInterfaceDetail(dev_info, dev_interface_data.get(), dev_interface_detail.get(), size, nullptr, nullptr)) {
-		dbg("SetupDiGetDeviceInterfaceDetail error %#lx", GetLastError());
+		spdlog::error("SetupDiGetDeviceInterfaceDetail error {:#x}", GetLastError());
 		dev_interface_detail.reset();
 	}
 
@@ -71,7 +71,7 @@ bool usbip::traverse_intfdevs(const GUID &guid, const walkfunc_t &walker)
 	if (auto h = hdevinfo(SetupDiGetClassDevs(&guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE))) {
 		ok = traverse_dev_info(h.get(), walker);
 	} else {
-		dbg("SetupDiGetClassDevs error %#lx", GetLastError());
+		spdlog::error("SetupDiGetClassDevs error {:#x}", GetLastError());
 	}
 
 	return ok;

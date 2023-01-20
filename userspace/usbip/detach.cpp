@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
+ *               2022-2023 Vadym Hrynchyshyn
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +19,8 @@
 
 #include <libusbip\vhci.h>
 #include <libusbip\getopt.h>
-#include <libusbip\common.h>
+
+#include <spdlog\spdlog.h>
 
 namespace
 {
@@ -32,18 +34,18 @@ int detach_port(const char *portstr)
 	if (!strcmp(portstr, "*")) {
 		port = -1;
 	} else if (sscanf_s(portstr, "%d", &port) != 1) {
-		err("invalid port: %s", portstr);
+		spdlog::error("invalid port: {}", portstr);
 		return 1;
 	}
 
 	if (port > vhci::TOTAL_PORTS) {
-		err("invalid port %d, max is %d", port, vhci::TOTAL_PORTS);
+		spdlog::error("invalid port {}, max is {}", port, vhci::TOTAL_PORTS);
 		return 1;
 	}
 
 	auto hdev = vhci::open();
 	if (!hdev) {
-		err("can't open vhci driver");
+		spdlog::error("can't open vhci device");
 		return 2;
 	}
 
@@ -61,13 +63,13 @@ int detach_port(const char *portstr)
 
 	switch (ret) {
 	case ERR_INVARG:
-		err("invalid port: %d", port);
+		spdlog::error("invalid port: {}", port);
 		break;
 	case ERR_NOTEXIST:
-		err("non-existent port: %d", port);
+		spdlog::error("non-existent port: {}", port);
 		break;
 	default:
-		err("failed to detach");
+		spdlog::error("failed to detach");
 	}
 
 	return 3;
@@ -106,7 +108,7 @@ int usbip_detach(int argc, char *argv[])
 		}
 	}
 
-	err("port is required");
+	spdlog::error("port is required");
 	usbip_detach_usage();
 
 	return 1;

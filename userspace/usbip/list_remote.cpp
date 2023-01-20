@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
+ *               2022-2023 Vadym Hrynchyshyn
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +24,7 @@
 #include <libusbip\dbgcode.h>
 
 #include <usbip\proto_op.h>
+#include <spdlog\spdlog.h>
 
 namespace
 {
@@ -31,7 +33,7 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 {
 	auto rc = usbip_net_send_op_common(sockfd, OP_REQ_DEVLIST, 0);
 	if (rc < 0) {
-		dbg("failed to send common header: %s", dbg_errcode(rc));
+		spdlog::error("failed to send common header: {}", dbg_errcode(rc));
 		return ERR_NETWORK;
 	}
 
@@ -40,22 +42,21 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 
 	rc = usbip_net_recv_op_common(sockfd, &code, &status);
 	if (rc < 0) {
-		dbg("failed to recv common header: %s", dbg_errcode(rc));
+		spdlog::error("failed to recv common header: {}", dbg_errcode(rc));
 		return rc;
 	}
 
 	op_devlist_reply reply{};
 	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
 	if (rc < 0) {
-		dbg("failed to recv devlist: %s", dbg_errcode(rc));
+		spdlog::error("failed to recv devlist: {}", dbg_errcode(rc));
 		return rc;
 	}
 
 	PACK_OP_DEVLIST_REPLY(0, &reply);
-	dbg("exportable devices: %d\n", reply.ndev);
 
 	if (!reply.ndev) {
-		info("no exportable devices found on %s", host);
+		spdlog::info("no exportable devices found on '{}'", host);
 		return 0;
 	}
 
@@ -63,12 +64,12 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 	printf("======================\n");
 	printf(" - %s\n", host);
 
-	for (unsigned int i = 0; i < reply.ndev; ++i) {
+	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
 		usbip_usb_device udev{};
 		rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
 		if (rc < 0) {
-			dbg("failed to recv devlist: usbip_usb_device[%d]: %s", i, dbg_errcode(rc));
+			spdlog::error("failed to recv devlist: usbip_usb_device[{}]: {}", i, dbg_errcode(rc));
 			return ERR_NETWORK;
 		}
 		usbip_net_pack_usb_device(0, &udev);
@@ -86,7 +87,7 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 			usbip_usb_interface uintf{};
 			rc = usbip_net_recv(sockfd, &uintf, sizeof(uintf));
 			if (rc < 0) {
-				dbg("failed to recv devlist: usbip_usb_intf[%d]: %s", j, dbg_errcode(rc));
+				spdlog::error("failed to recv devlist: usbip_usb_intf[{}]: {}", j, dbg_errcode(rc));
 				return ERR_NETWORK;
 			}
 
@@ -109,14 +110,14 @@ int list_exported_devices(const char *host)
 {
 	auto sock = usbip_net_tcp_connect(host, usbip_port);
 	if (!sock) {
-		err("failed to connect a remote host: %s", host);
+		spdlog::error("failed to connect a remote host '{}'", host);
 		return 3;
 	}
-	dbg("connected to %s:%s\n", host, usbip_port);
+	spdlog::debug("connected to {}:{}\n", host, usbip_port);
 
 	auto rc = get_exported_devices(host, sock.get());
 	if (rc < 0) {
-		err("failed to get device list from %s", host);
+		spdlog::error("failed to get device list from '{}'", host);
 		return 4;
 	}
 

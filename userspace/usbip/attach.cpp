@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
+ *               2022-2023 Vadym Hrynchyshyn
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +20,9 @@
 #include <libusbip\vhci.h>
 #include <libusbip\getopt.h>
 #include <libusbip\network.h>
-#include <libusbip\common.h>
 #include <libusbip\dbgcode.h>
+
+#include <spdlog\spdlog.h>
 
 namespace
 {
@@ -55,7 +57,7 @@ auto init(vhci::ioctl_plugin &r, const char *host, const char *busid, const char
         for (auto &i: v) {
                 if (auto src = i.src) {
                         if (auto err = strcpy_s(i.dst, i.len, src)) {
-                                dbg("'%s' copy error #%d", src, err);
+                                spdlog::error("'{}' copy error #{}", src, err);
                                 return ERR_GENERAL;
                         }
                 }
@@ -73,7 +75,7 @@ auto import_device(const char *host, const char *busid, const char *serial)
         
         auto hdev = vhci::open();
         if (!hdev) {
-                dbg("failed to open vhci driver");
+                spdlog::error("failed to open vhci device");
                 return make_error(ERR_DRIVER);
         }
 
@@ -114,42 +116,42 @@ int attach_device(const char *host, const char *busid, const char *serial, bool 
         if (result > ST_OK) { // <linux>/tools/usb/usbip/libsrc/usbip_common.c, op_common_status_strings
                 switch (auto err = static_cast<op_status_t>(result)) {
                 case ST_NA:
-                        err("device not available");
+                        spdlog::error("device not available");
                         break;
                 case ST_DEV_BUSY:
-                        err("device busy (already exported)");
+                        spdlog::error("device busy (already exported)");
                         break;
                 case ST_DEV_ERR:
-                        err("device in error state");
+                        spdlog::error("device in error state");
                         break;
                 case ST_NODEV:
-                        err("device not found by bus id: %s", busid);
+                        spdlog::error("device not found by bus id: {}", busid);
                         break;
                 case ST_ERROR:
-                        err("unexpected response");
+                        spdlog::error("unexpected response");
                         break;
                 default:
-                        err("failed to attach: #%d %s", err, dbg_opcode_status(err));
+                        spdlog::error("attach error #{} {}", err, dbg_opcode_status(err));
                 }
 
         } else switch (auto err = static_cast<err_t>(result)) {
                 case ERR_DRIVER:
-                        err("vhci driver is not loaded");
+                        spdlog::error("vhci driver is not loaded");
                         break;
                 case ERR_NETWORK:
-                        err("can't connect to %s:%s", host, usbip_port);
+                        spdlog::error("can't connect to {}:{}", host, usbip_port);
                         break;
                 case ERR_PORTFULL:
-                        err("no available port");
+                        spdlog::error("no available port");
                         break;
                 case ERR_PROTOCOL:
-                        err("protocol error");
+                        spdlog::error("protocol error");
                         break;
                 case ERR_VERSION:
-                        err("incompatible protocol version");
+                        spdlog::error("incompatible protocol version");
                         break;
                 default:
-                        err("failed to attach: #%d %s", err, dbg_errcode(err));
+                        spdlog::error("attach error #{} {}", err, dbg_errcode(err));
         }
 
         return 3;
@@ -199,20 +201,20 @@ int usbip_attach(int argc, char *argv[])
 			terse = true;
 			break;
 		default:
-			err("invalid option: %c", opt);
+                        spdlog::error("invalid option: {}", opt);
 			usbip_attach_usage();
 			return 1;
 		}
 	}
 
 	if (!host) {
-		err("empty remote host");
+                spdlog::error("empty remote host");
 		usbip_attach_usage();
 		return 1;
 	}
 	
 	if (!busid) {
-		err("empty busid");
+                spdlog::error("empty busid");
 		usbip_attach_usage();
 		return 1;
 	}

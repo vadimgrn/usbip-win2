@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
  *               2005-2007 Takahiro Hirofuchi
+ *               2022-2023 Vadym Hrynchyshyn
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +20,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <spdlog\spdlog.h>
+#include <spdlog\sinks\stdout_color_sinks.h>
+
 #include "usbip.h"
 #include "resource.h"
 
@@ -26,7 +30,6 @@
 #include <libusbip\win_socket.h>
 #include <libusbip\file_ver.h>
 #include <libusbip\getopt.h>
-#include <libusbip\common.h>
 #include <libusbip\network.h>
 #include <libusbip\strconv.h>
 
@@ -75,7 +78,7 @@ int usbip_help(int argc, char *argv[])
                                 }
 				return 0;
 			}
-		err("no help for invalid command: %s", argv[1]);
+		spdlog::error("no help for invalid command: {}", argv[1]);
 		return 1;
 	}
 
@@ -122,6 +125,9 @@ UsbIds& get_ids()
 
 int main(int argc, char *argv[])
 {
+	set_default_logger(spdlog::stderr_color_st("stderr"));
+	spdlog::set_pattern("%^%l%$: %v");
+
 	const option opts[] = 
 	{
 		{ "debug",    no_argument,       nullptr, 'd' },
@@ -132,9 +138,6 @@ int main(int argc, char *argv[])
 	int opt{};
 	int rc = EXIT_FAILURE;
 
-	usbip_progname = "usbip";
-	usbip_use_stderr = true;
-
 	for (opterr = 0; ; ) {
 		opt = getopt_long(argc, argv, "+dt:", opts, nullptr);
 		if (opt == -1) {
@@ -143,13 +146,13 @@ int main(int argc, char *argv[])
 
 		switch (opt) {
 		case 'd':
-			usbip_use_debug = true;
+			spdlog::set_level(spdlog::level::debug); 
 			break;
 		case 't':
 			usbip_setup_port_number(optarg);
 			break;
 		case '?':
-			err("invalid option: %c", opt);
+			spdlog::error("invalid option: {}", opt);
 			[[fallthrough]];
 		default:
 			usbip_usage();
@@ -159,7 +162,7 @@ int main(int argc, char *argv[])
 
 	usbip::InitWinSock2 ws2;
 	if (!ws2) {
-		err("cannot setup windows socket");
+		spdlog::error("cannot setup windows socket");
 		return EXIT_FAILURE;
 	}
 
@@ -171,7 +174,7 @@ int main(int argc, char *argv[])
 				optind = 0;
 				return c.fn(argc, argv);
 			}
-		err("invalid command: %s", cmd);
+		spdlog::error("invalid command: {}", cmd);
 	}
 
 	usbip_help(0, nullptr);

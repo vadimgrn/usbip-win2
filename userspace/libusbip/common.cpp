@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2022-2023 Vadym Hrynchyshyn
  */
+
+#include <spdlog\spdlog.h>
 
 #include "common.h"
 #include "strconv.h"
@@ -8,18 +11,11 @@
 #include <usbip\proto_op.h>
 #include <format>
 
-bool usbip_use_stderr;
-bool usbip_use_debug;
-const char* usbip_progname;
-
-#define DBG_UDEV_INTEGER(name)\
-	dbg("%-20s = %x", #name, (int) udev->name)
-
-#define DBG_UINF_INTEGER(name)\
-	dbg("%-20s = %x", #name, (int) uinf->name)
-
 namespace
 {
+
+constexpr auto &fmt_name_val = "{:20} = {}"; // name is left aligned
+constexpr auto &fmt_name_hex = "{:20} = {:#x}";
 
 struct speed_string 
 {
@@ -57,29 +53,30 @@ const char *usbip_speed_string(usb_device_speed speed)
 void dump_usb_interface(const UsbIds &ids, usbip_usb_interface *uinf)
 {
 	auto csp = usbip_names_get_class(ids, uinf->bInterfaceClass, uinf->bInterfaceSubClass, uinf->bInterfaceProtocol);
-        dbg("%-20s = %s", "Interface(C/SC/P)", csp.c_str());
+        spdlog::debug(fmt_name_val, "Interface(C/SC/P)", csp);
 }
 
 void dump_usb_device(const UsbIds &ids, usbip_usb_device *udev)
 {
-	dbg("%-20s = %s", "path",  udev->path);
-	dbg("%-20s = %s", "busid", udev->busid);
+        spdlog::debug(fmt_name_val, "path",  udev->path);
+        spdlog::debug(fmt_name_val, "busid", udev->busid);
 
-	auto csp = usbip_names_get_class(ids, udev->bDeviceClass, udev->bDeviceSubClass, udev->bDeviceProtocol);
-        dbg("%-20s = %s", "Device(C/SC/P)", csp.c_str());
+	auto str = usbip_names_get_class(ids, udev->bDeviceClass, udev->bDeviceSubClass, udev->bDeviceProtocol);
+        spdlog::debug(fmt_name_val, "Device(C/SC/P)", str);
 
-	DBG_UDEV_INTEGER(bcdDevice);
+        spdlog::debug(fmt_name_hex, "bcdDevice", udev->bcdDevice);
 
-	auto vp = usbip_names_get_product(ids, udev->idVendor, udev->idProduct);
-	dbg("%-20s = %s", "Vendor/Product", vp.c_str());
+	str = usbip_names_get_product(ids, udev->idVendor, udev->idProduct);
+        spdlog::debug(fmt_name_val, "Vendor/Product", str);
 
-	DBG_UDEV_INTEGER(bNumConfigurations);
-	DBG_UDEV_INTEGER(bNumInterfaces);
+        spdlog::debug(fmt_name_val, "bNumConfigurations", udev->bNumConfigurations);
+        spdlog::debug(fmt_name_val, "bNumInterfaces", udev->bNumInterfaces);
 
-	dbg("%-20s = %s", "speed", usbip_speed_string(static_cast<usb_device_speed>(udev->speed)));
+        str = usbip_speed_string(static_cast<usb_device_speed>(udev->speed));
+        spdlog::debug(fmt_name_val, "speed", str);
 
-	DBG_UDEV_INTEGER(busnum);
-	DBG_UDEV_INTEGER(devnum);
+        spdlog::debug(fmt_name_val, "busnum", udev->busnum);
+        spdlog::debug(fmt_name_val, "devnum", udev->devnum);
 }
 
 std::string usbip_names_get_product(const UsbIds &ids, uint16_t vendor, uint16_t product)

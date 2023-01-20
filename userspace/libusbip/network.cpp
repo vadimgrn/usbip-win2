@@ -1,10 +1,9 @@
 /*
- *
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2022-2023 Vadym Hrynchyshyn
  */
 
 #include "network.h"
-#include "common.h"
 #include "dbgcode.h"
 
 #include <usbip\proto_op.h>
@@ -12,29 +11,30 @@
 #include <ws2tcpip.h>
 #include <mstcpip.h>
 
+#include <spdlog\spdlog.h>
+
 void usbip_setup_port_number(const char *arg)
 {
 	char *end;
 	auto port = strtoul(arg, &end, 10);
 
 	if (end == arg) {
-		dbg("port: could not parse '%s' as a decimal integer", arg);
+		spdlog::error("port: could not parse '{}' as a decimal integer", arg);
 		return;
 	}
 
 	if (*end != '\0') {
-		dbg("port: garbage at end of '%s'", arg);
+		spdlog::error("port: garbage at end of '{}'", arg);
 		return;
 	}
 
 	if (port > UINT16_MAX) {
-		dbg("port: %s too high (max=%d)",
-		    arg, UINT16_MAX);
+		spdlog::error("port: {} too high (max={})", arg, UINT16_MAX);
 		return;
 	}
 
 	usbip_port = arg;
-	info("using port \"%s\"", usbip_port);
+	spdlog::info("using tcp port #'{}'", usbip_port);
 }
 
 static int usbip_net_xmit(SOCKET sockfd, void *buff, size_t bufflen, int sending)
@@ -85,7 +85,7 @@ int usbip_net_send_op_common(SOCKET sockfd, uint16_t code, uint32_t status)
 
 	auto rc = usbip_net_send(sockfd, &op_common, sizeof(op_common));
 	if (rc < 0) {
-		dbg("usbip_net_send failed: %d", rc);
+		spdlog::error("usbip_net_send error #{}", rc);
 		return -1;
 	}
 
@@ -101,14 +101,14 @@ int usbip_net_recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
 
 	rc = usbip_net_recv(sockfd, &op_common, sizeof(op_common));
 	if (rc < 0) {
-		dbg("usbip_net_recv failed: %d", rc);
+		spdlog::error("usbip_net_recv error #{}", rc);
 		return ERR_NETWORK;
 	}
 
 	PACK_OP_COMMON(0, &op_common);
 
 	if (op_common.version != USBIP_VERSION) {
-		dbg("version mismatch: %d != %d", op_common.version, USBIP_VERSION);
+		spdlog::error("version mismatch: {} != {}", op_common.version, USBIP_VERSION);
 		return ERR_VERSION;
 	}
 
@@ -117,7 +117,7 @@ int usbip_net_recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
 		break;
 	default:
 		if (op_common.code != *code) {
-			dbg("unexpected pdu %#0x for %#0x", op_common.code, *code);
+			spdlog::error("unexpected pdu {:#0x} for {:#0x}", op_common.code, *code);
 			return ERR_PROTOCOL;
 		}
 	}
@@ -125,7 +125,7 @@ int usbip_net_recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
 	*pstatus = op_common.status;
 
 	if (op_common.status != ST_OK) {
-		dbg("request failed: status: %s", dbg_opcode_status(op_common.status));
+		spdlog::error("request failed: status: {}", dbg_opcode_status(op_common.status));
 		return ERR_STATUS;
 	}
 
@@ -139,8 +139,9 @@ int usbip_net_set_reuseaddr(SOCKET sockfd)
 	int ret;
 
 	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&val, sizeof(val));
-	if (ret < 0)
-		dbg("setsockopt: SO_REUSEADDR");
+	if (ret < 0) {
+		spdlog::error("setsockopt: SO_REUSEADDR");
+	}
 
 	return ret;
 }
@@ -151,8 +152,9 @@ int usbip_net_set_nodelay(SOCKET sockfd)
 	int ret;
 
 	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
-	if (ret < 0)
-		dbg("setsockopt: TCP_NODELAY");
+	if (ret < 0) {
+		spdlog::error("setsockopt: TCP_NODELAY");
+	}
 
 	return ret;
 }
@@ -164,11 +166,14 @@ get_keepalive_timeout(void)
 	unsigned	timeout;
 	size_t	reqsize;
 
-	if (getenv_s(&reqsize, env_timeout, 32, "KEEPALIVE_TIMEOUT") != 0)
+	if (getenv_s(&reqsize, env_timeout, 32, "KEEPALIVE_TIMEOUT") != 0) {
 		return 0;
+	}
 
-	if (sscanf_s(env_timeout, "%u", &timeout) == 1)
+	if (sscanf_s(env_timeout, "%u", &timeout) == 1) {
 		return timeout;
+	}
+
 	return 0;
 }
 
@@ -188,8 +193,8 @@ int usbip_net_set_keepalive(SOCKET sockfd)
 		keepalive.keepaliveinterval = timeout * 1000 / 10 / 2;
 
 		ret = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &keepalive, sizeof(keepalive), nullptr, 0, &outlen, nullptr, nullptr);
-		if (ret != 0) {
-			dbg("failed to set KEEPALIVE via SIO_KEEPALIVE_VALS: 0x%lx", GetLastError());
+		if (ret) {
+			spdlog::error("failed to set KEEPALIVE via SIO_KEEPALIVE_VALS: {:#x}", GetLastError());
 			return -1;
 		}
 		return 0;
@@ -200,7 +205,7 @@ int usbip_net_set_keepalive(SOCKET sockfd)
 
 		ret = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
 		if (ret < 0) {
-			dbg("failed to set KEEPALIVE via setsockopt: 0x%lx", GetLastError());
+			spdlog::error("failed to set KEEPALIVE via setsockopt: {:#x}", GetLastError());
 		}
 		return ret;
 	}
@@ -212,8 +217,9 @@ int usbip_net_set_v6only(SOCKET sockfd)
 	int ret;
 
 	ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&val, sizeof(val));
-	if (ret < 0)
-		dbg("setsockopt: IPV6_V6ONLY");
+	if (ret < 0) {
+		spdlog::error("setsockopt: IPV6_V6ONLY");
+	}
 
 	return ret;
 }
@@ -234,7 +240,7 @@ usbip::Socket usbip_net_tcp_connect(const char *hostname, const char *port)
 	/* get all possible addresses */
 	ret = getaddrinfo(hostname, port, &hints, &res);
 	if (ret < 0) {
-		dbg("getaddrinfo: %s port %s: %S", hostname, port, gai_strerror(ret));
+		spdlog::error("getaddrinfo(host='{}', port='{}') error #{} {}", hostname, port, ret, gai_strerrorA(ret));
 		return sock;
 	}
 

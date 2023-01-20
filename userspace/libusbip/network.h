@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2005-2007 Takahiro Hirofuchi
+ * Copyright (C) 2022-2023 Vadym Hrynchyshyn
  */
 
 #pragma once
