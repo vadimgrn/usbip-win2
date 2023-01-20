@@ -14,9 +14,9 @@
  * GNU General Public License for more details.
  */
 
-#include "vhci.h"
 #include "usbip.h"
 
+#include <libusbip\vhci.h>
 #include <libusbip\common.h>
 #include <libusbip\getopt.h>
 
@@ -27,7 +27,9 @@
 namespace
 {
 
-int usbip_vhci_imported_device_dump(const usbip::vhci::ioctl_imported_dev &d)
+using namespace usbip;
+
+int usbip_vhci_imported_device_dump(const vhci::ioctl_imported_dev &d)
 {
         printf("Port %02d: device in use at %s\n", d.port, usbip_speed_string(d.speed));
 
@@ -47,16 +49,16 @@ int usbip_vhci_imported_device_dump(const usbip::vhci::ioctl_imported_dev &d)
         return 0;
 }
 
-auto get_imported_devices(std::vector<usbip::vhci::ioctl_imported_dev> &devs)
+auto get_imported_devices(std::vector<vhci::ioctl_imported_dev> &devs)
 {
-        auto hdev = usbip::vhci_driver_open();
+        auto hdev = vhci::open();
         if (!hdev) {
                 err("failed to open vhci driver");
                 return 3;
         }
         
         bool ok = false;
-        devs = usbip::vhci_get_imported_devs(hdev.get(), ok);
+        devs = vhci::get_imported_devs(hdev.get(), ok);
         if (!ok) {
                 err("failed to get imported devices information");
                 return 2;
@@ -67,7 +69,7 @@ auto get_imported_devices(std::vector<usbip::vhci::ioctl_imported_dev> &devs)
 
 int list_imported_devices(const std::set<int> &ports)
 {
-        std::vector<usbip::vhci::ioctl_imported_dev> devs;
+        std::vector<vhci::ioctl_imported_dev> devs;
         if (auto err = get_imported_devices(devs)) {
                 return err;
         }
@@ -102,7 +104,7 @@ void usbip_port_usage()
 "usage: usbip port [portN...]\n"
 "    portN      list given port(s) for checking, valid range is 1-%d\n";
 
-        printf(fmt, usbip::vhci::TOTAL_PORTS);
+        printf(fmt, vhci::TOTAL_PORTS);
 }
 
 int usbip_port_show(int argc, char *argv[])
@@ -114,7 +116,7 @@ int usbip_port_show(int argc, char *argv[])
                 auto str = argv[i];
                 int port;
 
-                if ((std::istringstream(str) >> port) && usbip::vhci::is_valid_port(port)) {
+                if ((std::istringstream(str) >> port) && vhci::is_valid_port(port)) {
                         ports.insert(port);
                 } else {
                         err("invalid port: %s", str);

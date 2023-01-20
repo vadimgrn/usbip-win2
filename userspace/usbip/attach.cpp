@@ -16,8 +16,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "vhci.h"
-
+#include <libusbip\vhci.h>
 #include <libusbip\getopt.h>
 #include <libusbip\network.h>
 #include <libusbip\common.h>
@@ -25,6 +24,8 @@
 
 namespace
 {
+
+using namespace usbip;
 
 const char usbip_attach_usage_string[] =
 "usbip attach <args>\n"
@@ -34,7 +35,7 @@ const char usbip_attach_usage_string[] =
 "    -t, --terse            show port number as a result\n";
 
 
-auto init(usbip::vhci::ioctl_plugin &r, const char *host, const char *busid, const char *serial)
+auto init(vhci::ioctl_plugin &r, const char *host, const char *busid, const char *serial)
 {
         struct Data
         {
@@ -65,18 +66,18 @@ auto init(usbip::vhci::ioctl_plugin &r, const char *host, const char *busid, con
 
 auto import_device(const char *host, const char *busid, const char *serial)
 {
-        usbip::vhci::ioctl_plugin r{};
+        vhci::ioctl_plugin r{};
         if (auto err = init(r, host, busid, serial)) {
                 return make_error(err);
         }
         
-        auto hdev = usbip::vhci_driver_open();
+        auto hdev = vhci::open();
         if (!hdev) {
                 dbg("failed to open vhci driver");
                 return make_error(ERR_DRIVER);
         }
 
-        if (!usbip::vhci_attach_device(hdev.get(), r)) {
+        if (!vhci::attach_device(hdev.get(), r)) {
                 return make_error(ERR_GENERAL);
         }
                

@@ -16,8 +16,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "vhci.h"
-
 #include <libusbip\common.h>
 #include <libusbip\getopt.h>
 

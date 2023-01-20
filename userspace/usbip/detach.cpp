@@ -16,13 +16,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "vhci.h"
-
+#include <libusbip\vhci.h>
 #include <libusbip\getopt.h>
 #include <libusbip\common.h>
 
 namespace
 {
+
+using namespace usbip;
 
 int detach_port(const char *portstr)
 {
@@ -35,18 +36,18 @@ int detach_port(const char *portstr)
 		return 1;
 	}
 
-	if (port > usbip::vhci::TOTAL_PORTS) {
-		err("invalid port %d, max is %d", port, usbip::vhci::TOTAL_PORTS);
+	if (port > vhci::TOTAL_PORTS) {
+		err("invalid port %d, max is %d", port, vhci::TOTAL_PORTS);
 		return 1;
 	}
 
-	auto hdev = usbip::vhci_driver_open();
+	auto hdev = vhci::open();
 	if (!hdev) {
 		err("can't open vhci driver");
 		return 2;
 	}
 
-	auto ret = usbip::vhci_detach_device(hdev.get(), port);
+	auto ret = vhci::detach_device(hdev.get(), port);
 	hdev.reset();
 
 	if (!ret) {
@@ -82,7 +83,7 @@ void usbip_detach_usage()
 "    -p, --port=<port>    "
 " port the device is on, max %d, * or below 1 - all ports\n";
 
-	printf(fmt, usbip::vhci::TOTAL_PORTS);
+	printf(fmt, vhci::TOTAL_PORTS);
 }
 
 int usbip_detach(int argc, char *argv[])

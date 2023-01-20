@@ -110,6 +110,7 @@
     <ClCompile Include="strconv.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="usb_ids.cpp" />
+    <ClCompile Include="vhci.cpp" />
     <ClCompile Include="win_socket.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -126,6 +127,7 @@
     <ClInclude Include="strconv.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="usb_ids.h" />
+    <ClInclude Include="vhci.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
   </ItemGroup>

@@ -96,12 +96,10 @@
     <ClCompile Include="list.cpp" />
     <ClCompile Include="list_remote.cpp" />
     <ClCompile Include="port.cpp" />
-    <ClCompile Include="vhci.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />
-    <ClInclude Include="vhci.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="usbip.rc" />
