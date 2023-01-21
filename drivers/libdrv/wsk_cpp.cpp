@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <ntddk.h>
@@ -50,7 +50,7 @@ private:
         KEVENT m_completion_event;
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        static NTSTATUS completion(_In_ PDEVICE_OBJECT, _In_ PIRP, _In_ PVOID Context);
+        static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *Context);
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         void set_completetion_routine()
@@ -97,7 +97,7 @@ void socket_async_context::reset()
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS socket_async_context::completion(_In_ PDEVICE_OBJECT, _In_ PIRP irp, _In_ PVOID Context)
+NTSTATUS socket_async_context::completion(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_ void *Context)
 {
         if (irp->PendingReturned) {
                 KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
@@ -183,6 +183,7 @@ struct wsk::SOCKET
 {
         WSK_SOCKET *Self;
         socket_async_context close_ctx;
+        volatile LONG usage_cnt;
 
         union { // shortcuts to Self->Dispatch
                 const WSK_PROVIDER_BASIC_DISPATCH *Basic;
@@ -191,6 +192,15 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_CONNECTION_DISPATCH *Connection;
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
+
+        template<typename F, typename... Args>
+        auto invoke(F f, Args&&... args) 
+        {
+                InterlockedIncrement(&usage_cnt);
+                auto ret = f(args...); 
+                InterlockedDecrement(&usage_cnt);
+                return ret;
+        }
 };
 
 
@@ -255,7 +265,7 @@ PAGED auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG fla
 
         auto f = send ? sock->Connection->WskSend : sock->Connection->WskReceive;
 
-        auto err = f(sock->Self, buffer, flags, ctx.irp());
+        auto err = sock->invoke(f, sock->Self, buffer, flags, ctx.irp());
         ctx.wait_for_completion(err);
 
         NT_ASSERT(err != STATUS_NOT_SUPPORTED);
@@ -271,14 +281,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
         NT_ASSERT(sock);
-        return sock->Connection->WskSend(sock->Self, buffer, flags, irp);
+        return sock->invoke(sock->Connection->WskSend, sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
         NT_ASSERT(sock);
-        return sock->Connection->WskReceive(sock->Self, buffer, flags, irp);
+        return sock->invoke(sock->Connection->WskReceive, sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -394,7 +404,7 @@ PAGED NTSTATUS wsk::socket(
         ctx.wait_for_completion(err);
 
         if (!err) {
-                sock->Self = (WSK_SOCKET*)ctx.irp()->IoStatus.Information;
+                sock->Self = reinterpret_cast<WSK_SOCKET*>(ctx.irp()->IoStatus.Information);
                 sock->Basic = static_cast<decltype(sock->Basic)>(sock->Self->Dispatch);
         } else {
                 ::free(sock);
@@ -474,10 +484,11 @@ PAGED NTSTATUS wsk::control(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->Basic->WskControlSocket(sock->Self, RequestType, ControlCode, Level,
-                                                 InputSize, InputBuffer,
-                                                 OutputSize, OutputBuffer, OutputSizeReturned,
-                                                 use_irp ? ctx.irp() : nullptr);
+        auto err = sock->invoke(sock->Basic->WskControlSocket, 
+                                sock->Self, RequestType, ControlCode, Level,
+                                InputSize, InputBuffer,
+                                OutputSize, OutputBuffer, OutputSizeReturned,
+                                use_irp ? ctx.irp() : nullptr);
 
         if (use_irp) {
                 ctx.wait_for_completion(err);
@@ -504,6 +515,11 @@ PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, b
                        sizeof(r), &r, 0, nullptr, nullptr, wait4disable, nullptr);
 }
 
+/*
+ * Before calling the WskCloseSocket function, a WSK application must ensure that there are no other 
+ * function calls in progress to any of the socket's functions, including any extension functions, 
+ * in any of the application's other threads. 
+ */
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
@@ -515,6 +531,8 @@ PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 
         auto &ctx = sock->close_ctx;
         ctx.reset();
+
+        NT_ASSERT(!sock->usage_cnt);
 
         auto err = sock->Basic->WskCloseSocket(sock->Self, ctx.irp());
         ctx.wait_for_completion(err);
@@ -533,7 +551,7 @@ PAGED NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->Connection->WskBind(sock->Self, LocalAddress, 0, ctx.irp());
+        auto err = sock->invoke(sock->Connection->WskBind, sock->Self, LocalAddress, 0, ctx.irp());
         return ctx.wait_for_completion(err);
 }
 
@@ -547,7 +565,7 @@ PAGED NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->Connection->WskConnect(sock->Self, RemoteAddress, 0, ctx.irp());
+        auto err = sock->invoke(sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, ctx.irp());
         return ctx.wait_for_completion(err);
 }
 
@@ -561,14 +579,14 @@ PAGED NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->Connection->WskDisconnect(sock->Self, buffer, flags, ctx.irp());
+        auto err = sock->invoke(sock->Connection->WskDisconnect, sock->Self, buffer, flags, ctx.irp());
         return ctx.wait_for_completion(err);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication)
 {
-        return sock->Connection->WskRelease(sock->Self, DataIndication);
+        return sock->invoke(sock->Connection->WskRelease, sock->Self, DataIndication);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -581,7 +599,7 @@ PAGED NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->Connection->WskGetLocalAddress(sock->Self, LocalAddress, ctx.irp());
+        auto err = sock->invoke(sock->Connection->WskGetLocalAddress, sock->Self, LocalAddress, ctx.irp());
         return ctx.wait_for_completion(err);
 }
 
@@ -595,7 +613,7 @@ PAGED NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddre
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->Connection->WskGetRemoteAddress(sock->Self, RemoteAddress, ctx.irp());
+        auto err = sock->invoke(sock->Connection->WskGetRemoteAddress, sock->Self, RemoteAddress, ctx.irp());
         return ctx.wait_for_completion(err);
 }
 
