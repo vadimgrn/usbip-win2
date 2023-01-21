@@ -1,4 +1,3 @@
-#include "common.h"
 #include "dbgcode.h"
 #include "setupdi.h"
 

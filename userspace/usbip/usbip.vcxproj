@@ -90,6 +90,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="strings.cpp" />
     <ClCompile Include="usbip.cpp" />
     <ClCompile Include="attach.cpp" />
     <ClCompile Include="detach.cpp" />
@@ -98,6 +99,7 @@
     <ClCompile Include="port.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="strings.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />
   </ItemGroup>

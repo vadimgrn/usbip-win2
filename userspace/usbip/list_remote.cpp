@@ -18,8 +18,8 @@
  */
 
 #include "usbip.h"
+#include "strings.h"
 
-#include <libusbip\common.h>
 #include <libusbip\network.h>
 #include <libusbip\dbgcode.h>
 
@@ -28,6 +28,8 @@
 
 namespace
 {
+
+using namespace usbip;
 
 int get_exported_devices(const char *host, SOCKET sockfd)
 {
@@ -76,8 +78,8 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 
 		auto &ids = get_ids();
 
-		auto product_name = usbip_names_get_product(ids, udev.idVendor, udev.idProduct);
-		auto class_name = usbip_names_get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
+		auto product_name = get_product(ids, udev.idVendor, udev.idProduct);
+		auto class_name = get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
 
 		printf("%11s: %s\n", udev.busid, product_name.c_str());
 		printf("%11s: %s\n", "", udev.path);
@@ -93,7 +95,7 @@ int get_exported_devices(const char *host, SOCKET sockfd)
 
 			usbip_net_pack_usb_interface(0, &uintf);
 
-			auto csp = usbip_names_get_class(ids, uintf.bInterfaceClass, uintf.bInterfaceSubClass, uintf.bInterfaceProtocol);
+			auto csp = get_class(ids, uintf.bInterfaceClass, uintf.bInterfaceSubClass, uintf.bInterfaceProtocol);
 			printf("%11s: %2d - %s\n", "", j, csp.c_str());
 		}
 

@@ -17,9 +17,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libusbip\common.h>
-#include <libusbip\getopt.h>
+#include "strings.h"
 
+#include <libusbip\getopt.h>
 #include <spdlog\spdlog.h>
 
 int list_exported_devices(const char *host);

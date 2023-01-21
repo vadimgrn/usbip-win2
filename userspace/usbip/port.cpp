@@ -16,9 +16,9 @@
  */
 
 #include "usbip.h"
+#include "strings.h"
 
 #include <libusbip\vhci.h>
-#include <libusbip\common.h>
 #include <libusbip\getopt.h>
 
 #include <spdlog\spdlog.h>
@@ -34,9 +34,9 @@ using namespace usbip;
 
 int usbip_vhci_imported_device_dump(const vhci::ioctl_imported_dev &d)
 {
-        printf("Port %02d: device in use at %s\n", d.port, usbip_speed_string(d.speed));
+        printf("Port %02d: device in use at %s\n", d.port, get_speed_str(d.speed));
 
-        auto product_name = usbip_names_get_product(get_ids(), d.vendor, d.product);
+        auto product_name = get_product(get_ids(), d.vendor, d.product);
         printf("       %s\n", product_name.c_str());
 
         printf("%10s -> usbip://%s:%s/%s\n", " ", d.host, d.service, d.busid);
