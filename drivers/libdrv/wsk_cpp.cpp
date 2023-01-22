@@ -59,6 +59,8 @@ private:
         }
 };
 
+static_assert(sizeof(socket_async_context) == 32);
+
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS socket_async_context::ctor()
 {
@@ -183,7 +185,6 @@ struct wsk::SOCKET
 {
         WSK_SOCKET *Self;
         socket_async_context close_ctx;
-        volatile LONG usage_cnt;
 
         union { // shortcuts to Self->Dispatch
                 const WSK_PROVIDER_BASIC_DISPATCH *Basic;
@@ -193,12 +194,22 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
 
+        volatile LONG invoke_cnt;
+        volatile bool closing;
+
         template<typename F, typename... Args>
-        auto invoke(F f, Args&&... args) 
+        auto invoke(F&& f, Args&&... args) 
         {
-                InterlockedIncrement(&usage_cnt);
+                if (closing) {
+                        using R = decltype(f(args...)); // @see std::invoke_result
+                        static_assert(sizeof(R) == sizeof(NTSTATUS)); // R must be NTSTATUS
+                        return STATUS_CONNECTION_DISCONNECTED;
+                }
+
+                InterlockedIncrement(&invoke_cnt);
                 auto ret = f(args...); 
-                InterlockedDecrement(&usage_cnt);
+                InterlockedDecrement(&invoke_cnt);
+
                 return ret;
         }
 };
@@ -231,6 +242,23 @@ void free(_In_ wsk::SOCKET *sock)
                 sock->close_ctx.dtor();
                 ExFreePoolWithTag(sock, WSK_POOL_TAG);
         }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(APC_LEVEL)
+PAGED void wait_invokers(_In_ wsk::SOCKET *sock)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(sock->closing);
+        enum { MS = 10'000 }; // millisecond in units of 100 nanoseconds
+
+        for (int i = 0; i < 100 && sock->invoke_cnt; ++i) { // ~10 sec. max
+                LARGE_INTEGER intv{ .QuadPart = -100*MS }; // relative
+                NT_VERIFY(NT_SUCCESS(KeDelayExecutionThread(KernelMode, false, &intv)));
+        }
+
+        NT_ASSERT(!sock->invoke_cnt);
 }
 
 PAGED auto setsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
@@ -524,15 +552,18 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
         PAGED_CODE();
-
+ 
         if (!sock) {
                 return STATUS_INVALID_PARAMETER;
         }
 
+        static_assert(sizeof(sock->closing) ==  sizeof(CHAR));
+        InterlockedExchange8(PCHAR(&sock->closing), true); // @see KeMemoryBarrier
+
         auto &ctx = sock->close_ctx;
         ctx.reset();
 
-        NT_ASSERT(!sock->usage_cnt);
+        wait_invokers(sock);
 
         auto err = sock->Basic->WskCloseSocket(sock->Self, ctx.irp());
         ctx.wait_for_completion(err);
