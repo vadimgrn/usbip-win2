@@ -10,8 +10,7 @@
 #include <libusbip\hkey.h>
 #include <libusbip\setupdi.h>
 #include <libusbip\file_ver.h>
-
-#include <CLI11\CLI11.hpp>
+#include <libusbip\CLI11.hpp>
 
 /*
  * See: devcon utility

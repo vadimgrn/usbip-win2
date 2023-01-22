@@ -1,3 +1,4 @@
 Currently NuGet doesn't have required version of CLI11.
 How to make CLI11.hpp
 cmake -DCLI11_SINGLE_FILE=ON -DCLI11_BUILD_DOCS=OFF -DCLI11_BUILD_TESTS=OFF -DCLI11_BUILD_EXAMPLES=OFF .
+make
