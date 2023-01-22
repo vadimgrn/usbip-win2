@@ -13,30 +13,6 @@
 
 #include <spdlog\spdlog.h>
 
-void usbip_setup_port_number(const char *arg)
-{
-	char *end;
-	auto port = strtoul(arg, &end, 10);
-
-	if (end == arg) {
-		spdlog::error("port: could not parse '{}' as a decimal integer", arg);
-		return;
-	}
-
-	if (*end != '\0') {
-		spdlog::error("port: garbage at end of '{}'", arg);
-		return;
-	}
-
-	if (port > UINT16_MAX) {
-		spdlog::error("port: {} too high (max={})", arg, UINT16_MAX);
-		return;
-	}
-
-	usbip_port = arg;
-	spdlog::info("using tcp port #'{}'", usbip_port);
-}
-
 static int usbip_net_xmit(SOCKET sockfd, void *buff, size_t bufflen, int sending)
 {
 	int total = 0;

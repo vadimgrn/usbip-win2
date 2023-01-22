@@ -1,110 +1,23 @@
 /*
- * command structure borrowed from udev
- * (git://git.kernel.org/pub/scm/linux/hotplug/udev.git)
- *
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
- *               2005-2007 Takahiro Hirofuchi
- *               2022-2023 Vadym Hrynchyshyn
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
-
-#include <spdlog\spdlog.h>
-#include <spdlog\sinks\stdout_color_sinks.h>
 
 #include "usbip.h"
 #include "resource.h"
 
 #include <libusbip\usb_ids.h>
-#include <libusbip\win_socket.h>
 #include <libusbip\file_ver.h>
-#include <libusbip\getopt.h>
-#include <libusbip\network.h>
-#include <libusbip\strconv.h>
+#include <usbip\vhci.h>
+
+#include <spdlog\spdlog.h>
+#include <spdlog\sinks\stdout_color_sinks.h>
+
+#include <libusbip\CLI11.hpp>
 
 namespace
 {
 
-int usbip_help(int argc, char *argv[]);
-int usbip_version(int argc, char *argv[]);
-
-const char usbip_usage_string[] =
-	"usbip [--debug] [--tcp-port PORT] [version]\n"
-	"             [help] <command> <args>\n";
-
-void usbip_usage()
-{
-	printf("usage: %s", usbip_usage_string);
-}
-
-struct command 
-{
-	const char *name;
-	int (*fn)(int argc, char *argv[]);
-	const char *help;
-	void (*usage)();
-};
-
-const command cmds[] =
-{
-	{ "help", usbip_help},
-	{ "version", usbip_version},
-	{ "attach", usbip_attach, "Attach a remote USB device",	usbip_attach_usage },
-	{ "detach", usbip_detach, "Detach a remote USB device", usbip_detach_usage },
-	{ "list", usbip_list, "List remote USB devices", usbip_list_usage },
-	{ "port", usbip_port_show, "Show imported USB devices", usbip_port_usage },
-};
-
-int usbip_help(int argc, char *argv[])
-{
-	if (argc > 1) {
-		for (auto &c: cmds)
-			if (std::string_view(c.name) == argv[1]) {
-				if (c.usage) {
-					c.usage();
-                                } else {
-					printf("no help for command: %s\n", argv[1]);
-                                }
-				return 0;
-			}
-		spdlog::error("no help for invalid command: {}", argv[1]);
-		return 1;
-	}
-
-	usbip_usage();
-	printf("\n");
-	for (auto &c: cmds) {
-		if (c.help) {
-			printf("  %-10s %s\n", c.name, c.help);
-                }
-        }
-	printf("\n");
-	return 0;
-}
-
-int usbip_version(int /*argc*/, [[maybe_unused]] char *argv[])
-{
-	assert(__argv[0] != argv[0]);
-
-	auto me = libusbip::utf8_to_wchar(__argv[0]);
-	FileVersion fv(me);
-
-	auto ver = fv.GetFileVersion();
-	printf("%S\n", ver.data());
-
-	return 0;
-}
+using namespace usbip;
 
 auto get_ids_data()
 {
@@ -113,70 +26,107 @@ auto get_ids_data()
 	return r.str();
 }
 
+auto get_version(_In_ const wchar_t *program)
+{
+	FileVersion fv(program);
+	auto ver = fv.GetFileVersion();
+	return CLI::narrow(ver);
+}
+
+template<typename F, typename... Args>
+inline auto pack(F f, Args&&... args) 
+{
+	return [f, &...args = std::forward<Args>(args)] 
+	{ 
+		if (auto err = f(std::forward<Args>(args)...)) {
+			exit(err);; // throw CLI::RuntimeError(err);
+		}
+	};
+}
+
+void add_cmd_attach(CLI::App &app, attach_args &r)
+{
+	auto cmd = app.add_subcommand("attach", "Attach a remote USB device");
+
+	cmd->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")->required();
+	cmd->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")->required();
+	cmd->add_option("-s,--serial", r.serial, "USB device serial number to override");
+	cmd->add_flag("-t,--terse", r.terse, "Show port number as a result")->capture_default_str();
+
+	cmd->callback(pack(cmd_attach, r));
+}
+
+void add_cmd_detach(CLI::App &app, detach_args &r)
+{
+	auto cmd = app.add_subcommand("detach", "Detach a remote USB device");
+
+	cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in, -1 or zero means ALL ports")
+		->check(CLI::Range(-1, int(vhci::TOTAL_PORTS)))
+		->required();
+
+	cmd->callback(pack(cmd_detach, r));
+}
+
+void add_cmd_list(CLI::App &app, list_args &r)
+{
+	auto cmd = app.add_subcommand("list", "List USB devices");
+	cmd->add_option("-r,--remote", r.remote, "List exported devices on a remote")->required();
+
+	cmd->callback(pack(cmd_list, r));
+}
+
+void add_cmd_port(CLI::App &app, port_args &r)
+{
+	auto cmd = app.add_subcommand("port", "List given hub port(s) for checking");
+
+	cmd->add_option("number", r.ports, "Hub port number")
+		->check(CLI::Range(1, int(vhci::TOTAL_PORTS)))
+		->expected(1, vhci::TOTAL_PORTS);
+
+	cmd->callback(pack(cmd_port, r));
+}
+
+void init(CLI::App &app, const wchar_t *program)
+{
+	app.set_version_flag("-V,--version", get_version(program));
+
+	app.add_flag("-d,--debug", [] (auto) { spdlog::set_level(spdlog::level::debug); }, "Debug output");
+
+	app.add_option("-t,--tcp-port", global_args.tcp_port, "TCP/IP port number of USB/IP server")
+		->check(CLI::Range(1024, USHRT_MAX))
+		->capture_default_str();
+}
+
 } // namespace
 
 
-UsbIds& get_ids()
+const UsbIds& usbip::get_ids()
 {
 	static UsbIds ids(get_ids_data());
 	assert(ids);
 	return ids;
 }
 
-int main(int argc, char *argv[])
+int wmain(int argc, wchar_t *argv[])
 {
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
 
-	const option opts[] = 
-	{
-		{ "debug",    no_argument,       nullptr, 'd' },
-		{ "tcp-port", required_argument, nullptr, 't' },
-		{}
-	};
+	CLI::App app("USB/IP client");
+	init(app, *argv);
+	
+	attach_args attach_opts;
+	add_cmd_attach(app, attach_opts);
 
-	int opt{};
-	int rc = EXIT_FAILURE;
+	detach_args detach_opts;
+	add_cmd_detach(app, detach_opts);
 
-	for (opterr = 0; ; ) {
-		opt = getopt_long(argc, argv, "+dt:", opts, nullptr);
-		if (opt == -1) {
-			break;
-		}
+	list_args list_opts;
+	add_cmd_list(app, list_opts);
 
-		switch (opt) {
-		case 'd':
-			spdlog::set_level(spdlog::level::debug); 
-			break;
-		case 't':
-			usbip_setup_port_number(optarg);
-			break;
-		case '?':
-			spdlog::error("invalid option: {}", opt);
-			[[fallthrough]];
-		default:
-			usbip_usage();
-			return EXIT_FAILURE;
-		}
-	}
+	port_args port_opts;
+	add_cmd_port(app, port_opts);
 
-	usbip::InitWinSock2 ws2;
-	if (!ws2) {
-		spdlog::error("cannot setup windows socket");
-		return EXIT_FAILURE;
-	}
-
-	if (auto cmd = argv[optind]) {
-		for (auto &c: cmds)
-			if (std::string_view(c.name) == cmd) {
-				argc -= optind;
-				argv += optind;
-				optind = 0;
-				return c.fn(argc, argv);
-			}
-		spdlog::error("invalid command: {}", cmd);
-	}
-
-	usbip_help(0, nullptr);
-	return rc;
+	app.require_subcommand(1);
+	CLI11_PARSE(app, argc, argv);
 }

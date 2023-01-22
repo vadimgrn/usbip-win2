@@ -54,7 +54,7 @@
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;UNICODE;_CONSOLE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;UNICODE;_CONSOLE</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -75,7 +75,7 @@
       <OmitFramePointers>true</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;UNICODE;_CONSOLE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;UNICODE;_CONSOLE</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -95,7 +95,6 @@
     <ClCompile Include="attach.cpp" />
     <ClCompile Include="detach.cpp" />
     <ClCompile Include="list.cpp" />
-    <ClCompile Include="list_remote.cpp" />
     <ClCompile Include="port.cpp" />
   </ItemGroup>
   <ItemGroup>

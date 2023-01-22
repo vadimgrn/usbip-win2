@@ -1,5 +1,8 @@
 #pragma once
 
+const unsigned short usbip_port = 3240;
+static_assert(sizeof(usbip_port) == 2);
+
 enum op_status_t // op_common.status
 {
         ST_OK,

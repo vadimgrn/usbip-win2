@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="getopt.c" />
     <ClCompile Include="proto_op.cpp" />
     <ClCompile Include="setupdi.cpp" />
     <ClCompile Include="strconv.cpp" />
@@ -25,7 +24,6 @@
     <ClInclude Include="dbgcode.h" />
     <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="getopt.h" />
     <ClInclude Include="setupdi.h" />
     <ClInclude Include="strconv.h" />
     <ClInclude Include="network.h" />

@@ -57,7 +57,7 @@
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>_DEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>libusbip;..\..\include;..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -81,7 +81,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>libusbip;..\..\include;..\src</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -103,7 +103,6 @@
   <ItemGroup>
     <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="getopt.c" />
     <ClCompile Include="proto_op.cpp" />
     <ClCompile Include="setupdi.cpp" />
     <ClCompile Include="strconv.cpp" />
@@ -119,7 +118,6 @@
     <ClInclude Include="dbgcode.h" />
     <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="getopt.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="setupdi.h" />
     <ClInclude Include="strconv.h" />
