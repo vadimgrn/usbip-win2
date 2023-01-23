@@ -11,7 +11,7 @@
 
 #include <WinSock2.h>
 
-namespace usbip
+namespace libusbip
 {
 
 struct SocketTag {};
@@ -46,17 +46,19 @@ private:
 namespace std
 {
 
+using libusbip::Socket;
+
 template<>
-struct std::hash<usbip::Socket>
+struct std::hash<Socket>
 {
-        auto operator() (const usbip::Socket &s) const noexcept
+        auto operator() (const Socket &s) const noexcept
         {
-                std::hash<usbip::Socket::type> f;
+                std::hash<Socket::type> f;
                 return f(s.get());
         }
 };
 
-inline void swap(usbip::Socket &a, usbip::Socket &b) noexcept
+inline void swap(Socket &a, Socket &b) noexcept
 {
         a.swap(b);
 }

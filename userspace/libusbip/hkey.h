@@ -11,7 +11,7 @@
 
 #include <windows.h>
 
-namespace usbip
+namespace libusbip
 {
 
 struct HKeyTag {};
@@ -24,23 +24,25 @@ inline void close_handle(HKey::type h, HKey::tag_type) noexcept
         assert(err == ERROR_SUCCESS);
 }
 
-} // namespace usbip
+} // namespace libusbip
 
 
 namespace std
 {
 
+using libusbip::HKey;
+
 template<>
-struct std::hash<usbip::HKey>
+struct std::hash<HKey>
 {
-        auto operator() (const usbip::HKey &h) const noexcept
+        auto operator() (const HKey &h) const noexcept
         {
-                std::hash<usbip::HKey::type> f;
+                std::hash<HKey::type> f;
                 return f(h.get());
         }
 };
 
-inline void swap(usbip::HKey &a, usbip::HKey &b) noexcept
+inline void swap(HKey &a, HKey &b) noexcept
 {
         a.swap(b);
 }

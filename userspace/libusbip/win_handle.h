@@ -11,7 +11,7 @@
 
 #include <windows.h>
 
-namespace usbip
+namespace libusbip
 {
 
 struct HandleTag {};
@@ -24,23 +24,25 @@ inline void close_handle(Handle::type h, Handle::tag_type) noexcept
         assert(ok);
 }
 
-} // namespace usbip
+} // namespace libusbip
 
 
 namespace std
 {
 
+using libusbip::Handle;
+
 template<>
-struct std::hash<usbip::Handle>
+struct std::hash<Handle>
 {
-        auto operator() (const usbip::Handle &h) const noexcept
+        auto operator() (const Handle &h) const noexcept
         {
-                std::hash<usbip::Handle::type> f;
+                std::hash<Handle::type> f;
                 return f(h.get());
         }
 };
 
-inline void swap(usbip::Handle &a, usbip::Handle &b) noexcept
+inline void swap(Handle &a, Handle &b) noexcept
 {
         a.swap(b);
 }

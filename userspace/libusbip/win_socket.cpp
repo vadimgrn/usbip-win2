@@ -30,12 +30,12 @@ auto init_wsa() noexcept
 } // namespace
 
 
-usbip::InitWinSock2::InitWinSock2() :
+libusbip::InitWinSock2::InitWinSock2() :
         m_ok(init_wsa())
 {
 }
 
-usbip::InitWinSock2::~InitWinSock2()
+libusbip::InitWinSock2::~InitWinSock2()
 {
         if (m_ok) {
                 [[maybe_unused]] auto err = WSACleanup();

@@ -1,6 +1,6 @@
 #include "dbgcode.h"
 
-const char *dbg_opcode_status(int status)
+const char* libusbip::dbg_opcode_status(int status)
 {
 	const char* v[] =
 	{
@@ -11,7 +11,7 @@ const char *dbg_opcode_status(int status)
 		v[status] : "dbg_opcode_status: unexpected status";
 }
 
-const char *dbg_errcode(int err)
+const char* libusbip::dbg_errcode(int err)
 {
 	const char* v[] =
 	{

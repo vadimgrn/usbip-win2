@@ -14,7 +14,7 @@ namespace
 
 bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
+        if (auto inf = libusbip::get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
@@ -36,14 +36,15 @@ std::wstring usbip::vhci::get_path()
                 return walker_devpath(path, guid, std::forward<decltype(args)>(args)...); 
         };
 
-        traverse_intfdevs(guid, f);
+        libusbip::traverse_intfdevs(guid, f);
         return path;
 }
 
-auto usbip::vhci::open(const std::wstring &path) -> Handle
+libusbip::Handle usbip::vhci::open(const std::wstring &path)
 {
-        return Handle(CreateFile(path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
-                                 nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        return libusbip::Handle(CreateFile(path.c_str(), 
+                GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 }
 
 auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioctl_imported_dev>

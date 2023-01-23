@@ -11,7 +11,7 @@ namespace usbip::vhci
 {
 
 std::wstring get_path();
-Handle open(const std::wstring &path = get_path());
+libusbip::Handle open(const std::wstring &path = get_path());
 
 std::vector<ioctl_imported_dev> get_imported_devs(HANDLE dev, bool &result);
 

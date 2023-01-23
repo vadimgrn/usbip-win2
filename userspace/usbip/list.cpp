@@ -32,36 +32,35 @@ namespace
 {
 
 using namespace usbip;
+using namespace libusbip;
 
-int get_exported_devices(const std::string &host, SOCKET sockfd)
+auto get_exported_devices(const std::string &host, SOCKET sockfd)
 {
-	auto rc = usbip_net_send_op_common(sockfd, OP_REQ_DEVLIST, 0);
-	if (rc < 0) {
-		spdlog::error("failed to send common header: {}", dbg_errcode(rc));
-		return ERR_NETWORK;
+	if (!net::send_op_common(sockfd, OP_REQ_DEVLIST, 0)) {
+		spdlog::error("failed to send common header");
+		return false;
 	}
 
 	uint16_t code = OP_REP_DEVLIST;
 	int status = 0;
 
-	rc = usbip_net_recv_op_common(sockfd, &code, &status);
-	if (rc < 0) {
-		spdlog::error("failed to recv common header: {}", dbg_errcode(rc));
-		return rc;
+	if (auto err = net::recv_op_common(sockfd, &code, &status)) {
+		spdlog::error("failed to recv common header: {}", dbg_errcode(err));
+		return false;
 	}
 
-	op_devlist_reply reply{};
-	rc = usbip_net_recv(sockfd, &reply, sizeof(reply));
-	if (rc < 0) {
-		spdlog::error("failed to recv devlist: {}", dbg_errcode(rc));
-		return rc;
+	op_devlist_reply reply;
+	
+	if (net::recv(sockfd, &reply, sizeof(reply))) {
+		PACK_OP_DEVLIST_REPLY(0, &reply);
+	} else {
+		spdlog::error("failed to recv devlist");
+		return false;
 	}
-
-	PACK_OP_DEVLIST_REPLY(0, &reply);
 
 	if (!reply.ndev) {
 		spdlog::info("no exportable devices found on '{}'", host);
-		return 0;
+		return true;
 	}
 
 	printf("Exportable USB devices\n");
@@ -70,13 +69,14 @@ int get_exported_devices(const std::string &host, SOCKET sockfd)
 
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
-		usbip_usb_device udev{};
-		rc = usbip_net_recv(sockfd, &udev, sizeof(udev));
-		if (rc < 0) {
-			spdlog::error("failed to recv devlist: usbip_usb_device[{}]: {}", i, dbg_errcode(rc));
-			return ERR_NETWORK;
+		usbip_usb_device udev;
+
+		if (net::recv(sockfd, &udev, sizeof(udev))) {
+			usbip_net_pack_usb_device(0, &udev);
+		} else {
+			spdlog::error("failed to recv devlist: usbip_usb_device[{}]", i);
+			return false;
 		}
-		usbip_net_pack_usb_device(0, &udev);
 
 		auto &ids = get_ids();
 
@@ -88,14 +88,14 @@ int get_exported_devices(const std::string &host, SOCKET sockfd)
 		printf("%11s: %s\n", "", class_name.c_str());
 
 		for (int j = 0; j < udev.bNumInterfaces; ++j) {
-			usbip_usb_interface uintf{};
-			rc = usbip_net_recv(sockfd, &uintf, sizeof(uintf));
-			if (rc < 0) {
-				spdlog::error("failed to recv devlist: usbip_usb_intf[{}]: {}", j, dbg_errcode(rc));
-				return ERR_NETWORK;
-			}
+			usbip_usb_interface uintf;
 
-			usbip_net_pack_usb_interface(0, &uintf);
+			if (net::recv(sockfd, &uintf, sizeof(uintf))) {
+				usbip_net_pack_usb_interface(0, &uintf);
+			} else {
+				spdlog::error("failed to recv devlist: usbip_usb_intf[{}]", j);
+				return false;
+			}
 
 			auto csp = get_class(ids, uintf.bInterfaceClass, uintf.bInterfaceSubClass, uintf.bInterfaceProtocol);
 			printf("%11s: %2d - %s\n", "", j, csp.c_str());
@@ -104,7 +104,7 @@ int get_exported_devices(const std::string &host, SOCKET sockfd)
 		printf("\n");
 	}
 
-	return 0;
+	return true;
 }
 
 } // namespace
@@ -114,7 +114,7 @@ int usbip::cmd_list(list_args &r)
 {
 	auto port = std::to_string(global_args.tcp_port);
 
-	auto sock = usbip_net_tcp_connect(r.remote.c_str(), port.c_str());
+	auto sock = net::tcp_connect(r.remote.c_str(), port.c_str());
 	if (!sock) {
 		spdlog::error("failed to connect a remote host '{}'", r.remote);
 		return 3;
@@ -122,8 +122,7 @@ int usbip::cmd_list(list_args &r)
 
 	spdlog::debug("connected to {}:{}\n", r.remote, port);
 
-	auto rc = get_exported_devices(r.remote, sock.get());
-	if (rc < 0) {
+	if (!get_exported_devices(r.remote, sock.get())) {
 		spdlog::error("failed to get device list from '{}'", r.remote);
 		return 4;
 	}

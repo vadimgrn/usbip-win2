@@ -6,14 +6,21 @@
 #pragma once
 
 #include "win_socket.h"
+#include <usbip\consts.h>
 
-int usbip_net_recv(SOCKET sockfd, void *buff, size_t bufflen);
-int usbip_net_send(SOCKET sockfd, void *buff, size_t bufflen);
-int usbip_net_send_op_common(SOCKET sockfd, uint16_t code, uint32_t status);
-int usbip_net_recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus);
-int usbip_net_set_reuseaddr(SOCKET sockfd);
-int usbip_net_set_nodelay(SOCKET sockfd);
-int usbip_net_set_keepalive(SOCKET sockfd);
-int usbip_net_set_v6only(SOCKET sockfd);
+namespace libusbip::net
+{
 
-usbip::Socket usbip_net_tcp_connect(const char *hostname, const char *port);
+bool recv(SOCKET sockfd, void *buf, size_t len);
+bool send(SOCKET sockfd, const void *buf, size_t len);
+
+bool send_op_common(SOCKET sockfd, uint16_t code, uint32_t status);
+err_t recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus);
+
+bool set_reuseaddr(SOCKET sockfd);
+bool set_nodelay(SOCKET sockfd);
+bool set_keepalive(SOCKET sockfd);
+
+Socket tcp_connect(const char *hostname, const char *port);
+
+} // namespace libusbip::net

@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace usbip
+namespace libusbip
 {
 
 /*
@@ -74,4 +74,4 @@ private:
         type m_handle = null;
 };
 
-} // namespace usbip
+} // namespace libusbip

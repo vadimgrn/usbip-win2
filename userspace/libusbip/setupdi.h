@@ -9,7 +9,7 @@
 
 #include "generic_handle.h"
 
-namespace usbip
+namespace libusbip
 {
 
 struct hdevinfo_tag {};
@@ -28,4 +28,4 @@ bool traverse_intfdevs(const GUID &guid, const walkfunc_t &walker);
 std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> 
 get_intf_detail(HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID &pguid);
 
-} // namespace usbip
+} // namespace libusbip

@@ -132,7 +132,7 @@ auto install_devnode_and_driver(_In_ const devnode_args_t &args)
                 return EXIT_FAILURE;
         }
 
-        auto dev_list = usbip::hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
+        auto dev_list = libusbip::hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
         if (!dev_list) {
                 fwprintf(stderr, L"SetupDiCreateDeviceInfoList error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
@@ -193,7 +193,7 @@ auto classfilter(_In_ const classfilter_args_t &args)
                 return EXIT_FAILURE;
         }
 
-        usbip::HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
+        libusbip::HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
         if (!key) {
                 fwprintf(stderr, L"SetupDiOpenClassRegKeyEx('%s') error %#lx\n", args.class_guid.data(), GetLastError());
                 return EXIT_FAILURE;

@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2005-2007 Takahiro Hirofuchi
- * Copyright (C) 2022-2023 Vadym Hrynchyshyn
+* Copyright (C) 2022-2023 Vadym Hrynchyshyn
+* Copyright (C) 2005-2007 Takahiro Hirofuchi
  */
 
 #include "network.h"
@@ -13,138 +13,37 @@
 
 #include <spdlog\spdlog.h>
 
-static int usbip_net_xmit(SOCKET sockfd, void *buff, size_t bufflen, int sending)
+namespace
 {
-	int total = 0;
 
-	if (!bufflen)
-		return 0;
-
-	do {
-		int nbytes;
-
-		if (sending)
-			nbytes = send(sockfd, (char*)buff, (int)bufflen, 0);
-		else
-			nbytes = recv(sockfd, (char*)buff, (int)bufflen, 0);
-
-		if (nbytes <= 0)
-			return -1;
-
-		buff	= (void *) ((intptr_t) buff + nbytes);
-		bufflen	-= nbytes;
-		total	+= nbytes;
-	} while (bufflen > 0);
-
-	return total;
-}
-
-int usbip_net_recv(SOCKET sockfd, void *buff, size_t bufflen)
+auto xmit(SOCKET sockfd, void *buf, size_t len, bool sending)
 {
-	return usbip_net_xmit(sockfd, buff, bufflen, 0);
-}
+	while (len) {
+		auto ret = sending ? send(sockfd, static_cast<const char*>(buf), int(len), 0) :
+			             recv(sockfd, static_cast<char*>(buf), int(len), 0);
 
-int usbip_net_send(SOCKET sockfd, void *buff, size_t bufflen)
-{
-	return usbip_net_xmit(sockfd, buff, bufflen, 1);
-}
-
-int usbip_net_send_op_common(SOCKET sockfd, uint16_t code, uint32_t status)
-{
-        op_common op_common{};
-
-	op_common.version = USBIP_VERSION;
-	op_common.code    = code;
-	op_common.status  = status;
-
-	PACK_OP_COMMON(1, &op_common);
-
-	auto rc = usbip_net_send(sockfd, &op_common, sizeof(op_common));
-	if (rc < 0) {
-		spdlog::error("usbip_net_send error #{}", rc);
-		return -1;
-	}
-
-	return 0;
-}
-
-int usbip_net_recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
-{
-	struct op_common op_common;
-	int rc;
-
-	memset(&op_common, 0, sizeof(op_common));
-
-	rc = usbip_net_recv(sockfd, &op_common, sizeof(op_common));
-	if (rc < 0) {
-		spdlog::error("usbip_net_recv error #{}", rc);
-		return ERR_NETWORK;
-	}
-
-	PACK_OP_COMMON(0, &op_common);
-
-	if (op_common.version != USBIP_VERSION) {
-		spdlog::error("version mismatch: {} != {}", op_common.version, USBIP_VERSION);
-		return ERR_VERSION;
-	}
-
-	switch (*code) {
-	case OP_UNSPEC:
-		break;
-	default:
-		if (op_common.code != *code) {
-			spdlog::error("unexpected pdu {:#0x} for {:#0x}", op_common.code, *code);
-			return ERR_PROTOCOL;
+		if (ret > 0) {
+			buf = static_cast<char*>(buf) + ret;
+			len -= ret;
+		} else { // !ret -> EOF
+			static_assert(SOCKET_ERROR < 0);
+			return false;
 		}
 	}
 
-	*pstatus = op_common.status;
-
-	if (op_common.status != ST_OK) {
-		spdlog::error("request failed: status: {}", dbg_opcode_status(op_common.status));
-		return ERR_STATUS;
-	}
-
-	*code = op_common.code;
-	return 0;
+	return true;
 }
 
-int usbip_net_set_reuseaddr(SOCKET sockfd)
+unsigned int get_keepalive_timeout()
 {
-	const int val = 1;
-	int ret;
+	char env_timeout[32];
+	size_t reqsize;
 
-	ret = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const char *)&val, sizeof(val));
-	if (ret < 0) {
-		spdlog::error("setsockopt: SO_REUSEADDR");
-	}
-
-	return ret;
-}
-
-int usbip_net_set_nodelay(SOCKET sockfd)
-{
-	int val = 1;
-	int ret;
-
-	ret = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
-	if (ret < 0) {
-		spdlog::error("setsockopt: TCP_NODELAY");
-	}
-
-	return ret;
-}
-
-unsigned
-get_keepalive_timeout(void)
-{
-	char	env_timeout[32];
-	unsigned	timeout;
-	size_t	reqsize;
-
-	if (getenv_s(&reqsize, env_timeout, 32, "KEEPALIVE_TIMEOUT") != 0) {
+	if (getenv_s(&reqsize, env_timeout, sizeof(env_timeout), "KEEPALIVE_TIMEOUT")) { // error
 		return 0;
 	}
+
+	unsigned int timeout;
 
 	if (sscanf_s(env_timeout, "%u", &timeout) == 1) {
 		return timeout;
@@ -153,97 +52,153 @@ get_keepalive_timeout(void)
 	return 0;
 }
 
-int usbip_net_set_keepalive(SOCKET sockfd)
+} // namespace
+
+
+bool libusbip::net::recv(SOCKET sockfd, void *buf, size_t len)
 {
-	unsigned	timeout;
-
-	timeout = get_keepalive_timeout();
-	if (timeout > 0) {
-		struct tcp_keepalive	keepalive;
-		DWORD	outlen;
-		int	ret;
-
-		/* windows tries 10 times every keepaliveinterval */
-		keepalive.onoff = 1;
-		keepalive.keepalivetime = timeout * 1000 / 2;
-		keepalive.keepaliveinterval = timeout * 1000 / 10 / 2;
-
-		ret = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &keepalive, sizeof(keepalive), nullptr, 0, &outlen, nullptr, nullptr);
-		if (ret) {
-			spdlog::error("failed to set KEEPALIVE via SIO_KEEPALIVE_VALS: {:#x}", GetLastError());
-			return -1;
-		}
-		return 0;
-	}
-	else {
-		DWORD	val = 1;
-		int	ret;
-
-		ret = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
-		if (ret < 0) {
-			spdlog::error("failed to set KEEPALIVE via setsockopt: {:#x}", GetLastError());
-		}
-		return ret;
-	}
+	return xmit(sockfd, buf, len, false);
 }
 
-int usbip_net_set_v6only(SOCKET sockfd)
+bool libusbip::net::send(SOCKET sockfd, const void *buf, size_t len)
+{
+	return xmit(sockfd, const_cast<void*>(buf), len, true);
+}
+
+bool libusbip::net::send_op_common(SOCKET sockfd, uint16_t code, uint32_t status)
+{
+        op_common r {
+		.version = USBIP_VERSION,
+		.code = code,
+		.status = status,
+	};
+
+	PACK_OP_COMMON(1, &r);
+	return send(sockfd, &r, sizeof(r));
+}
+
+err_t libusbip::net::recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
+{
+	op_common r;
+
+	if (recv(sockfd, &r, sizeof(r))) {
+		PACK_OP_COMMON(0, &r);
+	} else {
+		return ERR_NETWORK;
+	}
+
+	if (r.version != USBIP_VERSION) {
+		spdlog::error("version mismatch: {} != {}", r.version, USBIP_VERSION);
+		return ERR_VERSION;
+	}
+
+	switch (*code) {
+	case OP_UNSPEC:
+		break;
+	default:
+		if (r.code != *code) {
+			spdlog::error("unexpected pdu {:#0x} for {:#0x}", r.code, *code);
+			return ERR_PROTOCOL;
+		}
+	}
+
+	*pstatus = r.status;
+
+	if (r.status != ST_OK) {
+		spdlog::error("request failed: status: {}", libusbip::dbg_opcode_status(r.status));
+		return ERR_STATUS;
+	}
+
+	*code = r.code;
+	return ERR_NONE;
+}
+
+bool libusbip::net::set_reuseaddr(SOCKET sockfd)
 {
 	int val = 1;
-	int ret;
 
-	ret = setsockopt(sockfd, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&val, sizeof(val));
-	if (ret < 0) {
-		spdlog::error("setsockopt: IPV6_V6ONLY");
+	auto err = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&val, sizeof(val));
+	if (err) {
+		spdlog::error("setsockopt(SO_REUSEADDR): WSAGetLastError {}", WSAGetLastError());
 	}
 
-	return ret;
+	return !err;
 }
 
-/*
- * IPv6 Ready
- */
-usbip::Socket usbip_net_tcp_connect(const char *hostname, const char *port)
+bool libusbip::net::set_nodelay(SOCKET sockfd)
 {
-        usbip::Socket sock;
-        struct addrinfo hints, *res, *rp;
-	int ret;
+	int val = 1;
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-
-	/* get all possible addresses */
-	ret = getaddrinfo(hostname, port, &hints, &res);
-	if (ret < 0) {
-		spdlog::error("getaddrinfo(host='{}', port='{}') error #{} {}", hostname, port, ret, gai_strerrorA(ret));
-		return sock;
+	auto err = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
+	if (err) {
+		spdlog::error("setsockopt(TCP_NODELAY): WSAGetLastError {}", WSAGetLastError());
 	}
 
-	/* try the addresses */
-	for (rp = res; rp; rp = rp->ai_next) {
+	return !err;
+}
 
-                sock.reset(socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol));
+bool libusbip::net::set_keepalive(SOCKET sockfd)
+{
+	if (auto timeout = get_keepalive_timeout()) { // windows tries 10 times every keepaliveinterval
+
+		tcp_keepalive r {
+			.onoff = 1,
+			.keepalivetime = timeout*1000/2,
+			.keepaliveinterval = timeout*1000/10/2,
+		};
+		
+		DWORD outlen;
+		auto err = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
+		if (err) {
+			spdlog::error("WSAIoctl(SIO_KEEPALIVE_VALS): WSAGetLastError {}", WSAGetLastError());
+		}
+
+		return !err;
+	}
+
+	int val = 1;
+
+	auto err = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
+	if (err) {
+		spdlog::error("setsockopt(SO_KEEPALIVE): WSAGetLastError {}", WSAGetLastError());
+	}
+
+	return !err;
+}
+
+auto libusbip::net::tcp_connect(const char *hostname, const char *port) -> Socket
+{
+	Socket sock;
+
+	addrinfo hints{ .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM };
+	std::unique_ptr<addrinfo, decltype(freeaddrinfo)&> info(nullptr, freeaddrinfo);
+
+	if (addrinfo *result; auto err = getaddrinfo(hostname, port, &hints, &result)) {
+		spdlog::error("getaddrinfo(host='{}', port='{}'): {}", hostname, port, gai_strerrorA(err));
+		return sock;
+	} else {
+		info.reset(result);
+	}
+
+	for (auto r = info.get(); r; r = r->ai_next) {
+
+                sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
                 if (!sock) {
                         continue;
                 }
 
-		/* should set TCP_NODELAY for usbip */
-		usbip_net_set_nodelay(sock.get());
-		/* TODO: write code for heartbeat */
-		usbip_net_set_keepalive(sock.get());
-
-		if (connect(sock.get(), rp->ai_addr, (int)rp->ai_addrlen) == 0)
+		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive(h))) {
+			sock.close();
 			break;
+		}
 
-		sock.close();
+		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
+			spdlog::error("connect: WSAGetLastError {}", WSAGetLastError());
+			sock.close();
+		} else {
+			break;
+		}
 	}
-
-	freeaddrinfo(res);
-
-        if (!rp) {
-                sock.close();
-        }
 
 	return sock;
 }

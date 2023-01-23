@@ -124,7 +124,7 @@ int usbip::cmd_attach(attach_args &r)
                         spdlog::error("unexpected response");
                         break;
                 default:
-                        spdlog::error("attach error #{} {}", err, dbg_opcode_status(err));
+                        spdlog::error("attach error #{} {}", err, libusbip::dbg_opcode_status(err));
                 }
 
         } else switch (auto err = static_cast<err_t>(result)) {
@@ -144,7 +144,7 @@ int usbip::cmd_attach(attach_args &r)
                 spdlog::error("incompatible protocol version");
                 break;
         default:
-                spdlog::error("attach error #{} {}", err, dbg_errcode(err));
+                spdlog::error("attach error #{} {}", err, libusbip::dbg_errcode(err));
         }
 
         return 3;

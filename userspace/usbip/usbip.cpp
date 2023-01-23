@@ -5,8 +5,10 @@
 #include "usbip.h"
 #include "resource.h"
 
-#include <libusbip\usb_ids.h>
+#include <libusbip\win_socket.h>
 #include <libusbip\file_ver.h>
+#include <libusbip\usb_ids.h>
+
 #include <usbip\vhci.h>
 
 #include <spdlog\spdlog.h>
@@ -39,7 +41,8 @@ inline auto pack(F f, Args&&... args)
 	return [f, &...args = std::forward<Args>(args)] 
 	{ 
 		if (auto err = f(std::forward<Args>(args)...)) {
-			exit(err);; // throw CLI::RuntimeError(err);
+			spdlog::debug("exit code {}", err);
+			exit(err); // throw CLI::RuntimeError(err);
 		}
 	};
 }
@@ -89,7 +92,6 @@ void add_cmd_port(CLI::App &app, port_args &r)
 void init(CLI::App &app, const wchar_t *program)
 {
 	app.set_version_flag("-V,--version", get_version(program));
-
 	app.add_flag("-d,--debug", [] (auto) { spdlog::set_level(spdlog::level::debug); }, "Debug output");
 
 	app.add_option("-t,--tcp-port", global_args.tcp_port, "TCP/IP port number of USB/IP server")
@@ -111,6 +113,12 @@ int wmain(int argc, wchar_t *argv[])
 {
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
+
+	libusbip::InitWinSock2 ws2;
+	if (!ws2) {
+		spdlog::critical("cannot initialize winsock2");
+		return EXIT_FAILURE;
+	}
 
 	CLI::App app("USB/IP client");
 	init(app, *argv);
