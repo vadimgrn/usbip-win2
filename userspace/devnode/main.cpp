@@ -6,6 +6,7 @@
 #include <cfgmgr32.h>
 #include <newdev.h>
 #include <regstr.h>
+#include <combaseapi.h>
 
 #include <libusbip\hkey.h>
 #include <libusbip\setupdi.h>

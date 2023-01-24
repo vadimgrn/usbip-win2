@@ -5,6 +5,7 @@
 
 #include "network.h"
 #include "dbgcode.h"
+#include "strconv.h"
 
 #include <usbip\proto_op.h>
 
@@ -196,7 +197,8 @@ auto usbip::net::tcp_connect(const char *hostname, const char *service) -> Socke
 		}
 
 		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
-			spdlog::error("connect: WSAGetLastError {}", WSAGetLastError());
+			auto err = WSAGetLastError();
+			spdlog::error(L"connect: {}", format_message(err));
 			sock.close();
 		} else {
 			break;

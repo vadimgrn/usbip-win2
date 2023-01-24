@@ -43,3 +43,20 @@ std::string usbip::to_utf8(std::wstring_view wstr)
         return str;
 }
  
+std::wstring usbip::format_message(unsigned int msg_id)
+{
+        static_assert(sizeof(msg_id) == sizeof(DWORD));
+
+        std::wstring s;
+        s.resize(1024);
+
+        if (auto n = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, 0, msg_id, 
+                                    LANG_USER_DEFAULT, s.data(), DWORD(s.size()), nullptr)) {
+                s.resize(n);
+        } else {
+                auto err = GetLastError();
+                s = L"FormatMessage: GetLastError " + std::to_wstring(err);
+        }
+
+        return s;
+}
