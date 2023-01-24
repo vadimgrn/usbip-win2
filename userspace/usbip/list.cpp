@@ -81,7 +81,7 @@ int usbip::cmd_list(list_args &r)
 
 	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
 
-	if (!enum_exportable_devices(sock, on_device, on_interface)) {
+	if (!enum_exportable_devices(sock.get(), on_device, on_interface)) {
 		spdlog::error("failed to get exportable device list");
 		return EXIT_FAILURE;
 	}

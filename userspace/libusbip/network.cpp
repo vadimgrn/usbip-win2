@@ -82,6 +82,8 @@ auto set_keepalive_env(SOCKET s)
 
 bool usbip::net::recv(SOCKET s, void *buf, size_t len, bool *eof)
 {
+	assert(s != INVALID_SOCKET);
+
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
 	case SOCKET_ERROR:
 		spdlog::error("recv: WSAGetLastError {}", WSAGetLastError());
@@ -101,6 +103,7 @@ bool usbip::net::recv(SOCKET s, void *buf, size_t len, bool *eof)
 
 bool usbip::net::send(SOCKET s, const void *buf, size_t len)
 {
+	assert(s != INVALID_SOCKET);
 	auto addr = static_cast<const char*>(buf);
 
 	while (len) {
@@ -120,7 +123,9 @@ bool usbip::net::send(SOCKET s, const void *buf, size_t len)
 
 bool usbip::net::send_op_common(SOCKET s, uint16_t code)
 {
-        op_common r {
+	assert(s != INVALID_SOCKET);
+
+	op_common r {
 		.version = USBIP_VERSION,
 		.code = code,
 		.status = ST_OK
@@ -132,6 +137,7 @@ bool usbip::net::send_op_common(SOCKET s, uint16_t code)
 
 err_t usbip::net::recv_op_common(SOCKET s, uint16_t expected_code, op_status_t *status)
 {
+	assert(s != INVALID_SOCKET);
 	op_common r;
 
 	if (recv(s, &r, sizeof(r))) {

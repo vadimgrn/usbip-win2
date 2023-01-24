@@ -29,20 +29,20 @@ namespace
 
 using namespace usbip;
 
-int dump(const vhci::ioctl_get_imported_devices &d)
+void dump(const vhci::ioctl_get_imported_devices &d)
 {
-        printf("Port %02d: device in use at %s\n", d.port, get_speed_str(d.speed));
-
-        auto product_name = get_product(get_ids(), d.vendor, d.product);
-        printf("       %s\n", product_name.c_str());
-
-        printf("%10s -> usbip://%s:%s/%s\n", " ", d.host, d.service, d.busid);
-
+        auto prod = get_product(get_ids(), d.vendor, d.product);
         USHORT bus = d.devid >> 16;
         USHORT dev = d.devid & 0xFFFF;
-        printf("%10s -> remote bus/dev %03d/%03d\n", " ", bus, dev);
 
-        return 0;
+        printf( "Port %02d: device in use at %s\n"
+                "        %s\n"
+                "%10s -> usbip://%s:%s/%s\n"
+                "%10s -> remote bus/dev %03d/%03d\n",
+                d.port, get_speed_str(d.speed),
+                prod.c_str(),
+                " ", d.host, d.service, d.busid,
+                " ", bus, dev);
 }
 
 auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &devs)
@@ -85,7 +85,6 @@ int usbip::cmd_port(port_args &r)
                         }
                         dump(d);
                 }
-
         }
 
         if (!(found || r.ports.empty())) {

@@ -10,21 +10,23 @@
 #include <spdlog\spdlog.h>
 
 bool usbip::enum_exportable_devices(
-	Socket &sock, const usbip_usb_device_f &on_dev, const usbip_usb_interface_f &on_intf)
+	SOCKET s, const usbip_usb_device_f &on_dev, const usbip_usb_interface_f &on_intf)
 {
-	if (!net::send_op_common(sock.get(), OP_REQ_DEVLIST)) {
+	assert(s != INVALID_SOCKET);
+	
+	if (!net::send_op_common(s, OP_REQ_DEVLIST)) {
 		spdlog::error("send_op_common");
 		return false;
 	}
 
-	if (auto err = net::recv_op_common(sock.get(), OP_REP_DEVLIST)) {
+	if (auto err = net::recv_op_common(s, OP_REP_DEVLIST)) {
 		spdlog::error("recv_op_common {}", errt_str(err));
 		return false;
 	}
 
 	op_devlist_reply reply;
 	
-	if (net::recv(sock.get(), &reply, sizeof(reply))) {
+	if (net::recv(s, &reply, sizeof(reply))) {
 		PACK_OP_DEVLIST_REPLY(false, &reply);
 	} else {
 		spdlog::error("recv op_devlist_reply");
@@ -37,7 +39,7 @@ bool usbip::enum_exportable_devices(
 
 		usbip_usb_device dev;
 
-		if (net::recv(sock.get(), &dev, sizeof(dev))) {
+		if (net::recv(s, &dev, sizeof(dev))) {
 			usbip_net_pack_usb_device(false, &dev);
 			on_dev(i, dev);
 		} else {
@@ -49,7 +51,7 @@ bool usbip::enum_exportable_devices(
 
 			usbip_usb_interface intf;
 
-			if (net::recv(sock.get(), &intf, sizeof(intf))) {
+			if (net::recv(s, &intf, sizeof(intf))) {
 				usbip_net_pack_usb_interface(false, &intf);
 				on_intf(i, dev, j, intf);
 			} else {
