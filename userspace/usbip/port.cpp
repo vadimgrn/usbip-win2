@@ -63,34 +63,6 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &devs)
         return 0;
 }
 
-int list_imported_devices(const std::set<int> &ports)
-{
-        std::vector<vhci::ioctl_get_imported_devices> devs;
-        if (auto err = get_imported_devices(devs)) {
-                return err;
-        }
-
-        printf("Imported USB devices\n");
-        printf("====================\n");
-
-        bool found = false;
-
-        for (auto& d: devs) {
-                assert(d.port);
-                if (ports.empty() || ports.contains(d.port)) {
-                        found = true;
-                        dump(d);
-                }
-
-        }
-
-        if (!(found || ports.empty())) {
-                return 2; // port check failed
-        }
-
-        return 0;
-}
-
 } // namespace
 
 
@@ -101,8 +73,10 @@ int usbip::cmd_port(port_args &r)
                 return err;
         }
 
-        printf("Imported USB devices\n");
-        printf("====================\n");
+        if (!devs.empty()) {
+                printf("Imported USB devices\n"
+                       "====================\n");
+        }
 
         bool found = false;
 
