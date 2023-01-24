@@ -11,7 +11,7 @@
 
 #include <windows.h>
 
-namespace libusbip
+namespace usbip
 {
 
 struct HKeyTag {};
@@ -24,13 +24,13 @@ inline void close_handle(HKey::type h, HKey::tag_type) noexcept
         assert(err == ERROR_SUCCESS);
 }
 
-} // namespace libusbip
+} // namespace usbip
 
 
 namespace std
 {
 
-using libusbip::HKey;
+using usbip::HKey;
 
 template<>
 struct std::hash<HKey>

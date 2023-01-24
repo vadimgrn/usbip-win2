@@ -557,7 +557,7 @@ PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        static_assert(sizeof(sock->closing) ==  sizeof(CHAR));
+        static_assert(sizeof(sock->closing) == sizeof(CHAR));
         InterlockedExchange8(PCHAR(&sock->closing), true); // @see KeMemoryBarrier
 
         auto &ctx = sock->close_ctx;

@@ -24,8 +24,8 @@ namespace
 
 using namespace usbip;
 
-static_assert(sizeof(vhci::ioctl_plugin::service) == NI_MAXSERV);
-static_assert(sizeof(vhci::ioctl_plugin::host) == NI_MAXHOST);
+static_assert(sizeof(vhci::ioctl_plugin_hardware::service) == NI_MAXSERV);
+static_assert(sizeof(vhci::ioctl_plugin_hardware::host) == NI_MAXHOST);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -43,7 +43,7 @@ PAGED void log(_In_ const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void fill(_Inout_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ctx)
+PAGED void fill(_Inout_ vhci::ioctl_get_imported_devices &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
         auto &src = *ctx.ext;
@@ -70,7 +70,7 @@ PAGED void fill(_Inout_ vhci::ioctl_imported_dev &dst, _In_ const device_ctx &ct
                 }
         }
 
-        static_cast<vhci::ioctl_imported_dev_data&>(dst) = src.dev;
+        static_cast<vhci::imported_dev_data&>(dst) = src.dev;
 }
 
 /*
@@ -324,7 +324,7 @@ PAGED auto start_device(_In_ int &port, _In_ UDECXUSBDEVICE device)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin &r)
+PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardware &r)
 {
         PAGED_CODE();
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, serial %s", r.host, r.service, r.busid, r.serial);
@@ -369,7 +369,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
-        vhci::ioctl_plugin *r{};
+        vhci::ioctl_plugin_hardware *r{};
         if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)) {
                 return err;
         }
@@ -388,7 +388,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
-        vhci::ioctl_plugout *r{};
+        vhci::ioctl_plugout_hardware *r{};
         if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)) {
                 return err;
         }
@@ -415,7 +415,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
         PAGED_CODE();
 
         size_t buf_sz;
-        vhci::ioctl_imported_dev *buf;
+        vhci::ioctl_get_imported_devices *buf;
         if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*buf), reinterpret_cast<PVOID*>(&buf), &buf_sz)) {
                 return err;
         }

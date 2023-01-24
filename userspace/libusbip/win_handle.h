@@ -11,7 +11,7 @@
 
 #include <windows.h>
 
-namespace libusbip
+namespace usbip
 {
 
 struct HandleTag {};
@@ -24,13 +24,13 @@ inline void close_handle(Handle::type h, Handle::tag_type) noexcept
         assert(ok);
 }
 
-} // namespace libusbip
+} // namespace usbip
 
 
 namespace std
 {
 
-using libusbip::Handle;
+using usbip::Handle;
 
 template<>
 struct std::hash<Handle>

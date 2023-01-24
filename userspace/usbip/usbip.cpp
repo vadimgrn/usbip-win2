@@ -114,7 +114,7 @@ int wmain(int argc, wchar_t *argv[])
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
 
-	libusbip::InitWinSock2 ws2;
+	InitWinSock2 ws2;
 	if (!ws2) {
 		spdlog::critical("cannot initialize winsock2");
 		return EXIT_FAILURE;

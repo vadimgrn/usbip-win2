@@ -8,19 +8,15 @@
 #include "win_socket.h"
 #include <usbip\consts.h>
 
-namespace libusbip::net
+namespace usbip::net
 {
 
-bool recv(SOCKET sockfd, void *buf, size_t len);
-bool send(SOCKET sockfd, const void *buf, size_t len);
+bool recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr);
+bool send(SOCKET s, const void *buf, size_t len);
 
-bool send_op_common(SOCKET sockfd, uint16_t code, uint32_t status);
-err_t recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus);
+bool send_op_common(SOCKET s, uint16_t code);
+err_t recv_op_common(SOCKET s, uint16_t expected_code, op_status_t *status = nullptr);
 
-bool set_reuseaddr(SOCKET sockfd);
-bool set_nodelay(SOCKET sockfd);
-bool set_keepalive(SOCKET sockfd);
+Socket tcp_connect(const char *hostname, const char *service);
 
-Socket tcp_connect(const char *hostname, const char *port);
-
-} // namespace libusbip::net
+} // namespace usbip::net

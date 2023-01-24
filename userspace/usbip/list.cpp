@@ -32,72 +32,73 @@ namespace
 {
 
 using namespace usbip;
-using namespace libusbip;
 
-auto get_exported_devices(const std::string &host, SOCKET sockfd)
+auto get_exported_devices(SOCKET s)
 {
-	if (!net::send_op_common(sockfd, OP_REQ_DEVLIST, 0)) {
-		spdlog::error("failed to send common header");
+	const auto cmd = OP_REQ_DEVLIST;
+
+	if (!net::send_op_common(s, cmd)) {
+		spdlog::error("send_op_common");
 		return false;
 	}
 
-	uint16_t code = OP_REP_DEVLIST;
-	int status = 0;
-
-	if (auto err = net::recv_op_common(sockfd, &code, &status)) {
-		spdlog::error("failed to recv common header: {}", dbg_errcode(err));
+	if (auto err = net::recv_op_common(s, cmd)) {
+		spdlog::error("recv_op_common {}", errt_str(err));
 		return false;
 	}
 
 	op_devlist_reply reply;
 	
-	if (net::recv(sockfd, &reply, sizeof(reply))) {
-		PACK_OP_DEVLIST_REPLY(0, &reply);
+	if (net::recv(s, &reply, sizeof(reply))) {
+		PACK_OP_DEVLIST_REPLY(false, &reply);
 	} else {
-		spdlog::error("failed to recv devlist");
+		spdlog::error("recv op_devlist_reply");
 		return false;
 	}
 
 	if (!reply.ndev) {
-		spdlog::info("no exportable devices found on '{}'", host);
+		spdlog::info("no exportable devices found");
 		return true;
 	}
 
-	printf("Exportable USB devices\n");
-	printf("======================\n");
-	printf(" - %s\n", host.c_str());
+	printf("Exportable USB devices\n"
+	       "======================\n");
 
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
-		usbip_usb_device udev;
+		usbip_usb_device dev;
 
-		if (net::recv(sockfd, &udev, sizeof(udev))) {
-			usbip_net_pack_usb_device(0, &udev);
+		if (net::recv(s, &dev, sizeof(dev))) {
+			usbip_net_pack_usb_device(false, &dev);
 		} else {
-			spdlog::error("failed to recv devlist: usbip_usb_device[{}]", i);
+			spdlog::error("recv usbip_usb_device[{}]", i);
 			return false;
 		}
 
 		auto &ids = get_ids();
 
-		auto product_name = get_product(ids, udev.idVendor, udev.idProduct);
-		auto class_name = get_class(ids, udev.bDeviceClass, udev.bDeviceSubClass, udev.bDeviceProtocol);
+		auto product_name = get_product(ids, dev.idVendor, dev.idProduct);
+		auto class_name = get_class(ids, dev.bDeviceClass, dev.bDeviceSubClass, dev.bDeviceProtocol);
 
-		printf("%11s: %s\n", udev.busid, product_name.c_str());
-		printf("%11s: %s\n", "", udev.path);
-		printf("%11s: %s\n", "", class_name.c_str());
+		printf("%11s: %s\n"
+		       "%11s: %s\n"
+		       "%11s: %s\n",
+			dev.busid, product_name.c_str(),
+			"", dev.path,
+			"", class_name.c_str());
 
-		for (int j = 0; j < udev.bNumInterfaces; ++j) {
-			usbip_usb_interface uintf;
+		for (int j = 0; j < dev.bNumInterfaces; ++j) {
 
-			if (net::recv(sockfd, &uintf, sizeof(uintf))) {
-				usbip_net_pack_usb_interface(0, &uintf);
+			usbip_usb_interface intf;
+
+			if (net::recv(s, &intf, sizeof(intf))) {
+				usbip_net_pack_usb_interface(false, &intf);
 			} else {
-				spdlog::error("failed to recv devlist: usbip_usb_intf[{}]", j);
+				spdlog::error("recv usbip_usb_intf[{}]", j);
 				return false;
 			}
 
-			auto csp = get_class(ids, uintf.bInterfaceClass, uintf.bInterfaceSubClass, uintf.bInterfaceProtocol);
+			auto csp = get_class(ids, intf.bInterfaceClass, intf.bInterfaceSubClass, intf.bInterfaceProtocol);
 			printf("%11s: %2d - %s\n", "", j, csp.c_str());
 		}
 
@@ -112,18 +113,16 @@ auto get_exported_devices(const std::string &host, SOCKET sockfd)
 
 int usbip::cmd_list(list_args &r)
 {
-	auto port = std::to_string(global_args.tcp_port);
-
-	auto sock = net::tcp_connect(r.remote.c_str(), port.c_str());
+	auto sock = net::tcp_connect(r.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
-		spdlog::error("failed to connect a remote host '{}'", r.remote);
+		spdlog::error("can't connect to {}:{}", r.remote, global_args.tcp_port);
 		return 3;
 	}
 
-	spdlog::debug("connected to {}:{}\n", r.remote, port);
+	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
 
-	if (!get_exported_devices(r.remote, sock.get())) {
-		spdlog::error("failed to get device list from '{}'", r.remote);
+	if (!get_exported_devices(sock.get())) {
+		spdlog::error("failed to get exported device list");
 		return 4;
 	}
 

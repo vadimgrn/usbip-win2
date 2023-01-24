@@ -6,11 +6,11 @@
 
 #include <string>
 
-namespace libusbip
+namespace usbip
 {
 
 std::wstring utf8_to_wchar(std::string_view str);
 std::string to_utf8(std::wstring_view wstr);
 
-} // namespace libusbip
+} // namespace usbip
 

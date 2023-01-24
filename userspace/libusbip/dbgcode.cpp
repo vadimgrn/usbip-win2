@@ -1,18 +1,23 @@
 #include "dbgcode.h"
+#include <usbip\consts.h>
 
-const char* libusbip::dbg_opcode_status(int status)
+const char* usbip::op_status_str(int status)
 {
+	static_assert(sizeof(op_status_t) <= sizeof(status));
+
 	const char* v[] =
 	{
 		"ST_OK", "ST_NA", "ST_DEV_BUSY", "ST_DEV_ERR", "ST_NODEV", "ST_ERROR"
 	};
 
-	return status >= 0 && status < sizeof(v)/sizeof(*v) ? 
-		v[status] : "dbg_opcode_status: unexpected status";
+	return  status >= 0 && status < sizeof(v)/sizeof(*v) ? 
+		v[status] : "op_status_str: unexpected status";
 }
 
-const char* libusbip::dbg_errcode(int err)
+const char* usbip::errt_str(int err)
 {
+	static_assert(sizeof(err_t) <= sizeof(err));
+
 	const char* v[] =
 	{
                 "ERR_NONE", "ERR_GENERAL", "ERR_INVARG", "ERR_NETWORK", "ERR_VERSION", 
@@ -20,8 +25,8 @@ const char* libusbip::dbg_errcode(int err)
 	};
 
 	if (err < 0) {
-                err = -err;
-        }
+		err = -err;
+	}
 
-        return err < sizeof(v)/sizeof(*v) ? v[err] : "dbg_errcode: unexpected code";
+	return err < sizeof(v)/sizeof(*v) ? v[err] : "errt_str: unexpected code";
 }

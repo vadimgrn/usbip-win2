@@ -16,75 +16,133 @@
 namespace
 {
 
-auto xmit(SOCKET sockfd, void *buf, size_t len, bool sending)
+auto do_setsockopt(SOCKET s, int level, int optname, int optval)
 {
-	while (len) {
-		auto ret = sending ? send(sockfd, static_cast<const char*>(buf), int(len), 0) :
-			             recv(sockfd, static_cast<char*>(buf), int(len), 0);
-
-		if (ret > 0) {
-			buf = static_cast<char*>(buf) + ret;
-			len -= ret;
-		} else { // !ret -> EOF
-			static_assert(SOCKET_ERROR < 0);
-			return false;
-		}
+	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
+	if (err) {
+		spdlog::error("setsockopt(level={}, optname={}, optval={}): WSAGetLastError {}", 
+			       level, optname, optval, WSAGetLastError());
 	}
 
-	return true;
+	return !err;
 }
 
-unsigned int get_keepalive_timeout()
+inline auto set_nodelay(SOCKET s)
 {
-	char env_timeout[32];
-	size_t reqsize;
+	return do_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, true);
+}
 
-	if (getenv_s(&reqsize, env_timeout, sizeof(env_timeout), "KEEPALIVE_TIMEOUT")) { // error
-		return 0;
+inline auto set_keepalive(SOCKET s)
+{
+	return do_setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, true);
+}
+
+auto get_keepalive_timeout()
+{
+	auto &name = "KEEPALIVE_TIMEOUT";
+	unsigned int value{};
+
+	char buf[32];
+	size_t required;
+
+	if (auto err = getenv_s(&required, buf, sizeof(buf), name); !err) {
+		sscanf_s(buf, "%u", &value);
+	} else if (required) {
+		spdlog::error("{} required buffer size is {}, error #{}", name, required, err);
 	}
 
-	unsigned int timeout;
+	return value;
+}
 
-	if (sscanf_s(env_timeout, "%u", &timeout) == 1) {
-		return timeout;
+auto set_keepalive_env(SOCKET s)
+{
+	auto val = get_keepalive_timeout();
+	if (!val) {
+		return set_keepalive(s);
 	}
 
-	return 0;
+	tcp_keepalive r { // windows tries 10 times every keepaliveinterval
+		.onoff = 1,
+		.keepalivetime = val*1000/2,
+		.keepaliveinterval = val*1000/(10*2)
+	};
+
+	DWORD outlen;
+
+	auto err = WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
+	if (err) {
+		spdlog::error("WSAIoctl(SIO_KEEPALIVE_VALS): WSAGetLastError {}", WSAGetLastError());
+	}
+
+	return !err;
 }
 
 } // namespace
 
 
-bool libusbip::net::recv(SOCKET sockfd, void *buf, size_t len)
+bool usbip::net::recv(SOCKET s, void *buf, size_t len, bool *eof)
 {
-	return xmit(sockfd, buf, len, false);
+	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
+	case SOCKET_ERROR:
+		spdlog::error("recv: WSAGetLastError {}", WSAGetLastError());
+		return false;
+	case 0: // connection has been gracefully closed
+		if (len) {
+			spdlog::debug("recv: EOF");
+			if (eof) {
+				*eof = true;
+			}
+		}
+		[[fallthrough]];
+	default:
+		return ret == len;
+	}
 }
 
-bool libusbip::net::send(SOCKET sockfd, const void *buf, size_t len)
+bool usbip::net::send(SOCKET s, const void *buf, size_t len)
 {
-	return xmit(sockfd, const_cast<void*>(buf), len, true);
+	auto addr = static_cast<const char*>(buf);
+
+	while (len) {
+		auto ret = ::send(s, addr, static_cast<int>(len), 0);
+
+		if (ret == SOCKET_ERROR) {
+			spdlog::error("send: WSAGetLastError {}", WSAGetLastError());
+			return false;
+		}
+
+		addr += ret;
+		len -= ret;
+	}
+
+	return true;
 }
 
-bool libusbip::net::send_op_common(SOCKET sockfd, uint16_t code, uint32_t status)
+bool usbip::net::send_op_common(SOCKET s, uint16_t code)
 {
         op_common r {
 		.version = USBIP_VERSION,
 		.code = code,
-		.status = status,
+		.status = ST_OK
 	};
 
-	PACK_OP_COMMON(1, &r);
-	return send(sockfd, &r, sizeof(r));
+	PACK_OP_COMMON(true, &r);
+	return send(s, &r, sizeof(r));
 }
 
-err_t libusbip::net::recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
+err_t usbip::net::recv_op_common(SOCKET s, uint16_t expected_code, op_status_t *status)
 {
 	op_common r;
 
-	if (recv(sockfd, &r, sizeof(r))) {
-		PACK_OP_COMMON(0, &r);
+	if (recv(s, &r, sizeof(r))) {
+		PACK_OP_COMMON(false, &r);
 	} else {
 		return ERR_NETWORK;
+	}
+
+	auto st = static_cast<op_status_t>(r.status);
+	if (status) {
+		*status = st;
 	}
 
 	if (r.version != USBIP_VERSION) {
@@ -92,89 +150,28 @@ err_t libusbip::net::recv_op_common(SOCKET sockfd, uint16_t *code, int *pstatus)
 		return ERR_VERSION;
 	}
 
-	switch (*code) {
-	case OP_UNSPEC:
-		break;
-	default:
-		if (r.code != *code) {
-			spdlog::error("unexpected pdu {:#0x} for {:#0x}", r.code, *code);
-			return ERR_PROTOCOL;
-		}
+	if (r.code != expected_code) {
+		spdlog::error("received op_common.code {} != expected {}", r.code, expected_code);
+		return ERR_PROTOCOL;
 	}
 
-	*pstatus = r.status;
-
-	if (r.status != ST_OK) {
-		spdlog::error("request failed: status: {}", libusbip::dbg_opcode_status(r.status));
+	if (st != ST_OK) {
+		spdlog::error("op_common.status #{} {}", st, op_status_str(st));
 		return ERR_STATUS;
 	}
 
-	*code = r.code;
 	return ERR_NONE;
 }
 
-bool libusbip::net::set_reuseaddr(SOCKET sockfd)
-{
-	int val = 1;
-
-	auto err = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&val, sizeof(val));
-	if (err) {
-		spdlog::error("setsockopt(SO_REUSEADDR): WSAGetLastError {}", WSAGetLastError());
-	}
-
-	return !err;
-}
-
-bool libusbip::net::set_nodelay(SOCKET sockfd)
-{
-	int val = 1;
-
-	auto err = setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (const char*)&val, sizeof(val));
-	if (err) {
-		spdlog::error("setsockopt(TCP_NODELAY): WSAGetLastError {}", WSAGetLastError());
-	}
-
-	return !err;
-}
-
-bool libusbip::net::set_keepalive(SOCKET sockfd)
-{
-	if (auto timeout = get_keepalive_timeout()) { // windows tries 10 times every keepaliveinterval
-
-		tcp_keepalive r {
-			.onoff = 1,
-			.keepalivetime = timeout*1000/2,
-			.keepaliveinterval = timeout*1000/10/2,
-		};
-		
-		DWORD outlen;
-		auto err = WSAIoctl(sockfd, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
-		if (err) {
-			spdlog::error("WSAIoctl(SIO_KEEPALIVE_VALS): WSAGetLastError {}", WSAGetLastError());
-		}
-
-		return !err;
-	}
-
-	int val = 1;
-
-	auto err = setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, sizeof(val));
-	if (err) {
-		spdlog::error("setsockopt(SO_KEEPALIVE): WSAGetLastError {}", WSAGetLastError());
-	}
-
-	return !err;
-}
-
-auto libusbip::net::tcp_connect(const char *hostname, const char *port) -> Socket
+auto usbip::net::tcp_connect(const char *hostname, const char *service) -> Socket
 {
 	Socket sock;
 
 	addrinfo hints{ .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM };
 	std::unique_ptr<addrinfo, decltype(freeaddrinfo)&> info(nullptr, freeaddrinfo);
 
-	if (addrinfo *result; auto err = getaddrinfo(hostname, port, &hints, &result)) {
-		spdlog::error("getaddrinfo(host='{}', port='{}'): {}", hostname, port, gai_strerrorA(err));
+	if (addrinfo *result; auto err = getaddrinfo(hostname, service, &hints, &result)) {
+		spdlog::error("getaddrinfo(host='{}', service='{}'): {}", hostname, service, gai_strerrorA(err));
 		return sock;
 	} else {
 		info.reset(result);
@@ -187,7 +184,7 @@ auto libusbip::net::tcp_connect(const char *hostname, const char *port) -> Socke
                         continue;
                 }
 
-		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive(h))) {
+		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive_env(h))) {
 			sock.close();
 			break;
 		}

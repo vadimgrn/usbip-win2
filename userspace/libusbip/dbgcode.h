@@ -1,9 +1,9 @@
 #pragma once
 
-namespace libusbip
+namespace usbip
 {
 
-const char *dbg_opcode_status(int status);
-const char *dbg_errcode(int err);
+const char *op_status_str(int status);
+const char *errt_str(int err);
 
-} // namespace libusbip
+} // namespace usbip

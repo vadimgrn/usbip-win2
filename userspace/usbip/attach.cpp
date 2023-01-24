@@ -29,17 +29,15 @@ namespace
 
 using namespace usbip;
 
-auto init(vhci::ioctl_plugin &r, const attach_args &args)
+auto init(vhci::ioctl_plugin_hardware &r, const attach_args &args)
 {
-        auto service = std::to_string(global_args.tcp_port);
-
         struct {
                 char *dst;
                 size_t len;
                 const std::string &src;
         } const v[] = {
                 { r.busid, ARRAYSIZE(r.busid), args.busid },
-                { r.service, ARRAYSIZE(r.service), service },
+                { r.service, ARRAYSIZE(r.service), global_args.tcp_port },
                 { r.host, ARRAYSIZE(r.host), args.remote },
                 { r.serial, ARRAYSIZE(r.serial), args.serial },
         };
@@ -58,7 +56,8 @@ auto init(vhci::ioctl_plugin &r, const attach_args &args)
 
 auto import_device(const attach_args &args)
 {
-        vhci::ioctl_plugin r{};
+        vhci::ioctl_plugin_hardware r{};
+
         if (auto err = init(r, args)) {
                 return make_error(err);
         }
@@ -124,7 +123,7 @@ int usbip::cmd_attach(attach_args &r)
                         spdlog::error("unexpected response");
                         break;
                 default:
-                        spdlog::error("attach error #{} {}", err, libusbip::dbg_opcode_status(err));
+                        spdlog::error("attach error #{} {}", err, op_status_str(err));
                 }
 
         } else switch (auto err = static_cast<err_t>(result)) {
@@ -144,7 +143,7 @@ int usbip::cmd_attach(attach_args &r)
                 spdlog::error("incompatible protocol version");
                 break;
         default:
-                spdlog::error("attach error #{} {}", err, libusbip::dbg_errcode(err));
+                spdlog::error("attach error #{} {}", err, errt_str(err));
         }
 
         return 3;

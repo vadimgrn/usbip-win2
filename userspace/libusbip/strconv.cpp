@@ -4,7 +4,7 @@
 #include "strconv.h"
 #include <windows.h>
 
-std::wstring libusbip::utf8_to_wchar(std::string_view str)
+std::wstring usbip::utf8_to_wchar(std::string_view str)
 {
         std::wstring wstr;
 	auto cb = static_cast<int>(str.size());
@@ -23,7 +23,7 @@ std::wstring libusbip::utf8_to_wchar(std::string_view str)
 	return wstr;
 }
  
-std::string libusbip::to_utf8(std::wstring_view wstr)
+std::string usbip::to_utf8(std::wstring_view wstr)
 {
         std::string str;
         auto cch = static_cast<int>(wstr.size());

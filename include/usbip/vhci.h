@@ -65,7 +65,7 @@ enum ioctl {
         get_imported_devices = make_ioctl(function::get_imported_devices)
 };
 
-struct ioctl_plugin
+struct ioctl_plugin_hardware
 {
         int port; // OUT, must be the first member; [1..TOTAL_PORTS] in (port & 0xFFFF) or see make_error()
         char busid[USBIP_BUS_ID_SIZE];
@@ -74,7 +74,7 @@ struct ioctl_plugin
         char serial[255];
 };
 
-struct ioctl_imported_dev_data
+struct imported_dev_data
 {
         UINT32 devid;
         static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
@@ -86,9 +86,9 @@ struct ioctl_imported_dev_data
         UINT16 product;
 };
 
-struct ioctl_imported_dev : ioctl_plugin, ioctl_imported_dev_data {};
+struct ioctl_get_imported_devices : ioctl_plugin_hardware, imported_dev_data {};
 
-struct ioctl_plugout
+struct ioctl_plugout_hardware
 {
         int port; // [1..TOTAL_PORTS] or all ports if <= 0
 };

@@ -20,13 +20,13 @@
 namespace
 {
 
-struct devnode_args_t
+struct devnode_args
 {
         std::wstring infpath;
         std::wstring hwid;
 };
 
-struct classfilter_args_t
+struct classfilter_args
 {
         bool add;
         std::string_view level;
@@ -123,16 +123,16 @@ void prompt_reboot()
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-auto install_devnode_and_driver(_In_ const devnode_args_t &args)
+auto install_devnode_and_driver(_In_ const devnode_args &r)
 {
         GUID ClassGUID;
         WCHAR ClassName[MAX_CLASS_NAME_LEN];
-        if (!SetupDiGetINFClass(args.infpath.c_str(), &ClassGUID, ClassName, ARRAYSIZE(ClassName), 0)) {
-                fwprintf(stderr, L"SetupDiGetINFClass('%s') error %#lx\n", args.infpath.c_str(), GetLastError());
+        if (!SetupDiGetINFClass(r.infpath.c_str(), &ClassGUID, ClassName, ARRAYSIZE(ClassName), 0)) {
+                fwprintf(stderr, L"SetupDiGetINFClass('%s') error %#lx\n", r.infpath.c_str(), GetLastError());
                 return EXIT_FAILURE;
         }
 
-        auto dev_list = libusbip::hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
+        auto dev_list = usbip::hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
         if (!dev_list) {
                 fwprintf(stderr, L"SetupDiCreateDeviceInfoList error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
@@ -144,7 +144,7 @@ auto install_devnode_and_driver(_In_ const devnode_args_t &args)
                 return EXIT_FAILURE;
         }
 
-        auto id = make_hwid(args.hwid);
+        auto id = make_hwid(r.hwid);
         auto id_sz = DWORD(id.length()*sizeof(id[0]));
 
         if (!SetupDiSetDeviceRegistryProperty(dev_list.get(), &dev_data, SPDRP_HARDWAREID, 
@@ -168,7 +168,7 @@ auto install_devnode_and_driver(_In_ const devnode_args_t &args)
         // the same as "pnputil /add-driver usbip2_vhci.inf /install"
 
         BOOL RebootRequired;
-        if (!UpdateDriverForPlugAndPlayDevices(nullptr, args.hwid.c_str(), args.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
+        if (!UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
                 fwprintf(stderr, L"UpdateDriverForPlugAndPlayDevices error %#lx\n", GetLastError());
                 return EXIT_FAILURE;
         }
@@ -185,30 +185,30 @@ auto install_devnode_and_driver(_In_ const devnode_args_t &args)
  * devcon classfilter usb upper !usbip2_filter ; remove
  * @see devcon, cmdClassFilter
  */
-auto classfilter(_In_ const classfilter_args_t &args) 
+auto classfilter(_In_ const classfilter_args &r) 
 {
         GUID ClassGUID;
-        if (auto err = CLSIDFromString(args.class_guid.data(), &ClassGUID)) {
-                fwprintf(stderr, L"CLSIDFromString('%s') error %#lx\n", args.class_guid.data(), err);
+        if (auto err = CLSIDFromString(r.class_guid.data(), &ClassGUID)) {
+                fwprintf(stderr, L"CLSIDFromString('%s') error %#lx\n", r.class_guid.data(), err);
                 return EXIT_FAILURE;
         }
 
-        libusbip::HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
+        usbip::HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
         if (!key) {
-                fwprintf(stderr, L"SetupDiOpenClassRegKeyEx('%s') error %#lx\n", args.class_guid.data(), GetLastError());
+                fwprintf(stderr, L"SetupDiOpenClassRegKeyEx('%s') error %#lx\n", r.class_guid.data(), GetLastError());
                 return EXIT_FAILURE;
         }
 
-        auto val_name = args.level == opt_upper ? REGSTR_VAL_UPPERFILTERS : REGSTR_VAL_LOWERFILTERS;
+        auto val_name = r.level == opt_upper ? REGSTR_VAL_UPPERFILTERS : REGSTR_VAL_LOWERFILTERS;
         std::vector<WCHAR> val(4096);
         if (!read_multi_z(key.get(), val_name, val)) {
                 return EXIT_FAILURE;
         }
 
-        auto modified = args.add;
-        auto filters = split_multi_sz(val.empty() ? nullptr : val.data(), args.driver_name, modified);
-        if (args.add) {
-                filters.emplace_back(args.driver_name);
+        auto modified = r.add;
+        auto filters = split_multi_sz(val.empty() ? nullptr : val.data(), r.driver_name, modified);
+        if (r.add) {
+                filters.emplace_back(r.driver_name);
         }
 
         if (!modified) {
@@ -226,26 +226,26 @@ auto classfilter(_In_ const classfilter_args_t &args)
         return EXIT_SUCCESS;
 }
 
-void add_devnode_cmds(_In_ CLI::App &app, _In_ devnode_args_t &args)
+void add_devnode_cmds(_In_ CLI::App &app, _In_ devnode_args &r)
 {
         auto cmd = app.add_subcommand("install", "Install a device node and its driver");
 
-        cmd->add_option("infpath", args.infpath, "Path fo .inf file")
+        cmd->add_option("infpath", r.infpath, "Path fo .inf file")
                 ->check(CLI::ExistingFile)
                 ->required();
 
-        cmd->add_option("hwid", args.hwid, "Hardware Id of the device")->required();
+        cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
 
-        auto f = [&args] 
+        auto f = [&r] 
         { 
-                if (auto err = install_devnode_and_driver(args)) {
+                if (auto err = install_devnode_and_driver(r)) {
                         exit(err);
                 }
         };
         cmd->callback(std::move(f));
 }
 
-void add_classfilter_cmds(_In_ CLI::App &app, _In_ classfilter_args_t &args)
+void add_classfilter_cmds(_In_ CLI::App &app, _In_ classfilter_args &r)
 {
         auto &cmd_add = "add";
 
@@ -253,17 +253,17 @@ void add_classfilter_cmds(_In_ CLI::App &app, _In_ classfilter_args_t &args)
 
                 auto cmd = app.add_subcommand(action, std::string(action) + " class filter driver");
 
-                cmd->add_option("Level", args.level)
+                cmd->add_option("Level", r.level)
                         ->check(CLI::IsMember({opt_upper, "lower"}))
                         ->required();
 
-                cmd->add_option("ClassGuid", args.class_guid)->required();
-                cmd->add_option("DriverName", args.driver_name, "Filter driver name")->required();
+                cmd->add_option("ClassGuid", r.class_guid)->required();
+                cmd->add_option("DriverName", r.driver_name, "Filter driver name")->required();
 
-                auto f = [&args, add = action == cmd_add]
+                auto f = [&r, add = action == cmd_add]
                 { 
-                        args.add = add;
-                        if (auto err = classfilter(args)) {
+                        r.add = add;
+                        if (auto err = classfilter(r)) {
                                 exit(err);
                         }
                 };
@@ -280,18 +280,18 @@ int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
         app.set_version_flag("-V,--version", get_version(*argv));
 
         auto &devnode = L"devnode";
-        devnode_args_t devnode_args;
+        devnode_args args_devnode;
 
         auto &classfilter = L"classfilter";
-        classfilter_args_t classfilter_args;
+        classfilter_args args_classfilter;
 
-        if (auto prog = std::filesystem::path(*argv).stem(); prog == devnode) {
-                add_devnode_cmds(app, devnode_args);
-        } else if (prog == classfilter) {
-                add_classfilter_cmds(app, classfilter_args);
+        if (auto program = std::filesystem::path(*argv).stem(); program == devnode) {
+                add_devnode_cmds(app, args_devnode);
+        } else if (program == classfilter) {
+                add_classfilter_cmds(app, args_classfilter);
         } else {
                 fwprintf(stderr, L"Unexpected program name '%s', must be '%s' or '%s'\n", 
-                                   prog.c_str(), devnode, classfilter);
+                                   program.c_str(), devnode, classfilter);
 
                 return EXIT_FAILURE;
         }

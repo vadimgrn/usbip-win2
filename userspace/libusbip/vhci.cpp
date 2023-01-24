@@ -14,7 +14,7 @@ namespace
 
 bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = libusbip::get_intf_detail(dev_info, data, guid)) {
+        if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
@@ -36,20 +36,25 @@ std::wstring usbip::vhci::get_path()
                 return walker_devpath(path, guid, std::forward<decltype(args)>(args)...); 
         };
 
-        libusbip::traverse_intfdevs(guid, f);
+        traverse_intfdevs(guid, f);
         return path;
 }
 
-libusbip::Handle usbip::vhci::open(const std::wstring &path)
+auto usbip::vhci::open(const std::wstring &path) -> Handle
 {
-        return libusbip::Handle(CreateFile(path.c_str(), 
-                GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
-                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        Handle h;
+        if (!path.empty()) {
+                h.reset(CreateFile(path.c_str(), 
+                        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        }
+        return h;
+
 }
 
-auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioctl_imported_dev>
+auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioctl_get_imported_devices>
 {
-        std::vector<ioctl_imported_dev> v(TOTAL_PORTS);
+        std::vector<ioctl_get_imported_devices> v(TOTAL_PORTS);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
         DWORD BytesReturned; // must be set if the last arg is NULL
@@ -67,7 +72,7 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
         return v;
 }
 
-bool usbip::vhci::attach(HANDLE dev, ioctl_plugin &r)
+bool usbip::vhci::attach(HANDLE dev, ioctl_plugin_hardware &r)
 {
         DWORD BytesReturned; // must be set if the last arg is NULL
 
@@ -82,7 +87,7 @@ bool usbip::vhci::attach(HANDLE dev, ioctl_plugin &r)
 
 int usbip::vhci::detach(HANDLE dev, int port)
 {
-        ioctl_plugout r{ port };
+        ioctl_plugout_hardware r{ port };
 
         DWORD BytesReturned; // must be set if the last arg is NULL
         if (DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr)) {

@@ -165,8 +165,8 @@ struct op_devlist_reply {
 };
 
 struct op_devlist_reply_extra {
-        struct usbip_usb_device    udev;
-        //	usbip_usb_interface uinf[];
+        usbip_usb_device udev;
+//	usbip_usb_interface uinf[];
 };
 
 #define PACK_OP_DEVLIST_REQUEST(pack, request)  do {\

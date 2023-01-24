@@ -4,7 +4,7 @@
 namespace
 {
 
-auto traverse_dev_info(HDEVINFO dev_info, const libusbip::walkfunc_t &walker)
+auto traverse_dev_info(HDEVINFO dev_info, const usbip::walkfunc_t &walker)
 {
 	SP_DEVINFO_DATA	dev_info_data{ sizeof(dev_info_data) };
 
@@ -26,7 +26,7 @@ auto traverse_dev_info(HDEVINFO dev_info, const libusbip::walkfunc_t &walker)
 } // namespace
 
 
-std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> libusbip::get_intf_detail(
+std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> usbip::get_intf_detail(
 	HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID &guid)
 {
 	std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> dev_interface_detail;
@@ -64,7 +64,7 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> libusbip::get_intf_detail(
 	return dev_interface_detail;
 }
 
-bool libusbip::traverse_intfdevs(const GUID &guid, const walkfunc_t &walker)
+bool usbip::traverse_intfdevs(const GUID &guid, const walkfunc_t &walker)
 {
 	bool ok = false;
 

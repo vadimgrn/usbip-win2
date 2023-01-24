@@ -18,7 +18,7 @@ const UsbIds& get_ids();
 
 struct global_args
 {
-        unsigned short tcp_port = usbip_port;
+        std::string tcp_port = usbip_port;
 };
 inline struct global_args global_args;
 

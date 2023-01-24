@@ -11,7 +11,7 @@
 
 #include <WinSock2.h>
 
-namespace libusbip
+namespace usbip
 {
 
 struct SocketTag {};
@@ -46,7 +46,7 @@ private:
 namespace std
 {
 
-using libusbip::Socket;
+using usbip::Socket;
 
 template<>
 struct std::hash<Socket>

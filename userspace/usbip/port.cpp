@@ -29,7 +29,7 @@ namespace
 
 using namespace usbip;
 
-int usbip_vhci_imported_device_dump(const vhci::ioctl_imported_dev &d)
+int dump(const vhci::ioctl_get_imported_devices &d)
 {
         printf("Port %02d: device in use at %s\n", d.port, get_speed_str(d.speed));
 
@@ -49,7 +49,7 @@ int usbip_vhci_imported_device_dump(const vhci::ioctl_imported_dev &d)
         return 0;
 }
 
-auto get_imported_devices(std::vector<vhci::ioctl_imported_dev> &devs)
+auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &devs)
 {
         auto dev = vhci::open();
         if (!dev) {
@@ -69,7 +69,7 @@ auto get_imported_devices(std::vector<vhci::ioctl_imported_dev> &devs)
 
 int list_imported_devices(const std::set<int> &ports)
 {
-        std::vector<vhci::ioctl_imported_dev> devs;
+        std::vector<vhci::ioctl_get_imported_devices> devs;
         if (auto err = get_imported_devices(devs)) {
                 return err;
         }
@@ -82,8 +82,8 @@ int list_imported_devices(const std::set<int> &ports)
         for (auto& d: devs) {
                 assert(d.port);
                 if (ports.empty() || ports.contains(d.port)) {
-                        usbip_vhci_imported_device_dump(d);
                         found = true;
+                        dump(d);
                 }
 
         }
@@ -100,7 +100,7 @@ int list_imported_devices(const std::set<int> &ports)
 
 int usbip::cmd_port(port_args &r)
 {
-        std::vector<vhci::ioctl_imported_dev> devs;
+        std::vector<vhci::ioctl_get_imported_devices> devs;
         if (auto err = get_imported_devices(devs)) {
                 return err;
         }
@@ -113,7 +113,7 @@ int usbip::cmd_port(port_args &r)
         for (auto& d: devs) {
                 assert(d.port);
                 if (r.ports.empty() || r.ports.contains(d.port)) {
-                        usbip_vhci_imported_device_dump(d);
+                        dump(d);
                         found = true;
                 }
 
