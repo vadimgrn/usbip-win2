@@ -1,6 +1,6 @@
 #pragma once
 
-inline auto& usbip_port = "3240";
+constexpr auto& usbip_port = "3240";
 
 enum op_status_t // op_common.status
 {

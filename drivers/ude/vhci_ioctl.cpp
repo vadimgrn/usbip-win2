@@ -60,8 +60,7 @@ PAGED void fill(_Inout_ vhci::ioctl_get_imported_devices &dst, _In_ const device
                 const UNICODE_STRING &ustr;
         } const v[] = {
                 {dst.service, sizeof(dst.service), src.service_name},
-                {dst.host, sizeof(dst.host), src.node_name},
-                {dst.serial, sizeof(dst.serial), src.serial}
+                {dst.host, sizeof(dst.host), src.node_name}
         };
 
         for (auto &[ansi, ansi_sz, ustr]: v) {
@@ -327,7 +326,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardware &r)
 {
         PAGED_CODE();
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, serial %s", r.host, r.service, r.busid, r.serial);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s", r.host, r.service, r.busid);
 
         auto &error = r.port;
         error = make_error(ERR_GENERAL);

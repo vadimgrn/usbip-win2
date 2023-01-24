@@ -71,7 +71,6 @@ struct ioctl_plugin_hardware
         char busid[USBIP_BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
-        char serial[255];
 };
 
 struct imported_dev_data

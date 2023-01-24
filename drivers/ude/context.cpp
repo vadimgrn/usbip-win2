@@ -55,7 +55,6 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ con
         } const v[] = {
                 {ext->node_name, r.host},
                 {ext->service_name, r.service},
-                {ext->serial, r.serial}
         };
 
         for (auto &[ustr, ansi]: v) {

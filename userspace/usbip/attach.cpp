@@ -39,7 +39,6 @@ auto init(vhci::ioctl_plugin_hardware &r, const attach_args &args)
                 { r.busid, ARRAYSIZE(r.busid), args.busid },
                 { r.service, ARRAYSIZE(r.service), global_args.tcp_port },
                 { r.host, ARRAYSIZE(r.host), args.remote },
-                { r.serial, ARRAYSIZE(r.serial), args.serial },
         };
 
         for (auto &i: v) {

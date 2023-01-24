@@ -53,7 +53,6 @@ void add_cmd_attach(CLI::App &app, attach_args &r)
 
 	cmd->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")->required();
 	cmd->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")->required();
-	cmd->add_option("-s,--serial", r.serial, "USB device serial number to override");
 	cmd->add_flag("-t,--terse", r.terse, "Show port number as a result")->capture_default_str();
 
 	cmd->callback(pack(cmd_attach, r));

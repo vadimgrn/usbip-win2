@@ -42,10 +42,6 @@ int dump(const vhci::ioctl_get_imported_devices &d)
         USHORT dev = d.devid & 0xFFFF;
         printf("%10s -> remote bus/dev %03d/%03d\n", " ", bus, dev);
 
-        if (*d.serial) {
-                printf("%10s -> serial '%s'\n", " ", d.serial);
-        }
-
         return 0;
 }
 
