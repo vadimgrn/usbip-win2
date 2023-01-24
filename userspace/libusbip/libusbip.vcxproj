@@ -101,6 +101,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="commands.cpp" />
     <ClCompile Include="dbgcode.cpp" />
     <ClCompile Include="file_ver.cpp" />
     <ClCompile Include="proto_op.cpp" />
@@ -115,6 +116,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
+    <ClInclude Include="commands.h" />
     <ClInclude Include="dbgcode.h" />
     <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />

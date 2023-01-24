@@ -50,17 +50,17 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &devs)
         auto dev = vhci::open();
         if (!dev) {
                 spdlog::error("failed to open vhci device");
-                return 3;
+                return EXIT_FAILURE;
         }
 
         bool ok = false;
         devs = vhci::get_imported_devs(dev.get(), ok);
         if (!ok) {
                 spdlog::error("failed to get imported devices information");
-                return 2;
+                return EXIT_FAILURE;
         }
 
-        return 0;
+        return EXIT_SUCCESS;
 }
 
 } // namespace
@@ -73,25 +73,24 @@ int usbip::cmd_port(port_args &r)
                 return err;
         }
 
-        if (!devs.empty()) {
-                printf("Imported USB devices\n"
-                       "====================\n");
-        }
-
         bool found = false;
 
         for (auto& d: devs) {
                 assert(d.port);
                 if (r.ports.empty() || r.ports.contains(d.port)) {
+                        if (!found) {
+                                found = true;
+                                printf("Imported USB devices\n"
+                                       "====================\n");
+                        }
                         dump(d);
-                        found = true;
                 }
 
         }
 
         if (!(found || r.ports.empty())) {
-                return 2; // port check failed
+                return EXIT_FAILURE; // port check failed
         }
 
-        return 0;
+        return EXIT_SUCCESS;
 }

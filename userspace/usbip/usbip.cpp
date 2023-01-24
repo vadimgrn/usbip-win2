@@ -92,10 +92,10 @@ void init(CLI::App &app, const wchar_t *program)
 {
 	app.set_version_flag("-V,--version", get_version(program));
 
-	app.add_flag("-v,--verbose,-d,--debug", 
+	app.add_flag("-d,--debug", 
 		     [] (auto) { spdlog::set_level(spdlog::level::debug); }, "Debug output");
 
-	app.add_option("-p,-t,--tcp-port", global_args.tcp_port, "TCP/IP port number of USB/IP server")
+	app.add_option("-t,--tcp-port", global_args.tcp_port, "TCP/IP port number of USB/IP server")
 		->check(CLI::Range(1024, USHRT_MAX))
 		->capture_default_str();
 }

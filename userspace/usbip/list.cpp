@@ -23,8 +23,7 @@
 #include <usbip\proto_op.h>
 
 #include <libusbip\network.h>
-#include <libusbip\vhci.h>
-#include <libusbip\dbgcode.h>
+#include <libusbip\commands.h>
 
 #include <spdlog\spdlog.h>
 
@@ -33,79 +32,40 @@ namespace
 
 using namespace usbip;
 
-auto get_exported_devices(SOCKET s)
+void on_device(int idx, const usbip_usb_device &d)
 {
-	const auto cmd = OP_REQ_DEVLIST;
-
-	if (!net::send_op_common(s, cmd)) {
-		spdlog::error("send_op_common");
-		return false;
+	if (!idx) { // first
+		printf("Exportable USB devices\n"
+		       "======================\n");
 	}
 
-	if (auto err = net::recv_op_common(s, cmd)) {
-		spdlog::error("recv_op_common {}", errt_str(err));
-		return false;
-	}
+	auto &ids = get_ids();
 
-	op_devlist_reply reply;
-	
-	if (net::recv(s, &reply, sizeof(reply))) {
-		PACK_OP_DEVLIST_REPLY(false, &reply);
-	} else {
-		spdlog::error("recv op_devlist_reply");
-		return false;
-	}
+	auto prod = get_product(ids, d.idVendor, d.idProduct);
+	auto csp = get_class(ids, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol);
 
-	if (!reply.ndev) {
-		spdlog::info("no exportable devices found");
-		return true;
-	}
+	printf( "%11s: %s\n"
+		"%11s: %s\n"
+		"%11s: %s\n",
+		d.busid, prod.c_str(),
+		"", d.path,
+		"", csp.c_str());
 
-	printf("Exportable USB devices\n"
-	       "======================\n");
-
-	for (UINT32 i = 0; i < reply.ndev; ++i) {
-
-		usbip_usb_device dev;
-
-		if (net::recv(s, &dev, sizeof(dev))) {
-			usbip_net_pack_usb_device(false, &dev);
-		} else {
-			spdlog::error("recv usbip_usb_device[{}]", i);
-			return false;
-		}
-
-		auto &ids = get_ids();
-
-		auto product_name = get_product(ids, dev.idVendor, dev.idProduct);
-		auto class_name = get_class(ids, dev.bDeviceClass, dev.bDeviceSubClass, dev.bDeviceProtocol);
-
-		printf("%11s: %s\n"
-		       "%11s: %s\n"
-		       "%11s: %s\n",
-			dev.busid, product_name.c_str(),
-			"", dev.path,
-			"", class_name.c_str());
-
-		for (int j = 0; j < dev.bNumInterfaces; ++j) {
-
-			usbip_usb_interface intf;
-
-			if (net::recv(s, &intf, sizeof(intf))) {
-				usbip_net_pack_usb_interface(false, &intf);
-			} else {
-				spdlog::error("recv usbip_usb_intf[{}]", j);
-				return false;
-			}
-
-			auto csp = get_class(ids, intf.bInterfaceClass, intf.bInterfaceSubClass, intf.bInterfaceProtocol);
-			printf("%11s: %2d - %s\n", "", j, csp.c_str());
-		}
-
+	if (!d.bNumInterfaces) {
 		printf("\n");
 	}
+}
 
-	return true;
+void on_interface(int, const usbip_usb_device &d, int idx, const usbip_usb_interface &r)
+{
+	auto &ids = get_ids();
+
+	auto csp = get_class(ids, r.bInterfaceClass, r.bInterfaceSubClass, r.bInterfaceProtocol);
+	printf("%11s: %2d - %s\n", "", idx, csp.c_str());
+
+	if (idx + 1 == d.bNumInterfaces) { // last
+		printf("\n");
+	}
 }
 
 } // namespace
@@ -116,15 +76,15 @@ int usbip::cmd_list(list_args &r)
 	auto sock = net::tcp_connect(r.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
 		spdlog::error("can't connect to {}:{}", r.remote, global_args.tcp_port);
-		return 3;
+		return EXIT_FAILURE;
 	}
 
 	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
 
-	if (!get_exported_devices(sock.get())) {
-		spdlog::error("failed to get exported device list");
-		return 4;
+	if (!enum_exportable_devices(sock, on_device, on_interface)) {
+		spdlog::error("failed to get exportable device list");
+		return EXIT_FAILURE;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }

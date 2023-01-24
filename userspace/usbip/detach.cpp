@@ -12,7 +12,7 @@ int usbip::cmd_detach(detach_args &r)
 	auto dev = vhci::open();
 	if (!dev) {
 		spdlog::error("can't open vhci device");
-		return 2;
+		return EXIT_FAILURE;
 	}
 
 	auto ret = vhci::detach(dev.get(), r.port);
@@ -24,7 +24,7 @@ int usbip::cmd_detach(detach_args &r)
 		} else {
 			printf("port %d is succesfully detached\n", r.port);
 		}
-		return 0;
+		return EXIT_SUCCESS;
 	}
 
 	switch (ret) {
@@ -38,5 +38,5 @@ int usbip::cmd_detach(detach_args &r)
 		spdlog::error("failed to detach");
 	}
 
-	return 3;
+	return EXIT_FAILURE;
 }

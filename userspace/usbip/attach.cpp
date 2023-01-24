@@ -87,7 +87,7 @@ int usbip::cmd_attach(attach_args &r)
 {
         auto result = import_device(r);
 
-        if (int port = get_port(result)) {
+        if (auto port = get_port(result)) {
 
                 assert(port > 0);
                 assert(!get_error(result));
@@ -98,7 +98,7 @@ int usbip::cmd_attach(attach_args &r)
                         printf("succesfully attached to port %d\n", port);
                 }
 
-                return 0;
+                return EXIT_SUCCESS;
         }
 
         result = get_error(result);
@@ -145,5 +145,5 @@ int usbip::cmd_attach(attach_args &r)
                 spdlog::error("attach error #{} {}", err, errt_str(err));
         }
 
-        return 3;
+        return EXIT_FAILURE;
 }
