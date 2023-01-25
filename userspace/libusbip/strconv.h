@@ -9,11 +9,22 @@
 namespace usbip
 {
 
-std::wstring utf8_to_wchar(std::string_view str);
-std::string wchar_to_utf8(std::wstring_view wstr);
+std::wstring utf8_to_wchar(std::string_view s);
+std::string wchar_to_utf8(std::wstring_view ws);
 
-std::string format_message(unsigned long msg_id);
+/*
+ * Use for error codes returned by GetLastError, WSAGetLastError, etc.
+ */
 std::wstring wformat_message(unsigned long msg_id);
 
-} // namespace usbip
+/*
+ * #include <system_error>
+ * std::system_category().message(ERROR_INVALID_PARAMETER); // encoding is CP_ACP
+ */
+inline auto format_message(unsigned long msg_id)
+{
+        auto msg = wformat_message(msg_id);
+        return wchar_to_utf8(msg);
+}
 
+} // namespace usbip

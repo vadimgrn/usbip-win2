@@ -2,96 +2,86 @@
  * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 #include "strconv.h"
-#include <windows.h>
 
+#include <cassert>
 #include <memory>
 
-namespace
+#include <windows.h>
+
+std::wstring usbip::utf8_to_wchar(std::string_view s)
 {
+        std::wstring ws;
 
-/*
- * #include <system_error>
- * std::system_category().message(ERROR_INVALID_PARAMETER);
- */
-template<typename R, typename STR, typename FMT, typename TO_STR>
-inline auto format_message(FMT format, TO_STR to_str, STR errm, DWORD msg_id)
-{
-        R msg;
-
-        std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(nullptr, LocalFree);
-        STR buf;
-
-        const auto flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-
-        if (auto n = format(flags, nullptr, msg_id, 0, (STR)&buf, 0, nullptr)) {
-                buf_ptr.reset(buf);
-                msg.assign(buf, n);
-        } else {
+        auto errmsg = [] {
                 auto err = GetLastError();
-                msg = errm + to_str(err);
-        }
+                return L"MultiByteToWideChar: GetLastError " + std::to_wstring(err);
+        };
 
-        return msg;
-}
+        auto f = [] (auto &s, auto buf, auto cch) { 
+                return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, 
+                                           s.data(), static_cast<int>(s.size()), buf, cch); 
+        };
 
-} // namespace
-
-
-std::wstring usbip::utf8_to_wchar(std::string_view str)
-{
-        std::wstring wstr;
-	auto cb = static_cast<int>(str.size());
-
-        auto cch = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.data(), cb, nullptr, 0);
+        auto cch = f(s, nullptr, 0);
         if (!cch) {
-                return wstr;
+                return ws = errmsg();
         }
 
-        wstr.resize(cch);
+        ws.resize(cch);
 
-        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str.data(), cb, wstr.data(), cch) != cch) {
-		wstr.clear();
+        if (f(s, ws.data(), cch) != cch) {
+		ws = errmsg();
 	}
 
-	return wstr;
+	return ws;
 }
  
-std::string usbip::wchar_to_utf8(std::wstring_view wstr)
+std::string usbip::wchar_to_utf8(std::wstring_view ws)
 {
-        std::string str;
-        auto cch = static_cast<int>(wstr.size());
+        std::string s;
 
-        auto cb = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wstr.data(), cch, nullptr, 0, nullptr, nullptr);
+        auto errmsg = [] {
+                auto err = GetLastError();
+                return "WideCharToMultiByte: GetLastError " + std::to_string(err);
+        };
+
+        auto f = [] (auto &s, auto buf, auto cb) {
+                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s.data(), static_cast<int>(s.size()), 
+                                           buf, cb, nullptr, nullptr);
+        };
+
+        auto cb = f(ws, nullptr, 0);
         if (!cb) {
-                return str;
+                return s = errmsg();
         }
 
-        str.resize(cb);
+        s.resize(cb);
 
-        if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wstr.data(), cch, 
-                                str.data(), cb, nullptr, nullptr) != cb) {
-                str.clear();
+        if (f(ws, s.data(), cb) != cb) {
+                s = errmsg();
         }
 
-        return str;
-}
-
-std::string usbip::format_message(unsigned long msg_id)
-{
-        static_assert(sizeof(msg_id) == sizeof(DWORD));
-
-        using func = std::string(DWORD);
-        func &to_str = std::to_string;
-
-        auto errm = (LPSTR)"FormatMessageA: GetLastError ";
-        return ::format_message<std::string, LPSTR>(FormatMessageA, to_str, errm, msg_id);
+        return s;
 }
 
 std::wstring usbip::wformat_message(unsigned long msg_id)
 {
-        using func = std::wstring(DWORD);
-        func &to_str = std::to_wstring;
+        static_assert(sizeof(msg_id) == sizeof(DWORD));
+        std::wstring msg;
 
-        auto errm = (LPWSTR)L"FormatMessageW: GetLastError ";
-        return ::format_message<std::wstring, LPWSTR>(FormatMessageW, to_str, errm, msg_id);
+        const auto flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+                           FORMAT_MESSAGE_IGNORE_INSERTS;
+
+        std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(nullptr, LocalFree);
+        LPWSTR buf{};
+
+        if (auto cch = FormatMessageW(flags, nullptr, msg_id, 0, (LPWSTR)&buf, 0, nullptr)) {
+                buf_ptr.reset(buf);
+                msg.assign(buf, cch);
+        } else {
+                auto err = GetLastError();
+                msg = L"FormatMessageW: GetLastError " + std::to_wstring(err);
+        }
+
+        return msg;
 }
