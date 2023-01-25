@@ -11,6 +11,8 @@
 #include <libusbip\hkey.h>
 #include <libusbip\setupdi.h>
 #include <libusbip\file_ver.h>
+#include <libusbip\strconv.h>
+
 #include <libusbip\CLI11.hpp>
 
 /*
@@ -20,6 +22,8 @@
 
 namespace
 {
+
+using namespace usbip;
 
 struct devnode_args
 {
@@ -36,6 +40,12 @@ struct classfilter_args
 };
 
 auto &opt_upper = "upper";
+
+void print_last_error(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastError())
+{
+        auto msg = wformat_message(err);
+        fwprintf(stderr, L"%S(%s) error %#lx %s", api, str, err, msg.c_str());
+}
 
 auto get_version(_In_ const wchar_t *program)
 {
@@ -98,7 +108,7 @@ auto read_multi_z(_In_ HKEY key, _In_ LPCWSTR val_name, _Out_ std::vector<WCHAR>
                         val.resize(val_sz);
                         break;
                 default:
-                        fwprintf(stderr, L"RegGetValue('%s') error %ld\n", val_name, err);
+                        print_last_error("RegGetValue", val_name, err);
                         return false;
                 }
         }
@@ -115,7 +125,7 @@ void prompt_reboot()
                 break;
         default:
                 assert(ret == -1);
-                fwprintf(stderr, L"SetupPromptReboot error %#lx\n", GetLastError());
+                print_last_error("SetupPromptReboot");
         }
 }
 
@@ -129,19 +139,19 @@ auto install_devnode_and_driver(_In_ const devnode_args &r)
         GUID ClassGUID;
         WCHAR ClassName[MAX_CLASS_NAME_LEN];
         if (!SetupDiGetINFClass(r.infpath.c_str(), &ClassGUID, ClassName, ARRAYSIZE(ClassName), 0)) {
-                fwprintf(stderr, L"SetupDiGetINFClass('%s') error %#lx\n", r.infpath.c_str(), GetLastError());
+                print_last_error("SetupDiGetINFClass", r.infpath.c_str());
                 return EXIT_FAILURE;
         }
 
-        auto dev_list = usbip::hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
+        auto dev_list = hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
         if (!dev_list) {
-                fwprintf(stderr, L"SetupDiCreateDeviceInfoList error %#lx\n", GetLastError());
+                print_last_error("SetupDiCreateDeviceInfoList");
                 return EXIT_FAILURE;
         }
 
         SP_DEVINFO_DATA dev_data{ sizeof(dev_data) };
         if (!SetupDiCreateDeviceInfo(dev_list.get(), ClassName, &ClassGUID, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
-                fwprintf(stderr, L"SetupDiCreateDeviceInfo error %#lx\n", GetLastError());
+                print_last_error("SetupDiCreateDeviceInfo");
                 return EXIT_FAILURE;
         }
 
@@ -150,18 +160,18 @@ auto install_devnode_and_driver(_In_ const devnode_args &r)
 
         if (!SetupDiSetDeviceRegistryProperty(dev_list.get(), &dev_data, SPDRP_HARDWAREID, 
                                               reinterpret_cast<const BYTE*>(id.data()), id_sz)) {
-                fwprintf(stderr, L"SetupDiSetDeviceRegistryProperty error %#lx\n", GetLastError());
+                print_last_error("SetupDiSetDeviceRegistryProperty");
                 return EXIT_FAILURE;
         }
 
         if (!SetupDiCallClassInstaller(DIF_REGISTERDEVICE, dev_list.get(), &dev_data)) {
-                fwprintf(stderr, L"SetupDiCallClassInstaller error %#lx\n", GetLastError());
+                print_last_error("SetupDiCallClassInstaller");
                 return EXIT_FAILURE;
         }
 
         SP_DEVINSTALL_PARAMS params{ .cbSize = sizeof(params) };
         if (!SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
-                fwprintf(stderr, L"SetupDiGetDeviceInstallParams error %#lx\n", GetLastError());
+                print_last_error("SetupDiGetDeviceInstallParams");
                 return EXIT_FAILURE;
         }
         auto reboot_required = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
@@ -170,7 +180,7 @@ auto install_devnode_and_driver(_In_ const devnode_args &r)
 
         BOOL RebootRequired;
         if (!UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
-                fwprintf(stderr, L"UpdateDriverForPlugAndPlayDevices error %#lx\n", GetLastError());
+                print_last_error("UpdateDriverForPlugAndPlayDevices");
                 return EXIT_FAILURE;
         }
 
@@ -190,13 +200,13 @@ auto classfilter(_In_ const classfilter_args &r)
 {
         GUID ClassGUID;
         if (auto err = CLSIDFromString(r.class_guid.data(), &ClassGUID)) {
-                fwprintf(stderr, L"CLSIDFromString('%s') error %#lx\n", r.class_guid.data(), err);
+                print_last_error("CLSIDFromString", r.class_guid.data(), err);
                 return EXIT_FAILURE;
         }
 
-        usbip::HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
+        HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
         if (!key) {
-                fwprintf(stderr, L"SetupDiOpenClassRegKeyEx('%s') error %#lx\n", r.class_guid.data(), GetLastError());
+                print_last_error("SetupDiOpenClassRegKeyEx", r.class_guid.data());
                 return EXIT_FAILURE;
         }
 
@@ -220,7 +230,7 @@ auto classfilter(_In_ const classfilter_args &r)
             auto err = RegSetValueEx(key.get(), val_name, 0, REG_MULTI_SZ,
                                      reinterpret_cast<const BYTE*>(str.data()), 
                                      DWORD(str.length()*sizeof(str[0])))) {
-                fwprintf(stderr, L"RegSetValueEx('%s') error %ld\n", val_name, err);
+                print_last_error("RegSetValueEx", val_name, err);
                 return EXIT_FAILURE;
         }
 
