@@ -23,8 +23,8 @@ std::wstring wformat_message(unsigned long msg_id);
  */
 inline auto format_message(unsigned long msg_id)
 {
-        auto msg = wformat_message(msg_id);
-        return wchar_to_utf8(msg);
+        auto ws = wformat_message(msg_id);
+        return wchar_to_utf8(ws);
 }
 
 } // namespace usbip

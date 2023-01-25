@@ -45,8 +45,8 @@ std::string usbip::wchar_to_utf8(std::wstring_view ws)
                 return "WideCharToMultiByte: GetLastError " + std::to_string(err);
         };
 
-        auto f = [] (auto &s, auto buf, auto cb) {
-                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s.data(), static_cast<int>(s.size()), 
+        auto f = [] (auto &ws, auto buf, auto cb) {
+                return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(), static_cast<int>(ws.size()), 
                                            buf, cb, nullptr, nullptr);
         };
 

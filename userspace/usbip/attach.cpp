@@ -116,7 +116,7 @@ int usbip::cmd_attach(attach_args &r)
                         spdlog::error("device in error state");
                         break;
                 case ST_NODEV:
-                        spdlog::error("device not found by bus id: {}", r.busid);
+                        spdlog::error("device not found by bus-id '{}'", r.busid);
                         break;
                 case ST_ERROR:
                         spdlog::error("unexpected response");

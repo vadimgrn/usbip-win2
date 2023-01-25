@@ -1,5 +1,6 @@
 #include "dbgcode.h"
 #include "setupdi.h"
+#include "strconv.h"
 
 #include <cassert>
 #include <string>
@@ -43,13 +44,22 @@ std::wstring usbip::vhci::get_path()
 auto usbip::vhci::open(const std::wstring &path) -> Handle
 {
         Handle h;
-        if (!path.empty()) {
-                h.reset(CreateFile(path.c_str(), 
-                        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
-                        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        }
-        return h;
 
+        if (path.empty()) { // get_path() failed
+                spdlog::error("{}: vhci device not found, the driver is not loaded?", __func__);
+                return h;
+        }
+
+        h.reset(CreateFile(path.c_str(), 
+                GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+
+        if (!h) {
+                auto err = GetLastError();
+                spdlog::error("CreateFile error {:#x} {}", err, format_message(err));
+        }
+
+        return h;
 }
 
 auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioctl_get_imported_devices>
@@ -64,7 +74,8 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
                 v.resize(BytesReturned / sizeof(v[0]));
                 result = true;
         } else {
-                spdlog::error("DeviceIoControl error {:#x}", GetLastError());
+                auto err = GetLastError();
+                spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
                 v.clear();
                 result = false;
         }
@@ -78,7 +89,8 @@ bool usbip::vhci::attach(HANDLE dev, ioctl_plugin_hardware &r)
 
         auto ok = DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r, sizeof(r.port), &BytesReturned, nullptr);
         if (!ok) {
-                spdlog::error("DeviceIoControl error {:#x}", GetLastError());
+                auto err = GetLastError();
+                spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
         }
  
         assert(BytesReturned == sizeof(r.port));
@@ -95,7 +107,7 @@ int usbip::vhci::detach(HANDLE dev, int port)
         }
 
         auto err = GetLastError();
-        spdlog::error("DeviceIoControl error {:#x}", err);
+        spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
 
         switch (err) {
         case ERROR_FILE_NOT_FOUND:

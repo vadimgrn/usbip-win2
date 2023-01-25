@@ -26,7 +26,6 @@ struct attach_args
 {
         std::string remote;
         std::string busid;
-        std::string serial;
         bool terse{};
 };
 int cmd_attach(attach_args &r);

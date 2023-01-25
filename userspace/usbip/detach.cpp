@@ -29,10 +29,10 @@ int usbip::cmd_detach(detach_args &r)
 
 	switch (ret) {
 	case ERR_INVARG:
-		spdlog::error("invalid port: {}", r.port);
+		spdlog::error("invalid port {}", r.port);
 		break;
 	case ERR_NOTEXIST:
-		spdlog::error("non-existent port: {}", r.port);
+		spdlog::error("non-existent port {}", r.port);
 		break;
 	default:
 		spdlog::error("failed to detach");
