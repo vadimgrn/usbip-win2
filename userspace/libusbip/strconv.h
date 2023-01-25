@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <cwctype>
 
 namespace usbip
 {
@@ -25,6 +26,15 @@ inline auto format_message(unsigned long msg_id)
 {
         auto ws = wformat_message(msg_id);
         return wchar_to_utf8(ws);
+}
+
+inline auto& rtrim(std::wstring &s)
+{
+        while (!s.empty() && std::iswspace(s.back())) {
+                s.pop_back();
+        }
+
+        return s;
 }
 
 } // namespace usbip

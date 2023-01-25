@@ -78,6 +78,7 @@ std::wstring usbip::wformat_message(unsigned long msg_id)
         if (auto cch = FormatMessageW(flags, nullptr, msg_id, 0, (LPWSTR)&buf, 0, nullptr)) {
                 buf_ptr.reset(buf);
                 msg.assign(buf, cch);
+                rtrim(msg);
         } else {
                 auto err = GetLastError();
                 msg = L"FormatMessageW: GetLastError " + std::to_wstring(err);
