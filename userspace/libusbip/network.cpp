@@ -198,7 +198,7 @@ auto usbip::net::tcp_connect(const char *hostname, const char *service) -> Socke
 
 		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
 			auto err = WSAGetLastError();
-			spdlog::error(L"connect: {}", format_message(err));
+			spdlog::error("connect: {}", format_message(err));
 			sock.close();
 		} else {
 			break;

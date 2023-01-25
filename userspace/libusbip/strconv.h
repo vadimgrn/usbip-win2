@@ -10,9 +10,10 @@ namespace usbip
 {
 
 std::wstring utf8_to_wchar(std::string_view str);
-std::string to_utf8(std::wstring_view wstr);
+std::string wchar_to_utf8(std::wstring_view wstr);
 
-std::wstring format_message(unsigned int msg_id);
+std::string format_message(unsigned long msg_id);
+std::wstring wformat_message(unsigned long msg_id);
 
 } // namespace usbip
 
