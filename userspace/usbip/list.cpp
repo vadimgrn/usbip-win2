@@ -43,7 +43,6 @@ void on_device_count(int count)
 void on_device(int, const usbip_usb_device &d)
 {
 	auto &ids = get_ids();
-
 	auto prod = get_product(ids, d.idVendor, d.idProduct);
 	auto csp = get_class(ids, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol);
 

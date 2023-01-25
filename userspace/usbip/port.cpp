@@ -45,7 +45,7 @@ void dump(const vhci::ioctl_get_imported_devices &d)
                 " ", bus, dev);
 }
 
-auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &devs)
+auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
 {
         auto dev = vhci::open();
         if (!dev) {
@@ -53,8 +53,8 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &devs)
                 return EXIT_FAILURE;
         }
 
-        bool ok = false;
-        devs = vhci::get_imported_devs(dev.get(), ok);
+        bool ok{};
+        v = vhci::get_imported_devs(dev.get(), ok);
         if (!ok) {
                 spdlog::error("failed to get imported devices information");
                 return EXIT_FAILURE;
@@ -73,6 +73,7 @@ int usbip::cmd_port(port_args &r)
                 return err;
         }
 
+        spdlog::debug("{} imported usb device(s)", devs.size());
         bool found = false;
 
         for (auto& d: devs) {

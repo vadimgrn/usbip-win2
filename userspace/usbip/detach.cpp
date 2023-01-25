@@ -18,7 +18,7 @@ int usbip::cmd_detach(detach_args &r)
 	auto ret = vhci::detach(dev.get(), r.port);
 	dev.reset();
 
-	if (!ret) {
+	if (ret == ERR_NONE) {
 		if (r.port <= 0) {
 			printf("all ports are detached\n");
 		} else {

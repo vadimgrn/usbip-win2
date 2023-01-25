@@ -69,7 +69,8 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
 
         DWORD BytesReturned; // must be set if the last arg is NULL
 
-        if (DeviceIoControl(dev, ioctl::get_imported_devices, nullptr, 0, v.data(), idevs_bytes, &BytesReturned, nullptr)) {
+        if (DeviceIoControl(dev, ioctl::get_imported_devices, nullptr, 0, 
+                            v.data(), idevs_bytes, &BytesReturned, nullptr)) {
                 assert(!(BytesReturned % sizeof(v[0])));
                 v.resize(BytesReturned / sizeof(v[0]));
                 result = true;
@@ -97,13 +98,13 @@ bool usbip::vhci::attach(HANDLE dev, ioctl_plugin_hardware &r)
         return ok;
 }
 
-int usbip::vhci::detach(HANDLE dev, int port)
+auto usbip::vhci::detach(HANDLE dev, int port) -> err_t
 {
-        ioctl_plugout_hardware r{ port };
+        ioctl_plugout_hardware r{ .port = port };
 
         DWORD BytesReturned; // must be set if the last arg is NULL
         if (DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr)) {
-                return 0;
+                return ERR_NONE;
         }
 
         auto err = GetLastError();
