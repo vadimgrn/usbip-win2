@@ -2,7 +2,7 @@
  * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn
  */
 
-#include "commands.h"
+#include "remote.h"
 #include "network.h"
 #include "dbgcode.h"
 
@@ -10,7 +10,10 @@
 #include <spdlog\spdlog.h>
 
 bool usbip::enum_exportable_devices(
-	SOCKET s, const usbip_usb_device_f &on_dev, const usbip_usb_interface_f &on_intf)
+	SOCKET s, 
+	const usbip_usb_device_f &on_dev, 
+	const usbip_usb_interface_f &on_intf,
+	const usbip_usb_device_cnt_f &on_dev_cnt)
 {
 	assert(s != INVALID_SOCKET);
 	
@@ -34,6 +37,11 @@ bool usbip::enum_exportable_devices(
 	}
 
 	spdlog::debug("{} exportable device(s)", reply.ndev);
+	assert(reply.ndev <= INT_MAX);
+
+	if (on_dev_cnt) {
+		on_dev_cnt(reply.ndev);
+	}
 
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 

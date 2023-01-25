@@ -23,7 +23,7 @@
 #include <usbip\proto_op.h>
 
 #include <libusbip\network.h>
-#include <libusbip\commands.h>
+#include <libusbip\remote.h>
 
 #include <spdlog\spdlog.h>
 
@@ -32,13 +32,16 @@ namespace
 
 using namespace usbip;
 
-void on_device(int idx, const usbip_usb_device &d)
+void on_device_count(int count)
 {
-	if (!idx) { // first
+	if (count) {
 		printf("Exportable USB devices\n"
-		       "======================\n");
+			"======================\n");
 	}
+}
 
+void on_device(int, const usbip_usb_device &d)
+{
 	auto &ids = get_ids();
 
 	auto prod = get_product(ids, d.idVendor, d.idProduct);
@@ -81,7 +84,7 @@ int usbip::cmd_list(list_args &r)
 
 	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
 
-	if (!enum_exportable_devices(sock.get(), on_device, on_interface)) {
+	if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
 		spdlog::error("failed to get exportable device list");
 		return EXIT_FAILURE;
 	}

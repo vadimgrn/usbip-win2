@@ -10,7 +10,7 @@
     <ClCompile Include="usb_ids.cpp" />
     <ClCompile Include="win_socket.cpp" />
     <ClCompile Include="vhci.cpp" />
-    <ClCompile Include="commands.cpp" />
+    <ClCompile Include="remote.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h">
@@ -33,7 +33,7 @@
     <ClInclude Include="win_socket.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="vhci.h" />
-    <ClInclude Include="commands.h" />
+    <ClInclude Include="remote.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
