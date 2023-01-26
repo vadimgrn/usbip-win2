@@ -33,13 +33,24 @@ struct devnode_args
 
 struct classfilter_args
 {
-        bool add;
         std::string_view level;
         std::wstring class_guid;
         std::wstring driver_name;
 };
 
 auto &opt_upper = "upper";
+
+using command_t = std::function<int(void*)>;
+
+auto pack(command_t cmd, void *p) 
+{
+        return [cmd = std::move(cmd), p] 
+        {
+                if (auto ec = cmd(p)) {
+                        exit(ec); // throw CLI::RuntimeError(ec);
+                }
+        };
+}
 
 void errmsg(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastError())
 {
@@ -51,7 +62,7 @@ auto get_version(_In_ const wchar_t *program)
 {
         FileVersion fv(program);
         auto ver = fv.GetFileVersion();
-        return CLI::narrow(ver);
+        return wchar_to_utf8(ver); // CLI::narrow
 }
 
 auto split_multi_sz(_In_ PCWSTR str, _In_ const std::wstring_view &exclude, _Inout_ bool &excluded)
@@ -134,8 +145,10 @@ void prompt_reboot()
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-auto install_devnode_and_driver(_In_ const devnode_args &r)
+auto install_devnode_and_driver(_In_ void *p) // command_t
 {
+        auto &r = *reinterpret_cast<devnode_args*>(p);
+
         GUID ClassGUID;
         WCHAR ClassName[MAX_CLASS_NAME_LEN];
         if (!SetupDiGetINFClass(r.infpath.c_str(), &ClassGUID, ClassName, ARRAYSIZE(ClassName), 0)) {
@@ -196,11 +209,11 @@ auto install_devnode_and_driver(_In_ const devnode_args &r)
  * devcon classfilter usb upper !usbip2_filter ; remove
  * @see devcon, cmdClassFilter
  */
-auto classfilter(_In_ const classfilter_args &r) 
+auto classfilter(_In_ classfilter_args &r, _In_ bool add)
 {
         GUID ClassGUID;
-        if (auto err = CLSIDFromString(r.class_guid.data(), &ClassGUID)) {
-                errmsg("CLSIDFromString", r.class_guid.data(), err);
+        if (auto clsid = r.class_guid.data(); auto err = CLSIDFromString(clsid, &ClassGUID)) {
+                errmsg("CLSIDFromString", clsid, err);
                 return EXIT_FAILURE;
         }
 
@@ -216,9 +229,9 @@ auto classfilter(_In_ const classfilter_args &r)
                 return EXIT_FAILURE;
         }
 
-        auto modified = r.add;
+        auto modified = add;
         auto filters = split_multi_sz(val.empty() ? nullptr : val.data(), r.driver_name, modified);
-        if (r.add) {
+        if (add) {
                 filters.emplace_back(r.driver_name);
         }
 
@@ -237,8 +250,9 @@ auto classfilter(_In_ const classfilter_args &r)
         return EXIT_SUCCESS;
 }
 
-void add_devnode_cmds(_In_ CLI::App &app, _In_ devnode_args &r)
+void add_devnode_cmds(_In_ CLI::App &app)
 {
+        static devnode_args r;
         auto cmd = app.add_subcommand("install", "Install a device node and its driver");
 
         cmd->add_option("infpath", r.infpath, "Path fo .inf file")
@@ -246,18 +260,12 @@ void add_devnode_cmds(_In_ CLI::App &app, _In_ devnode_args &r)
                 ->required();
 
         cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
-
-        auto f = [&r] 
-        { 
-                if (auto err = install_devnode_and_driver(r)) {
-                        exit(err);
-                }
-        };
-        cmd->callback(std::move(f));
+        cmd->callback(pack(install_devnode_and_driver, &r));
 }
 
-void add_classfilter_cmds(_In_ CLI::App &app, _In_ classfilter_args &r)
+void add_classfilter_cmds(_In_ CLI::App &app)
 {
+        static classfilter_args r;
         auto &cmd_add = "add";
 
         for (auto action: {cmd_add, "remove"}) {
@@ -271,14 +279,12 @@ void add_classfilter_cmds(_In_ CLI::App &app, _In_ classfilter_args &r)
                 cmd->add_option("ClassGuid", r.class_guid)->required();
                 cmd->add_option("DriverName", r.driver_name, "Filter driver name")->required();
 
-                auto f = [&r, add = action == cmd_add]
+                auto f = [add = action == cmd_add] (auto p) 
                 { 
-                        r.add = add;
-                        if (auto err = classfilter(r)) {
-                                exit(err);
-                        }
+                        auto r = reinterpret_cast<classfilter_args*>(p);
+                        return classfilter(*r, add);
                 };
-                cmd->callback(std::move(f));
+                cmd->callback(pack(std::move(f), &r));
         }
 }
 
@@ -291,15 +297,12 @@ int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
         app.set_version_flag("-V,--version", get_version(*argv));
 
         auto &devnode = L"devnode";
-        devnode_args args_devnode;
-
         auto &classfilter = L"classfilter";
-        classfilter_args args_classfilter;
 
         if (auto program = std::filesystem::path(*argv).stem(); program == devnode) {
-                add_devnode_cmds(app, args_devnode);
+                add_devnode_cmds(app);
         } else if (program == classfilter) {
-                add_classfilter_cmds(app, args_classfilter);
+                add_classfilter_cmds(app);
         } else {
                 fwprintf(stderr, L"Unexpected program name '%s', must be '%s' or '%s'\n", 
                                    program.c_str(), devnode, classfilter);

@@ -83,8 +83,9 @@ constexpr auto get_error(int result) { return result >> 16; }
 /*
  * @see vhci/plugin.cpp, make_error
  */
-int usbip::cmd_attach(attach_args &r)
+int usbip::cmd_attach(void *p)
 {
+        auto &r = *reinterpret_cast<attach_args*>(p);
         auto result = import_device(r);
 
         if (auto port = get_port(result)) {

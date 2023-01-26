@@ -66,8 +66,10 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
 } // namespace
 
 
-int usbip::cmd_port(port_args &r)
+int usbip::cmd_port(void *p)
 {
+        auto &r = *reinterpret_cast<port_args*>(p);
+
         std::vector<vhci::ioctl_get_imported_devices> devs;
         if (auto err = get_imported_devices(devs)) {
                 return err;

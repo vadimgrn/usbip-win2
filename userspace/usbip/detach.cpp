@@ -7,8 +7,10 @@
 #include <libusbip\vhci.h>
 #include <spdlog\spdlog.h>
 
-int usbip::cmd_detach(detach_args &r)
+int usbip::cmd_detach(void *p)
 {
+	auto &r = *reinterpret_cast<detach_args*>(p);
+
 	auto dev = vhci::open();
 	if (!dev) {
 		spdlog::error("can't open vhci device");

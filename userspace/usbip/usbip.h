@@ -22,30 +22,32 @@ struct global_args
 };
 inline struct global_args global_args;
 
+using command_t = int(void*);
+
 struct attach_args
 {
         std::string remote;
         std::string busid;
         bool terse{};
 };
-int cmd_attach(attach_args &r);
+command_t cmd_attach;
 
 struct detach_args
 {
         int port;
 };
-int cmd_detach(detach_args &r);
+command_t cmd_detach;
 
 struct list_args
 {
         std::string remote;
 };
-int cmd_list(list_args &r);
+command_t cmd_list;
 
 struct port_args
 {
         std::set<int> ports;
 };
-int cmd_port(port_args &r);
+command_t cmd_port;
 
 } // namespace usbip

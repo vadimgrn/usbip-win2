@@ -73,8 +73,10 @@ void on_interface(int, const usbip_usb_device &d, int idx, const usbip_usb_inter
 } // namespace
 
 
-int usbip::cmd_list(list_args &r)
+int usbip::cmd_list(void *p)
 {
+	auto &r = *reinterpret_cast<list_args*>(p);
+
 	auto sock = net::tcp_connect(r.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
 		spdlog::error("can't connect to {}:{}", r.remote, global_args.tcp_port);
