@@ -51,17 +51,17 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ con
 
         struct {
                 UNICODE_STRING &ustr;
-                const char *ansi;
+                const char *utf8;
         } const v[] = {
                 {ext->node_name, r.host},
                 {ext->service_name, r.service},
         };
 
-        for (auto &[ustr, ansi]: v) {
-                if (!*ansi) {
-                        // RtlInitUnicodeString(&uni, nullptr); // the same as zeroed memory
-                } else if (auto err = libdrv::to_unicode_str(ustr, ansi)) {
-                        Trace(TRACE_LEVEL_ERROR, "to_unicode_str('%s') %!STATUS!", ansi, err);
+        for (auto &[ustr, utf8]: v) {
+                if (!*utf8) {
+                        // RtlInitUnicodeString(&ustr, nullptr); // the same as zeroed memory
+                } else if (auto err = libdrv::utf8_to_unicode(ustr, utf8)) {
+                        Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", utf8, err);
                         return err;
                 }
         }

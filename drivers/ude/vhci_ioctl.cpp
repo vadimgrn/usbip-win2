@@ -55,17 +55,17 @@ PAGED void fill(_Inout_ vhci::ioctl_get_imported_devices &dst, _In_ const device
         }
 
         struct {
-                char *ansi;
-                USHORT ansi_sz;
+                char *utf8;
+                USHORT utf8_sz;
                 const UNICODE_STRING &ustr;
         } const v[] = {
                 {dst.service, sizeof(dst.service), src.service_name},
                 {dst.host, sizeof(dst.host), src.node_name}
         };
 
-        for (auto &[ansi, ansi_sz, ustr]: v) {
-                if (auto err = libdrv::to_ansi_str(ansi, ansi_sz, ustr)) {
-                        Trace(TRACE_LEVEL_ERROR, "to_ansi_str('%!USTR!') %!STATUS!", &ustr, err);
+        for (auto &[utf8, utf8_sz, ustr]: v) {
+                if (auto err = libdrv::unicode_to_utf8(utf8, utf8_sz, ustr)) {
+                        Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ustr, err);
                 }
         }
 

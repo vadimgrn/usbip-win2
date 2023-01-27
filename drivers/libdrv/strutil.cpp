@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "strutil.h"
@@ -55,27 +55,26 @@ void libdrv::free(void *data)
 
 /*
 * RtlFreeUnicodeString must be used to release memory.
-* @see RtlUTF8StringToUnicodeString
 */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi)
+PAGED NTSTATUS libdrv::utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8)
 {
         PAGED_CODE();
 
-        ANSI_STRING s;
-        RtlInitAnsiString(&s, ansi);
+        UTF8_STRING s;
+        RtlInitUTF8String(&s, utf8);
 
-        return RtlAnsiStringToUnicodeString(&dst, &s, true);
+        return RtlUTF8StringToUnicodeString(&dst, &s, true);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
-        ANSI_STRING s{ 0, len, dest };
-        return RtlUnicodeStringToAnsiString(&s, &src, false);
+        UTF8_STRING s{ .MaximumLength = len, .Buffer = dest };
+        return RtlUnicodeStringToUTF8String(&s, &src, false);
 }
 
 _IRQL_requires_same_

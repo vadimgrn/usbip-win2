@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -15,11 +15,11 @@ void free(void *data);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS to_unicode_str(_Out_ UNICODE_STRING &dst, _In_ const char *ansi);
+PAGED NTSTATUS utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS to_ansi_str(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src);
+PAGED NTSTATUS unicode_to_utf8(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)

@@ -65,6 +65,9 @@ enum ioctl {
         get_imported_devices = make_ioctl(function::get_imported_devices)
 };
 
+/*
+ * Strings encoding must be UTF8. 
+ */
 struct ioctl_plugin_hardware
 {
         int port; // OUT, must be the first member; [1..TOTAL_PORTS] in (port & 0xFFFF) or see make_error()
