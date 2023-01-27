@@ -45,20 +45,20 @@ auto init(vhci::ioctl_plugin_hardware &r, const attach_args &args)
                 if (!i.src.empty()) {
                         if (auto err = strcpy_s(i.dst, i.len, i.src.c_str())) {
                                 spdlog::error("strcpy_s('{}') error #{}", i.src, err);
-                                return ERR_GENERAL;
+                                return false;
                         }
                 }
         }
 
-        return ERR_NONE;
+        return true;
 }
 
 auto import_device(const attach_args &args)
 {
         vhci::ioctl_plugin_hardware r{};
 
-        if (auto err = init(r, args)) {
-                return make_error(err);
+        if (!init(r, args)) {
+                return make_error(ERR_INVARG);
         }
 
         auto dev = vhci::open();
@@ -83,7 +83,7 @@ constexpr auto get_error(int result) { return result >> 16; }
 /*
  * @see vhci/plugin.cpp, make_error
  */
-int usbip::cmd_attach(void *p)
+bool usbip::cmd_attach(void *p)
 {
         auto &r = *reinterpret_cast<attach_args*>(p);
         auto result = import_device(r);
@@ -99,7 +99,7 @@ int usbip::cmd_attach(void *p)
                         printf("succesfully attached to port %d\n", port);
                 }
 
-                return EXIT_SUCCESS;
+                return true;
         }
 
         result = get_error(result);
@@ -146,5 +146,5 @@ int usbip::cmd_attach(void *p)
                 spdlog::error("attach error #{} {}", err, errt_str(err));
         }
 
-        return EXIT_FAILURE;
+        return false;
 }

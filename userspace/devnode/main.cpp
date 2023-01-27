@@ -40,14 +40,14 @@ struct classfilter_args
 
 auto &opt_upper = "upper";
 
-using command_t = std::function<int(void*)>;
+using command_t = std::function<bool()>;
 
-auto pack(command_t cmd, void *p) 
+auto pack(command_t cmd) 
 {
-        return [cmd = std::move(cmd), p] 
+        return [cmd = std::move(cmd)] 
         {
-                if (auto ec = cmd(p)) {
-                        exit(ec); // throw CLI::RuntimeError(ec);
+                if (!cmd()) {
+                        exit(EXIT_FAILURE); // throw CLI::RuntimeError(EXIT_FAILURE);
                 }
         };
 }
@@ -145,27 +145,26 @@ void prompt_reboot()
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-auto install_devnode_and_driver(_In_ void *p) // command_t
+_Function_class_(command_t)
+auto install_devnode_and_driver(_In_ devnode_args &r)
 {
-        auto &r = *reinterpret_cast<devnode_args*>(p);
-
         GUID ClassGUID;
         WCHAR ClassName[MAX_CLASS_NAME_LEN];
         if (!SetupDiGetINFClass(r.infpath.c_str(), &ClassGUID, ClassName, ARRAYSIZE(ClassName), 0)) {
                 errmsg("SetupDiGetINFClass", r.infpath.c_str());
-                return EXIT_FAILURE;
+                return false;
         }
 
         auto dev_list = hdevinfo(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
         if (!dev_list) {
                 errmsg("SetupDiCreateDeviceInfoList");
-                return EXIT_FAILURE;
+                return false;
         }
 
         SP_DEVINFO_DATA dev_data{ sizeof(dev_data) };
         if (!SetupDiCreateDeviceInfo(dev_list.get(), ClassName, &ClassGUID, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
                 errmsg("SetupDiCreateDeviceInfo");
-                return EXIT_FAILURE;
+                return false;
         }
 
         auto id = make_hwid(r.hwid);
@@ -174,18 +173,18 @@ auto install_devnode_and_driver(_In_ void *p) // command_t
         if (!SetupDiSetDeviceRegistryProperty(dev_list.get(), &dev_data, SPDRP_HARDWAREID, 
                                               reinterpret_cast<const BYTE*>(id.data()), id_sz)) {
                 errmsg("SetupDiSetDeviceRegistryProperty");
-                return EXIT_FAILURE;
+                return false;
         }
 
         if (!SetupDiCallClassInstaller(DIF_REGISTERDEVICE, dev_list.get(), &dev_data)) {
                 errmsg("SetupDiCallClassInstaller");
-                return EXIT_FAILURE;
+                return false;
         }
 
         SP_DEVINSTALL_PARAMS params{ .cbSize = sizeof(params) };
         if (!SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
                 errmsg("SetupDiGetDeviceInstallParams");
-                return EXIT_FAILURE;
+                return false;
         }
         auto reboot_required = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
 
@@ -194,14 +193,14 @@ auto install_devnode_and_driver(_In_ void *p) // command_t
         BOOL RebootRequired;
         if (!UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
                 errmsg("UpdateDriverForPlugAndPlayDevices");
-                return EXIT_FAILURE;
+                return false;
         }
 
         if (reboot_required || RebootRequired) {
                 prompt_reboot();
         }
 
-        return EXIT_SUCCESS;
+        return true;
 }
 
 /*
@@ -214,19 +213,19 @@ auto classfilter(_In_ classfilter_args &r, _In_ bool add)
         GUID ClassGUID;
         if (auto clsid = r.class_guid.data(); auto err = CLSIDFromString(clsid, &ClassGUID)) {
                 errmsg("CLSIDFromString", clsid, err);
-                return EXIT_FAILURE;
+                return false;
         }
 
         HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
         if (!key) {
                 errmsg("SetupDiOpenClassRegKeyEx", r.class_guid.data());
-                return EXIT_FAILURE;
+                return false;
         }
 
         auto val_name = r.level == opt_upper ? REGSTR_VAL_UPPERFILTERS : REGSTR_VAL_LOWERFILTERS;
         std::vector<WCHAR> val(4096);
         if (!read_multi_z(key.get(), val_name, val)) {
-                return EXIT_FAILURE;
+                return false;
         }
 
         auto modified = add;
@@ -236,7 +235,7 @@ auto classfilter(_In_ classfilter_args &r, _In_ bool add)
         }
 
         if (!modified) {
-                return EXIT_SUCCESS;
+                return true;
         }
 
         if (auto str = make_multi_sz(filters); 
@@ -244,10 +243,10 @@ auto classfilter(_In_ classfilter_args &r, _In_ bool add)
                                      reinterpret_cast<const BYTE*>(str.data()), 
                                      DWORD(str.length()*sizeof(str[0])))) {
                 errmsg("RegSetValueEx", val_name, err);
-                return EXIT_FAILURE;
+                return false;
         }
 
-        return EXIT_SUCCESS;
+        return true;
 }
 
 void add_devnode_cmds(_In_ CLI::App &app)
@@ -260,7 +259,9 @@ void add_devnode_cmds(_In_ CLI::App &app)
                 ->required();
 
         cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
-        cmd->callback(pack(install_devnode_and_driver, &r));
+        
+        auto f = [r = &r] { return install_devnode_and_driver(*r); };
+        cmd->callback(pack(std::move(f)));
 }
 
 void add_classfilter_cmds(_In_ CLI::App &app)
@@ -279,12 +280,8 @@ void add_classfilter_cmds(_In_ CLI::App &app)
                 cmd->add_option("ClassGuid", r.class_guid)->required();
                 cmd->add_option("DriverName", r.driver_name, "Filter driver name")->required();
 
-                auto f = [add = action == cmd_add] (auto p) 
-                { 
-                        auto r = reinterpret_cast<classfilter_args*>(p);
-                        return classfilter(*r, add);
-                };
-                cmd->callback(pack(std::move(f), &r));
+                auto f = [r = &r, add = action == cmd_add] { return classfilter(*r, add); };
+                cmd->callback(pack(std::move(f)));
         }
 }
 

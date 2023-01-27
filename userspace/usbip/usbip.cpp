@@ -8,6 +8,7 @@
 #include <libusbip\win_socket.h>
 #include <libusbip\file_ver.h>
 #include <libusbip\usb_ids.h>
+#include <libusbip\strconv.h>
 
 #include <usbip\vhci.h>
 
@@ -32,15 +33,14 @@ auto get_version(_In_ const wchar_t *program)
 {
 	FileVersion fv(program);
 	auto ver = fv.GetFileVersion();
-	return CLI::narrow(ver);
+	return wchar_to_utf8(ver); // CLI::narrow
 }
 
 auto pack(command_t cmd, void *p) 
 {
 	return [cmd, p] { 
-		if (auto ec = cmd(p)) {
-			spdlog::debug("exit code {}", ec);
-			exit(ec); // throw CLI::RuntimeError(ec);
+		if (!cmd(p)) {
+			exit(EXIT_FAILURE); // throw CLI::RuntimeError(EXIT_FAILURE);
 		}
 	};
 }

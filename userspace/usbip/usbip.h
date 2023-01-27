@@ -22,7 +22,7 @@ struct global_args
 };
 inline struct global_args global_args;
 
-using command_t = int(void*);
+using command_t = bool(void*);
 
 struct attach_args
 {

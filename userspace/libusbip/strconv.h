@@ -21,6 +21,7 @@ std::wstring wformat_message(unsigned long msg_id);
 /*
  * #include <system_error>
  * std::system_category().message(ERROR_INVALID_PARAMETER); // encoding is CP_ACP
+ * For POSIX errno codes: std::generic_category().message(errno()).
  */
 inline auto format_message(unsigned long msg_id)
 {

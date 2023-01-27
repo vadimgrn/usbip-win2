@@ -29,7 +29,7 @@ namespace
 
 using namespace usbip;
 
-void dump(const vhci::ioctl_get_imported_devices &d)
+void print(const vhci::ioctl_get_imported_devices &d)
 {
         auto prod = get_product(get_ids(), d.vendor, d.product);
         USHORT bus = d.devid >> 16;
@@ -50,29 +50,28 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
         auto dev = vhci::open();
         if (!dev) {
                 spdlog::error("failed to open vhci device");
-                return EXIT_FAILURE;
+                return false;
         }
 
         bool ok{};
         v = vhci::get_imported_devs(dev.get(), ok);
         if (!ok) {
                 spdlog::error("failed to get imported devices information");
-                return EXIT_FAILURE;
         }
 
-        return EXIT_SUCCESS;
+        return ok;
 }
 
 } // namespace
 
 
-int usbip::cmd_port(void *p)
+bool usbip::cmd_port(void *p)
 {
         auto &r = *reinterpret_cast<port_args*>(p);
 
         std::vector<vhci::ioctl_get_imported_devices> devs;
-        if (auto err = get_imported_devices(devs)) {
-                return err;
+        if (!get_imported_devices(devs)) {
+                return false;
         }
 
         spdlog::debug("{} imported usb device(s)", devs.size());
@@ -86,13 +85,9 @@ int usbip::cmd_port(void *p)
                                 printf("Imported USB devices\n"
                                        "====================\n");
                         }
-                        dump(d);
+                        print(d);
                 }
         }
 
-        if (!(found || r.ports.empty())) {
-                return EXIT_FAILURE; // port check failed
-        }
-
-        return EXIT_SUCCESS;
+        return found || r.ports.empty();
 }

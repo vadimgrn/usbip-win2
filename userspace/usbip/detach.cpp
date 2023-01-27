@@ -7,14 +7,14 @@
 #include <libusbip\vhci.h>
 #include <spdlog\spdlog.h>
 
-int usbip::cmd_detach(void *p)
+bool usbip::cmd_detach(void *p)
 {
 	auto &r = *reinterpret_cast<detach_args*>(p);
 
 	auto dev = vhci::open();
 	if (!dev) {
 		spdlog::error("can't open vhci device");
-		return EXIT_FAILURE;
+		return false;
 	}
 
 	auto ret = vhci::detach(dev.get(), r.port);
@@ -26,7 +26,7 @@ int usbip::cmd_detach(void *p)
 		} else {
 			printf("port %d is succesfully detached\n", r.port);
 		}
-		return EXIT_SUCCESS;
+		return true;
 	}
 
 	switch (ret) {
@@ -40,5 +40,5 @@ int usbip::cmd_detach(void *p)
 		spdlog::error("failed to detach");
 	}
 
-	return EXIT_FAILURE;
+	return false;
 }
