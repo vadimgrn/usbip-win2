@@ -145,7 +145,6 @@ void prompt_reboot()
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-_Function_class_(command_t)
 auto install_devnode_and_driver(_In_ devnode_args &r)
 {
         GUID ClassGUID;

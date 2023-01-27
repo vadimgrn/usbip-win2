@@ -25,8 +25,8 @@ std::wstring usbip::utf8_to_wchar(std::string_view s)
 
         ws.resize(cch);
 
-        if (f(s, ws.data(), cch) != cch) [[unlikely]] {
-                ws.resize(cch);
+        if (auto n = f(s, ws.data(), cch); n != cch) [[unlikely]] {
+                ws.resize(n);
                 assert(!"MultiByteToWideChar");
         }
 
@@ -50,8 +50,8 @@ std::string usbip::wchar_to_utf8(std::wstring_view ws)
 
         s.resize(cb);
 
-        if (f(ws, s.data(), cb) != cb) [[unlikely]] {
-                s.resize(cb);
+        if (auto n = f(ws, s.data(), cb); n != cb) [[unlikely]] {
+                s.resize(n);
                 assert(!"WideCharToMultiByte");
         }
 

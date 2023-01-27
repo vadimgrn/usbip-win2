@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <string>
+#include <system_error>
 
 #include <spdlog\spdlog.h>
 
@@ -13,15 +14,40 @@
 namespace
 {
 
+using namespace usbip;
+
 bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
+        if (auto inf = get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
         }
 
         return false;
+}
+
+auto init(vhci::ioctl_plugin_hardware &r, const vhci::attach_args &args)
+{
+        struct {
+                char *dst;
+                size_t len;
+                const std::string &src;
+        } const v[] = {
+                { r.busid, ARRAYSIZE(r.busid), args.busid },
+                { r.service, ARRAYSIZE(r.service), args.service },
+                { r.host, ARRAYSIZE(r.host), args.hostname },
+        };
+
+        for (auto &i: v) {
+                if (auto err = strcpy_s(i.dst, i.len, i.src.c_str())) {
+                        auto msg = std::generic_category().message(err);
+                        spdlog::error("strcpy_s('{}') error #{} {}", i.src, err, msg);
+                        return false;
+                }
+        }
+
+        return true;
 }
 
 } // namespace
@@ -84,18 +110,24 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
         return v;
 }
 
-bool usbip::vhci::attach(HANDLE dev, ioctl_plugin_hardware &r)
+int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
-        DWORD BytesReturned; // must be set if the last arg is NULL
-
-        auto ok = DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r, sizeof(r.port), &BytesReturned, nullptr);
-        if (!ok) {
-                auto err = GetLastError();
-                spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
+        ioctl_plugin_hardware r{};
+        if (!init(r, args)) {
+                return make_error(ERR_INVARG);
         }
- 
-        assert(BytesReturned == sizeof(r.port));
-        return ok;
+
+        if (DWORD BytesReturned; // must be set if the last arg is NULL
+            DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), 
+                            &r, sizeof(r.port), &BytesReturned, nullptr)) {
+                assert(BytesReturned == sizeof(r.port));
+                return r.port;
+        }
+
+        auto err = GetLastError();
+        spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
+
+        return make_error(ERR_GENERAL);
 }
 
 auto usbip::vhci::detach(HANDLE dev, int port) -> err_t

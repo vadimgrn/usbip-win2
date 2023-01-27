@@ -66,7 +66,7 @@ enum ioctl {
 };
 
 /*
- * Strings encoding must be UTF8. 
+ * Strings encoding is UTF8. 
  */
 struct ioctl_plugin_hardware
 {

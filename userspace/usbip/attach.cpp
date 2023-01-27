@@ -29,49 +29,21 @@ namespace
 
 using namespace usbip;
 
-auto init(vhci::ioctl_plugin_hardware &r, const attach_args &args)
+auto import_device(const attach_args &r)
 {
-        struct {
-                char *dst;
-                size_t len;
-                const std::string &src;
-        } const v[] = {
-                { r.busid, ARRAYSIZE(r.busid), args.busid },
-                { r.service, ARRAYSIZE(r.service), global_args.tcp_port },
-                { r.host, ARRAYSIZE(r.host), args.remote },
-        };
-
-        for (auto &i: v) {
-                if (!i.src.empty()) {
-                        if (auto err = strcpy_s(i.dst, i.len, i.src.c_str())) {
-                                spdlog::error("strcpy_s('{}') error #{}", i.src, err);
-                                return false;
-                        }
-                }
-        }
-
-        return true;
-}
-
-auto import_device(const attach_args &args)
-{
-        vhci::ioctl_plugin_hardware r{};
-
-        if (!init(r, args)) {
-                return make_error(ERR_INVARG);
-        }
-
         auto dev = vhci::open();
         if (!dev) {
                 spdlog::error("failed to open vhci device");
                 return make_error(ERR_DRIVER);
         }
 
-        if (!vhci::attach(dev.get(), r)) {
-                return make_error(ERR_GENERAL);
-        }
+        vhci::attach_args args { 
+                .hostname = r.remote,
+                .service = global_args.tcp_port, 
+                .busid = r.busid
+        };
 
-        return r.port;
+        return vhci::attach(dev.get(), args);
 }
 
 constexpr auto get_port(int result) { return result & 0xFFFF; }
