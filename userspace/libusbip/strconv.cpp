@@ -12,11 +12,6 @@ std::wstring usbip::utf8_to_wchar(std::string_view s)
 {
         std::wstring ws;
 
-        auto errmsg = [] {
-                auto err = GetLastError();
-                return L"MultiByteToWideChar: GetLastError " + std::to_wstring(err);
-        };
-
         auto f = [] (auto &s, auto buf, auto cch) { 
                 return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, 
                                            s.data(), static_cast<int>(s.size()), buf, cch); 
@@ -24,14 +19,16 @@ std::wstring usbip::utf8_to_wchar(std::string_view s)
 
         auto cch = f(s, nullptr, 0);
         if (!cch) {
-                return ws = errmsg();
+                auto err = GetLastError();
+                return L"MultiByteToWideChar: GetLastError " + std::to_wstring(err);
         }
 
         ws.resize(cch);
 
-        if (f(s, ws.data(), cch) != cch) {
-		ws = errmsg();
-	}
+        if (f(s, ws.data(), cch) != cch) [[unlikely]] {
+                ws.resize(cch);
+                assert(!"MultiByteToWideChar");
+        }
 
 	return ws;
 }
@@ -40,11 +37,6 @@ std::string usbip::wchar_to_utf8(std::wstring_view ws)
 {
         std::string s;
 
-        auto errmsg = [] {
-                auto err = GetLastError();
-                return "WideCharToMultiByte: GetLastError " + std::to_string(err);
-        };
-
         auto f = [] (auto &ws, auto buf, auto cb) {
                 return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(), static_cast<int>(ws.size()), 
                                            buf, cb, nullptr, nullptr);
@@ -52,13 +44,15 @@ std::string usbip::wchar_to_utf8(std::wstring_view ws)
 
         auto cb = f(ws, nullptr, 0);
         if (!cb) {
-                return s = errmsg();
+                auto err = GetLastError();
+                return "WideCharToMultiByte: GetLastError " + std::to_string(err);
         }
 
         s.resize(cb);
 
-        if (f(ws, s.data(), cb) != cb) {
-                s = errmsg();
+        if (f(ws, s.data(), cb) != cb) [[unlikely]] {
+                s.resize(cb);
+                assert(!"WideCharToMultiByte");
         }
 
         return s;
@@ -69,14 +63,12 @@ std::wstring usbip::wformat_message(unsigned long msg_id)
         static_assert(sizeof(msg_id) == sizeof(DWORD));
         std::wstring msg;
 
-        const auto flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | 
+        const auto flags = FORMAT_MESSAGE_FROM_SYSTEM |
+                           FORMAT_MESSAGE_ALLOCATE_BUFFER |
                            FORMAT_MESSAGE_IGNORE_INSERTS;
 
-        std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(nullptr, LocalFree);
-        LPWSTR buf{};
-
-        if (auto cch = FormatMessageW(flags, nullptr, msg_id, 0, (LPWSTR)&buf, 0, nullptr)) {
-                buf_ptr.reset(buf);
+        if (LPWSTR buf{}; auto cch = FormatMessageW(flags, nullptr, msg_id, 0, (LPWSTR)&buf, 0, nullptr)) {
+                std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(buf, LocalFree);
                 msg.assign(buf, cch);
                 rtrim(msg);
         } else {
