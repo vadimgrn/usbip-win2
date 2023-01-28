@@ -35,14 +35,3 @@ enum
         USBIP_DEV_PATH_MAX = 256, 
         USBIP_BUS_ID_SIZE = 32 
 };
-
-/*
- * err_t are negative, op_status_t are positive.
- */
-constexpr auto make_error(err_t err, op_status_t status = ST_OK)
-{
-        static_assert(sizeof(int) == 4);
-        return int(status ? status : err) << 16;
-}
-
-static_assert(!make_error(ERR_NONE));

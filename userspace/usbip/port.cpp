@@ -32,14 +32,15 @@ using namespace usbip;
 void print(const vhci::ioctl_get_imported_devices &d)
 {
         auto prod = get_product(get_ids(), d.vendor, d.product);
+
         USHORT bus = d.devid >> 16;
         USHORT dev = d.devid & 0xFFFF;
 
         printf( "Port %02d: device in use at %s\n"
-                "        %s\n"
+                "       %s\n"
                 "%10s -> usbip://%s:%s/%s\n"
                 "%10s -> remote bus/dev %03d/%03d\n",
-                d.port, get_speed_str(d.speed),
+                d.out.port, get_speed_str(d.speed),
                 prod.c_str(),
                 " ", d.host, d.service, d.busid,
                 " ", bus, dev);
@@ -49,14 +50,13 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
 {
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error("failed to open vhci device");
                 return false;
         }
 
         bool ok{};
         v = vhci::get_imported_devs(dev.get(), ok);
         if (!ok) {
-                spdlog::error("failed to get imported devices information");
+                spdlog::error("failed to get imported devices");
         }
 
         return ok;
@@ -77,9 +77,9 @@ bool usbip::cmd_port(void *p)
         spdlog::debug("{} imported usb device(s)", devs.size());
         bool found = false;
 
-        for (auto& d: devs) {
-                assert(d.port);
-                if (r.ports.empty() || r.ports.contains(d.port)) {
+        for (auto &d: devs) {
+                assert(d.out.port);
+                if (r.ports.empty() || r.ports.contains(d.out.port)) {
                         if (!found) {
                                 found = true;
                                 printf("Imported USB devices\n"

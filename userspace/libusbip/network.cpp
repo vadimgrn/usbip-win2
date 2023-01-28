@@ -185,9 +185,8 @@ auto usbip::net::tcp_connect(const char *hostname, const char *service) -> Socke
 	std::unique_ptr<addrinfo, decltype(freeaddrinfo)&> info(nullptr, freeaddrinfo);
 
 	if (addrinfo *result; auto err = getaddrinfo(hostname, service, &hints, &result)) {
-		auto errmsg = gai_strerror(err);
-		spdlog::error("getaddrinfo(host='{}', service='{}') error {:#x} {}", 
-			       hostname, service, err, wchar_to_utf8(errmsg));
+		auto msg = gai_strerror(err);
+		spdlog::error("getaddrinfo {}:{} error {:#x} {}", hostname, service, err, wchar_to_utf8(msg));
 		return sock;
 	} else {
 		info.reset(result);
@@ -207,7 +206,7 @@ auto usbip::net::tcp_connect(const char *hostname, const char *service) -> Socke
 
 		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
 			auto err = WSAGetLastError();
-			spdlog::error("connect({}:{}) error {:#x} {}", hostname, service, err, format_message(err));
+			spdlog::error("connect {}:{} error {:#x} {}", hostname, service, err, format_message(err));
 			sock.close();
 		} else {
 			break;

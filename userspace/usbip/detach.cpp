@@ -13,7 +13,6 @@ bool usbip::cmd_detach(void *p)
 
 	auto dev = vhci::open();
 	if (!dev) {
-		spdlog::error("can't open vhci device");
 		return false;
 	}
 

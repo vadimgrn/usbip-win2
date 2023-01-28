@@ -182,7 +182,7 @@ inline void sched_receive_usbip_header(_In_ device_ctx &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &d, _In_ const vhci::ioctl_plugin_hardware &r);
+PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &d, _In_ const vhci::ioctl_plugin_hardware &args);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

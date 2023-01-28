@@ -43,13 +43,16 @@ PAGED void log(_In_ const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void fill(_Inout_ vhci::ioctl_get_imported_devices &dst, _In_ const device_ctx &ctx)
+PAGED void fill(_Out_ vhci::ioctl_get_imported_devices &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
         auto &src = *ctx.ext;
 
-//      ioctl_plugin
-        dst.port = ctx.port;
+//      ioctl_plugin_hardware
+
+        dst.out.port = ctx.port;
+        dst.out.error = 0;
+
         if (auto s = src.busid) {
                 RtlStringCbCopyA(dst.busid, sizeof(dst.busid), s);
         }
@@ -96,54 +99,52 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
         return send(ext.sock, memory::stack, &req, sizeof(req));
 }
 
+/*
+ * @return err_t or op_status_t 
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Inout_ op_import_reply &reply)
+PAGED int recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
 {
         PAGED_CODE();
 
-        auto status = ST_OK;
-
-        if (auto err = recv_op_common(ext.sock, OP_REP_IMPORT, status)) {
-                return make_error(err);
-        }
-
-        if (status) {
-                Trace(TRACE_LEVEL_ERROR, "OP_REP_IMPORT %!op_status_t!", status);
-                return make_error(ERR_NONE, status);
+        if (auto err = recv_op_common(ext.sock, OP_REP_IMPORT)) {
+                return err;
         }
 
         if (auto err = recv(ext.sock, pool, &reply, sizeof(reply))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
-                return make_error(ERR_NETWORK);
+                return ERR_NETWORK;
         }
-
-        PACK_OP_IMPORT_REPLY(0, &reply);
+        PACK_OP_IMPORT_REPLY(false, &reply);
 
         if (strncmp(reply.udev.busid, ext.busid, sizeof(reply.udev.busid))) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, ext.busid);
-                return make_error(ERR_PROTOCOL);
+                return ERR_PROTOCOL;
         }
 
-        return make_error(ERR_NONE);
+        return ERR_NONE;
 }
 
+/*
+ * @return err_t or op_status_t 
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
+PAGED int import_remote_device(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
         if (auto err = send_req_import(ext)) {
                 Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
-                return make_error(ERR_NETWORK);
+                return ERR_NETWORK;
         }
 
-        op_import_reply reply{};
-        if (auto err = recv_rep_import(ext, memory::stack, reply)) { // result made by make_error()
+        op_import_reply reply;
+        if (auto err = recv_rep_import(ext, memory::stack, reply)) {
                 return err;
         }
-
+ 
         auto &udev = reply.udev; 
         log(udev);
 
@@ -154,7 +155,7 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
                 d->product = udev.idProduct;
         }
 
-        return make_error(ERR_NONE);
+        return ERR_NONE;
 }
 
 _IRQL_requires_same_
@@ -306,7 +307,7 @@ struct device_ctx_ext_ptr
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto start_device(_In_ int &port, _In_ UDECXUSBDEVICE device)
+PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
@@ -328,16 +329,18 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardw
         PAGED_CODE();
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s", r.host, r.service, r.busid);
 
-        auto &error = r.port;
-        error = make_error(ERR_GENERAL);
+        auto &port = r.out.port;
+        port = 0;
+
+        auto &error = r.out.error;
 
         device_ctx_ext_ptr ext;
         if (NT_ERROR(create_device_ctx_ext(ext.ptr, r))) {
+                error = ERR_GENERAL;
                 return;
         }
 
-        if (auto err = connect(*ext.ptr)) {
-                error = make_error(err);
+        if (bool(error = connect(*ext.ptr))) {
                 Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
                 return;
         }
@@ -350,15 +353,15 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardw
 
         UDECXUSBDEVICE dev;
         if (NT_ERROR(device::create(dev, vhci, ext.ptr))) {
+                error = ERR_GENERAL;
                 return;
         }
         ext.release(); // now dev owns it
 
-        if (auto err = start_device(r.port, dev)) {
-                error = make_error(err);
+        if (bool(error = start_device(port, dev))) {
                 WdfObjectDelete(dev); // UdecxUsbDevicePlugIn failed or was not called
         } else {
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x -> port %d", ptr04x(dev), r.port);
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x -> port %d", ptr04x(dev), port);
         }
 }
 
@@ -377,7 +380,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
                 plugin_hardware(vhci, *r);
         }
 
-        WdfRequestSetInformation(Request, sizeof(r->port));
+        WdfRequestSetInformation(Request, sizeof(r->out));
         return STATUS_SUCCESS;
 }
 

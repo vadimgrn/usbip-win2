@@ -24,61 +24,50 @@
 
 #include <spdlog\spdlog.h>
 
-namespace
-{
-
-using namespace usbip;
-
-auto import_device(const attach_args &r)
+bool usbip::cmd_attach(void *p)
 {
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error("failed to open vhci device");
-                return make_error(ERR_DRIVER);
+                return false;
         }
 
-        vhci::attach_args args { 
-                .hostname = r.remote,
-                .service = global_args.tcp_port, 
-                .busid = r.busid
-        };
+        auto &args = *reinterpret_cast<attach_args*>(p);
 
-        return vhci::attach(dev.get(), args);
-}
+        vhci::ioctl_plugin_hardware r{};
+        if (!fill(r, args.remote, global_args.tcp_port, args.busid)) {
+                return false;
+        }
 
-constexpr auto get_port(int result) { return result & 0xFFFF; }
-constexpr auto get_error(int result) { return result >> 16; }
-
-} // namespace
-
-
-/*
- * @see vhci/plugin.cpp, make_error
- */
-bool usbip::cmd_attach(void *p)
-{
-        auto &r = *reinterpret_cast<attach_args*>(p);
-        auto result = import_device(r);
-
-        if (auto port = get_port(result)) {
-
-                assert(port > 0);
-                assert(!get_error(result));
-
-                if (r.terse) {
+        if (auto port = vhci::attach(dev.get(), r)) {
+                if (args.terse) {
                         printf("%d\n", port);
                 } else {
                         printf("succesfully attached to port %d\n", port);
                 }
-
                 return true;
         }
 
-        result = get_error(result);
-        assert(result);
-
-        if (result > ST_OK) { // <linux>/tools/usb/usbip/libsrc/usbip_common.c, op_common_status_strings
-                switch (auto err = static_cast<op_status_t>(result)) {
+        if (auto err = r.get_err()) {
+                switch (err) {
+                case ERR_DRIVER:
+                        spdlog::error("vhci driver is not loaded");
+                        break;
+                case ERR_NETWORK:
+                        spdlog::error("can't connect to {}:{}", args.remote, global_args.tcp_port);
+                        break;
+                case ERR_PORTFULL:
+                        spdlog::error("no available port");
+                        break;
+                case ERR_PROTOCOL:
+                        spdlog::error("protocol error");
+                        break;
+                case ERR_VERSION:
+                        spdlog::error("incompatible protocol version");
+                        break;
+                default:
+                        spdlog::error("attach error #{} {}", err, errt_str(err));
+                }
+        } else switch (auto st = r.get_status()) { // <linux>/tools/usb/usbip/libsrc/usbip_common.c, op_common_status_strings
                 case ST_NA:
                         spdlog::error("device not available");
                         break;
@@ -95,27 +84,8 @@ bool usbip::cmd_attach(void *p)
                         spdlog::error("unexpected response");
                         break;
                 default:
-                        spdlog::error("attach error #{} {}", err, op_status_str(err));
-                }
-
-        } else switch (auto err = static_cast<err_t>(result)) {
-        case ERR_DRIVER:
-                spdlog::error("vhci driver is not loaded");
-                break;
-        case ERR_NETWORK:
-                spdlog::error("can't connect to {}:{}", r.remote, global_args.tcp_port);
-                break;
-        case ERR_PORTFULL:
-                spdlog::error("no available port");
-                break;
-        case ERR_PROTOCOL:
-                spdlog::error("protocol error");
-                break;
-        case ERR_VERSION:
-                spdlog::error("incompatible protocol version");
-                break;
-        default:
-                spdlog::error("attach error #{} {}", err, errt_str(err));
+                        assert(st != ST_OK);
+                        spdlog::error("attach status #{} {}", st, op_status_str(st));
         }
 
         return false;

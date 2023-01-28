@@ -27,29 +27,6 @@ bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_
         return false;
 }
 
-auto init(vhci::ioctl_plugin_hardware &r, const vhci::attach_args &args)
-{
-        struct {
-                char *dst;
-                size_t len;
-                const std::string &src;
-        } const v[] = {
-                { r.busid, ARRAYSIZE(r.busid), args.busid },
-                { r.service, ARRAYSIZE(r.service), args.service },
-                { r.host, ARRAYSIZE(r.host), args.hostname },
-        };
-
-        for (auto &i: v) {
-                if (auto err = strcpy_s(i.dst, i.len, i.src.c_str())) {
-                        auto msg = std::generic_category().message(err);
-                        spdlog::error("strcpy_s('{}') error #{} {}", i.src, err, msg);
-                        return false;
-                }
-        }
-
-        return true;
-}
-
 } // namespace
 
 
@@ -110,29 +87,54 @@ auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioc
         return v;
 }
 
-int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
+bool usbip::vhci::fill(
+        _Inout_ ioctl_plugin_hardware &r, 
+        _In_ const std::string_view &host, 
+        _In_ const std::string_view &service,
+        _In_ const std::string_view &busid)
 {
-        ioctl_plugin_hardware r{};
-        if (!init(r, args)) {
-                return make_error(ERR_INVARG);
+        struct {
+                char *dst;
+                size_t len;
+                const std::string_view &src;
+        } const v[] = {
+                { r.busid, ARRAYSIZE(r.busid), busid },
+                { r.service, ARRAYSIZE(r.service), service },
+                { r.host, ARRAYSIZE(r.host), host },
+        };
+
+        for (auto &i: v) {
+                if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
+                        auto msg = std::generic_category().message(err);
+                        spdlog::error("strncpy_s('{}') error #{} {}", i.src, err, msg);
+                        return false;
+                }
         }
 
+        return true;
+}
+
+/*
+ * @return hub port number, [1..TOTAL_PORTS]. If zero is returned, call r.get_err() or r.get_status(). 
+ */
+int usbip::vhci::attach(_In_ HANDLE dev, _Inout_ ioctl_plugin_hardware &r)
+{
         if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), 
-                            &r, sizeof(r.port), &BytesReturned, nullptr)) {
-                assert(BytesReturned == sizeof(r.port));
-                return r.port;
+            DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r.out, sizeof(r.out), &BytesReturned, nullptr)) {
+                assert(BytesReturned == sizeof(r.out));
+                return r.out.port;
         }
 
         auto err = GetLastError();
         spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
 
-        return make_error(ERR_GENERAL);
+        r.out.error = ERR_GENERAL;
+        return 0;
 }
 
 auto usbip::vhci::detach(HANDLE dev, int port) -> err_t
 {
-        ioctl_plugout_hardware r{ .port = port };
+        ioctl_plugout_hardware r { .port = port };
 
         DWORD BytesReturned; // must be set if the last arg is NULL
         if (DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr)) {
