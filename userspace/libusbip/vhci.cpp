@@ -30,6 +30,9 @@ bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_
 } // namespace
 
 
+/*
+ * @return "" if the driver is not loaded 
+ */
 std::wstring usbip::vhci::get_path()
 {
         std::wstring path;
@@ -132,24 +135,18 @@ int usbip::vhci::attach(_In_ HANDLE dev, _Inout_ ioctl_plugin_hardware &r)
         return 0;
 }
 
-auto usbip::vhci::detach(HANDLE dev, int port) -> err_t
+bool usbip::vhci::detach(HANDLE dev, int port)
 {
         ioctl_plugout_hardware r { .port = port };
 
-        DWORD BytesReturned; // must be set if the last arg is NULL
-        if (DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr)) {
-                return ERR_NONE;
+        if (DWORD BytesReturned; // must be set if the last arg is NULL
+            DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr)) {
+                assert(!BytesReturned);
+                return true;
         }
 
         auto err = GetLastError();
         spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
 
-        switch (err) {
-        case ERROR_FILE_NOT_FOUND:
-                return ERR_NOTEXIST;
-        case ERROR_INVALID_PARAMETER:
-                return ERR_INVARG;
-        default:
-                return ERR_GENERAL;
-        }
+        return false;
 }

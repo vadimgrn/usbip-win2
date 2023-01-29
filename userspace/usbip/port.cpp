@@ -37,7 +37,7 @@ void print(const vhci::ioctl_get_imported_devices &d)
         USHORT dev = d.devid & 0xFFFF;
 
         printf( "Port %02d: device in use at %s\n"
-                "       %s\n"
+                "         %s\n"
                 "%10s -> usbip://%s:%s/%s\n"
                 "%10s -> remote bus/dev %03d/%03d\n",
                 d.out.port, get_speed_str(d.speed),
@@ -56,7 +56,7 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
         bool ok{};
         v = vhci::get_imported_devs(dev.get(), ok);
         if (!ok) {
-                spdlog::error("failed to get imported devices");
+                spdlog::error("can't get imported devices");
         }
 
         return ok;

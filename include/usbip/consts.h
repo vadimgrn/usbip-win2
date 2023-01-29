@@ -12,17 +12,14 @@ enum op_status_t // op_common.status
         ST_ERROR // ST_DEV_ERR?
 };
 
-/* error codes for userspace tools and library */
+/* error codes for the driver ioctls */
 enum err_t
 {
-        ERR_PORTFULL = -9,
-        ERR_DRIVER,
-        ERR_NOTEXIST,
-        ERR_STATUS,
+        ERR_PORTFULL = -6,
         ERR_PROTOCOL,
         ERR_VERSION,
         ERR_NETWORK,
-        ERR_INVARG,
+        ERR_CONNECT,
         ERR_GENERAL,
         ERR_NONE
 };

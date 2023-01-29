@@ -23,7 +23,7 @@ bool usbip::enum_exportable_devices(
 	}
 
 	if (auto err = net::recv_op_common(s, OP_REP_DEVLIST)) {
-		spdlog::error("recv_op_common {}", errt_str(err));
+		spdlog::error("recv_op_common -> {}", err); // err_t or op_status_t
 		return false;
 	}
 

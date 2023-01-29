@@ -9,11 +9,8 @@
   #include <winioctl.h>
 #endif
 
-#include <usbspec.h>
-
 #include "ch9.h"
 #include "consts.h"
-#include "proto.h"
 
 namespace usbip::vhci
 {
@@ -73,10 +70,10 @@ struct ioctl_plugin_hardware
         struct {
                 int port; // [1..TOTAL_PORTS] or zero if an error
                 int error;
-        } out; // must be first member
+        } out; // must be the first member
 
-        auto get_err() const { return out.error < ERR_NONE ? static_cast<err_t>(out.error) : ERR_NONE; }
-        auto get_status() const { return out.error > ST_OK ? static_cast<op_status_t>(out.error) : ST_OK; }
+        auto get_err() const { return out.error < 0 ? static_cast<err_t>(out.error) : ERR_NONE; }
+        auto get_status() const { return out.error > 0 ? static_cast<op_status_t>(out.error) : ST_OK; }
 
         char busid[USBIP_BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
@@ -86,10 +83,10 @@ struct ioctl_plugin_hardware
 struct imported_dev_data
 {
         UINT32 devid;
-        static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
+//      static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
 
         usb_device_speed speed;
-        static_assert(sizeof(speed) == 4);
+        static_assert(sizeof(speed) == sizeof(int));
 
         UINT16 vendor;
         UINT16 product;

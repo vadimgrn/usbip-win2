@@ -44,6 +44,7 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
 
 /*
  * @return err_t or op_status_t 
+ * @see userspace/libusbip/network.cpp, recv_op_common.
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED int usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
@@ -58,12 +59,12 @@ PAGED int usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
 	PACK_OP_COMMON(false, &r);
 
 	if (r.version != USBIP_VERSION) {
-		Trace(TRACE_LEVEL_ERROR, "Version(%#x) != expected(%#x)", r.version, USBIP_VERSION);
+		Trace(TRACE_LEVEL_ERROR, "version(%#x) != expected(%#x)", r.version, USBIP_VERSION);
 		return ERR_VERSION;
 	}
 
         if (r.code != expected_code) {
-                Trace(TRACE_LEVEL_ERROR, "Code(%#x) != expected(%#x)", r.code, expected_code);
+                Trace(TRACE_LEVEL_ERROR, "code(%#x) != expected(%#x)", r.code, expected_code);
                 return ERR_PROTOCOL;
         }
 

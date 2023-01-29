@@ -251,14 +251,14 @@ PAGED auto connect(_Inout_ device_ctx_ext &ext)
         ADDRINFOEXW *ai{};
         if (auto err = getaddrinfo(ai, ext)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                return ERR_NETWORK;
+                return ERR_CONNECT;
         }
 
         NT_ASSERT(!ext.sock);
         ext.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &ext, nullptr, ai, try_connect, nullptr);
 
         wsk::free(ai);
-        return ext.sock ? ERR_NONE : ERR_NETWORK;
+        return ext.sock ? ERR_NONE : ERR_CONNECT;
 }
 
 _IRQL_requires_same_
@@ -404,7 +404,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
                 device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
         } else {
                 Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
-                err = STATUS_NO_SUCH_DEVICE;
+                err = vhci::is_valid_port(r->port) ? STATUS_DEVICE_NOT_CONNECTED : STATUS_INVALID_PARAMETER;
         }
 
         return err;

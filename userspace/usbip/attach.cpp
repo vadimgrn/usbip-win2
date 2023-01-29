@@ -49,20 +49,20 @@ bool usbip::cmd_attach(void *p)
 
         if (auto err = r.get_err()) {
                 switch (err) {
-                case ERR_DRIVER:
-                        spdlog::error("vhci driver is not loaded");
-                        break;
-                case ERR_NETWORK:
+                case ERR_CONNECT:
                         spdlog::error("can't connect to {}:{}", args.remote, global_args.tcp_port);
                         break;
-                case ERR_PORTFULL:
-                        spdlog::error("no available port");
+                case ERR_NETWORK:
+                        spdlog::error("network error");
                         break;
                 case ERR_PROTOCOL:
                         spdlog::error("protocol error");
                         break;
                 case ERR_VERSION:
                         spdlog::error("incompatible protocol version");
+                        break;
+                case ERR_PORTFULL:
+                        spdlog::error("no available port");
                         break;
                 default:
                         spdlog::error("attach error #{} {}", err, errt_str(err));

@@ -25,6 +25,6 @@ bool fill(_Inout_ ioctl_plugin_hardware &r,
         _In_ const std::string_view &busid);
 
 int attach(_In_ HANDLE dev, _Inout_ ioctl_plugin_hardware &r);
-err_t detach(HANDLE dev, int port);
+bool detach(HANDLE dev, int port);
 
 } // namespace usbip::vhci

@@ -143,38 +143,36 @@ bool usbip::net::send_op_common(SOCKET s, uint16_t code)
 	return send(s, &r, sizeof(r));
 }
 
-err_t usbip::net::recv_op_common(SOCKET s, uint16_t expected_code, op_status_t *status)
+/*
+ * @return err_t or op_status_t 
+ * @see drivers/ude/network.cpp, recv_op_common.
+ */
+int usbip::net::recv_op_common(SOCKET s, uint16_t expected_code)
 {
 	assert(s != INVALID_SOCKET);
+	
 	op_common r;
-
 	if (recv(s, &r, sizeof(r))) {
 		PACK_OP_COMMON(false, &r);
 	} else {
 		return ERR_NETWORK;
 	}
 
-	auto st = static_cast<op_status_t>(r.status);
-	if (status) {
-		*status = st;
-	}
-
 	if (r.version != USBIP_VERSION) {
-		spdlog::error("version mismatch: {} != {}", r.version, USBIP_VERSION);
+		spdlog::error("op_common.version {} != {}", r.version, USBIP_VERSION);
 		return ERR_VERSION;
 	}
 
 	if (r.code != expected_code) {
-		spdlog::error("received op_common.code {} != expected {}", r.code, expected_code);
+		spdlog::error("op_common.code {} != {}", r.code, expected_code);
 		return ERR_PROTOCOL;
 	}
 
-	if (st != ST_OK) {
+	auto st = static_cast<op_status_t>(r.status);
+	if (st) {
 		spdlog::error("op_common.status #{} {}", st, op_status_str(st));
-		return ERR_STATUS;
 	}
-
-	return ERR_NONE;
+	return st;
 }
 
 auto usbip::net::tcp_connect(const char *hostname, const char *service) -> Socket
