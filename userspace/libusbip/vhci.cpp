@@ -68,9 +68,9 @@ auto usbip::vhci::open(const std::wstring &path) -> Handle
         return h;
 }
 
-auto usbip::vhci::get_imported_devs(HANDLE dev, bool &result) -> std::vector<ioctl_get_imported_devices>
+auto usbip::vhci::get_imported_devices(HANDLE dev, bool &result) -> std::vector<imported_device>
 {
-        std::vector<ioctl_get_imported_devices> v(TOTAL_PORTS);
+        std::vector<imported_device> v(TOTAL_PORTS);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
         DWORD BytesReturned; // must be set if the last arg is NULL

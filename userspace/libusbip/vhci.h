@@ -17,7 +17,7 @@ namespace usbip::vhci
 std::wstring get_path();
 Handle open(const std::wstring &path = get_path());
 
-std::vector<ioctl_get_imported_devices> get_imported_devs(HANDLE dev, bool &result);
+std::vector<imported_device> get_imported_devices(HANDLE dev, bool &result);
 
 bool fill(_Inout_ ioctl_plugin_hardware &r, 
         _In_ const std::string_view &host, 

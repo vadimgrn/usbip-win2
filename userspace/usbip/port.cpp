@@ -21,7 +21,6 @@
 #include "strings.h"
 
 #include <libusbip\vhci.h>
-
 #include <spdlog\spdlog.h>
 
 namespace
@@ -29,7 +28,7 @@ namespace
 
 using namespace usbip;
 
-void print(const vhci::ioctl_get_imported_devices &d)
+void print(const vhci::imported_device &d)
 {
         auto prod = get_product(get_ids(), d.vendor, d.product);
 
@@ -46,7 +45,10 @@ void print(const vhci::ioctl_get_imported_devices &d)
                 " ", bus, dev);
 }
 
-auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
+} // namespace
+
+
+bool usbip::cmd_port(void *p)
 {
         auto dev = vhci::open();
         if (!dev) {
@@ -54,32 +56,20 @@ auto get_imported_devices(std::vector<vhci::ioctl_get_imported_devices> &v)
         }
 
         bool ok{};
-        v = vhci::get_imported_devs(dev.get(), ok);
+        auto devices = vhci::get_imported_devices(dev.get(), ok);
         if (!ok) {
                 spdlog::error("can't get imported devices");
-        }
-
-        return ok;
-}
-
-} // namespace
-
-
-bool usbip::cmd_port(void *p)
-{
-        auto &r = *reinterpret_cast<port_args*>(p);
-
-        std::vector<vhci::ioctl_get_imported_devices> devs;
-        if (!get_imported_devices(devs)) {
                 return false;
         }
 
-        spdlog::debug("{} imported usb device(s)", devs.size());
-        bool found = false;
+        spdlog::debug("{} imported usb device(s)", devices.size());
 
-        for (auto &d: devs) {
+        auto &ports = reinterpret_cast<port_args*>(p)->ports; 
+        bool found{};
+
+        for (auto &d: devices) {
                 assert(d.out.port);
-                if (r.ports.empty() || r.ports.contains(d.out.port)) {
+                if (ports.empty() || ports.contains(d.out.port)) {
                         if (!found) {
                                 found = true;
                                 printf("Imported USB devices\n"
@@ -89,5 +79,5 @@ bool usbip::cmd_port(void *p)
                 }
         }
 
-        return found || r.ports.empty();
+        return found || ports.empty();
 }

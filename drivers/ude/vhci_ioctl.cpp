@@ -43,7 +43,7 @@ PAGED void log(_In_ const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void fill(_Out_ vhci::ioctl_get_imported_devices &dst, _In_ const device_ctx &ctx)
+PAGED void fill(_Out_ vhci::imported_device &dst, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
         auto &src = *ctx.ext;
@@ -417,7 +417,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
         PAGED_CODE();
 
         size_t buf_sz;
-        vhci::ioctl_get_imported_devices *buf;
+        vhci::imported_device *buf;
         if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*buf), reinterpret_cast<PVOID*>(&buf), &buf_sz)) {
                 return err;
         }

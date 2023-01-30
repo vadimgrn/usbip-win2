@@ -56,16 +56,19 @@ constexpr auto make_ioctl(function id)
                         FILE_READ_DATA | FILE_WRITE_DATA);
 }
 
-enum ioctl {
-        plugin_hardware      = make_ioctl(function::plugin),
-        plugout_hardware     = make_ioctl(function::plugout),
-        get_imported_devices = make_ioctl(function::get_imported_devices)
-};
+namespace ioctl 
+{
+        enum {
+                plugin_hardware      = make_ioctl(function::plugin),
+                plugout_hardware     = make_ioctl(function::plugout),
+                get_imported_devices = make_ioctl(function::get_imported_devices)
+        };
+} // namespace ioctl
 
 /*
  * Strings encoding is UTF8. 
  */
-struct ioctl_plugin_hardware
+struct ioctl_plugin_hardware // IN/OUT
 {
         struct {
                 int port; // [1..TOTAL_PORTS] or zero if an error
@@ -80,6 +83,11 @@ struct ioctl_plugin_hardware
         char host[1025];  // NI_MAXHOST in ws2def.h
 };
 
+struct ioctl_plugout_hardware // IN
+{
+        int port; // [1..TOTAL_PORTS] or all ports if <= 0
+};
+
 struct imported_dev_data
 {
         UINT32 devid;
@@ -92,11 +100,6 @@ struct imported_dev_data
         UINT16 product;
 };
 
-struct ioctl_get_imported_devices : ioctl_plugin_hardware, imported_dev_data {};
-
-struct ioctl_plugout_hardware
-{
-        int port; // [1..TOTAL_PORTS] or all ports if <= 0
-};
+struct imported_device : ioctl_plugin_hardware, imported_dev_data {}; // OUT, ioctl::get_imported_devices
 
 } // namespace usbip::vhci
