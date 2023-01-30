@@ -72,16 +72,16 @@ void add_cmd_detach(CLI::App &app)
 void add_cmd_list(CLI::App &app)
 {
 	static list_args r;
-	auto cmd = app.add_subcommand("list", "List USB devices");
+	auto cmd = app.add_subcommand("list", "List exportable USB devices");
 
-	cmd->add_option("-r,--remote", r.remote, "List exported devices on a remote")->required();
+	cmd->add_option("-r,--remote", r.remote, "List exportable devices on a remote")->required();
 	cmd->callback(pack(cmd_list, &r));
 }
 
 void add_cmd_port(CLI::App &app)
 {
 	static port_args r;
-	auto cmd = app.add_subcommand("port", "List given hub port(s) for checking");
+	auto cmd = app.add_subcommand("port", "Show imported USB devices");
 
 	cmd->add_option("number", r.ports, "Hub port number")
 		->check(CLI::Range(1, int(vhci::TOTAL_PORTS)))

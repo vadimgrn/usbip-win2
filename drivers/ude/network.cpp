@@ -44,7 +44,7 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
 
 /*
  * @return err_t or op_status_t 
- * @see userspace/libusbip/network.cpp, recv_op_common.
+ * @see userspace/libusbip/remote.cpp, recv_op_common.
  */
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED int usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)

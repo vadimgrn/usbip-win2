@@ -6,7 +6,6 @@
     <ClCompile Include="proto_op.cpp" />
     <ClCompile Include="setupdi.cpp" />
     <ClCompile Include="strconv.cpp" />
-    <ClCompile Include="network.cpp" />
     <ClCompile Include="usb_ids.cpp" />
     <ClCompile Include="win_socket.cpp" />
     <ClCompile Include="vhci.cpp" />
@@ -27,7 +26,6 @@
     <ClInclude Include="generic_handle.h" />
     <ClInclude Include="setupdi.h" />
     <ClInclude Include="strconv.h" />
-    <ClInclude Include="network.h" />
     <ClInclude Include="usb_ids.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />

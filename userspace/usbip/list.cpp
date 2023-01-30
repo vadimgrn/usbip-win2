@@ -21,8 +21,6 @@
 #include "strings.h"
 
 #include <usbip\proto_op.h>
-
-#include <libusbip\network.h>
 #include <libusbip\remote.h>
 
 #include <spdlog\spdlog.h>
@@ -77,7 +75,7 @@ bool usbip::cmd_list(void *p)
 {
 	auto &r = *reinterpret_cast<list_args*>(p);
 
-	auto sock = net::tcp_connect(r.remote.c_str(), global_args.tcp_port.c_str());
+	auto sock = connect(r.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
 		spdlog::error("can't connect to {}:{}", r.remote, global_args.tcp_port);
 		return false;

@@ -1,17 +1,18 @@
 /*
- * Copyright (C) 2023 Vadym Hrynchyshyn
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn
  */
 
 #pragma once
 
-#include <WinSock2.h>
-#include <functional>
+#include "win_socket.h"
 
 struct usbip_usb_device;
 struct usbip_usb_interface;
 
 namespace usbip
 {
+
+Socket connect(const char *hostname, const char *service);
 
 /*
  * @param idx zero-based index of usb device
