@@ -483,7 +483,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	NT_ASSERT(!ctx.request);
 
 	if (auto hdev = get_device(&dev)) {
-		TraceDbg("dev %04x: unplugging after %!STATUS!", ptr04x(hdev), NT_ERROR(st.Status) ? st.Status : err);
+		TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), err);
 		device::sched_plugout_and_delete(hdev);
 	}
 
@@ -539,7 +539,7 @@ NTSTATUS drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 		return err;
 	}
 
-	WSK_BUF buf{ ctx.mdl_buf.get(), 0, length };
+	WSK_BUF buf{ .Mdl = ctx.mdl_buf.get(), .Length = length };
 	receive(buf, free_drain_buffer, ctx);
 
 	return RECV_MORE_DATA_REQUIRED;
@@ -550,7 +550,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
-	WSK_BUF buf{ nullptr, 0, length };
+	WSK_BUF buf{ .Length = length };
 
 	if (auto err = prepare_wsk_mdl(buf.Mdl, ctx, urb)) {
 		NT_ASSERT(err != RECV_MORE_DATA_REQUIRED);
@@ -655,7 +655,7 @@ void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 	ctx.mdl_buf.reset();
 
 	ctx.mdl_hdr.next(nullptr);
-	WSK_BUF buf{ ctx.mdl_hdr.get(), 0, sizeof(ctx.hdr) };
+	WSK_BUF buf{ .Mdl = ctx.mdl_hdr.get(), .Length = sizeof(ctx.hdr) };
 
 	auto received = [] (auto &ctx) // inherits PAGED from the function, can be called on DISPATCH_LEVEL
 	{

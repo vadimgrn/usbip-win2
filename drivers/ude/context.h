@@ -6,7 +6,7 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\ch9.h>
-#include <libdrv/wdf_cpp.h>
+#include <libdrv\wdf_cpp.h>
 
 #include <usbip\proto.h>
 

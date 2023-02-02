@@ -24,7 +24,7 @@ PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *da
                 return err;
         }
 
-        WSK_BUF buf{ mdl.get(), 0, len };
+        WSK_BUF buf{ .Mdl = mdl.get(), .Length = len };
         return send(sock, &buf, WSK_FLAG_NODELAY);
 }
 
@@ -38,7 +38,7 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
                 return err;
         }
 
-        WSK_BUF buf{ mdl.get(), 0, len };
+        WSK_BUF buf{ .Mdl = mdl.get(), .Length = len };
         return receive(sock, &buf);
 }
 
