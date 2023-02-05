@@ -9,11 +9,10 @@
 
 #include <usbip\consts.h>
 
-class UsbIds;
-
 namespace usbip
 {
 
+class UsbIds;
 const UsbIds& get_ids();
 
 struct global_args

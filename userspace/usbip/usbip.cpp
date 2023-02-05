@@ -24,14 +24,14 @@ using namespace usbip;
 
 auto get_ids_data()
 {
-	Resource r(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDR_USB_IDS), RT_RCDATA);
+	win::Resource r(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDR_USB_IDS), RT_RCDATA);
 	assert(r);
 	return r.str();
 }
 
 auto get_version(_In_ const wchar_t *program)
 {
-	FileVersion fv(program);
+	win::FileVersion fv(program);
 	auto ver = fv.GetFileVersion();
 	return wchar_to_utf8(ver); // CLI::narrow
 }

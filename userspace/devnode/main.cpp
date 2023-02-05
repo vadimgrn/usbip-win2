@@ -60,7 +60,7 @@ void errmsg(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastErr
 
 auto get_version(_In_ const wchar_t *program)
 {
-        FileVersion fv(program);
+        win::FileVersion fv(program);
         auto ver = fv.GetFileVersion();
         return wchar_to_utf8(ver); // CLI::narrow
 }

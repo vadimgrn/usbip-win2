@@ -1,11 +1,10 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usb_ids.h"
 
 #include <cassert>
-#include <cerrno>
 #include <functional>
 
 namespace
@@ -55,7 +54,29 @@ void for_each_line(std::string_view text, const line_f &f)
 } // namespace
 
 
-DWORD Resource::load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type)
+class win::Resource::Impl
+{
+public:
+        Impl(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type) { load(hModule, name, type); }
+
+        explicit operator bool() const noexcept { return hResInfo && hResData; }
+        auto operator!() const noexcept { return !bool(*this); } 
+
+        DWORD load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type);
+
+        auto data() const noexcept { return LockResource(hResData); }
+        auto size(HMODULE hModule) const noexcept { return SizeofResource(hModule, hResInfo); }
+
+        auto str() const noexcept { return m_str; }
+
+private:
+        HRSRC hResInfo{};
+        HGLOBAL hResData{};
+        std::string_view m_str;
+};
+
+
+DWORD win::Resource::Impl::load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type)
 {
         hResInfo = FindResource(hModule, name, type);
         if (!hResInfo) {
@@ -71,7 +92,63 @@ DWORD Resource::load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR t
         return ERROR_SUCCESS;
 }
 
-void UsbIds::load(const std::string_view &content)
+win::Resource::Resource(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type) 
+        : m_impl(new Impl(hModule, name, type)) {}
+
+win::Resource::~Resource() { delete m_impl; }
+
+auto win::Resource::operator =(Resource&& obj) -> Resource&
+{
+        if (&obj != this) {
+                delete m_impl;
+                m_impl = obj.release();
+        }
+
+        return *this;
+}
+
+win::Resource::operator bool() const noexcept { return static_cast<bool>(*m_impl); }
+
+DWORD win::Resource::load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type) 
+{
+        return m_impl->load(hModule, name, type); 
+}
+
+void* win::Resource::data() const noexcept { return m_impl->data(); }
+DWORD win::Resource::size(HMODULE hModule) const noexcept{ return m_impl->size(hModule); }
+std::string_view win::Resource::str() const noexcept { return m_impl->str(); }
+
+
+class usbip::UsbIds::Impl
+{
+public:
+        Impl(const std::string_view &content) { load(content); }
+
+        auto operator!() const noexcept { return m_vendor.empty() || m_class.empty(); } 
+        explicit operator bool() const noexcept { return !!*this; }
+
+        void load(const std::string_view &content);
+
+        std::pair<std::string_view, std::string_view> find_product(uint16_t vid, uint16_t pid) const noexcept;
+
+        std::tuple<std::string_view, std::string_view, std::string_view> 
+                find_class_subclass_proto(uint8_t class_id, uint8_t subclass_id, uint8_t prot_id) const noexcept;
+
+private:
+        using products_t = std::unordered_map<uint16_t, std::string_view>;
+        using vendors_t = std::unordered_map<uint16_t, std::pair<std::string_view, products_t>>;
+        vendors_t m_vendor;
+
+        using proto_t = std::unordered_map<uint8_t, std::string_view>;
+        using subclass_t = std::unordered_map<uint8_t, std::pair<std::string_view, proto_t>>;
+        using class_t = std::unordered_map<uint8_t, std::pair<std::string_view, subclass_t>>;
+        class_t m_class;
+
+        bool parse_vid_pid(uint16_t &vid, uint16_t &pid, std::string_view &line, std::string_view &tail);
+        bool parse_class_sub_proto(uint8_t &cls, uint8_t &subcls, std::string_view &line, std::string_view &tail);
+};
+
+void usbip::UsbIds::Impl::load(const std::string_view &content)
 {
         uint16_t vid{};
         uint16_t pid{};
@@ -84,7 +161,8 @@ void UsbIds::load(const std::string_view &content)
         for_each_line(content, std::move(f));
 }
 
-bool UsbIds::parse_vid_pid(uint16_t &vid, uint16_t &pid, std::string_view &line, std::string_view &tail)
+bool usbip::UsbIds::Impl::parse_vid_pid(
+        uint16_t &vid, uint16_t &pid, std::string_view &line, std::string_view &tail)
 {
         if (line.starts_with("# List of known device classes, subclasses and protocols")) {
                 uint8_t cls{};
@@ -116,7 +194,8 @@ bool UsbIds::parse_vid_pid(uint16_t &vid, uint16_t &pid, std::string_view &line,
         return false;
 }
 
-bool UsbIds::parse_class_sub_proto(uint8_t &cls, uint8_t &subcls, std::string_view &line, std::string_view&)
+bool usbip::UsbIds::Impl::parse_class_sub_proto(
+        uint8_t &cls, uint8_t &subcls, std::string_view &line, std::string_view&)
 {
         if (line.starts_with("# List of Audio Class Terminal Types")) {
                 return true;
@@ -151,7 +230,8 @@ bool UsbIds::parse_class_sub_proto(uint8_t &cls, uint8_t &subcls, std::string_vi
         return false;
 }
 
-std::pair<std::string_view, std::string_view> UsbIds::find_product(uint16_t vid, uint16_t pid) const noexcept
+std::pair<std::string_view, std::string_view> 
+usbip::UsbIds::Impl::find_product(uint16_t vid, uint16_t pid) const noexcept
 {
         std::pair<std::string_view, std::string_view> res;
 
@@ -172,7 +252,8 @@ std::pair<std::string_view, std::string_view> UsbIds::find_product(uint16_t vid,
 }
 
 std::tuple<std::string_view, std::string_view, std::string_view> 
-UsbIds::find_class_subclass_proto(uint8_t class_id, uint8_t subclass_id, uint8_t prot_id) const noexcept
+usbip::UsbIds::Impl::find_class_subclass_proto(
+        uint8_t class_id, uint8_t subclass_id, uint8_t prot_id) const noexcept
 {
         std::tuple<std::string_view, std::string_view, std::string_view>  res;
 
@@ -198,4 +279,35 @@ UsbIds::find_class_subclass_proto(uint8_t class_id, uint8_t subclass_id, uint8_t
         }
 
         return res;
+}
+
+
+usbip::UsbIds::UsbIds(const std::string_view &content) : m_impl(new Impl(content)) {}
+usbip::UsbIds::~UsbIds() { delete m_impl; }
+
+auto usbip::UsbIds::operator =(UsbIds&& obj) -> UsbIds&
+{
+        if (&obj != this) {
+                delete m_impl;
+                m_impl = obj.release();
+        }
+
+        return *this;
+}
+
+usbip::UsbIds::operator bool() const noexcept { return static_cast<bool>(*m_impl); }
+bool usbip::UsbIds::operator !() const noexcept { return !*m_impl; }
+
+void usbip::UsbIds::load(const std::string_view &content) { m_impl->load(content); }
+
+std::pair<std::string_view, std::string_view> 
+usbip::UsbIds::find_product(uint16_t vid, uint16_t pid) const noexcept 
+{ 
+        return m_impl->find_product(vid, pid); 
+}
+
+std::tuple<std::string_view, std::string_view, std::string_view> 
+usbip::UsbIds::find_class_subclass_proto(uint8_t class_id, uint8_t subclass_id, uint8_t prot_id) const noexcept
+{
+        return m_impl->find_class_subclass_proto(class_id, subclass_id, prot_id);
 }

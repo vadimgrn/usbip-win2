@@ -1,44 +1,70 @@
 ﻿/*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 
 #include <windows.h>
+
+namespace win
+{
 
 class Resource
 {
 public:
-	Resource(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type) { load(hModule, name, type); }
+	Resource(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type);
+	~Resource();
 
-	explicit operator bool() const noexcept { return hResInfo && hResData; }
+	Resource(const Resource&) = delete;
+	Resource& operator =(const Resource&) = delete;
+
+	Resource(Resource&& obj) : m_impl(obj.release()) {}
+	Resource& operator =(Resource&& obj);
+
+	explicit operator bool() const noexcept;
 	auto operator!() const noexcept { return !bool(*this); } 
 
 	DWORD load(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type);
 
-	auto data() const noexcept { return LockResource(hResData); }
-	auto size(HMODULE hModule) const noexcept { return SizeofResource(hModule, hResInfo); }
+	void* data() const noexcept;
+	DWORD size(HMODULE hModule) const noexcept;
 
-	auto str() const noexcept { return m_str; }
+	std::string_view str() const noexcept;
 
 private:
-	HRSRC hResInfo{};
-	HGLOBAL hResData{};
-	std::string_view m_str;
+	class Impl;
+	Impl *m_impl{}; // std::unique_ptr is not compatible with __declspec(dllexport) for the class
+
+	Impl *release() {
+		auto p = m_impl;
+		m_impl = nullptr;
+		return p;
+	}
 };
 
+} // namespace win
+
+
+namespace usbip
+{
 
 class UsbIds
 {
 public:
-	UsbIds(const std::string_view &content) { load(content); }
+	UsbIds(const std::string_view &content);
+	~UsbIds();
 
-	auto operator!() const noexcept { return m_vendor.empty() || m_class.empty(); } 
-	explicit operator bool() const noexcept { return !!*this; }
+	UsbIds(const UsbIds&) = delete;
+	UsbIds& operator =(const UsbIds&) = delete;
+
+	UsbIds(UsbIds&& obj) : m_impl(obj.release()) {}
+	UsbIds& operator =(UsbIds&& obj);
+
+	explicit operator bool() const noexcept;
+	bool operator !() const noexcept;
 
 	void load(const std::string_view &content);
 
@@ -46,17 +72,15 @@ public:
 
 	std::tuple<std::string_view, std::string_view, std::string_view> 
 		find_class_subclass_proto(uint8_t class_id, uint8_t subclass_id, uint8_t prot_id) const noexcept;
-
 private:
-	using products_t = std::unordered_map<uint16_t, std::string_view>;
-	using vendors_t = std::unordered_map<uint16_t, std::pair<std::string_view, products_t>>;
-	vendors_t m_vendor;
+	class Impl;
+	Impl *m_impl{}; // std::unique_ptr is not compatible with __declspec(dllexport) for the class
 
-	using proto_t = std::unordered_map<uint8_t, std::string_view>;
-	using subclass_t = std::unordered_map<uint8_t, std::pair<std::string_view, proto_t>>;
-	using class_t = std::unordered_map<uint8_t, std::pair<std::string_view, subclass_t>>;
-	class_t m_class;
-
-	bool parse_vid_pid(uint16_t &vid, uint16_t &pid, std::string_view &line, std::string_view &tail);
-	bool parse_class_sub_proto(uint8_t &cls, uint8_t &subcls, std::string_view &line, std::string_view &tail);
+	Impl *release() {
+		auto p = m_impl;
+		m_impl = nullptr;
+		return p;
+	}
 };
+
+} // namespace usbip
