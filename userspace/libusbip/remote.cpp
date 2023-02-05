@@ -3,7 +3,7 @@
  */
 
 #include "remote.h"
-#include "dbgcode.h"
+#include "errmsg.h"
 #include "strconv.h"
 
 #include <usbip\proto_op.h>

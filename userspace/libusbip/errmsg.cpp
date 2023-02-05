@@ -1,4 +1,4 @@
-#include "dbgcode.h"
+#include "errmsg.h"
 #include <usbip\consts.h>
 
 const char* usbip::op_status_str(int status)

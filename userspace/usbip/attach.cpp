@@ -20,7 +20,7 @@
 #include "usbip.h"
 
 #include <libusbip\vhci.h>
-#include <libusbip\dbgcode.h>
+#include <libusbip\errmsg.h>
 
 #include <spdlog\spdlog.h>
 
