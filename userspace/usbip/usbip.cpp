@@ -9,8 +9,10 @@
 #include <libusbip\file_ver.h>
 #include <libusbip\usb_ids.h>
 #include <libusbip\strconv.h>
+#include <libusbip\module.h>
 
 #include <usbip\vhci.h>
+#include <resources\messages.h>
 
 #include <spdlog\spdlog.h>
 #include <spdlog\sinks\stdout_color_sinks.h>
@@ -117,9 +119,17 @@ int wmain(int argc, wchar_t *argv[])
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
 
+	auto &filename = L"resources";
+	HModule rsrc(LoadLibraryEx(filename, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR));
+	if (!rsrc) {
+		auto err = GetLastError();
+		spdlog::critical(L"can't load '{}.dll', error {:#x} {}", filename, err, wformat_message(err));
+		return EXIT_FAILURE;
+	}
+
 	InitWinSock2 ws2;
 	if (!ws2) {
-		spdlog::critical("cannot initialize winsock2");
+		spdlog::critical("can't initialize Windows Sockets 2");
 		return EXIT_FAILURE;
 	}
 

@@ -4,32 +4,50 @@
 
 #pragma once
 
+#include <windows.h>
+
 #include <string>
 #include <cwctype>
 
 namespace usbip
 {
 
-std::wstring utf8_to_wchar(std::string_view s);
-std::string wchar_to_utf8(std::wstring_view ws);
+std::wstring utf8_to_wchar(_In_ std::string_view s);
+std::string wchar_to_utf8(_In_ std::wstring_view ws);
+
+std::wstring wformat_message(_In_ DWORD flags, _In_opt_ HMODULE module, _In_ DWORD msg_id);
 
 /*
  * Use for error codes returned by GetLastError, WSAGetLastError, etc.
  */
-std::wstring wformat_message(unsigned long msg_id);
+inline auto wformat_message(_In_ DWORD msg_id)
+{
+        return wformat_message(FORMAT_MESSAGE_FROM_SYSTEM, nullptr, msg_id);
+}
 
 /*
  * #include <system_error>
  * std::system_category().message(ERROR_INVALID_PARAMETER); // encoding is CP_ACP
  * For POSIX errno codes: std::generic_category().message(errno()).
  */
-inline auto format_message(unsigned long msg_id)
-{
+inline auto format_message(_In_ DWORD msg_id) 
+{ 
         auto ws = wformat_message(msg_id);
         return wchar_to_utf8(ws);
 }
 
-inline auto& rtrim(std::wstring &s)
+inline auto wformat_message(_In_ HMODULE module, _In_ DWORD msg_id)
+{
+        return wformat_message(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_FROM_HMODULE, module, msg_id);
+}
+
+inline auto format_message(_In_ HMODULE module, _In_ DWORD msg_id)
+{
+        auto ws = wformat_message(module, msg_id);
+        return wchar_to_utf8(ws);
+}
+
+inline auto& rtrim(_Inout_ std::wstring &s)
 {
         while (!s.empty() && std::iswspace(s.back())) {
                 s.pop_back();

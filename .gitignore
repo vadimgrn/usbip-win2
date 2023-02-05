@@ -5,3 +5,6 @@
 x64
 /packages
 /bin/usbip2-*.*
+/userspace/resources/messages.h
+/userspace/resources/messages.rc
+/userspace/resources/MSG*.bin

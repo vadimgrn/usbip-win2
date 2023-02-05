@@ -32,6 +32,7 @@
     <ClInclude Include="hkey.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="remote.h" />
+    <ClInclude Include="module.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

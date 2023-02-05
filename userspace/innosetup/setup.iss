@@ -74,6 +74,7 @@ Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy
 Source: {#SolutionDir + "drivers\"}{#CertFile}; DestDir: "{tmp}"
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
+Source: {#BuildDir + "resources.dll"}; DestDir: "{app}"
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"
