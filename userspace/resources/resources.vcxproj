@@ -19,11 +19,11 @@
   <ItemGroup>
     <CustomBuild Include="messages.mc">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">mc.exe -c messages.mc</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">mc.exe -c -n messages.mc</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">messages.h;messages.rc;MSG00409.bin;%(Outputs)</Outputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">mc.exe -c messages.mc</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">mc.exe -c -n messages.mc</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">messages.h;messages.rc;MSG00409.bin;%(Outputs)</Outputs>
