@@ -47,13 +47,4 @@ inline auto format_message(_In_ HMODULE module, _In_ DWORD msg_id)
         return wchar_to_utf8(ws);
 }
 
-inline auto& rtrim(_Inout_ std::wstring &s)
-{
-        while (!s.empty() && std::iswspace(s.back())) {
-                s.pop_back();
-        }
-
-        return s;
-}
-
 } // namespace usbip

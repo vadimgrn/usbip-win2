@@ -17,12 +17,6 @@
     <ResourceCompile Include="resources.rc" />
   </ItemGroup>
   <ItemGroup>
-    <MessageCompile Include="messages.mc">
-      <GenerateBaselineResource>true</GenerateBaselineResource>
-      <BaselineResourcePath>.</BaselineResourcePath>
-    </MessageCompile>
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="messages.mc">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">mc.exe -c messages.mc</Command>
