@@ -54,7 +54,7 @@ namespace usbip
 class UsbIds
 {
 public:
-	UsbIds(const std::string_view &content);
+	UsbIds(std::string_view content);
 	~UsbIds();
 
 	UsbIds(const UsbIds&) = delete;
@@ -66,7 +66,7 @@ public:
 	explicit operator bool() const noexcept;
 	bool operator !() const noexcept;
 
-	void load(const std::string_view &content);
+	void load(std::string_view content);
 
 	std::pair<std::string_view, std::string_view> find_product(uint16_t vid, uint16_t pid) const noexcept;
 

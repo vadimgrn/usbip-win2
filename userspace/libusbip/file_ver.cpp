@@ -14,12 +14,12 @@
 class win::FileVersion::Impl
 {
 public:
-        Impl(const std::wstring_view &path) { SetFile(path); }
+        Impl(std::wstring_view path) { SetFile(path); }
 
         explicit operator bool () const { return !m_info.empty(); }
         auto operator !() const { return m_info.empty(); }
 
-        DWORD SetFile(const std::wstring_view &path);
+        DWORD SetFile(std::wstring_view path);
         std::wstring VerLanguageName() const;
 
         void SetDefTranslation() { m_def_transl = GetTranslation(true); }
@@ -54,7 +54,7 @@ private:
 };
 
 
-DWORD win::FileVersion::Impl::SetFile(const std::wstring_view &path)
+DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
 {
         auto sz = GetFileVersionInfoSize(path.data(), nullptr);
         if (!sz) {
@@ -197,7 +197,7 @@ void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) cons
         code_page = LOWORD(dw);
 }
 
-win::FileVersion::FileVersion(const std::wstring_view &path) : m_impl(new Impl(path)) {}
+win::FileVersion::FileVersion(std::wstring_view path) : m_impl(new Impl(path)) {}
 win::FileVersion::~FileVersion() { delete m_impl; }
 
 auto win::FileVersion::operator =(FileVersion&& obj) -> FileVersion&
@@ -213,7 +213,7 @@ auto win::FileVersion::operator =(FileVersion&& obj) -> FileVersion&
 win::FileVersion::operator bool () const { return static_cast<bool>(*m_impl); }
 bool win::FileVersion::operator !() const { return !*m_impl; }
 
-DWORD win::FileVersion::SetFile(const std::wstring_view &path) { return m_impl->SetFile(path); }
+DWORD win::FileVersion::SetFile(std::wstring_view path) { return m_impl->SetFile(path); }
 std::wstring win::FileVersion::VerLanguageName() const { return m_impl->VerLanguageName(); }
 
 void win::FileVersion::SetDefTranslation() { m_impl->SetDefTranslation(); }

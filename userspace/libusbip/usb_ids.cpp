@@ -122,12 +122,12 @@ std::string_view win::Resource::str() const noexcept { return m_impl->str(); }
 class usbip::UsbIds::Impl
 {
 public:
-        Impl(const std::string_view &content) { load(content); }
+        Impl(std::string_view content) { load(content); }
 
         auto operator!() const noexcept { return m_vendor.empty() || m_class.empty(); } 
         explicit operator bool() const noexcept { return !!*this; }
 
-        void load(const std::string_view &content);
+        void load(std::string_view content);
 
         std::pair<std::string_view, std::string_view> find_product(uint16_t vid, uint16_t pid) const noexcept;
 
@@ -148,7 +148,7 @@ private:
         bool parse_class_sub_proto(uint8_t &cls, uint8_t &subcls, std::string_view &line, std::string_view &tail);
 };
 
-void usbip::UsbIds::Impl::load(const std::string_view &content)
+void usbip::UsbIds::Impl::load(std::string_view content)
 {
         uint16_t vid{};
         uint16_t pid{};
@@ -282,7 +282,7 @@ usbip::UsbIds::Impl::find_class_subclass_proto(
 }
 
 
-usbip::UsbIds::UsbIds(const std::string_view &content) : m_impl(new Impl(content)) {}
+usbip::UsbIds::UsbIds(std::string_view content) : m_impl(new Impl(content)) {}
 usbip::UsbIds::~UsbIds() { delete m_impl; }
 
 auto usbip::UsbIds::operator =(UsbIds&& obj) -> UsbIds&
@@ -298,7 +298,7 @@ auto usbip::UsbIds::operator =(UsbIds&& obj) -> UsbIds&
 usbip::UsbIds::operator bool() const noexcept { return static_cast<bool>(*m_impl); }
 bool usbip::UsbIds::operator !() const noexcept { return !*m_impl; }
 
-void usbip::UsbIds::load(const std::string_view &content) { m_impl->load(content); }
+void usbip::UsbIds::load(std::string_view content) { m_impl->load(content); }
 
 std::pair<std::string_view, std::string_view> 
 usbip::UsbIds::find_product(uint16_t vid, uint16_t pid) const noexcept 

@@ -13,7 +13,7 @@ namespace win
 class FileVersion 
 {
 public:
-        FileVersion(const std::wstring_view &path);
+        FileVersion(std::wstring_view path);
         ~FileVersion();
 
         FileVersion(const FileVersion&) = delete;
@@ -25,7 +25,7 @@ public:
         explicit operator bool () const;
         bool operator !() const;
 
-        DWORD SetFile(const std::wstring_view &path);
+        DWORD SetFile(std::wstring_view path);
         std::wstring VerLanguageName() const;
 
         void SetDefTranslation();

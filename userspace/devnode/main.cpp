@@ -65,7 +65,7 @@ auto get_version(_In_ const wchar_t *program)
         return wchar_to_utf8(ver); // CLI::narrow
 }
 
-auto split_multi_sz(_In_ PCWSTR str, _In_ const std::wstring_view &exclude, _Inout_ bool &excluded)
+auto split_multi_sz(_In_ PCWSTR str, _In_ std::wstring_view exclude, _Inout_ bool &excluded)
 {
         std::vector<std::wstring> v;
 

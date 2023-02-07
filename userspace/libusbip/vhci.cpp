@@ -92,9 +92,9 @@ auto usbip::vhci::get_imported_devices(HANDLE dev, bool &result) -> std::vector<
 
 bool usbip::vhci::fill(
         _Inout_ ioctl_plugin_hardware &r, 
-        _In_ const std::string_view &host, 
-        _In_ const std::string_view &service,
-        _In_ const std::string_view &busid)
+        _In_ std::string_view host, 
+        _In_ std::string_view service,
+        _In_ std::string_view busid)
 {
         struct {
                 char *dst;

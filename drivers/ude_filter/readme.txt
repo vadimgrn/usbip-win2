@@ -1,4 +1,4 @@
-This is an upper filter driver which is required for emulated HCI (VHCI) driver usbip2_vhci.
+This is an upper class filter driver which is required for emulated HCI (VHCI) driver usbip2_vhci.
 UDE doesn't propagate SELECT_CONFIGURATION/SELECT_INTERFACE and this is a major issue for VHCI.
 This driver fixes that. 
 
