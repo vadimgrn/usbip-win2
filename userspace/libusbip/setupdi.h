@@ -5,7 +5,6 @@
 
 #include <cassert>
 #include <memory>
-#include <functional>
 
 #include "generic_handle.h"
 

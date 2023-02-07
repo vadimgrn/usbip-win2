@@ -7,8 +7,6 @@
 #include "generic_handle.h"
 
 #include <cassert>
-#include <functional>
-
 #include <windows.h>
 
 namespace usbip
@@ -25,26 +23,3 @@ inline void close_handle(Handle::type h, Handle::tag_type) noexcept
 }
 
 } // namespace usbip
-
-
-namespace std
-{
-
-using usbip::Handle;
-
-template<>
-struct std::hash<Handle>
-{
-        auto operator() (const Handle &h) const noexcept
-        {
-                std::hash<Handle::type> f;
-                return f(h.get());
-        }
-};
-
-inline void swap(Handle &a, Handle &b) noexcept
-{
-        a.swap(b);
-}
-
-} // namespace std

@@ -7,8 +7,6 @@
 #include "generic_handle.h"
 
 #include <cassert>
-#include <functional>
-
 #include <WinSock2.h>
 
 namespace usbip
@@ -41,26 +39,3 @@ private:
 };
 
 } // namespace usbip
-
-
-namespace std
-{
-
-using usbip::Socket;
-
-template<>
-struct std::hash<Socket>
-{
-        auto operator() (const Socket &s) const noexcept
-        {
-                std::hash<Socket::type> f;
-                return f(s.get());
-        }
-};
-
-inline void swap(Socket &a, Socket &b) noexcept
-{
-        a.swap(b);
-}
-
-} // namespace std

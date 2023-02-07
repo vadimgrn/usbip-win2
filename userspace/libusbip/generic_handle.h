@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <functional>
+
 namespace usbip
 {
 
@@ -12,7 +14,6 @@ namespace usbip
  */
 template<typename Handle, typename Tag>
 void close_handle(Handle, Tag) noexcept;
-
 
 template<typename Handle, typename Tag, auto NoneValue>
 class generic_handle
@@ -81,3 +82,28 @@ private:
 };
 
 } // namespace usbip
+
+
+namespace std
+{
+
+using usbip::generic_handle;
+
+template<typename Handle, typename Tag, auto NoneValue>
+struct std::hash<generic_handle<Handle, Tag, NoneValue>>
+{
+        auto operator() (const generic_handle<Handle, Tag, NoneValue> &h) const noexcept
+        {
+                std::hash<h.type> f;
+                return f(h.get());
+        }
+};
+
+template<typename Handle, typename Tag, auto NoneValue>
+inline void swap(generic_handle<Handle, Tag, NoneValue> &a, 
+                 generic_handle<Handle, Tag, NoneValue> &b) noexcept
+{
+        a.swap(b);
+}
+
+} // namespace std
