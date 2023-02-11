@@ -542,7 +542,7 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request)
+NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_opt_ WDFREQUEST request)
 {
         auto &endp = *get_endpoint_ctx(endpoint);
         auto addr = endp.descriptor.bEndpointAddress;
@@ -559,7 +559,7 @@ NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
+NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request)
 {
         auto &dev = *get_device_ctx(device);
 

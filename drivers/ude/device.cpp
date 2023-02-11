@@ -309,7 +309,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPOINT_INIT *init)
 {
         PAGED_CODE();
-        UDECX_USB_ENDPOINT_INIT_AND_METADATA data{ init };
+        UDECX_USB_ENDPOINT_INIT_AND_METADATA data{ .UdecxUsbEndpointInit = init };
         return endpoint_add(dev, &data);
 }
 

@@ -251,7 +251,7 @@ PAGED auto connect(_Inout_ device_ctx_ext &ext)
         ADDRINFOEXW *ai{};
         if (auto err = getaddrinfo(ai, ext)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                return ERR_CONNECT;
+                return ERR_ADDRINFO;
         }
 
         NT_ASSERT(!ext.sock);

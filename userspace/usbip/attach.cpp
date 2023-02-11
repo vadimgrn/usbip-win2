@@ -49,6 +49,9 @@ bool usbip::cmd_attach(void *p)
 
         if (auto err = r.get_err()) {
                 switch (err) {
+                case ERR_ADDRINFO:
+                        spdlog::error("can't get address info for {}:{}", args.remote, global_args.tcp_port);
+                        break;
                 case ERR_CONNECT:
                         spdlog::error("can't connect to {}:{}", args.remote, global_args.tcp_port);
                         break;

@@ -30,11 +30,11 @@ NTSTATUS set_interface(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_ WDFREQUEST request);
+NTSTATUS clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_opt_ WDFREQUEST request);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS reset_port(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request);
+NTSTATUS reset_port(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request);
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_INTERNAL_DEVICE_CONTROL)
 _IRQL_requires_same_
