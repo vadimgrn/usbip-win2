@@ -104,8 +104,29 @@ void init(CLI::App &app, const wchar_t *program)
 		->capture_default_str();
 }
 
+auto &msgtable_dll = L"resources"; // resource-only DLL that contains RT_MESSAGETABLE
+
+auto get_resource_module()
+{
+	static HModule mod(LoadLibraryEx(msgtable_dll, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR));
+	return mod.get();
+}
+
 } // namespace
 
+
+std::string usbip::GetLastErrorMsg(unsigned long msg_id)
+{
+	static_assert(sizeof(msg_id) == sizeof(UINT32));
+	static_assert(std::is_same_v<decltype(msg_id), DWORD>);
+
+	if (msg_id == ~0UL) {
+		msg_id = GetLastError();
+	}
+
+	auto hmod = get_resource_module();
+	return format_message(hmod, msg_id);
+}
 
 const UsbIds& usbip::get_ids()
 {
@@ -119,17 +140,16 @@ int wmain(int argc, wchar_t *argv[])
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
 
-	auto &filename = L"resources";
-	HModule rsrc(LoadLibraryEx(filename, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR));
-	if (!rsrc) {
+	if (get_resource_module() == HModule::None) {
 		auto err = GetLastError();
-		spdlog::critical(L"can't load '{}.dll', error {:#x} {}", filename, err, wformat_message(err));
+		auto fname = wchar_to_utf8(msgtable_dll);
+		spdlog::critical("can't load '{}.dll', error {:#x} {}", fname, err, format_message(err));
 		return EXIT_FAILURE;
 	}
 
 	InitWinSock2 ws2;
 	if (!ws2) {
-		spdlog::critical("can't initialize Windows Sockets 2");
+		spdlog::critical("can't initialize Windows Sockets 2, {}", GetLastErrorMsg());
 		return EXIT_FAILURE;
 	}
 

@@ -1,12 +1,6 @@
-#include "errmsg.h"
 #include "setupdi.h"
-#include "strconv.h"
 
-#include <cassert>
-#include <string>
-#include <system_error>
-
-#include <spdlog\spdlog.h>
+#include <resources\messages.h>
 
 #include <initguid.h>
 #include "vhci.h"
@@ -14,11 +8,9 @@
 namespace
 {
 
-using namespace usbip;
-
 bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = get_intf_detail(dev_info, data, guid)) {
+        if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
@@ -47,27 +39,27 @@ std::wstring usbip::vhci::get_path()
         return path;
 }
 
+/*
+ * Call GetLastError if returned handle is invalid.
+ */
 auto usbip::vhci::open(const std::wstring &path) -> Handle
 {
         Handle h;
 
-        if (path.empty()) { // get_path() failed
-                spdlog::error("{}: vhci device not found, the driver is not loaded?", __func__);
-                return h;
-        }
-
-        h.reset(CreateFile(path.c_str(), 
-                GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
-                nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-
-        if (!h) {
-                auto err = GetLastError();
-                spdlog::error("CreateFile error {:#x} {}", err, format_message(err));
+        if (!path.empty()) {
+                h.reset(CreateFile(path.c_str(), 
+                        GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        } else { // get_path() failed
+                SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
         }
 
         return h;
 }
 
+/*
+ * Call GetLastError if result is false.
+ */
 auto usbip::vhci::get_imported_devices(HANDLE dev, bool &result) -> std::vector<imported_device>
 {
         std::vector<imported_device> v(TOTAL_PORTS);
@@ -81,16 +73,17 @@ auto usbip::vhci::get_imported_devices(HANDLE dev, bool &result) -> std::vector<
                 v.resize(BytesReturned / sizeof(v[0]));
                 result = true;
         } else {
-                auto err = GetLastError();
-                spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
-                v.clear();
                 result = false;
+                v.clear();
         }
 
         return v;
 }
 
-bool usbip::vhci::fill(
+/*
+ * Call std::generic_category().message() if return != 0.
+ */
+errno_t usbip::vhci::fill(
         _Inout_ ioctl_plugin_hardware &r, 
         _In_ std::string_view host, 
         _In_ std::string_view service,
@@ -108,45 +101,38 @@ bool usbip::vhci::fill(
 
         for (auto &i: v) {
                 if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
-                        auto msg = std::generic_category().message(err);
-                        spdlog::error("strncpy_s('{}') error #{} {}", i.src, err, msg);
-                        return false;
+                        return err;
                 }
         }
 
-        return true;
+        return 0;
 }
 
 /*
- * @return hub port number, [1..TOTAL_PORTS]. If zero is returned, call r.get_err() or r.get_status(). 
+ * @return hub port number, [1..TOTAL_PORTS]. Call GetLastError() if zero is returned. 
  */
 int usbip::vhci::attach(_In_ HANDLE dev, _Inout_ ioctl_plugin_hardware &r)
 {
         if (DWORD BytesReturned; // must be set if the last arg is NULL
             DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r.out, sizeof(r.out), &BytesReturned, nullptr)) {
                 assert(BytesReturned == sizeof(r.out));
+                SetLastError(r.out.error);
                 return r.out.port;
         }
 
-        auto err = GetLastError();
-        spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
-
-        r.out.error = ERR_GENERAL;
         return 0;
 }
 
+/*
+* @return call GetLastError() if false is returned
+*/
 bool usbip::vhci::detach(HANDLE dev, int port)
 {
         ioctl_plugout_hardware r { .port = port };
 
-        if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr)) {
-                assert(!BytesReturned);
-                return true;
-        }
+        DWORD BytesReturned; // must be set if the last arg is NULL
+        auto ok = DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
+        assert(!BytesReturned);
 
-        auto err = GetLastError();
-        spdlog::error("DeviceIoControl error {:#x} {}", err, format_message(err));
-
-        return false;
+        return ok;
 }

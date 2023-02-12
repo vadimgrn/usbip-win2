@@ -12,21 +12,6 @@ enum op_status_t // op_common.status
         ST_ERROR // ST_DEV_ERR?
 };
 
-/* error codes for the driver ioctls */
-enum err_t
-{
-        ERR_PORTFULL = -7,
-        ERR_PROTOCOL,
-        ERR_VERSION,
-        ERR_NETWORK,
-        ERR_CONNECT,
-        ERR_ADDRINFO,
-        ERR_GENERAL,
-        ERR_NONE
-};
-
-static_assert(!ERR_NONE);
-
 enum 
 { 
         USBIP_VERSION = 0x111, 

@@ -18,8 +18,8 @@ using Socket = generic_handle<SOCKET, SocketTag, INVALID_SOCKET>;
 template<>
 inline void close_handle(Socket::type s, Socket::tag_type) noexcept
 {
-        [[maybe_unused]] auto ok = !closesocket(s);
-        assert(ok);
+        [[maybe_unused]] auto err = closesocket(s);
+        assert(!err);
 }
 
 class InitWinSock2

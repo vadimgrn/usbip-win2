@@ -20,21 +20,24 @@
 #include "usbip.h"
 
 #include <libusbip\vhci.h>
-#include <libusbip\errmsg.h>
-
 #include <spdlog\spdlog.h>
+
+#include <system_error>
 
 bool usbip::cmd_attach(void *p)
 {
         auto dev = vhci::open();
         if (!dev) {
+                spdlog::error(GetLastErrorMsg());
                 return false;
         }
 
         auto &args = *reinterpret_cast<attach_args*>(p);
-
         vhci::ioctl_plugin_hardware r{};
-        if (!fill(r, args.remote, global_args.tcp_port, args.busid)) {
+
+        if (auto err = fill(r, args.remote, global_args.tcp_port, args.busid)) {
+                auto msg = std::generic_category().message(err);
+                spdlog::error("#{} {}", err, msg);
                 return false;
         }
 
@@ -47,49 +50,6 @@ bool usbip::cmd_attach(void *p)
                 return true;
         }
 
-        if (auto err = r.get_err()) {
-                switch (err) {
-                case ERR_ADDRINFO:
-                        spdlog::error("can't get address info for {}:{}", args.remote, global_args.tcp_port);
-                        break;
-                case ERR_CONNECT:
-                        spdlog::error("can't connect to {}:{}", args.remote, global_args.tcp_port);
-                        break;
-                case ERR_NETWORK:
-                        spdlog::error("network error");
-                        break;
-                case ERR_PROTOCOL:
-                        spdlog::error("protocol error");
-                        break;
-                case ERR_VERSION:
-                        spdlog::error("incompatible protocol version");
-                        break;
-                case ERR_PORTFULL:
-                        spdlog::error("no available port");
-                        break;
-                default:
-                        spdlog::error("attach error #{} {}", err, errt_str(err));
-                }
-        } else switch (auto st = r.get_status()) { // <linux>/tools/usb/usbip/libsrc/usbip_common.c, op_common_status_strings
-                case ST_NA:
-                        spdlog::error("device not available");
-                        break;
-                case ST_DEV_BUSY:
-                        spdlog::error("device busy (already exported)");
-                        break;
-                case ST_DEV_ERR:
-                        spdlog::error("device in error state");
-                        break;
-                case ST_NODEV:
-                        spdlog::error("device not found by bus-id '{}'", r.busid);
-                        break;
-                case ST_ERROR:
-                        spdlog::error("unexpected response");
-                        break;
-                default:
-                        assert(st != ST_OK);
-                        spdlog::error("attach status #{} {}", st, op_status_str(st));
-        }
-
+        spdlog::error(GetLastErrorMsg());
         return false;
 }

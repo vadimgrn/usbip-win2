@@ -13,13 +13,14 @@ bool usbip::cmd_detach(void *p)
 
 	auto dev = vhci::open();
 	if (!dev) {
+		spdlog::error(GetLastErrorMsg());
 		return false;
 	}
 
 	auto ok = vhci::detach(dev.get(), r.port);
 
 	if (!ok) {
-		spdlog::error("can't detach port {}", r.port);
+		spdlog::error(GetLastErrorMsg());		
 	} else if (r.port <= 0) {
 		printf("all ports are detached\n");
 	} else {

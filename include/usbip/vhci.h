@@ -72,11 +72,9 @@ struct ioctl_plugin_hardware // IN/OUT
 {
         struct {
                 int port; // [1..TOTAL_PORTS] or zero if an error
-                int error;
+                UINT32 error;
+                static_assert(sizeof(error) == sizeof(unsigned long));
         } out; // must be the first member
-
-        auto get_err() const { return out.error < 0 ? static_cast<err_t>(out.error) : ERR_NONE; }
-        auto get_status() const { return out.error > 0 ? static_cast<op_status_t>(out.error) : ST_OK; }
 
         char busid[USBIP_BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV

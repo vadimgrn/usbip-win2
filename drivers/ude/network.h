@@ -29,7 +29,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code);
+PAGED UINT32 recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code);
 
 enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 

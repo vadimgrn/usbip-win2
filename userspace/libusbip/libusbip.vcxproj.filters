@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="errmsg.cpp" />
     <ClCompile Include="file_ver.cpp" />
     <ClCompile Include="proto_op.cpp" />
     <ClCompile Include="setupdi.cpp" />
@@ -21,7 +20,6 @@
     <ClInclude Include="..\..\include\usbip\proto_op.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="errmsg.h" />
     <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />
     <ClInclude Include="setupdi.h" />
@@ -33,13 +31,11 @@
     <ClInclude Include="vhci.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="module.h" />
+    <ClInclude Include="op_common.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
       <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
 </Project>

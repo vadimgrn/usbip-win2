@@ -15,6 +15,8 @@ namespace usbip
 class UsbIds;
 const UsbIds& get_ids();
 
+std::string GetLastErrorMsg(unsigned long msg_id = ~0UL);
+
 struct global_args
 {
         std::string tcp_port = usbip_port;

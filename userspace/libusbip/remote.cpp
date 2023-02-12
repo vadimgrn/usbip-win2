@@ -3,31 +3,24 @@
  */
 
 #include "remote.h"
-#include "errmsg.h"
 #include "strconv.h"
 
 #include <usbip\proto_op.h>
+#include <libusbip\op_common.h>
 
 #include <ws2tcpip.h>
 #include <mstcpip.h>
 
-#include <spdlog\spdlog.h>
+#include <memory>
 
 namespace
 {
 
 using namespace usbip;
 
-auto do_setsockopt(SOCKET s, int level, int optname, int optval)
+inline auto do_setsockopt(SOCKET s, int level, int optname, int optval)
 {
-	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
-	if (err) {
-		auto ec = WSAGetLastError();
-		spdlog::error("setsockopt(level={}, optname={}, optval={}) error {:#x} {}", 
-			level, optname, optval, ec, format_message(ec));
-	}
-
-	return !err;
+	return !setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
 }
 
 inline auto set_nodelay(SOCKET s)
@@ -45,13 +38,13 @@ auto get_keepalive_timeout()
 	auto &name = "KEEPALIVE_TIMEOUT";
 	unsigned int value{};
 
-	char buf[32];
+	char buf[128];
 	size_t required;
 
 	if (auto err = getenv_s(&required, buf, sizeof(buf), name); !err) {
 		sscanf_s(buf, "%u", &value);
 	} else if (required) {
-		spdlog::error("{} required buffer size is {}, error {:#x}", name, required, err);
+//		spdlog::error("{} required buffer size is {}, error {:#x}", name, required, err);
 	}
 
 	return value;
@@ -71,14 +64,7 @@ auto set_keepalive_env(SOCKET s)
 	};
 
 	DWORD outlen;
-
-	auto err = WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
-	if (err) {
-		auto ec = WSAGetLastError();
-		spdlog::error("WSAIoctl(SIO_KEEPALIVE_VALS) error {:#x} {}", ec, format_message(ec));
-	}
-
-	return !err;
+	return !WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
 }
 
 auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
@@ -87,16 +73,11 @@ auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
 
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
 	case SOCKET_ERROR:
-		if (auto err = WSAGetLastError()) {
-			spdlog::error("recv error {:#x} {}", err, format_message(err));
-		}
+		SetLastError(WSAGetLastError());
 		return false;
 	case 0: // connection has been gracefully closed
-		if (len) {
-			spdlog::debug("recv: EOF");
-			if (eof) {
-				*eof = true;
-			}
+		if (len && eof) {
+			*eof = true;
 		}
 		[[fallthrough]];
 	default:
@@ -113,8 +94,7 @@ auto send(SOCKET s, const void *buf, size_t len)
 		auto ret = ::send(s, addr, static_cast<int>(len), 0);
 
 		if (ret == SOCKET_ERROR) {
-			auto err = WSAGetLastError();
-			spdlog::error("send error {:#x} {}", err, format_message(err));
+			SetLastError(WSAGetLastError());
 			return false;
 		}
 
@@ -139,11 +119,7 @@ auto send_op_common(SOCKET s, uint16_t code)
 	return send(s, &r, sizeof(r));
 }
 
-/*
-* @return err_t or op_status_t 
-* @see drivers/ude/network.cpp, recv_op_common.
-*/
-int recv_op_common(SOCKET s, uint16_t expected_code)
+auto recv_op_common(SOCKET s, uint16_t expected_code)
 {
 	assert(s != INVALID_SOCKET);
 
@@ -151,24 +127,20 @@ int recv_op_common(SOCKET s, uint16_t expected_code)
 	if (recv(s, &r, sizeof(r))) {
 		PACK_OP_COMMON(false, &r);
 	} else {
-		return ERR_NETWORK;
+		UINT32 err = GetLastError();
+		return err;
 	}
 
 	if (r.version != USBIP_VERSION) {
-		spdlog::error("op_common.version {} != {}", r.version, USBIP_VERSION);
-		return ERR_VERSION;
+		return ERROR_USBIP_VERSION;
 	}
 
 	if (r.code != expected_code) {
-		spdlog::error("op_common.code {} != {}", r.code, expected_code);
-		return ERR_PROTOCOL;
+		return ERROR_USBIP_PROTOCOL;
 	}
 
 	auto st = static_cast<op_status_t>(r.status);
-	if (st) {
-		spdlog::error("op_common.status #{} {}", st, op_status_str(st));
-	}
-	return st;
+	return op_status_error(st);
 }
 
 } // namespace
@@ -181,9 +153,8 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 	addrinfo hints{ .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM };
 	std::unique_ptr<addrinfo, decltype(freeaddrinfo)&> info(nullptr, freeaddrinfo);
 
-	if (addrinfo *result; auto err = getaddrinfo(hostname, service, &hints, &result)) {
-		auto msg = gai_strerror(err);
-		spdlog::error("getaddrinfo {}:{} error {:#x} {}", hostname, service, err, wchar_to_utf8(msg));
+	if (addrinfo *result; getaddrinfo(hostname, service, &hints, &result)) {
+		SetLastError(WSAGetLastError()); // see gai_strerror()
 		return sock;
 	} else {
 		info.reset(result);
@@ -193,18 +164,21 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 
 		sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
 		if (!sock) {
+			SetLastError(WSAGetLastError());
 			continue;
 		}
 
 		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive_env(h))) {
+			auto saved = WSAGetLastError();
 			sock.close();
+			SetLastError(saved);
 			break;
 		}
 
 		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
-			auto err = WSAGetLastError();
-			spdlog::error("connect {}:{} error {:#x} {}", hostname, service, err, format_message(err));
+			auto saved = WSAGetLastError();
 			sock.close();
+			SetLastError(saved);
 		} else {
 			break;
 		}
@@ -213,6 +187,9 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 	return sock;
 }
 
+/*
+ * @return call GetLastError() if false is returned
+ */
 bool usbip::enum_exportable_devices(
 	SOCKET s, 
 	const usbip_usb_device_f &on_dev, 
@@ -222,12 +199,11 @@ bool usbip::enum_exportable_devices(
 	assert(s != INVALID_SOCKET);
 	
 	if (!send_op_common(s, OP_REQ_DEVLIST)) {
-		spdlog::error("send_op_common");
 		return false;
 	}
 
 	if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
-		spdlog::error("recv_op_common -> {}", err); // err_t or op_status_t
+		SetLastError(err);
 		return false;
 	}
 
@@ -236,11 +212,9 @@ bool usbip::enum_exportable_devices(
 	if (recv(s, &reply, sizeof(reply))) {
 		PACK_OP_DEVLIST_REPLY(false, &reply);
 	} else {
-		spdlog::error("recv op_devlist_reply");
 		return false;
 	}
 
-	spdlog::debug("{} exportable device(s)", reply.ndev);
 	assert(reply.ndev <= INT_MAX);
 
 	if (on_dev_cnt) {
@@ -255,7 +229,6 @@ bool usbip::enum_exportable_devices(
 			usbip_net_pack_usb_device(false, &dev);
 			on_dev(i, dev);
 		} else {
-			spdlog::error("recv usbip_usb_device[{}]", i);
 			return false;
 		}
 
@@ -267,7 +240,6 @@ bool usbip::enum_exportable_devices(
 				usbip_net_pack_usb_interface(false, &intf);
 				on_intf(i, dev, j, intf);
 			} else {
-				spdlog::error("recv usbip_usb_intf[{}]", j);
 				return false;
 			}
 		}

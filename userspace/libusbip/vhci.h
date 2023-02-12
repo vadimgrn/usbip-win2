@@ -19,7 +19,7 @@ Handle open(const std::wstring &path = get_path());
 
 std::vector<imported_device> get_imported_devices(HANDLE dev, bool &result);
 
-bool fill(_Inout_ ioctl_plugin_hardware &r, 
+errno_t fill(_Inout_ ioctl_plugin_hardware &r, 
         _In_ std::string_view host, 
         _In_ std::string_view service,
         _In_ std::string_view busid);

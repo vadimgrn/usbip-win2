@@ -14,6 +14,8 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
 
+#include <libusbip/op_common.h>
+
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
@@ -42,37 +44,34 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
         return receive(sock, &buf);
 }
 
-/*
- * @return err_t or op_status_t 
- * @see userspace/libusbip/remote.cpp, recv_op_common.
- */
+_IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
+PAGED UINT32 usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
 {
         PAGED_CODE();
 
         op_common r;
         if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
-                return ERR_NETWORK;
+                return ERROR_USBIP_NETWORK;
         }
 	PACK_OP_COMMON(false, &r);
 
 	if (r.version != USBIP_VERSION) {
 		Trace(TRACE_LEVEL_ERROR, "version(%#x) != expected(%#x)", r.version, USBIP_VERSION);
-		return ERR_VERSION;
+		return ERROR_USBIP_VERSION;
 	}
 
         if (r.code != expected_code) {
                 Trace(TRACE_LEVEL_ERROR, "code(%#x) != expected(%#x)", r.code, expected_code);
-                return ERR_PROTOCOL;
+                return ERROR_USBIP_PROTOCOL;
         }
 
         auto st = static_cast<op_status_t>(r.status);
         if (st) {
                 Trace(TRACE_LEVEL_ERROR, "code %#x, %!op_status_t!", r.code, st);
         }
-        return st;
+        return op_status_error(st);
 }
 
 /*

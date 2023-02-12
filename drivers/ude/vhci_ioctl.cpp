@@ -13,6 +13,8 @@
 #include "ioctl.h"
 
 #include <usbip\proto_op.h>
+#include <resources\messages.h>
+
 #include <libdrv\dbgcommon.h>
 #include <libdrv\strutil.h>
 
@@ -93,18 +95,15 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
 
         strcpy_s(req.body.busid, sizeof(req.body.busid), ext.busid);
 
-        PACK_OP_COMMON(0, &req.hdr);
-        PACK_OP_IMPORT_REQUEST(0, &req.body);
+        PACK_OP_COMMON(false, &req.hdr);
+        PACK_OP_IMPORT_REQUEST(false, &req.body);
 
         return send(ext.sock, memory::stack, &req, sizeof(req));
 }
 
-/*
- * @return err_t or op_status_t 
- */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
+PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
 {
         PAGED_CODE();
 
@@ -114,30 +113,27 @@ PAGED int recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_i
 
         if (auto err = recv(ext.sock, pool, &reply, sizeof(reply))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
-                return ERR_NETWORK;
+                return ERROR_USBIP_NETWORK;
         }
         PACK_OP_IMPORT_REPLY(false, &reply);
 
         if (strncmp(reply.udev.busid, ext.busid, sizeof(reply.udev.busid))) {
-                Trace(TRACE_LEVEL_ERROR, "Received busid(%s) != expected(%s)", reply.udev.busid, ext.busid);
-                return ERR_PROTOCOL;
+                Trace(TRACE_LEVEL_ERROR, "Received bus-id '%s' != '%s'", reply.udev.busid, ext.busid);
+                return ERROR_USBIP_PROTOCOL;
         }
 
-        return ERR_NONE;
+        return 0U;
 }
 
-/*
- * @return err_t or op_status_t 
- */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int import_remote_device(_Inout_ device_ctx_ext &ext)
+PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
         if (auto err = send_req_import(ext)) {
                 Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
-                return ERR_NETWORK;
+                return ERROR_USBIP_NETWORK;
         }
 
         op_import_reply reply;
@@ -155,7 +151,7 @@ PAGED int import_remote_device(_Inout_ device_ctx_ext &ext)
                 d->product = udev.idProduct;
         }
 
-        return ERR_NONE;
+        return 0U;
 }
 
 _IRQL_requires_same_
@@ -251,14 +247,14 @@ PAGED auto connect(_Inout_ device_ctx_ext &ext)
         ADDRINFOEXW *ai{};
         if (auto err = getaddrinfo(ai, ext)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                return ERR_ADDRINFO;
+                return ERROR_USBIP_ADDRINFO;
         }
 
         NT_ASSERT(!ext.sock);
         ext.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &ext, nullptr, ai, try_connect, nullptr);
 
         wsk::free(ai);
-        return ext.sock ? ERR_NONE : ERR_CONNECT;
+        return ext.sock ? 0U : ERROR_USBIP_CONNECT;
 }
 
 _IRQL_requires_same_
@@ -270,7 +266,7 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
         port = vhci::claim_roothub_port(dev);
         if (!port) {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
-                return ERR_PORTFULL;
+                return ERROR_USBIP_PORTFULL;
         }
 
         auto speed = get_device_ctx(dev)->speed();
@@ -283,10 +279,10 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
 
         if (auto err = UdecxUsbDevicePlugIn(dev, &options)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
-                return ERR_GENERAL;
+                return ERROR_USBIP_GENERAL;
         }
 
-        return ERR_NONE;
+        return 0U;
 }
 
 struct device_ctx_ext_ptr
@@ -319,7 +315,7 @@ PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
                 sched_receive_usbip_header(*dev);
         }
 
-        return ERR_NONE;
+        return 0U;
 }
 
 _IRQL_requires_same_
@@ -336,7 +332,7 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardw
 
         device_ctx_ext_ptr ext;
         if (NT_ERROR(create_device_ctx_ext(ext.ptr, r))) {
-                error = ERR_GENERAL;
+                error = ERROR_USBIP_GENERAL;
                 return;
         }
 
@@ -353,7 +349,7 @@ PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardw
 
         UDECXUSBDEVICE dev;
         if (NT_ERROR(device::create(dev, vhci, ext.ptr))) {
-                error = ERR_GENERAL;
+                error = ERROR_USBIP_GENERAL;
                 return;
         }
         ext.release(); // now dev owns it

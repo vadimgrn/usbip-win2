@@ -77,14 +77,14 @@ bool usbip::cmd_list(void *p)
 
 	auto sock = connect(r.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
-		spdlog::error("can't connect to {}:{}", r.remote, global_args.tcp_port);
+		spdlog::error(GetLastErrorMsg());
 		return false;
 	}
 
 	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
 
 	if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
-		spdlog::error("can't get exportable device list");
+		spdlog::error(GetLastErrorMsg());
 		return false;
 	}
 

@@ -52,13 +52,14 @@ bool usbip::cmd_port(void *p)
 {
         auto dev = vhci::open();
         if (!dev) {
+                spdlog::error(GetLastErrorMsg());
                 return false;
         }
 
-        bool ok{};
+        bool ok;
         auto devices = vhci::get_imported_devices(dev.get(), ok);
         if (!ok) {
-                spdlog::error("can't get imported devices");
+                spdlog::error(GetLastErrorMsg());
                 return false;
         }
 
