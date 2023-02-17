@@ -1,9 +1,10 @@
+#include "vhci.h"
 #include "setupdi.h"
 
 #include <resources\messages.h>
 
 #include <initguid.h>
-#include "vhci.h"
+#include <usbip\vhci.h>
 
 namespace
 {
@@ -60,20 +61,19 @@ auto usbip::vhci::open(const std::wstring &path) -> Handle
 /*
  * Call GetLastError if result is false.
  */
-auto usbip::vhci::get_imported_devices(HANDLE dev, bool &result) -> std::vector<imported_device>
+auto usbip::vhci::get_imported_devices(HANDLE dev, bool &success) -> std::vector<imported_device>
 {
         std::vector<imported_device> v(TOTAL_PORTS);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
-        DWORD BytesReturned; // must be set if the last arg is NULL
-
-        if (DeviceIoControl(dev, ioctl::get_imported_devices, nullptr, 0, 
+        if (DWORD BytesReturned; // must be set if the last arg is NULL
+            DeviceIoControl(dev, ioctl::get_imported_devices, nullptr, 0, 
                             v.data(), idevs_bytes, &BytesReturned, nullptr)) {
                 assert(!(BytesReturned % sizeof(v[0])));
                 v.resize(BytesReturned / sizeof(v[0]));
-                result = true;
+                success = true;
         } else {
-                result = false;
+                success = false;
                 v.clear();
         }
 
@@ -83,8 +83,8 @@ auto usbip::vhci::get_imported_devices(HANDLE dev, bool &result) -> std::vector<
 /*
  * Call std::generic_category().message() if return != 0.
  */
-errno_t usbip::vhci::fill(
-        _Inout_ ioctl_plugin_hardware &r, 
+errno_t usbip::vhci::init(
+        _Out_ ioctl_plugin_hardware &r, 
         _In_ std::string_view host, 
         _In_ std::string_view service,
         _In_ std::string_view busid)
@@ -105,6 +105,7 @@ errno_t usbip::vhci::fill(
                 }
         }
 
+        r.out = decltype(r.out){}; // clear
         return 0;
 }
 

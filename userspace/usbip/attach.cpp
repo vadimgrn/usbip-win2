@@ -20,6 +20,8 @@
 #include "usbip.h"
 
 #include <libusbip\vhci.h>
+#include <usbip\vhci.h>
+
 #include <spdlog\spdlog.h>
 
 #include <system_error>
@@ -33,23 +35,25 @@ bool usbip::cmd_attach(void *p)
         }
 
         auto &args = *reinterpret_cast<attach_args*>(p);
-        vhci::ioctl_plugin_hardware r{};
+        vhci::ioctl_plugin_hardware r;
 
-        if (auto err = fill(r, args.remote, global_args.tcp_port, args.busid)) {
+        if (auto err = init(r, args.remote, global_args.tcp_port, args.busid)) {
                 auto msg = std::generic_category().message(err);
                 spdlog::error("#{} {}", err, msg);
                 return false;
         }
 
-        if (auto port = vhci::attach(dev.get(), r)) {
-                if (args.terse) {
-                        printf("%d\n", port);
-                } else {
-                        printf("succesfully attached to port %d\n", port);
-                }
-                return true;
+        auto port = vhci::attach(dev.get(), r);
+        if (!port) {
+                spdlog::error(GetLastErrorMsg());
+                return false;
         }
 
-        spdlog::error(GetLastErrorMsg());
-        return false;
+        if (args.terse) {
+                printf("%d\n", port);
+        } else {
+                printf("succesfully attached to port %d\n", port);
+        }
+
+        return true;
 }

@@ -21,6 +21,8 @@
 #include "strings.h"
 
 #include <libusbip\vhci.h>
+#include <usbip\vhci.h>
+
 #include <spdlog\spdlog.h>
 
 namespace

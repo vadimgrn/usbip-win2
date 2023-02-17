@@ -30,7 +30,7 @@
     <ClInclude Include="hkey.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="remote.h" />
-    <ClInclude Include="module.h" />
+    <ClInclude Include="hmodule.h" />
     <ClInclude Include="op_common.h" />
   </ItemGroup>
   <ItemGroup>

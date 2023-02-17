@@ -9,7 +9,7 @@
 #include <libusbip\file_ver.h>
 #include <libusbip\usb_ids.h>
 #include <libusbip\strconv.h>
-#include <libusbip\module.h>
+#include <libusbip\hmodule.h>
 
 #include <usbip\vhci.h>
 #include <resources\messages.h>
@@ -106,10 +106,10 @@ void init(CLI::App &app, const wchar_t *program)
 
 auto &msgtable_dll = L"resources"; // resource-only DLL that contains RT_MESSAGETABLE
 
-auto get_resource_module()
+auto& get_resource_module()
 {
 	static HModule mod(LoadLibraryEx(msgtable_dll, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR));
-	return mod.get();
+	return mod;
 }
 
 } // namespace
@@ -124,8 +124,8 @@ std::string usbip::GetLastErrorMsg(unsigned long msg_id)
 		msg_id = GetLastError();
 	}
 
-	auto hmod = get_resource_module();
-	return format_message(hmod, msg_id);
+	auto &mod = get_resource_module();
+	return format_message(mod.get(), msg_id);
 }
 
 const UsbIds& usbip::get_ids()
@@ -140,10 +140,9 @@ int wmain(int argc, wchar_t *argv[])
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
 
-	if (get_resource_module() == HModule::None) {
+	if (!get_resource_module()) {
 		auto err = GetLastError();
-		auto fname = wchar_to_utf8(msgtable_dll);
-		spdlog::critical("can't load '{}.dll', error {:#x} {}", fname, err, format_message(err));
+		spdlog::critical(L"can't load '{}.dll', error {:#x} {}", msgtable_dll, err, wformat_message(err));
 		return EXIT_FAILURE;
 	}
 

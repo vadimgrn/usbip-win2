@@ -5,9 +5,7 @@
 #pragma once
 
 #include <windows.h>
-
 #include <string>
-#include <cwctype>
 
 namespace usbip
 {
@@ -36,12 +34,12 @@ inline auto format_message(_In_ DWORD msg_id, _In_ DWORD lang_id = 0)
         return wchar_to_utf8(ws);
 }
 
-inline auto wformat_message(_In_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0)
+inline auto wformat_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0)
 {
         return wformat_message(FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_FROM_SYSTEM, module, msg_id, lang_id);
 }
 
-inline auto format_message(_In_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0)
+inline auto format_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0)
 {
         auto ws = wformat_message(module, msg_id, lang_id);
         return wchar_to_utf8(ws);

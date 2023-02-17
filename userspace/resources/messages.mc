@@ -1,6 +1,6 @@
-;#pragma once
-;//
 ;// Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+;//
+;#pragma once
 
 MessageIdTypedef=UINT32
 
@@ -24,7 +24,7 @@ Severity=Error
 Facility=Driver
 SymbolicName=ERROR_USBIP_ADDRINFO
 Language=English
-Can't get address information for hostname:port.
+Cannot get address information for hostname
 .
 
 MessageId=
@@ -32,7 +32,7 @@ Severity=Error
 Facility=Driver
 SymbolicName=ERROR_USBIP_CONNECT
 Language=English
-Can't connect to the server.
+Unable to establish TCP/IP connection to remote host.
 .
 
 MessageId=
@@ -40,7 +40,7 @@ Severity=Error
 Facility=Driver
 SymbolicName=ERROR_USBIP_NETWORK
 Language=English
-Network error during the data exchange with a remote host.
+Network error while communicating with remote host.
 .
 
 MessageId=
@@ -109,7 +109,7 @@ Device unexpected response.
 
 MessageId=
 Severity=Error
-Facility=Application
+Facility=Library
 SymbolicName=ERROR_USBIP_VHCI_NOT_FOUND
 Language=English
 VHCI device not found, driver not loaded?

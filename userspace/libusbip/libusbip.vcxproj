@@ -114,7 +114,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
-    <ClInclude Include="module.h" />
+    <ClInclude Include="hmodule.h" />
     <ClInclude Include="op_common.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="file_ver.h" />

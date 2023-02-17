@@ -2,8 +2,6 @@
 
 #include "win_handle.h"
 
-#include <usbip\vhci.h>
-
 #include <string>
 #include <vector>
 
@@ -17,9 +15,12 @@ namespace usbip::vhci
 std::wstring get_path();
 Handle open(const std::wstring &path = get_path());
 
-std::vector<imported_device> get_imported_devices(HANDLE dev, bool &result);
+struct imported_device;
+std::vector<imported_device> get_imported_devices(HANDLE dev, bool &success);
 
-errno_t fill(_Inout_ ioctl_plugin_hardware &r, 
+struct ioctl_plugin_hardware;
+
+errno_t init(_Out_ ioctl_plugin_hardware &r, 
         _In_ std::string_view host, 
         _In_ std::string_view service,
         _In_ std::string_view busid);
