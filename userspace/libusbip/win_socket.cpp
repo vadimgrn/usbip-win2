@@ -3,6 +3,8 @@
  */
 
 #include "win_socket.h"
+#include "log.h"
+#include "last_error.h"
 
 namespace
 {
@@ -13,11 +15,13 @@ auto init_wsa() noexcept
         WSADATA	wsaData;
 
         if (auto err = WSAStartup(MAKEWORD(MINOR, MAJOR), &wsaData)) {
-                SetLastError(err);
+                usbip::set_last_error wsa(err);
+                libusbip::log->error("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);
                 return false;
         }
 
         if (!(LOBYTE(wsaData.wVersion) == MINOR && HIBYTE(wsaData.wVersion) == MAJOR)) {
+                libusbip::log->error("WinSock2 version {}.{} is not available", MAJOR, MINOR);
                 WSACleanup();
                 SetLastError(WSAEINVAL);
                 return false;

@@ -1,5 +1,7 @@
 #include "vhci.h"
 #include "setupdi.h"
+#include "log.h"
+#include "last_error.h"
 
 #include <resources\messages.h>
 
@@ -9,7 +11,7 @@
 namespace
 {
 
-bool walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
+auto walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
         if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
@@ -47,12 +49,12 @@ auto usbip::vhci::open(const std::wstring &path) -> Handle
 {
         Handle h;
 
-        if (!path.empty()) {
-                h.reset(CreateFile(path.c_str(), 
+        if (path.empty()) { // get_path() failed
+                SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
+        } else {
+                h.reset(CreateFile(path.c_str(),
                         GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, 
                         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-        } else { // get_path() failed
-                SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
         }
 
         return h;
@@ -101,6 +103,7 @@ errno_t usbip::vhci::init(
 
         for (auto &i: v) {
                 if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
+                        libusbip::log->error("strncpy_s('{}') error #{}", i.src, err);
                         return err;
                 }
         }

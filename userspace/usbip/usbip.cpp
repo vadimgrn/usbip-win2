@@ -5,6 +5,7 @@
 #include "usbip.h"
 #include "resource.h"
 
+#include <libusbip\log.h>
 #include <libusbip\win_socket.h>
 #include <libusbip\file_ver.h>
 #include <libusbip\usb_ids.h>
@@ -112,6 +113,13 @@ auto& get_resource_module()
 	return mod;
 }
 
+void init_spdlog()
+{
+	libusbip::log = spdlog::stderr_color_st("stderr");
+	set_default_logger(libusbip::log);
+	spdlog::set_pattern("%^%l%$: %v");
+}
+
 } // namespace
 
 
@@ -137,8 +145,7 @@ const UsbIds& usbip::get_ids()
 
 int wmain(int argc, wchar_t *argv[])
 {
-	set_default_logger(spdlog::stderr_color_st("stderr"));
-	spdlog::set_pattern("%^%l%$: %v");
+	init_spdlog();
 
 	if (!get_resource_module()) {
 		auto err = GetLastError();

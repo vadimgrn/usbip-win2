@@ -4,6 +4,8 @@
 
 #include "remote.h"
 #include "strconv.h"
+#include "log.h"
+#include "last_error.h"
 
 #include <usbip\proto_op.h>
 #include <libusbip\op_common.h>
@@ -21,7 +23,14 @@ using namespace usbip;
 
 inline auto do_setsockopt(SOCKET s, int level, int optname, int optval)
 {
-	return !setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
+	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
+	if (err) {
+		wsa_set_last_error wsa;
+		libusbip::log->error("setsockopt(level={}, optname={}, optval={}) error {:#x}", 
+			              level, optname, optval, wsa.error);	
+	}
+
+	return !err;
 }
 
 inline auto set_nodelay(SOCKET s)
@@ -55,7 +64,13 @@ auto set_keepalive(SOCKET s, ULONG timeout, ULONG interval)
 	};
 
 	DWORD outlen;
-	return !WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
+
+	auto err = WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
+	if (err) {
+		wsa_set_last_error wsa;
+		libusbip::log->error("WSAIoctl(SIO_KEEPALIVE_VALS) error {:#x}", wsa.error);
+	}
+	return !err;
 }
 
 auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
@@ -64,11 +79,16 @@ auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
 
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
 	case SOCKET_ERROR:
-		SetLastError(WSAGetLastError());
+		if (wsa_set_last_error wsa; wsa) {
+			libusbip::log->error("recv error {:#x}", wsa.error);
+		}
 		return false;
 	case 0: // connection has been gracefully closed
-		if (len && eof) {
-			*eof = true;
+		if (len) {
+			libusbip::log->error("recv EOF");
+			if (eof) {
+				*eof = true;
+			}
 		}
 		[[fallthrough]];
 	default:
@@ -85,7 +105,8 @@ auto send(SOCKET s, const void *buf, size_t len)
 		auto ret = ::send(s, addr, static_cast<int>(len), 0);
 
 		if (ret == SOCKET_ERROR) {
-			SetLastError(WSAGetLastError());
+			wsa_set_last_error wsa;
+			libusbip::log->error("send error {:#x}", wsa.error);
 			return false;
 		}
 
@@ -145,7 +166,8 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 	std::unique_ptr<addrinfo, decltype(freeaddrinfo)&> info(nullptr, freeaddrinfo);
 
 	if (addrinfo *result; getaddrinfo(hostname, service, &hints, &result)) {
-		SetLastError(WSAGetLastError()); // see gai_strerror()
+		wsa_set_last_error wsa; // see gai_strerror()
+		libusbip::log->error("getaddrinfo {}:{} error {:#x}", hostname, service, wsa.error);
 		return sock;
 	} else {
 		info.reset(result);
@@ -155,7 +177,8 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 
 		sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
 		if (!sock) {
-			SetLastError(WSAGetLastError());
+			wsa_set_last_error wsa;
+			libusbip::log->error("socket() {}:{} error {:#x}", hostname, service, wsa.error);
 			continue;
 		}
 
@@ -166,16 +189,15 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 		};
 
 		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive(h, timeout, interval))) {
-			auto saved = WSAGetLastError();
+			set_last_error save; // close() can change last error
 			sock.close();
-			SetLastError(saved);
 			break;
 		}
 
 		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
-			auto saved = WSAGetLastError();
+			wsa_set_last_error wsa;
+			libusbip::log->error("connect {}:{} error {:#x}", hostname, service, wsa.error);
 			sock.close();
-			SetLastError(saved);
 		} else {
 			break;
 		}
@@ -200,6 +222,7 @@ bool usbip::enum_exportable_devices(
 	}
 
 	if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
+		libusbip::log->error("recv_op_common -> {}", err);
 		SetLastError(err);
 		return false;
 	}
@@ -212,6 +235,7 @@ bool usbip::enum_exportable_devices(
 		return false;
 	}
 
+	libusbip::log->debug("{} exportable device(s)", reply.ndev);
 	assert(reply.ndev <= INT_MAX);
 
 	if (on_dev_cnt) {
