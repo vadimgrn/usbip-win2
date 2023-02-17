@@ -12,6 +12,7 @@
 #include <mstcpip.h>
 
 #include <memory>
+#include <chrono>
 
 namespace
 {
@@ -33,34 +34,24 @@ inline auto set_keepalive(SOCKET s)
 	return do_setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, true);
 }
 
-auto get_keepalive_timeout()
+/*
+ * The default system-wide value of the keep-alive timeout is controllable 
+ * through the KeepAliveTime registry setting which takes a value in milliseconds. 
+ * If the key is not set, the default keep-alive timeout is 2 hours. 
+ *
+ * The default system-wide value of the keep-alive interval is controllable through 
+ * the KeepAliveInterval registry setting which takes a value in milliseconds. 
+ * If the key is not set, the default keep-alive interval is 1 second.
+ * 
+ * On Windows Vista and later, the number of keep-alive probes (data retransmissions) 
+ * is set to 10 and cannot be changed. 
+ */
+auto set_keepalive(SOCKET s, ULONG timeout, ULONG interval)
 {
-	auto &name = "KEEPALIVE_TIMEOUT";
-	unsigned int value{};
-
-	char buf[128];
-	size_t required;
-
-	if (auto err = getenv_s(&required, buf, sizeof(buf), name); !err) {
-		sscanf_s(buf, "%u", &value);
-	} else if (required) {
-//		spdlog::error("{} required buffer size is {}, error {:#x}", name, required, err);
-	}
-
-	return value;
-}
-
-auto set_keepalive_env(SOCKET s)
-{
-	auto val = get_keepalive_timeout();
-	if (!val) {
-		return set_keepalive(s);
-	}
-
-	tcp_keepalive r { // windows tries 10 times every keepaliveinterval
-		.onoff = 1,
-		.keepalivetime = val*1000/2,
-		.keepaliveinterval = val*1000/(10*2)
+	tcp_keepalive r {
+		.onoff = true,
+		.keepalivetime = timeout, // timeout(ms) with no activity until the first keep-alive packet is sent
+		.keepaliveinterval = interval // interval(ms), between when successive keep-alive packets are sent if no acknowledgement is received
 	};
 
 	DWORD outlen;
@@ -168,7 +159,13 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 			continue;
 		}
 
-		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive_env(h))) {
+		using namespace std::chrono_literals;
+		enum { 
+		        timeout = std::chrono::milliseconds(30s).count(),
+			interval = std::chrono::milliseconds(1s).count(),
+		};
+
+		if (auto h = sock.get(); !(set_nodelay(h) && set_keepalive(h, timeout, interval))) {
 			auto saved = WSAGetLastError();
 			sock.close();
 			SetLastError(saved);
