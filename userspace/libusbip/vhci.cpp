@@ -103,7 +103,7 @@ errno_t usbip::vhci::init(
 
         for (auto &i: v) {
                 if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
-                        libusbip::log->error("strncpy_s('{}') error #{}", i.src, err);
+                        libusbip::output("strncpy_s('{}') error #{}", i.src, err);
                         return err;
                 }
         }

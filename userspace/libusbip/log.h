@@ -5,11 +5,30 @@
 #pragma once
 
 #include <spdlog\spdlog.h>
-#include <spdlog\sinks\null_sink.h>
 
 namespace libusbip
 {
 
-inline auto log = spdlog::null_logger_st("libusbip");
+/*
+ * Do not use logger directly, call output().
+ */
+inline std::shared_ptr<spdlog::logger> logger;
+inline auto output_level = spdlog::level::debug;
+
+template<typename... Args>
+inline void output(spdlog::format_string_t<Args...> fmt, Args&&... args)
+{
+        if (auto obj = logger.get()) {
+                obj->log(output_level, fmt, std::forward<Args>(args)...);
+        }
+}
+
+template<typename... Args>
+inline void output(spdlog::wformat_string_t<Args...> fmt, Args&&... args)
+{
+        if (auto obj = logger.get()) {
+                obj->log(output_level, fmt, std::forward<Args>(args)...);
+        }
+}
 
 } // namespace libusbip

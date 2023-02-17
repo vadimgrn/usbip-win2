@@ -300,8 +300,8 @@ int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
         } else if (program == classfilter) {
                 add_classfilter_cmds(app);
         } else {
-                fwprintf(stderr, L"Unexpected program name '%s', must be '%s' or '%s'\n", 
-                                   program.c_str(), devnode, classfilter);
+                fwprintf(stderr, L"Program name must be '%s' or '%s', not '%s'\n", 
+                                   devnode, classfilter, program.c_str());
 
                 return EXIT_FAILURE;
         }

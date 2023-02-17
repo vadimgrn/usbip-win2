@@ -115,8 +115,8 @@ auto& get_resource_module()
 
 void init_spdlog()
 {
-	libusbip::log = spdlog::stderr_color_st("stderr");
-	set_default_logger(libusbip::log);
+	libusbip::logger = spdlog::stderr_color_st("stderr");
+	set_default_logger(libusbip::logger);
 	spdlog::set_pattern("%^%l%$: %v");
 }
 

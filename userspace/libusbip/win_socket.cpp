@@ -16,12 +16,12 @@ auto init_wsa() noexcept
 
         if (auto err = WSAStartup(MAKEWORD(MINOR, MAJOR), &wsaData)) {
                 usbip::set_last_error wsa(err);
-                libusbip::log->error("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);
+                libusbip::output("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);
                 return false;
         }
 
         if (!(LOBYTE(wsaData.wVersion) == MINOR && HIBYTE(wsaData.wVersion) == MAJOR)) {
-                libusbip::log->error("WinSock2 version {}.{} is not available", MAJOR, MINOR);
+                libusbip::output("WinSock2 version {}.{} is not available", MAJOR, MINOR);
                 WSACleanup();
                 SetLastError(WSAEINVAL);
                 return false;

@@ -26,8 +26,8 @@ inline auto do_setsockopt(SOCKET s, int level, int optname, int optval)
 	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
 	if (err) {
 		wsa_set_last_error wsa;
-		libusbip::log->error("setsockopt(level={}, optname={}, optval={}) error {:#x}", 
-			              level, optname, optval, wsa.error);	
+		libusbip::output("setsockopt(level={}, optname={}, optval={}) error {:#x}", 
+			         level, optname, optval, wsa.error);	
 	}
 
 	return !err;
@@ -68,7 +68,7 @@ auto set_keepalive(SOCKET s, ULONG timeout, ULONG interval)
 	auto err = WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
 	if (err) {
 		wsa_set_last_error wsa;
-		libusbip::log->error("WSAIoctl(SIO_KEEPALIVE_VALS) error {:#x}", wsa.error);
+		libusbip::output("WSAIoctl(SIO_KEEPALIVE_VALS) error {:#x}", wsa.error);
 	}
 	return !err;
 }
@@ -80,12 +80,12 @@ auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
 	case SOCKET_ERROR:
 		if (wsa_set_last_error wsa; wsa) {
-			libusbip::log->error("recv error {:#x}", wsa.error);
+			libusbip::output("recv error {:#x}", wsa.error);
 		}
 		return false;
 	case 0: // connection has been gracefully closed
 		if (len) {
-			libusbip::log->error("recv EOF");
+			libusbip::output("recv EOF");
 			if (eof) {
 				*eof = true;
 			}
@@ -106,7 +106,7 @@ auto send(SOCKET s, const void *buf, size_t len)
 
 		if (ret == SOCKET_ERROR) {
 			wsa_set_last_error wsa;
-			libusbip::log->error("send error {:#x}", wsa.error);
+			libusbip::output("send error {:#x}", wsa.error);
 			return false;
 		}
 
@@ -167,7 +167,7 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 
 	if (addrinfo *result; getaddrinfo(hostname, service, &hints, &result)) {
 		wsa_set_last_error wsa; // see gai_strerror()
-		libusbip::log->error("getaddrinfo {}:{} error {:#x}", hostname, service, wsa.error);
+		libusbip::output("getaddrinfo {}:{} error {:#x}", hostname, service, wsa.error);
 		return sock;
 	} else {
 		info.reset(result);
@@ -178,7 +178,7 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 		sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
 		if (!sock) {
 			wsa_set_last_error wsa;
-			libusbip::log->error("socket() {}:{} error {:#x}", hostname, service, wsa.error);
+			libusbip::output("socket() {}:{} error {:#x}", hostname, service, wsa.error);
 			continue;
 		}
 
@@ -196,7 +196,7 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
 
 		if (connect(sock.get(), r->ai_addr, int(r->ai_addrlen))) {
 			wsa_set_last_error wsa;
-			libusbip::log->error("connect {}:{} error {:#x}", hostname, service, wsa.error);
+			libusbip::output("connect {}:{} error {:#x}", hostname, service, wsa.error);
 			sock.close();
 		} else {
 			break;
@@ -222,7 +222,7 @@ bool usbip::enum_exportable_devices(
 	}
 
 	if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
-		libusbip::log->error("recv_op_common -> {}", err);
+		libusbip::output("recv_op_common -> {}", err);
 		SetLastError(err);
 		return false;
 	}
@@ -235,7 +235,7 @@ bool usbip::enum_exportable_devices(
 		return false;
 	}
 
-	libusbip::log->debug("{} exportable device(s)", reply.ndev);
+	libusbip::output("{} exportable device(s)", reply.ndev);
 	assert(reply.ndev <= INT_MAX);
 
 	if (on_dev_cnt) {
