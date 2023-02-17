@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2005-2007 Takahiro Hirofuchi
- * Copyright (C) 2021-2023 Vadym Hrynchyshyn
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2005 - 2007 Takahiro Hirofuchi
  */
 
 #include "strings.h"
