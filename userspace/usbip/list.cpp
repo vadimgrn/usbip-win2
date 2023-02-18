@@ -29,28 +29,32 @@ void on_device(int, const usbip_usb_device &d)
 	auto prod = get_product(ids, d.idVendor, d.idProduct);
 	auto csp = get_class(ids, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol);
 
-	printf( "%11s: %s\n"
-		"%11s: %s\n"
-		"%11s: %s\n",
-		d.busid, prod.c_str(),
-		"", d.path,
-		"", csp.c_str());
+	auto lines = std::format(
+			"{:^11}: {}\n"
+			"{:11}: {}\n"
+			"{:11}: {}\n",
+			d.busid, prod,
+			"", d.path,
+			"", csp);
 
 	if (!d.bNumInterfaces) {
-		printf("\n");
+		lines += '\n';
 	}
+
+	printf(lines.c_str());
 }
 
 void on_interface(int, const usbip_usb_device &d, int idx, const usbip_usb_interface &r)
 {
 	auto &ids = get_ids();
-
 	auto csp = get_class(ids, r.bInterfaceClass, r.bInterfaceSubClass, r.bInterfaceProtocol);
-	printf("%11s: %2d - %s\n", "", idx, csp.c_str());
 
+	auto s = std::format("{:11}: {:2} - {}\n", "", idx, csp);
 	if (idx + 1 == d.bNumInterfaces) { // last
-		printf("\n");
+		s += '\n';
 	}
+
+	printf(s.c_str());
 }
 
 } // namespace
