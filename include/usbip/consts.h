@@ -1,6 +1,9 @@
 #pragma once
 
-constexpr auto& usbip_port = "3240";
+namespace usbip
+{
+
+constexpr auto& tcp_port = "3240";
 
 enum op_status_t // op_common.status
 {
@@ -12,9 +15,27 @@ enum op_status_t // op_common.status
         ST_ERROR // ST_DEV_ERR?
 };
 
-enum 
-{ 
-        USBIP_VERSION = 0x111, 
-        USBIP_DEV_PATH_MAX = 256, 
-        USBIP_BUS_ID_SIZE = 32 
+enum { 
+        USBIP_VERSION = 0x111, // protocol
+        DEV_PATH_MAX = 256, 
+        BUS_ID_SIZE = 32 
 };
+
+} // namespace usbip
+
+
+namespace usbip::vhci
+{
+
+enum { 
+        USB2_PORTS = 30,
+        USB3_PORTS = USB2_PORTS,
+        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
+};
+
+constexpr auto is_valid_port(int port)
+{
+        return port > 0 && port <= TOTAL_PORTS;
+}
+
+} // namespace usbip::vhci

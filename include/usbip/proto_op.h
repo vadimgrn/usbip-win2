@@ -15,8 +15,8 @@ struct usbip_usb_interface
 
 struct usbip_usb_device 
 {
-        char path[USBIP_DEV_PATH_MAX];
-        char busid[USBIP_BUS_ID_SIZE];
+        char path[usbip::DEV_PATH_MAX];
+        char busid[usbip::BUS_ID_SIZE];
 
         UINT32 busnum;
         UINT32 devnum;
@@ -74,7 +74,7 @@ struct op_common {
 #define OP_REP_IMPORT   (OP_REPLY   | OP_IMPORT)
 
 struct op_import_request {
-        char busid[USBIP_BUS_ID_SIZE];
+        char busid[usbip::BUS_ID_SIZE];
 };
 
 struct op_import_reply {

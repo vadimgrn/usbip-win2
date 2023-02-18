@@ -12,7 +12,6 @@
 #include <libusbip\strconv.h>
 #include <libusbip\hmodule.h>
 
-#include <usbip\vhci.h>
 #include <resources\messages.h>
 
 #include <spdlog\spdlog.h>

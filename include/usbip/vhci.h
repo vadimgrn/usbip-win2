@@ -19,17 +19,6 @@
 namespace usbip::vhci
 {
 
-enum { 
-        USB2_PORTS = 30,
-        USB3_PORTS = USB2_PORTS,
-        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
-};
-
-constexpr auto is_valid_port(int port)
-{
-        return port > 0 && port <= TOTAL_PORTS;
-}
-
 inline auto get_port_range(_In_ usb_device_speed speed)
 {
         struct{ int begin;  int end; } r;
@@ -82,7 +71,7 @@ struct plugin_hardware // IN/OUT, ioctl::plugin_hardware
                 static_assert(sizeof(error) == sizeof(unsigned long));
         } out; // must be the first member
 
-        char busid[USBIP_BUS_ID_SIZE];
+        char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
 };

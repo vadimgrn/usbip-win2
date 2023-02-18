@@ -19,7 +19,7 @@ std::string GetLastErrorMsg(unsigned long msg_id = ~0UL);
 
 struct global_args
 {
-        std::string tcp_port = usbip_port;
+        std::string tcp_port = usbip::tcp_port;
 };
 inline struct global_args global_args;
 
