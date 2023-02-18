@@ -5,7 +5,7 @@
 #include "usbip.h"
 #include "resource.h"
 
-#include <libusbip\log.h>
+#include <libusbip\output.h>
 #include <libusbip\win_socket.h>
 #include <libusbip\file_ver.h>
 #include <libusbip\usb_ids.h>
@@ -115,8 +115,10 @@ auto& get_resource_module()
 
 void init_spdlog()
 {
-	libusbip::logger = spdlog::stderr_color_st("stderr");
-	set_default_logger(libusbip::logger);
+	auto logger = spdlog::stderr_color_st("stderr");
+	libusbip::logger = [logger] (auto msg) { logger->debug(msg); };
+
+	set_default_logger(std::move(logger));
 	spdlog::set_pattern("%^%l%$: %v");
 }
 

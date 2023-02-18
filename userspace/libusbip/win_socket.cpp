@@ -3,7 +3,7 @@
  */
 
 #include "win_socket.h"
-#include "log.h"
+#include "output.h"
 #include "last_error.h"
 
 namespace
@@ -11,9 +11,10 @@ namespace
 
 auto init_wsa() noexcept
 {
-        enum { MAJOR = 2, MINOR = 2 };
-        WSADATA	wsaData;
+        const BYTE MAJOR = 2;
+        const BYTE MINOR = 2;
 
+        WSADATA	wsaData;
         if (auto err = WSAStartup(MAKEWORD(MINOR, MAJOR), &wsaData)) {
                 usbip::set_last_error wsa(err);
                 libusbip::output("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);

@@ -1,5 +1,5 @@
 #include "setupdi.h"
-#include "log.h"
+#include "output.h"
 #include "last_error.h"
 
 namespace

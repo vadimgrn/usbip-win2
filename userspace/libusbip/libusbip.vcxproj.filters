@@ -32,15 +32,12 @@
     <ClInclude Include="remote.h" />
     <ClInclude Include="hmodule.h" />
     <ClInclude Include="op_common.h" />
-    <ClInclude Include="log.h" />
+    <ClInclude Include="output.h" />
     <ClInclude Include="last_error.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
       <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
   </ItemGroup>
 </Project>

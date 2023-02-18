@@ -1,6 +1,6 @@
 #include "vhci.h"
 #include "setupdi.h"
-#include "log.h"
+#include "output.h"
 #include "last_error.h"
 
 #include <resources\messages.h>

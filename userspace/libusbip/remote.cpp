@@ -4,7 +4,7 @@
 
 #include "remote.h"
 #include "strconv.h"
-#include "log.h"
+#include "output.h"
 #include "last_error.h"
 
 #include <usbip\proto_op.h>
@@ -151,8 +151,7 @@ auto recv_op_common(SOCKET s, uint16_t expected_code)
 		return ERROR_USBIP_PROTOCOL;
 	}
 
-	auto st = static_cast<op_status_t>(r.status);
-	return op_status_error(st);
+	return op_status_error(static_cast<op_status_t>(r.status));
 }
 
 } // namespace
@@ -222,7 +221,6 @@ bool usbip::enum_exportable_devices(
 	}
 
 	if (auto err = recv_op_common(s, OP_REP_DEVLIST)) {
-		libusbip::output("recv_op_common -> {}", err);
 		SetLastError(err);
 		return false;
 	}
