@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "vhci.h"
 #include "setupdi.h"
 #include "output.h"
@@ -11,15 +15,68 @@
 namespace
 {
 
+using namespace usbip;
+
 auto walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
-        if (auto inf = usbip::get_intf_detail(dev_info, data, guid)) {
+        if (auto inf = get_intf_detail(dev_info, data, guid)) {
                 assert(inf->cbSize == sizeof(*inf)); // this is not a size/length of DevicePath
                 path = inf->DevicePath;
                 return true;
         }
 
         return false;
+}
+
+auto init(_Out_ vhci::plugin_hardware &r, _In_ const vhci::attach_args &args)
+{
+        struct {
+                char *dst;
+                size_t len;
+                const std::string &src;
+        } const v[] = {
+                { r.busid, ARRAYSIZE(r.busid), args.busid },
+                { r.service, ARRAYSIZE(r.service), args.service },
+                { r.host, ARRAYSIZE(r.host), args.hostname },
+        };
+
+        for (auto &i: v) {
+                if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
+                        libusbip::output("strncpy_s('{}') error #{} {}", i.src, err, 
+                                          std::generic_category().message(err));
+                        return false;
+                }
+        }
+
+        r.out = decltype(r.out){}; // clear
+        return true;
+}
+
+void assign(_Out_ std::vector<imported_device> &dst, _In_ const std::vector<vhci::imported_device> &src)
+{
+        dst.resize(src.size());
+
+        for (size_t i = 0; i < src.size(); ++i) {
+                auto &d = dst[i];
+                auto &s = src[i];
+
+                d.hub_port = s.out.port;
+
+                d.hostname = s.host;
+                assert(d.hostname.size() < ARRAYSIZE(s.host));
+
+                d.service = s.service;
+                assert(d.service.size() < ARRAYSIZE(s.service));
+
+                d.busid = s.busid;
+                assert(d.busid.size() < ARRAYSIZE(s.busid));
+
+                d.devid = s.devid;
+                d.speed = s.speed;
+
+                d.vendor = s.vendor;
+                d.product = s.product;
+        }
 }
 
 } // namespace
@@ -45,7 +102,7 @@ std::wstring usbip::vhci::get_path()
 /*
  * Call GetLastError if returned handle is invalid.
  */
-auto usbip::vhci::open(const std::wstring &path) -> Handle
+auto usbip::vhci::open(_In_ const std::wstring &path) -> Handle
 {
         Handle h;
 
@@ -63,9 +120,11 @@ auto usbip::vhci::open(const std::wstring &path) -> Handle
 /*
  * Call GetLastError if result is false.
  */
-auto usbip::vhci::get_imported_devices(HANDLE dev, bool &success) -> std::vector<imported_device>
+std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDLE dev, _Out_ bool &success)
 {
-        std::vector<imported_device> v(TOTAL_PORTS);
+        std::vector<usbip::imported_device> result;
+
+        std::vector<vhci::imported_device> v(TOTAL_PORTS);
         auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
 
         if (DWORD BytesReturned; // must be set if the last arg is NULL
@@ -73,50 +132,26 @@ auto usbip::vhci::get_imported_devices(HANDLE dev, bool &success) -> std::vector
                             v.data(), idevs_bytes, &BytesReturned, nullptr)) {
                 assert(!(BytesReturned % sizeof(v[0])));
                 v.resize(BytesReturned / sizeof(v[0]));
-                success = true;
+                assign(result, v);
+                success = true; // result could be empty
         } else {
                 success = false;
-                v.clear();
         }
 
-        return v;
-}
-
-/*
- * Call std::generic_category().message() if return != 0.
- */
-errno_t usbip::vhci::init(
-        _Out_ ioctl_plugin_hardware &r, 
-        _In_ std::string_view host, 
-        _In_ std::string_view service,
-        _In_ std::string_view busid)
-{
-        struct {
-                char *dst;
-                size_t len;
-                const std::string_view &src;
-        } const v[] = {
-                { r.busid, ARRAYSIZE(r.busid), busid },
-                { r.service, ARRAYSIZE(r.service), service },
-                { r.host, ARRAYSIZE(r.host), host },
-        };
-
-        for (auto &i: v) {
-                if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
-                        libusbip::output("strncpy_s('{}') error #{}", i.src, err);
-                        return err;
-                }
-        }
-
-        r.out = decltype(r.out){}; // clear
-        return 0;
+        return result;
 }
 
 /*
  * @return hub port number, [1..TOTAL_PORTS]. Call GetLastError() if zero is returned. 
  */
-int usbip::vhci::attach(_In_ HANDLE dev, _Inout_ ioctl_plugin_hardware &r)
+int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
+        plugin_hardware r;
+        if (!init(r, args)) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return 0;
+        }
+
         if (DWORD BytesReturned; // must be set if the last arg is NULL
             DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r.out, sizeof(r.out), &BytesReturned, nullptr)) {
                 assert(BytesReturned == sizeof(r.out));
@@ -132,7 +167,7 @@ int usbip::vhci::attach(_In_ HANDLE dev, _Inout_ ioctl_plugin_hardware &r)
 */
 bool usbip::vhci::detach(HANDLE dev, int port)
 {
-        ioctl_plugout_hardware r { .port = port };
+        plugout_hardware r { .port = port };
 
         DWORD BytesReturned; // must be set if the last arg is NULL
         auto ok = DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);

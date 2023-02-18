@@ -26,8 +26,8 @@ namespace
 
 using namespace usbip;
 
-static_assert(sizeof(vhci::ioctl_plugin_hardware::service) == NI_MAXSERV);
-static_assert(sizeof(vhci::ioctl_plugin_hardware::host) == NI_MAXHOST);
+static_assert(sizeof(vhci::plugin_hardware::service) == NI_MAXSERV);
+static_assert(sizeof(vhci::plugin_hardware::host) == NI_MAXHOST);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -50,7 +50,7 @@ PAGED void fill(_Out_ vhci::imported_device &dst, _In_ const device_ctx &ctx)
         PAGED_CODE();
         auto &src = *ctx.ext;
 
-//      ioctl_plugin_hardware
+//      plugin_hardware
 
         dst.out.port = ctx.port;
         dst.out.error = 0;
@@ -320,7 +320,7 @@ PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl_plugin_hardware &r)
+PAGED void plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::plugin_hardware &r)
 {
         PAGED_CODE();
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s", r.host, r.service, r.busid);
@@ -367,7 +367,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
-        vhci::ioctl_plugin_hardware *r{};
+        vhci::plugin_hardware *r{};
         if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)) {
                 return err;
         }
@@ -386,7 +386,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
 
-        vhci::ioctl_plugout_hardware *r{};
+        vhci::plugout_hardware *r{};
         if (auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)) {
                 return err;
         }

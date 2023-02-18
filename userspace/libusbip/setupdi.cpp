@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "setupdi.h"
 #include "output.h"
 #include "last_error.h"
@@ -7,7 +11,7 @@ namespace
 
 using namespace usbip;
 
-auto traverse_dev_info(HDEVINFO dev_info, const walkfunc_t &walker)
+auto traverse_dev_info(_In_ HDEVINFO dev_info, _In_ const walkfunc_t &walker)
 {
 	SP_DEVINFO_DATA	dev_info_data{ .cbSize = sizeof(dev_info_data) };
 
@@ -31,7 +35,7 @@ auto traverse_dev_info(HDEVINFO dev_info, const walkfunc_t &walker)
  * OK if GetLastError() returns ERROR_NO_MORE_ITEMS.
  */
 std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> usbip::get_intf_detail(
-	HDEVINFO dev_info, SP_DEVINFO_DATA *dev_info_data, const GUID &guid)
+	_In_ HDEVINFO dev_info, _In_ SP_DEVINFO_DATA *dev_info_data, _In_ const GUID &guid)
 {
 	std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> dev_interface_detail;
 
@@ -71,7 +75,7 @@ std::shared_ptr<SP_DEVICE_INTERFACE_DETAIL_DATA> usbip::get_intf_detail(
  * Call GetLastError() if false is returned. 
  * Interface not found if GetLastError() returns ERROR_NO_MORE_ITEMS.
  */
-bool usbip::traverse_intfdevs(const GUID &guid, const walkfunc_t &walker)
+bool usbip::traverse_intfdevs(_In_ const GUID &guid, _In_ const walkfunc_t &walker)
 {
 	auto ok = false;
 	

@@ -3,13 +3,9 @@
  */
 
 #include "usbip.h"
-
 #include <libusbip\vhci.h>
-#include <usbip\vhci.h>
 
 #include <spdlog\spdlog.h>
-
-#include <system_error>
 
 bool usbip::cmd_attach(void *p)
 {
@@ -20,13 +16,12 @@ bool usbip::cmd_attach(void *p)
         }
 
         auto &args = *reinterpret_cast<attach_args*>(p);
-        vhci::ioctl_plugin_hardware r;
 
-        if (auto err = init(r, args.remote, global_args.tcp_port, args.busid)) {
-                auto msg = std::generic_category().message(err);
-                spdlog::error("#{} {}", err, msg);
-                return false;
-        }
+        vhci::attach_args r {
+                .hostname = args.remote, 
+                .service = global_args.tcp_port, 
+                .busid = args.busid,
+        };
 
         auto port = vhci::attach(dev.get(), r);
         if (!port) {

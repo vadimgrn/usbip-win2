@@ -6,8 +6,8 @@
 #include "strings.h"
 
 #include <libusbip\vhci.h>
-#include <usbip\vhci.h>
 
+#include <format>
 #include <spdlog\spdlog.h>
 
 namespace
@@ -15,21 +15,24 @@ namespace
 
 using namespace usbip;
 
-void print(const vhci::imported_device &d)
+void print(const imported_device &d)
 {
-        auto prod = get_product(get_ids(), d.vendor, d.product);
+        auto product = get_product(get_ids(), d.vendor, d.product);
 
         USHORT bus = d.devid >> 16;
         USHORT dev = d.devid & 0xFFFF;
 
-        printf( "Port %02d: device in use at %s\n"
-                "         %s\n"
-                "%10s -> usbip://%s:%s/%s\n"
-                "%10s -> remote bus/dev %03d/%03d\n",
-                d.out.port, get_speed_str(d.speed),
-                prod.c_str(),
-                " ", d.host, d.service, d.busid,
-                " ", bus, dev);
+        constexpr auto &fmt = R"(Port {:02}: device in use at {}
+         {}
+           -> usbip://{}:{}/{}
+           -> remote bus/dev {:03}/{:03}
+)";
+        auto msg = std::format(fmt, d.hub_port, get_speed_str(d.speed),
+                                product,
+                                d.hostname, d.service, d.busid,
+                                bus, dev);
+
+        printf(msg.c_str());
 }
 
 } // namespace
@@ -56,8 +59,8 @@ bool usbip::cmd_port(void *p)
         bool found{};
 
         for (auto &d: devices) {
-                assert(d.out.port);
-                if (ports.empty() || ports.contains(d.out.port)) {
+                assert(d.hub_port);
+                if (ports.empty() || ports.contains(d.hub_port)) {
                         if (!found) {
                                 found = true;
                                 printf("Imported USB devices\n"

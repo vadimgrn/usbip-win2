@@ -34,7 +34,7 @@ seqnum_t usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::create_device_ctx_ext(
-        _Out_ device_ctx_ext* &ext, _In_ const vhci::ioctl_plugin_hardware &r)
+        _Out_ device_ctx_ext* &ext, _In_ const vhci::plugin_hardware &r)
 {
         PAGED_CODE();
 
