@@ -21,7 +21,7 @@ namespace
 
 using namespace usbip;
 
-inline auto do_setsockopt(SOCKET s, int level, int optname, int optval)
+inline auto do_setsockopt(_In_ SOCKET s, _In_ int level, _In_ int optname, _In_ int optval)
 {
 	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
 	if (err) {
@@ -33,12 +33,12 @@ inline auto do_setsockopt(SOCKET s, int level, int optname, int optval)
 	return !err;
 }
 
-inline auto set_nodelay(SOCKET s)
+inline auto set_nodelay(_In_ SOCKET s)
 {
 	return do_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, true);
 }
 
-inline auto set_keepalive(SOCKET s)
+inline auto set_keepalive(_In_ SOCKET s)
 {
 	return do_setsockopt(s, SOL_SOCKET, SO_KEEPALIVE, true);
 }
@@ -55,7 +55,7 @@ inline auto set_keepalive(SOCKET s)
  * On Windows Vista and later, the number of keep-alive probes (data retransmissions) 
  * is set to 10 and cannot be changed. 
  */
-auto set_keepalive(SOCKET s, ULONG timeout, ULONG interval)
+auto set_keepalive(_In_ SOCKET s, _In_ ULONG timeout, _In_ ULONG interval)
 {
 	tcp_keepalive r {
 		.onoff = true,
@@ -73,7 +73,7 @@ auto set_keepalive(SOCKET s, ULONG timeout, ULONG interval)
 	return !err;
 }
 
-auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
+auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Outptr_opt_ bool *eof = nullptr)
 {
 	assert(s != INVALID_SOCKET);
 
@@ -96,7 +96,7 @@ auto recv(SOCKET s, void *buf, size_t len, bool *eof = nullptr)
 	}
 }
 
-auto send(SOCKET s, const void *buf, size_t len)
+auto send(_In_ SOCKET s, _In_ const void *buf, _In_ size_t len)
 {
 	assert(s != INVALID_SOCKET);
 	auto addr = static_cast<const char*>(buf);
@@ -117,7 +117,7 @@ auto send(SOCKET s, const void *buf, size_t len)
 	return true;
 }
 
-auto send_op_common(SOCKET s, uint16_t code)
+auto send_op_common(_In_ SOCKET s, _In_ uint16_t code)
 {
 	assert(s != INVALID_SOCKET);
 
@@ -131,7 +131,7 @@ auto send_op_common(SOCKET s, uint16_t code)
 	return send(s, &r, sizeof(r));
 }
 
-auto recv_op_common(SOCKET s, uint16_t expected_code)
+auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 {
 	assert(s != INVALID_SOCKET);
 
@@ -157,7 +157,7 @@ auto recv_op_common(SOCKET s, uint16_t expected_code)
 } // namespace
 
 
-auto usbip::connect(const char *hostname, const char *service) -> Socket
+auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Socket
 {
 	Socket sock;
 
@@ -209,10 +209,10 @@ auto usbip::connect(const char *hostname, const char *service) -> Socket
  * @return call GetLastError() if false is returned
  */
 bool usbip::enum_exportable_devices(
-	SOCKET s, 
-	const usbip_usb_device_f &on_dev, 
-	const usbip_usb_interface_f &on_intf,
-	const usbip_usb_device_cnt_f &on_dev_cnt)
+	_In_ SOCKET s, 
+	_In_ const usbip_usb_device_f &on_dev, 
+	_In_ const usbip_usb_interface_f &on_intf,
+	_In_opt_ const usbip_usb_device_cnt_f &on_dev_cnt)
 {
 	assert(s != INVALID_SOCKET);
 	

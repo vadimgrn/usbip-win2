@@ -16,7 +16,7 @@ struct HKeyTag {};
 using HKey = generic_handle<HKEY, HKeyTag, HKEY(INVALID_HANDLE_VALUE)>;
 
 template<>
-inline void close_handle(HKey::type h, HKey::tag_type) noexcept
+inline void close_handle(_In_ HKey::type h, _In_ HKey::tag_type) noexcept
 {
         [[maybe_unused]] auto err = RegCloseKey(h);
         assert(err == ERROR_SUCCESS);

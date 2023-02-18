@@ -16,7 +16,7 @@ struct HModuleTag {};
 using HModule = generic_handle<HMODULE, HModuleTag, nullptr>;
 
 template<>
-inline void close_handle(HModule::type h, HModule::tag_type) noexcept
+inline void close_handle(_In_ HModule::type h, _In_ HModule::tag_type) noexcept
 {
         [[maybe_unused]] auto ok = FreeLibrary(h);
         assert(ok);
