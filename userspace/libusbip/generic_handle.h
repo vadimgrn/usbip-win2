@@ -24,7 +24,7 @@ public:
 
         static constexpr auto None = NoneValue;
 
-        constexpr generic_handle() = default;
+        constexpr generic_handle() noexcept = default;
         constexpr explicit generic_handle(type h) noexcept : m_handle(h) {}
 
         ~generic_handle() { do_close(); }

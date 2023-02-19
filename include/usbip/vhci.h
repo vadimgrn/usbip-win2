@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <guiddef.h>
 
 #ifdef _KERNEL_MODE
@@ -15,6 +16,10 @@
 
 #include "ch9.h"
 #include "consts.h"
+
+/*
+ * Strings encoding is UTF8. 
+ */
 
 namespace usbip::vhci
 {
@@ -37,51 +42,17 @@ inline auto get_port_range(_In_ usb_device_speed speed)
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
-enum class function { // 12 bit
-        plugin = 0x800, // values of less than 0x800 are reserved for Microsoft
-        plugout, 
-        get_imported_devices 
-};
-
-constexpr auto make_ioctl(function id)
+struct imported_device_location
 {
-        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, 
-                        FILE_READ_DATA | FILE_WRITE_DATA);
-}
-
-namespace ioctl 
-{
-        enum {
-                plugin_hardware      = make_ioctl(function::plugin),
-                plugout_hardware     = make_ioctl(function::plugout),
-                get_imported_devices = make_ioctl(function::get_imported_devices),
-        };
-
-} // namespace ioctl
-
-
-/*
- * Strings encoding is UTF8. 
- */
-struct plugin_hardware // IN/OUT, ioctl::plugin_hardware
-{
-        struct {
-                int port; // [1..TOTAL_PORTS] or zero if an error
-                UINT32 error;
-                static_assert(sizeof(error) == sizeof(unsigned long));
-        } out; // must be the first member
+        int port; // OUT, [1..TOTAL_PORTS] or zero if an error
 
         char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
         char host[1025];  // NI_MAXHOST in ws2def.h
 };
+static_assert(!offsetof(imported_device_location, port)); // must be the first member
 
-struct plugout_hardware // IN, ioctl::plugout_hardware
-{
-        int port; // [1..TOTAL_PORTS] or all ports if <= 0
-};
-
-struct imported_dev_data
+struct imported_device_properties
 {
         UINT32 devid;
 //      static_assert(sizeof(devid) == sizeof(usbip_header_basic::devid));
@@ -93,6 +64,51 @@ struct imported_dev_data
         UINT16 product;
 };
 
-struct imported_device : plugin_hardware, imported_dev_data {}; // OUT, ioctl::get_imported_devices
+struct imported_device : imported_device_location, imported_device_properties {};
 
 } // namespace usbip::vhci
+
+
+namespace usbip::vhci::ioctl
+{
+
+enum class function { // 12 bit
+        plugin_hardware = 0x800, // values of less than 0x800 are reserved for Microsoft
+        plugout_hardware, 
+        get_imported_devices 
+};
+
+constexpr auto make(function id)
+{
+        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, 
+                        FILE_READ_DATA | FILE_WRITE_DATA);
+}
+
+enum {
+        PLUGIN_HARDWARE      = make(function::plugin_hardware),
+        PLUGOUT_HARDWARE     = make(function::plugout_hardware),
+        GET_IMPORTED_DEVICES = make(function::get_imported_devices),
+};
+
+struct base
+{
+        union {
+                ULONG size; // IN, self size, 
+                UINT32 error; // OUT, ERROR_USBIP_XXX
+        };
+};
+
+struct plugin_hardware : base, imported_device_location {};
+
+struct plugout_hardware : base
+{
+        int port; // [1..TOTAL_PORTS] or all ports if <= 0
+};
+
+struct get_imported_devices : base
+{
+        imported_device devices[ANYSIZE_ARRAY];
+};
+static_assert(sizeof(get_imported_devices) == sizeof(base) + sizeof(get_imported_devices::devices));
+
+} // namespace usbip::vhci::ioctl

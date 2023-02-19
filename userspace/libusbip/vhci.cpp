@@ -28,7 +28,7 @@ auto walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_
         return false;
 }
 
-auto init(_Out_ vhci::plugin_hardware &r, _In_ const vhci::attach_args &args)
+auto init(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
 {
         struct {
                 char *dst;
@@ -48,28 +48,33 @@ auto init(_Out_ vhci::plugin_hardware &r, _In_ const vhci::attach_args &args)
                 }
         }
 
-        r.out = decltype(r.out){}; // clear
         return true;
 }
 
-void assign(_Out_ std::vector<imported_device> &dst, _In_ const std::vector<vhci::imported_device> &src)
+void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_device *src, _In_ size_t cnt)
 {
-        dst.resize(src.size());
+        assert(dst.empty());
+        dst.reserve(cnt);
 
-        for (size_t i = 0; i < src.size(); ++i) {
+        for (size_t i = 0; i < cnt; ++i) {
+                dst.resize(i + 1);
                 auto &d = dst[i];
                 auto &s = src[i];
+                
+                // imported_device_location 
 
-                d.hub_port = s.out.port;
+                d.hub_port = s.port;
 
-                d.hostname = s.host;
-                assert(d.hostname.size() < ARRAYSIZE(s.host));
+                d.busid = s.busid;
+                assert(d.busid.size() < ARRAYSIZE(s.busid));
 
                 d.service = s.service;
                 assert(d.service.size() < ARRAYSIZE(s.service));
 
-                d.busid = s.busid;
-                assert(d.busid.size() < ARRAYSIZE(s.busid));
+                d.hostname = s.host;
+                assert(d.hostname.size() < ARRAYSIZE(s.host));
+
+                // imported_device_properties
 
                 d.devid = s.devid;
                 d.speed = s.speed;
@@ -124,20 +129,31 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
 {
         std::vector<usbip::imported_device> result;
 
-        std::vector<vhci::imported_device> v(TOTAL_PORTS);
-        auto idevs_bytes = DWORD(v.size()*sizeof(v[0]));
+        ioctl::get_imported_devices *r{};
+        std::vector<char> v(sizeof(*r) + (TOTAL_PORTS - ARRAYSIZE(r->devices))*sizeof(*r->devices));
+        r = reinterpret_cast<ioctl::get_imported_devices*>(v.data());
+        r->size = sizeof(*r);
 
-        if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::get_imported_devices, nullptr, 0, 
-                            v.data(), idevs_bytes, &BytesReturned, nullptr)) {
-                assert(!(BytesReturned % sizeof(v[0])));
-                v.resize(BytesReturned / sizeof(v[0]));
-                assign(result, v);
-                success = true; // result could be empty
-        } else {
-                success = false;
+        DWORD BytesReturned; // must be set if the last arg is NULL
+        success = DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size), 
+                                  v.data(), DWORD(v.size()), &BytesReturned, nullptr);
+
+        if (!success) {
+                return result;
         }
 
+        const auto devices_offset = offsetof(ioctl::get_imported_devices, devices);
+
+        assert(BytesReturned >= devices_offset);
+        BytesReturned -= devices_offset;
+
+        assert(!(BytesReturned % sizeof(*r->devices)));
+
+        if (auto cnt = BytesReturned/sizeof(*r->devices)) {
+                assign(result, r->devices, cnt);
+        }
+
+        SetLastError(r->error);
         return result;
 }
 
@@ -146,17 +162,19 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
  */
 int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
-        plugin_hardware r;
+        ioctl::plugin_hardware r {{ .size = sizeof(r) }};
         if (!init(r, args)) {
                 SetLastError(ERROR_INVALID_PARAMETER);
                 return 0;
         }
 
+        const auto outlen = offsetof(ioctl::plugin_hardware, port) + sizeof(r.port);
+
         if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::plugin_hardware, &r, sizeof(r), &r.out, sizeof(r.out), &BytesReturned, nullptr)) {
-                assert(BytesReturned == sizeof(r.out));
-                SetLastError(r.out.error);
-                return r.out.port;
+            DeviceIoControl(dev, ioctl::PLUGIN_HARDWARE, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
+                assert(BytesReturned == outlen);
+                SetLastError(r.error);
+                return r.port;
         }
 
         return 0;
@@ -167,11 +185,16 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 */
 bool usbip::vhci::detach(HANDLE dev, int port)
 {
-        plugout_hardware r { .port = port };
+        ioctl::plugout_hardware r { .port = port };
+        r.size = sizeof(r);
 
-        DWORD BytesReturned; // must be set if the last arg is NULL
-        auto ok = DeviceIoControl(dev, ioctl::plugout_hardware, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
-        assert(!BytesReturned);
+        if (DWORD BytesReturned; // must be set if the last arg is NULL
+            DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), 
+                            &r, sizeof(r.error), &BytesReturned, nullptr)) {
+                assert(BytesReturned == sizeof(r.error));
+                SetLastError(r.error);
+                return !r.error;
+        }
 
-        return ok;
+        return false;
 }

@@ -106,7 +106,7 @@ void init(CLI::App &app, const wchar_t *program)
 
 auto &msgtable_dll = L"resources"; // resource-only DLL that contains RT_MESSAGETABLE
 
-auto& get_resource_module()
+auto& get_resource_module() noexcept
 {
 	static HModule mod(LoadLibraryEx(msgtable_dll, nullptr, LOAD_LIBRARY_SEARCH_APPLICATION_DIR));
 	return mod;

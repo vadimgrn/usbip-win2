@@ -68,7 +68,7 @@ struct device_ctx_ext
         UNICODE_STRING serial; // user-defined
         //
         
-        vhci::imported_dev_data dev; // for ioctl_get_imported_dev
+        vhci::imported_device_properties dev;
 };
 
 /*
@@ -184,7 +184,7 @@ inline void sched_receive_usbip_header(_In_ device_ctx &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &d, _In_ const vhci::plugin_hardware &args);
+PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &d, _In_ const vhci::ioctl::plugin_hardware &args);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

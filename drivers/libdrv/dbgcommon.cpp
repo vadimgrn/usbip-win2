@@ -241,12 +241,12 @@ const char *usbuser_request_name(_In_ ULONG UsbUserRequest)
 const char *device_control_name(ULONG ioctl_code)
 {
 	using namespace usbip;
-	static_assert(sizeof(ioctl_code) == sizeof(vhci::ioctl::plugin_hardware));
+	static_assert(sizeof(ioctl_code) == sizeof(vhci::ioctl::PLUGIN_HARDWARE));
 
 	switch (ioctl_code) {
-	case vhci::ioctl::plugin_hardware: return "vhci_plugin_hardware";
-	case vhci::ioctl::plugout_hardware: return "vhci_plugout_hardware";
-	case vhci::ioctl::get_imported_devices: return "vhci_get_imported_devices";
+	case vhci::ioctl::PLUGIN_HARDWARE: return "vhci_plugin_hardware";
+	case vhci::ioctl::PLUGOUT_HARDWARE: return "vhci_plugout_hardware";
+	case vhci::ioctl::GET_IMPORTED_DEVICES: return "vhci_get_imported_devices";
 
 	case IOCTL_USB_DIAG_IGNORE_HUBS_ON: return "USB_DIAG_IGNORE_HUBS_ON";
 	case IOCTL_USB_DIAG_IGNORE_HUBS_OFF: return "USB_DIAG_IGNORE_HUBS_OFF";
