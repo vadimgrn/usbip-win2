@@ -101,6 +101,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="device_speed.cpp" />
     <ClCompile Include="remote.cpp" />
     <ClCompile Include="file_ver.cpp" />
     <ClCompile Include="proto_op.cpp" />
@@ -114,6 +115,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
+    <ClInclude Include="device_speed.h" />
     <ClInclude Include="hmodule.h" />
     <ClInclude Include="last_error.h" />
     <ClInclude Include="output.h" />

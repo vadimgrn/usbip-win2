@@ -6,9 +6,9 @@
 #include "setupdi.h"
 #include "output.h"
 #include "last_error.h"
+#include "device_speed.h"
 
 #include <resources\messages.h>
-#include <usbip\ch9.h>
 
 #include <initguid.h>
 #include <usbip\vhci.h>
@@ -17,26 +17,6 @@ namespace
 {
 
 using namespace usbip;
-
-auto win_speed(usb_device_speed speed) noexcept
-{
-        switch (speed) {
-        case USB_SPEED_SUPER_PLUS:
-        case USB_SPEED_SUPER:
-                return UsbSuperSpeed;
-        case USB_SPEED_WIRELESS:
-        case USB_SPEED_HIGH:
-                return UsbHighSpeed;
-        case USB_SPEED_FULL:
-                return UsbFullSpeed;
-        case USB_SPEED_LOW: 
-        case USB_SPEED_UNKNOWN:
-                return UsbLowSpeed;
-        }
-
-        assert(!"win_speed");
-        return UsbLowSpeed;
-}
 
 auto walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {

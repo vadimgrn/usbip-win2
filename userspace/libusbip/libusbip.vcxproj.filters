@@ -9,6 +9,7 @@
     <ClCompile Include="win_socket.cpp" />
     <ClCompile Include="vhci.cpp" />
     <ClCompile Include="remote.cpp" />
+    <ClCompile Include="device_speed.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\consts.h">
@@ -34,6 +35,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
+    <ClInclude Include="device_speed.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

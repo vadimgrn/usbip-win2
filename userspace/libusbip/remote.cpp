@@ -6,15 +6,13 @@
 #include "strconv.h"
 #include "output.h"
 #include "last_error.h"
+#include "device_speed.h"
+#include "op_common.h"
 
 #include <usbip\proto_op.h>
-#include <libusbip\op_common.h>
 
 #include <ws2tcpip.h>
 #include <mstcpip.h>
-
-#include <memory>
-#include <chrono>
 
 namespace
 {
@@ -154,6 +152,31 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 	return op_status_error(static_cast<op_status_t>(r.status));
 }
 
+auto as_usb_device(_In_ const usbip_usb_device &d)
+{
+	return usb_device {
+		.path = d.path,
+		.busid = d.busid,
+
+		.busnum = d.busnum,
+		.devnum = d.devnum,
+		.speed = win_speed(static_cast<usb_device_speed>(d.speed)),
+
+		.idVendor = d.idVendor,
+		.idProduct = d.idProduct,
+		.bcdDevice = d.bcdDevice,
+
+		.bDeviceClass = d.bDeviceClass,
+		.bDeviceSubClass = d.bDeviceSubClass,
+		.bDeviceProtocol = d.bDeviceProtocol,
+
+		.bConfigurationValue = d.bConfigurationValue,
+
+		.bNumConfigurations = d.bNumConfigurations,
+		.bNumInterfaces = d.bNumInterfaces,
+	};
+}
+
 } // namespace
 
 
@@ -207,9 +230,9 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Sock
 
 bool usbip::enum_exportable_devices(
 	_In_ SOCKET s, 
-	_In_ const usbip_usb_device_f &on_dev, 
-	_In_ const usbip_usb_interface_f &on_intf,
-	_In_opt_ const usbip_usb_device_cnt_f &on_dev_cnt)
+	_In_ const usb_device_f &on_dev, 
+	_In_ const usb_interface_f &on_intf,
+	_In_opt_ const usb_device_cnt_f &on_dev_cnt)
 {
 	assert(s != INVALID_SOCKET);
 	
@@ -237,13 +260,16 @@ bool usbip::enum_exportable_devices(
 		on_dev_cnt(reply.ndev);
 	}
 
+	usb_device lib_dev;
+
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
 		usbip_usb_device dev;
 
 		if (recv(s, &dev, sizeof(dev))) {
 			usbip_net_pack_usb_device(false, &dev);
-			on_dev(i, dev);
+			lib_dev = as_usb_device(dev);
+			on_dev(i, lib_dev);
 		} else {
 			return false;
 		}
@@ -254,7 +280,8 @@ bool usbip::enum_exportable_devices(
 
 			if (recv(s, &intf, sizeof(intf))) {
 				usbip_net_pack_usb_interface(false, &intf);
-				on_intf(i, dev, j, intf);
+				static_assert(sizeof(intf) == sizeof(usb_interface));
+				on_intf(i, lib_dev, j, reinterpret_cast<usb_interface&>(intf));
 			} else {
 				return false;
 			}

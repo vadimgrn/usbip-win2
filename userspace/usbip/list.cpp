@@ -23,7 +23,7 @@ void on_device_count(int count)
 	}
 }
 
-void on_device(int, const usbip_usb_device &d)
+void on_device(int, const usb_device &d)
 {
 	auto &ids = get_ids();
 	auto prod = get_product(ids, d.idVendor, d.idProduct);
@@ -44,7 +44,7 @@ void on_device(int, const usbip_usb_device &d)
 	printf(lines.c_str());
 }
 
-void on_interface(int, const usbip_usb_device &d, int idx, const usbip_usb_interface &r)
+void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
 {
 	auto &ids = get_ids();
 	auto csp = get_class(ids, r.bInterfaceClass, r.bInterfaceSubClass, r.bInterfaceProtocol);
