@@ -12,15 +12,20 @@ struct usbip_usb_interface;
 namespace usbip
 {
 
+/**
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number of symbolic name
+ * @return call GetLastError() if returned handle is invalid
+ */
 Socket connect(_In_ const char *hostname, _In_ const char *service);
 
-/*
+/**
  * @param idx zero-based index of usb device
  * @param dev usb device
  */
 using usbip_usb_device_f = std::function<void(_In_ int idx, _In_ const usbip_usb_device &dev)>;
 
-/*
+/**
  * @param dev_idx zero-based index of usb device
  * @param dev usb device
  * @param idx zero-based index of usb interface that belong to this usb device
@@ -28,16 +33,22 @@ using usbip_usb_device_f = std::function<void(_In_ int idx, _In_ const usbip_usb
  */
 using usbip_usb_interface_f = std::function<void(_In_ int dev_idx, _In_ const usbip_usb_device &dev, int idx, const usbip_usb_interface &intf)>;
 
-/*
+/**
  * @param count number of usb devices
  */
 using usbip_usb_device_cnt_f = std::function<void(_In_ int count)>;
 
+/**
+ * @param s socket handle
+ * @param on_dev will be called for every usb device
+ * @param on_intf will be called for every usb interface of usb device
+ * @param on_dev_cnt will be called once before other callbacks
+ * @return call GetLastError() if false is returned
+ */
 bool enum_exportable_devices(
         _In_ SOCKET s, 
         _In_ const usbip_usb_device_f &on_dev, 
         _In_ const usbip_usb_interface_f &on_intf,
-        _In_opt_ const usbip_usb_device_cnt_f& on_dev_cnt = nullptr);
+        _In_opt_ const usbip_usb_device_cnt_f &on_dev_cnt = nullptr);
 
 } // namespace usbip
-

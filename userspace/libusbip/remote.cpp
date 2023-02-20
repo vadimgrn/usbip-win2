@@ -205,9 +205,6 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Sock
 	return sock;
 }
 
-/*
- * @return call GetLastError() if false is returned
- */
 bool usbip::enum_exportable_devices(
 	_In_ SOCKET s, 
 	_In_ const usbip_usb_device_f &on_dev, 

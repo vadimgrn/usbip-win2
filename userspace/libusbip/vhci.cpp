@@ -60,21 +60,22 @@ void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_d
                 auto &s = src[i];
 
                 imported_device d { 
-                        // imported_device_location 
-                        .port = s.port,
-                        .hostname = s.host,
-                        .service = s.service,
-                        .busid = s.busid,
-                        // imported_device_properties
-                        .devid = s.devid,
-                        .speed = s.speed,
-                        .vendor = s.vendor,
-                        .product = s.product,
+                        { .hostname = s.host,
+                          .service = s.service,
+                          .busid = s.busid }
                 };
 
+                // imported_device_location 
                 assert(d.hostname.size() < ARRAYSIZE(s.host));
                 assert(d.service.size() < ARRAYSIZE(s.service));
                 assert(d.busid.size() < ARRAYSIZE(s.busid));
+                d.port = s.port;
+
+                // imported_device_properties
+                d.devid = s.devid;
+                d.speed = s.speed;
+                d.vendor = s.vendor;
+                d.product = s.product;
 
                 dst.push_back(std::move(d));
         }
@@ -83,9 +84,6 @@ void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_d
 } // namespace
 
 
-/*
- * @return "" if the driver is not loaded 
- */
 std::wstring usbip::vhci::get_path()
 {
         std::wstring path;
@@ -100,9 +98,6 @@ std::wstring usbip::vhci::get_path()
         return path;
 }
 
-/*
- * Call GetLastError if returned handle is invalid.
- */
 auto usbip::vhci::open(_In_ const std::wstring &path) -> Handle
 {
         Handle h;
@@ -118,9 +113,6 @@ auto usbip::vhci::open(_In_ const std::wstring &path) -> Handle
         return h;
 }
 
-/*
- * Call GetLastError if result is false.
- */
 std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDLE dev, _Out_ bool &success)
 {
         std::vector<usbip::imported_device> result;
@@ -153,9 +145,6 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
         return result;
 }
 
-/*
- * @return hub port number, [1..TOTAL_PORTS]. Call GetLastError() if zero is returned. 
- */
 int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_info &info)
 {
         ioctl::plugin_hardware r {{ .size = sizeof(r) }};
@@ -176,9 +165,6 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_info &info)
         return 0;
 }
 
-/*
-* @return call GetLastError() if false is returned
-*/
 bool usbip::vhci::detach(HANDLE dev, int port)
 {
         ioctl::plugout_hardware r { .port = port };
