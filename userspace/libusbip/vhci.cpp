@@ -28,16 +28,16 @@ auto walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_
         return false;
 }
 
-auto init(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
+auto init(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const attach_info &info)
 {
         struct {
                 char *dst;
                 size_t len;
                 const std::string &src;
         } const v[] = {
-                { r.busid, ARRAYSIZE(r.busid), args.busid },
-                { r.service, ARRAYSIZE(r.service), args.service },
-                { r.host, ARRAYSIZE(r.host), args.hostname },
+                { r.busid, ARRAYSIZE(r.busid), info.busid },
+                { r.service, ARRAYSIZE(r.service), info.service },
+                { r.host, ARRAYSIZE(r.host), info.hostname },
         };
 
         for (auto &i: v) {
@@ -57,30 +57,26 @@ void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_d
         dst.reserve(cnt);
 
         for (size_t i = 0; i < cnt; ++i) {
-                dst.resize(i + 1);
-                auto &d = dst[i];
                 auto &s = src[i];
-                
-                // imported_device_location 
 
-                d.hub_port = s.port;
+                imported_device d { 
+                        // imported_device_location 
+                        .port = s.port,
+                        .hostname = s.host,
+                        .service = s.service,
+                        .busid = s.busid,
+                        // imported_device_properties
+                        .devid = s.devid,
+                        .speed = s.speed,
+                        .vendor = s.vendor,
+                        .product = s.product,
+                };
 
-                d.busid = s.busid;
+                assert(d.hostname.size() < ARRAYSIZE(s.host));
+                assert(d.service.size() < ARRAYSIZE(s.service));
                 assert(d.busid.size() < ARRAYSIZE(s.busid));
 
-                d.service = s.service;
-                assert(d.service.size() < ARRAYSIZE(s.service));
-
-                d.hostname = s.host;
-                assert(d.hostname.size() < ARRAYSIZE(s.host));
-
-                // imported_device_properties
-
-                d.devid = s.devid;
-                d.speed = s.speed;
-
-                d.vendor = s.vendor;
-                d.product = s.product;
+                dst.push_back(std::move(d));
         }
 }
 
@@ -160,10 +156,10 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
 /*
  * @return hub port number, [1..TOTAL_PORTS]. Call GetLastError() if zero is returned. 
  */
-int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
+int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_info &info)
 {
         ioctl::plugin_hardware r {{ .size = sizeof(r) }};
-        if (!init(r, args)) {
+        if (!init(r, info)) {
                 SetLastError(ERROR_INVALID_PARAMETER);
                 return 0;
         }

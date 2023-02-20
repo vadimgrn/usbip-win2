@@ -17,13 +17,13 @@ bool usbip::cmd_attach(void *p)
 
         auto &args = *reinterpret_cast<attach_args*>(p);
 
-        vhci::attach_args r {
+        attach_info info {
                 .hostname = args.remote, 
                 .service = global_args.tcp_port, 
                 .busid = args.busid,
         };
 
-        auto port = vhci::attach(dev.get(), r);
+        auto port = vhci::attach(dev.get(), info);
         if (!port) {
                 spdlog::error(GetLastErrorMsg());
                 return false;

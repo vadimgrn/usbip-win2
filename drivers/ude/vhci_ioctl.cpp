@@ -398,21 +398,20 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
         }
 
         static_assert(offsetof(vhci::ioctl::plugout_hardware, size) == 
-                      offsetof(vhci::ioctl::plugout_hardware, error));
+                      offsetof(vhci::ioctl::plugout_hardware, error)); // are members of union
 
         auto r_size = r->size;
-        r->error = 0; // union with r->size
-
-        if (r_size != sizeof(*r)) {
+        
+        if (r->error = r_size == sizeof(*r) ? 0 : ERROR_USBIP_ABI; r->error) {
                 Trace(TRACE_LEVEL_ERROR, "sizeof(plugout_hardware) %Iu != plugout_hardware.size %lu", sizeof(*r), r_size);
-                r->error = ERROR_USBIP_ABI;
         } else if (auto vhci = get_vhci(Request); r->port <= 0) {
                 vhci::destroy_all_devices(vhci);
+        } else if (!vhci::is_valid_port(r->port)) {
+                return STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::find_device(vhci, r->port)) {
                 device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
         } else {
-                Trace(TRACE_LEVEL_ERROR, "Invalid or empty port %d", r->port);
-                r->error = !vhci::is_valid_port(r->port) ? ERROR_USBIP_PORT_INVALID : ERROR_USBIP_PORT_EMPTY;
+                return STATUS_DEVICE_NOT_CONNECTED;
         }
 
         WdfRequestSetInformation(Request, sizeof(r->error));
@@ -424,7 +423,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 {
         PAGED_CODE();
-        const auto devices_offset = offsetof(vhci::ioctl::get_imported_devices, devices);
 
         size_t outlen;
         vhci::ioctl::get_imported_devices *r;
@@ -432,20 +430,23 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
                 return err;
         }
 
+        const auto devices_offset = offsetof(vhci::ioctl::get_imported_devices, devices);
+
         if (r->size != sizeof(*r)) {
                 Trace(TRACE_LEVEL_ERROR, "sizeof(get_imported_devices) %Iu != get_imported_devices.size %lu", 
                                           sizeof(*r), r->size);
                 r->error = ERROR_USBIP_ABI;
-                static_assert(devices_offset == sizeof(r->size)); // libusbip expected min output size
-                WdfRequestSetInformation(Request, sizeof(r->size)); // correct, not sizeof(r->error)
+                WdfRequestSetInformation(Request, sizeof(r->error));
+                static_assert(sizeof(r->error) == devices_offset); // libusbip expected min output size
                 return STATUS_SUCCESS;
         }
 
         outlen -= devices_offset;
 
-        if (outlen % sizeof(*r->devices)) {
-                Trace(TRACE_LEVEL_ERROR, "Array size %Iu != n*sizeof(imported_device) %Iu", outlen, sizeof(*r->devices));
-                return STATUS_INVALID_PARAMETER;
+        if (auto rem = outlen % sizeof(*r->devices)) {
+                Trace(TRACE_LEVEL_ERROR, "byte[%Iu] does not accommodate N*sizeof(imported device), "
+                                         "remainder %Iu/%Iu=%Iu", outlen, outlen, sizeof(*r->devices), rem);
+                return STATUS_INVALID_BUFFER_SIZE;
         }
 
         auto max_cnt = outlen/sizeof(*r->devices);
@@ -457,12 +458,9 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices) && devices_cnt < max_cnt; ++port) {
                 if (auto dev = vhci::find_device(vhci, port)) {
                         auto &ctx = *get_device_ctx(dev.get());
-                        if (NT_ERROR(fill(r->devices[devices_cnt], ctx))) {
-                                r->error = ERROR_USBIP_GENERAL;
-                                port = ARRAYSIZE(vhci_ctx::devices); // break outer loop
-                                break;
+                        if (auto err = fill(r->devices[devices_cnt++], ctx)) {
+                                return err;
                         }
-                        ++devices_cnt;
                 }
         }
 

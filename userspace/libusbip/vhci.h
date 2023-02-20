@@ -19,10 +19,10 @@ namespace usbip
 
 struct imported_device
 {
-        int hub_port; // [1..TOTAL_PORTS]
+        int port; // [1..TOTAL_PORTS], hub port number
 
         std::string hostname;
-        std::string service;
+        std::string service; // TCP/IP port number or symbolic name
         std::string busid;
 
         UINT32 devid;
@@ -30,6 +30,13 @@ struct imported_device
 
         UINT16 vendor;
         UINT16 product;
+};
+
+struct attach_info
+{
+        std::string hostname;
+        std::string service;
+        std::string busid;
 };
 
 } // namespace usbip
@@ -43,14 +50,7 @@ Handle open(_In_ const std::wstring &path = get_path());
 
 std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &success);
 
-struct attach_args
-{
-        std::string hostname;
-        std::string service;
-        std::string busid;
-};
-
-int attach(_In_ HANDLE dev, _In_ const attach_args &args);
+int attach(_In_ HANDLE dev, _In_ const attach_info &info);
 bool detach(_In_ HANDLE dev, _In_ int port);
 
 } // namespace usbip::vhci

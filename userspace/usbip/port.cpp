@@ -27,7 +27,7 @@ void print(const imported_device &d)
            -> usbip://{}:{}/{}
            -> remote bus/dev {:03}/{:03}
 )";
-        auto msg = std::format(fmt, d.hub_port, get_speed_str(d.speed),
+        auto msg = std::format(fmt, d.port, get_speed_str(d.speed),
                                 product,
                                 d.hostname, d.service, d.busid,
                                 bus, dev);
@@ -59,8 +59,8 @@ bool usbip::cmd_port(void *p)
         bool found{};
 
         for (auto &d: devices) {
-                assert(d.hub_port);
-                if (ports.empty() || ports.contains(d.hub_port)) {
+                assert(d.port);
+                if (ports.empty() || ports.contains(d.port)) {
                         if (!found) {
                                 found = true;
                                 printf("Imported USB devices\n"

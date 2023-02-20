@@ -61,14 +61,14 @@ struct device_ctx_ext
         device_ctx *ctx;
         wsk::SOCKET *sock;
 
-        // from vhci::ioctl_plugin
+        // from ioctl::plugin_hardware
         PSTR busid;
         UNICODE_STRING node_name;
         UNICODE_STRING service_name;
         UNICODE_STRING serial; // user-defined
         //
         
-        vhci::imported_device_properties dev;
+        vhci::imported_device_properties dev; // for ioctl::get_imported_devices
 };
 
 /*

@@ -77,22 +77,6 @@ ABI mismatch, unexpected size of the input structure
 
 MessageId=
 Severity=Error
-Facility=Driver
-SymbolicName=ERROR_USBIP_PORT_INVALID
-Language=English
-USB port number is out of range
-.
-
-MessageId=
-Severity=Error
-Facility=Driver
-SymbolicName=ERROR_USBIP_PORT_EMPTY
-Language=English
-USB port is not occupied
-.
-
-MessageId=
-Severity=Error
 Facility=Device
 SymbolicName=ERROR_USBIP_ST_NA
 Language=English
