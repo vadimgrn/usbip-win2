@@ -1,7 +1,6 @@
 #pragma once
 
 #include <usbip\proto.h>
-#include <usbip\ch9.h>
 
 #include <ntddk.h>
 #include <usbdi.h>

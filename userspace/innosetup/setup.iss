@@ -67,22 +67,30 @@ MinVersion=10.0.19041
 [Messages]
 WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
 
-[Files]
-Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
-Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy
-Source: {#SolutionDir + "drivers\"}{#CertFile}; DestDir: "{tmp}"
+[Components]
+Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
+Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
-Source: {#BuildDir + "resources.dll"}; DestDir: "{app}"
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"
-Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"
+[Files]
+Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
+Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
+Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
+Source: {#SolutionDir + "drivers\"}{#CertFile}; DestDir: "{tmp}"; Components: main
+
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "resources.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"; Components: main
+Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
+
+Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb"; Components: sdk
+
+Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "file_ver.h, op_common.h, setupdi.h ,usb_ids.h"; Components: sdk
+Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 
 #if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb"
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb"; Components: main
 #endif
-
 
 [Tasks]
 Name: modifypath; Description: "&Add to PATH environment variable for all users"

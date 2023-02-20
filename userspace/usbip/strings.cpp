@@ -5,10 +5,8 @@
 
 #include "strings.h"
 
-#include <usbip\proto_op.h>
 #include <libusbip\usb_ids.h>
-
-#include <spdlog\spdlog.h>
+#include <format>
 
 namespace
 {
@@ -19,30 +17,21 @@ auto &fmt_name_hex = "{:20} = {:#x}";
 } // namespace
 
 
-const char* usbip::get_speed_str(usb_device_speed speed)
+const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
 {
-        struct {
-                usb_device_speed val;
-                const char *speed;
-                const char *desc;
-        } const v[] = {
-                { USB_SPEED_UNKNOWN, "unknown", "Unknown Speed"},
-                { USB_SPEED_LOW,  "1.5", "Low Speed(1.5Mbps)"  },
-                { USB_SPEED_FULL, "12",  "Full Speed(12Mbps)" },
-                { USB_SPEED_HIGH, "480", "High Speed(480Mbps)" },
-                { USB_SPEED_WIRELESS, "53.3-480", "Wireless" },
-                { USB_SPEED_SUPER, "5000", "Super Speed(5000Mbps)" },
-                { USB_SPEED_SUPER_PLUS, "10000", "Super Speed Plus(10 Gbit/s)" },
-                {}
-        };
+         const char *names[] { 
+                 "Low Speed(1.5Mbps)", 
+                 "Full Speed(12Mbps)", 
+                 "High Speed(480Mbps)", 
+                 "Super Speed(5000Mbps)",
+         };
 
-        for (auto &i : v) {
-                if (i.val == speed) {
-                        return i.desc;
-                }
-        }
+         static_assert(UsbLowSpeed == 0);
+         static_assert(UsbFullSpeed == 1);
+         static_assert(UsbHighSpeed == 2);
+         static_assert(UsbSuperSpeed == 3);
 
-	return v[0].desc;
+         return speed >= 0 && speed < ARRAYSIZE(names) ? names[speed] : "Unknown Speed";
 }
 
 std::string usbip::get_product(const UsbIds &ids, uint16_t vendor, uint16_t product)

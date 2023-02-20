@@ -11,9 +11,6 @@
     <ClCompile Include="remote.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\usbip\ch9.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
@@ -34,6 +31,9 @@
     <ClInclude Include="op_common.h" />
     <ClInclude Include="output.h" />
     <ClInclude Include="last_error.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

@@ -18,7 +18,6 @@
     <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
     <ClCompile Include="strutil.cpp" />
-    <ClCompile Include="usb_util.cpp" />
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />

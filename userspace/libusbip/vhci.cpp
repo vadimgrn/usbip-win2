@@ -8,6 +8,7 @@
 #include "last_error.h"
 
 #include <resources\messages.h>
+#include <usbip\ch9.h>
 
 #include <initguid.h>
 #include <usbip\vhci.h>
@@ -16,6 +17,26 @@ namespace
 {
 
 using namespace usbip;
+
+auto win_speed(usb_device_speed speed) noexcept
+{
+        switch (speed) {
+        case USB_SPEED_SUPER_PLUS:
+        case USB_SPEED_SUPER:
+                return UsbSuperSpeed;
+        case USB_SPEED_WIRELESS:
+        case USB_SPEED_HIGH:
+                return UsbHighSpeed;
+        case USB_SPEED_FULL:
+                return UsbFullSpeed;
+        case USB_SPEED_LOW: 
+        case USB_SPEED_UNKNOWN:
+                return UsbLowSpeed;
+        }
+
+        assert(!"win_speed");
+        return UsbLowSpeed;
+}
 
 auto walker_devpath(std::wstring &path, const GUID &guid, HDEVINFO dev_info, SP_DEVINFO_DATA *data)
 {
@@ -73,7 +94,7 @@ void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_d
 
                 // imported_device_properties
                 d.devid = s.devid;
-                d.speed = s.speed;
+                d.speed = win_speed(s.speed);
                 d.vendor = s.vendor;
                 d.product = s.product;
 

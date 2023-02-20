@@ -5,7 +5,7 @@
 #pragma once
 
 #include "win_handle.h"
-#include <usbip/ch9.h>
+#include <usbspec.h>
 
 #include <string>
 #include <vector>
@@ -29,7 +29,7 @@ struct imported_device : attach_info
         int port; // [1..TOTAL_PORTS], hub port number
 
         UINT32 devid;
-        usb_device_speed speed;
+        USB_DEVICE_SPEED speed;
 
         UINT16 vendor;
         UINT16 product;

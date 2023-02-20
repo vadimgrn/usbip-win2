@@ -6,7 +6,6 @@
     <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
     <ClCompile Include="strutil.cpp" />
-    <ClCompile Include="usb_util.cpp" />
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
@@ -24,9 +23,6 @@
     <ClInclude Include="usbd_helper.h" />
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wsk_cpp.h" />
-    <ClInclude Include="..\..\include\usbip\ch9.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
@@ -42,6 +38,9 @@
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="select.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

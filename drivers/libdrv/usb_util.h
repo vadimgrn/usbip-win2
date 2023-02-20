@@ -4,11 +4,8 @@
 
 #pragma once
 
-#include <usbip\ch9.h>
-#include <usbip\proto.h>
-
-#include <ntdef.h>
 #include <usbspec.h>
+#include <usbip\proto.h>
 
 inline auto& get_setup(usbip_header_cmd_submit &hdr)
 {
@@ -20,5 +17,3 @@ inline auto& get_submit_setup(usbip_header &hdr)
 {
 	return get_setup(hdr.u.cmd_submit);
 }
-
-usb_device_speed get_usb_speed(USHORT bcdUSB);

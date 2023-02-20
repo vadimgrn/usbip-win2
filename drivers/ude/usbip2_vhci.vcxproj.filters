@@ -6,9 +6,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\usbip\ch9.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
@@ -35,6 +32,9 @@
     <ClInclude Include="device_queue.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="ioctl.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />

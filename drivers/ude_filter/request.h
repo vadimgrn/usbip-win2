@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <libdrv\ch9.h>
 #include <libdrv\usbd_helper.h>
 
 namespace usbip::filter
@@ -16,7 +17,7 @@ namespace impl
  * 9.4 Standard Device Requests
  * 9.4.14 Set Firmware Status
  * bRequest: SET_FW_STATUS
- * wValue: 0 : Disallow FW update, 1 : Allow FW update, 2 – 0xFF : Reserved
+ * wValue: 0 : Disallow FW update, 1 : Allow FW update, 2 â€“ 0xFF : Reserved
  * wIndex: Zero
  * wLength: Zero
  */
