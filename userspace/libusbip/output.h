@@ -10,8 +10,8 @@
 namespace libusbip
 {
 
-using output_fn = std::function<void(std::string)>;
-inline output_fn output_function;
+inline std::function<void(std::string)> output_function;
+inline std::function<void(std::wstring)> woutput_function;
 
 template<typename... Args>
 inline void output(std::string_view fmt, Args&&... args)
@@ -24,8 +24,8 @@ inline void output(std::string_view fmt, Args&&... args)
 template<typename... Args>
 inline void output(std::wstring_view fmt, Args&&... args)
 {
-        if (output_function) {
-                output_function(vformat(fmt, std::make_wformat_args(args...)));
+        if (woutput_function) {
+                woutput_function(vformat(fmt, std::make_wformat_args(args...)));
         }
 }
 

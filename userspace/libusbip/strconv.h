@@ -5,10 +5,14 @@
 #pragma once
 
 #include <windows.h>
+
 #include <string>
+#include <vector>
 
 namespace usbip
 {
+
+std::vector<std::wstring> split_multiz(_In_ std::wstring_view str);
 
 std::wstring utf8_to_wchar(_In_ std::string_view s);
 std::string wchar_to_utf8(_In_ std::wstring_view ws);

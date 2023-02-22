@@ -117,10 +117,17 @@ void init_spdlog()
 	set_default_logger(spdlog::stderr_color_st("stderr"));
 	spdlog::set_pattern("%^%l%$: %v");
 
-	using fn = void(const std::string&);
-	fn &f = spdlog::debug; // pick this overload
+	{
+		using fn = void(const std::string&);
+		fn &f = spdlog::debug; // pick this overload
+		libusbip::output_function = f;
+	}
 
-	libusbip::output_function = f;
+	{
+		using fn = void(const std::wstring&);
+		fn &f = spdlog::debug; // pick this overload
+		libusbip::woutput_function = f;
+	}
 }
 
 } // namespace

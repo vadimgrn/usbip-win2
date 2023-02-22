@@ -9,7 +9,7 @@
 #include <combaseapi.h>
 
 #include <libusbip\hkey.h>
-#include <libusbip\setupdi.h>
+#include <libusbip\hdevinfo.h>
 #include <libusbip\file_ver.h>
 #include <libusbip\strconv.h>
 

@@ -74,3 +74,16 @@ std::wstring usbip::wformat_message(
 
         return msg;
 }
+
+std::vector<std::wstring> usbip::split_multiz(_In_ std::wstring_view str)
+{
+        std::vector<std::wstring> v;
+
+        while (!str.empty() && str.front()) {
+                auto &s = v.emplace_back(str.data());
+                auto n = s.size() + 1; // skip L'\0'
+                str.remove_prefix(min(n, str.size()));
+        }
+
+        return v;
+}

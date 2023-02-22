@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClCompile Include="file_ver.cpp" />
     <ClCompile Include="proto_op.cpp" />
-    <ClCompile Include="setupdi.cpp" />
     <ClCompile Include="strconv.cpp" />
     <ClCompile Include="usb_ids.cpp" />
     <ClCompile Include="win_socket.cpp" />
@@ -20,7 +19,7 @@
     </ClInclude>
     <ClInclude Include="file_ver.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="setupdi.h" />
+    <ClInclude Include="hdevinfo.h" />
     <ClInclude Include="strconv.h" />
     <ClInclude Include="usb_ids.h" />
     <ClInclude Include="win_handle.h" />
