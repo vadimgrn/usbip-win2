@@ -80,9 +80,12 @@ std::vector<std::wstring> usbip::split_multiz(_In_ std::wstring_view str)
         std::vector<std::wstring> v;
 
         while (!str.empty() && str.front()) {
-                auto &s = v.emplace_back(str.data());
-                auto n = s.size() + 1; // skip L'\0'
-                str.remove_prefix(min(n, str.size()));
+                auto str_sz = str.size();
+
+                auto len = wcsnlen_s(str.data(), str_sz);
+                v.emplace_back(str.data(), len);
+
+                str.remove_prefix(min(len + 1, str_sz)); // skip L'\0'
         }
 
         return v;

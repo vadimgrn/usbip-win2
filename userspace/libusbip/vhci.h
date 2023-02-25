@@ -41,16 +41,11 @@ struct imported_device : attach_info
 namespace usbip::vhci
 {
 
-/*
- * @return full path to the driver device or empty string if the driver is not loaded 
- */
-std::wstring get_path();
-
 /**
- * @param path full path to the driver device
- * @return call GetLastError if returned handle is invalid
+ * Open driver's device interface
+ * @return handle, call GetLastError() if it is invalid
  */
-Handle open(_In_ const std::wstring &path = get_path());
+Handle open();
 
 /*
  * @param dev handle of the driver device

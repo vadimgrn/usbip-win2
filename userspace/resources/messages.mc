@@ -122,3 +122,11 @@ SymbolicName=ERROR_USBIP_VHCI_NOT_FOUND
 Language=English
 VHCI device not found, driver not loaded?
 .
+
+MessageId=
+Severity=Error
+Facility=Library
+SymbolicName=ERROR_USBIP_DEVICE_INTERFACE_LIST
+Language=English
+Several VHCI device interfaces found
+.

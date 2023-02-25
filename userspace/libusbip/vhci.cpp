@@ -73,10 +73,7 @@ void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_d
         }
 }
 
-} // namespace
-
-
-std::wstring usbip::vhci::get_path()
+auto get_path()
 {
         auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
         std::wstring path;
@@ -84,42 +81,53 @@ std::wstring usbip::vhci::get_path()
         for (std::wstring multiz; true; ) {
 
                 ULONG cch;
-
                 if (auto err = CM_Get_Device_Interface_List_Size(&cch, guid, nullptr, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
                         libusbip::output("CM_Get_Device_Interface_List_Size error #{}", err);
+                        auto code = CM_MapCrToWin32Err(err, ERROR_INVALID_PARAMETER);
+                        SetLastError(code);
                         return path;
-                } else if (cch == 1) { // not found, CM_Get_Device_Interface_List will return L"" and CR_SUCCESS
-                        return path;
-                }
+                } 
 
-                multiz.resize(cch); // L"path1\0path2\0pathn\0\0"
+                multiz.resize(cch); // "path1\0path2\0pathn\0\0"
 
                 switch (auto err = CM_Get_Device_Interface_List(guid, nullptr, multiz.data(), cch, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
                 case CR_SUCCESS:
                         if (auto v = split_multiz(multiz); auto n = v.size()) {
-                                if (n > 1) {
-                                        libusbip::output("CM_Get_Device_Interface_List returned {} paths", n);
+                                if (n == 1) {
+                                        path = v.front();
+                                        assert(!path.empty());
+                                } else {
+                                        libusbip::output("CM_Get_Device_Interface_List: {} paths returned", n);
+                                        for (auto &s: v) {
+                                                libusbip::output(s);
+                                        }
+                                        SetLastError(ERROR_USBIP_DEVICE_INTERFACE_LIST);
                                 }
-                                path = v.front();
+                        } else {
+                                assert(multiz.size() == 1); // if not found, returns CR_SUCCESS and ""
+                                assert(!multiz.front());
+                                SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
                         }
-                        assert(!path.empty());
                         return path;
                 case CR_BUFFER_SMALL:
                         break;
                 default:
                         libusbip::output("CM_Get_Device_Interface_List error #{}", err);
+                        auto code = CM_MapCrToWin32Err(err, ERROR_NOT_ENOUGH_MEMORY);
+                        SetLastError(code);
                         return path;
                 }
         }
 }
 
-auto usbip::vhci::open(_In_ const std::wstring &path) -> Handle
+} // namespace
+
+
+auto usbip::vhci::open() -> Handle
 {
         Handle h;
 
-        if (path.empty()) { // get_path() failed
-                SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
-        } else {
+        if (auto path = get_path(); !path.empty()) {
                 h.reset(CreateFile(path.c_str(), GENERIC_READ | GENERIC_WRITE, 
                                    FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, 
                                    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
