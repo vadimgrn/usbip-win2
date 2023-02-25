@@ -10,10 +10,10 @@
 
 #include <libusbip\hkey.h>
 #include <libusbip\hdevinfo.h>
-#include <libusbip\file_ver.h>
 #include <libusbip\strconv.h>
+#include <libusbip\src\file_ver.h>
 
-#include <libusbip\CLI11.hpp>
+#include <CLI11\CLI11.hpp>
 
 /*
  * See: devcon utility

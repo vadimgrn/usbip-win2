@@ -1,44 +1,55 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="proto_op.cpp" />
-    <ClCompile Include="strconv.cpp" />
-    <ClCompile Include="usb_ids.cpp" />
-    <ClCompile Include="win_socket.cpp" />
-    <ClCompile Include="vhci.cpp" />
-    <ClCompile Include="remote.cpp" />
-    <ClCompile Include="device_speed.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\usbip\proto_op.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="file_ver.h" />
-    <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="hdevinfo.h" />
-    <ClInclude Include="strconv.h" />
-    <ClInclude Include="usb_ids.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
-    <ClInclude Include="hkey.h" />
-    <ClInclude Include="vhci.h" />
-    <ClInclude Include="remote.h" />
-    <ClInclude Include="hmodule.h" />
-    <ClInclude Include="op_common.h" />
-    <ClInclude Include="output.h" />
-    <ClInclude Include="last_error.h" />
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="device_speed.h" />
+    <ClInclude Include="generic_handle.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="remote.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="output.h">
+      <Filter>public</Filter>
+    </ClInclude>
+    <ClInclude Include="src\op_common.h" />
+    <ClInclude Include="src\last_error.h" />
+    <ClInclude Include="src\device_speed.h" />
+    <ClInclude Include="src\file_ver.h" />
+    <ClInclude Include="src\usb_ids.h" />
+    <ClInclude Include="hdevinfo.h" />
+    <ClInclude Include="hkey.h" />
+    <ClInclude Include="hmodule.h" />
+    <ClInclude Include="strconv.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
       <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
     </Filter>
+    <Filter Include="public">
+      <UniqueIdentifier>{e7199aa4-b812-401f-b655-bb96adb27561}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\device_speed.cpp" />
+    <ClCompile Include="src\file_ver.cpp" />
+    <ClCompile Include="src\proto_op.cpp" />
+    <ClCompile Include="src\remote.cpp" />
+    <ClCompile Include="src\strconv.cpp" />
+    <ClCompile Include="src\usb_ids.cpp" />
+    <ClCompile Include="src\vhci.cpp" />
+    <ClCompile Include="src\win_socket.cpp" />
   </ItemGroup>
 </Project>

@@ -7,17 +7,18 @@
 
 #include <libusbip\output.h>
 #include <libusbip\win_socket.h>
-#include <libusbip\file_ver.h>
-#include <libusbip\usb_ids.h>
-#include <libusbip\strconv.h>
 #include <libusbip\hmodule.h>
+#include <libusbip\strconv.h>
+
+#include <libusbip\src\file_ver.h>
+#include <libusbip\src\usb_ids.h>
 
 #include <resources\messages.h>
 
 #include <spdlog\spdlog.h>
 #include <spdlog\sinks\stdout_color_sinks.h>
 
-#include <libusbip\CLI11.hpp>
+#include <CLI11\CLI11.hpp>
 
 namespace
 {

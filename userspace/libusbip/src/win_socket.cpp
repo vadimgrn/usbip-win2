@@ -2,8 +2,8 @@
  * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "win_socket.h"
-#include "output.h"
+#include "..\win_socket.h"
+#include "..\output.h"
 #include "last_error.h"
 
 namespace

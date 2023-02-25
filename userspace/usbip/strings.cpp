@@ -5,7 +5,7 @@
 
 #include "strings.h"
 
-#include <libusbip\usb_ids.h>
+#include <libusbip\src\usb_ids.h>
 #include <format>
 
 namespace

@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\userspace\libusbip\proto_op.cpp" />
+    <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
     <ClCompile Include="context.cpp" />
     <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="device_queue.cpp" />

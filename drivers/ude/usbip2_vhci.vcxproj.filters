@@ -43,13 +43,13 @@
     <ClCompile Include="device.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
-    <ClCompile Include="..\..\userspace\libusbip\proto_op.cpp" />
     <ClCompile Include="context.cpp" />
     <ClCompile Include="wsk_receive.cpp" />
     <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="wsk_context.cpp" />
     <ClCompile Include="device_queue.cpp" />
     <ClCompile Include="proto.cpp" />
+    <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_vhci.inf" />

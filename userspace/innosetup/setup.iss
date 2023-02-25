@@ -85,7 +85,7 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 
 Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb"; Components: sdk
 
-Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "device_speed.h, file_ver.h, op_common.h, hdevinfo.h, usb_ids.h"; Components: sdk
+Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 
 #if Configuration == "Debug"
