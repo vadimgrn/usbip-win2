@@ -14,7 +14,7 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
 
-#include "libusbip/src/op_common.h"
+#include <libusbip/src/op_common.h>
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)

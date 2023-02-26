@@ -12,18 +12,6 @@
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="generic_handle.h">
-      <Filter>public</Filter>
-    </ClInclude>
-    <ClInclude Include="remote.h">
-      <Filter>public</Filter>
-    </ClInclude>
-    <ClInclude Include="vhci.h">
-      <Filter>public</Filter>
-    </ClInclude>
-    <ClInclude Include="output.h">
-      <Filter>public</Filter>
-    </ClInclude>
     <ClInclude Include="src\op_common.h" />
     <ClInclude Include="src\last_error.h" />
     <ClInclude Include="src\device_speed.h" />
@@ -33,13 +21,14 @@
     <ClInclude Include="hkey.h" />
     <ClInclude Include="hmodule.h" />
     <ClInclude Include="strconv.h" />
+    <ClInclude Include="generic_handle.h" />
+    <ClInclude Include="output.h" />
+    <ClInclude Include="remote.h" />
+    <ClInclude Include="vhci.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
       <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="public">
-      <UniqueIdentifier>{e7199aa4-b812-401f-b655-bb96adb27561}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

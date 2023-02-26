@@ -4,6 +4,10 @@
 
 #pragma once
 
+ /*
+  * This header is used in the driver and libusbip.
+  */
+
 #include <usbip\consts.h>
 #include <resources\messages.h>
 

@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <memory>
+#include <format>
 
 std::wstring usbip::utf8_to_wchar(_In_ std::string_view s)
 {
@@ -18,7 +19,7 @@ std::wstring usbip::utf8_to_wchar(_In_ std::string_view s)
         auto cch = f(s, nullptr, 0);
         if (!cch) {
                 auto err = GetLastError();
-                return L"MultiByteToWideChar: GetLastError " + std::to_wstring(err);
+                return L"MultiByteToWideChar error " + std::format(L"{:#x}", err);
         }
 
         ws.resize(cch);
@@ -43,7 +44,7 @@ std::string usbip::wchar_to_utf8(_In_ std::wstring_view ws)
         auto cb = f(ws, nullptr, 0);
         if (!cb) {
                 auto err = GetLastError();
-                return "WideCharToMultiByte: GetLastError " + std::to_string(err);
+                return "WideCharToMultiByte error " + std::format("{:#x}", err);
         }
 
         s.resize(cb);
@@ -69,7 +70,7 @@ std::wstring usbip::wformat_message(
                 msg.assign(buf, cch);
         } else {
                 auto err = GetLastError();
-                msg = L"FormatMessageW: GetLastError " + std::to_wstring(err);
+                msg = L"FormatMessageW error " + std::format(L"{:#x}", err);
         }
 
         return msg;
