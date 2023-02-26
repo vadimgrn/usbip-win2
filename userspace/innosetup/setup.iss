@@ -90,6 +90,8 @@ Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\inclu
 
 #if Configuration == "Debug"
  Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb"; Components: main
+ Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}"; DestName: "classfilter.pdb"; Components: main
+ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: main and not sdk
 #endif
 
 [Tasks]
