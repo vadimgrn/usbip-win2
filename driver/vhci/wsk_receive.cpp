@@ -734,7 +734,9 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 
 	switch (err) {
 	case RECV_NEXT_USBIP_HDR:
-		sched_receive_usbip_header(&ctx);
+		if (!vpdo->unplugged) {
+			sched_receive_usbip_header(&ctx);
+		}
 		[[fallthrough]];
 	case RECV_MORE_DATA_REQUIRED:
 		return StopCompletion;
