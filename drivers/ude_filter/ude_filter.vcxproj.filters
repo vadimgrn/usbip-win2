@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="driver.cpp" />
+    <ClCompile Include="device.cpp" />
+    <ClCompile Include="pnp.cpp" />
+    <ClCompile Include="int_dev_ctrl.cpp" />
+    <ClCompile Include="select.cpp" />
+    <ClCompile Include="request.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="driver.h" />
+    <ClInclude Include="trace.h" />
+    <ClInclude Include="device.h" />
+    <ClInclude Include="pnp.h" />
+    <ClInclude Include="int_dev_ctrl.h" />
+    <ClInclude Include="select.h" />
+    <ClInclude Include="irp.h" />
+    <ClInclude Include="request.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="usbip2_filter.inf" />
+  </ItemGroup>
+</Project>

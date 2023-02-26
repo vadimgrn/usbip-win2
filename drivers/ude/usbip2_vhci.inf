@@ -1,0 +1,57 @@
+;
+; usbip2_vhci.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=USB
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; USB host controllers and USB hubs
+Provider=%Manufacturer%
+CatalogFile=usbip2_vhci.cat
+PnpLockDown=1
+
+[DestinationDirs]
+DefaultDestDir = 13 ; Driver package isolation
+
+[SourceDisksNames]
+1 = "USBIP-WIN2 VHCI Installation Disk",,,""
+
+[SourceDisksFiles]
+usbip2_vhci.sys = 1,,
+
+[Manufacturer]
+%Manufacturer%=Standard,NT$ARCH$.10.0 ; for Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
+
+[Standard.NT$ARCH$.10.0]
+%DisplayName%=vhci_Device, ROOT\USBIP_WIN2\VHCI
+
+[vhci_Device.NT]
+CopyFiles=@usbip2_vhci.sys
+
+[vhci_Device.NT.HW]
+Include=machine.inf
+Needs=PciD3ColdSupported
+
+[vhci_Device.NT.Services]
+; Flags: 0x00000002 (SPSVCINST_ASSOCSERVICE)
+AddService = usbip2_vhci,2,vhci_Device_Service_Inst
+
+[vhci_Device_Service_Inst]
+DisplayName    = %DisplayName%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\usbip2_vhci.sys ; Driver package isolation
+Dependencies   = ucx01000, udecx, usbip2_filter
+AddReg         = vhci_Device_Service_AddReg
+
+[vhci_Device_Service_AddReg]
+; Inflight Trace Recorder (IFR) parameter "VerboseOn".
+; The default setting of zero causes the IFR to log errors, warnings, and informational events
+HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
+HKR,Parameters\Wdf,VerifierOn,0x00010001,1
+HKR,Parameters\Wdf,VerboseOn,0x00010001,1
+
+[Strings]
+Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
+DisplayName="USBIP 3.X Emulated Host Controller" ; for device and service

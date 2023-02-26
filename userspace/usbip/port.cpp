@@ -1,154 +1,74 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn
- *               2011 matt mooney <mfm@muteddisk.com>
- *               2005-2007 Takahiro Hirofuchi
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "vhci.h"
 #include "usbip.h"
+#include "strings.h"
 
-#include <libusbip\common.h>
-#include <libusbip\getopt.h>
+#include <libusbip\vhci.h>
 
-#include <set>
-#include <sstream>
-#include <vector>
+#include <format>
+#include <spdlog\spdlog.h>
 
 namespace
 {
 
-int usbip_vhci_imported_device_dump(const ioctl_usbip_vhci_imported_dev &d)
+using namespace usbip;
+
+void print(const imported_device &d)
 {
-        if (d.status == VDEV_ST_NULL || d.status == VDEV_ST_NOTASSIGNED) {
-                return 0;
-        }
+        auto product = get_product(get_ids(), d.vendor, d.product);
 
-        printf("Port %02d: <%s> at %s\n", d.port, usbip_status_string(d.status), usbip_speed_string(d.speed));
-
-        auto product_name = usbip_names_get_product(get_ids(), d.vendor, d.product);
-        printf("       %s\n", product_name.c_str());
-
-        printf("%10s -> usbip://%s:%s/%s\n", " ", d.host, d.service, d.busid);
-        
         USHORT bus = d.devid >> 16;
         USHORT dev = d.devid & 0xFFFF;
-        printf("%10s -> remote bus/dev %03d/%03d\n", " ", bus, dev);
 
-        if (*d.serial) {
-                printf("%10s -> serial '%s'\n", " ", d.serial);
-        }
+        constexpr auto &fmt = R"(Port {:02}: device in use at {}
+         {}
+           -> usbip://{}:{}/{}
+           -> remote bus/dev {:03}/{:03}
+)";
+        auto msg = std::format(fmt, d.port, get_speed_str(d.speed),
+                                product,
+                                d.hostname, d.service, d.busid,
+                                bus, dev);
 
-        return 0;
-}
-
-auto get_imported_devices(std::vector<ioctl_usbip_vhci_imported_dev> &devs, int port)
-{
-        std::vector<hci_version> versions;
-
-        if (port > 0) {
-                versions.push_back(get_hci_version(port));
-        } else for (auto ver: vhci_list) {
-                versions.push_back(ver);
-        }
-
-        for (auto ver: versions) {
-
-                auto hdev = usbip::vhci_driver_open(ver);
-                if (!hdev) {
-                        err("failed to open vhci driver");
-                        return 3;
-                }
-        
-                auto v = usbip::vhci_get_imported_devs(hdev.get());
-                if (v.empty()) {
-                        err("failed to get attach information");
-                        return 2;
-                }
-                
-                for (auto &d: v) {
-                        if (d.port) {
-                                devs.push_back(d);
-                        } else {
-                                break;
-                        }
-                }
-        }
-
-        return 0;
-}
-
-int list_imported_devices(const std::set<int> &ports)
-{
-        std::vector<ioctl_usbip_vhci_imported_dev> devs;
-        devs.reserve(USBIP_TOTAL_PORTS);
-
-        {
-                auto port = ports.size() == 1 ? *ports.begin() : 0;
-                if (auto err = get_imported_devices(devs, port)) {
-                        return err;
-                }
-        }
-
-        printf("Imported USB devices\n");
-        printf("====================\n");
-
-        bool found = false;
-
-        for (auto& d: devs) {
-                assert(d.port);
-                if (ports.empty() || ports.contains(d.port)) {
-                        usbip_vhci_imported_device_dump(d);
-                        found = true;
-                }
-
-        }
-
-        if (!(found || ports.empty())) {
-                return 2; // port check failed
-        }
-
-        return 0;
+        printf(msg.c_str());
 }
 
 } // namespace
 
 
-void usbip_port_usage()
+bool usbip::cmd_port(void *p)
 {
-        const char fmt[] =
-"usage: usbip port [portN...]\n"
-"    portN      list given port(s) for checking, valid range is 1-%d\n";
+        auto dev = vhci::open();
+        if (!dev) {
+                spdlog::error(GetLastErrorMsg());
+                return false;
+        }
 
-        printf(fmt, USBIP_TOTAL_PORTS);
-}
+        bool ok;
+        auto devices = vhci::get_imported_devices(dev.get(), ok);
+        if (!ok) {
+                spdlog::error(GetLastErrorMsg());
+                return false;
+        }
 
-int usbip_port_show(int argc, char *argv[])
-{
-        std::set<int> ports;
+        spdlog::debug("{} imported usb device(s)", devices.size());
 
-        for (int i = 1; i < argc; ++i) {
+        auto &ports = reinterpret_cast<port_args*>(p)->ports; 
+        bool found{};
 
-                auto str = argv[i];
-                int port;
-
-                if ((std::istringstream(str) >> port) && is_valid_vport(port)) {
-                        ports.insert(port);
-                } else {
-                        err("invalid port: %s", str);
-                        usbip_port_usage();
-                        return 1;
+        for (auto &d: devices) {
+                assert(d.port);
+                if (ports.empty() || ports.contains(d.port)) {
+                        if (!found) {
+                                found = true;
+                                printf("Imported USB devices\n"
+                                       "====================\n");
+                        }
+                        print(d);
                 }
         }
 
-	return list_imported_devices(ports);
+        return found || ports.empty();
 }

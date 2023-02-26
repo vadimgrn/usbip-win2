@@ -1,42 +1,46 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="dbgcode.cpp" />
-    <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="common.cpp" />
-    <ClCompile Include="getopt.c" />
-    <ClCompile Include="proto_op.cpp" />
-    <ClCompile Include="setupdi.cpp" />
-    <ClCompile Include="util.cpp" />
-    <ClCompile Include="network.cpp" />
-    <ClCompile Include="usb_ids.cpp" />
-    <ClCompile Include="win_socket.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="libusbip\dbgcode.h" />
-    <ClInclude Include="libusbip\file_ver.h" />
-    <ClInclude Include="libusbip\generic_handle.h" />
-    <ClInclude Include="libusbip\common.h" />
-    <ClInclude Include="libusbip\getopt.h" />
-    <ClInclude Include="libusbip\setupdi.h" />
-    <ClInclude Include="libusbip\util.h" />
-    <ClInclude Include="libusbip\network.h" />
-    <ClInclude Include="libusbip\usb_ids.h" />
-    <ClInclude Include="libusbip\win_handle.h" />
-    <ClInclude Include="libusbip\win_socket.h" />
-    <ClInclude Include="..\..\include\usbip\ch9.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\include\usbip\consts.h">
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\usbip\proto_op.h">
       <Filter>usbip</Filter>
     </ClInclude>
+    <ClInclude Include="win_handle.h" />
+    <ClInclude Include="win_socket.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="src\op_common.h" />
+    <ClInclude Include="src\last_error.h" />
+    <ClInclude Include="src\device_speed.h" />
+    <ClInclude Include="src\file_ver.h" />
+    <ClInclude Include="src\usb_ids.h" />
+    <ClInclude Include="hdevinfo.h" />
+    <ClInclude Include="hkey.h" />
+    <ClInclude Include="hmodule.h" />
+    <ClInclude Include="generic_handle.h" />
+    <ClInclude Include="output.h" />
+    <ClInclude Include="remote.h" />
+    <ClInclude Include="vhci.h" />
+    <ClInclude Include="format_message.h" />
+    <ClInclude Include="src\strconv.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
       <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\device_speed.cpp" />
+    <ClCompile Include="src\file_ver.cpp" />
+    <ClCompile Include="src\proto_op.cpp" />
+    <ClCompile Include="src\remote.cpp" />
+    <ClCompile Include="src\strconv.cpp" />
+    <ClCompile Include="src\usb_ids.cpp" />
+    <ClCompile Include="src\vhci.cpp" />
+    <ClCompile Include="src\win_socket.cpp" />
+    <ClCompile Include="src\format_message.cpp" />
   </ItemGroup>
 </Project>

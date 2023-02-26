@@ -1,70 +1,81 @@
 /*
- * Copyright (C) 2011 matt mooney <mfm@muteddisk.com>
- *               2005-2007 Takahiro Hirofuchi
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "vhci.h"
+#include "usbip.h"
+#include "strings.h"
 
-#include <libusbip\common.h>
-#include <libusbip\getopt.h>
+#include <usbip\proto_op.h>
+#include <libusbip\remote.h>
 
-int list_exported_devices(const char *host);
+#include <spdlog\spdlog.h>
 
-static const char usbip_list_usage_string[] =
-	"usbip list [-p|--parsable] <args>\n"
-	"    -p, --parsable         Parsable list format\n"
-	"    -r, --remote=<host>    List the exported USB devices on <host>\n"
-	;
-
-void usbip_list_usage()
+namespace
 {
-	printf("usage: %s", usbip_list_usage_string);
+
+using namespace usbip;
+
+void on_device_count(int count)
+{
+	if (count) {
+		printf("Exportable USB devices\n"
+			"======================\n");
+	}
 }
 
-int usbip_list(int argc, char *argv[])
+void on_device(int, const usb_device &d)
 {
-	const struct option opts[] = {
-		{ "parsable", no_argument, nullptr, 'p' },
-		{ "remote", required_argument, nullptr, 'r' },
-		{}
-	};
+	auto &ids = get_ids();
+	auto prod = get_product(ids, d.idVendor, d.idProduct);
+	auto csp = get_class(ids, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol);
 
-	BOOL parsable = FALSE;
-	int opt;
-	int ret = 1;
+	auto lines = std::format(
+			"{:^11}: {}\n"
+			"{:11}: {}\n"
+			"{:11}: {}\n",
+			d.busid, prod,
+			"", d.path,
+			"", csp);
 
-	for (;;) {
-		opt = getopt_long(argc, argv, "pr:", opts, nullptr);
-
-		if (opt == -1)
-			break;
-
-		switch (opt) {
-		case 'p':
-			parsable = TRUE;
-			break;
-		case 'r':
-			ret = list_exported_devices(optarg);
-			goto out;
-			break;
-		}
+	if (!d.bNumInterfaces) {
+		lines += '\n';
 	}
 
-	err("-r option required");
-	usbip_list_usage();
-out:
-	return ret;
+	printf(lines.c_str());
+}
+
+void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
+{
+	auto &ids = get_ids();
+	auto csp = get_class(ids, r.bInterfaceClass, r.bInterfaceSubClass, r.bInterfaceProtocol);
+
+	auto s = std::format("{:11}: {:2} - {}\n", "", idx, csp);
+	if (idx + 1 == d.bNumInterfaces) { // last
+		s += '\n';
+	}
+
+	printf(s.c_str());
+}
+
+} // namespace
+
+
+bool usbip::cmd_list(void *p)
+{
+	auto &r = *reinterpret_cast<list_args*>(p);
+
+	auto sock = connect(r.remote.c_str(), global_args.tcp_port.c_str());
+	if (!sock) {
+		spdlog::error(GetLastErrorMsg());
+		return false;
+	}
+
+	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
+
+	if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
+		spdlog::error(GetLastErrorMsg());
+		return false;
+	}
+
+	return true;
 }

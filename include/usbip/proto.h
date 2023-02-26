@@ -129,7 +129,7 @@ struct usbip_header {
 	} u;
 };
 
-static_assert(sizeof(struct usbip_header) == 48, "assert");
+static_assert(sizeof(usbip_header) == 48);
 
 /* the same as usb_iso_packet_descriptor but packed for pdu */
 struct usbip_iso_packet_descriptor {

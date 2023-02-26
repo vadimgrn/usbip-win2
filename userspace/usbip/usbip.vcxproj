@@ -18,7 +18,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>NotSet</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
@@ -26,7 +26,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>NotSet</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
     <SpectreMitigation>false</SpectreMitigation>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
@@ -54,7 +54,7 @@
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;UNICODE;_CONSOLE;WIN32_LEAN_AND_MEAN;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -62,7 +62,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib</AdditionalDependencies>
+      <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib;CfgMgr32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -75,7 +75,7 @@
       <OmitFramePointers>true</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;UNICODE;_CONSOLE;WIN32_LEAN_AND_MEAN;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -86,27 +86,27 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib</AdditionalDependencies>
+      <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib;CfgMgr32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="strings.cpp" />
     <ClCompile Include="usbip.cpp" />
     <ClCompile Include="attach.cpp" />
     <ClCompile Include="detach.cpp" />
     <ClCompile Include="list.cpp" />
-    <ClCompile Include="list_remote.cpp" />
     <ClCompile Include="port.cpp" />
-    <ClCompile Include="vhci.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="strings.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="usbip.h" />
-    <ClInclude Include="vhci.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="usbip.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="packages.config" />
     <None Include="usb.ids" />
   </ItemGroup>
   <ItemGroup>
@@ -116,5 +116,12 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets" Condition="Exists('..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets'))" />
+  </Target>
 </Project>

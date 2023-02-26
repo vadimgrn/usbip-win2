@@ -15,8 +15,8 @@ struct usbip_usb_interface
 
 struct usbip_usb_device 
 {
-        char path[USBIP_DEV_PATH_MAX];
-        char busid[USBIP_BUS_ID_SIZE];
+        char path[usbip::DEV_PATH_MAX];
+        char busid[usbip::BUS_ID_SIZE];
 
         UINT32 busnum;
         UINT32 devnum;
@@ -24,7 +24,7 @@ struct usbip_usb_device
 
         UINT16 idVendor;
         UINT16 idProduct;
-        UINT16 bcdDevice;
+        UINT16 bcdDevice; // Device Release Number
 
         UINT8 bDeviceClass;
         UINT8 bDeviceSubClass;
@@ -74,7 +74,7 @@ struct op_common {
 #define OP_REP_IMPORT   (OP_REPLY   | OP_IMPORT)
 
 struct op_import_request {
-        char busid[USBIP_BUS_ID_SIZE];
+        char busid[usbip::BUS_ID_SIZE];
 };
 
 struct op_import_reply {
@@ -165,8 +165,8 @@ struct op_devlist_reply {
 };
 
 struct op_devlist_reply_extra {
-        struct usbip_usb_device    udev;
-        //	usbip_usb_interface uinf[];
+        usbip_usb_device udev;
+//	usbip_usb_interface uinf[];
 };
 
 #define PACK_OP_DEVLIST_REQUEST(pack, request)  do {\

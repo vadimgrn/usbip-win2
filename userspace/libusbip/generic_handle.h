@@ -1,4 +1,10 @@
+/*
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
+
+#include <functional>
 
 namespace usbip
 {
@@ -9,57 +15,55 @@ namespace usbip
 template<typename Handle, typename Tag>
 void close_handle(Handle, Tag) noexcept;
 
-
-template<typename Handle, typename Tag, auto NullValue>
+template<typename Handle, typename Tag, auto NoneValue>
 class generic_handle
 {
 public:
         using type = Handle;
         using tag_type = Tag;
-        static constexpr auto null = NullValue;
 
-        explicit generic_handle(type h = null) noexcept : m_handle(h) {}
-        ~generic_handle() { close(); }
+        static constexpr auto None = NoneValue;
+
+        constexpr generic_handle() noexcept = default;
+        constexpr explicit generic_handle(type h) noexcept : m_handle(h) {}
+
+        ~generic_handle() { do_close(); }
 
         generic_handle(const generic_handle&) = delete;
         generic_handle& operator=(const generic_handle&) = delete;
 
         generic_handle(generic_handle&& h) noexcept : m_handle(h.release()) {}
 
-        generic_handle& operator=(generic_handle&& h) noexcept
+        auto& operator=(generic_handle&& h) noexcept
         {
                 reset(h.release());
                 return *this;
         }
 
-        explicit operator bool() const noexcept { return m_handle != null; }
-        auto operator !() const noexcept { return m_handle == null; }
+        constexpr explicit operator bool() const noexcept { return m_handle != None; }
+        constexpr auto operator !() const noexcept { return m_handle == None; }
 
-        auto get() const noexcept { return m_handle; }
+        constexpr auto get() const noexcept { return m_handle; }
 
         auto release() noexcept
         {
                 auto h = m_handle;
-                m_handle = null;
+                m_handle = None;
                 return h;
         }
 
-        void reset(type h = null) noexcept
+        void reset(type h = None) noexcept
         {
-                if (m_handle == h) {
-                        return;
+                if (m_handle != h) {
+                        do_close();
+                        m_handle = h;
                 }
 
-                if (*this) {
-                        close_handle(m_handle, tag_type());
-                }
-
-                m_handle = h;
         }
 
         void close() noexcept { reset(); }
 
-        void swap(generic_handle& h) noexcept
+        void swap(generic_handle &h) noexcept
         {
                 auto tmp = h.m_handle;
                 h.m_handle = m_handle;
@@ -67,7 +71,39 @@ public:
         }
 
 private:
-        type m_handle = null;
+        type m_handle = None;
+
+        void do_close() noexcept
+        {
+                if (*this) {
+                        close_handle(m_handle, tag_type());
+                }
+        }
 };
 
 } // namespace usbip
+
+
+namespace std
+{
+
+using usbip::generic_handle;
+
+template<typename Handle, typename Tag, auto NoneValue>
+struct std::hash<generic_handle<Handle, Tag, NoneValue>>
+{
+        auto operator() (const generic_handle<Handle, Tag, NoneValue> &h) const noexcept
+        {
+                std::hash<h.type> f;
+                return f(h.get());
+        }
+};
+
+template<typename Handle, typename Tag, auto NoneValue>
+inline void swap(generic_handle<Handle, Tag, NoneValue> &a, 
+                 generic_handle<Handle, Tag, NoneValue> &b) noexcept
+{
+        a.swap(b);
+}
+
+} // namespace std

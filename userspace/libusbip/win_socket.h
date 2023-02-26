@@ -1,10 +1,12 @@
+/*
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
 
 #include "generic_handle.h"
 
 #include <cassert>
-#include <functional>
-
 #include <WinSock2.h>
 
 namespace usbip
@@ -14,10 +16,10 @@ struct SocketTag {};
 using Socket = generic_handle<SOCKET, SocketTag, INVALID_SOCKET>;
 
 template<>
-inline void close_handle(Socket::type s, Socket::tag_type) noexcept
+inline void close_handle(_In_ Socket::type s, _In_ Socket::tag_type) noexcept
 {
-        [[maybe_unused]] auto ok = !closesocket(s);
-        assert(ok);
+        [[maybe_unused]] auto err = closesocket(s);
+        assert(!err);
 }
 
 class InitWinSock2
@@ -37,24 +39,3 @@ private:
 };
 
 } // namespace usbip
-
-
-namespace std
-{
-
-template<>
-struct std::hash<usbip::Socket>
-{
-        auto operator() (const usbip::Socket &s) const noexcept
-        {
-                std::hash<usbip::Socket::type> f;
-                return f(s.get());
-        }
-};
-
-inline void swap(usbip::Socket &a, usbip::Socket &b) noexcept
-{
-        a.swap(b);
-}
-
-} // namespace std

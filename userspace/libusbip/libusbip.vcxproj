@@ -21,7 +21,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>NotSet</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
@@ -29,7 +29,7 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>NotSet</CharacterSet>
+    <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v143</PlatformToolset>
     <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
@@ -56,8 +56,8 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>libusbip;..\..\include;..\src</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -71,7 +71,7 @@
       </Command>
     </PreBuildEvent>
     <Lib>
-      <AdditionalDependencies>legacy_stdio_definitions.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -81,8 +81,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>libusbip;..\..\include;..\src</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -97,38 +97,41 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>legacy_stdio_definitions.lib;Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="dbgcode.cpp" />
-    <ClCompile Include="file_ver.cpp" />
-    <ClCompile Include="common.cpp" />
-    <ClCompile Include="getopt.c" />
-    <ClCompile Include="proto_op.cpp" />
-    <ClCompile Include="setupdi.cpp" />
-    <ClCompile Include="util.cpp" />
-    <ClCompile Include="network.cpp" />
-    <ClCompile Include="usb_ids.cpp" />
-    <ClCompile Include="win_socket.cpp" />
-  </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
-    <ClInclude Include="dbgcode.h" />
-    <ClInclude Include="file_ver.h" />
+    <ClInclude Include="format_message.h" />
+    <ClInclude Include="hdevinfo.h" />
+    <ClInclude Include="hkey.h" />
+    <ClInclude Include="hmodule.h" />
+    <ClInclude Include="output.h" />
+    <ClInclude Include="remote.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="common.h" />
-    <ClInclude Include="getopt.h" />
-    <ClInclude Include="setupdi.h" />
-    <ClInclude Include="util.h" />
-    <ClInclude Include="network.h" />
-    <ClInclude Include="usb_ids.h" />
+    <ClInclude Include="src\device_speed.h" />
+    <ClInclude Include="src\file_ver.h" />
+    <ClInclude Include="src\last_error.h" />
+    <ClInclude Include="src\op_common.h" />
+    <ClInclude Include="src\strconv.h" />
+    <ClInclude Include="src\usb_ids.h" />
+    <ClInclude Include="vhci.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\device_speed.cpp" />
+    <ClCompile Include="src\file_ver.cpp" />
+    <ClCompile Include="src\format_message.cpp" />
+    <ClCompile Include="src\proto_op.cpp" />
+    <ClCompile Include="src\remote.cpp" />
+    <ClCompile Include="src\strconv.cpp" />
+    <ClCompile Include="src\usb_ids.cpp" />
+    <ClCompile Include="src\vhci.cpp" />
+    <ClCompile Include="src\win_socket.cpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets" />
 </Project>

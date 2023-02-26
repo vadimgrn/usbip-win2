@@ -1,0 +1,46 @@
+; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+;
+; usbip2_filter.inf
+; Upper-level class filter primitive driver
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=USB
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; USB host controllers and USB hubs
+Provider=%Manufacturer%
+CatalogFile=usbip2_filter.cat
+PnpLockDown=1
+
+[DestinationDirs]
+DefaultDestDir = 13 ; Driver package isolation
+
+[SourceDisksNames]
+1 = "USBIP-WIN2 Filter Installation Disk",,,""
+
+[SourceDisksFiles]
+usbip2_filter.sys = 1,,
+
+[DefaultInstall.NT$ARCH$] ; @see Creating a new primitive driver
+CopyFiles = @usbip2_filter.sys
+
+[DefaultInstall.NT$ARCH$.Services]
+AddService = usbip2_filter,,usbip2_filter_Service_Inst
+
+[usbip2_filter_Service_Inst]
+DisplayName    = %DisplayName%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\usbip2_filter.sys ; Driver package isolation
+AddReg         = usbip2_filter_Service_AddReg
+
+[usbip2_filter_Service_AddReg]
+; Inflight Trace Recorder (IFR) parameter "VerboseOn".
+; The default setting of zero causes the IFR to log errors, warnings, and informational events
+HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
+HKR,Parameters\Wdf,VerifierOn,0x00010001,1
+HKR,Parameters\Wdf,VerboseOn,0x00010001,1
+
+[Strings]
+Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
+DisplayName="USBIP Upper Class Filter" ; for device and service

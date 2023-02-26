@@ -1,5 +1,10 @@
 #pragma once
 
+namespace usbip
+{
+
+constexpr auto& tcp_port = "3240";
+
 enum op_status_t // op_common.status
 {
         ST_OK,
@@ -10,61 +15,27 @@ enum op_status_t // op_common.status
         ST_ERROR // ST_DEV_ERR?
 };
 
-/* error codes for userspace tools and library */
-enum err_t
-{
-        ERR_USB_VER = -13,
-        ERR_CERTIFICATE,
-        ERR_ACCESS,
-        ERR_PORTFULL,
-        ERR_DRIVER,
-        ERR_NOTEXIST,
-        ERR_EXIST,
-        ERR_STATUS,
-        ERR_PROTOCOL,
-        ERR_VERSION,
-        ERR_NETWORK,
-        ERR_INVARG,
-        ERR_GENERAL,
-        ERR_NONE
+enum { 
+        USBIP_VERSION = 0x111, // protocol
+        DEV_PATH_MAX = 256, 
+        BUS_ID_SIZE = 32 
 };
 
-static_assert(!ERR_NONE);
+} // namespace usbip
 
-enum usbip_device_status
+
+namespace usbip::vhci
 {
-	/* dev status unknown. */
-	DEV_ST_UNKNOWN,
 
-	/* sdev is available. */
-	SDEV_ST_AVAILABLE,
-	/* sdev is now used. */
-	SDEV_ST_USED,
-	/* sdev is unusable because of a fatal error. */
-	SDEV_ST_ERROR,
-
-	/* vdev does not connect a remote device. */
-	VDEV_ST_NULL,
-	/* vdev is used, but the USB address is not assigned yet */
-	VDEV_ST_NOTASSIGNED,
-	VDEV_ST_USED,
-	VDEV_ST_ERROR
+enum { 
+        USB2_PORTS = 30,
+        USB3_PORTS = USB2_PORTS,
+        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
 };
 
-enum 
-{ 
-        USBIP_VERSION = 0x111, 
-        USBIP_DEV_PATH_MAX = 256, 
-        USBIP_BUS_ID_SIZE = 32 
-};
-
-/*
- * err_t are negative, op_status_t are positive.
- */
-constexpr auto make_error(err_t err, op_status_t status = ST_OK)
+constexpr auto is_valid_port(int port)
 {
-        static_assert(sizeof(int) == 4);
-        return int(status ? status : err) << 16;
+        return port > 0 && port <= TOTAL_PORTS;
 }
 
-static_assert(!make_error(ERR_NONE));
+} // namespace usbip::vhci

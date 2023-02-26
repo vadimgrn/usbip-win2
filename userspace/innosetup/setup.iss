@@ -1,4 +1,4 @@
-; Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
 #if Ver < EncodeVer(6,2,0,0)
         #error This script requires Inno Setup 6.2 or later
@@ -24,10 +24,16 @@
 #define Copyright GetFileCopyright(ExePath)
 #define Company GetFileCompany(ExePath)
 
-#define AppGUID "{b26d8e8f-5ed4-40e7-835f-03dfcc57cb45}"
+#define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define HWID_ROOT "USBIP\root"
-#define TestCert "USBIP Test"
+#define VhciHwid "ROOT\USBIP_WIN2\VHCI"
+
+#define FilterDriver "usbip2_filter"
+#define FilterClassGuid "{{36FC9E60-C465-11CF-8056-444553540000}" ; see usbip2_filter.inf
+
+#define CertFile "usbip_test.pfx"
+#define CertName "USBIP Test"
+#define CertPwd "usbip"
 
 [Setup]
 AppName={#ProductName}
@@ -47,6 +53,7 @@ LicenseFile={#SolutionDir + "LICENSE"}
 AppId={{#AppGUID}
 OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
+SolidCompression=yes
 DisableWelcomePage=no
 WizardSmallImageFile=usbip-small.bmp
 WizardImageFile=usbip-logo.bmp
@@ -60,40 +67,51 @@ MinVersion=10.0.19041
 [Messages]
 WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
 
-[Files]
-Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme
-Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy
-Source: {#SolutionDir + "driver\usbip_test.pfx"}; DestDir: "{tmp}"
+[Components]
+Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
+Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"
-Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"
+[Files]
+Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
+Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
+Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
+Source: {#SolutionDir + "drivers\"}{#CertFile}; DestDir: "{tmp}"; Components: main
+
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "resources.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"; Components: main
+Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
+
+Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb"; Components: sdk
+
+Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Components: sdk
+Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 
 #if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb"
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb"; Components: main
+ Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}"; DestName: "classfilter.pdb"; Components: main
+ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: main and not sdk
 #endif
-
 
 [Tasks]
 Name: modifypath; Description: "&Add to PATH environment variable for all users"
 
 [Run]
 
-Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX Root ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
-Filename: {sys}\certutil.exe; Parameters: "-f -p usbip -importPFX TrustedPublisher ""{tmp}\usbip_test.pfx"" FriendlyName=""{#TestCert}"""; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\usbip_vhci.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip_root.inf {#HWID_ROOT}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "add upper ""{#FilterClassGuid}"" {#FilterDriver}"; Flags: runhidden
+
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_vhci.inf {#VhciHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-; @see devcon hwids "USBIP\*"
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#HWID_ROOT} /subtree"; RunOnceId: "RemoveRootDevice"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /F %P IN ('findstr /m ""CatalogFile=usbip2_vhci.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
-
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore Root ""{#TestCert}"""; RunOnceId: "DelCertRoot"; Flags: runhidden
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore TrustedPublisher ""{#TestCert}"""; RunOnceId: "DelCertTrustedPublisher"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#VhciHwid} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#FilterClassGuid}"" {#FilterDriver}"; RunOnceId: "RemoveFromUpperFilters"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden
 
 [Code]
 

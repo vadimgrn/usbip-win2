@@ -1,0 +1,129 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{F40CF5CC-4395-4958-B248-25A2BF91D735}</ProjectGuid>
+    <TemplateGuid>{dd38f7fc-d7bd-488b-9242-7d8754cde80d}</TemplateGuid>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
+    <Configuration>Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+    <RootNamespace>ude_filter</RootNamespace>
+    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+    <ProjectName>usbip2_filter</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>WDM</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>WDM</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <DriverSign>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
+    </DriverSign>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <ClCompile>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <WppEnabled>true</WppEnabled>
+      <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppAdditionalConfigurationFile>
+      </WppAdditionalConfigurationFile>
+      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WppScanConfigurationData>trace.h</WppScanConfigurationData>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <DriverSign>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
+    </DriverSign>
+    <ClCompile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <ClCompile>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <WppEnabled>true</WppEnabled>
+      <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppAdditionalConfigurationFile>
+      </WppAdditionalConfigurationFile>
+      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WppScanConfigurationData>trace.h</WppScanConfigurationData>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <Inf Include="usbip2_filter.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <FilesToPackage Include="$(TargetPath)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="request.cpp" />
+    <ClCompile Include="device.cpp" />
+    <ClCompile Include="driver.cpp" />
+    <ClCompile Include="int_dev_ctrl.cpp" />
+    <ClCompile Include="pnp.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="request.h" />
+    <ClInclude Include="irp.h" />
+    <ClInclude Include="device.h" />
+    <ClInclude Include="driver.h" />
+    <ClInclude Include="int_dev_ctrl.h" />
+    <ClInclude Include="pnp.h" />
+    <ClInclude Include="trace.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\libdrv\libdrv.vcxproj">
+      <Project>{27ab4325-4980-4634-9818-ae6bd61de532}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

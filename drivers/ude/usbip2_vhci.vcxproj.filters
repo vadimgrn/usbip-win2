@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="usbip">
+      <UniqueIdentifier>{5f9be0b4-bbce-4b48-b1e8-5f7349396603}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\include\usbip\consts.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\usbip\proto.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\usbip\proto_op.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\include\usbip\vhci.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+    <ClInclude Include="vhci.h" />
+    <ClInclude Include="driver.h" />
+    <ClInclude Include="vhci_ioctl.h" />
+    <ClInclude Include="trace.h" />
+    <ClInclude Include="device.h" />
+    <ClInclude Include="network.h" />
+    <ClInclude Include="urbtransfer.h" />
+    <ClInclude Include="context.h" />
+    <ClInclude Include="wsk_receive.h" />
+    <ClInclude Include="device_ioctl.h" />
+    <ClInclude Include="wsk_context.h" />
+    <ClInclude Include="device_queue.h" />
+    <ClInclude Include="proto.h" />
+    <ClInclude Include="ioctl.h" />
+    <ClInclude Include="..\..\include\usbip\ch9.h">
+      <Filter>usbip</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="vhci.cpp" />
+    <ClCompile Include="driver.cpp" />
+    <ClCompile Include="vhci_ioctl.cpp" />
+    <ClCompile Include="device.cpp" />
+    <ClCompile Include="network.cpp" />
+    <ClCompile Include="urbtransfer.cpp" />
+    <ClCompile Include="context.cpp" />
+    <ClCompile Include="wsk_receive.cpp" />
+    <ClCompile Include="device_ioctl.cpp" />
+    <ClCompile Include="wsk_context.cpp" />
+    <ClCompile Include="device_queue.cpp" />
+    <ClCompile Include="proto.cpp" />
+    <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="usbip2_vhci.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="custom_wpp.ini" />
+  </ItemGroup>
+</Project>
