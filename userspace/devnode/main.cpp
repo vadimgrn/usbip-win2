@@ -10,8 +10,10 @@
 
 #include <libusbip\hkey.h>
 #include <libusbip\hdevinfo.h>
-#include <libusbip\strconv.h>
+#include <libusbip\format_message.h>
+
 #include <libusbip\src\file_ver.h>
+#include <libusbip\src\strconv.h>
 
 #include <CLI11\CLI11.hpp>
 
@@ -62,7 +64,7 @@ auto get_version(_In_ const wchar_t *program)
 {
         win::FileVersion fv(program);
         auto ver = fv.GetFileVersion();
-        return wchar_to_utf8(ver); // CLI::narrow
+        return wchar_to_utf8(ver); // CLI::narrow(ver)
 }
 
 auto split_multi_sz(_In_ PCWSTR str, _In_ std::wstring_view exclude, _Inout_ bool &excluded)

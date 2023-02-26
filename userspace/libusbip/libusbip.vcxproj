@@ -104,6 +104,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h" />
     <ClInclude Include="..\..\include\usbip\consts.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
+    <ClInclude Include="format_message.h" />
     <ClInclude Include="hdevinfo.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="hmodule.h" />
@@ -114,8 +115,8 @@
     <ClInclude Include="src\file_ver.h" />
     <ClInclude Include="src\last_error.h" />
     <ClInclude Include="src\op_common.h" />
+    <ClInclude Include="src\strconv.h" />
     <ClInclude Include="src\usb_ids.h" />
-    <ClInclude Include="strconv.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
@@ -123,6 +124,7 @@
   <ItemGroup>
     <ClCompile Include="src\device_speed.cpp" />
     <ClCompile Include="src\file_ver.cpp" />
+    <ClCompile Include="src\format_message.cpp" />
     <ClCompile Include="src\proto_op.cpp" />
     <ClCompile Include="src\remote.cpp" />
     <ClCompile Include="src\strconv.cpp" />

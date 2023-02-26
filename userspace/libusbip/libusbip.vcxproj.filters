@@ -20,11 +20,12 @@
     <ClInclude Include="hdevinfo.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="hmodule.h" />
-    <ClInclude Include="strconv.h" />
     <ClInclude Include="generic_handle.h" />
     <ClInclude Include="output.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="vhci.h" />
+    <ClInclude Include="format_message.h" />
+    <ClInclude Include="src\strconv.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
@@ -40,5 +41,6 @@
     <ClCompile Include="src\usb_ids.cpp" />
     <ClCompile Include="src\vhci.cpp" />
     <ClCompile Include="src\win_socket.cpp" />
+    <ClCompile Include="src\format_message.cpp" />
   </ItemGroup>
 </Project>

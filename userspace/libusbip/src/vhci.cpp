@@ -2,12 +2,12 @@
  * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\strconv.h"
 #include "..\output.h"
 #include "..\vhci.h"
 
 #include "last_error.h"
 #include "device_speed.h"
+#include "strconv.h"
 
 #include <resources\messages.h>
 
@@ -79,7 +79,7 @@ auto get_path()
         auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
         std::wstring path;
 
-        for (std::wstring multiz; true; ) {
+        for (std::wstring multisz; true; ) {
 
                 ULONG cch;
                 if (auto err = CM_Get_Device_Interface_List_Size(&cch, guid, nullptr, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
@@ -89,11 +89,11 @@ auto get_path()
                         return path;
                 } 
 
-                multiz.resize(cch); // "path1\0path2\0pathn\0\0"
+                multisz.resize(cch); // "path1\0path2\0pathn\0\0"
 
-                switch (auto err = CM_Get_Device_Interface_List(guid, nullptr, multiz.data(), cch, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
+                switch (auto err = CM_Get_Device_Interface_List(guid, nullptr, multisz.data(), cch, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
                 case CR_SUCCESS:
-                        if (auto v = split_multiz(multiz); auto n = v.size()) {
+                        if (auto v = split_multisz(multisz); auto n = v.size()) {
                                 if (n == 1) {
                                         path = v.front();
                                         assert(!path.empty());
@@ -105,8 +105,8 @@ auto get_path()
                                         SetLastError(ERROR_USBIP_DEVICE_INTERFACE_LIST);
                                 }
                         } else {
-                                assert(multiz.size() == 1); // if not found, returns CR_SUCCESS and ""
-                                assert(!multiz.front());
+                                assert(multisz.size() == 1); // if not found, returns CR_SUCCESS and ""
+                                assert(!multisz.front());
                                 SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
                         }
                         return path;

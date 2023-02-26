@@ -5,8 +5,8 @@
 #include "device_speed.h"
 #include "op_common.h"
 #include "last_error.h"
+#include "strconv.h"
 
-#include "..\strconv.h"
 #include "..\remote.h"
 #include "..\output.h"
 

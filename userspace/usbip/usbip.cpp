@@ -6,11 +6,13 @@
 #include "resource.h"
 
 #include <libusbip\output.h>
-#include <libusbip\win_socket.h>
 #include <libusbip\hmodule.h>
+#include <libusbip\win_socket.h>
+#include <libusbip\format_message.h>
 
-#include <libusbip\src\file_ver.h>
 #include <libusbip\src\usb_ids.h>
+#include <libusbip\src\strconv.h>
+#include <libusbip\src\file_ver.h>
 
 #include <resources\messages.h>
 
@@ -35,7 +37,7 @@ auto get_version(_In_ const wchar_t *program)
 {
 	win::FileVersion fv(program);
 	auto ver = fv.GetFileVersion();
-	return wchar_to_utf8(ver); // CLI::narrow
+	return wchar_to_utf8(ver); // CLI::narrow(ver)
 }
 
 auto pack(command_t cmd, void *p) 
@@ -124,6 +126,12 @@ void init_spdlog()
 
 } // namespace
 
+
+template<>
+std::string libusbip::to_utf8(const std::wstring &s)
+{
+	return wchar_to_utf8(s); // CLI::narrow
+}
 
 std::string usbip::GetLastErrorMsg(unsigned long msg_id)
 {

@@ -5,28 +5,10 @@
 #pragma once
 
 #include <windows.h>
-
 #include <string>
-#include <vector>
 
 namespace usbip
 {
-
-/*
- * Examples:
- * "aaa\0\bbb\0" -> {"aaa", "bbb"}
- * "aaa\0\bbb\0\0\ccc" -> {"aaa", "bbb"}
- * "\0aaa\0\bbb\0" -> {}
- *
- * @param str list of strings, each ending with L'\0'.
- *            Extra '\0' at end terminates the list.
- *            Split stops if head begins with L'\0'.
- * @return vector of strings that does not contain empty strings
- */
-std::vector<std::wstring> split_multiz(_In_ std::wstring_view str);
-
-std::wstring utf8_to_wchar(_In_ std::string_view s);
-std::string wchar_to_utf8(_In_ std::wstring_view ws);
 
 std::wstring wformat_message(_In_ DWORD flags, _In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id);
 
@@ -43,21 +25,13 @@ inline auto wformat_message(_In_ DWORD msg_id, _In_ DWORD lang_id = 0)
  * std::system_category().message(ERROR_INVALID_PARAMETER); // encoding is CP_ACP
  * For POSIX errno codes: std::generic_category().message(errno()).
  */
-inline auto format_message(_In_ DWORD msg_id, _In_ DWORD lang_id = 0) 
-{ 
-        auto ws = wformat_message(msg_id, lang_id);
-        return wchar_to_utf8(ws);
-}
+std::string format_message(_In_ DWORD msg_id, _In_ DWORD lang_id = 0);
 
 inline auto wformat_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0)
 {
         return wformat_message(FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_FROM_SYSTEM, module, msg_id, lang_id);
 }
 
-inline auto format_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0)
-{
-        auto ws = wformat_message(module, msg_id, lang_id);
-        return wchar_to_utf8(ws);
-}
+std::string format_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id = 0);
 
 } // namespace usbip
