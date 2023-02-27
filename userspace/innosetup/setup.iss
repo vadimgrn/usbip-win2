@@ -89,7 +89,7 @@ Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 
 #if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb"; Components: main
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb, libusbip_check.pdb"; Components: main
  Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}"; DestName: "classfilter.pdb"; Components: main
  Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: main and not sdk
 #endif

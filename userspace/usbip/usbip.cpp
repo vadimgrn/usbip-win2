@@ -127,12 +127,6 @@ void init_spdlog()
 } // namespace
 
 
-template<>
-std::string libusbip::to_utf8(const std::wstring &s)
-{
-	return wchar_to_utf8(s); // CLI::narrow
-}
-
 std::string usbip::GetLastErrorMsg(unsigned long msg_id)
 {
 	static_assert(sizeof(msg_id) == sizeof(UINT32));

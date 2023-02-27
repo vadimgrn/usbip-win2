@@ -5,8 +5,12 @@
 #pragma once
 
 #include "generic_handle.h"
-
 #include <cassert>
+
+/*
+ * Define WIN32_LEAN_AND_MEAN for the project 
+ * to prevent inclusion of winsock.h in windows.h
+ */
 #include <WinSock2.h>
 
 namespace usbip
