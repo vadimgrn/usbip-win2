@@ -26,6 +26,7 @@
     <ClInclude Include="vhci.h" />
     <ClInclude Include="format_message.h" />
     <ClInclude Include="src\strconv.h" />
+    <ClInclude Include="src\output.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

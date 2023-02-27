@@ -2,12 +2,12 @@
  * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\output.h"
 #include "..\vhci.h"
 
 #include "last_error.h"
 #include "device_speed.h"
 #include "strconv.h"
+#include "output.h"
 
 #include <resources\messages.h>
 

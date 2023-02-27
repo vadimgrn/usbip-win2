@@ -115,6 +115,7 @@
     <ClInclude Include="src\file_ver.h" />
     <ClInclude Include="src\last_error.h" />
     <ClInclude Include="src\op_common.h" />
+    <ClInclude Include="src\output.h" />
     <ClInclude Include="src\strconv.h" />
     <ClInclude Include="src\usb_ids.h" />
     <ClInclude Include="vhci.h" />

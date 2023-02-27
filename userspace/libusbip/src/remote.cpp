@@ -2,13 +2,13 @@
  * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn
  */
 
+#include "..\remote.h"
+
 #include "device_speed.h"
 #include "op_common.h"
 #include "last_error.h"
 #include "strconv.h"
-
-#include "..\remote.h"
-#include "..\output.h"
+#include "output.h"
 
 #include <usbip\proto_op.h>
 
