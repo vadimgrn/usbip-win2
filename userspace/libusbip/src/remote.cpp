@@ -181,6 +181,11 @@ auto as_usb_device(_In_ const usbip_usb_device &d)
 } // namespace
 
 
+const char* usbip::get_tcp_port() noexcept
+{
+	return tcp_port;
+}
+
 auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Socket
 {
 	Socket sock;

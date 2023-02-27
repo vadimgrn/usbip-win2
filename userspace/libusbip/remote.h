@@ -44,6 +44,11 @@ struct usb_interface
 };
 
 /**
+ * @return default TCP/IP port number of usbip server
+ */
+const char *get_tcp_port() noexcept;
+
+/**
  * @param hostname name or IP address of a host to connect to
  * @param service TCP/IP port number of symbolic name
  * @return call GetLastError() if returned handle is invalid

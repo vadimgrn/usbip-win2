@@ -9,6 +9,7 @@
 #include <libusbip\hmodule.h>
 #include <libusbip\win_socket.h>
 #include <libusbip\format_message.h>
+#include <libusbip\vhci.h>
 
 #include <libusbip\src\usb_ids.h>
 #include <libusbip\src\strconv.h>
@@ -67,7 +68,7 @@ void add_cmd_detach(CLI::App &app)
 	auto cmd = app.add_subcommand("detach", "Detach a remote USB device");
 
 	cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in, -1 or zero means ALL ports")
-		->check(CLI::Range(-1, int(vhci::TOTAL_PORTS)))
+		->check(CLI::Range(-1, vhci::get_total_ports()))
 		->required();
 
 	cmd->callback(pack(cmd_detach, &r));
@@ -87,9 +88,11 @@ void add_cmd_port(CLI::App &app)
 	static port_args r;
 	auto cmd = app.add_subcommand("port", "Show imported USB devices");
 
+	auto cnt = vhci::get_total_ports();
+
 	cmd->add_option("number", r.ports, "Hub port number")
-		->check(CLI::Range(1, int(vhci::TOTAL_PORTS)))
-		->expected(1, vhci::TOTAL_PORTS);
+		->check(CLI::Range(1, cnt))
+		->expected(1, cnt);
 
 	cmd->callback(pack(cmd_port, &r));
 }

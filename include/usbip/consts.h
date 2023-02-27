@@ -3,7 +3,7 @@
 namespace usbip
 {
 
-constexpr auto& tcp_port = "3240";
+constexpr auto &tcp_port = "3240";
 
 enum op_status_t // op_common.status
 {

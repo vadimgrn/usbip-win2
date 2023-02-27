@@ -124,6 +124,11 @@ auto get_path()
 } // namespace
 
 
+int usbip::vhci::get_total_ports() noexcept
+{
+        return TOTAL_PORTS;
+}
+
 auto usbip::vhci::open() -> Handle
 {
         Handle h;
@@ -142,7 +147,7 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
         std::vector<usbip::imported_device> result;
 
         ioctl::get_imported_devices *r{};
-        std::vector<char> v(sizeof(*r) + (TOTAL_PORTS - ARRAYSIZE(r->devices))*sizeof(*r->devices));
+        std::vector<char> v(sizeof(*r) + (get_total_ports() - ARRAYSIZE(r->devices))*sizeof(*r->devices));
         r = reinterpret_cast<ioctl::get_imported_devices*>(v.data());
         r->size = sizeof(*r);
 
