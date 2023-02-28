@@ -130,3 +130,11 @@ SymbolicName=ERROR_USBIP_DEVICE_INTERFACE_LIST
 Language=English
 Multiple instances of VHCI device interface found.
 .
+
+MessageId=
+Severity=Error
+Facility=Library
+SymbolicName=ERROR_USBIP_DRIVER_RESPONSE
+Language=English
+Unexpected response from the driver (length, content, etc.).
+.

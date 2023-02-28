@@ -30,13 +30,24 @@ namespace wsk
 namespace usbip
 {
 
+enum { 
+        USB2_PORTS = 30,
+        USB3_PORTS = USB2_PORTS,
+        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
+};
+
+constexpr auto is_valid_port(int port)
+{
+        return port > 0 && port <= TOTAL_PORTS;
+}
+
 /*
  * Context space for WDFDEVICE, Virtual Host Controller Interface.
  * Parent is WDFDRIVER.
  */
 struct vhci_ctx
 {
-        UDECXUSBDEVICE devices[vhci::TOTAL_PORTS]; // do not access directly, functions must be used
+        UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
         KSPIN_LOCK lock;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)

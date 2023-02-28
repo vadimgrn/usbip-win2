@@ -43,5 +43,6 @@
     <ClCompile Include="src\vhci.cpp" />
     <ClCompile Include="src\win_socket.cpp" />
     <ClCompile Include="src\format_message.cpp" />
+    <ClCompile Include="src\output.cpp" />
   </ItemGroup>
 </Project>

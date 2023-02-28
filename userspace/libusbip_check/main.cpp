@@ -16,7 +16,7 @@ int main()
 {
         using namespace usbip;
         
-        libusbip::output_function = [] (auto) {};
+        libusbip::set_debug_output([] (auto) {});
         wformat_message(ERROR_INVALID_PARAMETER);
         hdevinfo();
         HKey();

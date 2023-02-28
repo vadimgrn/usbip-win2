@@ -27,6 +27,8 @@ namespace
 
 using namespace usbip;
 
+const auto MAX_HUB_PORTS = 127;
+
 auto get_ids_data()
 {
 	win::Resource r(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDR_USB_IDS), RT_RCDATA);
@@ -68,7 +70,7 @@ void add_cmd_detach(CLI::App &app)
 	auto cmd = app.add_subcommand("detach", "Detach a remote USB device");
 
 	cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in, -1 or zero means ALL ports")
-		->check(CLI::Range(-1, vhci::get_total_ports()))
+		->check(CLI::Range(-1, MAX_HUB_PORTS))
 		->required();
 
 	cmd->callback(pack(cmd_detach, &r));
@@ -88,11 +90,9 @@ void add_cmd_port(CLI::App &app)
 	static port_args r;
 	auto cmd = app.add_subcommand("port", "Show imported USB devices");
 
-	auto cnt = vhci::get_total_ports();
-
 	cmd->add_option("number", r.ports, "Hub port number")
-		->check(CLI::Range(1, cnt))
-		->expected(1, cnt);
+		->check(CLI::Range(1, MAX_HUB_PORTS))
+		->expected(1, MAX_HUB_PORTS);
 
 	cmd->callback(pack(cmd_port, &r));
 }
@@ -124,7 +124,7 @@ void init_spdlog()
 
 	using fn = void(const std::string&);
 	fn &f = spdlog::debug; // pick this overload
-	libusbip::output_function = f;
+	libusbip::set_debug_output(f);
 }
 
 } // namespace

@@ -126,6 +126,7 @@
     <ClCompile Include="src\device_speed.cpp" />
     <ClCompile Include="src\file_ver.cpp" />
     <ClCompile Include="src\format_message.cpp" />
+    <ClCompile Include="src\output.cpp" />
     <ClCompile Include="src\proto_op.cpp" />
     <ClCompile Include="src\remote.cpp" />
     <ClCompile Include="src\strconv.cpp" />

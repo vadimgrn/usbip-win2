@@ -11,9 +11,13 @@ namespace libusbip
 {
 
 /*
- * Assign a function to this variable if you want to get debug messages from the library.
  * @param utf-8 encoded message 
  */
-inline std::function<void(std::string)> output_function;
+using output_func_type = std::function<void(std::string)>;
+
+/*
+ * Set a function if you want to get debug messages from the library.
+ */
+void set_debug_output(const output_func_type &f);
 
 } // namespace libusbip
