@@ -1,13 +1,22 @@
 ![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")
 
 # USB/IP Client for Windows
-- **Is fully implemented**
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
 - Works with Linux USB/IP server at least for kernels 4.19 - 5.19
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - There is no "official" USB/IP client for Windows
-- [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
+
+## Two implementations
+- [UDE driver](https://github.com/vadimgrn/usbip-win2/tree/master) (version 0.9.5 and later)
+  - Stable, but **has known issues** for some kind of devices
+  - Should be used if your devices work with it
+- [WDM driver](https://github.com/vadimgrn/usbip-win2/tree/wdm) (versions up to 0.9.5)
+  - **Is fully implemented**
+  - Development stopped in favor of UDE driver
+  - Use it only if UDE driver has issues with your devices
+  - Will be supported until UDE driver is fully functional
+  - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
 
 ## Requirements
 - Windows 10 x64 Version [2004](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable) (OS build 19041) and later
@@ -27,6 +36,8 @@
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - Brand new UDE driver was written from scratch
+- libusbip and usbip utility are fully rewritten
+- USBIP SDK for third party developers
 - InnoSetup installer is used for installation of drivers and userspace stuff
 - Windows 10 v.2004 or later is required
 - C++ 20 is used for all projects
