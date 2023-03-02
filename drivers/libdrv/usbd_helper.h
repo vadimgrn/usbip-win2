@@ -3,7 +3,7 @@
 #include <usbip\proto.h>
 
 #include <ntddk.h>
-#include <usbdi.h>
+#include <usb.h>
 
 struct usbip_iso_packet_descriptor;
 
@@ -20,12 +20,12 @@ UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in);
 
 constexpr auto IsTransferDirectionIn(ULONG TransferFlags)
 {
-	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_IN;
+	return USBD_TRANSFER_DIRECTION_FLAG(TransferFlags) == USBD_TRANSFER_DIRECTION_IN;
 }
 
 constexpr auto IsTransferDirectionOut(ULONG TransferFlags)
 {
-	return USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
+	return USBD_TRANSFER_DIRECTION_FLAG(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
 }
 
 constexpr auto is_transfer_dir_in(const USB_DEFAULT_PIPE_SETUP_PACKET &r)

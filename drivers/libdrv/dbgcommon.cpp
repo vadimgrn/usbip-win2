@@ -2,7 +2,8 @@
 #include <usbip\proto.h>
 #include <usbip\vhci.h>
 
-#include <usbdi.h>
+#include <usb.h>
+#include <usbioctl.h>
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
@@ -488,7 +489,7 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 
 const char* usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
 {
-	auto dir = USBD_TRANSFER_DIRECTION(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
+	auto dir = USBD_TRANSFER_DIRECTION_FLAG(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT ? "OUT" : "IN";
 
 	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
 					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
