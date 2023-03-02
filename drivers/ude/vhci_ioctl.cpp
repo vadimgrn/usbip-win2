@@ -439,18 +439,17 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
                 return STATUS_SUCCESS;
         }
 
-        const auto devices_offset = offsetof(vhci::ioctl::get_imported_devices, devices);
-        outlen -= devices_offset; // size of array
+        auto devices_size = outlen - offsetof(vhci::ioctl::get_imported_devices, devices); // size of array
 
-        auto max_cnt = outlen/sizeof(*r->devices);
-        NT_ASSERT(max_cnt > 0);
+        auto max_cnt = devices_size/sizeof(*r->devices);
+        NT_ASSERT(max_cnt);
 
         auto vhci = get_vhci(Request);
-        ULONG cnt{};
+        ULONG cnt = 0;
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
                 if (auto dev = vhci::find_device(vhci, port)) {
-                        if (cnt >= max_cnt) {
+                        if (cnt == max_cnt) {
                                 return STATUS_BUFFER_TOO_SMALL;
                         } else if (auto ctx = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *ctx)) {
                                 return err;
@@ -458,10 +457,11 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
                 }
         }
 
-        TraceDbg("%d device(s) reported", cnt);
+        TraceDbg("%lu device(s) reported", cnt);
 
-        outlen = devices_offset + cnt*sizeof(*r->devices);
-        WdfRequestSetInformation(Request, outlen);
+        auto bytes_written = vhci::ioctl::get_imported_devices_size(cnt);
+        NT_ASSERT(bytes_written <= outlen);
+        WdfRequestSetInformation(Request, bytes_written);
 
         r->error = 0;
         return STATUS_SUCCESS;
@@ -469,6 +469,12 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 
 /*
  * IRP_MJ_DEVICE_CONTROL
+ * 
+ * This is a public driver API. How to maintain its compatibility for libusbip users.
+ * 1.IOCTLs are like syscals on Linux. Once IOCTL code is released, its input/output data remain the same for lifetime.
+ * 2.If this is not possible, new IOCTL code must be added.
+ * 3.IOCTL could be removed (unlike syscals) for various reasons. This will break backward compatibility.
+ *   It can be declared as deprecated in some release and removed afterwards. The removed IOCTL code must never be reused.
  */
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_

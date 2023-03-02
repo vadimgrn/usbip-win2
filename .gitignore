@@ -4,7 +4,7 @@
 /.vs
 x64
 /packages
-/bin/usbip2-*.*
+/bin/usbip-*.*
 /userspace/resources/messages.h
 /userspace/resources/messages.rc
 /userspace/resources/MSG*.bin

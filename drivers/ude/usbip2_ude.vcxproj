@@ -47,7 +47,7 @@
     <ClInclude Include="wsk_receive.h" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="usbip2_vhci.inf" />
+    <Inf Include="usbip2_ude.inf" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3A3812CE-3370-4B5F-829D-43433267B154}</ProjectGuid>
@@ -57,7 +57,7 @@
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <RootNamespace>ude</RootNamespace>
-    <ProjectName>usbip2_vhci</ProjectName>
+    <ProjectName>usbip2_ude</ProjectName>
   </PropertyGroup>
   <PropertyGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>

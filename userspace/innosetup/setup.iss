@@ -26,13 +26,13 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define VhciHwid "ROOT\USBIP_WIN2\VHCI"
+#define UdeHwid "ROOT\USBIP_WIN2\UDE"
 
 #define FilterDriver "usbip2_filter"
 #define FilterClassGuid "{{36FC9E60-C465-11CF-8056-444553540000}" ; see usbip2_filter.inf
 
-#define CertFile "usbip_test.pfx"
-#define CertName "USBIP Test"
+#define CertFile "usbip.pfx"
+#define CertName "USBip"
 #define CertPwd "usbip"
 
 [Setup]
@@ -75,7 +75,7 @@ Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
 Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
-Source: {#SolutionDir + "drivers\"}{#CertFile}; DestDir: "{tmp}"; Components: main
+Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "resources.dll"}; DestDir: "{app}"; Components: main
@@ -104,11 +104,11 @@ Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
 Filename: {app}\classfilter.exe; Parameters: "add upper ""{#FilterClassGuid}"" {#FilterDriver}"; Flags: runhidden
 
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_vhci.inf {#VhciHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_ude.inf {#UdeHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#VhciHwid} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
+Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#UdeHwid} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
 Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#FilterClassGuid}"" {#FilterDriver}"; RunOnceId: "RemoveFromUpperFilters"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden

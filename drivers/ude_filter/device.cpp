@@ -9,6 +9,7 @@
 #include "device.tmh"
 
 #include "driver.h"
+#include <usbip\consts.h>
 
 namespace
 {
@@ -101,8 +102,16 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 {
 	PAGED_CODE();
 
-	DECLARE_CONST_UNICODE_STRING(name, L"\\Driver\\usbip2_vhci"); // FIXME: declare in header?
-	return driver_name_equal(pdo->DriverObject, name, true);
+	DECLARE_CONST_UNICODE_STRING(prefix, L"\\Driver\\");
+
+	UNICODE_STRING fname;
+	NT_SUCCESS(RtlUnicodeStringInit(&fname, driver_filename));
+
+	DECLARE_UNICODE_STRING_SIZE(driver_name, 64);
+	NT_SUCCESS(RtlUnicodeStringCopy(&driver_name, &prefix));
+	NT_SUCCESS(RtlUnicodeStringCat(&driver_name, &fname));
+
+	return driver_name_equal(pdo->DriverObject, driver_name, true);
 }
 
 } // namespace
@@ -132,7 +141,7 @@ PAGED void usbip::destroy(_Inout_ filter_ext &f)
  * In particular, whether a read or write IRP gets a memory descriptor list (MDL) 
  * or a system copy buffer depends on what the top object's DO_DIRECT_IO and DO_BUFFERED_IO flags are.
  * 
- * We don't need to copy the SectorSize or AlignmentRequirement members of the lower device object — 
+ * We don't need to copy the SectorSize or AlignmentRequirement members of the lower device object,
  * IoAttachDeviceToDeviceStack will do that automatically.
  *
  * There's ordinarily no need for a filter device object (FiDO) to have its own name. 

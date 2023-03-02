@@ -103,9 +103,6 @@ auto get_path()
                                         assert(!path.empty());
                                 } else {
                                         libusbip::output("CM_Get_Device_Interface_List: {} paths returned", n);
-                                        for (auto &s: v) {
-                                                libusbip::output(s);
-                                        }
                                         SetLastError(ERROR_USBIP_DEVICE_INTERFACE_LIST);
                                 }
                         } else {
@@ -151,8 +148,8 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
         ioctl::get_imported_devices *r{};
         std::vector<char> buf;
 
-        for (auto cnt = 8; true; cnt <<= 1) {
-                buf.resize(devices_offset + cnt*sizeof(*r->devices));
+        for (auto cnt = 4; true; cnt <<= 1) {
+                buf.resize(ioctl::get_imported_devices_size(cnt));
 
                 r = reinterpret_cast<ioctl::get_imported_devices*>(buf.data());
                 r->size = sizeof(*r);

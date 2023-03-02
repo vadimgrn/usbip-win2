@@ -68,12 +68,12 @@ BEGIN
         BLOCK "040004b0"
         BEGIN
             VALUE "CompanyName", "usbip-win2"
-            VALUE "FileDescription", "devnode for usbip-win2"
+            VALUE "FileDescription", "devnode for USBip"
             VALUE "FileVersion", "0.9.5.0"
             VALUE "InternalName", "devnode.exe"
             VALUE "LegalCopyright", "Copyright (C) 2022 - 2023 usbip-win2 project"
             VALUE "OriginalFilename", "devnode.exe"
-            VALUE "ProductName", "usbip-win2"
+            VALUE "ProductName", "USBip"
             VALUE "ProductVersion", "0.9.5.0"
         END
     END

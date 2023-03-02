@@ -52,7 +52,7 @@
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Inf Include="usbip2_vhci.inf" />
+    <Inf Include="usbip2_ude.inf" />
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />

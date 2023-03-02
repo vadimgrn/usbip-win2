@@ -94,6 +94,10 @@ struct get_imported_devices : base
 {
         imported_device devices[ANYSIZE_ARRAY];
 };
-static_assert(sizeof(get_imported_devices) == sizeof(base) + sizeof(get_imported_devices::devices));
+
+constexpr auto get_imported_devices_size(_In_ ULONG n)
+{
+        return offsetof(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
+}
 
 } // namespace usbip::vhci::ioctl

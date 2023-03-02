@@ -9,7 +9,7 @@
 
 ## Two implementations
 - [UDE driver](https://github.com/vadimgrn/usbip-win2/tree/master) (version 0.9.5 and later)
-  - Stable, but **has known issues** for some kind of devices
+  - Is stable, but **has known issues** for some kind of devices
   - Should be used if your devices work with it
 - [WDM driver](https://github.com/vadimgrn/usbip-win2/tree/wdm) (versions up to 0.9.5)
   - **Is fully implemented**
@@ -17,6 +17,7 @@
   - Use it only if UDE driver has issues with your devices
   - Will be supported until UDE driver is fully functional
   - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
+- UDE and WDM drivers can be installed and used together on the same PC, just make sure you use the appropriate usbip.exe for each one
 
 ## Requirements
 - Windows 10 x64 Version [2004](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable) (OS build 19041) and later
@@ -35,9 +36,9 @@
 - [System Worker Threads](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/system-worker-threads) are used to initiate receive operation
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
-- Brand new UDE driver was written from scratch
-- libusbip and usbip utility are fully rewritten
-- USBIP SDK for third party developers
+- Brand new UDE driver, not inherited from the parent repo
+- Userspace code is fully rewritten (libusbip and usbip utility)
+- SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
 - Windows 10 v.2004 or later is required
 - C++ 20 is used for all projects
@@ -58,10 +59,10 @@
 - [WDK for Windows 11](https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk), version 22H2 (10.0.22621.0)
 
 ### Build Visual Studio solution
-- Open `usbip_win.sln`
+- Open `usbip_win2.sln`
 - Set certificate driver signing for `package` project
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
-  - Enter `..\usbip_test.pfx` (password: usbip)
+  - Enter `usbip.pfx` (password: usbip)
 - Build the solution
 - All output files are created under x64/{Debug,Release} folders.
 
@@ -127,10 +128,10 @@ port 1 is successfully detached
 - If an uninstaller is corrupted, run these commands as Administrator
 ```
 rem devcon classfilter usb upper !usbip2_filter
-"C:\Program Files\usbip-win2\classfilter" remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
-pnputil /remove-device /deviceid ROOT\USBIP_WIN2\VHCI /subtree
+"C:\Program Files\USBip\classfilter" remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
+pnputil /remove-device /deviceid ROOT\USBIP_WIN2\UDE /subtree
 FOR /f %P IN ('findstr /M /L "Manufacturer=\"USBIP-WIN2\"" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
-del /Q "C:\Program Files\usbip-win2"
+del /Q "C:\Program Files\USBip"
 ```
 
 ## Obtaining USB/IP logs on Windows
@@ -140,24 +141,30 @@ del /Q "C:\Program Files\usbip-win2"
 - Start log sessions for drivers (copy commands to .bat file and run it as Admin)
 ```
 @echo off
-set NAME=usbip2
+set NAME=usbip
+
+tracelog.exe -stop %NAME%-ude
 tracelog.exe -stop %NAME%-fltr
-tracelog.exe -stop %NAME%-vhci
+
 rm %NAME%-*.*
-tracepdb.exe -f "C:\Program Files\usbip-win2\*.pdb" -s -p %TEMP%\%NAME%
+tracepdb.exe -f "C:\Program Files\USBip\*.pdb" -s -p %TEMP%\%NAME%
+
+tracelog.exe -start %NAME%-ude -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%-ude.etl -flag 0xF -level 5
 tracelog.exe -start %NAME%-fltr -guid #90c336ed-69fb-43d6-b800-1552d72d200b -f %NAME%-fltr.etl -flag 0x3 -level 5
-tracelog.exe -start %NAME%-vhci -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%-vhci.etl -flag 0xF -level 5
 ```
 - Reproduce the issue
 - Stop log sessions and get plain text logs (copy commands to .bat file and run it as Admin)
 ```
 @echo off
-set NAME=usbip2
+set NAME=usbip
 set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
+
+tracelog.exe -stop %NAME%-ude
 tracelog.exe -stop %NAME%-fltr
-tracelog.exe -stop %NAME%-vhci
+
+tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-ude.txt %NAME%-ude.etl
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-fltr.txt %NAME%-fltr.etl
-tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-vhci.txt %NAME%-vhci.etl
+
 rem sed -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-*.txt
 rem sed -i "s/`anonymous namespace':://" %NAME%-*.txt
 rem rm sed*
@@ -178,10 +185,10 @@ rem rm sed*
   - Run following commands and copy the output
 ```
 !analyze -v
-!wdfkd.wdfsearchpath %TEMP%\usbip2
+!wdfkd.wdfsearchpath %TEMP%\USBip
 !wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
-!wdfkd.wdflogdump usbip2_vhci -d
-!wdfkd.wdflogdump usbip2_vhci -f
+!wdfkd.wdflogdump usbip2_ude -d
+!wdfkd.wdflogdump usbip2_ude -f
 ```
 
 ## Obtaining USB/IP log on Linux
@@ -199,7 +206,7 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 9 10 11 12 14 15 16 18 20 24 26 33 34 35 36 /driver usbip2_filter.sys usbip2_vhci.sys
+verifier /rc 1 2 4 5 6 9 10 11 12 14 15 16 18 20 24 26 33 34 35 36 /driver usbip2_filter.sys usbip2_ude.sys
 ```
 - Query driver statistics
 ```
@@ -209,4 +216,4 @@ verifier /query
 ```
 verifier /reset
 ```
-- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv and usbip2_vhci projects
+- To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv, usbip2_filter, usbip2_ude projects

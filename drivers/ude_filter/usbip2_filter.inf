@@ -15,7 +15,7 @@ PnpLockDown=1
 DefaultDestDir = 13 ; Driver package isolation
 
 [SourceDisksNames]
-1 = "USBIP-WIN2 Filter Installation Disk",,,""
+1 = "USBip Filter Installation Disk",,,""
 
 [SourceDisksFiles]
 usbip2_filter.sys = 1,,
@@ -43,4 +43,4 @@ HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 
 [Strings]
 Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
-DisplayName="USBIP Upper Class Filter" ; for device and service
+DisplayName="USBip Upper Class Filter" ; for device and service
