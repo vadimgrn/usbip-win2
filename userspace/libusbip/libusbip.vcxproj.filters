@@ -26,6 +26,7 @@
     <ClInclude Include="vhci.h" />
     <ClInclude Include="format_message.h" />
     <ClInclude Include="src\strconv.h" />
+    <ClInclude Include="src\output.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
@@ -42,5 +43,6 @@
     <ClCompile Include="src\vhci.cpp" />
     <ClCompile Include="src\win_socket.cpp" />
     <ClCompile Include="src\format_message.cpp" />
+    <ClCompile Include="src\output.cpp" />
   </ItemGroup>
 </Project>

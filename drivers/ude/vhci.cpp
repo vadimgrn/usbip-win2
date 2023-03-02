@@ -192,8 +192,8 @@ PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
         UDECX_WDF_DEVICE_CONFIG cfg;
         UDECX_WDF_DEVICE_CONFIG_INIT(&cfg, query_usb_capability);
 
-        cfg.NumberOfUsb20Ports = vhci::USB2_PORTS;
-        cfg.NumberOfUsb30Ports = vhci::USB3_PORTS;
+        cfg.NumberOfUsb20Ports = USB2_PORTS;
+        cfg.NumberOfUsb30Ports = USB3_PORTS;
 
         if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
@@ -272,6 +272,23 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
         }
 
         return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_port_range(_In_ usb_device_speed speed)
+{
+        struct{ int begin;  int end; } r;
+
+        if (speed < USB_SPEED_SUPER) {
+                r.begin = 0;
+                r.end = USB2_PORTS;
+        } else {
+                r.begin = USB2_PORTS;
+                r.end = TOTAL_PORTS;
+        }
+
+        return r;
 }
 
 } // namespace

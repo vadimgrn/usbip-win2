@@ -9,6 +9,7 @@
 #include <libusbip\hmodule.h>
 #include <libusbip\win_socket.h>
 #include <libusbip\format_message.h>
+#include <libusbip\vhci.h>
 
 #include <libusbip\src\usb_ids.h>
 #include <libusbip\src\strconv.h>
@@ -25,6 +26,8 @@ namespace
 {
 
 using namespace usbip;
+
+const auto MAX_HUB_PORTS = 127;
 
 auto get_ids_data()
 {
@@ -67,7 +70,7 @@ void add_cmd_detach(CLI::App &app)
 	auto cmd = app.add_subcommand("detach", "Detach a remote USB device");
 
 	cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in, -1 or zero means ALL ports")
-		->check(CLI::Range(-1, int(vhci::TOTAL_PORTS)))
+		->check(CLI::Range(-1, MAX_HUB_PORTS))
 		->required();
 
 	cmd->callback(pack(cmd_detach, &r));
@@ -88,8 +91,8 @@ void add_cmd_port(CLI::App &app)
 	auto cmd = app.add_subcommand("port", "Show imported USB devices");
 
 	cmd->add_option("number", r.ports, "Hub port number")
-		->check(CLI::Range(1, int(vhci::TOTAL_PORTS)))
-		->expected(1, vhci::TOTAL_PORTS);
+		->check(CLI::Range(1, MAX_HUB_PORTS))
+		->expected(1, MAX_HUB_PORTS);
 
 	cmd->callback(pack(cmd_port, &r));
 }
@@ -121,17 +124,11 @@ void init_spdlog()
 
 	using fn = void(const std::string&);
 	fn &f = spdlog::debug; // pick this overload
-	libusbip::output_function = f;
+	libusbip::set_debug_output(f);
 }
 
 } // namespace
 
-
-template<>
-std::string libusbip::to_utf8(const std::wstring &s)
-{
-	return wchar_to_utf8(s); // CLI::narrow
-}
 
 std::string usbip::GetLastErrorMsg(unsigned long msg_id)
 {

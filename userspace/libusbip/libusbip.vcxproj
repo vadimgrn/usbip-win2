@@ -56,7 +56,7 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -82,7 +82,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>..\..\include;..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN;SPDLOG_WCHAR_TO_UTF8_SUPPORT</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;UNICODE;_NO_CRT_STDIO_INLINE;WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -115,6 +115,7 @@
     <ClInclude Include="src\file_ver.h" />
     <ClInclude Include="src\last_error.h" />
     <ClInclude Include="src\op_common.h" />
+    <ClInclude Include="src\output.h" />
     <ClInclude Include="src\strconv.h" />
     <ClInclude Include="src\usb_ids.h" />
     <ClInclude Include="vhci.h" />
@@ -125,6 +126,7 @@
     <ClCompile Include="src\device_speed.cpp" />
     <ClCompile Include="src\file_ver.cpp" />
     <ClCompile Include="src\format_message.cpp" />
+    <ClCompile Include="src\output.cpp" />
     <ClCompile Include="src\proto_op.cpp" />
     <ClCompile Include="src\remote.cpp" />
     <ClCompile Include="src\strconv.cpp" />

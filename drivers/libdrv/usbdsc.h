@@ -1,7 +1,7 @@
 #pragma once
 
 #include <ntddk.h>
-#include <usbdi.h>
+#include <usb.h>
 
 namespace usbdlib
 {

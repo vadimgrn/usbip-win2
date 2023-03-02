@@ -27,9 +27,10 @@ void print(const imported_device &d)
            -> usbip://{}:{}/{}
            -> remote bus/dev {:03}/{:03}
 )";
+        auto &loc = d.location;
         auto msg = std::format(fmt, d.port, get_speed_str(d.speed),
                                 product,
-                                d.hostname, d.service, d.busid,
+                                loc.hostname, loc.service, loc.busid,
                                 bus, dev);
 
         printf(msg.c_str());

@@ -17,16 +17,17 @@
 namespace usbip
 {
 
-struct attach_info
+struct device_location
 {
         std::string hostname;
         std::string service; // TCP/IP port number or symbolic name
         std::string busid;
 };
 
-struct imported_device : attach_info
+struct imported_device
 {
-        int port; // [1..TOTAL_PORTS], hub port number
+        device_location location;
+        int port; // hub port number, >= 1
 
         UINT32 devid;
         USB_DEVICE_SPEED speed;
@@ -56,14 +57,14 @@ std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &s
 
 /**
  * @param dev handle of the driver device
- * @param info arguments of the command
- * @return hub port number, [1..TOTAL_PORTS]. Call GetLastError() if zero is returned. 
+ * @param location remote device to attach to
+ * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
  */
-int attach(_In_ HANDLE dev, _In_ const attach_info &info);
+int attach(_In_ HANDLE dev, _In_ const device_location &location);
 
 /**
  * @param dev handle of the driver device
- * @param port hub port number
+ * @param port hub port number, <= 0 means detach all ports
  * @return call GetLastError() if false is returned
  */
 bool detach(_In_ HANDLE dev, _In_ int port);

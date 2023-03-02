@@ -5,9 +5,6 @@
 #include "usbip.h"
 #include "strings.h"
 
-#include <usbip\proto_op.h>
-#include <libusbip\remote.h>
-
 #include <spdlog\spdlog.h>
 
 namespace

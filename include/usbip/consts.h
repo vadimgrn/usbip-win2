@@ -3,7 +3,7 @@
 namespace usbip
 {
 
-constexpr auto& tcp_port = "3240";
+constexpr auto &tcp_port = "3240";
 
 enum op_status_t // op_common.status
 {
@@ -22,20 +22,3 @@ enum {
 };
 
 } // namespace usbip
-
-
-namespace usbip::vhci
-{
-
-enum { 
-        USB2_PORTS = 30,
-        USB3_PORTS = USB2_PORTS,
-        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
-};
-
-constexpr auto is_valid_port(int port)
-{
-        return port > 0 && port <= TOTAL_PORTS;
-}
-
-} // namespace usbip::vhci

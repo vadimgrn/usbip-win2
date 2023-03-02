@@ -3,7 +3,7 @@
  */
 
 #include "..\win_socket.h"
-#include "..\output.h"
+#include "output.h"
 #include "last_error.h"
 
 namespace

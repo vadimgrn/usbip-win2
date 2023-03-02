@@ -2,13 +2,13 @@
  * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn
  */
 
+#include "..\remote.h"
+
 #include "device_speed.h"
 #include "op_common.h"
 #include "last_error.h"
 #include "strconv.h"
-
-#include "..\remote.h"
-#include "..\output.h"
+#include "output.h"
 
 #include <usbip\proto_op.h>
 
@@ -180,6 +180,11 @@ auto as_usb_device(_In_ const usbip_usb_device &d)
 
 } // namespace
 
+
+const char* usbip::get_tcp_port() noexcept
+{
+	return tcp_port;
+}
 
 auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Socket
 {

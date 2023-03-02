@@ -24,27 +24,12 @@
 namespace usbip::vhci
 {
 
-inline auto get_port_range(_In_ usb_device_speed speed)
-{
-        struct{ int begin;  int end; } r;
-
-        if (speed < USB_SPEED_SUPER) {
-                r.begin = 0;
-                r.end = USB2_PORTS;
-        } else {
-                r.begin = USB2_PORTS;
-                r.end = TOTAL_PORTS;
-        }
-
-        return r;
-}
-
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
 struct imported_device_location
 {
-        int port; // OUT, [1..TOTAL_PORTS] or zero if an error
+        int port; // OUT, >= 1 or zero if an error
 
         char busid[BUS_ID_SIZE];
         char service[32]; // NI_MAXSERV
@@ -75,7 +60,7 @@ namespace usbip::vhci::ioctl
 enum class function { // 12 bit
         plugin_hardware = 0x800, // values of less than 0x800 are reserved for Microsoft
         plugout_hardware, 
-        get_imported_devices 
+        get_imported_devices,
 };
 
 constexpr auto make(function id)
@@ -102,7 +87,7 @@ struct plugin_hardware : base, imported_device_location {};
 
 struct plugout_hardware : base
 {
-        int port; // [1..TOTAL_PORTS] or all ports if <= 0
+        int port; // all ports if <= 0
 };
 
 struct get_imported_devices : base

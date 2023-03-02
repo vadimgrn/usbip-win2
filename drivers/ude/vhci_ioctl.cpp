@@ -406,7 +406,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
                 Trace(TRACE_LEVEL_ERROR, "sizeof(plugout_hardware) %Iu != plugout_hardware.size %lu", sizeof(*r), r_size);
         } else if (auto vhci = get_vhci(Request); r->port <= 0) {
                 vhci::destroy_all_devices(vhci);
-        } else if (!vhci::is_valid_port(r->port)) {
+        } else if (!is_valid_port(r->port)) {
                 return STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::find_device(vhci, r->port)) {
                 device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
@@ -430,45 +430,40 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
                 return err;
         }
 
-        const auto devices_offset = offsetof(vhci::ioctl::get_imported_devices, devices);
-
         if (r->size != sizeof(*r)) {
                 Trace(TRACE_LEVEL_ERROR, "sizeof(get_imported_devices) %Iu != get_imported_devices.size %lu", 
                                           sizeof(*r), r->size);
+        
                 r->error = ERROR_USBIP_ABI;
                 WdfRequestSetInformation(Request, sizeof(r->error));
-                static_assert(sizeof(r->error) == devices_offset); // libusbip expected min output size
                 return STATUS_SUCCESS;
         }
 
-        outlen -= devices_offset;
-
-        if (auto rem = outlen % sizeof(*r->devices)) {
-                Trace(TRACE_LEVEL_ERROR, "byte[%Iu] does not accommodate N*sizeof(imported device), "
-                                         "remainder %Iu/%Iu=%Iu", outlen, outlen, sizeof(*r->devices), rem);
-                return STATUS_INVALID_BUFFER_SIZE;
-        }
+        const auto devices_offset = offsetof(vhci::ioctl::get_imported_devices, devices);
+        outlen -= devices_offset; // size of array
 
         auto max_cnt = outlen/sizeof(*r->devices);
-        ULONG devices_cnt{};
+        NT_ASSERT(max_cnt > 0);
 
         auto vhci = get_vhci(Request);
-        r->error = 0; // success
+        ULONG cnt{};
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices) && devices_cnt < max_cnt; ++port) {
+        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
                 if (auto dev = vhci::find_device(vhci, port)) {
-                        auto &ctx = *get_device_ctx(dev.get());
-                        if (auto err = fill(r->devices[devices_cnt++], ctx)) {
+                        if (cnt >= max_cnt) {
+                                return STATUS_BUFFER_TOO_SMALL;
+                        } else if (auto ctx = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *ctx)) {
                                 return err;
                         }
                 }
         }
 
-        TraceDbg("%d device(s) reported", devices_cnt);
+        TraceDbg("%d device(s) reported", cnt);
 
-        outlen = devices_offset + devices_cnt*sizeof(*r->devices);
+        outlen = devices_offset + cnt*sizeof(*r->devices);
         WdfRequestSetInformation(Request, outlen);
 
+        r->error = 0;
         return STATUS_SUCCESS;
 }
 

@@ -37,6 +37,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_filter", "drivers\ud
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "resources", "userspace\resources\resources.vcxproj", "{EF113E88-152A-4EB5-811C-1D499C3248A0}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip_check", "userspace\libusbip_check\libusbip_check.vcxproj", "{48394B64-9CBB-4006-A144-2529D1C45546}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2C173853-88C0-4334-85BF-0B46CFD5A007} = {2C173853-88C0-4334-85BF-0B46CFD5A007}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -87,6 +92,10 @@ Global
 		{EF113E88-152A-4EB5-811C-1D499C3248A0}.Debug|x64.Build.0 = Debug|x64
 		{EF113E88-152A-4EB5-811C-1D499C3248A0}.Release|x64.ActiveCfg = Release|x64
 		{EF113E88-152A-4EB5-811C-1D499C3248A0}.Release|x64.Build.0 = Release|x64
+		{48394B64-9CBB-4006-A144-2529D1C45546}.Debug|x64.ActiveCfg = Debug|x64
+		{48394B64-9CBB-4006-A144-2529D1C45546}.Debug|x64.Build.0 = Debug|x64
+		{48394B64-9CBB-4006-A144-2529D1C45546}.Release|x64.ActiveCfg = Release|x64
+		{48394B64-9CBB-4006-A144-2529D1C45546}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
