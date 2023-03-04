@@ -77,10 +77,7 @@ enum {
 
 struct base
 {
-        union {
-                ULONG size; // IN, self size, 
-                UINT32 error; // OUT, ERROR_USBIP_XXX
-        };
+        ULONG size; // IN, self size
 };
 
 struct plugin_hardware : base, imported_device_location {};

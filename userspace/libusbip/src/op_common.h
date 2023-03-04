@@ -27,7 +27,7 @@ inline auto op_status_str(op_status_t st)
 
 inline auto op_status_error(op_status_t st)
 {
-        static const UINT32 v[] = 
+        static const DWORD v[] = 
         {
                 0, // ST_OK
                 ERROR_USBIP_ST_NA,

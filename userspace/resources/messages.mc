@@ -1,8 +1,13 @@
 ;// Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;//
 ;#pragma once
+;
 
-MessageIdTypedef=UINT32
+MessageIdTypedef=DWORD
+;#ifdef _NTSTATUS_
+;  static_assert(sizeof(DWORD) == sizeof(NTSTATUS));
+;#endif
+;
 
 FacilityNames=(System=0x0FF:FACILITY_SYSTEM
 Driver=0x100:FACILITY_DRIVER

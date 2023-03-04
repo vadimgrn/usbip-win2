@@ -138,8 +138,7 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 	if (recv(s, &r, sizeof(r))) {
 		PACK_OP_COMMON(false, &r);
 	} else {
-		UINT32 err = GetLastError();
-		return err;
+		return GetLastError();
 	}
 
 	if (r.version != USBIP_VERSION) {

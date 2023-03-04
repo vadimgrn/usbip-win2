@@ -163,13 +163,6 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
                                 return result;
                         }
                                 
-                        static_assert(sizeof(r->error) == devices_offset);
-
-                        if (auto err = r->error) {
-                                SetLastError(err);
-                                return result;
-                        }
-
                         buf.resize(BytesReturned);
                         break;
 
@@ -207,8 +200,7 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
                 if (BytesReturned != outlen) [[unlikely]] {
                         SetLastError(ERROR_USBIP_DRIVER_RESPONSE);
                 } else {
-                        assert(bool(r.error) != bool(r.port));
-                        SetLastError(r.error);
+                        assert(r.port > 0);
                         return r.port;
                 }
         }
@@ -221,18 +213,6 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
         ioctl::plugout_hardware r { .port = port };
         r.size = sizeof(r);
 
-        if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), 
-                            &r, sizeof(r.error), &BytesReturned, nullptr)) {
-
-                if (BytesReturned != sizeof(r.error)) [[unlikely]] {
-                        SetLastError(ERROR_USBIP_DRIVER_RESPONSE);
-                } else if (r.error) {
-                        SetLastError(r.error);
-                } else {
-                        return true;
-                }
-        }
-
-        return false;
+        DWORD BytesReturned; // must be set if the last arg is NULL
+        return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
