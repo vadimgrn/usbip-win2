@@ -478,10 +478,12 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
  * IRP_MJ_DEVICE_CONTROL
  * 
  * This is a public driver API. How to maintain its compatibility for libusbip users.
- * 1.IOCTLs are like syscals on Linux. Once IOCTL code is released, its input/output data remain the same for lifetime.
+ * 1.IOCTLs are like syscals on Linux. Once IOCTL code is released, its input/output data remain 
+ *   the same for lifetime.
  * 2.If this is not possible, new IOCTL code must be added.
  * 3.IOCTL could be removed (unlike syscals) for various reasons. This will break backward compatibility.
- *   It can be declared as deprecated in some release and removed afterwards. The removed IOCTL code must never be reused.
+ *   It can be declared as deprecated in some release and removed afterwards. 
+ *   The removed IOCTL code must never be reused.
  */
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_

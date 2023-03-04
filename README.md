@@ -9,14 +9,15 @@
 
 ## Two implementations
 - [UDE driver](https://github.com/vadimgrn/usbip-win2/tree/master) (version 0.9.5 and later)
-  - Is stable, but **has known issues** for some kind of devices
+  - Is stable, but **has known issues** for some kind of devices (at least audio devices)
   - Should be used if your devices work with it
+  - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (list is incomplete)
 - [WDM driver](https://github.com/vadimgrn/usbip-win2/tree/wdm) (versions up to 0.9.5)
   - **Is fully implemented**
   - Development stopped in favor of UDE driver
   - Use it only if UDE driver has issues with your devices
   - Will be supported until UDE driver is fully functional
-  - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#list-of-devices-known-to-work) that work (list is incomplete)
+  - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#wdm-driver-list-of-devices-known-to-work) that work (list is incomplete)
 - UDE and WDM drivers can be installed and used together on the same PC, just make sure you use the appropriate usbip.exe for each one
 
 ## Requirements
