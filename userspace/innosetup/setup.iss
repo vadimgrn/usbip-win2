@@ -12,11 +12,17 @@
         #error Use option /DConfiguration=<cfg>
 #endif
 
-#ifndef ExePath
+#ifdef ExePath
+        #define BuildDir AddBackslash(ExtractFilePath(ExePath))
+#else
         #error Use option /DExePath=path-to-exe
 #endif
 
-#define BuildDir AddBackslash(ExtractFilePath(ExePath))
+#ifndef VCToolsRedistInstallDir
+        #error Use option /DVCToolsRedistInstallDir
+#endif
+
+#define VCToolsRedistExe "vc_redist.x64.exe"
 
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
@@ -79,7 +85,7 @@ Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Compon
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{tmp}"; Components: main
+Source: {#BuildDir + "libusbip.dll"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
@@ -89,6 +95,8 @@ Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.id
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 
+Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
+
 #if Configuration == "Debug"
  Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb, libusbip_check.pdb"; Components: main
  Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}"; DestName: "classfilter.pdb"; Components: main
@@ -96,10 +104,12 @@ Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\inclu
 #endif
 
 [Tasks]
-Name: modifypath; Description: "&Add to PATH environment variable for all users"
+Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
+Name: modifypath; Description: "Add to &PATH environment variable for all users"
 
 [Run]
 
+Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist 
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden

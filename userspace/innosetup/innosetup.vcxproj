@@ -41,19 +41,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\usbip-win2-*-$(Configuration).exe</NMakeCleanCommandLine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\usbip-win2-*-$(Configuration).exe</NMakeCleanCommandLine>
