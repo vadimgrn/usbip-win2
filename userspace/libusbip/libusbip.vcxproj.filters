@@ -1,48 +1,77 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClInclude Include="..\..\include\usbip\consts.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\usbip\proto_op.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
-    <ClInclude Include="win_handle.h" />
-    <ClInclude Include="win_socket.h" />
-    <ClInclude Include="..\..\include\usbip\ch9.h">
-      <Filter>usbip</Filter>
-    </ClInclude>
-    <ClInclude Include="src\op_common.h" />
-    <ClInclude Include="src\last_error.h" />
-    <ClInclude Include="src\device_speed.h" />
-    <ClInclude Include="src\file_ver.h" />
-    <ClInclude Include="src\usb_ids.h" />
+    <ClCompile Include="src\device_speed.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dllmain.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\file_ver.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\format_message.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\output.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\proto_op.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\strconv.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\usb_ids.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vhci.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\remote.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\win_socket.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="format_message.h" />
+    <ClInclude Include="generic_handle.h" />
     <ClInclude Include="hdevinfo.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="hmodule.h" />
-    <ClInclude Include="generic_handle.h" />
     <ClInclude Include="output.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="vhci.h" />
-    <ClInclude Include="format_message.h" />
-    <ClInclude Include="src\strconv.h" />
-    <ClInclude Include="src\output.h" />
+    <ClInclude Include="win_handle.h" />
+    <ClInclude Include="win_socket.h" />
+    <ClInclude Include="dllspec.h" />
+    <ClInclude Include="src\device_speed.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\file_ver.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\output.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\op_common.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\last_error.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\strconv.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="src\usb_ids.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="usbip">
-      <UniqueIdentifier>{8a8641a4-9936-459a-9b1d-304c26ed7306}</UniqueIdentifier>
+    <Filter Include="src">
+      <UniqueIdentifier>{8a8cf4b9-ec4c-4a7d-a9f3-4ac48541990a}</UniqueIdentifier>
     </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="src\device_speed.cpp" />
-    <ClCompile Include="src\file_ver.cpp" />
-    <ClCompile Include="src\proto_op.cpp" />
-    <ClCompile Include="src\remote.cpp" />
-    <ClCompile Include="src\strconv.cpp" />
-    <ClCompile Include="src\usb_ids.cpp" />
-    <ClCompile Include="src\vhci.cpp" />
-    <ClCompile Include="src\win_socket.cpp" />
-    <ClCompile Include="src\format_message.cpp" />
-    <ClCompile Include="src\output.cpp" />
   </ItemGroup>
 </Project>

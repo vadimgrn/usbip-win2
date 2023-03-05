@@ -4,7 +4,9 @@
 
 #pragma once
 
+#include "dllspec.h"
 #include "generic_handle.h"
+
 #include <cassert>
 
 /*
@@ -26,7 +28,7 @@ inline void close_handle(_In_ Socket::type s, _In_ Socket::tag_type) noexcept
         assert(!err);
 }
 
-class InitWinSock2
+class USBIP_API InitWinSock2
 {
 public:
         InitWinSock2();

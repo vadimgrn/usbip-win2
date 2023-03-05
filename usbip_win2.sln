@@ -3,13 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.2.32519.379
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip", "userspace\libusbip\libusbip.vcxproj", "{2C173853-88C0-4334-85BF-0B46CFD5A007}"
-	ProjectSection(ProjectDependencies) = postProject
-		{EF113E88-152A-4EB5-811C-1D499C3248A0} = {EF113E88-152A-4EB5-811C-1D499C3248A0}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip", "userspace\usbip\usbip.vcxproj", "{36CEE68D-D6CF-4413-978C-794488F44555}"
 	ProjectSection(ProjectDependencies) = postProject
+		{35196D26-E918-4002-B87E-1EEC2BF54444} = {35196D26-E918-4002-B87E-1EEC2BF54444}
 		{EF113E88-152A-4EB5-811C-1D499C3248A0} = {EF113E88-152A-4EB5-811C-1D499C3248A0}
 	EndProjectSection
 EndProject
@@ -24,8 +20,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "innosetup", "userspace\inno
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\devnode\devnode.vcxproj", "{7A610672-F2EF-4048-883A-41195D0977DC}"
 	ProjectSection(ProjectDependencies) = postProject
-		{2C173853-88C0-4334-85BF-0B46CFD5A007} = {2C173853-88C0-4334-85BF-0B46CFD5A007}
-		{EF113E88-152A-4EB5-811C-1D499C3248A0} = {EF113E88-152A-4EB5-811C-1D499C3248A0}
+		{35196D26-E918-4002-B87E-1EEC2BF54444} = {35196D26-E918-4002-B87E-1EEC2BF54444}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_ude", "drivers\ude\usbip2_ude.vcxproj", "{3A3812CE-3370-4B5F-829D-43433267B154}"
@@ -39,7 +34,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "resources", "userspace\reso
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip_check", "userspace\libusbip_check\libusbip_check.vcxproj", "{48394B64-9CBB-4006-A144-2529D1C45546}"
 	ProjectSection(ProjectDependencies) = postProject
-		{2C173853-88C0-4334-85BF-0B46CFD5A007} = {2C173853-88C0-4334-85BF-0B46CFD5A007}
+		{35196D26-E918-4002-B87E-1EEC2BF54444} = {35196D26-E918-4002-B87E-1EEC2BF54444}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip", "userspace\libusbip\libusbip.vcxproj", "{35196D26-E918-4002-B87E-1EEC2BF54444}"
+	ProjectSection(ProjectDependencies) = postProject
+		{EF113E88-152A-4EB5-811C-1D499C3248A0} = {EF113E88-152A-4EB5-811C-1D499C3248A0}
 	EndProjectSection
 EndProject
 Global
@@ -48,10 +48,6 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2C173853-88C0-4334-85BF-0B46CFD5A007}.Debug|x64.ActiveCfg = Debug|x64
-		{2C173853-88C0-4334-85BF-0B46CFD5A007}.Debug|x64.Build.0 = Debug|x64
-		{2C173853-88C0-4334-85BF-0B46CFD5A007}.Release|x64.ActiveCfg = Release|x64
-		{2C173853-88C0-4334-85BF-0B46CFD5A007}.Release|x64.Build.0 = Release|x64
 		{36CEE68D-D6CF-4413-978C-794488F44555}.Debug|x64.ActiveCfg = Debug|x64
 		{36CEE68D-D6CF-4413-978C-794488F44555}.Debug|x64.Build.0 = Debug|x64
 		{36CEE68D-D6CF-4413-978C-794488F44555}.Release|x64.ActiveCfg = Release|x64
@@ -96,6 +92,10 @@ Global
 		{48394B64-9CBB-4006-A144-2529D1C45546}.Debug|x64.Build.0 = Debug|x64
 		{48394B64-9CBB-4006-A144-2529D1C45546}.Release|x64.ActiveCfg = Release|x64
 		{48394B64-9CBB-4006-A144-2529D1C45546}.Release|x64.Build.0 = Release|x64
+		{35196D26-E918-4002-B87E-1EEC2BF54444}.Debug|x64.ActiveCfg = Debug|x64
+		{35196D26-E918-4002-B87E-1EEC2BF54444}.Debug|x64.Build.0 = Debug|x64
+		{35196D26-E918-4002-B87E-1EEC2BF54444}.Release|x64.ActiveCfg = Release|x64
+		{35196D26-E918-4002-B87E-1EEC2BF54444}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

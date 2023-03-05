@@ -4,9 +4,10 @@
 
 #pragma once
 
+#include "dllspec.h"
 #include "win_socket.h"
-#include <usbspec.h>
 
+#include <usbspec.h>
 #include <string>
 
 namespace usbip
@@ -46,14 +47,14 @@ struct usb_interface
 /**
  * @return default TCP/IP port number of usbip server
  */
-const char *get_tcp_port() noexcept;
+USBIP_API const char *get_tcp_port() noexcept;
 
 /**
  * @param hostname name or IP address of a host to connect to
  * @param service TCP/IP port number of symbolic name
  * @return call GetLastError() if returned handle is invalid
  */
-Socket connect(_In_ const char *hostname, _In_ const char *service);
+USBIP_API Socket connect(_In_ const char *hostname, _In_ const char *service);
 
 /**
  * @param idx zero-based index of usb device
@@ -81,7 +82,7 @@ using usb_device_cnt_f = std::function<void(_In_ int count)>;
  * @param on_dev_cnt will be called once before other callbacks
  * @return call GetLastError() if false is returned
  */
-bool enum_exportable_devices(
+USBIP_API bool enum_exportable_devices(
         _In_ SOCKET s, 
         _In_ const usb_device_f &on_dev, 
         _In_ const usb_interface_f &on_intf,

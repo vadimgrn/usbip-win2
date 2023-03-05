@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "dllspec.h"
+
 #include <string>
 #include <functional>
 
@@ -18,6 +20,6 @@ using output_func_type = std::function<void(std::string)>;
 /*
  * Set a function if you want to get debug messages from the library.
  */
-void set_debug_output(const output_func_type &f);
+USBIP_API void set_debug_output(const output_func_type &f);
 
 } // namespace libusbip

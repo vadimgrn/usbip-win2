@@ -4,14 +4,16 @@
 
 #pragma once
 
+#include "..\dllspec.h"
+
 #include <string>
 #include <vector>
 
 namespace usbip
 {
 
-std::wstring utf8_to_wchar(_In_ std::string_view s);
-std::string wchar_to_utf8(_In_ std::wstring_view ws);
+USBIP_API std::wstring utf8_to_wchar(_In_ std::string_view s);
+USBIP_API std::string wchar_to_utf8(_In_ std::wstring_view ws);
 
 /*
  * @param str list of strings, each ending with L'\0'.
@@ -24,6 +26,6 @@ std::string wchar_to_utf8(_In_ std::wstring_view ws);
  * "aaa\0\bbb\0\0\ccc" -> {"aaa", "bbb"}
  * "\0aaa\0\bbb\0" -> {}
  */
-std::vector<std::wstring> split_multisz(_In_ std::wstring_view str);
+USBIP_API std::vector<std::wstring> split_multisz(_In_ std::wstring_view str);
 
 } // namespace usbip

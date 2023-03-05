@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "dllspec.h"
 #include "win_handle.h"
 #include <usbspec.h>
 
@@ -46,27 +47,27 @@ namespace usbip::vhci
  * Open driver's device interface
  * @return handle, call GetLastError() if it is invalid
  */
-Handle open();
+USBIP_API Handle open();
 
 /*
  * @param dev handle of the driver device
  * @param success result of the operation
  * @return call GetLastError if success is false
  */
-std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &success);
+USBIP_API std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &success);
 
 /**
  * @param dev handle of the driver device
  * @param location remote device to attach to
  * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
  */
-int attach(_In_ HANDLE dev, _In_ const device_location &location);
+USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
 
 /**
  * @param dev handle of the driver device
  * @param port hub port number, <= 0 means detach all ports
  * @return call GetLastError() if false is returned
  */
-bool detach(_In_ HANDLE dev, _In_ int port);
+USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 
 } // namespace usbip::vhci

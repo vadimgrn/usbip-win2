@@ -78,12 +78,13 @@ Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Com
 Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "resources.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 
-Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb"; Components: sdk
+Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb, libusbip.dll"; Components: sdk
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk

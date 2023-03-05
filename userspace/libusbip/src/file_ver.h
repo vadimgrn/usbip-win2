@@ -4,13 +4,15 @@
 
 #pragma once
 
+#include "..\dllspec.h"
+
 #include <windows.h>
 #include <string>
 
 namespace win
 {
 
-class FileVersion 
+class USBIP_API FileVersion 
 {
 public:
         FileVersion(std::wstring_view path);

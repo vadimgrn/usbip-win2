@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\dllspec.h"
+
 #include <cstdint>
 #include <string>
 
@@ -12,7 +14,7 @@
 namespace win
 {
 
-class Resource
+class USBIP_API Resource
 {
 public:
 	Resource(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTSTR type);
@@ -51,7 +53,7 @@ private:
 namespace usbip
 {
 
-class UsbIds
+class USBIP_API UsbIds
 {
 public:
 	UsbIds(std::string_view content);
