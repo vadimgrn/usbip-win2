@@ -30,7 +30,7 @@ CopyFiles=@usbip2_ude.sys
 
 [ude_Device.NT.HW]
 Include=machine.inf
-Needs=PciD3ColdSupported
+Needs=PciD3ColdSupported.HW
 
 [ude_Device.NT.Services]
 ; Flags: 0x00000002 (SPSVCINST_ASSOCSERVICE)
