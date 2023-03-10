@@ -1,4 +1,4 @@
-![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")
+![license](https://img.shields.io/github/license/vadimgrn/usbip-win2 "License")[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/white_img.png)](https://www.buymeacoffee.com/usbip)
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
@@ -218,3 +218,6 @@ verifier /query
 verifier /reset
 ```
 - To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv, usbip2_filter, usbip2_ude projects
+
+### If you like this project
+<a href="https://www.buymeacoffee.com/usbip" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
