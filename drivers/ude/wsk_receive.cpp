@@ -505,15 +505,15 @@ void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	NT_ASSERT(received);
 	dev.received = received;
 
-	reuse(ctx);
+	auto irp = ctx.wsk_irp; // do not access ctx or wsk_irp after receive
+	IoReuseIrp(irp, STATUS_SUCCESS);
 
-	auto wsk_irp = ctx.wsk_irp; // do not access ctx or wsk_irp after send
-	IoSetCompletionRoutine(wsk_irp, on_receive, &ctx, true, true, true);
+	IoSetCompletionRoutine(irp, on_receive, &ctx, true, true, true);
 
-	auto err = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, wsk_irp);
-	NT_ASSERT(err != STATUS_NOT_SUPPORTED);
+	auto st = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, irp);
+	NT_ASSERT(st != STATUS_NOT_SUPPORTED);
 
-	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, err);
+	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, st);
 }
 
 _IRQL_requires_same_

@@ -52,19 +52,12 @@ wsk_context *alloc_wsk_context(_In_ device_ctx *dev, _In_opt_ WDFREQUEST request
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_opt_ wsk_context *ctx, _In_ bool reuse);
+void free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp);
 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void reuse(_In_ wsk_context &ctx)
-{
-        IoReuseIrp(ctx.wsk_irp, STATUS_UNSUCCESSFUL);
-}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -148,7 +148,7 @@ auto usbip::alloc_wsk_context(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
+void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp)
 {
         if (!ctx) {
                 return;
@@ -157,8 +157,8 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse)
         ctx->request = WDF_NO_HANDLE;
         ctx->mdl_buf.reset();
 
-        if (reuse) {
-                ::reuse(*ctx);
+        if (reuse_irp) {
+                IoReuseIrp(ctx->wsk_irp, STATUS_SUCCESS);
         }
 
         ExFreeToLookasideListEx(&g_lookaside, ctx);
