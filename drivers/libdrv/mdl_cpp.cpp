@@ -159,7 +159,7 @@ size_t usbip::size(_In_opt_ const MDL *mdl)
         size_t total = 0;
 
         for ( ; mdl; mdl = mdl->Next) {
-                total += MmGetMdlByteCount(mdl);
+                total += MmGetMdlByteCount(const_cast<MDL*>(mdl));
         }
 
         return total;

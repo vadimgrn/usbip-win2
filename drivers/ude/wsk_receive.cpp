@@ -451,22 +451,23 @@ NTSTATUS free_drain_buffer(_Inout_ wsk_context &ctx)
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+NTSTATUS on_receive(
+	_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
 	auto &ctx = *static_cast<wsk_context*>(Context);
 	auto &dev = *ctx.dev;
 
-	auto &st = wsk_irp->IoStatus;
-	TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(ctx.request), st.Status, st.Information);
+	auto &ios = wsk_irp->IoStatus;
+	TraceWSK("req %04x, %!STATUS!, Information %Iu", ptr04x(ctx.request), ios.Status, ios.Information);
 
-	auto err = NT_ERROR(st.Status) ? st.Status :
-		   st.Information == dev.receive_size ? dev.received(ctx) :
-		   st.Information ? STATUS_RECEIVE_PARTIAL : 
-		   STATUS_CONNECTION_RESET; // STATUS_CONNECTION_DISCONNECTED, server's stub_rx_loop is finished
+	auto st = NT_ERROR(ios.Status) ? ios.Status :
+		  ios.Information == dev.receive_size ? dev.received(ctx) :
+		  ios.Information ? STATUS_RECEIVE_PARTIAL : 
+		  STATUS_CONNECTION_DISCONNECTED; // EOF
 
-	switch (err) {
+	switch (st) {
 	case RECV_NEXT_USBIP_HDR:
-		if (!dev.unplugged) { // FIXME: race condition with IOCTL_PLUGOUT_HARDWARE
+		if (!dev.unplugged) { // IOCTL_PLUGOUT_HARDWARE set this flag on PASSIVE_LEVEL
 			sched_receive_usbip_header(dev);
 		}
 		[[fallthrough]];
@@ -483,7 +484,7 @@ NTSTATUS on_receive(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inex
 	NT_ASSERT(!ctx.request);
 
 	if (auto hdev = get_device(&dev)) {
-		TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), err);
+		TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st);
 		device::sched_plugout_and_delete(hdev);
 	}
 
