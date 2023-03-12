@@ -25,9 +25,11 @@ PAGED void close_socket(_Inout_ SOCKET* &sock);
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
 
+_IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len);
 
+_IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED ULONG recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code);
 

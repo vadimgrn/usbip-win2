@@ -97,7 +97,7 @@ win::Resource::Resource(_In_opt_ HMODULE hModule, _In_ LPCTSTR name, _In_ LPCTST
 
 win::Resource::~Resource() { delete m_impl; }
 
-auto win::Resource::operator =(Resource&& obj) -> Resource&
+auto win::Resource::operator =(Resource&& obj) noexcept -> Resource&
 {
         if (&obj != this) {
                 delete m_impl;
@@ -285,7 +285,7 @@ usbip::UsbIds::Impl::find_class_subclass_proto(
 usbip::UsbIds::UsbIds(std::string_view content) : m_impl(new Impl(content)) {}
 usbip::UsbIds::~UsbIds() { delete m_impl; }
 
-auto usbip::UsbIds::operator =(UsbIds&& obj) -> UsbIds&
+auto usbip::UsbIds::operator =(UsbIds&& obj) noexcept -> UsbIds&
 {
         if (&obj != this) {
                 delete m_impl;

@@ -30,6 +30,7 @@ PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *da
         return send(sock, &buf, WSK_FLAG_NODELAY);
 }
 
+_IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len)
 {
@@ -51,7 +52,7 @@ PAGED ULONG usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_cod
         PAGED_CODE();
         static_assert(sizeof(ULONG) == sizeof(DWORD)); // return type
 
-        op_common r;
+        op_common r{};
         if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
                 return ERROR_USBIP_NETWORK;

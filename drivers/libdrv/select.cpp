@@ -13,7 +13,7 @@ namespace
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto next_interface(_In_ const USBD_INTERFACE_INFORMATION *iface, _In_ const void *cfg_end)
+auto next_interface(_In_ const USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)
 {
 	const void *next = (char*)iface + iface->Length;
 	if (!cfg_end) {
@@ -33,7 +33,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void interfaces_str(
 	_In_ char *buf, _In_ size_t len, _In_ const USBD_INTERFACE_INFORMATION *r, _In_ int cnt, 
-	_In_ const void *cfg_end)
+	_In_opt_ const void *cfg_end)
 {
 	auto st = STATUS_SUCCESS;
 

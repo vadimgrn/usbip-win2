@@ -346,7 +346,8 @@ void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
         int old_port = 0;
         bool removed = false;
 
-        if (Lock lck(vhci_ctx.lock); port) {
+        Lock lck(vhci_ctx.lock); 
+        if (port) {
                 old_port = port;
                 removed = true;
 
@@ -359,6 +360,7 @@ void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
                 port = 0;
                 static_assert(!is_valid_port(0));
         }
+        lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
         if (removed) {
                 TraceDbg("dev %04x, port %ld", ptr04x(dev), old_port);
@@ -377,10 +379,12 @@ wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
 
         auto &ctx = *get_vhci_ctx(vhci);
 
-        if (Lock lck(ctx.lock); auto handle = ctx.devices[port - 1]) {
+        Lock lck(ctx.lock); 
+        if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
                 dev.reset(handle); // adds reference
         }
+        lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
         return dev;
 }

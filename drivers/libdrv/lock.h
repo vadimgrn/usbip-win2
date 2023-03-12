@@ -10,17 +10,20 @@ class Lock
 {
 public:
         _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_saves_global_(QueuedSpinLock,m_hlock)
         _IRQL_raises_(DISPATCH_LEVEL)
-        Lock(_Inout_ KSPIN_LOCK &lock) 
+        Lock(_Inout_ KSPIN_LOCK &lock)
         { 
                 KeAcquireInStackQueuedSpinLock(&lock, &m_hlock); 
                 NT_ASSERT(acquired());
         }
 
-        _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_requires_(DISPATCH_LEVEL)
+        _IRQL_restores_global_(QueuedSpinLock,m_hlock) // FIXME: annotations for destructors are ignored
         ~Lock() { release(); }
 
-        _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_requires_(DISPATCH_LEVEL)
+        _IRQL_restores_global_(QueuedSpinLock,m_hlock)
         void release()
         {
                 if (acquired()) {

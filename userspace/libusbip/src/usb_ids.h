@@ -23,8 +23,8 @@ public:
 	Resource(const Resource&) = delete;
 	Resource& operator =(const Resource&) = delete;
 
-	Resource(Resource&& obj) : m_impl(obj.release()) {}
-	Resource& operator =(Resource&& obj);
+	Resource(Resource&& obj) noexcept : m_impl(obj.release()) {}
+	Resource& operator =(Resource&& obj) noexcept;
 
 	explicit operator bool() const noexcept;
 	auto operator!() const noexcept { return !bool(*this); } 
@@ -62,8 +62,8 @@ public:
 	UsbIds(const UsbIds&) = delete;
 	UsbIds& operator =(const UsbIds&) = delete;
 
-	UsbIds(UsbIds&& obj) : m_impl(obj.release()) {}
-	UsbIds& operator =(UsbIds&& obj);
+	UsbIds(UsbIds&& obj) noexcept : m_impl(obj.release()) {}
+	UsbIds& operator =(UsbIds&& obj) noexcept;
 
 	explicit operator bool() const noexcept;
 	bool operator !() const noexcept;

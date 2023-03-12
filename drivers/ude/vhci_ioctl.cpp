@@ -113,6 +113,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
 {
         PAGED_CODE();
+        RtlZeroMemory(&reply, sizeof(reply));
 
         if (auto err = recv_op_common(ext.sock, OP_REP_IMPORT)) {
                 return err;

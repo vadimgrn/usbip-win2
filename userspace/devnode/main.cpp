@@ -67,7 +67,7 @@ auto get_version(_In_ const wchar_t *program)
         return wchar_to_utf8(ver); // CLI::narrow(ver)
 }
 
-auto split_multi_sz(_In_ PCWSTR str, _In_ std::wstring_view exclude, _Inout_ bool &excluded)
+auto split_multi_sz(_In_opt_ PCWSTR str, _In_ std::wstring_view exclude, _Inout_ bool &excluded)
 {
         std::vector<std::wstring> v;
 
@@ -211,9 +211,11 @@ auto install_devnode_and_driver(_In_ devnode_args &r)
  */
 auto classfilter(_In_ classfilter_args &r, _In_ bool add)
 {
-        GUID ClassGUID;
-        if (auto clsid = r.class_guid.data(); auto err = CLSIDFromString(clsid, &ClassGUID)) {
-                errmsg("CLSIDFromString", clsid, err);
+        auto clsid = r.class_guid.data(); 
+
+        CLSID ClassGUID;
+        if (auto ret = CLSIDFromString(clsid, &ClassGUID); FAILED(ret)) {
+                errmsg("CLSIDFromString", clsid, ret);
                 return false;
         }
 

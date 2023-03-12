@@ -200,7 +200,7 @@ void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) cons
 win::FileVersion::FileVersion(std::wstring_view path) : m_impl(new Impl(path)) {}
 win::FileVersion::~FileVersion() { delete m_impl; }
 
-auto win::FileVersion::operator =(FileVersion&& obj) -> FileVersion&
+auto win::FileVersion::operator =(FileVersion&& obj) noexcept -> FileVersion&
 {
         if (&obj != this) {
                 delete m_impl;

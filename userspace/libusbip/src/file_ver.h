@@ -21,8 +21,8 @@ public:
         FileVersion(const FileVersion&) = delete;
         FileVersion& operator =(const FileVersion&) = delete;
 
-        FileVersion(FileVersion&& obj) : m_impl(obj.release()) {}
-        FileVersion& operator =(FileVersion&& obj);
+        FileVersion(FileVersion&& obj) noexcept : m_impl(obj.release()) {}
+        FileVersion& operator =(FileVersion&& obj) noexcept;
 
         explicit operator bool () const;
         bool operator !() const;

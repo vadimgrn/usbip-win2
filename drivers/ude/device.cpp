@@ -130,13 +130,14 @@ void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
                 device::send_cmd_unlink(endp.device, request);
         }
 
-        auto purge_complete = [] (auto queue, auto) // EVT_WDF_IO_QUEUE_STATE
+        auto purge_complete = [] (auto queue, [[maybe_unused]] auto ctx) // EVT_WDF_IO_QUEUE_STATE
         { 
                 auto endp = get_endpoint(queue);
+                NT_ASSERT(endp == ctx);
                 UdecxUsbEndpointPurgeComplete(endp);
         };
 
-        WdfIoQueuePurge(endp.queue, purge_complete, WDF_NO_CONTEXT);
+        WdfIoQueuePurge(endp.queue, purge_complete, &endp);
 }
 
 _Function_class_(EVT_UDECX_USB_ENDPOINT_START)

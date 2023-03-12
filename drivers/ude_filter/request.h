@@ -29,7 +29,7 @@ inline const USB_DEFAULT_PIPE_SETUP_PACKET setup_select =
         .wIndex{.W = MAXUSHORT}
 };
 
-const auto const_part = MAXULONG << 1;
+constexpr auto const_part = ~1UL; // first bit is not set
 
 } // namespace impl
 
@@ -53,6 +53,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void unpack_request_select(_Inout_ _URB_CONTROL_TRANSFER_EX &r)
 {
+        static_assert(sizeof(impl::const_part) == sizeof(r.Timeout));
+
         bool cfg_or_intf = r.Timeout & ~impl::const_part;
         r.Timeout = 0;
 

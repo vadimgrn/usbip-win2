@@ -72,9 +72,13 @@ auto set_keepalive(_In_ SOCKET s, _In_ ULONG timeout, _In_ ULONG interval)
 	return !err;
 }
 
-auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Outptr_opt_ bool *eof = nullptr)
+auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = nullptr)
 {
 	assert(s != INVALID_SOCKET);
+
+	if (eof) {
+		*eof = false;
+	}
 
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
 	case SOCKET_ERROR:
@@ -134,7 +138,7 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 {
 	assert(s != INVALID_SOCKET);
 
-	op_common r;
+	op_common r{};
 	if (recv(s, &r, sizeof(r))) {
 		PACK_OP_COMMON(false, &r);
 	} else {
@@ -250,7 +254,7 @@ bool usbip::enum_exportable_devices(
 		return false;
 	}
 
-	op_devlist_reply reply;
+	op_devlist_reply reply{};
 	
 	if (recv(s, &reply, sizeof(reply))) {
 		PACK_OP_DEVLIST_REPLY(false, &reply);
@@ -269,7 +273,7 @@ bool usbip::enum_exportable_devices(
 
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
-		usbip_usb_device dev;
+		usbip_usb_device dev{};
 
 		if (recv(s, &dev, sizeof(dev))) {
 			usbip_net_pack_usb_device(false, &dev);
@@ -281,7 +285,7 @@ bool usbip::enum_exportable_devices(
 
 		for (int j = 0; j < dev.bNumInterfaces; ++j) {
 
-			usbip_usb_interface intf;
+			usbip_usb_interface intf{};
 
 			if (recv(s, &intf, sizeof(intf))) {
 				usbip_net_pack_usb_interface(false, &intf);

@@ -18,9 +18,9 @@ int main()
         
         libusbip::set_debug_output([] (auto) {});
         wformat_message(ERROR_INVALID_PARAMETER);
-        hdevinfo();
-        HKey();
-        HModule();
+        hdevinfo devinfo;
+        HKey key;
+        HModule module;
         connect("", "1234");
         vhci::open();
 }

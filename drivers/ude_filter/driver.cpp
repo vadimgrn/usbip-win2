@@ -53,8 +53,6 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_STRING *RegistryPath)
 {
-	PAGED_CODE();
-
 	WPP_INIT_TRACING(drvobj, RegistryPath);
 	Trace(TRACE_LEVEL_INFORMATION, "%04x, '%!USTR!'", ptr04x(drvobj), RegistryPath);
 
@@ -62,7 +60,10 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_S
 	drvobj->DriverExtension->AddDevice = add_device;
 
 	for (int i = 0; i < ARRAYSIZE(drvobj->MajorFunction); ++i) {
-		drvobj->MajorFunction[i] = dispatch_lower;
+#pragma warning(push)
+#pragma warning(disable:28168)
+		drvobj->MajorFunction[i] = dispatch_lower; // C28168 must be ignored
+#pragma warning(pop)
 	}
 
 	drvobj->MajorFunction[IRP_MJ_PNP] = pnp;
