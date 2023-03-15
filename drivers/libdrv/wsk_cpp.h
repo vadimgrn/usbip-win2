@@ -16,9 +16,6 @@ PAGED NTSTATUS initialize();
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void shutdown(); 
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED WSK_PROVIDER_NPI *GetProviderNPI();
-
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS control_client(
         _In_ ULONG ControlCode,

@@ -12,12 +12,11 @@ namespace
 
 const ULONG WSK_POOL_TAG = 'KSWV';
 
-const WSK_CLIENT_DISPATCH g_WskDispatch{ MAKE_WSK_VERSION(1, 0) };
-WSK_REGISTRATION g_WskRegistration;
+const WSK_CLIENT_DISPATCH g_Dispatch{ MAKE_WSK_VERSION(1, 0) };
+WSK_REGISTRATION g_Registration;
 
 enum { F_REGISTER, F_CAPTURE };
 LONG g_init_flags;
-
 
 class socket_async_context
 {
@@ -133,8 +132,9 @@ PAGED ULONG NTAPI ProviderNpiInit(
         NT_ASSERT(!Context);
 
         auto prov = static_cast<WSK_PROVIDER_NPI*>(Parameter);
+        enum { TIMEOUT = 5*60*1000 }; // milliseconds, @see WSK_INFINITE_WAIT
 
-        bool ok = prov && !WskCaptureProviderNPI(&g_WskRegistration, WSK_INFINITE_WAIT, prov);
+        auto ok = prov && NT_SUCCESS(WskCaptureProviderNPI(&g_Registration, TIMEOUT, prov));
         if (ok) {
                 InterlockedBitTestAndSet(&g_init_flags, F_CAPTURE);
         }
@@ -142,39 +142,29 @@ PAGED ULONG NTAPI ProviderNpiInit(
         return ok;
 }
 
+/*
+ * Must not be called after ReleaseProviderNPI.
+ */
 _When_(!testonly, _IRQL_requires_(PASSIVE_LEVEL))
 _When_(testonly, _IRQL_requires_max_(APC_LEVEL))
-PAGED auto GetProviderNPIOnce(bool testonly = false)
+PAGED auto GetProviderNPI(bool testonly = false)
 {
         PAGED_CODE();
 
         static RTL_RUN_ONCE once = RTL_RUN_ONCE_INIT;
         static WSK_PROVIDER_NPI prov;
 
-        if (RtlRunOnceExecuteOnce(&once, ProviderNpiInit, testonly ? nullptr : &prov, nullptr)) {
-                NT_ASSERT(!prov.Client);
-        }
-
-        return prov.Client ? &prov : nullptr;
+        RtlRunOnceExecuteOnce(&once, ProviderNpiInit, testonly ? nullptr : &prov, nullptr);
+        return BitTest(&g_init_flags, F_CAPTURE) ? &prov : nullptr;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED void ReleaseProviderNPIOnce()
+PAGED void ReleaseProviderNPI()
 {
         PAGED_CODE();
 
-        if (GetProviderNPIOnce(true) && InterlockedBitTestAndReset(&g_init_flags, F_CAPTURE)) {
-                WskReleaseProviderNPI(&g_WskRegistration);
-        }
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void deinitialize()
-{
-        PAGED_CODE();
-
-        if (InterlockedBitTestAndReset(&g_init_flags, F_REGISTER)) {
-                WskDeregister(&g_WskRegistration);
+        if (GetProviderNPI(true); InterlockedBitTestAndReset(&g_init_flags, F_CAPTURE)) {
+                WskReleaseProviderNPI(&g_Registration);
         }
 }
 
@@ -221,10 +211,10 @@ namespace
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto alloc_socket(_Out_ wsk::SOCKET* &sock)
 {
-	sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(wsk::SOCKET), WSK_POOL_TAG);
-	if (!sock) {
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
+        sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(wsk::SOCKET), WSK_POOL_TAG);
+        if (!sock) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
 
         auto err = sock->close_ctx.ctor();
         if (err) {
@@ -232,7 +222,7 @@ auto alloc_socket(_Out_ wsk::SOCKET* &sock)
                 sock = nullptr;
         }
 
-	return err;
+        return err;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -365,7 +355,7 @@ PAGED NTSTATUS wsk::getaddrinfo(
         PAGED_CODE();
         Result = nullptr;
 
-        auto prov = GetProviderNPIOnce();
+        auto prov = GetProviderNPI();
         if (!prov) {
                 return STATUS_UNSUCCESSFUL;
         }
@@ -393,7 +383,7 @@ PAGED void wsk::free(_In_opt_ ADDRINFOEXW *AddrInfo)
         PAGED_CODE();
 
         if (AddrInfo) {
-                auto prov = GetProviderNPIOnce();
+                auto prov = GetProviderNPI();
                 NT_ASSERT(prov);
                 prov->Dispatch->WskFreeAddressInfo(prov->Client, AddrInfo);
         }
@@ -412,7 +402,7 @@ PAGED NTSTATUS wsk::socket(
         PAGED_CODE();
         sock = nullptr;
 
-        auto prov = GetProviderNPIOnce();
+        auto prov = GetProviderNPI();
         if (!prov) {
                 return STATUS_UNSUCCESSFUL;
         }
@@ -458,7 +448,7 @@ PAGED NTSTATUS wsk::control_client(
                 return STATUS_INVALID_PARAMETER;
         }
 
-        auto prov = GetProviderNPIOnce();
+        auto prov = GetProviderNPI();
         if (!prov) {
                 return STATUS_UNSUCCESSFUL;
         }
@@ -552,7 +542,7 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
         PAGED_CODE();
- 
+
         if (!sock) {
                 return STATUS_INVALID_PARAMETER;
         }
@@ -750,29 +740,25 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS wsk::initialize()
 {
         PAGED_CODE();
-        WSK_CLIENT_NPI npi{ nullptr, &g_WskDispatch };
+        WSK_CLIENT_NPI npi{ .Dispatch = &g_Dispatch };
 
-        auto err = WskRegister(&npi, &g_WskRegistration);
-        if (!err) {
+        auto st = WskRegister(&npi, &g_Registration);
+        if (NT_SUCCESS(st)) {
                 InterlockedBitTestAndSet(&g_init_flags, F_REGISTER);
         }
 
-        return err;
+        return st;
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void wsk::shutdown()
 {
         PAGED_CODE();
-        ReleaseProviderNPIOnce();
-        deinitialize();
-}
+        ReleaseProviderNPI();
 
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED WSK_PROVIDER_NPI* wsk::GetProviderNPI()
-{
-        PAGED_CODE();
-        return GetProviderNPIOnce();
+        if (InterlockedBitTestAndReset(&g_init_flags, F_REGISTER)) {
+                WskDeregister(&g_Registration);
+        }
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
