@@ -1,0 +1,17 @@
+@google CodeQL and the Static Tools Logo Test
+
+mkdir D:\codeql-home
+cd D:\codeql-home
+mkdir databases
+mkdir AnalysisResults
+
+# extract https://github.com/github/codeql-cli-binaries/releases/download/v2.6.3/codeql-win64.zip
+git clone https://github.com/microsoft/Windows-Driver-Developer-Supplemental-Tools.git --recursive -b WHCP_22H2
+
+# run in "x64 Native Tools Command Prompt for VS 2022"
+D:
+cd codeql-home
+codeql\codeql database create databases\usbip-win2 -l=cpp -s=D:\usbip-win2 -c="msbuild /t:rebuild D:\usbip-win2\usbip_win2.sln"
+exit
+
+codeql\codeql database analyze databases\usbip-win2 --format=sarifv2.1.0 --output=AnalysisResults\usbip-win2.sarif Windows-Driver-Developer-Supplemental-Tools\codeql\windows-drivers\queries\suites\windows_driver_mustfix.qls
