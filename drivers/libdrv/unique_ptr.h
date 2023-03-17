@@ -17,7 +17,7 @@ public:
         enum { pooltag = PoolTag };
 
         constexpr unique_ptr() = default;
-        unique_ptr(void *ptr) : m_ptr(ptr) {}
+        unique_ptr(_In_ void *ptr) : m_ptr(ptr) {}
 
         unique_ptr(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes) :
                 m_ptr(ExAllocatePool2(Flags, NumberOfBytes, pooltag)) {}
@@ -44,22 +44,22 @@ public:
                 return p;
         }
 
-        unique_ptr(unique_ptr&& p) : m_ptr(p.release()) {}
+        unique_ptr(_Inout_ unique_ptr&& p) : m_ptr(p.release()) {}
 
-        auto& operator=(unique_ptr&& p)
+        auto& operator=_Inout_ (unique_ptr&& p)
         {
                 reset(p.release());
                 return *this;
         }
 
-        void reset(void *ptr = nullptr)
+        void reset(_In_ void *ptr = nullptr)
         {
                 if (m_ptr != ptr) {
                         unique_ptr(ptr).swap(*this);
                 }
         }
 
-        void swap(unique_ptr &p) { ::swap(m_ptr, p.m_ptr); }
+        void swap(_Inout_ unique_ptr &p) { ::swap(m_ptr, p.m_ptr); }
 
 private:
         void *m_ptr{};
@@ -67,7 +67,7 @@ private:
 
 
 template<ULONG PoolTag>
-inline void swap(unique_ptr<PoolTag> &a, unique_ptr<PoolTag> &b)
+inline void swap(_Inout_ unique_ptr<PoolTag> &a, _Inout_ unique_ptr<PoolTag> &b)
 {
         a.swap(b);
 }

@@ -49,8 +49,17 @@ struct vhci_ctx
 {
         UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
         KSPIN_LOCK lock;
+
+        HANDLE load_thread;
+        volatile bool stop_thread;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
+
+inline auto get_device(_In_ vhci_ctx *ctx)
+{
+        NT_ASSERT(ctx);
+        return static_cast<WDFDEVICE>(WdfObjectContextGetObject(ctx));
+}
 
 struct wsk_context;
 struct device_ctx;
@@ -73,10 +82,9 @@ struct device_ctx_ext
         wsk::SOCKET *sock;
 
         // from ioctl::plugin_hardware
-        PSTR busid;
         UNICODE_STRING node_name;
         UNICODE_STRING service_name;
-        UNICODE_STRING serial; // user-defined
+        UNICODE_STRING busid;
         //
         
         vhci::imported_device_properties dev; // for ioctl::get_imported_devices
@@ -195,7 +203,7 @@ inline void sched_receive_usbip_header(_In_ device_ctx &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &d, _In_ const vhci::ioctl::plugin_hardware &args);
+PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ const vhci::ioctl::plugin_hardware &r);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

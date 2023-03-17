@@ -7,7 +7,6 @@
 #include "context.tmh"
 
 #include "driver.h"
-
 #include <libdrv\strutil.h>
 
  /*
@@ -44,25 +43,20 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        ext->busid = libdrv::strdup(POOL_FLAG_NON_PAGED, r.busid);
-        if (!ext->busid) {
-                Trace(TRACE_LEVEL_ERROR, "Copy '%s' error", r.busid);
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
         struct {
-                UNICODE_STRING &ustr;
-                const char *utf8;
+                UNICODE_STRING &dst;
+                const char *src;
         } const v[] = {
                 {ext->node_name, r.host},
                 {ext->service_name, r.service},
+                {ext->busid, r.busid},
         };
 
-        for (auto &[ustr, utf8]: v) {
-                if (!*utf8) {
-                        // RtlInitUnicodeString(&ustr, nullptr); // the same as zeroed memory
-                } else if (auto err = libdrv::utf8_to_unicode(ustr, utf8)) {
-                        Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", utf8, err);
+        for (auto &[dst, src]: v) {
+                if (!*src) {
+                        // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
+                } else if (auto err = libdrv::utf8_to_unicode(dst, src)) {
+                        Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, err);
                         return err;
                 }
         }
@@ -79,10 +73,9 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
         NT_ASSERT(ext);
         NT_ASSERT(!ext->sock);
 
-        libdrv::free(ext->busid);
         RtlFreeUnicodeString(&ext->node_name);
         RtlFreeUnicodeString(&ext->service_name);
-        RtlFreeUnicodeString(&ext->serial);
+        RtlFreeUnicodeString(&ext->busid);
 
         ExFreePoolWithTag(ext, pooltag);
 }

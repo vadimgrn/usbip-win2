@@ -11,6 +11,7 @@
 #include "device.h"
 #include "network.h"
 #include "ioctl.h"
+#include "load_imported_devices.h"
 
 #include <usbip\proto_op.h>
 #include <resources\messages.h>
@@ -51,36 +52,21 @@ PAGED void log(_In_ const usbip_usb_device &d)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto fill(_Out_ vhci::imported_device &dst, _In_ const device_ctx &ctx)
+PAGED auto fill(_Out_ vhci::imported_device &dev, _In_ const device_ctx &ctx)
 {
         PAGED_CODE();
         auto &src = *ctx.ext;
 
 //      imported_device_location
-
-        dst.port = ctx.port;
-
-        if (auto s = src.busid) {
-                RtlStringCbCopyA(dst.busid, sizeof(dst.busid), s);
+        dev.port = ctx.port;
+        if (auto err = copy(dev.host, sizeof(dev.host), src.node_name, 
+                            dev.service, sizeof(dev.service), src.service_name,  
+                            dev.busid, sizeof(dev.busid), src.busid)) {
+                return err;
         }
+        //
 
-        struct {
-                char *utf8;
-                USHORT utf8_sz;
-                const UNICODE_STRING &ustr;
-        } const v[] = {
-                {dst.service, sizeof(dst.service), src.service_name},
-                {dst.host, sizeof(dst.host), src.node_name}
-        };
-
-        for (auto &[utf8, utf8_sz, ustr]: v) {
-                if (auto err = libdrv::unicode_to_utf8(utf8, utf8_sz, ustr)) {
-                        Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ustr, err);
-                        return err;
-                }
-        }
-
-        static_cast<vhci::imported_device_properties&>(dst) = src.dev;
+        static_cast<vhci::imported_device_properties&>(dev) = src.dev;
         return STATUS_SUCCESS;
 }
 
@@ -100,7 +86,10 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
 
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
 
-        strcpy_s(req.body.busid, sizeof(req.body.busid), ext.busid);
+        if (auto &busid = req.body.busid; auto err = libdrv::unicode_to_utf8(busid, sizeof(busid), ext.busid)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ext.busid, err);
+                return err;
+        }
 
         PACK_OP_COMMON(false, &req.hdr);
         PACK_OP_IMPORT_REQUEST(false, &req.body);
@@ -125,8 +114,12 @@ PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_
         }
         PACK_OP_IMPORT_REPLY(false, &reply);
 
-        if (strncmp(reply.udev.busid, ext.busid, sizeof(reply.udev.busid))) {
-                Trace(TRACE_LEVEL_ERROR, "Received bus-id '%s' != '%s'", reply.udev.busid, ext.busid);
+        if (char busid[sizeof(reply.udev.busid)];
+            DWORD err = libdrv::unicode_to_utf8(busid, sizeof(busid), ext.busid)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ext.busid, err);
+                return err;
+        } else if (strncmp(reply.udev.busid, busid, sizeof(busid))) {
+                Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
                 return ERROR_USBIP_PROTOCOL;
         }
 
@@ -543,7 +536,6 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
         cfg.EvtIoDeviceControl = device_control;
-        cfg.PowerManaged = WdfFalse;
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);

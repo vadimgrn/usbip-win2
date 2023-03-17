@@ -17,6 +17,7 @@
     <ClCompile Include="device_queue.cpp" />
     <ClCompile Include="network.cpp" />
     <ClCompile Include="proto.cpp" />
+    <ClCompile Include="load_imported_devices.cpp" />
     <ClCompile Include="urbtransfer.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="vhci.cpp" />
@@ -37,6 +38,7 @@
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="network.h" />
     <ClInclude Include="proto.h" />
+    <ClInclude Include="load_imported_devices.h" />
     <ClInclude Include="urbtransfer.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="vhci.h" />

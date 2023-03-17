@@ -9,6 +9,7 @@
 #include "device.h"
 #include "vhci_ioctl.h"
 #include "context.h"
+#include "load_imported_devices.h"
 
 #include <libdrv/lock.h>
 
@@ -26,6 +27,35 @@ namespace
 
 using namespace usbip;
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void load_thread_join(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        auto &ctx = *get_vhci_ctx(vhci);
+        ctx.stop_thread = true;
+
+        auto handle = InterlockedExchangePointer(&ctx.load_thread, nullptr);
+        if (!handle) {
+                TraceDbg("Already exited");
+                return;
+        }
+
+        _KTHREAD *thread{};
+        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, 
+                                                       (PVOID*)&thread, nullptr)));
+
+        if (TraceDbg("Joining"); auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
+                Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", err);
+        } else {
+                TraceDbg("Joined");
+        }
+
+        ObDereferenceObject(thread);
+        NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+}
+
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -35,7 +65,8 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT Object)
 
         auto vhci = static_cast<WDFDEVICE>(Object);
         TraceDbg("vhci %04x", ptr04x(vhci));
-
+        
+        load_thread_join(vhci);
         vhci::destroy_all_devices(vhci);
 }
 
@@ -425,5 +456,10 @@ PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
+        
+        if (auto ctx = get_vhci_ctx(vhci)) {
+                load_imported_devices(ctx);
+        }
+
         return STATUS_SUCCESS;
 }

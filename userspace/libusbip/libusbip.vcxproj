@@ -95,6 +95,7 @@
     <ClCompile Include="src\output.cpp" />
     <ClCompile Include="src\proto_op.cpp" />
     <ClCompile Include="src\remote.cpp" />
+    <ClCompile Include="src\state.cpp" />
     <ClCompile Include="src\strconv.cpp" />
     <ClCompile Include="src\usb_ids.cpp" />
     <ClCompile Include="src\vhci.cpp" />
@@ -114,6 +115,7 @@
     <ClInclude Include="src\last_error.h" />
     <ClInclude Include="src\op_common.h" />
     <ClInclude Include="src\output.h" />
+    <ClInclude Include="src\state.h" />
     <ClInclude Include="src\strconv.h" />
     <ClInclude Include="src\usb_ids.h" />
     <ClInclude Include="vhci.h" />

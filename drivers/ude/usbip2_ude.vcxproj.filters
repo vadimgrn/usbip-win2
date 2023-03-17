@@ -35,6 +35,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
+    <ClInclude Include="load_imported_devices.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -50,6 +51,7 @@
     <ClCompile Include="device_queue.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
+    <ClCompile Include="load_imported_devices.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_ude.inf" />

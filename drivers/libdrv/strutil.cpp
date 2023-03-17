@@ -3,59 +3,10 @@
  */
 
 #include "strutil.h"
-#include <ntstrsafe.h>
-
-namespace
-{
-
-const ULONG pooltag = 'VRDL';
-
-inline auto RtlStringCchLength(PCSTR  s, size_t *len) { return RtlStringCchLengthA(s, NTSTRSAFE_MAX_CCH, len); }
-inline auto RtlStringCchLength(PCWSTR s, size_t *len) { return RtlStringCchLengthW(s, NTSTRSAFE_MAX_CCH, len); }
-
-template<typename T>
-inline T *do_strdup(POOL_FLAGS Flags, const T *str)
-{
-        size_t len = 0;
-        auto st = RtlStringCchLength(str, &len);
-        if (st != STATUS_SUCCESS) {
-                return nullptr;
-        }
-
-        auto sz = ++len*sizeof(*str);
-        Flags |= POOL_FLAG_UNINITIALIZED;
-
-        auto s = (T*)ExAllocatePool2(Flags, sz, pooltag);
-        if (s) {
-                RtlCopyMemory(s, str, sz);
-        }
-
-        return s;
-}
-
-} // namespace
-
-
-LPSTR libdrv::strdup(POOL_FLAGS Flags, LPCSTR str)
-{
-        return do_strdup(Flags, str);
-}
-
-LPWSTR libdrv::strdup(POOL_FLAGS Flags, LPCWSTR str)
-{
-        return do_strdup(Flags, str);
-}
-
-void libdrv::free(void *data)
-{
-	if (data) {
-		ExFreePoolWithTag(data, pooltag);
-	}
-}
 
 /*
-* RtlFreeUnicodeString must be used to release memory.
-*/
+ * RtlFreeUnicodeString must be used to release memory.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS libdrv::utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8)
@@ -78,19 +29,46 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ char *dest, _In_ USHORT len, _In_ c
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED USHORT libdrv::strrchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED int libdrv::strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch, _In_ int from)
 {
         PAGED_CODE();
 
-        LONG cch = s.Length/sizeof(ch);
-
-        for (auto i = cch - 1; i >= 0; --i) {
+        for (auto i = from; i < s.Length; ++i) {
                 if (s.Buffer[i] == ch) {
-                        return USHORT(i + 1);
+                        return i;
                 }
         }
 
-        return 0;
+        return -1;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void libdrv::split(
+        _Out_ UNICODE_STRING &head, _Out_ UNICODE_STRING &tail, 
+        _In_ const UNICODE_STRING &str, _In_ WCHAR sep)
+{
+        PAGED_CODE();
+        NT_ASSERT(&head != &tail);
+
+        auto pos = strchr(str, sep);
+        if (pos < 0) {
+                head = str;
+                tail = UNICODE_STRING{};
+                return;
+        }
+
+        auto s = str.Buffer;
+        auto len = str.Length;
+
+        head.Length = USHORT(pos)*sizeof(*s);
+        head.MaximumLength = head.Length;
+        head.Buffer = s;
+
+        ++pos; // skip separator
+        
+        tail.Length = len - (head.Length + sizeof(*s));
+        tail.MaximumLength = tail.Length;
+        tail.Buffer = tail.Length ? s + pos : nullptr;
+}
