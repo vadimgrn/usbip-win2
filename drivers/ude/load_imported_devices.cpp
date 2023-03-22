@@ -158,18 +158,18 @@ PAGED void load_imported_devices(_In_ vhci_ctx &ctx)
 
         for (ULONG i = 0; i < max_lines && !ctx.stop_thread; ++i) {
 
-                auto s = (WDFSTRING)WdfCollectionGetItem(list, i);
-
-                UNICODE_STRING us;
-                WdfStringGetUnicodeString(s, &us);
-
-                if (auto err = parse_string(req, us)) {
-                        Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &us, err);
-                        continue;
-                } else {
-                        Trace(TRACE_LEVEL_INFORMATION, "usbip://%s:%s/%s", req.host, req.service, req.busid);
-                        req.port = 0;
+                UNICODE_STRING str{};
+                if (auto s = (WDFSTRING)WdfCollectionGetItem(list, i)) {
+                        WdfStringGetUnicodeString(s, &str);
                 }
+
+                if (auto err = parse_string(req, str)) {
+                        Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
+                        continue;
+                }
+
+                Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s", req.host, req.service, req.busid);
+                req.port = 0;
 
                 if (ULONG_PTR BytesReturned; // send IOCTL to itself
                         auto err = WdfIoTargetSendIoctlSynchronously(target.get<WDFIOTARGET>(), WDF_NO_HANDLE, 
@@ -181,6 +181,11 @@ PAGED void load_imported_devices(_In_ vhci_ctx &ctx)
         }
 }
 
+/*
+ * If load_thread is set to NULL here, it is possible that this thread will be suspended 
+ * while vhci_cleanup will be executed, WDFDEVICE will be destroyed, the driver will be unloaded.
+ * IoCreateSystemThread is used to prevent this.
+ */
 _IRQL_requires_same_
 _Function_class_(KSTART_ROUTINE)
 PAGED void run(_In_ void *ctx)
@@ -190,14 +195,38 @@ PAGED void run(_In_ void *ctx)
         auto &vhci = *static_cast<vhci_ctx*>(ctx);
         load_imported_devices(vhci);
 
-        if (auto handle = InterlockedExchangePointer(&vhci.load_thread, nullptr)) {
-                NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
-                TraceDbg("Thread closed");
+        if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.load_thread), nullptr)) {
+                ObDereferenceObject(thread);
+                TraceDbg("thread closed");
+        } else {
+                TraceDbg("thread exited");
         }
 }
 
 } // namespace 
 
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void usbip::load_imported_devices(_In_ vhci_ctx *vhci)
+{
+        PAGED_CODE();
+
+        const auto access = THREAD_ALL_ACCESS;
+        auto fdo = WdfDeviceWdmGetDeviceObject(get_device(vhci));
+
+        if (HANDLE handle; 
+            auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, nullptr, run, vhci)) {
+                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
+        } else {
+                PVOID thread;
+                NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
+                                                               &thread, nullptr)));
+
+                NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->load_thread), thread));
+                NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+        }
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -226,19 +255,4 @@ PAGED NTSTATUS usbip::copy(
         }
 
         return STATUS_SUCCESS;
-}
-
-/*
- * @see IoCreateSystemThread 
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::load_imported_devices(_In_ vhci_ctx *vhci)
-{
-        PAGED_CODE();
-
-        if (auto err = PsCreateSystemThread(&vhci->load_thread, THREAD_ALL_ACCESS, 
-                                            nullptr, nullptr, nullptr, run, vhci)) {
-                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
-        }
 }

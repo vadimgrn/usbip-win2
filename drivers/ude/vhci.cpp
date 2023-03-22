@@ -36,24 +36,19 @@ PAGED void load_thread_join(_In_ WDFDEVICE vhci)
         auto &ctx = *get_vhci_ctx(vhci);
         ctx.stop_thread = true;
 
-        auto handle = InterlockedExchangePointer(&ctx.load_thread, nullptr);
-        if (!handle) {
-                TraceDbg("Already exited");
+        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.load_thread), nullptr);
+        if (!thread) {
+                TraceDbg("already exited");
                 return;
         }
 
-        _KTHREAD *thread{};
-        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, 
-                                                       (PVOID*)&thread, nullptr)));
-
-        if (TraceDbg("Joining"); auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
+        if (TraceDbg("joining"); auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", err);
         } else {
-                TraceDbg("Joined");
+                TraceDbg("joined");
         }
 
         ObDereferenceObject(thread);
-        NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
