@@ -83,7 +83,7 @@ auto get_path()
         auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
         std::wstring path;
 
-        for (std::wstring multisz; true; ) {
+        for (std::wstring multi_sz; true; ) {
 
                 ULONG cch;
                 if (auto err = CM_Get_Device_Interface_List_Size(&cch, guid, nullptr, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
@@ -93,11 +93,11 @@ auto get_path()
                         return path;
                 } 
 
-                multisz.resize(cch); // "path1\0path2\0pathn\0\0"
+                multi_sz.resize(cch); // "path1\0path2\0pathn\0\0"
 
-                switch (auto err = CM_Get_Device_Interface_List(guid, nullptr, multisz.data(), cch, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
+                switch (auto err = CM_Get_Device_Interface_List(guid, nullptr, multi_sz.data(), cch, CM_GET_DEVICE_INTERFACE_LIST_PRESENT)) {
                 case CR_SUCCESS:
-                        if (auto v = split_multisz(multisz); auto n = v.size()) {
+                        if (auto v = split_multi_sz(multi_sz); auto n = v.size()) {
                                 if (n == 1) {
                                         path = v.front();
                                         assert(!path.empty());
@@ -106,8 +106,8 @@ auto get_path()
                                         SetLastError(ERROR_USBIP_DEVICE_INTERFACE_LIST);
                                 }
                         } else {
-                                assert(multisz.size() == 1); // if not found, returns CR_SUCCESS and ""
-                                assert(!multisz.front());
+                                assert(multi_sz.size() == 1); // if not found, returns CR_SUCCESS and ""
+                                assert(!multi_sz.front());
                                 SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
                         }
                         return path;

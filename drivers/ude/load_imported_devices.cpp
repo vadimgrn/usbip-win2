@@ -48,10 +48,11 @@ PAGED auto query_imported_devices(_In_ WDFKEY key)
         WDF_OBJECT_ATTRIBUTES_INIT(&str_attr);
         str_attr.ParentObject = list;
 
-        DECLARE_CONST_UNICODE_STRING(name, L"ImportedDevices");
+        UNICODE_STRING value_name;
+        RtlUnicodeStringInit(&value_name, imported_devices_value_name);
 
-        if (auto err = WdfRegistryQueryMultiString(key, &name, &str_attr, list)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &name, err);
+        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, list)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, err);
                 list = WDF_NO_HANDLE; // parent will destory it
         }
 

@@ -84,19 +84,6 @@ auto split_multi_sz(_In_opt_ PCWSTR str, _In_ std::wstring_view exclude, _Inout_
         return v;
 }
 
-auto make_multi_sz(_In_ const std::vector<std::wstring> &v)
-{
-        std::wstring str;
-
-        for (auto &s: v) {
-                str += s;
-                str += L'\0';
-        }
-
-        str += L'\0';
-        return str;
-}
-
 /*
  * @return REG_MULTI_SZ 
  */

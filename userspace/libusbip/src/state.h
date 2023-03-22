@@ -15,13 +15,13 @@ struct imported_device;
 
 /*
  * @param devices result of vhci::get_imported_devices()
- * @return status of the operation
+ * @return call GetLastError if false is returned
  */
 USBIP_API bool save_imported_devices(_In_ const std::vector<imported_device> &devices);
 
 /*
- * @param success status of the operation
- * @return imported devices stashed by save_imported_devices()
+ * @param success call GetLastError if false is returned
+ * @return imported devices stashed by save_imported_devices() if success
  */
 USBIP_API std::vector<device_location> load_imported_devices(_Out_ bool &success);
 

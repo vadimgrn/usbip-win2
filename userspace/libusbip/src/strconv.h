@@ -15,6 +15,8 @@ namespace usbip
 USBIP_API std::wstring utf8_to_wchar(_In_ std::string_view s);
 USBIP_API std::string wchar_to_utf8(_In_ std::wstring_view ws);
 
+USBIP_API std::wstring make_multi_sz(_In_ const std::vector<std::wstring> &v);
+
 /*
  * @param str list of strings, each ending with L'\0'.
  *            Extra '\0' at end terminates the list.
@@ -26,6 +28,6 @@ USBIP_API std::string wchar_to_utf8(_In_ std::wstring_view ws);
  * "aaa\0\bbb\0\0\ccc" -> {"aaa", "bbb"}
  * "\0aaa\0\bbb\0" -> {}
  */
-USBIP_API std::vector<std::wstring> split_multisz(_In_ std::wstring_view str);
+USBIP_API std::vector<std::wstring> split_multi_sz(_In_ std::wstring_view str);
 
 } // namespace usbip

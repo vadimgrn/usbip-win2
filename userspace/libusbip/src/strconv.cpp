@@ -59,7 +59,7 @@ std::string usbip::wchar_to_utf8(_In_ std::wstring_view ws)
         return s;
 }
 
-std::vector<std::wstring> usbip::split_multisz(_In_ std::wstring_view str)
+std::vector<std::wstring> usbip::split_multi_sz(_In_ std::wstring_view str)
 {
         std::vector<std::wstring> v;
 
@@ -73,4 +73,17 @@ std::vector<std::wstring> usbip::split_multisz(_In_ std::wstring_view str)
         }
 
         return v;
+}
+
+std::wstring usbip::make_multi_sz(_In_ const std::vector<std::wstring> &v)
+{
+        std::wstring str;
+
+        for (auto &s: v) {
+                str += s;
+                str += L'\0';
+        }
+
+        str += L'\0';
+        return str;
 }
