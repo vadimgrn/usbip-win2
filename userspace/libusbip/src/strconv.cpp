@@ -63,13 +63,9 @@ std::vector<std::wstring> usbip::split_multi_sz(_In_ std::wstring_view str)
 {
         std::vector<std::wstring> v;
 
-        while (!str.empty() && str.front()) {
-                auto str_sz = str.size();
-
-                auto len = wcsnlen_s(str.data(), str_sz);
+        while (auto len = wcsnlen_s(str.data(), str.size())) {
                 v.emplace_back(str.data(), len);
-
-                str.remove_prefix(min(len + 1, str_sz)); // skip L'\0'
+                str.remove_prefix(min(len + 1, str.size())); // skip L'\0'
         }
 
         return v;
@@ -80,8 +76,10 @@ std::wstring usbip::make_multi_sz(_In_ const std::vector<std::wstring> &v)
         std::wstring str;
 
         for (auto &s: v) {
-                str += s;
-                str += L'\0';
+                if (auto data = s.data(); auto len = wcsnlen_s(data, s.size())) {
+                        str.append(data, len);
+                        str += L'\0';
+                }
         }
 
         str += L'\0';

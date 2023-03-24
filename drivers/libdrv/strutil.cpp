@@ -66,9 +66,7 @@ PAGED void libdrv::split(
         head.MaximumLength = head.Length;
         head.Buffer = s;
 
-        ++pos; // skip separator
-        
         tail.Length = len - (head.Length + sizeof(*s));
         tail.MaximumLength = tail.Length;
-        tail.Buffer = tail.Length ? s + pos : nullptr;
+        tail.Buffer = tail.Length ? ++pos + s : nullptr;
 }
