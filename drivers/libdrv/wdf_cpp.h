@@ -66,6 +66,11 @@ public:
         template<typename T>
         auto get() const { return static_cast<T>(m_obj); }
 
+        template<typename T>
+        auto addr() const { return static_cast<T*>(&m_obj); }
+
+        auto operator &() { return &m_obj; }
+
         explicit operator bool() const { return m_obj; }
         auto operator !() const { return !m_obj; }
 

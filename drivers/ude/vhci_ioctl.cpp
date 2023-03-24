@@ -6,6 +6,7 @@
 #include "trace.h"
 #include "vhci_ioctl.tmh"
 
+#include "driver.h"
 #include "context.h"
 #include "vhci.h"
 #include "device.h"
@@ -362,14 +363,14 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
+PAGED auto plugin_hardware(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
 
         vhci::ioctl::plugin_hardware *r{};
 
         if (size_t length; 
-            auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
+            auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
                 return err;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
@@ -380,26 +381,26 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST Request)
                 return as_ntstatus(ERROR_USBIP_ABI);
         }
 
-        if (auto vhci = get_vhci(Request); auto err = plugin_hardware(vhci, *r)) {
+        if (auto vhci = get_vhci(request); auto err = plugin_hardware(vhci, *r)) {
                 return as_ntstatus(err);
         }
 
         constexpr auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
-        WdfRequestSetInformation(Request, written);
+        WdfRequestSetInformation(request, written);
         
         return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
+PAGED auto plugout_hardware(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
 
         vhci::ioctl::plugout_hardware *r{};
 
         if (size_t length; 
-            auto err = WdfRequestRetrieveInputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
+            auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
                 return err;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
@@ -410,7 +411,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
                 return as_ntstatus(ERROR_USBIP_ABI);
         }
 
-        if (auto vhci = get_vhci(Request); r->port <= 0) {
+        if (auto vhci = get_vhci(request); r->port <= 0) {
                 vhci::destroy_all_devices(vhci);
         } else if (!is_valid_port(r->port)) {
                 return STATUS_INVALID_PARAMETER;
@@ -425,14 +426,14 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST Request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
+PAGED auto get_imported_devices(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
 
         size_t outlen;
         vhci::ioctl::get_imported_devices *r;
 
-        if (auto err = WdfRequestRetrieveOutputBuffer(Request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &outlen)) {
+        if (auto err = WdfRequestRetrieveOutputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &outlen)) {
                 return err;
         } else if (r->size != sizeof(*r)) {
                 Trace(TRACE_LEVEL_ERROR, "get_imported_devices.size %lu != sizeof(get_imported_devices) %Iu", 
@@ -446,14 +447,16 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
         auto max_cnt = devices_size/sizeof(*r->devices);
         NT_ASSERT(max_cnt);
 
-        auto vhci = get_vhci(Request);
+        auto vhci = get_vhci(request);
         ULONG cnt = 0;
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
                 if (auto dev = vhci::find_device(vhci, port)) {
                         if (cnt == max_cnt) {
                                 return STATUS_BUFFER_TOO_SMALL;
-                        } else if (auto ctx = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *ctx)) {
+                        } else if (auto &ctx = *get_device_ctx(dev.get()); ctx.unplugged) {
+                                // skip
+                        } else if (auto err = fill(r->devices[cnt++], ctx)) {
                                 return err;
                         }
                 }
@@ -463,9 +466,147 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST Request)
 
         auto written = vhci::ioctl::get_imported_devices_size(cnt);
         NT_ASSERT(written <= outlen);
-        WdfRequestSetInformation(Request, written);
+        WdfRequestSetInformation(request, written);
 
         return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto check_save_imported_devices(_In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+        vhci::ioctl::save_imported_devices *r;
+
+        if (size_t length;
+                auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
+                return err;
+        } else if (length != sizeof(*r)) {
+                return STATUS_INVALID_BUFFER_SIZE;
+        } else if (r->size != sizeof(*r)) {
+                Trace(TRACE_LEVEL_ERROR, "save_imported_devices.size %lu != sizeof(save_imported_devices) %Iu", 
+                        r->size, sizeof(*r));
+
+                return as_ntstatus(ERROR_USBIP_ABI);
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto append_device(
+        _In_ const device_ctx &dev,
+        _In_ WDFCOLLECTION col, _In_ WDF_OBJECT_ATTRIBUTES &str_attr, _Inout_ UNICODE_STRING &str)
+{
+        PAGED_CODE();
+        auto &r = *dev.ext;
+
+        if (auto err = RtlUnicodeStringPrintf(&str, L"%wZ:%wZ/%wZ", &r.node_name, &r.service_name, &r.busid);
+                NT_ERROR(err)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", err);
+                return err;
+        } else if (WDFSTRING ws; NT_ERROR(err = WdfStringCreate(&str, &str_attr, &ws))) {
+                Trace(TRACE_LEVEL_ERROR, "WdfStringCreate %!STATUS!", err);
+                return err;
+        } else if (NT_ERROR(err = WdfCollectionAdd(col, ws))) {
+                Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", err);
+                return err;
+        } else {
+                TraceDbg("%!USTR!", &str);
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto read_devices(_In_ WDFDEVICE vhci, _In_ WDFCOLLECTION col)
+{
+        PAGED_CODE();
+
+        const auto buf_sz = sizeof(vhci::imported_device_location)*sizeof(WCHAR);
+
+        unique_ptr buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, buf_sz);
+        if (!buf) {
+                Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", buf_sz);
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        WDF_OBJECT_ATTRIBUTES str_attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&str_attr);
+        str_attr.ParentObject = col;
+
+        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
+
+                auto dev = vhci::find_device(vhci, port);
+                if (!dev) {
+                        continue;
+                }
+
+                auto &ctx = *get_device_ctx(dev.get());
+                if (ctx.unplugged) {
+                        continue;
+                }
+
+                UNICODE_STRING str {
+                        .MaximumLength = buf_sz, // bytes
+                        .Buffer = buf.get<WCHAR>()
+                };
+
+                if (auto err = append_device(ctx, col, str_attr, str)) {
+                        return err;
+                }
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto write_imported_devices(_In_ WDFCOLLECTION col)
+{
+        PAGED_CODE();
+
+        wdf::Registry key;
+        if (auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_SET_VALUE, 
+                                                          WDF_NO_OBJECT_ATTRIBUTES, &key)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey %!STATUS!", err);
+                return err;
+        }
+
+        UNICODE_STRING value_name;
+        RtlInitUnicodeString(&value_name, imported_devices_value_name);
+
+        if (auto err = WdfRegistryAssignMultiString(key.get(), &value_name, col)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignMultiString %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto save_imported_devices(_In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+
+        if (auto err = check_save_imported_devices(request)) {
+                return err;
+        }
+
+        wdf::ObjectDelete col;
+        if (auto err = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, col.addr<WDFCOLLECTION*>())) {
+                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", err);
+                return err;
+        }
+
+        if (auto vhci = get_vhci(request); auto err = read_devices(vhci, col.get<WDFCOLLECTION>())) {
+                return err;
+        }
+        
+        return write_imported_devices(col.get<WDFCOLLECTION>());
 }
 
 /*
@@ -504,6 +645,9 @@ void device_control(
                 break;
         case vhci::ioctl::GET_IMPORTED_DEVICES:
                 st = get_imported_devices(Request);
+                break;
+        case vhci::ioctl::SAVE_IMPORTED_DEVICES:
+                st = save_imported_devices(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));

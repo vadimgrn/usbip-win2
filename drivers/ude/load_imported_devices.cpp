@@ -17,7 +17,7 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_list(_In_ WDFOBJECT parent)
+PAGED auto make_collection(_In_ WDFOBJECT parent)
 {
         PAGED_CODE();
 
@@ -39,24 +39,24 @@ PAGED auto query_imported_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
         
-        auto list = make_list(key);
-        if (!list) {
-                return list;
+        auto col = make_collection(key);
+        if (!col) {
+                return col;
         }
 
         WDF_OBJECT_ATTRIBUTES str_attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&str_attr);
-        str_attr.ParentObject = list;
+        str_attr.ParentObject = col;
 
         UNICODE_STRING value_name;
         RtlUnicodeStringInit(&value_name, imported_devices_value_name);
 
-        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, list)) {
+        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, err);
-                list = WDF_NO_HANDLE; // parent will destory it
+                col = WDF_NO_HANDLE; // parent will destory it
         }
 
-        return list;
+        return col;
 }
 
 constexpr auto empty(_In_ const UNICODE_STRING &s)
@@ -74,14 +74,12 @@ PAGED auto parse_string(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const UNICOD
         UNICODE_STRING service;
         UNICODE_STRING busid;
 
-        const auto sep = L',';
-
-        libdrv::split(host, busid, str, sep);
+        libdrv::split(host, busid, str, L':');
         if (empty(host)) {
                 return STATUS_INVALID_PARAMETER;
         }
 
-        libdrv::split(service, busid, busid, sep);
+        libdrv::split(service, busid, busid, L'/');
         if (empty(service) || empty(busid)) {
                 return STATUS_INVALID_PARAMETER;
         }

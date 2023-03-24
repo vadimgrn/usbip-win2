@@ -51,7 +51,7 @@ AddReg         = ude_Device_Service_AddReg
 HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
 HKR,Parameters\Wdf,VerifierOn,0x00010001,1
 HKR,Parameters\Wdf,VerboseOn,0x00010001,1
-; HKR,Parameters,ImportedDevices,0x00010000,"192.168.1.15,3240,3-1","192.168.1.15,3240,1-1.3"
+; HKR,Parameters,ImportedDevices,0x00010000,"192.168.1.15:3240/3-1","192.168.1.15,3240,1-1.3"
 
 [Strings]
 Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation

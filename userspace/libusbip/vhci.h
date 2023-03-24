@@ -70,4 +70,10 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 
+/*
+ * @param dev handle of the driver device
+ * @return call GetLastError if false is returned
+ */
+USBIP_API bool save_imported_devices(_In_ HANDLE dev);
+
 } // namespace usbip::vhci

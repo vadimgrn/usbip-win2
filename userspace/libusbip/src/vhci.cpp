@@ -216,3 +216,12 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
         DWORD BytesReturned; // must be set if the last arg is NULL
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
+
+bool usbip::vhci::save_imported_devices(_In_ HANDLE dev)
+{
+        ioctl::save_imported_devices r{{ .size = sizeof(r) }};
+
+        DWORD BytesReturned; // must be set if the last arg is NULL
+        return DeviceIoControl(dev, ioctl::SAVE_IMPORTED_DEVICES, &r, sizeof(r),
+                               nullptr, 0, &BytesReturned, nullptr);
+}
