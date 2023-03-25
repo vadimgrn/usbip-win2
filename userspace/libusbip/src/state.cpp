@@ -21,8 +21,40 @@ auto get_subkey()
         return std::format(L"SYSTEM\\CurrentControlSet\\Services\\{}\\Parameters", driver_filename);
 }
 
+auto make_multi_sz(_In_ const std::vector<imported_device> &devices)
+{
+        std::wstring ws;
+
+        for (auto &i: devices) {
+                auto &r = i.location;
+                auto s = r.hostname + ',' + r.service + ',' + r.busid + '\0';
+                ws += utf8_to_wchar(s);
+        }
+
+        ws += L'\0';
+        return ws;
+}
+
 } // namespace
 
+
+bool usbip::save_imported_devices(_In_ const std::vector<imported_device> &devices)
+{
+        auto subkey = get_subkey();
+        auto value = ::make_multi_sz(devices);
+
+        auto err = RegSetKeyValue(HKEY_LOCAL_MACHINE, subkey.c_str(), imported_devices_value_name, 
+                                  REG_MULTI_SZ, value.data(), DWORD(value.size()*sizeof(value[0])));
+
+        if (err) {
+                libusbip::output(L"RegSetKeyValue('HKLM\\{}', value_name='{}') error {:#x} {}", 
+                                 subkey, imported_devices_value_name, err, wformat_message(err));
+
+                SetLastError(err);
+        }
+
+        return !err;
+}
 
 auto usbip::load_imported_devices(_Out_ bool &success) -> std::vector<device_location>
 {

@@ -61,7 +61,6 @@ enum class function { // 12 bit
         plugin_hardware = 0x800, // values of less than 0x800 are reserved for Microsoft
         plugout_hardware, 
         get_imported_devices,
-        save_imported_devices,
 };
 
 constexpr auto make(function id)
@@ -71,10 +70,9 @@ constexpr auto make(function id)
 }
 
 enum {
-        PLUGIN_HARDWARE       = make(function::plugin_hardware),
-        PLUGOUT_HARDWARE      = make(function::plugout_hardware),
-        GET_IMPORTED_DEVICES  = make(function::get_imported_devices),
-        SAVE_IMPORTED_DEVICES = make(function::save_imported_devices),
+        PLUGIN_HARDWARE      = make(function::plugin_hardware),
+        PLUGOUT_HARDWARE     = make(function::plugout_hardware),
+        GET_IMPORTED_DEVICES = make(function::get_imported_devices),
 };
 
 struct base
@@ -98,7 +96,5 @@ constexpr auto get_imported_devices_size(_In_ ULONG n)
 {
         return offsetof(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
-
-struct save_imported_devices : base {};
 
 } // namespace usbip::vhci::ioctl

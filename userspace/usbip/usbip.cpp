@@ -90,8 +90,6 @@ void add_cmd_port(CLI::App &app)
 	static port_args r;
 	auto cmd = app.add_subcommand("port", "Show imported USB devices");
 
-	cmd->add_flag("-s,--save", r.save, "Save imported devices");
-
 	cmd->add_option("number", r.ports, "Hub port number")
 		->check(CLI::Range(1, MAX_HUB_PORTS))
 		->expected(1, MAX_HUB_PORTS);

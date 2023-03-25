@@ -41,20 +41,10 @@ void print(const imported_device &d)
 
 bool usbip::cmd_port(void *p)
 {
-        auto &args = *reinterpret_cast<port_args*>(p); 
-
         auto dev = vhci::open();
         if (!dev) {
                 spdlog::error(GetLastErrorMsg());
                 return false;
-        }
-
-        if (args.save) {
-                auto ok = vhci::save_imported_devices(dev.get());
-                if (!ok) {
-                        spdlog::error(GetLastErrorMsg());
-                }
-                return ok;
         }
 
         bool ok;
@@ -66,11 +56,12 @@ bool usbip::cmd_port(void *p)
 
         spdlog::debug("{} imported usb device(s)", devices.size());
 
+        auto &ports = reinterpret_cast<port_args*>(p)->ports; 
         bool found{};
 
         for (auto &d: devices) {
                 assert(d.port);
-                if (args.ports.empty() || args.ports.contains(d.port)) {
+                if (ports.empty() || ports.contains(d.port)) {
                         if (!found) {
                                 found = true;
                                 printf("Imported USB devices\n"
@@ -80,5 +71,5 @@ bool usbip::cmd_port(void *p)
                 }
         }
 
-        return found || args.ports.empty();
+        return found || ports.empty();
 }
