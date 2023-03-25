@@ -49,6 +49,12 @@ namespace usbip::vhci
  */
 USBIP_API Handle open();
 
+/**
+ * @param dev handle of the driver device
+ * @return path to the driver key in the registry, call GetLastError() if empty string is returned
+ */
+USBIP_API std::wstring get_registry_path(_In_ HANDLE dev);
+
 /*
  * @param dev handle of the driver device
  * @param success result of the operation

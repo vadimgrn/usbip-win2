@@ -138,6 +138,22 @@ auto usbip::vhci::open() -> Handle
         return h;
 }
 
+std::wstring usbip::vhci::get_registry_path(_In_ HANDLE dev)
+{
+        std::wstring path;
+
+        const auto path_offset = offsetof(vhci::ioctl::driver_registry_path, path);
+        ioctl::driver_registry_path r{{ .size = sizeof(r) }};
+
+        if (DWORD BytesReturned; // must be set if the last arg is NULL
+            DeviceIoControl(dev, ioctl::DRIVER_REGISTRY_PATH, 
+                            &r, path_offset, &r, sizeof(r), &BytesReturned, nullptr)) {
+                path.assign(r.path, (BytesReturned - path_offset)/sizeof(*r.path));
+        }
+
+        return path;
+}
+
 std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDLE dev, _Out_ bool &success)
 {
         success = false;

@@ -17,7 +17,7 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_list(_In_ WDFOBJECT parent)
+PAGED auto make_collection(_In_ WDFOBJECT parent)
 {
         PAGED_CODE();
 
@@ -39,24 +39,24 @@ PAGED auto query_imported_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
         
-        auto list = make_list(key);
-        if (!list) {
-                return list;
+        auto col = make_collection(key);
+        if (!col) {
+                return col;
         }
 
         WDF_OBJECT_ATTRIBUTES str_attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&str_attr);
-        str_attr.ParentObject = list;
+        str_attr.ParentObject = col;
 
         UNICODE_STRING value_name;
         RtlUnicodeStringInit(&value_name, imported_devices_value_name);
 
-        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, list)) {
+        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, err);
-                list = WDF_NO_HANDLE; // parent will destory it
+                col = WDF_NO_HANDLE; // parent will destory it
         }
 
-        return list;
+        return col;
 }
 
 constexpr auto empty(_In_ const UNICODE_STRING &s)
@@ -135,8 +135,8 @@ PAGED void load_imported_devices(_In_ vhci_ctx &ctx)
                 return;
         }
 
-        auto list = query_imported_devices(key.get());
-        if (!list) {
+        auto col = query_imported_devices(key.get());
+        if (!col) {
                 return;
         }
 
@@ -155,12 +155,12 @@ PAGED void load_imported_devices(_In_ vhci_ctx &ctx)
         WDF_MEMORY_DESCRIPTOR output;
         WDF_MEMORY_DESCRIPTOR_INIT_BUFFER(&output, &req, outlen);
 
-        auto max_lines = min(WdfCollectionGetCount(list), ARRAYSIZE(ctx.devices));
+        auto max_lines = min(WdfCollectionGetCount(col), ARRAYSIZE(ctx.devices));
 
         for (ULONG i = 0; i < max_lines && !ctx.stop_thread; ++i) {
 
                 UNICODE_STRING str{};
-                if (auto s = (WDFSTRING)WdfCollectionGetItem(list, i)) {
+                if (auto s = (WDFSTRING)WdfCollectionGetItem(col, i)) {
                         WdfStringGetUnicodeString(s, &str);
                 }
 

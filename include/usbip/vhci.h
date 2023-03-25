@@ -61,6 +61,7 @@ enum class function { // 12 bit
         plugin_hardware = 0x800, // values of less than 0x800 are reserved for Microsoft
         plugout_hardware, 
         get_imported_devices,
+        driver_registry_path,
 };
 
 constexpr auto make(function id)
@@ -73,6 +74,7 @@ enum {
         PLUGIN_HARDWARE      = make(function::plugin_hardware),
         PLUGOUT_HARDWARE     = make(function::plugout_hardware),
         GET_IMPORTED_DEVICES = make(function::get_imported_devices),
+        DRIVER_REGISTRY_PATH = make(function::driver_registry_path),
 };
 
 struct base
@@ -96,5 +98,14 @@ constexpr auto get_imported_devices_size(_In_ ULONG n)
 {
         return offsetof(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
+
+/*
+ * The key name includes the absolute path of the key in the registry, 
+ * always starting at a base key, for example, HKEY_LOCAL_MACHINE. 
+ */
+struct driver_registry_path : base
+{
+        WCHAR path[255]; // key name max size
+};
 
 } // namespace usbip::vhci::ioctl
