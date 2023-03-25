@@ -491,8 +491,8 @@ PAGED auto driver_registry_path(_In_ WDFREQUEST request)
         auto path = WdfDriverGetRegistryPath(WdfGetDriver());
 
         NTSTRSAFE_PWSTR end; // points to L'\0'
-        if (auto err = RtlStringCbCopyExW(r->path, ARRAYSIZE(r->path), path, &end, 0, 0)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyExW('%S') %!STATUS!", path, err);
+        if (auto err = RtlStringCchCopyExW(r->path, ARRAYSIZE(r->path), path, &end, 0, 0)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCchCopyExW('%S') %!STATUS!", path, err);
                 return err;
         }
 

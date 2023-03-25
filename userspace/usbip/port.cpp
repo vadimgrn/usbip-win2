@@ -41,23 +41,40 @@ void print(const imported_device &d)
 
 bool usbip::cmd_port(void *p)
 {
+        auto &args = *reinterpret_cast<port_args*>(p); 
+
         auto dev = vhci::open();
         if (!dev) {
                 spdlog::error(GetLastErrorMsg());
                 return false;
         }
 
-        bool ok;
-        auto devices = vhci::get_imported_devices(dev.get(), ok);
-        if (!ok) {
+        bool success;
+
+        if (args.list_saved) {
+                if (auto v = vhci::get_saved_devices(dev.get(), success); !success) {
+                        spdlog::error(GetLastErrorMsg());
+                } else for (auto &i: v) {
+                        printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
+                }
+                return success;
+        }
+
+        auto devices = vhci::get_imported_devices(dev.get(), success);
+        if (!success) {
                 spdlog::error(GetLastErrorMsg());
                 return false;
         }
 
         spdlog::debug("{} imported usb device(s)", devices.size());
 
-        auto &ports = reinterpret_cast<port_args*>(p)->ports; 
-        bool found{};
+        std::vector<device_location> dl;
+        if (args.save) {
+                dl.reserve(devices.size());
+        }
+
+        auto &ports = args.ports; 
+        auto found = false;
 
         for (auto &d: devices) {
                 assert(d.port);
@@ -68,8 +85,18 @@ bool usbip::cmd_port(void *p)
                                        "====================\n");
                         }
                         print(d);
+                        if (args.save) {
+                                dl.push_back(std::move(d.location));
+                        }
                 }
         }
 
-        return found || ports.empty();
+        success = found || ports.empty();
+
+        if (args.save && !vhci::save_devices(dev.get(), dl)) {
+                spdlog::error(GetLastErrorMsg());
+                success = false;
+        }
+
+        return success;
 }

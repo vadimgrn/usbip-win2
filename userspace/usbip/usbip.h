@@ -48,6 +48,8 @@ command_t cmd_list;
 struct port_args
 {
         std::set<int> ports;
+        bool save;
+        bool list_saved;
 };
 command_t cmd_port;
 

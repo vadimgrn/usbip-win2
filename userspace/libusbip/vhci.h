@@ -51,14 +51,8 @@ USBIP_API Handle open();
 
 /**
  * @param dev handle of the driver device
- * @return path to the driver key in the registry, call GetLastError() if empty string is returned
- */
-USBIP_API std::wstring get_registry_path(_In_ HANDLE dev);
-
-/*
- * @param dev handle of the driver device
- * @param success result of the operation
- * @return call GetLastError if success is false
+ * @param success call GetLastError() if false is returned
+ * @return imported devices
  */
 USBIP_API std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &success);
 
@@ -75,5 +69,20 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
  * @return call GetLastError() if false is returned
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
+
+/**
+ * Saved devices will be attached on every driver loading.
+ * @param dev handle of the driver device
+ * @param devices to save
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool save_devices(_In_ HANDLE dev, _In_ const std::vector<device_location> &devices);
+
+/**
+ * @param dev handle of the driver device
+ * @param success call GetLastError() if false is returned
+ * @return devices stashed by save_devices()
+ */
+USBIP_API std::vector<device_location> get_saved_devices(_In_ HANDLE dev, _Out_ bool &success);
 
 } // namespace usbip::vhci

@@ -34,9 +34,6 @@
     <ClCompile Include="src\win_socket.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\state.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="format_message.h" />
@@ -69,9 +66,6 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="src\usb_ids.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="src\state.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

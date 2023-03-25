@@ -9,6 +9,7 @@
 
 #ifdef _KERNEL_MODE
   #include <wdm.h>
+  #include <minwindef.h>
 #else
   #include <windows.h>
   #include <winioctl.h>
@@ -105,7 +106,7 @@ constexpr auto get_imported_devices_size(_In_ ULONG n)
  */
 struct driver_registry_path : base
 {
-        WCHAR path[255]; // key name max size
+        WCHAR path[MAX_PATH]; // key name max size is 255
 };
 
 } // namespace usbip::vhci::ioctl
