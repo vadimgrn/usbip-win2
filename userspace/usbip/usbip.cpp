@@ -55,53 +55,69 @@ auto pack(command_t cmd, void *p)
 void add_cmd_attach(CLI::App &app)
 {
 	static attach_args r;
-	auto cmd = app.add_subcommand("attach", "Attach a remote USB device");
 
-	cmd->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")->required();
-	cmd->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")->required();
-	cmd->add_flag("-t,--terse", r.terse, "Show port number as a result");
+	auto cmd = app.add_subcommand("attach", "Attach to a remote/stashed USB device(s)")
+		->callback(pack(cmd_attach, &r))
+		->require_option(1);
 
-	cmd->callback(pack(cmd_attach, &r));
+	auto remote = cmd->add_option_group("remote", "Attach to a remote USB device");
+
+	remote->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")
+		->required();	
+
+	remote->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")
+		->required();	
+
+	remote->add_flag("-t,--terse", r.terse, "Show port number as a result");
+
+	cmd->add_option_group("stashed", "Attach to stashed USB devices")
+		->excludes(remote)
+		->add_flag("-s,--stashed", r.stashed, "Attach to devices stashed by 'port --stash'");
 }
 
 void add_cmd_detach(CLI::App &app)
 {
 	static detach_args r;
-	auto cmd = app.add_subcommand("detach", "Detach a remote USB device");
+
+	auto cmd = app.add_subcommand("detach", "Detach a remote USB device")
+		->callback(pack(cmd_detach, &r));
 
 	cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in, -1 or zero means ALL ports")
 		->check(CLI::Range(-1, MAX_HUB_PORTS))
 		->required();
-
-	cmd->callback(pack(cmd_detach, &r));
 }
 
 void add_cmd_list(CLI::App &app)
 {
 	static list_args r;
-	auto cmd = app.add_subcommand("list", "List exportable USB devices");
 
-	cmd->add_option("-r,--remote", r.remote, "List exportable devices on a remote")->required();
-	cmd->callback(pack(cmd_list, &r));
+	auto cmd = app.add_subcommand("list", "List exportable/stashed USB devices")
+		->callback(pack(cmd_list, &r))
+		->require_option(1);
+
+	auto remote = cmd->add_option_group("remote", "List exportable USB devices");
+
+	remote->add_option("-r,--remote", r.remote, "List exportable devices on a remote")
+		->required();
+
+	cmd->add_option_group("stashed", "List stashed USB devices")
+		->excludes(remote)
+		->add_flag("-s,--stashed", r.stashed, "List devices stashed by 'port --stash'");
 }
 
 void add_cmd_port(CLI::App &app)
 {
 	static port_args r;
-	auto cmd = app.add_subcommand("port", "Show imported USB devices");
 
-	auto list = cmd->add_flag("-l,--list-saved", r.list_saved,
-		                  "List devices that will be attached on every driver loading");
+	auto cmd = app.add_subcommand("port", "Show/stash imported USB devices")
+		->callback(pack(cmd_port, &r));
 
-	cmd->add_flag("-s,--save", r.save, "Attach listed devices on every driver loading")
-		->excludes(list);
+	cmd->add_flag("-s,--stash", r.stash,
+		      "Devices listed by the command will be attached each time the driver is loaded");
 	
 	cmd->add_option("number", r.ports, "Hub port number")
 		->check(CLI::Range(1, MAX_HUB_PORTS))
-		->expected(1, MAX_HUB_PORTS)
-		->excludes(list);
-
-	cmd->callback(pack(cmd_port, &r));
+		->expected(1, MAX_HUB_PORTS);
 }
 
 void init(CLI::App &app, const wchar_t *program)

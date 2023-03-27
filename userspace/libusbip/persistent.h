@@ -18,9 +18,9 @@ namespace usbip::vhci
 {
 
 /**
- * Persistent devices will be attached on every driver loading.
+ * Persistent devices will be attached each time the driver is loaded.
  * @param dev handle of the driver device
- * @param devices to save
+ * @param devices to stash
  * @return call GetLastError() if false is returned
  */
 USBIP_API bool set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_location> &devices);

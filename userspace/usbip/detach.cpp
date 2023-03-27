@@ -9,7 +9,7 @@
 
 bool usbip::cmd_detach(void *p)
 {
-	auto &r = *reinterpret_cast<detach_args*>(p);
+	auto &args = *reinterpret_cast<detach_args*>(p);
 
 	auto dev = vhci::open();
 	if (!dev) {
@@ -17,14 +17,14 @@ bool usbip::cmd_detach(void *p)
 		return false;
 	}
 
-	auto ok = vhci::detach(dev.get(), r.port);
+	auto ok = vhci::detach(dev.get(), args.port);
 
 	if (!ok) {
 		spdlog::error(GetLastErrorMsg());		
-	} else if (r.port <= 0) {
+	} else if (args.port <= 0) {
 		printf("all ports are detached\n");
 	} else {
-		printf("port %d is succesfully detached\n", r.port);
+		printf("port %d is succesfully detached\n", args.port);
 	}
 
 	return ok;

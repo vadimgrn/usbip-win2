@@ -35,7 +35,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="persistent_devices.h" />
+    <ClInclude Include="persistent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -51,7 +51,7 @@
     <ClCompile Include="device_queue.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
-    <ClCompile Include="persistent_devices.cpp" />
+    <ClCompile Include="persistent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_ude.inf" />

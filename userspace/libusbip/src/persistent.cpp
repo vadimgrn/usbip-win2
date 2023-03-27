@@ -71,15 +71,15 @@ auto make_multi_sz(_Out_ std::wstring &result, _In_ const std::vector<device_loc
         assert(result.empty());
 
         for (auto &i: v) {
-                if (!is_malformed(i)) {
-                        auto s = i.hostname + ',' + i.service + ',' + i.busid + '\0';
-                        result += utf8_to_wchar(s);
-                } else {
+                if (is_malformed(i)) {
                         libusbip::output("malformed device_location{ hostname='{}', service='{}', busid='{}' }", 
                                           i.hostname, i.service, i.busid);
 
                         return ERROR_INVALID_PARAMETER;
                 }
+
+                auto s = i.hostname + ',' + i.service + ',' + i.busid + '\0';
+                result += utf8_to_wchar(s);
         }
 
         result += L'\0';

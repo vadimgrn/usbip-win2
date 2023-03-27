@@ -52,15 +52,6 @@ bool usbip::cmd_port(void *p)
 
         bool success;
 
-        if (args.list_saved) {
-                if (auto v = vhci::get_persistent(dev.get(), success); !success) {
-                        spdlog::error(GetLastErrorMsg());
-                } else for (auto &i: v) {
-                        printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
-                }
-                return success;
-        }
-
         auto devices = vhci::get_imported_devices(dev.get(), success);
         if (!success) {
                 spdlog::error(GetLastErrorMsg());
@@ -70,7 +61,7 @@ bool usbip::cmd_port(void *p)
         spdlog::debug("{} imported usb device(s)", devices.size());
 
         std::vector<device_location> dl;
-        if (args.save) {
+        if (args.stash) {
                 dl.reserve(devices.size());
         }
 
@@ -86,7 +77,7 @@ bool usbip::cmd_port(void *p)
                                        "====================\n");
                         }
                         print(d);
-                        if (args.save) {
+                        if (args.stash) {
                                 dl.push_back(std::move(d.location));
                         }
                 }
@@ -94,7 +85,7 @@ bool usbip::cmd_port(void *p)
 
         success = found || ports.empty();
 
-        if (args.save && !vhci::set_persistent(dev.get(), dl)) {
+        if (args.stash && !vhci::set_persistent(dev.get(), dl)) {
                 spdlog::error(GetLastErrorMsg());
                 success = false;
         }

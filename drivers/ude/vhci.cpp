@@ -9,7 +9,7 @@
 #include "device.h"
 #include "vhci_ioctl.h"
 #include "context.h"
-#include "persistent_devices.h"
+#include "persistent.h"
 
 #include <libdrv/lock.h>
 

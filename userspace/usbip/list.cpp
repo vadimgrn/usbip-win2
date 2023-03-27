@@ -5,6 +5,9 @@
 #include "usbip.h"
 #include "strings.h"
 
+#include <libusbip\vhci.h>
+#include <libusbip\persistent.h>
+
 #include <spdlog\spdlog.h>
 
 namespace
@@ -54,20 +57,38 @@ void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
 	printf(s.c_str());
 }
 
+auto list_stashed_devices()
+{
+	bool success{};
+	
+	if (auto dev = vhci::open(); !dev) {
+		spdlog::error(GetLastErrorMsg());
+	} else if (auto v = vhci::get_persistent(dev.get(), success); !success) {
+		spdlog::error(GetLastErrorMsg());
+	} else for (auto &i: v) {
+		printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
+	}
+
+	return success;
+}
+
 } // namespace
 
 
 bool usbip::cmd_list(void *p)
 {
-	auto &r = *reinterpret_cast<list_args*>(p);
+	auto &args = *reinterpret_cast<list_args*>(p);
+	if (args.stashed) {
+		return list_stashed_devices();
+	}
 
-	auto sock = connect(r.remote.c_str(), global_args.tcp_port.c_str());
+	auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
 		spdlog::error(GetLastErrorMsg());
 		return false;
 	}
 
-	spdlog::debug("connected to {}:{}", r.remote, global_args.tcp_port);
+	spdlog::debug("connected to {}:{}", args.remote, global_args.tcp_port);
 
 	if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
 		spdlog::error(GetLastErrorMsg());

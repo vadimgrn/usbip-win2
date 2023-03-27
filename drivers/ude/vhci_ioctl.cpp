@@ -11,7 +11,7 @@
 #include "device.h"
 #include "network.h"
 #include "ioctl.h"
-#include "persistent_devices.h"
+#include "persistent.h"
 
 #include <usbip\proto_op.h>
 #include <resources\messages.h>

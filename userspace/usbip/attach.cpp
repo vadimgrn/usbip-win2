@@ -4,18 +4,47 @@
 
 #include "usbip.h"
 #include <libusbip\vhci.h>
+#include <libusbip\persistent.h>
 
 #include <spdlog\spdlog.h>
 
+namespace
+{
+
+using namespace usbip;
+
+auto attach_stashed_devices(HANDLE dev)
+{
+        bool success;
+        
+        if (auto v = vhci::get_persistent(dev, success); !success) {
+                spdlog::error(GetLastErrorMsg());
+        } else for (auto &i: v) {
+                printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
+                if (!vhci::attach(dev, i)) {
+                        spdlog::error(GetLastErrorMsg());
+                }
+        }
+
+        return success;
+}
+
+} // namespace
+
+
 bool usbip::cmd_attach(void *p)
 {
+        auto &args = *reinterpret_cast<attach_args*>(p);
+
         auto dev = vhci::open();
         if (!dev) {
                 spdlog::error(GetLastErrorMsg());
                 return false;
         }
 
-        auto &args = *reinterpret_cast<attach_args*>(p);
+        if (args.stashed) {
+                return attach_stashed_devices(dev.get());
+        }
 
         device_location location {
                 .hostname = args.remote, 

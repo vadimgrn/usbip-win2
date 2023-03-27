@@ -27,9 +27,13 @@ using command_t = bool(void*);
 
 struct attach_args
 {
+        // --remote
         std::string remote;
         std::string busid;
         bool terse{};
+
+        // --stash
+        bool stashed;
 };
 command_t cmd_attach;
 
@@ -41,15 +45,18 @@ command_t cmd_detach;
 
 struct list_args
 {
+        // --remote
         std::string remote;
+
+        // --stashed
+        bool stashed;
 };
 command_t cmd_list;
 
 struct port_args
 {
         std::set<int> ports;
-        bool save;
-        bool list_saved;
+        bool stash;
 };
 command_t cmd_port;
 

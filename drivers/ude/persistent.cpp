@@ -2,10 +2,10 @@
  * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "persistent_devices.h"
+#include "persistent.h"
 #include "context.h"
 #include "trace.h"
-#include "persistent_devices.tmh"
+#include "persistent.tmh"
 
 #include <libdrv\wdf_cpp.h>
 #include <libdrv\strconv.h>
@@ -130,7 +130,7 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 
         wdf::Registry key;
         if (auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_QUERY_VALUE, 
-                WDF_NO_OBJECT_ATTRIBUTES, &key)) {
+                                                          WDF_NO_OBJECT_ATTRIBUTES, &key)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey %!STATUS!", err);
                 return;
         }
