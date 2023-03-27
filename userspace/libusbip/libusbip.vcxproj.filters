@@ -34,6 +34,9 @@
     <ClCompile Include="src\win_socket.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="src\persistent.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="format_message.h" />
@@ -68,6 +71,7 @@
     <ClInclude Include="src\usb_ids.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="persistent.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">

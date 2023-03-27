@@ -17,7 +17,7 @@
     <ClCompile Include="select.cpp" />
     <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
-    <ClCompile Include="strutil.cpp" />
+    <ClCompile Include="strconv.cpp" />
     <ClCompile Include="usbd_helper.cpp" />
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="wsk_cpp.cpp" />
@@ -153,7 +153,7 @@
     <ClInclude Include="unique_ptr.h" />
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
-    <ClInclude Include="strutil.h" />
+    <ClInclude Include="strconv.h" />
     <ClInclude Include="usbd_helper.h" />
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wdf_cpp.h" />

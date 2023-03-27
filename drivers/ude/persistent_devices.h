@@ -21,6 +21,6 @@ PAGED NTSTATUS copy(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void load_imported_devices(_In_ vhci_ctx *vhci);
+PAGED void plugin_persistent_devices(_In_ vhci_ctx *vhci);
 
 } // namespace usbip

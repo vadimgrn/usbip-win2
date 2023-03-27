@@ -2,13 +2,13 @@
  * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "load_imported_devices.h"
+#include "persistent_devices.h"
 #include "context.h"
 #include "trace.h"
-#include "load_imported_devices.tmh"
+#include "persistent_devices.tmh"
 
 #include <libdrv\wdf_cpp.h>
-#include <libdrv\strutil.h>
+#include <libdrv\strconv.h>
 
 namespace 
 {
@@ -35,7 +35,7 @@ PAGED auto make_collection(_In_ WDFOBJECT parent)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto query_imported_devices(_In_ WDFKEY key)
+PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
         
@@ -49,7 +49,7 @@ PAGED auto query_imported_devices(_In_ WDFKEY key)
         str_attr.ParentObject = col;
 
         UNICODE_STRING value_name;
-        RtlUnicodeStringInit(&value_name, imported_devices_value_name);
+        RtlUnicodeStringInit(&value_name, persistent_devices_value_name);
 
         if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, err);
@@ -123,7 +123,7 @@ PAGED auto make_target(_In_ WDFDEVICE vhci)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void load_imported_devices(_In_ vhci_ctx &ctx)
+PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 {
         PAGED_CODE();
         auto vhci = get_device(&ctx);
@@ -135,7 +135,7 @@ PAGED void load_imported_devices(_In_ vhci_ctx &ctx)
                 return;
         }
 
-        auto col = query_imported_devices(key.get());
+        auto col = get_persistent_devices(key.get());
         if (!col) {
                 return;
         }
@@ -194,7 +194,7 @@ PAGED void run(_In_ void *ctx)
         PAGED_CODE();
 
         auto &vhci = *static_cast<vhci_ctx*>(ctx);
-        load_imported_devices(vhci);
+        plugin_persistent_devices(vhci);
 
         if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.load_thread), nullptr)) {
                 ObDereferenceObject(thread);
@@ -209,7 +209,7 @@ PAGED void run(_In_ void *ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::load_imported_devices(_In_ vhci_ctx *vhci)
+PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
 {
         PAGED_CODE();
 

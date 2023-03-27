@@ -6,6 +6,7 @@
 #include "strings.h"
 
 #include <libusbip\vhci.h>
+#include <libusbip\persistent.h>
 
 #include <format>
 #include <spdlog\spdlog.h>
@@ -52,7 +53,7 @@ bool usbip::cmd_port(void *p)
         bool success;
 
         if (args.list_saved) {
-                if (auto v = vhci::get_saved_devices(dev.get(), success); !success) {
+                if (auto v = vhci::get_persistent(dev.get(), success); !success) {
                         spdlog::error(GetLastErrorMsg());
                 } else for (auto &i: v) {
                         printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
@@ -93,7 +94,7 @@ bool usbip::cmd_port(void *p)
 
         success = found || ports.empty();
 
-        if (args.save && !vhci::save_devices(dev.get(), dl)) {
+        if (args.save && !vhci::set_persistent(dev.get(), dl)) {
                 spdlog::error(GetLastErrorMsg());
                 success = false;
         }

@@ -2,7 +2,7 @@
  * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "strutil.h"
+#include "strconv.h"
 
 /*
  * RtlFreeUnicodeString must be used to release memory.

@@ -93,6 +93,7 @@
     <ClCompile Include="src\file_ver.cpp" />
     <ClCompile Include="src\format_message.cpp" />
     <ClCompile Include="src\output.cpp" />
+    <ClCompile Include="src\persistent.cpp" />
     <ClCompile Include="src\proto_op.cpp" />
     <ClCompile Include="src\remote.cpp" />
     <ClCompile Include="src\strconv.cpp" />
@@ -108,6 +109,7 @@
     <ClInclude Include="hkey.h" />
     <ClInclude Include="hmodule.h" />
     <ClInclude Include="output.h" />
+    <ClInclude Include="persistent.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="src\device_speed.h" />
     <ClInclude Include="src\file_ver.h" />

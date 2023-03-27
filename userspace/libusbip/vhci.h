@@ -70,19 +70,4 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 
-/**
- * Saved devices will be attached on every driver loading.
- * @param dev handle of the driver device
- * @param devices to save
- * @return call GetLastError() if false is returned
- */
-USBIP_API bool save_devices(_In_ HANDLE dev, _In_ const std::vector<device_location> &devices);
-
-/**
- * @param dev handle of the driver device
- * @param success call GetLastError() if false is returned
- * @return devices stashed by save_devices()
- */
-USBIP_API std::vector<device_location> get_saved_devices(_In_ HANDLE dev, _Out_ bool &success);
-
 } // namespace usbip::vhci

@@ -7,7 +7,7 @@
 #include "context.tmh"
 
 #include "driver.h"
-#include <libdrv\strutil.h>
+#include <libdrv\strconv.h>
 
  /*
   * First bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN).

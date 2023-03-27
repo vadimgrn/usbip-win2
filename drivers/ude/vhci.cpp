@@ -9,7 +9,7 @@
 #include "device.h"
 #include "vhci_ioctl.h"
 #include "context.h"
-#include "load_imported_devices.h"
+#include "persistent_devices.h"
 
 #include <libdrv/lock.h>
 
@@ -453,7 +453,7 @@ PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
         
         if (auto ctx = get_vhci_ctx(vhci)) {
-                load_imported_devices(ctx);
+                plugin_persistent_devices(ctx);
         }
 
         return STATUS_SUCCESS;

@@ -11,13 +11,13 @@
 #include "device.h"
 #include "network.h"
 #include "ioctl.h"
-#include "load_imported_devices.h"
+#include "persistent_devices.h"
 
 #include <usbip\proto_op.h>
 #include <resources\messages.h>
 
 #include <libdrv\dbgcommon.h>
-#include <libdrv\strutil.h>
+#include <libdrv\strconv.h>
 
 #include <ntstrsafe.h>
 #include <usbuser.h>

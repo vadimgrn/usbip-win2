@@ -4,14 +4,10 @@
 
 #include "..\vhci.h"
 
-#include "last_error.h"
 #include "device_speed.h"
-#include "strconv.h"
 #include "output.h"
 
 #include <resources\messages.h>
-
-#include <ranges>
 #include <cfgmgr32.h>
 
 #include <initguid.h>
@@ -21,112 +17,6 @@ namespace
 {
 
 using namespace usbip;
-
-auto &parameters_key_name = L"\\Parameters"; // @see WdfDriverOpenParametersRegistryKey
-
-auto driver_registry_path(_In_ HANDLE dev)
-{
-        using namespace vhci;
-        std::pair<HKEY, std::wstring> result;
-
-        const auto path_offset = offsetof(ioctl::driver_registry_path, path);
-        ioctl::driver_registry_path r{{ .size = sizeof(r) }};
-
-        if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::DRIVER_REGISTRY_PATH, 
-                            &r, path_offset, &r, sizeof(r), &BytesReturned, nullptr)) {
-
-                std::wstring_view path(r.path, (BytesReturned - path_offset)/sizeof(*r.path));
-
-                if (std::wstring_view prefix(L"\\REGISTRY\\MACHINE\\"); path.starts_with(prefix)) {
-                        path.remove_prefix(prefix.size());
-                        result.first = HKEY_LOCAL_MACHINE;
-                }
-
-                result.second = path;
-        }
-
-        return result;
-}
-
-auto make_multi_sz(_In_ const std::vector<device_location> &v)
-{
-        std::wstring ws;
-
-        for (auto &i: v) {
-                auto s = i.hostname + ',' + i.service + ',' + i.busid + '\0';
-                ws += utf8_to_wchar(s);
-        }
-
-        ws += L'\0';
-        return ws;
-}
-
-auto parse_device_location(_In_ const std::string &str)
-{
-        device_location dl;
-
-        auto f = [] (auto r) { return std::string_view(r.begin(), r.end()); };
-        auto v = str | std::views::split(',') | std::views::transform(std::move(f));
-
-        if (auto i = v.begin(), end = v.end(); i != end) {
-                dl.hostname = *i;
-                if (++i != end) {
-                        dl.service = *i;
-                        if (++i != end) {
-                                dl.busid.assign((*i).data(), &str.back() + 1); // tail
-                        }
-                }
-        }
-
-        return dl;
-}
-
-auto query_imported_devices(_In_ HANDLE dev, _Out_ bool &success)
-{
-        success = false;
-        std::wstring multi_sz;
-
-        auto [key, subkey] = driver_registry_path(dev);
-        if (subkey.empty()) {
-                return multi_sz;
-        }
-
-        subkey += parameters_key_name;
-        DWORD size{}; // bytes
-
-        auto query_multi_sz = [key, &subkey, &size] (_Out_opt_ void *data)
-        {
-                auto err = RegGetValue(key, subkey.c_str(), imported_devices_value_name, 
-                                       RRF_RT_REG_MULTI_SZ, nullptr, data, &size);
-
-                if (err) {
-                        libusbip::output(L"RegGetValue('{}', value_name='{}') error {:#x}", 
-                                         subkey, imported_devices_value_name, err);
-
-                        SetLastError(err);
-                }
-
-                return err;
-        };
-
-        if (query_multi_sz(nullptr)) {
-                return multi_sz;
-        }
-
-        DWORD cch = size/sizeof(multi_sz[0]) + bool(size % sizeof(multi_sz[0]));
-        size = cch*sizeof(multi_sz[0]);
-
-        multi_sz.resize(cch);
-
-        if (query_multi_sz(multi_sz.data())) {
-                multi_sz.clear();
-        } else {
-                success = true;
-        }
-
-        return multi_sz;
-}
 
 auto init(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const device_location &loc)
 {
@@ -322,54 +212,4 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 
         DWORD BytesReturned; // must be set if the last arg is NULL
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
-}
-
-bool usbip::vhci::save_devices(_In_ HANDLE dev, _In_ const std::vector<device_location> &devices)
-{
-        auto [key, subkey] = driver_registry_path(dev);
-        if (subkey.empty()) {
-                return false;
-        }
-
-        subkey += parameters_key_name;
-        auto value = ::make_multi_sz(devices);
-
-        auto err = RegSetKeyValue(key, subkey.c_str(), imported_devices_value_name, 
-                                  REG_MULTI_SZ, value.data(), DWORD(value.size()*sizeof(value[0])));
-
-        if (err) {
-                libusbip::output(L"RegSetKeyValue('{}', value_name='{}') error {:#x}", 
-                                 subkey, imported_devices_value_name, err);
-
-                SetLastError(err);
-        }
-
-        return !err;
-}
-
-auto usbip::vhci::get_saved_devices(_In_ HANDLE dev, _Out_ bool &success) -> std::vector<device_location>
-{
-        std::vector<device_location> devs;
-
-        auto multi_sz = query_imported_devices(dev, success);
-        if (multi_sz.empty()) {
-                if (!success && GetLastError() == ERROR_FILE_NOT_FOUND) { // imported_devices_value_name absent
-                        success = true; // not saved yet
-                }
-                return devs;
-        }
-
-        for (auto &ws: split_multi_sz(multi_sz)) {
-
-                auto s = wchar_to_utf8(ws);
-                auto d = parse_device_location(s);
-
-                if (d.hostname.empty() || d.service.empty() || d.busid.empty()) {
-                        libusbip::output("malformed '{}'", s);
-                } else {
-                        devs.push_back(std::move(d));
-                }
-        }
-
-        return devs;
 }
