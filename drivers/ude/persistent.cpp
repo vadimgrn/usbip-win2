@@ -155,9 +155,9 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
         WDF_MEMORY_DESCRIPTOR output;
         WDF_MEMORY_DESCRIPTOR_INIT_BUFFER(&output, &req, outlen);
 
-        auto max_lines = min(WdfCollectionGetCount(col), ARRAYSIZE(ctx.devices));
+        auto max_cnt = min(WdfCollectionGetCount(col), ARRAYSIZE(ctx.devices));
 
-        for (ULONG i = 0; i < max_lines && !ctx.stop_thread; ++i) {
+        for (ULONG i = 0; i < max_cnt && !ctx.stop_thread; ++i) {
 
                 UNICODE_STRING str{};
                 if (auto s = (WDFSTRING)WdfCollectionGetItem(col, i)) {

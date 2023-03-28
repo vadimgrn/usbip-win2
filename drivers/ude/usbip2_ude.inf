@@ -42,7 +42,7 @@ ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_ude.sys ; Driver package isolation
-Dependencies   = ucx01000, udecx, usbip2_filter
+Dependencies   = ucx01000, udecx, usbip2_filter, TCPIP
 AddReg         = ude_Device_Service_AddReg
 
 [ude_Device_Service_AddReg]
