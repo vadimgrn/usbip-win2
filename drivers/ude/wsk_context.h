@@ -20,7 +20,7 @@ struct wsk_context
 
         // transient data
 
-        WDFREQUEST request; // WDF_NO_HANDLE for send_cmd_unlink
+        WDFREQUEST request; // can be WDF_NO_HANDLE
         Mdl mdl_buf; // describes URB_FROM_IRP()->TransferBuffer(MDL)
 
         // preallocated data

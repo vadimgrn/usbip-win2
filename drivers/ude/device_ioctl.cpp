@@ -131,9 +131,6 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
         return STATUS_SUCCESS;
 }
 
-/*
- * @param request can be WDF_NO_HANDLE
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
@@ -149,13 +146,13 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
                         ptr04x(ctx->request), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
-        if (auto request = ctx->request) {
-                auto &req = *get_request_ctx(request);
+        if (auto request = ctx->request) { // can be WDF_NO_HANDLE
+                auto &req = *get_request_ctx(request); // FIXME: is not zeroed?
 
                 req.seqnum = ctx->hdr.base.seqnum;
                 NT_ASSERT(is_valid_seqnum(req.seqnum));
 
-                NT_ASSERT(req.status == REQ_ZERO);
+                req.status = REQ_ZERO; // NT_ASSERT(req.status == REQ_ZERO) can fail
 
                 NT_ASSERT(endpoint);
                 req.endpoint = endpoint;
@@ -171,13 +168,11 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
-        auto err = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
-        NT_ASSERT(err != STATUS_NOT_SUPPORTED);
+        auto st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
+        NT_ASSERT(st != STATUS_NOT_SUPPORTED);
 
-        TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, err);
-        
-        static_assert(NT_SUCCESS(STATUS_PENDING));
-        return STATUS_PENDING;
+        TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, st);
+        return st;
 }
 
 _IRQL_requires_same_
@@ -492,7 +487,7 @@ NTSTATUS usbip::device::set_interface(
         TraceDbg("dev %04x, %d.%d", ptr04x(device), InterfaceNumber, AlternateSetting);
 
         auto params = (1UL << 16) | (AlternateSetting << 8) | InterfaceNumber; 
-        return do_select(device, request, params); // STATUS_PENDING on success
+        return do_select(device, request, params);
 }
 
  /*

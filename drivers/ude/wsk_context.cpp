@@ -144,7 +144,7 @@ auto usbip::alloc_wsk_context(
 }
 
 /*
- * alloc_wsk_context set ctx->is_isoc, it's safe do not clear it.
+ * alloc_wsk_context sets dev, request, is_isoc. It's safe do not clear them.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -154,7 +154,6 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp)
                 return;
         }
 
-        ctx->request = WDF_NO_HANDLE;
         ctx->mdl_buf.reset();
 
         if (reuse_irp) {
