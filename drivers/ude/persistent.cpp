@@ -12,6 +12,8 @@
 #include <libdrv\strconv.h>
 #include <libdrv\handle.h>
 
+#include <resources/messages.h>
+
 namespace 
 {
 
@@ -46,17 +48,17 @@ inline PAGED auto create_log(_In_ const wchar_t *path)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-inline PAGED void write(_In_ HANDLE h, _In_ const char *str, _In_ ULONG maxlen = 1024)
+inline PAGED void write(_In_ HANDLE h, _In_ const wchar_t *str, _In_ ULONG maxlen = 1024)
 {
         PAGED_CODE();
         if (!h) {
                 return;
         }
 
-        auto len = (ULONG)strnlen_s(str, maxlen);
+        auto bytes = static_cast<ULONG>(wcsnlen_s(str, maxlen)*sizeof(*str));
         IO_STATUS_BLOCK ios; 
 
-        if (auto err = ZwWriteFile(h, nullptr, nullptr, nullptr, &ios, (void*)str, len, nullptr, nullptr)) {
+        if (auto err = ZwWriteFile(h, nullptr, nullptr, nullptr, &ios, (void*)str, bytes, nullptr, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "ZwWriteFile %!STATUS!", err);
         }
 }
@@ -84,7 +86,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
-        
+
         auto col = make_collection(key);
         if (!col) {
                 return col;
@@ -167,6 +169,87 @@ PAGED auto make_target(_In_ WDFDEVICE vhci)
         return target;
 }
 
+constexpr auto get_delay(_In_ ULONG attempt, _In_ ULONG cnt)
+{
+        NT_ASSERT(cnt);
+        enum { UNIT = 10, MAX_DELAY = 30*60 }; // seconds
+        return attempt > 1 ? min(UNIT*attempt/cnt, MAX_DELAY) : 0; // first two attempts without a delay
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(APC_LEVEL)
+PAGED void sleep(_In_ int seconds, _Inout_ volatile bool &stopped)
+{
+        PAGED_CODE();
+        
+        enum { 
+                _100_NSEC = 1,  // in units of 100 nanoseconds
+                USEC = 10*_100_NSEC, // microsecond
+                MSEC = 1000*USEC, // millisecond
+                SEC = 1000*MSEC, // second
+        };
+
+        enum { RESOLUTION = 5 };
+        auto units = seconds/RESOLUTION + bool(seconds % RESOLUTION);
+
+        for (int i = 0; i < units && !stopped; ++i) { // to be able to interrupt
+                if (LARGE_INTEGER intv{ .QuadPart = -RESOLUTION*SEC }; // relative
+                    auto err = KeDelayExecutionThread(KernelMode, false, &intv)) {
+                        TraceDbg("KeDelayExecutionThread %!STATUS!", err);
+                }
+        }
+}
+
+/*
+ * WskGetAddressInfo() can return STATUS_INTERNAL_ERROR(0xC00000E5), but after some delay it will succeed.
+ * This can happen after reboot if dnscache(?) service is not ready yet.
+ */
+constexpr auto can_retry(_In_ DWORD error)
+{
+        switch (error) {
+        case ERROR_USBIP_ADDRINFO:
+        case ERROR_USBIP_CONNECT:
+        case ERROR_USBIP_NETWORK:
+                return true;
+        }
+
+        return false;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto plugin_hardware(
+        _In_ WDFSTRING line, 
+        _In_ WDFIOTARGET target,
+        _Inout_ vhci::ioctl::plugin_hardware &req,
+        _Inout_ WDF_MEMORY_DESCRIPTOR &input,
+        _Inout_ WDF_MEMORY_DESCRIPTOR &output,
+        _In_ const ULONG outlen)
+{
+        PAGED_CODE();
+
+        UNICODE_STRING str{};
+        WdfStringGetUnicodeString(line, &str);
+
+        if (auto err = parse_string(req, str)) {
+                Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
+                return true; // remove malformed string
+        }
+
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s", req.host, req.service, req.busid);
+        req.port = 0;
+
+        if (ULONG_PTR BytesReturned; // send IOCTL to itself
+            auto err = WdfIoTargetSendIoctlSynchronously(target, WDF_NO_HANDLE, vhci::ioctl::PLUGIN_HARDWARE, 
+                                                         &input, &output, nullptr, &BytesReturned)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetSendIoctlSynchronously %!STATUS!", err);
+                return !can_retry(err);
+        } else {
+                NT_ASSERT(BytesReturned == outlen);
+                return true;
+        }
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
@@ -201,29 +284,27 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
         WDF_MEMORY_DESCRIPTOR output;
         WDF_MEMORY_DESCRIPTOR_INIT_BUFFER(&output, &req, outlen);
 
-        auto max_cnt = min(WdfCollectionGetCount(col), ARRAYSIZE(ctx.devices));
+        for (ULONG attempt = 0; !ctx.stop_thread; ++attempt) {
 
-        for (ULONG i = 0; i < max_cnt && !ctx.stop_thread; ++i) {
-
-                UNICODE_STRING str{};
-                if (auto s = (WDFSTRING)WdfCollectionGetItem(col, i)) {
-                        WdfStringGetUnicodeString(s, &str);
+                ULONG cnt = min(WdfCollectionGetCount(col), ARRAYSIZE(ctx.devices));
+                if (!cnt) {
+                        break;
                 }
 
-                if (auto err = parse_string(req, str)) {
-                        Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
-                        continue;
+                if (auto secs = get_delay(attempt, cnt)) {
+                        TraceDbg("attempt #%lu, devices %lu -> sleep %d sec.", attempt, cnt, secs);
+                        sleep(secs, ctx.stop_thread);
                 }
 
-                Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s", req.host, req.service, req.busid);
-                req.port = 0;
+                for (ULONG i = 0; i < cnt && !ctx.stop_thread; ) {
 
-                if (ULONG_PTR BytesReturned; // send IOCTL to itself
-                        auto err = WdfIoTargetSendIoctlSynchronously(target.get<WDFIOTARGET>(), WDF_NO_HANDLE, 
-                                vhci::ioctl::PLUGIN_HARDWARE, &input, &output, nullptr, &BytesReturned)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfIoTargetSendIoctlSynchronously %!STATUS!", err);
-                } else {
-                        NT_ASSERT(BytesReturned == outlen);
+                        if (auto str = (WDFSTRING)WdfCollectionGetItem(col, i);
+                            plugin_hardware(str, target.get<WDFIOTARGET>(), req, input, output, outlen)) {
+                                WdfCollectionRemove(col, str);
+                                --cnt;
+                        } else {
+                                ++i;
+                        }
                 }
         }
 }
@@ -238,6 +319,7 @@ _Function_class_(KSTART_ROUTINE)
 PAGED void run(_In_ void *ctx)
 {
         PAGED_CODE();
+        KeSetPriorityThread(KeGetCurrentThread(), LOW_PRIORITY + 1);
 
         auto &vhci = *static_cast<vhci_ctx*>(ctx);
         plugin_persistent_devices(vhci);
