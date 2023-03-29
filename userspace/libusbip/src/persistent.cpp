@@ -54,8 +54,8 @@ auto driver_registry_path(_In_ HANDLE dev)
             DeviceIoControl(dev, ioctl::DRIVER_REGISTRY_PATH, 
                             &r, path_offset, &r, sizeof(r), &BytesReturned, nullptr)) {
 
-                std::wstring_view path(r.path, (BytesReturned - path_offset)/sizeof(*r.path));
-                result = make_key_path(path);
+                std::wstring_view abspath(r.path, (BytesReturned - path_offset)/sizeof(*r.path));
+                result = make_key_path(abspath);
         }
 
         return result;
@@ -135,7 +135,7 @@ auto get_persistant_devices(_In_ HANDLE dev, _Out_ bool &success)
                                          subkey, persistent_devices_value_name, err);
 
                         SetLastError(err);
-                        bytes = 0; // result must be empty
+                        bytes = 0; // clear result
                 }
         }
 

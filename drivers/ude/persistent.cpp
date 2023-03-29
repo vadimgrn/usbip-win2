@@ -3,17 +3,63 @@
  */
 
 #include "persistent.h"
-#include "context.h"
 #include "trace.h"
 #include "persistent.tmh"
 
+#include "context.h"
+
 #include <libdrv\wdf_cpp.h>
 #include <libdrv\strconv.h>
+#include <libdrv\handle.h>
 
 namespace 
 {
 
 using namespace usbip;
+
+/*
+ * @param path L"\\SystemRoot\\usbip2_ude.log" -> C:\Windows\...
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+inline PAGED auto create_log(_In_ const wchar_t *path)
+{
+        PAGED_CODE();
+
+        UNICODE_STRING name;
+        RtlInitUnicodeString(&name, path);
+
+        OBJECT_ATTRIBUTES attr;
+        InitializeObjectAttributes(&attr, &name, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, nullptr, nullptr);
+
+        const auto opts = FILE_WRITE_THROUGH | FILE_SYNCHRONOUS_IO_NONALERT | FILE_SEQUENTIAL_ONLY;
+        IO_STATUS_BLOCK ios;
+        HANDLE h{};
+
+        if (auto err = ZwCreateFile(&h, GENERIC_WRITE, &attr, &ios, nullptr, // AllocationSize
+                                    FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SUPERSEDE, opts, nullptr, 0)) {
+                Trace(TRACE_LEVEL_ERROR, "ZwCreateFile('%!USTR!') %!STATUS!", &name, err);
+        }
+
+        return libdrv::handle(h);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+inline PAGED void write(_In_ HANDLE h, _In_ const char *str, _In_ ULONG maxlen = 1024)
+{
+        PAGED_CODE();
+        if (!h) {
+                return;
+        }
+
+        auto len = (ULONG)strnlen_s(str, maxlen);
+        IO_STATUS_BLOCK ios; 
+
+        if (auto err = ZwWriteFile(h, nullptr, nullptr, nullptr, &ios, (void*)str, len, nullptr, nullptr)) {
+                Trace(TRACE_LEVEL_ERROR, "ZwWriteFile %!STATUS!", err);
+        }
+}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -198,9 +244,9 @@ PAGED void run(_In_ void *ctx)
 
         if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.load_thread), nullptr)) {
                 ObDereferenceObject(thread);
-                TraceDbg("thread closed");
+                TraceDbg("thread %04x closed", ptr04x(thread));
         } else {
-                TraceDbg("thread exited");
+                TraceDbg("thread %04x exited", ptr04x(thread));
         }
 }
 
@@ -224,8 +270,9 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
                 NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
                                                                &thread, nullptr)));
 
-                NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->load_thread), thread));
                 NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+                NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->load_thread), thread));
+                TraceDbg("thread %04x launched", ptr04x(thread));
         }
 }
 

@@ -60,18 +60,17 @@ void add_cmd_attach(CLI::App &app)
 		->callback(pack(cmd_attach, &r))
 		->require_option(1);
 
-	auto remote = cmd->add_option_group("remote", "Attach to a remote USB device");
+	auto rem = cmd->add_option_group("remote", "Attach to a remote USB device");
 
-	remote->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")
+	rem->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")
 		->required();	
 
-	remote->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")
+	rem->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")
 		->required();	
 
-	remote->add_flag("-t,--terse", r.terse, "Show port number as a result");
+	rem->add_flag("-t,--terse", r.terse, "Show port number as a result");
 
 	cmd->add_option_group("stashed", "Attach to stashed USB devices")
-		->excludes(remote)
 		->add_flag("-s,--stashed", r.stashed, "Attach to devices stashed by 'port --stash'");
 }
 
@@ -95,13 +94,11 @@ void add_cmd_list(CLI::App &app)
 		->callback(pack(cmd_list, &r))
 		->require_option(1);
 
-	auto remote = cmd->add_option_group("remote", "List exportable USB devices");
-
-	remote->add_option("-r,--remote", r.remote, "List exportable devices on a remote")
+	cmd->add_option_group("remote", "List exportable USB devices")
+		->add_option("-r,--remote", r.remote, "List exportable devices on a remote")
 		->required();
 
 	cmd->add_option_group("stashed", "List stashed USB devices")
-		->excludes(remote)
 		->add_flag("-s,--stashed", r.stashed, "List devices stashed by 'port --stash'");
 }
 

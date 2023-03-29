@@ -11,6 +11,7 @@
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="select.cpp" />
+    <ClCompile Include="handle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -41,6 +42,7 @@
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
+    <ClInclude Include="handle.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">
