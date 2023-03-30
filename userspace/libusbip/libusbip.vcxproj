@@ -111,6 +111,7 @@
     <ClInclude Include="output.h" />
     <ClInclude Include="persistent.h" />
     <ClInclude Include="remote.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="src\device_speed.h" />
     <ClInclude Include="src\file_ver.h" />
     <ClInclude Include="src\last_error.h" />
@@ -121,6 +122,9 @@
     <ClInclude Include="vhci.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="libusbip.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
