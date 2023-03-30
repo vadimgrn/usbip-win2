@@ -190,9 +190,9 @@ PAGED void sleep(_In_ int seconds, _Inout_ volatile bool &stopped)
         };
 
         enum { RESOLUTION = 5 };
-        auto units = seconds/RESOLUTION + bool(seconds % RESOLUTION);
+        auto n = seconds/RESOLUTION + bool(seconds % RESOLUTION);
 
-        for (int i = 0; i < units && !stopped; ++i) { // to be able to interrupt
+        for (int i = 0; i < n && !stopped; ++i) { // to be able to interrupt
                 if (LARGE_INTEGER intv{ .QuadPart = -RESOLUTION*SEC }; // relative
                     auto err = KeDelayExecutionThread(KernelMode, false, &intv)) {
                         TraceDbg("KeDelayExecutionThread %!STATUS!", err);
@@ -255,7 +255,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 {
         PAGED_CODE();
-        auto vhci = get_device(&ctx);
 
         wdf::Registry key;
         if (auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_QUERY_VALUE, 
@@ -265,9 +264,11 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
         }
 
         auto col = get_persistent_devices(key.get());
-        if (!col) {
+        if (!(col && WdfCollectionGetCount(col))) {
                 return;
         }
+
+        auto vhci = get_device(&ctx);
 
         auto target = make_target(vhci);
         if (!target) {

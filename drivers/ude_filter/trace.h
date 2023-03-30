@@ -4,6 +4,9 @@
 
 #pragma once
 
+// #define WPP_AUTOLOGGER L"usbip_filter"
+// #define WPP_GLOBALLOGGER
+
 //
 // Defining control guids, including this is required to happen before
 // including the tmh file (if the WppRecorder API is used)
