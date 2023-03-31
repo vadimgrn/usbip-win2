@@ -29,20 +29,21 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void load_thread_join(_In_ WDFDEVICE vhci)
+void attach_thread_join(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-
         auto &ctx = *get_vhci_ctx(vhci);
-        ctx.stop_thread = true;
 
-        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.load_thread), nullptr);
+        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.attach_thread), nullptr);
         if (!thread) {
                 TraceDbg("already exited");
                 return;
         }
 
-        if (TraceDbg("joining"); auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
+        TraceDbg("signal stop and wait"); 
+
+        if (KeSetEvent(&ctx.attach_thread_stop, IO_NO_INCREMENT, true); // raises IRQL
+            auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", err);
         } else {
                 TraceDbg("joined");
@@ -61,7 +62,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT Object)
         auto vhci = static_cast<WDFDEVICE>(Object);
         TraceDbg("vhci %04x", ptr04x(vhci));
         
-        load_thread_join(vhci);
+        attach_thread_join(vhci);
         vhci::destroy_all_devices(vhci);
 }
 
@@ -73,7 +74,11 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto init_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-        KeInitializeSpinLock(&get_vhci_ctx(vhci)->lock);
+        auto &ctx = *get_vhci_ctx(vhci);
+
+        KeInitializeSpinLock(&ctx.lock);
+        KeInitializeEvent(&ctx.attach_thread_stop, NotificationEvent, false);
+
         return STATUS_SUCCESS;
 }
 

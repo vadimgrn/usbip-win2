@@ -63,6 +63,8 @@ public:
         ObjectDelete(_Inout_ ObjectDelete&& r) : m_obj(r.release()) {}
         ObjectDelete& operator =(_Inout_ ObjectDelete&& r);
 
+        auto get() const { return m_obj; }
+
         template<typename T>
         auto get() const { return static_cast<T>(m_obj); }
 
@@ -99,7 +101,6 @@ public:
         Registry(_Inout_ Registry&& r) : m_key(r.release()) {}
         Registry& operator =(_Inout_ Registry&& r);
 
-        auto operator &() { return &m_key; }
         auto get() const { return m_key; }
 
         explicit operator bool() const { return m_key; }

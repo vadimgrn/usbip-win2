@@ -65,43 +65,29 @@ inline PAGED void write(_In_ HANDLE h, _In_ const wchar_t *str, _In_ ULONG maxle
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_collection(_In_ WDFOBJECT parent)
-{
-        PAGED_CODE();
-
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = parent;
-
-        WDFCOLLECTION col{};
-        if (auto err = WdfCollectionCreate(&attr, &col)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", err);
-        }
-        
-        return col;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
-
-        auto col = make_collection(key);
-        if (!col) {
+        wdf::ObjectDelete col;
+        
+        if (WDFCOLLECTION h{};
+            auto err = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &h)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", err);
                 return col;
+        } else {
+                col.reset(h);
         }
 
         WDF_OBJECT_ATTRIBUTES str_attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&str_attr);
-        str_attr.ParentObject = col;
+        str_attr.ParentObject = col.get();
 
         UNICODE_STRING value_name;
         RtlUnicodeStringInit(&value_name, persistent_devices_value_name);
 
-        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col)) {
+        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col.get<WDFCOLLECTION>())) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, err);
-                col = WDF_NO_HANDLE; // parent will destory it
+                col.reset();
         }
 
         return col;
@@ -178,7 +164,7 @@ constexpr auto get_delay(_In_ ULONG attempt, _In_ ULONG cnt)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED void sleep(_In_ int seconds, _Inout_ volatile bool &stopped)
+PAGED auto sleep(_Inout_ vhci_ctx &ctx, _In_ ULONG seconds)
 {
         PAGED_CODE();
         
@@ -189,15 +175,20 @@ PAGED void sleep(_In_ int seconds, _Inout_ volatile bool &stopped)
                 SEC = 1000*MSEC, // second
         };
 
-        enum { RESOLUTION = 5 };
-        auto n = seconds/RESOLUTION + bool(seconds % RESOLUTION);
+        LARGE_INTEGER timeout{ .QuadPart = seconds*SEC };
+        timeout.QuadPart *= -1; // relative
 
-        for (int i = 0; i < n && !stopped; ++i) { // to be able to interrupt
-                if (LARGE_INTEGER intv{ .QuadPart = -RESOLUTION*SEC }; // relative
-                    auto err = KeDelayExecutionThread(KernelMode, false, &intv)) {
-                        TraceDbg("KeDelayExecutionThread %!STATUS!", err);
-                }
+        switch (auto st = KeWaitForSingleObject(&ctx.attach_thread_stop, Executive, KernelMode, false, &timeout)) {
+        case STATUS_SUCCESS:
+                TraceDbg("thread stop requested");
+                return false;
+        case STATUS_TIMEOUT:
+                break;
+        default:
+                TraceDbg("KeWaitForSingleObject %!STATUS!", st);
         }
+
+        return true;
 }
 
 /*
@@ -219,7 +210,7 @@ constexpr auto can_retry(_In_ DWORD error)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
-        _In_ WDFSTRING line, 
+        _In_ const UNICODE_STRING &line, 
         _In_ WDFIOTARGET target,
         _Inout_ vhci::ioctl::plugin_hardware &req,
         _Inout_ WDF_MEMORY_DESCRIPTOR &input,
@@ -228,11 +219,8 @@ PAGED auto plugin_hardware(
 {
         PAGED_CODE();
 
-        UNICODE_STRING str{};
-        WdfStringGetUnicodeString(line, &str);
-
-        if (auto err = parse_string(req, str)) {
-                Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
+        if (auto err = parse_string(req, line)) {
+                Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &line, err);
                 return true; // remove malformed string
         }
 
@@ -252,19 +240,100 @@ PAGED auto plugin_hardware(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto open_parameters_key()
+{
+        PAGED_CODE();
+        wdf::Registry key;
+
+        if (WDFKEY h; 
+            auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_QUERY_VALUE, 
+                                                          WDF_NO_OBJECT_ATTRIBUTES, &h)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey %!STATUS!", err);
+        } else {
+                key.reset(h);
+        }
+
+        return key;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto contains(_In_ WDFCOLLECTION col, _In_ const UNICODE_STRING &str)
+{
+        PAGED_CODE();
+        
+        for (ULONG i = 0, cnt = WdfCollectionGetCount(col); i < cnt; ++i) {
+                auto item = (WDFSTRING)WdfCollectionGetItem(col, i);
+
+                UNICODE_STRING s{};
+                WdfStringGetUnicodeString(item, &s);
+                        
+                if (RtlEqualUnicodeString(&s, &str, true)) {
+                        return true;
+                }
+        }
+
+        return false;
+}
+
+/*
+ * Remove from collection A items absent in collection B.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void intersection(_In_ WDFCOLLECTION a, _In_ WDFCOLLECTION b)
+{
+        PAGED_CODE();
+
+        for (ULONG i = 0, cnt = WdfCollectionGetCount(a); i < cnt; ) {
+                auto item = (WDFSTRING)WdfCollectionGetItem(a, i);
+
+                UNICODE_STRING s{};
+                WdfStringGetUnicodeString(item, &s);
+
+                if (contains(b, s)) {
+                        ++i;
+                } else {
+                        TraceDbg("exclude %!USTR!", &s);
+                        WdfCollectionRemoveItem(a, i);
+                        --cnt;
+                }
+        }
+}
+
+/*
+ * Refreshing allows to remove devices that constantly fail to attach.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED ULONG get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh)
+{
+        PAGED_CODE();
+
+        if (!refresh) {
+                //
+        } else if (auto newcol = get_persistent_devices(key)) {
+                intersection(col, newcol.get<WDFCOLLECTION>());
+        } else {
+                return 0;
+        }
+
+        return min(WdfCollectionGetCount(col), ARRAYSIZE(vhci_ctx::devices));
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 {
         PAGED_CODE();
 
-        wdf::Registry key;
-        if (auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_QUERY_VALUE, 
-                                                          WDF_NO_OBJECT_ATTRIBUTES, &key)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey %!STATUS!", err);
+        auto key = open_parameters_key();
+        if (!key) {
                 return;
         }
 
-        auto col = get_persistent_devices(key.get());
-        if (!(col && WdfCollectionGetCount(col))) {
+        auto devices = get_persistent_devices(key.get());
+        if (!(devices && WdfCollectionGetCount(devices.get<WDFCOLLECTION>()))) {
                 return;
         }
 
@@ -285,23 +354,29 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
         WDF_MEMORY_DESCRIPTOR output;
         WDF_MEMORY_DESCRIPTOR_INIT_BUFFER(&output, &req, outlen);
 
-        for (ULONG attempt = 0; !ctx.stop_thread; ++attempt) {
+        for (ULONG attempt = 0; true; ++attempt) {
 
-                ULONG cnt = min(WdfCollectionGetCount(col), ARRAYSIZE(ctx.devices));
+                auto cnt = get_count(devices.get<WDFCOLLECTION>(), key.get(), attempt);
                 if (!cnt) {
                         break;
                 }
 
                 if (auto secs = get_delay(attempt, cnt)) {
-                        TraceDbg("attempt #%lu, devices %lu -> sleep %d sec.", attempt, cnt, secs);
-                        sleep(secs, ctx.stop_thread);
+                        TraceDbg("attempt #%lu, %lu device(s), sleep %lu sec.", attempt, cnt, secs);
+                        if (!sleep(ctx, secs)) {
+                                break;
+                        }
                 }
 
-                for (ULONG i = 0; i < cnt && !ctx.stop_thread; ) {
+                for (ULONG i = 0; i < cnt && sleep(ctx, 0); ) {
+                        UNICODE_STRING str{};
+                        if (auto s = (WDFSTRING)WdfCollectionGetItem(devices.get<WDFCOLLECTION>(), i)) {
+                                WdfStringGetUnicodeString(s, &str);
+                        }
 
-                        if (auto str = (WDFSTRING)WdfCollectionGetItem(col, i);
-                            plugin_hardware(str, target.get<WDFIOTARGET>(), req, input, output, outlen)) {
-                                WdfCollectionRemove(col, str);
+                        if (plugin_hardware(str, target.get<WDFIOTARGET>(), req, input, output, outlen)) {
+                                TraceDbg("exclude %!USTR!", &str);
+                                WdfCollectionRemoveItem(devices.get<WDFCOLLECTION>(), i);
                                 --cnt;
                         } else {
                                 ++i;
@@ -311,13 +386,13 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 }
 
 /*
- * If load_thread is set to NULL here, it is possible that this thread will be suspended 
+ * If attach_thread is set to NULL here, it is possible that this thread will be suspended 
  * while vhci_cleanup will be executed, WDFDEVICE will be destroyed, the driver will be unloaded.
  * IoCreateSystemThread is used to prevent this.
  */
 _IRQL_requires_same_
 _Function_class_(KSTART_ROUTINE)
-PAGED void run(_In_ void *ctx)
+PAGED void persistent_devices_thread(_In_ void *ctx)
 {
         PAGED_CODE();
         KeSetPriorityThread(KeGetCurrentThread(), LOW_PRIORITY + 1);
@@ -325,11 +400,11 @@ PAGED void run(_In_ void *ctx)
         auto &vhci = *static_cast<vhci_ctx*>(ctx);
         plugin_persistent_devices(vhci);
 
-        if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.load_thread), nullptr)) {
+        if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.attach_thread), nullptr)) {
                 ObDereferenceObject(thread);
-                TraceDbg("thread %04x closed", ptr04x(thread));
+                TraceDbg("dereferenced");
         } else {
-                TraceDbg("thread %04x exited", ptr04x(thread));
+                TraceDbg("exited");
         }
 }
 
@@ -346,7 +421,8 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
         auto fdo = WdfDeviceWdmGetDeviceObject(get_device(vhci));
 
         if (HANDLE handle; 
-            auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, nullptr, run, vhci)) {
+            auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, 
+                                            nullptr, persistent_devices_thread, vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
         } else {
                 PVOID thread;
@@ -354,8 +430,8 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
                                                                &thread, nullptr)));
 
                 NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
-                NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->load_thread), thread));
-                TraceDbg("thread %04x launched", ptr04x(thread));
+                NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->attach_thread), thread));
+                TraceDbg("thread launched");
         }
 }
 

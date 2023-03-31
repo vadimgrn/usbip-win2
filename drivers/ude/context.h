@@ -50,8 +50,8 @@ struct vhci_ctx
         UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
         KSPIN_LOCK lock;
 
-        _KTHREAD *load_thread;
-        volatile bool stop_thread;
+        _KTHREAD *attach_thread;
+        KEVENT attach_thread_stop;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
