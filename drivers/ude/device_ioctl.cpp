@@ -203,6 +203,20 @@ using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, const endpoint_c
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
+NTSTATUS get_current_frame_number(
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT, _In_ const endpoint_ctx&, _In_ WDFREQUEST, _In_ URB &urb)
+{
+        auto &r = urb.UrbGetCurrentFrameNumber;
+        r.FrameNumber = dev.current_frame_number ? dev.current_frame_number : 100;
+
+        TraceDbg("%lu", r.FrameNumber);
+
+        urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
 NTSTATUS control_transfer(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
@@ -393,6 +407,9 @@ auto usb_submit_urb(
         case URB_FUNCTION_CONTROL_TRANSFER_EX:
         case URB_FUNCTION_CONTROL_TRANSFER:
                 handler = control_transfer;
+                break;
+        case URB_FUNCTION_GET_CURRENT_FRAME_NUMBER:
+                handler = get_current_frame_number;
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "%s(%#04x), dev %04x, endp %04x", urb_function_str(func), func, 
