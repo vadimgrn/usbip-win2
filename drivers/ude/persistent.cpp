@@ -8,60 +8,13 @@
 
 #include "context.h"
 
-#include <libdrv\wdf_cpp.h>
 #include <libdrv\strconv.h>
-#include <libdrv\handle.h>
-
 #include <resources/messages.h>
 
 namespace 
 {
 
 using namespace usbip;
-
-/*
- * @param path L"\\SystemRoot\\usbip2_ude.log" -> C:\Windows\...
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-inline PAGED auto create_log(_In_ const wchar_t *path)
-{
-        PAGED_CODE();
-
-        UNICODE_STRING name;
-        RtlInitUnicodeString(&name, path);
-
-        OBJECT_ATTRIBUTES attr;
-        InitializeObjectAttributes(&attr, &name, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, nullptr, nullptr);
-
-        const auto opts = FILE_WRITE_THROUGH | FILE_SYNCHRONOUS_IO_NONALERT | FILE_SEQUENTIAL_ONLY;
-        IO_STATUS_BLOCK ios;
-        HANDLE h{};
-
-        if (auto err = ZwCreateFile(&h, GENERIC_WRITE, &attr, &ios, nullptr, // AllocationSize
-                                    FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SUPERSEDE, opts, nullptr, 0)) {
-                Trace(TRACE_LEVEL_ERROR, "ZwCreateFile('%!USTR!') %!STATUS!", &name, err);
-        }
-
-        return libdrv::handle(h);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-inline PAGED void write(_In_ HANDLE h, _In_ const wchar_t *str, _In_ ULONG maxlen = 1024)
-{
-        PAGED_CODE();
-        if (!h) {
-                return;
-        }
-
-        auto bytes = static_cast<ULONG>(wcsnlen_s(str, maxlen)*sizeof(*str));
-        IO_STATUS_BLOCK ios; 
-
-        if (auto err = ZwWriteFile(h, nullptr, nullptr, nullptr, &ios, (void*)str, bytes, nullptr, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "ZwWriteFile %!STATUS!", err);
-        }
-}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

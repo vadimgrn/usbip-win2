@@ -4,7 +4,13 @@
 
 #pragma once
 
-// #define WPP_AUTOLOGGER L"usbip_ude"
+/*
+ * WPP_GLOBALLOGGER will cause C++ compiler errors. To fix it, edit this template
+ * "C:\Program Files (x86)\Windows Kits\10\bin\<WDK_VERSION>\WppConfig\Rev1\km-init.tpl", WppInitGlobalLogger
+ * Parms[0].Name          = L"Start"; // (PWSTR)L"Start";
+ * Parms[0].Name          = L"Flags";
+ * Parms[1].Name          = L"Level";
+ */
 // #define WPP_GLOBALLOGGER
 
 //
