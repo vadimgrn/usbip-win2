@@ -130,7 +130,7 @@ auto get_persistant_devices(_In_ HANDLE dev, _Out_ bool &success)
 
                 if (err == ERROR_MORE_DATA) {
                         // continue;
-                } else if (stop = true; !(success = !err)) {
+                } else if (stop = true, success = !err; !success) {
                         libusbip::output(L"RegGetValue('{}', value_name='{}') error {:#x}",
                                          subkey, persistent_devices_value_name, err);
 

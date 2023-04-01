@@ -215,7 +215,7 @@ PAGED auto plugin_hardware(
         _Inout_ vhci::ioctl::plugin_hardware &req,
         _Inout_ WDF_MEMORY_DESCRIPTOR &input,
         _Inout_ WDF_MEMORY_DESCRIPTOR &output,
-        _In_ const ULONG outlen)
+        [[maybe_unused]] _In_ const ULONG outlen)
 {
         PAGED_CODE();
 
