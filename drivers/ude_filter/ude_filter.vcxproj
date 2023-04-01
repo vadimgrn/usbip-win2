@@ -116,6 +116,7 @@
     <ClInclude Include="driver.h" />
     <ClInclude Include="int_dev_ctrl.h" />
     <ClInclude Include="pnp.h" />
+    <ClInclude Include="smartptr.h" />
     <ClInclude Include="trace.h" />
   </ItemGroup>
   <ItemGroup>
