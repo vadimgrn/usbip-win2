@@ -11,6 +11,8 @@
 #include <libdrv\strconv.h>
 #include <resources/messages.h>
 
+#include <ntstrsafe.h>
+
 namespace 
 {
 

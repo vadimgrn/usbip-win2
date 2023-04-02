@@ -11,6 +11,8 @@
 #include "driver.h"
 #include <usbip\consts.h>
 
+#include <ntstrsafe.h>
+
 namespace
 {
 
@@ -105,11 +107,11 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 	DECLARE_CONST_UNICODE_STRING(prefix, L"\\Driver\\");
 
 	UNICODE_STRING fname;
-	NT_SUCCESS(RtlUnicodeStringInit(&fname, driver_filename));
+	RtlUnicodeStringInit(&fname, driver_filename);
 
 	DECLARE_UNICODE_STRING_SIZE(driver_name, 64);
-	NT_SUCCESS(RtlUnicodeStringCopy(&driver_name, &prefix));
-	NT_SUCCESS(RtlUnicodeStringCat(&driver_name, &fname));
+	NT_VERIFY(NT_SUCCESS(RtlUnicodeStringCopy(&driver_name, &prefix)));
+	NT_VERIFY(NT_SUCCESS(RtlUnicodeStringCat(&driver_name, &fname)));
 
 	return driver_name_equal(pdo->DriverObject, driver_name, true);
 }

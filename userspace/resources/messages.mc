@@ -3,6 +3,8 @@
 ;#pragma once
 ;
 
+;#include <minwindef.h>
+
 MessageIdTypedef=DWORD
 ;#ifdef _NTSTATUS_
 ;  static_assert(sizeof(DWORD) == sizeof(NTSTATUS));
