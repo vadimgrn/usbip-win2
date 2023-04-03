@@ -496,7 +496,7 @@ NTSTATUS on_receive(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_context &ctx)
+auto receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_context &ctx)
 {
 	auto &dev = *ctx.dev;
 
@@ -512,9 +512,15 @@ void receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	IoSetCompletionRoutine(irp, on_receive, &ctx, true, true, true);
 
 	auto st = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, irp);
-	NT_ASSERT(st != STATUS_NOT_SUPPORTED);
+	NT_ASSERT(st != STATUS_NOT_SUPPORTED); // on_receive will not be called for this status only
 
-	TraceWSK("%Iu bytes, %!STATUS!", buf.Length, st);
+	if (st == STATUS_PENDING) {
+		TraceWSK("%Iu bytes", buf.Length);
+	} else {
+		TraceDbg("%Iu bytes, %!STATUS!", buf.Length, st);
+	}
+
+	return RECV_MORE_DATA_REQUIRED;
 }
 
 _IRQL_requires_same_
@@ -541,9 +547,7 @@ NTSTATUS drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 	}
 
 	WSK_BUF buf{ .Mdl = ctx.mdl_buf.get(), .Length = length };
-	receive(buf, free_drain_buffer, ctx);
-
-	return RECV_MORE_DATA_REQUIRED;
+	return receive(buf, free_drain_buffer, ctx);
 }
 
 _IRQL_requires_same_
@@ -559,8 +563,7 @@ NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 		return err;
 	}
 
-	receive(buf, ret_submit, ctx);
-	return RECV_MORE_DATA_REQUIRED;
+	return receive(buf, ret_submit, ctx);
 }
 
 /*

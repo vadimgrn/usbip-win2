@@ -25,7 +25,7 @@ PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 	PAGED_CODE();
 
 	auto drv = static_cast<WDFDRIVER>(Object);
-	Trace(TRACE_LEVEL_INFORMATION, "driver %04x", ptr04x(drv));
+	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(drv));
 
 	wsk::shutdown();
 	delete_wsk_context_list();

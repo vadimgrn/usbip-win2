@@ -169,10 +169,15 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
         auto st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
-        NT_ASSERT(st != STATUS_NOT_SUPPORTED);
+        NT_ASSERT(st != STATUS_NOT_SUPPORTED); // send_complete will not be called for this status only
 
-        TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, st);
-        return st;
+        if (st == STATUS_PENDING) {
+                TraceWSK("wsk irp %04x, %Iu bytes", ptr04x(wsk_irp), buf.Length);
+        } else {
+                TraceDbg("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, st);
+        }
+        
+        return STATUS_PENDING;
 }
 
 _IRQL_requires_same_
