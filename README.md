@@ -121,7 +121,7 @@ Exportable USB devices
 successfully attached to port 1
 ```
 - New USB device should appear in the system, use it as usual
-- Detach the remote USB device using its usb port, pass -1 to detach all remote devices
+- Detach the remote USB device using its usb port, pass `-all` to detach all remote devices
   - `usbip.exe detach -p 1`
 ```
 port 1 is successfully detached
@@ -160,6 +160,7 @@ tracelog.exe -start %NAME%-fltr -guid #90c336ed-69fb-43d6-b800-1552d72d200b -f %
 ```
 - Reproduce the issue
 - Stop log sessions and get plain text logs (copy commands to .bat file and run it as Admin)
+- If you copy/paste commands directly, use `set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:`
 ```
 @echo off
 set NAME=usbip
