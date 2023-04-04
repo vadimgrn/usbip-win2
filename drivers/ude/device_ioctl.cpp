@@ -546,6 +546,8 @@ NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In
 {
         auto &endp = *get_endpoint_ctx(endpoint);
         auto addr = endp.descriptor.bEndpointAddress;
+
+        TraceDbg("dev %04x, endp %04x, bEndpointAddress %#x", ptr04x(endp.device), ptr04x(endpoint), addr);
         
         return send_ep0_out(endp.device, request, 
                 USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT,
@@ -566,10 +568,10 @@ NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUE
         NT_ASSERT(dev.port >= 1);
         auto port = static_cast<USHORT>(dev.port); // meaningless for a server which ignores it
 
-        static_assert(USB_RT_PORT == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER));
+        TraceDbg("dev %04x, port %d", ptr04x(device), port);
 
-        return send_ep0_out(device, request, 
-                USB_RT_PORT, USB_REQUEST_SET_FEATURE, USB_PORT_FEAT_RESET, port);
+        static_assert(USB_RT_PORT == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER));
+        return send_ep0_out(device, request, USB_RT_PORT, USB_REQUEST_SET_FEATURE, USB_PORT_FEAT_RESET, port);
 }
 
 /*

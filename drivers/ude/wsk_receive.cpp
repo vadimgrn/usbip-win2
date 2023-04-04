@@ -316,32 +316,50 @@ void atomic_complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 
 enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit &ret, _Inout_ URB &urb)
+{
+	auto urb_st = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
+	urb.UrbHeader.Status = urb_st;
+
+	if (urb_st == EndpointStalled) { // FIXME: @see endpoint_reset
+		if (auto &rc = *get_request_ctx(ctx.request); rc.endpoint == ctx.dev->ep0) {
+			// default control pipe does not require explicit clear stall
+		} else if (auto st = device::clear_endpoint_stall(rc.endpoint, WDF_NO_HANDLE); NT_ERROR(st)) {
+			Trace(TRACE_LEVEL_ERROR, "clear_endpoint_stall(%04x) %!STATUS!", ptr04x(rc.endpoint), st);
+		}
+	}
+
+	if (is_isoch(urb)) {
+		return isoch_transfer(ctx, ret, urb);
+	}
+
+	auto st = STATUS_SUCCESS;
+
+	if (auto tr = TryAsUrbTransfer(&urb)) { // see UdecxUrbRetrieveBuffer, UdecxUrbSetBytesCompleted
+		if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
+			st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+		}
+		if (NT_SUCCESS(st)) {
+			st = post_process_transfer_buffer(ctx, urb);
+		}
+	}
+
+	return st;
+}
+
 _Function_class_(device_ctx::received_fn)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 {
 	auto &ret = get_ret_submit(ctx);
-	auto st = STATUS_SUCCESS;
+	auto urb = try_get_urb(ctx.request); // IOCTL_INTERNAL_USB_SUBMIT_URB
 
-	if (auto urb = try_get_urb(ctx.request)) { // IOCTL_INTERNAL_USB_SUBMIT_URB
-
-		urb->UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-
-		if (is_isoch(*urb)) {
-			isoch_transfer(ctx, ret, *urb);
-		} else if (auto tr = TryAsUrbTransfer(urb)) { // see UdecxUrbRetrieveBuffer, UdecxUrbSetBytesCompleted
-			if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
-				st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
-			}
-			if (!st) {
-				st = post_process_transfer_buffer(ctx, *urb);
-			}
-		}
-
-	} else if (ret.status) {
-		st = STATUS_UNSUCCESSFUL;
-	}
+	auto st = urb ? ret_submit_urb(ctx, ret, *urb) :
+		  ret.status ? STATUS_UNSUCCESSFUL : 
+		  STATUS_SUCCESS;
 
 	atomic_complete(ctx.request, st);
 	return RECV_NEXT_USBIP_HDR;

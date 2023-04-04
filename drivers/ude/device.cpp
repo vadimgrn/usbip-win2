@@ -103,6 +103,9 @@ inline void device_reset(
         }
 }
 
+/*
+ * FIXME: UDE never(?) call this callback for stalled endpoints.
+ */
 _Function_class_(EVT_UDECX_USB_ENDPOINT_RESET)
 _IRQL_requires_same_
 void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
