@@ -989,8 +989,8 @@ urb_function_t* const urb_functions[] =
 
         get_status_from_other,
 
-        set_feature_to_other,
         clear_feature_to_other,
+        set_feature_to_other,
 
         get_descriptor_from_endpoint,
         set_descriptor_to_endpoint,
