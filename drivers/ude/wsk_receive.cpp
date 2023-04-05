@@ -25,6 +25,7 @@
 #include <libdrv\ch9.h>
 
 #include <usb.h>
+#include <usbdlib.h>
 
 namespace
 {
@@ -321,7 +322,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit &ret, _Inout_ URB &urb)
 {
 	auto urb_st = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-	urb.UrbHeader.Status = urb_st;
+	URB_STATUS(&urb) = urb_st;
 
 	if (urb_st == EndpointStalled) { // FIXME: @see endpoint_reset
 		if (auto &rc = *get_request_ctx(ctx.request); rc.endpoint == ctx.dev->ep0) {
@@ -710,7 +711,7 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	}
 
 	auto &urb = *libdrv::urb_from_irp(irp);
-	auto urb_st = urb.UrbHeader.Status;
+	auto urb_st = URB_STATUS(&urb);
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is that really required?

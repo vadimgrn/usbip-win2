@@ -36,6 +36,7 @@
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="persistent.h" />
+    <ClInclude Include="filter_request.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -52,6 +53,7 @@
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
     <ClCompile Include="persistent.cpp" />
+    <ClCompile Include="filter_request.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_ude.inf" />

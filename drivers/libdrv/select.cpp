@@ -156,18 +156,3 @@ _URB_SELECT_CONFIGURATION* libdrv::clone(
 
 	return dst;
 }
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_URB_SELECT_INTERFACE* libdrv::clone(
-	_In_ const _URB_SELECT_INTERFACE &r, _In_ POOL_FLAGS Flags, _In_ ULONG PoolTag)
-{
-	auto &len = r.Hdr.Length;
-
-	auto ptr = (_URB_SELECT_INTERFACE*)ExAllocatePool2(Flags | POOL_FLAG_UNINITIALIZED, len, PoolTag);
-	if (ptr) {
-		RtlCopyMemory(ptr, &r, len);
-	}
-
-	return ptr;
-}

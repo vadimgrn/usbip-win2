@@ -15,6 +15,9 @@
 #include "ioctl.h"
 #include "wsk_receive.h"
 
+#include "filter_request.h"
+#include <ude_filter\request.h>
+
 #include <libdrv\pdu.h>
 #include <libdrv\ch9.h>
 #include <libdrv\ch11.h>
@@ -24,8 +27,6 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
 #include <libdrv\select.h>
-
-#include <ude_filter\request.h>
 
 namespace
 {
@@ -217,8 +218,8 @@ NTSTATUS control_transfer(
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
-        if (filter::is_request_select(r)) {
-                filter::unpack_request_select(r);
+        if (filter::is_request(r)) {
+                filter::unpack_request(r);
                 if (auto err = upper_filter(endp.device, dev, r)) {
                         return err;
                 }

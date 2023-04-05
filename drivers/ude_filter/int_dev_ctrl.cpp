@@ -74,7 +74,6 @@ private:
 	URB *m_urb{};
 };
 
-
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -103,9 +102,9 @@ NTSTATUS on_send_request(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto send_request(_In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ bool cfg_or_intf)
+auto send_request(_In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ USHORT function)
 {
-	auto &target = fltr.target;
+	auto target = fltr.target;
 
 	irp_ptr irp(target->StackSize, false);
 	if (!irp) {
@@ -129,7 +128,7 @@ auto send_request(_In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ bool cf
 		return err;
 	}
 
-	filter::pack_request_select(urb.get()->UrbControlTransferEx, TransferBuffer, cfg_or_intf);
+	filter::pack_request(urb.get()->UrbControlTransferEx, TransferBuffer, function);
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.get();
@@ -145,62 +144,84 @@ auto send_request(_In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ bool cf
 	return st;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void send_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
+{
+	auto &hdr = urb.UrbHeader;
+
+	if (unique_ptr buf(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, hdr.Length); !buf) {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", hdr.Length);
+	} else if (RtlCopyMemory(buf.get(), &urb, hdr.Length); 
+		   NT_SUCCESS(send_request(fltr, buf.get(), hdr.Function))) {
+		buf.release();
+	}
+}
+
 /*
  * @see drivers/usb/usbip/stub_rx.c, tweak_set_configuration_cmd
  */
-_IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void select_configuration(_In_ filter_ext &fltr, _In_ _URB_SELECT_CONFIGURATION &r)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
 	{
 		char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
-	
+
 	ULONG len{};
-	
+
 	if (unique_ptr buf = clone(len, r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag); !buf) {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
-	} else if (NT_SUCCESS(send_request(fltr, buf.get(), true))) {
+	} else if (NT_SUCCESS(send_request(fltr, buf.get(), r.Hdr.Function))) {
 		buf.release();
 	}
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-void select_interface(_In_ filter_ext &fltr, _In_ _URB_SELECT_INTERFACE &r)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 {
-	{
-		char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_interface_str(buf, sizeof(buf), r));
+	switch (auto &hdr = urb.UrbHeader; hdr.Function) {
+	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
+	case URB_FUNCTION_SYNC_RESET_PIPE:
+	case URB_FUNCTION_SYNC_CLEAR_STALL:
+		if (auto r = &urb.UrbPipeRequest) {
+			TraceDbg("dev %04x, PipeHandle %04x", ptr04x(fltr.self), ptr04x(r->PipeHandle));
+		}
+		break;
+	case URB_FUNCTION_SELECT_INTERFACE:
+		if (auto r = &urb.UrbSelectInterface) {
+			char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
+			TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_interface_str(buf, sizeof(buf), *r));
+		}
+		break;
+	case URB_FUNCTION_SELECT_CONFIGURATION:
+		return select_configuration(fltr, urb.UrbSelectConfiguration);
+	default:
+		Trace(TRACE_LEVEL_ERROR, "Unexpected %s", urb_function_str(hdr.Function));
+		return;
 	}
 
-	if (unique_ptr buf = clone(r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag); !buf) {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", r.Hdr.Length);
-	} else if (NT_SUCCESS(send_request(fltr, buf.get(), false))) {
-		buf.release();
-	}
+	send_urb(fltr, urb);
 }
 
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS urb_complete(
+	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
 	auto &urb = *libdrv::urb_from_irp(irp);
+	auto irp_status = irp->IoStatus.Status;
 
-	auto &hdr = urb.UrbHeader;
-	auto &func = hdr.Function;
-
-	if (auto st = irp->IoStatus.Status; NT_ERROR(st) || USBD_ERROR(hdr.Status)) {
-		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, %!STATUS!, USBD_STATUS_%s", 
-			ptr04x(fltr.self), urb_function_str(func), st, get_usbd_status(hdr.Status));
-	} else if (func == URB_FUNCTION_SELECT_INTERFACE) {
-		select_interface(fltr, urb.UrbSelectInterface);
+	if (auto &hdr = urb.UrbHeader; USBD_ERROR(hdr.Status) || NT_ERROR(irp_status)) {
+		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, USBD_%s, %!STATUS!", ptr04x(fltr.self), 
+			urb_function_str(hdr.Function), get_usbd_status(hdr.Status), irp_status);
 	} else {
-		NT_ASSERT(func == URB_FUNCTION_SELECT_CONFIGURATION);
-		select_configuration(fltr, urb.UrbSelectConfiguration);
+		post_process_urb(fltr, urb);
 	}
 
 	if (irp->PendingReturned) {
@@ -212,11 +233,11 @@ NTSTATUS on_select(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpress
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto handle_select(_In_ filter_ext &fltr, _In_ IRP *irp)
+auto pre_process_urb(_In_ filter_ext &fltr, _In_ IRP *irp)
 {
 	IoCopyCurrentIrpStackLocationToNext(irp);
 
-	if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, on_select, &fltr, true, true, true)) {
+	if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, urb_complete, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
 		IoSkipCurrentIrpStackLocation(irp); // forward and forget
 	}
@@ -243,11 +264,19 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	if (!fltr.is_hub && libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
 
-		switch (auto urb = libdrv::urb_from_irp(irp); urb->UrbHeader.Function) {
+		auto urb = libdrv::urb_from_irp(irp);
+		auto func = urb->UrbHeader.Function;
+
+		switch (func) {
+		case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
+		case URB_FUNCTION_SYNC_RESET_PIPE:
+		case URB_FUNCTION_SYNC_CLEAR_STALL:
 		case URB_FUNCTION_SELECT_INTERFACE:
 		case URB_FUNCTION_SELECT_CONFIGURATION: 
-			return handle_select(fltr, irp);
-		}
+			return pre_process_urb(fltr, irp);
+		}	
+
+		TraceFlood("dev %04x, %s", ptr04x(fltr.self), urb_function_str(func));
 	}
 
 	return ForwardIrp(fltr, irp);

@@ -30,8 +30,4 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 _URB_SELECT_CONFIGURATION *clone(
 	_Out_ ULONG &size, _In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_URB_SELECT_INTERFACE *clone(_In_ const _URB_SELECT_INTERFACE &r, _In_ POOL_FLAGS Flags, _In_ ULONG PoolTag);
-
 } // namespace libdrv
