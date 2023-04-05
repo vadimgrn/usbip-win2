@@ -25,7 +25,7 @@ public:
         ObjectRef() = default;
         explicit ObjectRef(WDFOBJECT handle, bool add_ref = true);
 
-        ~ObjectRef();
+        ~ObjectRef() { dereference(); }
 
         ObjectRef(const ObjectRef &obj) : ObjectRef(obj.m_handle) {}
         ObjectRef& operator =(const ObjectRef &obj);
@@ -46,6 +46,13 @@ public:
 
 private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
+
+        void dereference()
+        {
+                if (m_handle) {
+                        WdfObjectDereference(m_handle);
+                }
+        }
 };
 
 

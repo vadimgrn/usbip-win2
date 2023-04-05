@@ -12,13 +12,6 @@ wdf::ObjectRef::ObjectRef(WDFOBJECT handle, bool add_ref) :
         }
 }
 
-wdf::ObjectRef::~ObjectRef()
-{
-        if (m_handle) {
-                WdfObjectDereference(m_handle);
-        }
-}
-
 auto wdf::ObjectRef::operator =(const ObjectRef &obj) -> ObjectRef&
 {
         reset(obj.m_handle);
@@ -44,10 +37,7 @@ void wdf::ObjectRef::reset(WDFOBJECT handle, bool add_ref)
                 return;
         }
 
-        if (m_handle) {
-                WdfObjectDereference(m_handle);
-        }
-
+        dereference();
         m_handle = handle;
 
         if (m_handle && add_ref) {

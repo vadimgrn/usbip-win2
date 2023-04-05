@@ -325,7 +325,7 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit
 
 	if (urb_st == EndpointStalled) { // FIXME: @see endpoint_reset
 		if (auto &rc = *get_request_ctx(ctx.request); rc.endpoint == ctx.dev->ep0) {
-			// default control pipe does not require explicit clear stall
+			// default control pipe does not require clear stall
 		} else if (auto st = device::clear_endpoint_stall(rc.endpoint, WDF_NO_HANDLE); NT_ERROR(st)) {
 			Trace(TRACE_LEVEL_ERROR, "clear_endpoint_stall(%04x) %!STATUS!", ptr04x(rc.endpoint), st);
 		}
