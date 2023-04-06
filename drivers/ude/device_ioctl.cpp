@@ -201,7 +201,6 @@ NTSTATUS control_transfer(
                 //
         } else if (auto func = filter::get_function(r, true); 
                    func == URB_FUNCTION_SELECT_CONFIGURATION && dev.skip_select_config) {
-                r.Hdr.Status = USBD_STATUS_NOT_SUPPORTED;
                 return STATUS_NOT_SUPPORTED;
         } else if (auto err = filter::unpack_request(dev, r, func)) {
                 return err;

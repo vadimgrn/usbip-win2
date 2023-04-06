@@ -28,12 +28,12 @@ public:
         {
                 if (acquired()) {
                         KeReleaseInStackQueuedSpinLock(&m_hlock); 
-                        m_hlock.LockQueue.Lock = 0;
+                        m_hlock.LockQueue.Lock = nullptr;
                         NT_ASSERT(!acquired());
                 }
         }
 
 private:
-        KLOCK_QUEUE_HANDLE m_hlock;
+        KLOCK_QUEUE_HANDLE m_hlock{};
         bool acquired() const { return m_hlock.LockQueue.Lock; }
 };

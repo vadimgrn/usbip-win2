@@ -18,8 +18,11 @@ void usbip::filter::pack_request(
         r.Hdr.Function = URB_FUNCTION_CONTROL_TRANSFER_EX;
 
         r.TransferBuffer = TransferBuffer;
+        NT_ASSERT(!r.TransferBufferLength);
+
         r.TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
         r.Timeout = impl::const_part | function;
+
         get_setup_packet(r) = impl::setup_packet;
 
         NT_ASSERT(is_request(r));

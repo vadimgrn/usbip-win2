@@ -102,8 +102,10 @@ struct device_ctx
         auto devid() const { return ext->dev.devid; }
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
-        UDECXUSBENDPOINT ep0; // default control pipe
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
+
+        UDECXUSBENDPOINT ep0; // default control pipe, has list head for endpoints
+        KSPIN_LOCK endpoint_list_lock; // for endpoint_ctx::entry
 
         int port; // vhci_ctx.devices[port - 1]
         volatile bool unplugged;
@@ -140,7 +142,8 @@ struct endpoint_ctx
         WDFQUEUE queue; // child
         USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
         USBD_PIPE_HANDLE PipeHandle;
-        LIST_ENTRY entry; // list head if default control pipe
+
+        LIST_ENTRY entry; // list head if default control pipe, protected by device_ctx::endpoint_list_lock
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
@@ -152,7 +155,15 @@ inline auto& get_endpoint(_In_ WDFQUEUE queue) // use get_device() for device_ct
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-endpoint_ctx *find_endpoint(_In_ const device_ctx &dev, _In_ USBD_PIPE_HANDLE PipeHandle);
+void insert_endpoint_list(_In_ endpoint_ctx &endp);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void remove_endpoint_list(_In_ endpoint_ctx &endp);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+endpoint_ctx *find_endpoint(_In_ device_ctx &dev, _In_ USBD_PIPE_HANDLE PipeHandle);
 
 enum request_status : LONG { REQ_ZERO, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 

@@ -167,7 +167,8 @@ void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGUR
 {
 	{
 		char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), 
+			  libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
 
 	ULONG len{};
@@ -188,7 +189,8 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
 		if (auto r = &urb.UrbPipeRequest) {
-			TraceDbg("dev %04x, UrbPipeRequest{PipeHandle %04x}", ptr04x(fltr.self), ptr04x(r->PipeHandle));
+			TraceDbg("dev %04x, %s, PipeHandle %04x", ptr04x(fltr.self), 
+				  urb_function_str(hdr.Function), ptr04x(r->PipeHandle));
 		}
 		break;
 	case URB_FUNCTION_SELECT_INTERFACE:

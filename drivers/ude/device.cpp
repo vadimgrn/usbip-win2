@@ -103,6 +103,24 @@ inline void device_reset(
         }
 }
 
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGED void NTAPI endpoint_cleanup(_In_ WDFOBJECT object)
+{
+        PAGED_CODE();
+
+        auto endpoint = static_cast<UDECXUSBENDPOINT>(object);
+        auto &endp = *get_endpoint_ctx(endpoint);
+        auto &d = endp.descriptor;
+
+        TraceDbg("endp %04x{Address %#x: %s %s[%d]}, PipeHandle %04x",
+                  ptr04x(endpoint), d.bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(d)),
+                  usb_endpoint_dir_out(d) ? "Out" : "In", usb_endpoint_num(d), ptr04x(endp.PipeHandle));
+
+        remove_endpoint_list(endp);
+}
+
 /*
  * FIXME: UDE never(?) call this callback for stalled endpoints.
  */
@@ -271,46 +289,43 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Endpoint %04x cleanup", ptr04x(obj)); }; 
+        attrs.EvtCleanupCallback = endpoint_cleanup;
         attrs.ParentObject = device;
 
-        UDECXUSBENDPOINT endp;
-        if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attrs, &endp)) {
+        UDECXUSBENDPOINT endpoint;
+        if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attrs, &endpoint)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
                 return err;
         }
 
-        auto &ctx = *get_endpoint_ctx(endp);
+        auto &endp = *get_endpoint_ctx(endpoint);
 
-        InitializeListHead(&ctx.entry);
-        ctx.device = device;
+        endp.device = device;
+        InitializeListHead(&endp.entry);
 
         auto &dev = *get_device_ctx(device);
 
         if (auto len = data->EndpointDescriptorBufferLength) {
                 NT_ASSERT(epd.bLength == len);
-                NT_ASSERT(sizeof(ctx.descriptor) >= len);
-                RtlCopyMemory(&ctx.descriptor, &epd, len);
-
-                if (auto ep0 = get_endpoint_ctx(dev.ep0)) {
-                        InsertTailList(&ep0->entry, &ctx.entry);
-                }
+                NT_ASSERT(sizeof(endp.descriptor) >= len);
+                RtlCopyMemory(&endp.descriptor, &epd, len);
+                insert_endpoint_list(endp);
         } else {
                 NT_ASSERT(epd == EP0);
-                static_cast<USB_ENDPOINT_DESCRIPTOR&>(ctx.descriptor) = epd;
-                dev.ep0 = endp;
+                static_cast<USB_ENDPOINT_DESCRIPTOR&>(endp.descriptor) = epd;
+                dev.ep0 = endpoint;
         }
 
-        if (auto err = create_endpoint_queue(ctx.queue, endp)) {
+        if (auto err = create_endpoint_queue(endp.queue, endpoint)) {
                 return err;
         }
 
         {
-                auto &d = ctx.descriptor;
+                auto &d = endp.descriptor;
                 TraceDbg("dev %04x, endp %04x{Address %#04x: %s %s[%d], MaxPacketSize %d, Interval %d}, queue %04x%!BIN!",
-                        ptr04x(device), ptr04x(endp), d.bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(d)),
+                        ptr04x(device), ptr04x(endpoint), d.bEndpointAddress, usbd_pipe_type_str(usb_endpoint_type(d)),
                         usb_endpoint_dir_out(d) ? "Out" : "In", usb_endpoint_num(d), d.wMaxPacketSize, 
-                        d.bInterval, ptr04x(ctx.queue), WppBinary(&d, d.bLength));
+                        d.bInterval, ptr04x(endp.queue), WppBinary(&d, d.bLength));
         }
 
         return STATUS_SUCCESS;
@@ -366,6 +381,7 @@ void endpoints_configure(
                          "NewConfigurationValue %d, InterfaceNumber %d, NewInterfaceSetting %d",
                           ptr04x(device), params->ConfigureType, params->NewConfigurationValue,
                           params->InterfaceNumber, params->NewInterfaceSetting);
+
         } else switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
                 TraceDbg("dev %04x, DeviceInitialize", ptr04x(device));
@@ -381,12 +397,6 @@ void endpoints_configure(
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, EndpointsReleasedOnly", ptr04x(device)); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD
-                for (ULONG i = 0, n = params->ReleasedEndpointsCount; i < n; ++i) {
-                        if (auto ctx = get_endpoint_ctx(params->ReleasedEndpoints[i]); auto e = &ctx->entry) {
-                                RemoveEntryList(e);
-                                InitializeListHead(e);
-                        }
-                }
                 break;
         }
 
@@ -504,6 +514,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
         ctx.vhci = vhci;
         ctx.ext = ext;
         ext->ctx = &ctx;
+        KeInitializeSpinLock(&ctx.endpoint_list_lock);
 
         if (auto err = init_device(dev, ctx)) {
                 return err;
