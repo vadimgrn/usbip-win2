@@ -30,6 +30,10 @@ NTSTATUS set_interface(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET make_clear_endpoint_stall(_In_ UCHAR bEndpointAddress);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_opt_ WDFREQUEST request);
 
 _IRQL_requires_same_

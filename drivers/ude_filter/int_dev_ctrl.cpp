@@ -188,7 +188,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
 		if (auto r = &urb.UrbPipeRequest) {
-			TraceDbg("dev %04x, PipeHandle %04x", ptr04x(fltr.self), ptr04x(r->PipeHandle));
+			TraceDbg("dev %04x, UrbPipeRequest{PipeHandle %04x}", ptr04x(fltr.self), ptr04x(r->PipeHandle));
 		}
 		break;
 	case URB_FUNCTION_SELECT_INTERFACE:

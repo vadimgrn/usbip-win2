@@ -79,3 +79,23 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
 
         ExFreePoolWithTag(ext, pooltag);
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto usbip::find_endpoint(_In_ const device_ctx &dev, _In_ USBD_PIPE_HANDLE PipeHandle) -> endpoint_ctx* 
+{
+        NT_ASSERT(PipeHandle);
+
+        auto ep0 = get_endpoint_ctx(dev.ep0);
+        auto head = &ep0->entry;
+
+        for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
+                auto endp = CONTAINING_RECORD(entry, endpoint_ctx, entry);
+                if (endp->PipeHandle == PipeHandle) {
+                        return endp;
+                }
+        }
+
+        TraceDbg("PipeHandle %04x not found", ptr04x(PipeHandle));
+        return nullptr;
+}

@@ -7,7 +7,6 @@
 #include "trace.h"
 #include "wsk_receive.tmh"
 
-#include "context.h"
 #include "wsk_context.h"
 #include "device.h"
 #include "device_queue.h"
@@ -15,7 +14,6 @@
 #include "network.h"
 #include "driver.h"
 #include "ioctl.h"
-#include "device_ioctl.h"
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
@@ -25,7 +23,6 @@
 #include <libdrv\ch9.h>
 
 #include <usb.h>
-#include <usbdlib.h>
 
 namespace
 {
@@ -321,16 +318,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit &ret, _Inout_ URB &urb)
 {
-	auto urb_st = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
-	URB_STATUS(&urb) = urb_st;
-
-	if (urb_st == EndpointStalled) { // FIXME: @see endpoint_reset
-		if (auto &rc = *get_request_ctx(ctx.request); rc.endpoint == ctx.dev->ep0) {
-			// default control pipe does not require clear stall
-		} else if (auto st = device::clear_endpoint_stall(rc.endpoint, WDF_NO_HANDLE); NT_ERROR(st)) {
-			Trace(TRACE_LEVEL_ERROR, "clear_endpoint_stall(%04x) %!STATUS!", ptr04x(rc.endpoint), st);
-		}
-	}
+	urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
 	if (is_isoch(urb)) {
 		return isoch_transfer(ctx, ret, urb);
@@ -711,7 +699,7 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	}
 
 	auto &urb = *libdrv::urb_from_irp(irp);
-	auto urb_st = URB_STATUS(&urb);
+	auto urb_st = urb.UrbHeader.Status;
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is that really required?

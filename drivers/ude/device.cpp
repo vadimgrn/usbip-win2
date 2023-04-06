@@ -281,16 +281,24 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         }
 
         auto &ctx = *get_endpoint_ctx(endp);
+
+        InitializeListHead(&ctx.entry);
         ctx.device = device;
+
+        auto &dev = *get_device_ctx(device);
 
         if (auto len = data->EndpointDescriptorBufferLength) {
                 NT_ASSERT(epd.bLength == len);
                 NT_ASSERT(sizeof(ctx.descriptor) >= len);
                 RtlCopyMemory(&ctx.descriptor, &epd, len);
+
+                if (auto ep0 = get_endpoint_ctx(dev.ep0)) {
+                        InsertTailList(&ep0->entry, &ctx.entry);
+                }
         } else {
                 NT_ASSERT(epd == EP0);
                 static_cast<USB_ENDPOINT_DESCRIPTOR&>(ctx.descriptor) = epd;
-                get_device_ctx(device)->ep0 = endp;
+                dev.ep0 = endp;
         }
 
         if (auto err = create_endpoint_queue(ctx.queue, endp)) {
@@ -373,6 +381,12 @@ void endpoints_configure(
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, EndpointsReleasedOnly", ptr04x(device)); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD
+                for (ULONG i = 0, n = params->ReleasedEndpointsCount; i < n; ++i) {
+                        if (auto ctx = get_endpoint_ctx(params->ReleasedEndpoints[i]); auto e = &ctx->entry) {
+                                RemoveEntryList(e);
+                                InitializeListHead(e);
+                        }
+                }
                 break;
         }
 

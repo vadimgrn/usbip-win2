@@ -7,11 +7,16 @@
 #include <wdm.h>
 struct _URB_CONTROL_TRANSFER_EX;
 
+namespace usbip 
+{
+        struct device_ctx;
+}
+
 namespace usbip::filter
 {
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void unpack_request(_Inout_ _URB_CONTROL_TRANSFER_EX &r);
+NTSTATUS unpack_request(_In_ const device_ctx &dev, _Inout_ _URB_CONTROL_TRANSFER_EX &ctrl, _In_ USHORT function);
 
 } // namespace usbip::filter

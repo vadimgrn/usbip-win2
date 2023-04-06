@@ -26,7 +26,6 @@
 #include <libdrv\usb_util.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
-#include <libdrv\select.h>
 
 namespace
 {
@@ -181,36 +180,12 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
         return STATUS_PENDING;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto upper_filter(_In_ UDECXUSBDEVICE device, _In_ device_ctx &dev, _Inout_ _URB_CONTROL_TRANSFER_EX &r)
-{
-        char buf[max(libdrv::SELECT_CONFIGURATION_STR_BUFSZ, libdrv::SELECT_INTERFACE_STR_BUFSZ)];
-
-        if (auto &pkt = get_setup_packet(r); pkt.bRequest == USB_REQUEST_SET_INTERFACE) {
-                auto req = reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer);
-                TraceDbg("dev %04x, %s", ptr04x(device), libdrv::select_interface_str(buf, sizeof(buf), *req));
-        } else {
-                NT_ASSERT(pkt.bRequest == USB_REQUEST_SET_CONFIGURATION);
-
-                auto req = reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer);
-                TraceDbg("dev %04x, %s", ptr04x(device), libdrv::select_configuration_str(buf, sizeof(buf), req));
-
-                if (dev.skip_select_config) {
-                        r.Hdr.Status = USBD_STATUS_NOT_SUPPORTED;
-                        return STATUS_NOT_SUPPORTED;
-                }
-        }
-
-        return STATUS_SUCCESS;
-}
-
-using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, const endpoint_ctx&, WDFREQUEST, URB&);
+using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, endpoint_ctx&, WDFREQUEST, URB&);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS control_transfer(
-        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeControl);
@@ -218,11 +193,18 @@ NTSTATUS control_transfer(
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
-        if (filter::is_request(r)) {
-                filter::unpack_request(r);
-                if (auto err = upper_filter(endp.device, dev, r)) {
-                        return err;
-                }
+        if (endp.PipeHandle != r.PipeHandle) {
+                endp.PipeHandle = r.PipeHandle;
+        }
+
+        if (!filter::is_request(r)) {
+                //
+        } else if (auto func = filter::get_function(r, true); 
+                   func == URB_FUNCTION_SELECT_CONFIGURATION && dev.skip_select_config) {
+                r.Hdr.Status = USBD_STATUS_NOT_SUPPORTED;
+                return STATUS_NOT_SUPPORTED;
+        } else if (auto err = filter::unpack_request(dev, r, func)) {
+                return err;
         }
 
         {
@@ -267,13 +249,17 @@ NTSTATUS control_transfer(
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS bulk_or_interrupt_transfer(
-        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeBulk || 
                   usb_endpoint_type(endp.descriptor) == UsbdPipeTypeInterrupt);
 
         auto &r = urb.UrbBulkOrInterruptTransfer;
+
+        if (endp.PipeHandle != r.PipeHandle) {
+                endp.PipeHandle = r.PipeHandle;
+        }
 
         {
                 auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
@@ -332,11 +318,15 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 NTSTATUS isoch_transfer(
-        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ const endpoint_ctx &endp,
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
 {
         NT_ASSERT(usb_endpoint_type(endp.descriptor) == UsbdPipeTypeIsochronous);
         auto &r = urb.UrbIsochronousTransfer;
+
+        if (endp.PipeHandle != r.PipeHandle) {
+                endp.PipeHandle = r.PipeHandle;
+        }
 
         {
                 const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
@@ -538,6 +528,18 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
         }
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET usbip::device::make_clear_endpoint_stall(_In_ UCHAR bEndpointAddress)
+{
+        return USB_DEFAULT_PIPE_SETUP_PACKET {
+                .bmRequestType{.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT},
+                .bRequest = USB_REQUEST_CLEAR_FEATURE,
+                .wValue{.W = USB_FEATURE_ENDPOINT_STALL},
+                .wIndex{.W = bEndpointAddress}
+        };
+}
+
 /*
  * @see <linux>/drivers/usb/core/message.c, usb_clear_halt
  */
@@ -549,10 +551,9 @@ NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In
         auto addr = endp.descriptor.bEndpointAddress;
 
         TraceDbg("dev %04x, endp %04x, bEndpointAddress %#x", ptr04x(endp.device), ptr04x(endpoint), addr);
-        
-        return send_ep0_out(endp.device, request, 
-                USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT,
-                USB_REQUEST_CLEAR_FEATURE, USB_FEATURE_ENDPOINT_STALL, addr);
+ 
+        auto r = make_clear_endpoint_stall(addr);
+        return send_ep0_out(endp.device, request, r.bmRequestType.B, r.bRequest, r.wValue.W, r.wIndex.W);
 }
 
 /*
