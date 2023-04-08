@@ -19,12 +19,24 @@ void send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS set_configuration(
-        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ UCHAR ConfigurationValue);
+USB_DEFAULT_PIPE_SETUP_PACKET make_set_configuration(_In_ UCHAR ConfigurationValue);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-USB_DEFAULT_PIPE_SETUP_PACKET make_clear_endpoint_stall(_In_ UCHAR bEndpointAddress);
+USB_DEFAULT_PIPE_SETUP_PACKET make_set_interface(_In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET make_clear_endpoint_stall(_In_ UCHAR EndpointAddress);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET make_reset_port(_In_ USHORT port);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_configuration(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ UCHAR ConfigurationValue);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

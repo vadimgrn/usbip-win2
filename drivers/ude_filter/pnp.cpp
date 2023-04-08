@@ -137,8 +137,8 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 }
 
 /*
-* If return zero, QueryBusTime() will be called again and again.
-* @return the current 32-bit USB frame number
+ * If return zero, QueryBusTime() will be called again and again.
+ * @return the current 32-bit USB frame number
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -221,7 +221,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
-	
+
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_START_DEVICE: // must be started after lower device objects
 		if constexpr (true) {
@@ -237,8 +237,8 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		}
 		break;
 	case IRP_MN_QUERY_INTERFACE:
-		if (!fltr.is_hub && IsEqualGUID(*stack.Parameters.QueryInterface.InterfaceType, 
-			                        USB_BUS_INTERFACE_USBDI_GUID)) {
+		if (auto &qi = stack.Parameters.QueryInterface; 
+		    !fltr.is_hub && IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
 			return query_interface_usbdi(fltr, irp, stack);
 		}
 		break;

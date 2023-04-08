@@ -201,7 +201,7 @@ auto control_transfer(
                 //
         } else if (auto func = filter::get_function(r, true); 
                    func == URB_FUNCTION_SELECT_CONFIGURATION && dev.skip_select_config) {
-                return STATUS_NOT_SUPPORTED;
+                return STATUS_REQUEST_NOT_ACCEPTED;
         } else if (auto err = filter::unpack_request(dev, r, func)) {
                 return err;
         }
@@ -453,22 +453,6 @@ auto send_ep0_out(
 } // namespace
 
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::set_configuration(
-        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
-{
-        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
-
-        USB_DEFAULT_PIPE_SETUP_PACKET r {
-                .bmRequestType{.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE},
-                .bRequest = USB_REQUEST_SET_CONFIGURATION,
-                .wValue{.W = ConfigurationValue},
-        };
-
-        return send_ep0_out(device, request, r);
-}
-
  /*
   * There is a race condition between IRP cancelation and RET_SUBMIT.
   * Sequence of events:
@@ -513,14 +497,63 @@ void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-USB_DEFAULT_PIPE_SETUP_PACKET usbip::device::make_clear_endpoint_stall(_In_ UCHAR bEndpointAddress)
+USB_DEFAULT_PIPE_SETUP_PACKET usbip::device::make_set_configuration(_In_ UCHAR ConfigurationValue)
+{
+        return USB_DEFAULT_PIPE_SETUP_PACKET {
+                .bmRequestType{.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE},
+                .bRequest = USB_REQUEST_SET_CONFIGURATION,
+                .wValue{.W = ConfigurationValue},
+        };
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET usbip::device::make_set_interface(
+        _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
+{
+        return USB_DEFAULT_PIPE_SETUP_PACKET {
+                .bmRequestType{.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE},
+                .bRequest = USB_REQUEST_SET_INTERFACE,
+                .wValue{.W = AlternateSetting},
+                .wIndex{.W = InterfaceNumber},
+        };
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET usbip::device::make_clear_endpoint_stall(_In_ UCHAR EndpointAddress)
 {
         return USB_DEFAULT_PIPE_SETUP_PACKET {
                 .bmRequestType{.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT},
                 .bRequest = USB_REQUEST_CLEAR_FEATURE,
                 .wValue{.W = USB_FEATURE_ENDPOINT_STALL},
-                .wIndex{.W = bEndpointAddress}
+                .wIndex{.W = EndpointAddress},
         };
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+USB_DEFAULT_PIPE_SETUP_PACKET usbip::device::make_reset_port(_In_ USHORT port)
+{
+        static_assert(USB_RT_PORT == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER));
+
+        return USB_DEFAULT_PIPE_SETUP_PACKET {
+                .bmRequestType{.B = USB_RT_PORT},
+                .bRequest = USB_REQUEST_SET_FEATURE,
+                .wValue{.W = USB_PORT_FEAT_RESET},
+                .wIndex{.W = port},
+        };
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::set_configuration(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
+{
+        TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
+
+        auto r = make_set_configuration(ConfigurationValue);
+        return send_ep0_out(device, request, r);
 }
 
 /*
@@ -554,15 +587,8 @@ NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUE
         auto port = static_cast<USHORT>(dev.port); // meaningless for a server which ignores it
 
         TraceDbg("dev %04x, port %d", ptr04x(device), port);
-        static_assert(USB_RT_PORT == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER));
 
-        USB_DEFAULT_PIPE_SETUP_PACKET r {
-                .bmRequestType{.B = USB_RT_PORT},
-                .bRequest = USB_REQUEST_SET_FEATURE,
-                .wValue{.W = USB_PORT_FEAT_RESET},
-                .wIndex{.W = port},
-        };
-
+        auto r = make_reset_port(port);
         return send_ep0_out(device, request, r);
 }
 

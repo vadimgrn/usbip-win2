@@ -45,12 +45,9 @@ void select_configuration(_Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const
         }
 
         auto cd = r.ConfigurationDescriptor; // null if unconfigured
+        auto cfg = cd ? cd->bConfigurationValue : UCHAR(0); // FIXME: can't pass -1 if unconfigured
 
-        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE;
-        pkt.bRequest = USB_REQUEST_SET_CONFIGURATION;
-        pkt.wValue.W = cd ? cd->bConfigurationValue : 0; // FIXME: can't pass -1 if unconfigured
-        pkt.wIndex.W = 0;
-        NT_ASSERT(!pkt.wLength);
+        pkt = device::make_set_configuration(cfg);
 }
 
 _IRQL_requires_same_
@@ -62,13 +59,8 @@ void select_interface(_Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const _UR
                 TraceDbg("%s", libdrv::select_interface_str(buf, sizeof(buf), r));
         }
         
-        auto &intf = r.Interface;
-
-        pkt.bmRequestType.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_INTERFACE;
-        pkt.bRequest = USB_REQUEST_SET_INTERFACE;
-        pkt.wValue.W = intf.AlternateSetting;
-        pkt.wIndex.W = intf.InterfaceNumber;
-        NT_ASSERT(!pkt.wLength);
+        auto &i = r.Interface;
+        pkt = device::make_set_interface(i.InterfaceNumber, i.AlternateSetting);
 }
 
 } // namespace
@@ -100,7 +92,8 @@ NTSTATUS usbip::filter::unpack_request(
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "Unexpected %s", func_name);
-                st = STATUS_INVALID_PARAMETER;
+                r.Hdr.Status = USBD_STATUS_INVALID_URB_FUNCTION;
+                st = STATUS_UNSUCCESSFUL;
         }
 
         return st;
