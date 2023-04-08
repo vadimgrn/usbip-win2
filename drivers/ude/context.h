@@ -104,7 +104,7 @@ struct device_ctx
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
 
-        UDECXUSBENDPOINT ep0; // default control pipe, has list head for endpoints
+        UDECXUSBENDPOINT ep0; // default control pipe
         KSPIN_LOCK endpoint_list_lock; // for endpoint_ctx::entry
 
         int port; // vhci_ctx.devices[port - 1]

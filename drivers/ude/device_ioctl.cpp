@@ -184,21 +184,7 @@ using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, endpoint_ctx&, W
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS get_current_frame_number(
-        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT, _In_ endpoint_ctx&, _In_ WDFREQUEST, _In_ URB &urb)
-{
-        auto &r = urb.UrbGetCurrentFrameNumber;
-        r.FrameNumber = dev.current_frame_number ? dev.current_frame_number : 100;
-
-        TraceDbg("%lu", r.FrameNumber);
-
-        urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Function_class_(urb_function_t)
-NTSTATUS control_transfer(
+auto control_transfer(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
 {
@@ -207,7 +193,7 @@ NTSTATUS control_transfer(
         static_assert(offsetof(_URB_CONTROL_TRANSFER, SetupPacket) == offsetof(_URB_CONTROL_TRANSFER_EX, SetupPacket));
         auto &r = urb.UrbControlTransferEx;
 
-        if (endp.PipeHandle != r.PipeHandle) {
+        if (r.PipeHandle && endp.PipeHandle != r.PipeHandle) { // r.PipeHandle is null if USBD_DEFAULT_PIPE_TRANSFER
                 endp.PipeHandle = r.PipeHandle;
         }
 
@@ -261,7 +247,7 @@ NTSTATUS control_transfer(
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS bulk_or_interrupt_transfer(
+auto bulk_or_interrupt_transfer(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
 {
@@ -330,7 +316,7 @@ auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER 
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
-NTSTATUS isoch_transfer(
+auto isoch_transfer(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp,
         _In_ WDFREQUEST request, _In_ URB &urb)
 {
@@ -382,6 +368,23 @@ NTSTATUS isoch_transfer(
         return send(endpoint, ctx, dev, false, &urb);
 }
 
+/*
+ * @see <linux>/drivers/usb/core/usb.c, usb_get_current_frame_number.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Function_class_(urb_function_t)
+auto get_current_frame_number(
+        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT, _In_ endpoint_ctx&, _In_ WDFREQUEST, _In_ URB &urb)
+{
+        auto &r = urb.UrbGetCurrentFrameNumber;
+        r.FrameNumber = dev.current_frame_number ? dev.current_frame_number : USBD_ISO_START_FRAME_RANGE;
+
+        TraceUrb("%lu", r.FrameNumber);
+
+        urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
+        return STATUS_SUCCESS;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usb_submit_urb(
@@ -421,8 +424,8 @@ auto usb_submit_urb(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, 
-        _In_ UCHAR bmRequestType, _In_ UCHAR bRequest, _In_ USHORT wValue, _In_ USHORT wIndex)
+auto send_ep0_out(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ const USB_DEFAULT_PIPE_SETUP_PACKET &setup)
 {
         auto &dev = *get_device_ctx(device);
 
@@ -438,41 +441,13 @@ auto send_ep0_out(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request,
                 return err;
         }
 
-        auto &pkt = get_submit_setup(ctx->hdr);
-        pkt.bmRequestType.B = bmRequestType;
-        pkt.bRequest = bRequest;
-        pkt.wValue.W = wValue;
-        pkt.wIndex.W = wIndex;
-        NT_ASSERT(!pkt.wLength);
-
-        NT_ASSERT(is_transfer_dir_out(pkt));
-        return ::send(dev.ep0, ctx, dev, true);
-}
-
-/*
- * @param request can be WDF_NO_HANDLE
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto do_select(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ ULONG params)
-{
-        bool iface = params >> 16; 
-
-        UCHAR bmRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | UCHAR(iface ? USB_RECIP_INTERFACE : USB_RECIP_DEVICE);
-        UCHAR bRequest = iface ? USB_REQUEST_SET_INTERFACE : USB_REQUEST_SET_CONFIGURATION;
-
-        USHORT wValue;
-        USHORT wIndex;
-
-        if (iface) {
-                wValue = UCHAR(params >> 8); // Alternative Setting
-                wIndex = UCHAR(params); // Interface
-        } else {
-                wValue = UCHAR(params); // Configuration Value
-                wIndex = 0;
+        if constexpr (auto &r = get_submit_setup(ctx->hdr); true) {
+                r = setup;
+                NT_ASSERT(!r.wLength);
+                NT_ASSERT(is_transfer_dir_out(r));
         }
 
-        return send_ep0_out(device, request, bmRequestType, bRequest, wValue, wIndex);
+        return ::send(dev.ep0, ctx, dev, true);
 }
 
 } // namespace
@@ -484,22 +459,14 @@ NTSTATUS usbip::device::set_configuration(
         _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, _In_ UCHAR ConfigurationValue)
 {
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
-        return do_select(device, request, ConfigurationValue);
-}
 
-/*
- * @param request can be WDF_NO_HANDLE
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::set_interface(
-        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, 
-        _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
-{
-        TraceDbg("dev %04x, %d.%d", ptr04x(device), InterfaceNumber, AlternateSetting);
+        USB_DEFAULT_PIPE_SETUP_PACKET r {
+                .bmRequestType{.B = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE},
+                .bRequest = USB_REQUEST_SET_CONFIGURATION,
+                .wValue{.W = ConfigurationValue},
+        };
 
-        auto params = (1UL << 16) | (AlternateSetting << 8) | InterfaceNumber; 
-        return do_select(device, request, params);
+        return send_ep0_out(device, request, r);
 }
 
  /*
@@ -569,7 +536,7 @@ NTSTATUS usbip::device::clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In
         TraceDbg("dev %04x, endp %04x, bEndpointAddress %#x", ptr04x(endp.device), ptr04x(endpoint), addr);
  
         auto r = make_clear_endpoint_stall(addr);
-        return send_ep0_out(endp.device, request, r.bmRequestType.B, r.bRequest, r.wValue.W, r.wIndex.W);
+        return send_ep0_out(endp.device, request, r);
 }
 
 /*
@@ -587,9 +554,16 @@ NTSTATUS usbip::device::reset_port(_In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUE
         auto port = static_cast<USHORT>(dev.port); // meaningless for a server which ignores it
 
         TraceDbg("dev %04x, port %d", ptr04x(device), port);
-
         static_assert(USB_RT_PORT == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_OTHER));
-        return send_ep0_out(device, request, USB_RT_PORT, USB_REQUEST_SET_FEATURE, USB_PORT_FEAT_RESET, port);
+
+        USB_DEFAULT_PIPE_SETUP_PACKET r {
+                .bmRequestType{.B = USB_RT_PORT},
+                .bRequest = USB_REQUEST_SET_FEATURE,
+                .wValue{.W = USB_PORT_FEAT_RESET},
+                .wIndex{.W = port},
+        };
+
+        return send_ep0_out(device, request, r);
 }
 
 /*

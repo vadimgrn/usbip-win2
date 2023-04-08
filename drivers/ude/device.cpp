@@ -390,8 +390,7 @@ void endpoints_configure(
                 st = device::set_configuration(device, request, params->NewConfigurationValue);
                 dev.skip_select_config = true;
                 break;
-        case UdecxEndpointsConfigureTypeInterfaceSettingChange:
-                //st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
+        case UdecxEndpointsConfigureTypeInterfaceSettingChange: // ignore this and react on requests from the upper filter
                 TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", 
                           ptr04x(device), params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
