@@ -357,9 +357,9 @@ PAGED void persistent_devices_thread(_In_ void *ctx)
 
         if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.attach_thread), nullptr)) {
                 ObDereferenceObject(thread);
-                TraceDbg("dereferenced");
+                TraceDbg("dereference");
         } else {
-                TraceDbg("exited");
+                TraceDbg("exit");
         }
 }
 

@@ -153,6 +153,7 @@
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="select.h" />
     <ClInclude Include="unique_ptr.h" />
+    <ClInclude Include="urb_ptr.h" />
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
     <ClInclude Include="strconv.h" />

@@ -16,6 +16,8 @@
 #include <libdrv\dbgcommon.h>
 #include <libdrv\ioctl.h>
 #include <libdrv\select.h>
+#include <libdrv\urb_ptr.h>
+
 
 namespace
 {

@@ -43,6 +43,7 @@
       <Filter>usbip</Filter>
     </ClInclude>
     <ClInclude Include="handle.h" />
+    <ClInclude Include="urb_ptr.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

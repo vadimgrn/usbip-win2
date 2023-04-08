@@ -5,7 +5,6 @@
     <ClCompile Include="device.cpp" />
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="int_dev_ctrl.cpp" />
-    <ClCompile Include="select.cpp" />
     <ClCompile Include="request.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -14,9 +13,9 @@
     <ClInclude Include="device.h" />
     <ClInclude Include="pnp.h" />
     <ClInclude Include="int_dev_ctrl.h" />
-    <ClInclude Include="select.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="request.h" />
+    <ClInclude Include="smartptr.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_filter.inf" />

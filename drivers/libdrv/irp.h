@@ -9,6 +9,30 @@
 namespace libdrv
 {
 
+class irp_ptr
+{
+public:
+	template<typename ...Args>
+	irp_ptr(Args&&... args) : m_irp(IoAllocateIrp(args...)) {}
+
+	~irp_ptr()
+	{
+		if (m_irp) {
+			IoFreeIrp(m_irp);
+		}
+	}
+
+	explicit operator bool() const { return m_irp; }
+	auto operator !() const { return !m_irp; }
+
+	auto get() const { return m_irp; }
+	void release() { m_irp = nullptr; }
+
+private:
+	IRP *m_irp{};
+};
+
+
 template<auto N, typename T = void>
 inline auto& argv(_In_ IRP *irp)
 {
