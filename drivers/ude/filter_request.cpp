@@ -22,7 +22,7 @@ using namespace usbip;
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto clear_endpoint_stall(
-        _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const _URB_PIPE_REQUEST &r)
+        _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _Inout_ _URB_PIPE_REQUEST &r)
 {
         if (auto endp = find_endpoint(dev, r.PipeHandle)) {
                 auto addr = endp->descriptor.bEndpointAddress;
@@ -32,7 +32,9 @@ auto clear_endpoint_stall(
         }
 
         Trace(TRACE_LEVEL_ERROR, "PipeHandle %04x not found", ptr04x(r.PipeHandle));
-        return STATUS_INVALID_PARAMETER;
+
+        r.Hdr.Status = USBD_STATUS_INVALID_PIPE_HANDLE;
+        return STATUS_INVALID_HANDLE;
 }
 
 _IRQL_requires_same_

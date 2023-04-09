@@ -34,6 +34,7 @@ struct filter_ext
 		struct {
 			IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
 			USBD_HANDLE usbd;
+			ULONG current_frame_number;
 		} dev; // is_hub == false
 	};
 	bool is_hub;

@@ -103,6 +103,7 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="query_interface.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="device.cpp" />
     <ClCompile Include="driver.cpp" />
@@ -110,6 +111,7 @@
     <ClCompile Include="pnp.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="query_interface.h" />
     <ClInclude Include="request.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="device.h" />

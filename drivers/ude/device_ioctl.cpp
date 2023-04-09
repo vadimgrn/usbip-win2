@@ -377,9 +377,9 @@ auto get_current_frame_number(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT, _In_ endpoint_ctx&, _In_ WDFREQUEST, _In_ URB &urb)
 {
         auto &r = urb.UrbGetCurrentFrameNumber;
-        r.FrameNumber = dev.current_frame_number ? dev.current_frame_number : USBD_ISO_START_FRAME_RANGE;
+        r.FrameNumber = dev.current_frame_number ? dev.current_frame_number : USBD_ISO_START_FRAME_RANGE/2;
 
-        TraceUrb("%lu", r.FrameNumber);
+//      TraceUrb("%lu", r.FrameNumber); // too often
 
         urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
         return STATUS_SUCCESS;

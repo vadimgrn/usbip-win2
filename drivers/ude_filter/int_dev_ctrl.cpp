@@ -133,29 +133,41 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 {
+	bool send{};
+
 	switch (auto &hdr = urb.UrbHeader; hdr.Function) {
+	case URB_FUNCTION_ISOCH_TRANSFER:
+	case URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL:
+		if constexpr (auto r = &urb.UrbIsochronousTransfer; true) {
+			fltr.dev.current_frame_number = r->StartFrame;
+		}
+		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
-		if (auto r = &urb.UrbPipeRequest) {
+		if constexpr (auto r = &urb.UrbPipeRequest; true) {
 			TraceDbg("dev %04x, %s, PipeHandle %04x", ptr04x(fltr.self), 
 				  urb_function_str(hdr.Function), ptr04x(r->PipeHandle));
 		}
+		send = true;
 		break;
 	case URB_FUNCTION_SELECT_INTERFACE:
-		if (auto r = &urb.UrbSelectInterface) {
+		if constexpr (auto r = &urb.UrbSelectInterface; true) {
 			char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
 			TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_interface_str(buf, sizeof(buf), *r));
 		}
+		send = true;
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
-		return select_configuration(fltr, urb.UrbSelectConfiguration);
+		select_configuration(fltr, urb.UrbSelectConfiguration);
+		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unexpected %s", urb_function_str(hdr.Function));
-		return;
 	}
 
-	send_urb(fltr, urb);
+	if (send) {
+		send_urb(fltr, urb);
+	}
 }
 
 _Function_class_(IO_COMPLETION_ROUTINE)
@@ -219,9 +231,13 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		auto func = urb->UrbHeader.Function;
 
 		switch (func) {
+		case URB_FUNCTION_ISOCH_TRANSFER:
+		case URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL:
+		//
 		case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 		case URB_FUNCTION_SYNC_RESET_PIPE:
 		case URB_FUNCTION_SYNC_CLEAR_STALL:
+		//
 		case URB_FUNCTION_SELECT_INTERFACE:
 		case URB_FUNCTION_SELECT_CONFIGURATION: 
 			return pre_process_urb(fltr, irp);

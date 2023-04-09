@@ -8,6 +8,7 @@
 
 #include "driver.h"
 #include "irp.h"
+#include "query_interface.h"
 
 #include <libdrv\remove_lock.h>
 #include <libdrv\ioctl.h>
@@ -18,6 +19,7 @@ namespace
 {
 
 using namespace usbip;
+using QueryInterface = decltype(_IO_STACK_LOCATION::Parameters.QueryInterface);
 
 constexpr auto SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
 {
@@ -136,68 +138,17 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 	return st;
 }
 
-/*
- * If return zero, QueryBusTime() will be called again and again.
- * @return the current 32-bit USB frame number
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Function_class_(PUSB_BUSIFFN_QUERY_BUS_TIME)
-NTSTATUS USB_BUSIFFN QueryBusTime(_In_ void*, _Out_opt_ ULONG *CurrentUsbFrame)
-{
-	if (CurrentUsbFrame) {
-		*CurrentUsbFrame = 0;
-//		TraceDbg("%lu", *CurrentUsbFrame); // too often
-		return STATUS_SUCCESS;
-	}
-
-	return STATUS_INVALID_PARAMETER;
-}
-
-/*
- * @return the current USB 2.0 frame/micro-frame number when called for
- *         a USB device attached to a USB 2.0 host controller
- *
- * The lowest 3 bits of the returned micro-frame value will contain the current 125us
- * micro-frame, while the upper 29 bits will contain the current 1ms USB frame number.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Function_class_(PUSB_BUSIFFN_QUERY_BUS_TIME_EX)
-NTSTATUS USB_BUSIFFN QueryBusTimeEx(_In_opt_ void *BusContext, _Out_opt_ ULONG *HighSpeedFrameCounter)
-{
-	auto st = QueryBusTime(BusContext, HighSpeedFrameCounter);
-	if (NT_SUCCESS(st)) {
-		*HighSpeedFrameCounter <<= 3;
-	}
-	return st;
-}
-
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED auto query_interface_usbdi(_Inout_ filter_ext &fltr, _In_ IRP *irp, _Inout_ _IO_STACK_LOCATION &stack)
+PAGED auto query_interface_usbdi(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
 {
 	PAGED_CODE();
 
-	auto &qi = stack.Parameters.QueryInterface;
-	auto &v3 = *reinterpret_cast<USB_BUS_INTERFACE_USBDI_V3*>(qi.Interface); // highest
-
 	auto st = ForwardIrpSynchronously(fltr, irp);
-
 	if (NT_SUCCESS(st)) {
-		TraceDbg("Size %d, Version %d => Size %d, Version %d", qi.Size, qi.Version, v3.Size, v3.Version);
-
-		switch (ULONG frame; v3.Version) {
-		case USB_BUSIF_USBDI_VERSION_3:
-			if (v3.QueryBusTimeEx(v3.BusContext, &frame) == STATUS_NOT_SUPPORTED) {
-				v3.QueryBusTimeEx = QueryBusTimeEx;
-			}
-			[[fallthrough]];
-		default:
-			if (v3.QueryBusTime(v3.BusContext, &frame) == STATUS_NOT_SUPPORTED) {
-				v3.QueryBusTime = QueryBusTime;
-			}
-		}
+		auto &v3 = *reinterpret_cast<USB_BUS_INTERFACE_USBDI_V3*>(qi.Interface); // highest
+		TraceDbg("Size %d, Version %d -> Size %d, Version %d", qi.Size, qi.Version, v3.Size, v3.Version);
+		replace_interface(v3, fltr);
 	}
 
 	CompleteRequest(irp);
@@ -239,7 +190,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	case IRP_MN_QUERY_INTERFACE:
 		if (auto &qi = stack.Parameters.QueryInterface; 
 		    !fltr.is_hub && IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
-			return query_interface_usbdi(fltr, irp, stack);
+			return query_interface_usbdi(fltr, irp, qi);
 		}
 		break;
 	}
