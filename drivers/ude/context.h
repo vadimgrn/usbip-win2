@@ -166,6 +166,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 endpoint_ctx *find_endpoint(_In_ device_ctx &dev, _In_ USBD_PIPE_HANDLE PipeHandle);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+endpoint_ctx *find_endpoint(_In_ device_ctx &dev, _In_ const USBD_PIPE_INFORMATION &pipe);
+
 enum request_status : LONG { REQ_ZERO, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
 
 /*

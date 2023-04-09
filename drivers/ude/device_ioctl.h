@@ -40,6 +40,12 @@ NTSTATUS set_configuration(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS set_interface(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, 
+        _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS clear_endpoint_stall(_In_ UDECXUSBENDPOINT endpoint, _In_opt_ WDFREQUEST request);
 
 _IRQL_requires_same_

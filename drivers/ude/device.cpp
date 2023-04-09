@@ -393,6 +393,7 @@ void endpoints_configure(
         case UdecxEndpointsConfigureTypeInterfaceSettingChange: // ignore this and react on requests from the upper filter
                 TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", 
                           ptr04x(device), params->InterfaceNumber, params->NewInterfaceSetting);
+                // st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, EndpointsReleasedOnly", ptr04x(device)); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD

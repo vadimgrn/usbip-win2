@@ -25,6 +25,18 @@ auto get_endpoint_list_head(_In_ device_ctx &dev)
         return &ep0->entry;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto equals(_In_ const endpoint_ctx &endp, _In_ const USBD_PIPE_INFORMATION &pipe)
+{
+        auto &d = endp.descriptor;
+
+        return  d.bEndpointAddress == pipe.EndpointAddress &&
+                d.wMaxPacketSize == pipe.MaximumPacketSize &&
+                d.bInterval == pipe.Interval &&
+                usb_endpoint_type(d) == pipe.PipeType;
+}
+
 } // namespace
 
 
@@ -137,6 +149,24 @@ auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ USBD_PIPE_HANDLE PipeHandle
         for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto endp = CONTAINING_RECORD(entry, endpoint_ctx, entry);
                 if (endp->PipeHandle == PipeHandle) {
+                        return endp;
+                }
+        }
+
+        return nullptr;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const USBD_PIPE_INFORMATION &pipe) -> endpoint_ctx*
+{
+        auto head = get_endpoint_list_head(dev);
+
+        Lock lck(dev.endpoint_list_lock);
+
+        for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
+                auto endp = CONTAINING_RECORD(entry, endpoint_ctx, entry);
+                if (equals(*endp, pipe)) {
                         return endp;
                 }
         }

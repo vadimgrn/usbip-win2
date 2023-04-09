@@ -43,6 +43,12 @@ inline auto next_descr(USB_COMMON_DESCRIPTOR *d)
 	return static_cast<USB_COMMON_DESCRIPTOR*>(end);
 }
 
+inline auto advance(_In_ const USBD_INTERFACE_INFORMATION *intf)
+{
+	auto next = reinterpret_cast<const char*>(intf) + intf->Length;
+	return reinterpret_cast<const USBD_INTERFACE_INFORMATION*>(next);
+}
+
 USB_COMMON_DESCRIPTOR *find_next_descr(
 	USB_CONFIGURATION_DESCRIPTOR *cfg, LONG type, USB_COMMON_DESCRIPTOR *prev = nullptr);
 

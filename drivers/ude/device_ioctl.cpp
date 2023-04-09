@@ -199,10 +199,7 @@ auto control_transfer(
 
         if (!filter::is_request(r)) {
                 //
-        } else if (auto func = filter::get_function(r, true); 
-                   func == URB_FUNCTION_SELECT_CONFIGURATION && dev.skip_select_config) {
-                return STATUS_REQUEST_NOT_ACCEPTED;
-        } else if (auto err = filter::unpack_request(dev, r, func)) {
+        } else if (auto func = filter::get_function(r, true); auto err = filter::unpack_request(dev, r, func)) {
                 return err;
         }
 
@@ -553,6 +550,18 @@ NTSTATUS usbip::device::set_configuration(
         TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), ConfigurationValue);
 
         auto r = make_set_configuration(ConfigurationValue);
+        return send_ep0_out(device, request, r);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::set_interface(
+        _In_ UDECXUSBDEVICE device, _In_opt_ WDFREQUEST request, 
+        _In_ UCHAR InterfaceNumber, _In_ UCHAR AlternateSetting)
+{
+        TraceDbg("dev %04x, %d.%d", ptr04x(device), InterfaceNumber, AlternateSetting);
+
+        auto r = make_set_interface(InterfaceNumber, AlternateSetting);
         return send_ep0_out(device, request, r);
 }
 
