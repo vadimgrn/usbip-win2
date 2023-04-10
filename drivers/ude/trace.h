@@ -10,15 +10,15 @@
 // Tracing GUID - ed18c9c5-8322-48ae-bf78-d01d898a1562
 //
 
-#define WPP_CONTROL_GUIDS                                                \
-    WPP_DEFINE_CONTROL_GUID(                                             \
-        VhciTraceGuid, (ed18c9c5,8322,48ae,bf78,d01d898a1562),           \
-                                                                         \
-        WPP_DEFINE_BIT(FLAG_GENERAL)           /* bit  0 = 0x00000001 */ \
-        WPP_DEFINE_BIT(FLAG_USBIP)             /* bit  1 = 0x00000002 */ \
-        WPP_DEFINE_BIT(FLAG_URB)               /* bit  2 = 0x00000004 */ \
-        WPP_DEFINE_BIT(FLAG_DBG)               /* bit  3 = 0x00000008 */ \
-        WPP_DEFINE_BIT(FLAG_WSK)               /* bit  4 = 0x00000010 */ \
+#define WPP_CONTROL_GUIDS                                      \
+    WPP_DEFINE_CONTROL_GUID(                                   \
+        VhciTraceGuid, (ed18c9c5,8322,48ae,bf78,d01d898a1562), \
+                                                               \
+        WPP_DEFINE_BIT(FLAG_GENERAL)                           \
+        WPP_DEFINE_BIT(FLAG_USBIP)                             \
+        WPP_DEFINE_BIT(FLAG_URB)                               \
+        WPP_DEFINE_BIT(FLAG_DBG)                               \
+        WPP_DEFINE_BIT(FLAG_WSK)                               \
         )                             
 
 #define WPP_FLAG_LEVEL_LOGGER(flag, level) \

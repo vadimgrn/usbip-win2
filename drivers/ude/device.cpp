@@ -8,7 +8,7 @@
 
 #include "driver.h"
 #include "device_queue.h"
-#include "context.h"
+#include "endpoint_list.h"
 #include "network.h"
 #include "vhci.h"
 #include "device_ioctl.h"
@@ -287,13 +287,13 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         UdecxUsbEndpointInitSetCallbacks(data->UdecxUsbEndpointInit, &cb);
 
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, endpoint_ctx);
-        attrs.EvtCleanupCallback = endpoint_cleanup;
-        attrs.ParentObject = device;
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, endpoint_ctx);
+        attr.EvtCleanupCallback = endpoint_cleanup;
+        attr.ParentObject = device;
 
         UDECXUSBENDPOINT endpoint;
-        if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attrs, &endpoint)) {
+        if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attr, &endpoint)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
                 return err;
         }
@@ -393,7 +393,7 @@ void endpoints_configure(
         case UdecxEndpointsConfigureTypeInterfaceSettingChange: // ignore this and react on requests from the upper filter
                 TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", 
                           ptr04x(device), params->InterfaceNumber, params->NewInterfaceSetting);
-                // st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
+//              st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, EndpointsReleasedOnly", ptr04x(device)); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD

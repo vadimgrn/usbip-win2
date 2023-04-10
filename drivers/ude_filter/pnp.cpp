@@ -188,7 +188,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		}
 		break;
 	case IRP_MN_QUERY_INTERFACE:
-		if (auto &qi = stack.Parameters.QueryInterface; 
+		if (auto &qi = stack.Parameters.QueryInterface;
 		    !fltr.is_hub && IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
 			return query_interface_usbdi(fltr, irp, qi);
 		}

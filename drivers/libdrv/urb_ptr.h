@@ -14,7 +14,9 @@ namespace libdrv
 class urb_ptr
 {
 public:
-	urb_ptr(_In_ USBD_HANDLE handle) : m_handle(handle) { NT_ASSERT(m_handle); }
+	explicit urb_ptr(_In_ USBD_HANDLE handle) : m_handle(handle) { NT_ASSERT(m_handle); }
+
+	urb_ptr(_In_ USBD_HANDLE handle, _In_ URB *urb) : m_handle(handle), m_urb(urb) { NT_ASSERT(m_handle); }
 
 	~urb_ptr()
 	{
@@ -32,8 +34,15 @@ public:
 		return st;
 	}
 
+	auto handle() const { return m_handle; }
 	auto get() const { return m_urb; }
-	void release() { m_urb = nullptr; }
+
+	auto release() 
+	{
+		auto urb = m_urb;
+		m_urb = nullptr; 
+		return urb;
+	}
 
 private:
 	USBD_HANDLE m_handle{};

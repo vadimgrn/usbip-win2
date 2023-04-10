@@ -6,7 +6,7 @@
 #include "trace.h"
 #include "filter_request.tmh"
 
-#include "context.h"
+#include "endpoint_list.h"
 #include "device_ioctl.h"
 
 #include <ude_filter/request.h>
@@ -26,7 +26,7 @@ void update_pipe_handles(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFORMA
 {
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
 
-                if (auto &p = intf.Pipes[i]; auto endp = find_endpoint(dev, p)) {
+                if (auto &p = intf.Pipes[i]; auto endp = find_endpoint(dev, compare_descr(p))) {
                         TraceDbg("interface %d.%d, pipe[%lu] {%s, addr %#x} -> PipeHandle %04x (was %04x)",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType), 
                                 p.EndpointAddress, ptr04x(p.PipeHandle), ptr04x(endp->PipeHandle));
@@ -45,7 +45,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto clear_endpoint_stall(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _Inout_ _URB_PIPE_REQUEST &r)
 {
-        if (auto endp = find_endpoint(dev, r.PipeHandle)) {
+        if (auto endp = find_endpoint(dev, compare_handle(r.PipeHandle))) {
                 auto addr = endp->descriptor.bEndpointAddress;
                 pkt = device::make_clear_endpoint_stall(addr);
                 TraceDbg("PipeHandle %04x, bEndpointAddress %#x", ptr04x(r.PipeHandle), addr);
@@ -95,10 +95,9 @@ auto select_interface(
                 char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
                 TraceDbg("%s", libdrv::select_interface_str(buf, sizeof(buf), r));
         }
-        
-        update_pipe_handles(dev, r.Interface);
 
         auto &i = r.Interface;
+        update_pipe_handles(dev, i);
         pkt = device::make_set_interface(i.InterfaceNumber, i.AlternateSetting);
 
         return STATUS_SUCCESS;

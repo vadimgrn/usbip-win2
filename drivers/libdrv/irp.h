@@ -26,16 +26,33 @@ public:
 	auto operator !() const { return !m_irp; }
 
 	auto get() const { return m_irp; }
-	void release() { m_irp = nullptr; }
+	
+	auto release() 
+	{ 
+		auto irp = m_irp;
+		m_irp = nullptr; 
+		return irp;
+	}
 
 private:
 	IRP *m_irp{};
 };
 
 
+inline auto list_entry(_In_ IRP *irp)
+{
+	return &irp->Tail.Overlay.ListEntry;
+}
+
+inline auto get_irp(_In_ LIST_ENTRY *entry)
+{
+	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
+}
+
 template<auto N, typename T = void>
 inline auto& argv(_In_ IRP *irp)
 {
+	NT_ASSERT(irp);
         auto &ptr = irp->Tail.Overlay.DriverContext[N];
         return reinterpret_cast<T*&>(ptr);
 }

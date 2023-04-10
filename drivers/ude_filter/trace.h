@@ -10,13 +10,13 @@
 // Tracing GUID - 90c336ed-69fb-43d6-b800-1552d72d200b
 //
 
-#define WPP_CONTROL_GUIDS                                                \
-    WPP_DEFINE_CONTROL_GUID(                                             \
-        FilterTraceGuid, (90c336ed,69fb,43d6,b800,1552d72d200b),         \
-                                                                         \
-        WPP_DEFINE_BIT(FLAG_GENERAL)           /* bit  0 = 0x00000001 */ \
-        WPP_DEFINE_BIT(FLAG_DBG)               /* bit  1 = 0x00000010 */ \
-        WPP_DEFINE_BIT(FLAG_FLOOD)             /* bit  2 = 0x00000100 */ \
+#define WPP_CONTROL_GUIDS                                        \
+    WPP_DEFINE_CONTROL_GUID(                                     \
+        FilterTraceGuid, (90c336ed,69fb,43d6,b800,1552d72d200b), \
+                                                                 \
+        WPP_DEFINE_BIT(FLAG_GENERAL)                             \
+        WPP_DEFINE_BIT(FLAG_DBG)                                 \
+        WPP_DEFINE_BIT(FLAG_FLOOD)                               \
         )                             
 
 #define WPP_FLAG_LEVEL_LOGGER(flag, level) \
