@@ -16,11 +16,12 @@ public:
         explicit handle(_In_ HANDLE h) : m_handle(h) {}
 
         _IRQL_requires_(PASSIVE_LEVEL)
-        PAGED ~handle() { do_close(); }
+        PAGED ~handle();
 
         handle(_In_ const handle&) = delete;
         handle& operator =(_In_ const handle&) = delete;
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         handle(_In_ handle &&h) : m_handle(h.release()) {}
 
         _IRQL_requires_(PASSIVE_LEVEL)
@@ -34,18 +35,23 @@ public:
         _IRQL_requires_(PASSIVE_LEVEL)
         PAGED void reset(_In_ HANDLE h = HANDLE{});
 
-        HANDLE release()
-        {
-                auto h = m_handle;
-                m_handle = HANDLE{};
-                return h;
-        }
+        void close() noexcept { reset(); }
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        HANDLE release();
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void swap(_Inout_ handle &h);
 
 private:
         HANDLE m_handle{};
-        
-        _IRQL_requires_(PASSIVE_LEVEL)
-        PAGED void do_close();
 };
+
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void swap(_Inout_ handle &a, _Inout_ handle &b)
+{
+        a.swap(b);
+}
 
 } // namespace libdrv

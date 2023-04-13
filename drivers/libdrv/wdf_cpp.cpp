@@ -12,6 +12,13 @@ wdf::ObjectRef::ObjectRef(WDFOBJECT handle, bool add_ref) :
         }
 }
 
+wdf::ObjectRef::~ObjectRef()
+{
+        if (m_handle) {
+                WdfObjectDereference(m_handle);
+        }
+}
+
 auto wdf::ObjectRef::operator =(const ObjectRef &obj) -> ObjectRef&
 {
         reset(obj.m_handle);
@@ -33,15 +40,22 @@ WDFOBJECT wdf::ObjectRef::release()
 
 void wdf::ObjectRef::reset(WDFOBJECT handle, bool add_ref)
 {
-        if (m_handle == handle) {
-                return;
+        if (m_handle != handle) {
+                ObjectRef(handle, add_ref).swap(*this);
         }
+}
 
-        dereference();
-        m_handle = handle;
+void wdf::ObjectRef::swap(_Inout_ ObjectRef &r)
+{
+        auto tmp = r.m_handle;
+        r.m_handle = m_handle;
+        m_handle = tmp;
+}
 
-        if (m_handle && add_ref) {
-                WdfObjectReference(m_handle);
+wdf::ObjectDelete::~ObjectDelete()
+{
+        if (m_obj) {
+                WdfObjectDelete(m_obj);
         }
 }
 
@@ -49,13 +63,6 @@ auto wdf::ObjectDelete::operator =(_Inout_ ObjectDelete&& r) -> ObjectDelete&
 {
         reset(r.release());
         return *this;
-}
-
-void wdf::ObjectDelete::do_delete()
-{
-        if (m_obj) {
-                WdfObjectDelete(m_obj);
-        }
 }
 
 WDFOBJECT wdf::ObjectDelete::release()
@@ -68,8 +75,7 @@ WDFOBJECT wdf::ObjectDelete::release()
 void wdf::ObjectDelete::reset(_In_ WDFOBJECT obj)
 {
         if (m_obj != obj) {
-                do_delete();
-                m_obj = obj;
+                ObjectDelete(obj).swap(*this);
         }
 }
 
@@ -80,17 +86,17 @@ void wdf::ObjectDelete::swap(_Inout_ ObjectDelete &r)
         r.m_obj = tmp;
 }
 
-auto wdf::Registry::operator =(_Inout_ Registry&& r) -> Registry&
-{
-        reset(r.release());
-        return *this;
-}
-
-void wdf::Registry::do_close()
+wdf::Registry::~Registry()
 {
         if (m_key) {
                 WdfRegistryClose(m_key);
         }
+}
+
+auto wdf::Registry::operator =(_Inout_ Registry&& r) -> Registry&
+{
+        reset(r.release());
+        return *this;
 }
 
 WDFKEY wdf::Registry::release()
@@ -103,8 +109,7 @@ WDFKEY wdf::Registry::release()
 void wdf::Registry::reset(_In_ WDFKEY key)
 {
         if (m_key != key) {
-                do_close();
-                m_key = key;
+                Registry(key).swap(*this);
         }
 }
 

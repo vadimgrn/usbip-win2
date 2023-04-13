@@ -27,7 +27,12 @@ public:
         constexpr generic_handle() noexcept = default;
         constexpr explicit generic_handle(type h) noexcept : m_handle(h) {}
 
-        ~generic_handle() { do_close(); }
+        ~generic_handle() 
+        {
+                if (*this) {
+                        close_handle(m_handle, tag_type());
+                }
+        }
 
         generic_handle(const generic_handle&) = delete;
         generic_handle& operator=(const generic_handle&) = delete;
@@ -55,8 +60,7 @@ public:
         void reset(type h = None) noexcept
         {
                 if (m_handle != h) {
-                        do_close();
-                        m_handle = h;
+                        generic_handle(h).swap(*this);
                 }
 
         }
@@ -72,13 +76,6 @@ public:
 
 private:
         type m_handle = None;
-
-        void do_close() noexcept
-        {
-                if (*this) {
-                        close_handle(m_handle, tag_type());
-                }
-        }
 };
 
 } // namespace usbip

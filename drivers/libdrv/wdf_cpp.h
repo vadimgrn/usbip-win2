@@ -25,7 +25,7 @@ public:
         ObjectRef() = default;
         explicit ObjectRef(WDFOBJECT handle, bool add_ref = true);
 
-        ~ObjectRef() { dereference(); }
+        ~ObjectRef();
 
         ObjectRef(const ObjectRef &obj) : ObjectRef(obj.m_handle) {}
         ObjectRef& operator =(const ObjectRef &obj);
@@ -39,21 +39,21 @@ public:
         auto get() const { return m_handle; }
 
         template<typename T>
-        auto get() const { return static_cast<T>(m_handle); static_assert(sizeof(T) == sizeof(m_handle)); }
+        auto get() const { return static_cast<T>(m_handle); }
 
         WDFOBJECT release();
         void reset(WDFOBJECT handle = WDF_NO_HANDLE, bool add_ref = true);
 
+        void swap(_Inout_ ObjectRef &r);
+
 private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
-
-        void dereference()
-        {
-                if (m_handle) {
-                        WdfObjectDereference(m_handle);
-                }
-        }
 };
+
+inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
+{
+        a.swap(b);
+}
 
 
 class ObjectDelete
@@ -62,7 +62,7 @@ public:
         ObjectDelete() = default;
         explicit ObjectDelete(_In_ WDFOBJECT obj) : m_obj(obj) {}
 
-        ~ObjectDelete() { do_delete(); }
+        ~ObjectDelete();
 
         ObjectDelete(const ObjectDelete&) = delete;
         ObjectDelete& operator =(const ObjectDelete&) = delete;
@@ -85,7 +85,6 @@ public:
 
 private:
         WDFOBJECT m_obj = WDF_NO_HANDLE;
-        void do_delete();
 };
 
 inline void swap(_Inout_ ObjectDelete &a, _Inout_ ObjectDelete &b)
@@ -100,7 +99,7 @@ public:
         Registry() = default;
         explicit Registry(_In_ WDFKEY key) : m_key(key) {}
 
-        ~Registry() { do_close(); }
+        ~Registry();
 
         Registry(const Registry&) = delete;
         Registry& operator =(const Registry&) = delete;
@@ -109,21 +108,19 @@ public:
         Registry& operator =(_Inout_ Registry&& r);
 
         auto get() const { return m_key; }
+        WDFKEY release();
 
         explicit operator bool() const { return m_key; }
         auto operator !() const { return !m_key; }
 
-        void close() noexcept { reset(); }
-        void swap(_Inout_ Registry &r);
-
-        WDFKEY release();
         void reset(_In_ WDFKEY key = WDF_NO_HANDLE);
+        void close() noexcept { reset(); }
+
+        void swap(_Inout_ Registry &r);
 
 private:
         WDFKEY m_key = WDF_NO_HANDLE;
-        void do_close();
 };
-
 
 inline void swap(_Inout_ Registry &a, _Inout_ Registry &b)
 {
