@@ -140,15 +140,25 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
-PAGED auto query_interface_usbdi(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
+PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
 {
 	PAGED_CODE();
-
 	auto st = ForwardIrpSynchronously(fltr, irp);
-	if (NT_SUCCESS(st)) {
+
+	if (NT_ERROR(st)) {
+		Trace(TRACE_LEVEL_ERROR, "%!GUID!, Size %d, Version %d, %!STATUS!", 
+			qi.InterfaceType, qi.Size, qi.Version, st);
+
+	} else if (IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
 		auto &v3 = *reinterpret_cast<USB_BUS_INTERFACE_USBDI_V3*>(qi.Interface); // highest
-		TraceDbg("Size %d, Version %d -> Size %d, Version %d", qi.Size, qi.Version, v3.Size, v3.Version);
+		TraceDbg("USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d -> Size %d, Version %d", 
+			  qi.Size, qi.Version, v3.Size, v3.Version);
+
 		replace_interface(v3, fltr);
+	} else {
+		auto &i = *reinterpret_cast<INTERFACE*>(qi.Interface);
+		TraceDbg("%!GUID!, Size %d, Version %d -> Size %d, Version %d", 
+			  qi.InterfaceType, qi.Size, qi.Version, i.Size, i.Version);
 	}
 
 	CompleteRequest(irp);
@@ -188,9 +198,8 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		}
 		break;
 	case IRP_MN_QUERY_INTERFACE:
-		if (auto &qi = stack.Parameters.QueryInterface;
-		    !fltr.is_hub && IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
-			return query_interface_usbdi(fltr, irp, qi);
+		if (auto &qi = stack.Parameters.QueryInterface; !fltr.is_hub) {
+			return query_interface(fltr, irp, qi);
 		}
 		break;
 	}
