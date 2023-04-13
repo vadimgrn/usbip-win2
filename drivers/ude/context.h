@@ -142,8 +142,11 @@ struct endpoint_ctx
         UDECXUSBDEVICE device; // parent
         WDFQUEUE queue; // child
         USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
-        USBD_PIPE_HANDLE PipeHandle;
 
+        // UCHAR interface_number; // interface to which it belongs
+        // UCHAR alternate_setting;
+
+        USBD_PIPE_HANDLE PipeHandle;
         LIST_ENTRY entry; // list head if default control pipe, protected by device_ctx::endpoint_list_lock
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)

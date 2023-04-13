@@ -184,7 +184,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 		select_configuration(fltr, urb.UrbSelectConfiguration);
 		break;
 	default:
-		TraceFlood("%s", urb_function_str(hdr.Function));
+		TraceFlood("dev %04x, %s", ptr04x(fltr.self), urb_function_str(hdr.Function));
 	}
 
 	if (send) {
@@ -194,7 +194,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 
 /*
  * IRP -> usbip2_filter.sys -> ucx01000.sys -> udecx.sys -> usbip2_ude.sys
- * IRP can be completed by ucx01000 or udecx driver, in such case UDE driver will not receive it.
+ * IRP can be completed by ucx01000 or udecx, in such case usbip2_ude will not receive it.
  * To detect such issues, all IRPs are inspected upon completion.
  */
 _IRQL_requires_same_

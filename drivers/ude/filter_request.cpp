@@ -22,7 +22,7 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void update_pipe_handles(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFORMATION &intf)
+void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFORMATION &intf)
 {
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
 
@@ -32,6 +32,8 @@ void update_pipe_handles(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFORMA
                                 p.EndpointAddress, ptr04x(p.PipeHandle), ptr04x(endp->PipeHandle));
 
                         endp->PipeHandle = p.PipeHandle;
+                        // endp->interface_number = intf.InterfaceNumber;
+                        // endp->alternate_setting = intf.AlternateSetting;
                 } else {
                         Trace(TRACE_LEVEL_ERROR, "interface %d.%d, pipe[%lu] {%s, addr %#x} -> not found",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType),
@@ -68,19 +70,20 @@ auto select_configuration(
                 TraceDbg("%s", libdrv::select_configuration_str(buf, sizeof(buf), &r));
         }
 
-        if (auto cd = r.ConfigurationDescriptor; cd) {
+        UCHAR cfg{}; // FIXME: can't pass -1 if unconfigured
+
+        if (auto cd = r.ConfigurationDescriptor) { // null if unconfigured
+                cfg = cd->bConfigurationValue;
+
                 auto intf = &r.Interface;
                 for (int i = 0; i < cd->bNumInterfaces; ++i, intf = usbdlib::advance(intf)) {
-                        update_pipe_handles(dev, *intf);
+                        update_pipe_properties(dev, *intf);
                 }
         }
 
         if (dev.skip_select_config) {
                 return STATUS_REQUEST_NOT_ACCEPTED;
         }
-
-        auto cd = r.ConfigurationDescriptor; // null if unconfigured
-        auto cfg = cd ? cd->bConfigurationValue : UCHAR(0); // FIXME: can't pass -1 if unconfigured
 
         pkt = device::make_set_configuration(cfg);
         return STATUS_SUCCESS;
@@ -97,7 +100,7 @@ auto select_interface(
         }
 
         auto &i = r.Interface;
-        update_pipe_handles(dev, i);
+        update_pipe_properties(dev, i);
         pkt = device::make_set_interface(i.InterfaceNumber, i.AlternateSetting);
 
         return STATUS_SUCCESS;
