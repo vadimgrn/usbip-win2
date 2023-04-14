@@ -92,15 +92,15 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 
 Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb, libusbip.dll"; Components: sdk
 
-Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Components: sdk
+Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 
 #if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "devnode.pdb, libusbip.pdb, libusbip_check.pdb"; Components: main
- Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}"; DestName: "classfilter.pdb"; Components: main
- Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: main and not sdk
+ Source: {#BuildDir + "*.pdb"}; DestDir: "{app}\pdb"; Excludes: "devnode.pdb, libusbip.pdb, libusbip_check.pdb"; Components: main
+ Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}\pdb"; DestName: "classfilter.pdb"; Components: main
+ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}\pdb"; Components: main and not sdk
 #endif
 
 [Tasks]
