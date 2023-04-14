@@ -105,6 +105,7 @@
     <ClInclude Include="dllspec.h" />
     <ClInclude Include="format_message.h" />
     <ClInclude Include="generic_handle.h" />
+    <ClInclude Include="generic_handle_ex.h" />
     <ClInclude Include="hdevinfo.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="hmodule.h" />

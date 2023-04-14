@@ -13,6 +13,8 @@
   enum _WDF_REQUEST_TYPE : int;
 #endif
 
+#include <libusbip/generic_handle_ex.h>
+
 #include <wdm.h>
 #include <wdf.h>
 
@@ -50,81 +52,43 @@ private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
 
+
 inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 {
         a.swap(b);
 }
 
 
-class ObjectDelete
-{
-public:
-        ObjectDelete() = default;
-        explicit ObjectDelete(_In_ WDFOBJECT obj) : m_obj(obj) {}
+using usbip::generic_handle;
 
-        ~ObjectDelete();
+struct ObjectDeleteTag {};
+using ObjectDelete = generic_handle<WDFOBJECT, ObjectDeleteTag, WDFOBJECT(WDF_NO_HANDLE)>;
 
-        ObjectDelete(const ObjectDelete&) = delete;
-        ObjectDelete& operator =(const ObjectDelete&) = delete;
+struct RegistryTag {};
+using Registry = generic_handle<WDFKEY, RegistryTag, WDFKEY(WDF_NO_HANDLE)>;
 
-        ObjectDelete(_Inout_ ObjectDelete&& r) : m_obj(r.release()) {}
-        ObjectDelete& operator =(_Inout_ ObjectDelete&& r);
-
-        auto get() const { return m_obj; }
-
-        template<typename T>
-        auto get() const { return static_cast<T>(m_obj); }
-
-        explicit operator bool() const { return m_obj; }
-        auto operator !() const { return !m_obj; }
-
-        WDFOBJECT release();
-        void reset(_In_ WDFOBJECT obj = WDF_NO_HANDLE);
-
-        void swap(_Inout_ ObjectDelete &r);
-
-private:
-        WDFOBJECT m_obj = WDF_NO_HANDLE;
-};
-
-inline void swap(_Inout_ ObjectDelete &a, _Inout_ ObjectDelete &b)
-{
-        a.swap(b);
-}
-
-
-class Registry
-{
-public:
-        Registry() = default;
-        explicit Registry(_In_ WDFKEY key) : m_key(key) {}
-
-        ~Registry();
-
-        Registry(const Registry&) = delete;
-        Registry& operator =(const Registry&) = delete;
-
-        Registry(_Inout_ Registry&& r) : m_key(r.release()) {}
-        Registry& operator =(_Inout_ Registry&& r);
-
-        auto get() const { return m_key; }
-        WDFKEY release();
-
-        explicit operator bool() const { return m_key; }
-        auto operator !() const { return !m_key; }
-
-        void reset(_In_ WDFKEY key = WDF_NO_HANDLE);
-        void close() noexcept { reset(); }
-
-        void swap(_Inout_ Registry &r);
-
-private:
-        WDFKEY m_key = WDF_NO_HANDLE;
-};
-
-inline void swap(_Inout_ Registry &a, _Inout_ Registry &b)
-{
-        a.swap(b);
-}
+using usbip::swap;
 
 } // namespace wdf
+
+
+namespace usbip
+{
+
+using wdf::ObjectDelete;
+
+template<>
+inline void close_handle(_In_ ObjectDelete::type obj, _In_ ObjectDelete::tag_type) noexcept
+{
+        WdfObjectDelete(obj);
+}
+
+using wdf::Registry;
+
+template<>
+inline void close_handle(_In_ Registry::type key, _In_ Registry::tag_type) noexcept
+{
+        WdfRegistryClose(key);
+}
+
+} // namespace usbip

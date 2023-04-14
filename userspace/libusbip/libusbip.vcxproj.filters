@@ -72,10 +72,15 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="persistent.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="generic_handle_ex.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">
       <UniqueIdentifier>{8a8cf4b9-ec4c-4a7d-a9f3-4ac48541990a}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="libusbip.rc" />
   </ItemGroup>
 </Project>
