@@ -112,7 +112,6 @@ struct device_ctx
 
         bool skip_select_config; // from the upper filter
         seqnum_t seqnum; // @see next_seqnum
-        ULONG current_frame_number;
 
         // for WSK receive
         WDFWORKITEM recv_hdr;

@@ -158,12 +158,6 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 	bool send{};
 
 	switch (auto &hdr = urb.UrbHeader; hdr.Function) {
-	case URB_FUNCTION_ISOCH_TRANSFER:
-	case URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL:
-		if constexpr (auto &r = urb.UrbIsochronousTransfer; true) {
-			fltr.device.start_frame = r.StartFrame;
-		}
-		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:

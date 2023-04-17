@@ -365,23 +365,6 @@ auto isoch_transfer(
         return send(endpoint, ctx, dev, false, &urb);
 }
 
-/*
- * @see <linux>/drivers/usb/core/usb.c, usb_get_current_frame_number.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Function_class_(urb_function_t)
-auto get_current_frame_number(
-        _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT, _In_ endpoint_ctx&, _In_ WDFREQUEST, _In_ URB &urb)
-{
-        auto &r = urb.UrbGetCurrentFrameNumber;
-        r.FrameNumber = dev.current_frame_number ? dev.current_frame_number : USBD_ISO_START_FRAME_RANGE/2;
-
-//      TraceUrb("%lu", r.FrameNumber); // too often
-
-        urb.UrbHeader.Status = USBD_STATUS_SUCCESS;
-        return STATUS_SUCCESS;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usb_submit_urb(
@@ -402,9 +385,6 @@ auto usb_submit_urb(
         case URB_FUNCTION_CONTROL_TRANSFER_EX:
         case URB_FUNCTION_CONTROL_TRANSFER:
                 handler = control_transfer;
-                break;
-        case URB_FUNCTION_GET_CURRENT_FRAME_NUMBER:
-                handler = get_current_frame_number;
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "%s(%#04x), dev %04x, endp %04x", urb_function_str(func), func, 

@@ -203,8 +203,6 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 		r.StartFrame = ret.start_frame;
 	}
 
-	ctx.dev->current_frame_number = ret.start_frame;
-
 	if (cnt >= 0 && ULONG(cnt) == r.NumberOfPackets) {
 		NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
 		byteswap(ctx.isoc, cnt);
