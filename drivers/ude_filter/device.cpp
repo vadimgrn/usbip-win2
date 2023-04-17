@@ -33,7 +33,7 @@ PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return err;
 	} else {
-		f.dev.parent_remove_lock = lck;
+		f.device.parent_remove_lock = lck;
 	}
 
 	return STATUS_SUCCESS;
@@ -51,8 +51,8 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 			ExFreePoolWithTag(ptr, pooltag);
 		}
 	} else {
-		auto &dev = f.dev;
-		NT_ASSERT(!dev.usbd); // @see IRP_MN_REMOVE_DEVICE
+		auto &dev = f.device;
+		NT_ASSERT(!dev.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
 
 		if (auto lck = dev.parent_remove_lock) {
 			IoReleaseRemoveLock(lck, 0);
@@ -199,8 +199,8 @@ PAGED NTSTATUS usbip::do_add_device(
 
 	if (fltr->is_hub) {
 		//
-	} else if (auto &dev = fltr->dev;
-		   auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, pooltag, &dev.usbd)) {
+	} else if (auto &dev = fltr->device;
+		   auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, pooltag, &dev.usbd_handle)) {
 		Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
 		destroy(*fltr);
 		return err;

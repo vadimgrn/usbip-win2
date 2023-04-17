@@ -8,47 +8,15 @@
 
 #include "driver.h"
 #include "device.h"
-#include <usbbusif.h>
 
 namespace
 {
 
 using namespace usbip;
 
-struct usbdi_ctx
+inline auto& get_filter_ext(_In_ void *BusContext)
 {
-	LONG ref_count;
-	filter_ext *self;
-	_USB_BUS_INTERFACE_USBDI_V3 v3;
-};
-
-inline auto get_context(_In_ void *BusContext)
-{
-	return static_cast<usbdi_ctx*>(BusContext);
-}
-
-inline auto& get_interface(_In_ void *BusContext)
-{
-	return get_context(BusContext)->v3;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-_IRQL_requires_same_
-PAGED auto alloc_usbdi_ctx(_In_ filter_ext &fltr, _In_ const _USB_BUS_INTERFACE_USBDI_V3 &r)
-{
-	PAGED_CODE();
-	usbdi_ctx *ctx = (usbdi_ctx*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ctx), pooltag);
-
-	if (ctx) {
-		ctx->ref_count = 1;
-		ctx->self = &fltr;
-		RtlCopyMemory(&ctx->v3, &r, min(r.Size, sizeof(r)));
-		TraceDbg("%04x", ptr04x(ctx));
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", sizeof(*ctx));
-	}
-
-	return ctx;
+	return *static_cast<filter_ext*>(BusContext);
 }
 
 _Function_class_(PINTERFACE_REFERENCE)
@@ -56,14 +24,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void USB_BUSIFFN InterfaceReference(_In_ void *BusContext)
 {
-	auto ctx = get_context(BusContext);
-
-	auto &i = ctx->v3;
-	i.InterfaceReference(i.BusContext);
-
-	auto cnt = InterlockedIncrement(&ctx->ref_count); 
-	TraceDbg("%04x, ref_count %lu", ptr04x(ctx), cnt);
-	NT_VERIFY(cnt > 0);
+	auto &f = get_filter_ext(BusContext);
+	TraceDbg("%04x", ptr04x(f.self));
 }
 
 _Function_class_(PINTERFACE_DEREFERENCE)
@@ -71,36 +33,33 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void USB_BUSIFFN InterfaceDereference(_In_ void *BusContext)
 {
-	auto ctx = get_context(BusContext);
-
-	auto &i = ctx->v3;
-	i.InterfaceDereference(i.BusContext);
-
-	auto cnt = InterlockedDecrement(&ctx->ref_count);
-	TraceDbg("%04x, ref_count %lu", ptr04x(ctx), cnt);
-
-	if (!cnt) {
-		ExFreePoolWithTag(ctx, pooltag);
-	} else {
-		NT_ASSERT(cnt > 0);
-	}
+	auto &f = get_filter_ext(BusContext);
+	TraceDbg("%04x", ptr04x(f.self));
 }
 
-_Function_class_(PUSB_BUSIFFN_GETUSBDI_VERSION)
+_Function_class_(PUSB_BUSIFFN_SUBMIT_ISO_OUT_URB)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void USB_BUSIFFN GetUSBDIVersion(
-	_In_ void *BusContext,
-	_Out_opt_ USBD_VERSION_INFORMATION *v,
-	_Out_opt_ ULONG *HcdCapabilities) // @see USB_HCD_CAPS_SUPPORTS_RT_THREADS
+_Must_inspect_result_ NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(_In_ void *BusContext, _In_ URB*)
 {
-	auto &i = get_interface(BusContext);
-	i.GetUSBDIVersion(i.BusContext, v, HcdCapabilities);
+	auto &f = get_filter_ext(BusContext);
+	Trace(TRACE_LEVEL_ERROR, "%04x, STATUS_NOT_SUPPORTED", ptr04x(f.self));
+	return STATUS_NOT_SUPPORTED;
+}
 
-	TraceDbg("USBDI_Version %#lx, Supported_USB_Version %#lx, HcdCapabilities %#lx",
-		  v ? v->USBDI_Version : 0, 
-		  v ? v->Supported_USB_Version : 0, 
-		  HcdCapabilities ? *HcdCapabilities: 0);
+_Function_class_(PUSB_BUSIFFN_ENUM_LOG_ENTRY)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS USB_BUSIFFN EnumLogEntry(
+	[[maybe_unused]] _In_ PVOID BusContext,
+	[[maybe_unused]] _In_ ULONG DriverTag,
+	[[maybe_unused]] _In_ ULONG EnumTag,
+	[[maybe_unused]] _In_ ULONG P1,
+	[[maybe_unused]] _In_ ULONG P2)
+{
+	auto &f = get_filter_ext(BusContext);
+	TraceDbg("%04x, STATUS_NOT_SUPPORTED", ptr04x(f.self));
+	return STATUS_NOT_SUPPORTED;
 }
 
 /*
@@ -118,93 +77,17 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	auto fltr = get_context(BusContext)->self;
+	auto &val = *CurrentUsbFrame;
 
-	auto &val = fltr->dev.current_frame_number;
+	auto &fltr = get_filter_ext(BusContext);
+	val = fltr.device.start_frame;
+
 	if (!val) {
 		val = USBD_ISO_START_FRAME_RANGE/10;
 	}
 
-	*CurrentUsbFrame = val;
-//	TraceFlood("%lu", *CurrentUsbFrame); // too often
-
+	// TraceFlood("%lu", val); // too often
 	return STATUS_SUCCESS;
-}
-
-_Function_class_(PUSB_BUSIFFN_SUBMIT_ISO_OUT_URB)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Must_inspect_result_ NTSTATUS USB_BUSIFFN SubmitIsoOutUrb(_In_ void *BusContext, _In_ URB *urb)
-{
-	auto &i = get_interface(BusContext);
-	auto st = i.SubmitIsoOutUrb(i.BusContext, urb);
-
-	TraceDbg("%!STATUS!", st);
-	return st;
-}
-
-_Function_class_(PUSB_BUSIFFN_QUERY_BUS_INFORMATION)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusInformation(
-	_In_ void *BusContext,
-	_In_ ULONG Level,
-	_Inout_ PVOID BusInformationBuffer,
-	_Out_ PULONG BusInformationBufferLength,
-	_Out_opt_ PULONG BusInformationActualLength)
-{
-	auto &i = get_interface(BusContext);
-	auto st = i.QueryBusInformation(i.BusContext, Level, BusInformationBuffer,
-		                        BusInformationBufferLength, BusInformationActualLength);
-	
-	if (NT_ERROR(st)) {
-		TraceDbg("Level %d, %!STATUS!", Level, st);
-		return st;
-	}
-
-	auto &r = *static_cast<USB_BUS_INFORMATION_LEVEL_1*>(BusInformationBuffer);
-	
-	switch (UNICODE_STRING s{}; Level) {
-	case 1:
-		s.Length = static_cast<USHORT>(r.ControllerNameLength);
-		s.MaximumLength = s.Length;
-		s.Buffer = r.ControllerNameUnicodeString;
-		[[fallthrough]];
-	case 0:
-		TraceDbg("Level %lu, TotalBandwidth %lu, ConsumedBandwidth %lu, ControllerName '%!USTR!'", 
-			  Level, r.TotalBandwidth, r.ConsumedBandwidth, &s);
-	}
-
-	return st;
-}
-
-_Function_class_(PUSB_BUSIFFN_IS_DEVICE_HIGH_SPEED)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_Must_inspect_result_ BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(_In_opt_ void *BusContext)
-{
-	auto &i = get_interface(BusContext);
-	auto ret = i.IsDeviceHighSpeed(i.BusContext);
-
-	TraceDbg("%d", ret);
-	return ret;
-}
-
-_Function_class_(PUSB_BUSIFFN_ENUM_LOG_ENTRY)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS USB_BUSIFFN EnumLogEntry(
-	_In_ PVOID BusContext,
-	_In_ ULONG DriverTag,
-	_In_ ULONG EnumTag,
-	_In_ ULONG P1,
-	_In_ ULONG P2)
-{
-	auto &i = get_interface(BusContext);
-	auto st = i.EnumLogEntry(i.BusContext, DriverTag, EnumTag, P1, P2);
-
-	TraceDbg("DriverTag %#lx, EnumTag %#lx, P1 %#lx, P2 %#lx, %!STATUS!", DriverTag, EnumTag, P1, P2, st);
-	return st;
 }
 
 /*
@@ -228,6 +111,151 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
 	return st;
 }
 
+_Function_class_(PUSB_BUSIFFN_QUERY_BUS_INFORMATION)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusInformation(
+	_In_ void *BusContext,
+	_In_ ULONG Level,
+	_Inout_ PVOID BusInformationBuffer,
+	_Out_ PULONG BusInformationBufferLength, // really _Inout_
+	_Out_opt_ PULONG BusInformationActualLength)
+{
+	auto &fltr = get_filter_ext(BusContext);
+	auto &bi = fltr.device.usbdi.bus_info;
+
+	auto name_len = bi.level_1.ControllerNameLength; // bytes
+	if (!name_len) { // setQueryBusInformation failed
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	ULONG min_len{};
+
+	switch (Level) {
+	case 1:
+		min_len = sizeof(bi.level_1);
+		break;
+	case 0:
+		min_len = sizeof(_USB_BUS_INFORMATION_LEVEL_0);
+		break;
+	default:
+		Trace(TRACE_LEVEL_ERROR, "Level %lu, NOT_SUPPORTED", Level);
+		return STATUS_NOT_SUPPORTED;
+	}
+
+	if (*BusInformationBufferLength < min_len) {
+		Trace(TRACE_LEVEL_ERROR, "dev %04x, Level %lu, BusInformationBufferLength %lu, BUFFER_TOO_SMALL", 
+			                  ptr04x(fltr.self), Level, *BusInformationBufferLength);
+		return STATUS_BUFFER_TOO_SMALL;
+	}
+
+	ULONG actual_len;
+
+	if (Level) {
+		const ULONG name_offset = offsetof(_USB_BUS_INFORMATION_LEVEL_1, ControllerNameUnicodeString);
+		actual_len = min(name_offset + name_len, *BusInformationBufferLength);
+	} else {
+		actual_len = min_len;
+	}
+
+	RtlCopyMemory(BusInformationBuffer, &bi, actual_len);
+	*BusInformationBufferLength = actual_len;
+
+	if (BusInformationActualLength) {
+		*BusInformationActualLength = actual_len;
+	}
+
+	return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void setQueryBusInformation(_Inout_ filter_ext &fltr, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
+{
+	PAGED_CODE();
+
+	const ULONG level = 1; // highest
+	auto &bi = fltr.device.usbdi.bus_info;
+
+	ULONG len = sizeof(bi);
+	ULONG actual_len{};
+
+	auto st = r.QueryBusInformation(r.BusContext, level, &bi, &len, &actual_len);
+
+	if (NT_ERROR(st)) {
+		bi.level_1.ControllerNameLength = 0;
+		Trace(TRACE_LEVEL_ERROR, "QueryBusInformation(Level=%lu), Length %lu, ActualLength %lu, %!STATUS!", 
+					  level, len, actual_len, st);
+		return;
+	}
+
+	auto name_len = static_cast<USHORT>(bi.level_1.ControllerNameLength); // bytes
+
+	const ULONG name_offset = offsetof(_USB_BUS_INFORMATION_LEVEL_1, ControllerNameUnicodeString);
+	auto remaining_len = actual_len - name_offset;
+
+	if (remaining_len < name_len) { // usbdi_bus_info cannot accomodate this name
+		bi.level_1.ControllerNameLength = 0;
+		Trace(TRACE_LEVEL_ERROR, "BusInformationActualLength %lu, ControllerNameLength %lu", 
+			                  actual_len, name_len);
+		return;
+	}
+
+	UNICODE_STRING name {
+		.Length = name_len,
+		.MaximumLength = name_len,
+		.Buffer = bi.level_1.ControllerNameUnicodeString
+	};
+
+	TraceDbg("Level %lu, TotalBandwidth %lu, ConsumedBandwidth %lu, ControllerName '%!USTR!'", 
+		  level, bi.level_1.TotalBandwidth, bi.level_1.ConsumedBandwidth, &name);
+}
+
+_Function_class_(PUSB_BUSIFFN_GETUSBDI_VERSION)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void USB_BUSIFFN GetUSBDIVersion(
+	_In_ void *BusContext,
+	_Out_opt_ USBD_VERSION_INFORMATION *VersionInformation,
+	_Out_opt_ ULONG *HcdCapabilities)
+{
+	auto &fltr = get_filter_ext(BusContext);
+	auto &v = fltr.device.usbdi.version;
+
+	if (auto &vi = v.VersionInformation; VersionInformation) {
+		VersionInformation->USBDI_Version = vi.USBDI_Version;
+		VersionInformation->Supported_USB_Version = vi.Supported_USB_Version;
+	}
+
+	if (HcdCapabilities) {
+		*HcdCapabilities = v.HcdCapabilities; // @see USB_HCD_CAPS_SUPPORTS_RT_THREADS
+	}
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void setGetUSBDIVersion(_Inout_ filter_ext &fltr, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
+{
+	PAGED_CODE();
+
+	auto &v = fltr.device.usbdi.version;
+	auto &vi = v.VersionInformation;
+
+	r.GetUSBDIVersion(r.BusContext, &vi, &v.HcdCapabilities);
+
+	TraceDbg("dev %04x, USBDI_Version %#lx, Supported_USB_Version %#lx, HcdCapabilities %#lx",
+		  ptr04x(fltr.self), vi.USBDI_Version, vi.Supported_USB_Version, v.HcdCapabilities);
+}
+
+_Function_class_(PUSB_BUSIFFN_IS_DEVICE_HIGH_SPEED)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_Must_inspect_result_ BOOLEAN USB_BUSIFFN IsDeviceHighSpeed(_In_opt_ void *BusContext)
+{
+	auto &fltr = get_filter_ext(BusContext);
+	return fltr.device.usbdi.IsDeviceHighSpeed;
+}
+
 _Function_class_(PUSB_BUSIFFN_QUERY_CONTROLLER_TYPE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -241,62 +269,132 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryControllerType(
 	_Out_opt_ PUCHAR PciRevisionId,
 	_Out_opt_ PUCHAR PciProgIf)
 {
-	auto &i = get_interface(BusContext);
-	auto st = i.QueryControllerType(i.BusContext, 
-					HcdiOptionFlags, 
-					PciVendorId, PciDeviceId, 
-					PciClass, PciSubClass, PciRevisionId, 
-					PciProgIf);
-	
-	TraceDbg("HcdiOptionFlags %#lx, PciVendorId %#04hx, PciDeviceId %#04hx, "
-		 "PciClass %#02x, PciSubClass %#02x, PciRevisionId %#02x, PciProgIf %#02x, %!STATUS!", 
-		HcdiOptionFlags ? *HcdiOptionFlags : 0,
-		PciVendorId ? *PciVendorId : 0,
-		PciDeviceId ? *PciDeviceId : 0,
-		PciClass ? *PciClass : 0,
-		PciSubClass ? *PciSubClass : 0,
-		PciRevisionId ? *PciRevisionId : 0, 
-		PciProgIf ? *PciProgIf : 0,
-		st);
+	auto &fltr = get_filter_ext(BusContext);
+	auto &r = fltr.device.usbdi.controller_type;
 
-	return st;
+	if (!r.PciClass) { // setQueryControllerType failed
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	if (HcdiOptionFlags) {
+		*HcdiOptionFlags = r.HcdiOptionFlags;
+	}
+
+	if (PciVendorId) {
+		*PciVendorId = r.PciVendorId;
+	}
+
+	if (PciDeviceId) {
+		*PciDeviceId = r.PciDeviceId;
+	}
+
+	if (PciClass) {
+		*PciClass = r.PciClass;
+	}
+
+	if (PciSubClass) {
+		*PciSubClass = r.PciSubClass;
+	}
+
+	if (PciRevisionId) {
+		*PciRevisionId = r.PciRevisionId;
+	}
+
+	if (PciProgIf) {
+		*PciProgIf = r.PciProgIf;
+	}
+
+	return STATUS_SUCCESS;
+}
+
+/*
+ * PciClass is typically set to PCI_CLASS_SERIAL_BUS_CTLR (0x0C).
+ * PciSubClass is typically set to PCI_SUBCLASS_SB_USB (0x03).
+ * 
+ * PciProgif is typically set to one of the following values:
+ * 0x00 - Universal Host Controller Interface (UHCI)
+ * 0x10 - Open Host Controller Interface (OHCI)
+ * 0x20 - Enhanced Host Controller Interface (EHCI)
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void setQueryControllerType(_Inout_ filter_ext &fltr, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
+{
+	PAGED_CODE();
+	auto &d = fltr.device.usbdi.controller_type;
+
+	auto st = r.QueryControllerType(r.BusContext, 
+					&d.HcdiOptionFlags,
+					&d.PciVendorId, &d.PciDeviceId,
+					&d.PciClass, &d.PciSubClass, &d.PciRevisionId,
+					&d.PciProgIf);
+
+	if (NT_ERROR(st)) {
+		Trace(TRACE_LEVEL_ERROR, "dev %04x, %!STATUS!", ptr04x(fltr.self), st);
+		d.PciClass = 0;
+		return;
+	}
+
+	TraceDbg("dev %04x, HcdiOptionFlags %#lx, PciVendorId %#04hx, PciDeviceId %#04hx, "
+		 "PciClass %#02x, PciSubClass %#02x, PciRevisionId %#02x, PciProgIf %#02x", 
+		  ptr04x(fltr.self), d.HcdiOptionFlags, d.PciVendorId, d.PciDeviceId,
+		  d.PciClass, d.PciSubClass, d.PciRevisionId, 
+		  d.PciProgIf);
+
+	NT_ASSERT(d.PciClass);
 }
 
 } // namespace
 
 
-_IRQL_requires_(PASSIVE_LEVEL)
+/*
+ * The first implementation allocated usbdi_ctx and InterfaceDereference freed it when 
+ * reference count dropped to zero. But Driver Verifier sometimes catched memory leak
+ * for usbdi_ctx because InterfaceDereference was not called.
+ * 
+ * struct usbdi_ctx
+ * {
+ *	LONG ref_count;
+ *	filter_ext *self;
+ *	_USB_BUS_INTERFACE_USBDI_V3 v3; // copy of original interface
+ * };
+ */
 _IRQL_requires_same_
-PAGED NTSTATUS usbip::replace_interface(_Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r, _In_ filter_ext &fltr)
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void usbip::query_interface(_Inout_ filter_ext &fltr, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
 {
 	PAGED_CODE();
 
-	auto ctx = alloc_usbdi_ctx(fltr, r);
-	if (!ctx) {
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	switch (r.Version) {
+	switch (auto &di = fltr.device.usbdi; r.Version) {
 	case USB_BUSIF_USBDI_VERSION_3:
+		if (auto &ct = di.controller_type; !ct.PciClass) { // first time
+			setQueryControllerType(fltr, r); // can fail, do not check ct.PciClass
+		}
 		r.QueryBusTimeEx = QueryBusTimeEx;
 		r.QueryControllerType = QueryControllerType;
 	case USB_BUSIF_USBDI_VERSION_2:
 		r.EnumLogEntry = EnumLogEntry;
 		[[fallthrough]];
 	case USB_BUSIF_USBDI_VERSION_1:
+		di.IsDeviceHighSpeed = r.IsDeviceHighSpeed(r.BusContext);
 		r.IsDeviceHighSpeed = IsDeviceHighSpeed;
 		[[fallthrough]];
 	case USB_BUSIF_USBDI_VERSION_0:
+		if (auto &vi = di.version.VersionInformation; !vi.USBDI_Version) { // first time
+			setGetUSBDIVersion(fltr, r);
+			setQueryBusInformation(fltr, r);
+			NT_ASSERT(vi.USBDI_Version);
+		}
 		r.GetUSBDIVersion = GetUSBDIVersion;
 		r.QueryBusTime = QueryBusTime;
 		r.SubmitIsoOutUrb = SubmitIsoOutUrb;
 		r.QueryBusInformation = QueryBusInformation;
 		[[fallthrough]];
 	default: // INTERFACE
-		r.BusContext = ctx;
-		r.InterfaceReference = InterfaceReference;
+		r.InterfaceDereference(r.BusContext); // release
 		r.InterfaceDereference = InterfaceDereference;
-	}
 
-	return STATUS_SUCCESS;
+		r.InterfaceReference = InterfaceReference;
+		r.BusContext = &fltr;
+	}
 }

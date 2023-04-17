@@ -29,8 +29,8 @@ static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
 static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
 static_assert(SizeOf_DEVICE_RELATIONS(2)  > sizeof(DEVICE_RELATIONS));
 
-_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 {
 	PAGED_CODE();
@@ -47,8 +47,8 @@ PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 	return dst;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *obj)
 {
 	PAGED_CODE();
@@ -63,8 +63,8 @@ PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *ob
 	return false;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELATIONS &r)
 {
 	PAGED_CODE();
@@ -101,8 +101,8 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
  * of our target device, we create and attach a filter object to it.
  * Note that we only attach the last detected USB device on it's hub.
  */
-_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
 	PAGED_CODE();
@@ -118,16 +118,16 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 	return st;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::RemoveLockGuard &lock)
 {
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
 
-	if (auto &handle = fltr.dev.usbd) {
-		USBD_CloseHandle(handle); // must be called before sending the IRP down the USB driver stack
-		handle = nullptr;
+	if (auto &h = fltr.device.usbd_handle) {
+		USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
+		h = nullptr;
 	}
 
 	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
@@ -138,31 +138,27 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 	return st;
 }
 
-_IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
 {
 	PAGED_CODE();
-	auto st = ForwardIrpSynchronously(fltr, irp);
+	auto st = ForwardIrpSynchronously(fltr, irp); 
 
 	if (NT_ERROR(st)) {
 		Trace(TRACE_LEVEL_ERROR, "%!GUID!, Size %d, Version %d, %!STATUS!", 
 			qi.InterfaceType, qi.Size, qi.Version, st);
-
 	} else if (IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
 		auto &v3 = *reinterpret_cast<USB_BUS_INTERFACE_USBDI_V3*>(qi.Interface); // highest
-		TraceDbg("USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d -> Size %d, Version %d", 
-			  qi.Size, qi.Version, v3.Size, v3.Version);
-
-		replace_interface(v3, fltr);
+		TraceDbg("USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d", qi.Size, qi.Version);
+		query_interface(fltr, v3);
 	} else {
 		auto &i = *reinterpret_cast<INTERFACE*>(qi.Interface);
 		TraceDbg("%!GUID!, Size %d, Version %d -> Size %d, Version %d", 
 			  qi.InterfaceType, qi.Size, qi.Version, i.Size, i.Version);
 	}
 
-	CompleteRequest(irp);
-	return st;
+	return CompleteRequest(irp, st);
 }
 
 } // namespace
@@ -199,7 +195,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		break;
 	case IRP_MN_QUERY_INTERFACE:
 		if (auto &qi = stack.Parameters.QueryInterface; !fltr.is_hub) {
-			return query_interface(fltr, irp, qi);
+			return ::query_interface(fltr, irp, qi);
 		}
 		break;
 	}

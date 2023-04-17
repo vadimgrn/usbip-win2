@@ -38,7 +38,7 @@ void free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 	auto &r = urb->UrbControlTransferEx;
 	unique_ptr(r.TransferBuffer);
 
-	libdrv::urb_ptr(fltr.dev.usbd, urb);
+	libdrv::urb_ptr(fltr.device.usbd_handle, urb);
 	IoFreeIrp(irp);
 }
 
@@ -80,7 +80,7 @@ auto make_irp(_Out_ IRP* &result, _In_ filter_ext &fltr, _In_ void *TransferBuff
 		return err;
 	}
 
-	libdrv::urb_ptr urb(fltr.dev.usbd);
+	libdrv::urb_ptr urb(fltr.device.usbd_handle);
 	if (auto err = urb.alloc(next_stack)) {
 		Trace(TRACE_LEVEL_ERROR, "USBD_UrbAllocate %!STATUS!", err);
 		return err;
@@ -161,7 +161,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 	case URB_FUNCTION_ISOCH_TRANSFER:
 	case URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL:
 		if constexpr (auto &r = urb.UrbIsochronousTransfer; true) {
-			fltr.dev.current_frame_number = r.StartFrame;
+			fltr.device.start_frame = r.StartFrame;
 		}
 		break;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:

@@ -4,9 +4,7 @@
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-
-#include <usb.h>
+#include "query_interface.h"
 
 extern "C" {
   #include <usbdlib.h>
@@ -33,9 +31,10 @@ struct filter_ext
 
 		struct {
 			IO_REMOVE_LOCK *parent_remove_lock; // -> hub filter_ext.remove_lock
-			USBD_HANDLE usbd;
-			ULONG current_frame_number;
-		} dev; // is_hub == false
+			USBD_HANDLE usbd_handle;
+			ULONG start_frame;
+			usbdi_all usbdi;
+		} device; // is_hub == false
 	};
 	bool is_hub;
 };
