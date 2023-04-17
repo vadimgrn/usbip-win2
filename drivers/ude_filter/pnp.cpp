@@ -143,7 +143,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
 {
 	PAGED_CODE();
-	auto st = ForwardIrpSynchronously(fltr, irp); 
+	auto st = ForwardIrpSynchronously(fltr, irp);
 
 	if (NT_ERROR(st)) {
 		Trace(TRACE_LEVEL_ERROR, "%!GUID!, Size %d, Version %d, %!STATUS!", 
