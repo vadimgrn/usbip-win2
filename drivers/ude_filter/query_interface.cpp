@@ -24,7 +24,7 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
 {
 	if (CurrentUsbFrame) {
 		*CurrentUsbFrame = USBD_ISO_START_FRAME_RANGE/10; // zero is OK too
-		// TraceFlood("%lu", *CurrentUsbFrame); // too often
+		// TraceDbg("%lu", *CurrentUsbFrame); // too often
 	}
 
 	return STATUS_SUCCESS;
@@ -47,7 +47,7 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
 	auto st = QueryBusTime(BusContext, HighSpeedFrameCounter);
 	if (NT_SUCCESS(st)) {
 		*HighSpeedFrameCounter <<= 3;
-		// TraceFlood("%lu", **HighSpeedFrameCounter); // too often
+		// TraceDbg("%lu", **HighSpeedFrameCounter); // too often
 	}
 	return st;
 }
@@ -71,10 +71,14 @@ PAGED void usbip::query_interface(_Inout_ filter_ext &, _Inout_ _USB_BUS_INTERFA
 			r.QueryBusTimeEx = QueryBusTimeEx;
 		}
 		[[fallthrough]];
+	case USB_BUSIF_USBDI_VERSION_2:
+	case USB_BUSIF_USBDI_VERSION_1:
 	case USB_BUSIF_USBDI_VERSION_0:
 		if (auto st = r.QueryBusTime(r.BusContext, &dummy); NT_ERROR(st)) {
 			TraceDbg("QueryBusTime -> %!STATUS!, substituted", st);
 			r.QueryBusTime = QueryBusTime;
 		}
+	default:
+		Trace(TRACE_LEVEL_ERROR, "Unexpected USB_BUSIF_USBDI_VERSION_%lu", r.Version);
 	}
 }

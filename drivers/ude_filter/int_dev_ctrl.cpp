@@ -151,16 +151,47 @@ void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGUR
 	}
 }
 
+constexpr auto pre_process_required(_In_ int function)
+{
+	switch (function) {
+		case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
+		case URB_FUNCTION_SYNC_RESET_PIPE:
+		case URB_FUNCTION_SYNC_CLEAR_STALL:
+		case URB_FUNCTION_SELECT_INTERFACE:
+		case URB_FUNCTION_SELECT_CONFIGURATION:
+			return true;
+	}
+
+	return false;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto pre_process_required(_In_ IRP *irp)
+{
+	bool ok{};
+
+	if (libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+		auto urb = libdrv::urb_from_irp(irp);
+		ok = pre_process_required(urb->UrbHeader.Function);
+	}
+
+	return ok;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 {
 	bool send{};
-
+	
 	switch (auto &hdr = urb.UrbHeader; hdr.Function) {
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 	case URB_FUNCTION_SYNC_RESET_PIPE:
 	case URB_FUNCTION_SYNC_CLEAR_STALL:
+		static_assert(pre_process_required(URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL));
+		static_assert(pre_process_required(URB_FUNCTION_SYNC_RESET_PIPE));
+		static_assert(pre_process_required(URB_FUNCTION_SYNC_CLEAR_STALL));
 		if constexpr (auto &r = urb.UrbPipeRequest; true) {
 			TraceDbg("dev %04x, %s, PipeHandle %04x", ptr04x(fltr.self), 
 				  urb_function_str(hdr.Function), ptr04x(r.PipeHandle));
@@ -168,6 +199,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 		send = true;
 		break;
 	case URB_FUNCTION_SELECT_INTERFACE:
+		static_assert(pre_process_required(URB_FUNCTION_SELECT_INTERFACE));
 		if constexpr (auto &r = urb.UrbSelectInterface; true) {
 			char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
 			TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_interface_str(buf, sizeof(buf), r));
@@ -175,10 +207,12 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 		send = true;
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
+		static_assert(pre_process_required(URB_FUNCTION_SELECT_CONFIGURATION));
 		select_configuration(fltr, urb.UrbSelectConfiguration);
 		break;
 	default:
-		TraceFlood("dev %04x, %s", ptr04x(fltr.self), urb_function_str(hdr.Function));
+		Trace(TRACE_LEVEL_ERROR, "Unhandled %s", urb_function_str(hdr.Function));
+		NT_ASSERT(!"Unhandled URB Function");
 	}
 
 	if (send) {
@@ -197,10 +231,7 @@ void post_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp)
 {
 	auto status = irp->IoStatus.Status;
 
-	if (auto ctl = libdrv::DeviceIoControlCode(irp); ctl != IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		TraceFlood("dev %04x, %s, %!STATUS!", ptr04x(fltr.self), internal_device_control_name(ctl), status);
-
-	} else if (auto &urb = *libdrv::urb_from_irp(irp); NT_ERROR(status) || USBD_ERROR(URB_STATUS(&urb))) {
+	if (auto &urb = *libdrv::urb_from_irp(irp); NT_ERROR(status) || USBD_ERROR(URB_STATUS(&urb))) {
 		auto &hdr = urb.UrbHeader;
 		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, USBD_STATUS_%s, %!STATUS!", ptr04x(fltr.self), 
 			urb_function_str(hdr.Function), get_usbd_status(hdr.Status), status);
@@ -255,6 +286,6 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	auto f = fltr.is_hub ? ForwardIrp : pre_process_irp;
+	auto f = !fltr.is_hub && pre_process_required(irp) ? pre_process_irp : ForwardIrp;
 	return f(fltr, irp);
 }

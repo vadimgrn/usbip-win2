@@ -16,7 +16,6 @@
                                                                  \
         WPP_DEFINE_BIT(FLAG_GENERAL)                             \
         WPP_DEFINE_BIT(FLAG_DBG)                                 \
-        WPP_DEFINE_BIT(FLAG_FLOOD)                               \
         )                             
 
 #define WPP_FLAG_LEVEL_LOGGER(flag, level) \
@@ -47,6 +46,5 @@
 // FUNC Trace{FLAGS=FLAG_GENERAL}(LEVEL, MSG, ...);
 // FUNC TraceEvents(LEVEL, FLAGS, MSG, ...);
 // FUNC TraceDbg{LEVEL=TRACE_LEVEL_VERBOSE, FLAGS=FLAG_DBG}(MSG, ...);
-// FUNC TraceFlood{LEVEL=TRACE_LEVEL_VERBOSE, FLAGS=FLAG_FLOOD}(MSG, ...);
 // end_wpp
 //
