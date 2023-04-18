@@ -109,8 +109,6 @@ struct device_ctx
 
         int port; // vhci_ctx.devices[port - 1]
         volatile bool unplugged;
-
-        bool skip_select_config; // from the upper filter
         seqnum_t seqnum; // @see next_seqnum
 
         // for WSK receive

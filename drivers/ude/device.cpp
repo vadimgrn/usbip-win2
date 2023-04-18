@@ -376,38 +376,23 @@ void endpoints_configure(
                           WppBinary(params->ReleasedEndpoints, USHORT(n*sizeof(*params->ReleasedEndpoints))));
         }
 
-        auto st = STATUS_SUCCESS;
-
-        if (auto &dev = *get_device_ctx(device); dev.unplugged) { // UDECXUSBDEVICE can no longer be used
-                TraceDbg("dev %04x, %!UDECX_ENDPOINTS_CONFIGURE_TYPE!: unplugged, "
-                         "NewConfigurationValue %d, InterfaceNumber %d, NewInterfaceSetting %d",
-                          ptr04x(device), params->ConfigureType, params->NewConfigurationValue,
-                          params->InterfaceNumber, params->NewInterfaceSetting);
-
-        } else switch (params->ConfigureType) {
+        switch (params->ConfigureType) {
         case UdecxEndpointsConfigureTypeDeviceInitialize: // for internal use, can be called several times
                 TraceDbg("dev %04x, DeviceInitialize", ptr04x(device));
                 break;
         case UdecxEndpointsConfigureTypeDeviceConfigurationChange:
-                st = device::set_configuration(device, request, params->NewConfigurationValue);
-                dev.skip_select_config = true;
+                TraceDbg("dev %04x, ConfigurationValue %d", ptr04x(device), params->NewConfigurationValue);
                 break;
-        case UdecxEndpointsConfigureTypeInterfaceSettingChange: // ignore this and react on requests from the upper filter
+        case UdecxEndpointsConfigureTypeInterfaceSettingChange:
                 TraceDbg("dev %04x, InterfaceNumber %d, NewInterfaceSetting %d", 
                           ptr04x(device), params->InterfaceNumber, params->NewInterfaceSetting);
-//              st = device::set_interface(device, request, params->InterfaceNumber, params->NewInterfaceSetting);
                 break;
         case UdecxEndpointsConfigureTypeEndpointsReleasedOnly:
                 TraceDbg("dev %04x, EndpointsReleasedOnly", ptr04x(device)); // WdfObjectDelete(ReleasedEndpoints[i]) can cause BSOD
                 break;
         }
 
-        if (st != STATUS_PENDING) {
-                if (st) {
-                        TraceDbg("%!STATUS!", st);
-                }
-                WdfRequestComplete(request, st);
-        }
+        WdfRequestComplete(request, STATUS_SUCCESS);
 }
 
 /*

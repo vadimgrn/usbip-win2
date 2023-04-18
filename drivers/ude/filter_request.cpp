@@ -81,10 +81,6 @@ auto select_configuration(
                 }
         }
 
-        if (dev.skip_select_config) {
-                return STATUS_REQUEST_NOT_ACCEPTED;
-        }
-
         pkt = device::make_set_configuration(cfg);
         return STATUS_SUCCESS;
 }
