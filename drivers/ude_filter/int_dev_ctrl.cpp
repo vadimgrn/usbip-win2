@@ -184,8 +184,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 		select_configuration(fltr, urb.UrbSelectConfiguration);
 		break;
 	default:
-		Trace(TRACE_LEVEL_ERROR, "Unexpected %s", urb_function_str(hdr.Function));
-		NT_ASSERT(!"Unexpected URB Function");
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), urb_function_str(hdr.Function));
 	}
 
 	if (send) {
@@ -242,20 +241,6 @@ auto pre_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp)
 	return IoCallDriver(fltr.target, irp);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto is_processing_required(_In_ IRP *irp)
-{
-	bool ok{};
-
-	if (libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		auto urb = libdrv::urb_from_irp(irp);
-		ok = filter::is_request_function(urb->UrbHeader.Function);
-	}
-
-	return ok;
-}
-
 } // namespace
 
 
@@ -273,6 +258,8 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	auto f = !fltr.is_hub && is_processing_required(irp) ? pre_process_irp : ForwardIrp;
+	auto is_urb = !fltr.is_hub && libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB;
+
+	auto f = is_urb ? pre_process_irp : ForwardIrp;
 	return f(fltr, irp);
 }

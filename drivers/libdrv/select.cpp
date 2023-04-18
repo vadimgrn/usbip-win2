@@ -41,7 +41,7 @@ void interfaces_str(
 
 		st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "
-			"Class %#02hhx, SubClass %#02hhx, Protocol %#02hhx, InterfaceHandle %04x, NumberOfPipes %lu)", 
+			"Class %#x, SubClass %#x, Protocol %#x, InterfaceHandle %04x, NumberOfPipes %lu)", 
 			r->Length, 
 			r->InterfaceNumber,
 			r->AlternateSetting,
@@ -56,8 +56,8 @@ void interfaces_str(
 			auto &p = r->Pipes[j];
 
 			st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
-				"\nPipes[%lu](MaximumPacketSize %#x, EndpointAddress %#02hhx %s[%d], Interval %#hhx, %s, "
-				"PipeHandle %04x, MaximumTransferSize %#lx, PipeFlags %#lx)",
+				"\nPipes[%lu](MaximumPacketSize %d, EndpointAddress %#x{%s[%d]}, Interval %d, %s, "
+				"PipeHandle %04x, MaximumTransferSize %lu, PipeFlags %#lx)",
 				j,
 				p.MaximumPacketSize,
 				p.EndpointAddress,
@@ -92,7 +92,7 @@ const char* libdrv::select_configuration_str(char *buf, size_t len, const _URB_S
 
 	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"ConfigurationHandle %04x, "
-			"ConfigurationDescriptor(bLength %d, bDescriptorType %d (must be %d), wTotalLength %hu, "
+			"ConfigurationDescriptor(bLength %d, bDescriptorType %d (must be %d), wTotalLength %d, "
 			"bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
 		        ptr04x(cfg->ConfigurationHandle),
 			cd->bLength,
