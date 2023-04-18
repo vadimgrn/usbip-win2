@@ -78,6 +78,7 @@ PAGED void usbip::query_interface(_Inout_ filter_ext &, _Inout_ _USB_BUS_INTERFA
 			TraceDbg("QueryBusTime -> %!STATUS!, substituted", st);
 			r.QueryBusTime = QueryBusTime;
 		}
+		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unexpected USB_BUSIF_USBDI_VERSION_%lu", r.Version);
 	}

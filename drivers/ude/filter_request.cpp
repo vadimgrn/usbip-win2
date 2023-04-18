@@ -26,7 +26,7 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
 {
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
 
-                if (auto &p = intf.Pipes[i]; auto endp = find_endpoint(dev, compare_descr(p))) {
+                if (auto &p = intf.Pipes[i]; auto endp = find_endpoint(dev, compare_endpoint_descr(p))) {
                         TraceDbg("interface %d.%d, pipe[%lu] {%s, addr %#x} -> PipeHandle %04x (was %04x)",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType), 
                                 p.EndpointAddress, ptr04x(p.PipeHandle), ptr04x(endp->PipeHandle));
@@ -47,7 +47,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto clear_endpoint_stall(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _Inout_ _URB_PIPE_REQUEST &r)
 {
-        if (auto endp = find_endpoint(dev, compare_handle(r.PipeHandle))) {
+        if (auto endp = find_endpoint(dev, compare_endpoint_handle(r.PipeHandle))) {
                 auto addr = endp->descriptor.bEndpointAddress;
                 pkt = device::make_clear_endpoint_stall(addr);
                 TraceDbg("PipeHandle %04x, bEndpointAddress %#x", ptr04x(r.PipeHandle), addr);
@@ -125,18 +125,25 @@ NTSTATUS usbip::filter::unpack_request(
         case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
         case URB_FUNCTION_SYNC_RESET_PIPE:
         case URB_FUNCTION_SYNC_CLEAR_STALL:
+                static_assert(is_request_function(URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL));
+                static_assert(is_request_function(URB_FUNCTION_SYNC_RESET_PIPE));
+                static_assert(is_request_function(URB_FUNCTION_SYNC_CLEAR_STALL));
                 st = clear_endpoint_stall(dev, pkt, *reinterpret_cast<_URB_PIPE_REQUEST*>(r.TransferBuffer));
                 break;
         case URB_FUNCTION_SELECT_INTERFACE:
+                static_assert(is_request_function(URB_FUNCTION_SELECT_INTERFACE));
                 st = select_interface(dev, pkt, *reinterpret_cast<_URB_SELECT_INTERFACE*>(r.TransferBuffer));
                 break;
         case URB_FUNCTION_SELECT_CONFIGURATION:
+                static_assert(is_request_function(URB_FUNCTION_SELECT_CONFIGURATION));
                 st = select_configuration(dev, pkt, *reinterpret_cast<_URB_SELECT_CONFIGURATION*>(r.TransferBuffer));
                 break;
         default:
-                st = STATUS_UNSUCCESSFUL;
-                r.Hdr.Status = USBD_STATUS_INVALID_URB_FUNCTION;
+                st = STATUS_INVALID_PARAMETER;
+                r.Hdr.Status = USBD_STATUS_INVALID_PARAMETER;
                 Trace(TRACE_LEVEL_ERROR, "Unexpected %s", func_name);
+                NT_ASSERT(!"Unexpected URB Function");
+
         }
 
         return st;

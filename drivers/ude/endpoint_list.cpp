@@ -17,7 +17,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_endpoint_list_head(_In_ device_ctx &dev)
 {
-        NT_ASSERT(dev.ep0);
         auto ep0 = get_endpoint_ctx(dev.ep0);
         return &ep0->entry;
 }
@@ -53,7 +52,7 @@ void usbip::remove_endpoint_list(_In_ endpoint_ctx &endp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const compare_algo &compare) -> endpoint_ctx*
+auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const compare_endpoint &compare) -> endpoint_ctx*
 {
         auto head = get_endpoint_list_head(dev);
 
@@ -69,7 +68,7 @@ auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const compare_algo &compare
         return nullptr;
 }
 
-bool usbip::compare_descr::operator() (const endpoint_ctx &endp) const
+bool usbip::compare_endpoint_descr::operator() (const endpoint_ctx &endp) const
 {
         auto &d = endp.descriptor;
 

@@ -35,6 +35,20 @@ static_assert(sizeof(const_part) == 2*sizeof(USHORT));
 } // namespace impl
 
 
+constexpr auto is_request_function(_In_ int function)
+{
+        switch (function) {
+        case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
+        case URB_FUNCTION_SYNC_RESET_PIPE:
+        case URB_FUNCTION_SYNC_CLEAR_STALL:
+        case URB_FUNCTION_SELECT_INTERFACE:
+        case URB_FUNCTION_SELECT_CONFIGURATION:
+                return true;
+        }
+
+        return false;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto is_request(_In_ const _URB_CONTROL_TRANSFER_EX &r)
@@ -53,6 +67,8 @@ inline auto get_function(_Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool clear = 
         if (clear) {
                 r.Timeout = 0;
         }
+
+        NT_ASSERT(is_request_function(function));
         return function;
 
 }
