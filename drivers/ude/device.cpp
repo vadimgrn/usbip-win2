@@ -322,11 +322,11 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         {
                 auto &d = endp.descriptor;
-                TraceDbg("dev %04x, endp %04x{Length %d, Address %#04x{%s %s[%d]}, Attributes %#x, MaxPacketSize %d, "
+                TraceDbg("dev %04x, endp %04x{Length %d, Address %#04x{%s %s[%d]}, Attributes %#x, MaxPacketSize %#x, "
                          "Interval %d, Audio{Refresh %#x, SynchAddress %#x}}, queue %04x%!BIN!",
                         ptr04x(device), ptr04x(endpoint), d.bLength, d.bEndpointAddress, 
                         usbd_pipe_type_str(usb_endpoint_type(d)), usb_endpoint_dir_out(d) ? "Out" : "In", 
-                        usb_endpoint_num(d), d.bmAttributes, d.wMaxPacketSize, d.bInterval, d.bRefresh, 
+                        usb_endpoint_num(d), d.bmAttributes, d.wMaxPacketSize, d.bInterval, d.bRefresh,
                         d.bSynchAddress, ptr04x(endp.queue), WppBinary(&d, d.bLength));
         }
 

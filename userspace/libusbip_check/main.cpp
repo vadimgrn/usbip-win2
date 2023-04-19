@@ -11,6 +11,7 @@
 #include <libusbip\output.h>
 #include <libusbip\remote.h>
 #include <libusbip\vhci.h>
+#include <libusbip\persistent.h>
 
 int main()
 {

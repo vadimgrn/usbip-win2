@@ -23,7 +23,8 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
 	_Out_opt_ ULONG *CurrentUsbFrame)
 {
 	if (CurrentUsbFrame) {
-		*CurrentUsbFrame = USBD_ISO_START_FRAME_RANGE/10; // zero is OK too
+		static ULONG dummy;
+		*CurrentUsbFrame = ++dummy; // zero is OK too
 		// TraceDbg("%lu", *CurrentUsbFrame); // too often
 	}
 

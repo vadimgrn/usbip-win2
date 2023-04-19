@@ -203,12 +203,15 @@ void post_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp)
 {
 	auto status = irp->IoStatus.Status;
 
-	if (auto &urb = *libdrv::urb_from_irp(irp); NT_ERROR(status) || USBD_ERROR(URB_STATUS(&urb))) {
-		auto &hdr = urb.UrbHeader;
+	if (auto ctl = libdrv::DeviceIoControlCode(irp); ctl != IOCTL_INTERNAL_USB_SUBMIT_URB) {
+		TraceDbg("dev %04x, %s, %!STATUS!", ptr04x(fltr.self), internal_device_control_name(ctl), status);
+
+	} else if (auto urb = libdrv::urb_from_irp(irp); NT_ERROR(status) || USBD_ERROR(URB_STATUS(urb))) {
+		auto &hdr = urb->UrbHeader;
 		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, USBD_STATUS_%s, %!STATUS!", ptr04x(fltr.self), 
 			urb_function_str(hdr.Function), get_usbd_status(hdr.Status), status);
 	} else {
-		post_process_urb(fltr, urb);
+		post_process_urb(fltr, *urb);
 	}
 }
 
@@ -258,8 +261,6 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	auto is_urb = !fltr.is_hub && libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB;
-
-	auto f = is_urb ? pre_process_irp : ForwardIrp;
+	auto f = fltr.is_hub ? ForwardIrp : pre_process_irp;
 	return f(fltr, irp);
 }

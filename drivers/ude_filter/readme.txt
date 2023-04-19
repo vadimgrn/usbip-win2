@@ -1,5 +1,5 @@
-This is an upper class filter driver which is required for emulated HCI (VHCI) driver usbip2_vhci.
-UDE doesn't propagate SELECT_CONFIGURATION/SELECT_INTERFACE and this is a major issue for VHCI.
+This is an upper class filter driver which is required for emulated HCI driver usbip2_ude.
+UDE doesn't propagate correctly SELECT_CONFIGURATION/SELECT_INTERFACE and this is a major issue.
 This driver fixes that. 
 
 Driver's class is "USB host controllers and USB hubs". 
@@ -11,4 +11,4 @@ Fow each newly added PDO (which is an emulated usb device) it creates Filter Dev
 IRP_MJ_INTERNAL_DEVICE_CONTROL -> IOCTL_INTERNAL_USB_SUBMIT_URB -> URB_FUNCTION_SELECT_CONFIGURATION | URB_FUNCTION_SELECT_INTERFACE.
 
 For each such request it creates _URB_CONTROL_TRANSFER_EX and passes it down.
-In such way usbip2_vhci driver receives required information.
+In such way usbip2_ude driver receives required information.

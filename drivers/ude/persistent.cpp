@@ -162,6 +162,9 @@ constexpr auto can_retry(_In_ DWORD error)
         return false;
 }
 
+/*
+ * @return true - do not try to connect to this device again
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
