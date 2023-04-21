@@ -18,7 +18,7 @@
   - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (list is incomplete)
 - [WDM driver](https://github.com/vadimgrn/usbip-win2/tree/wdm) (versions up to 0.9.5)
   - **Is fully implemented**
-  - The latest release is [0.9.3.3](https://github.com/vadimgrn/usbip-win2/releases/tag/v.0.9.3.3)
+  - The latest release is [0.9.3.4](https://github.com/vadimgrn/usbip-win2/releases/tag/wdm-0.9.3.4)
   - Development stopped in favor of UDE driver
   - Use it only if UDE driver has issues with your devices
   - Will be supported until UDE driver is fully functional
