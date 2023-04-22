@@ -14,6 +14,14 @@
 #include <libdrv\ioctl.h>
 
 #include <usbbusif.h>
+#include <wdmguid.h>
+
+#include <minwindef.h>
+#include <ks.h>
+
+#include <strmini.h>
+#include <initguid.h>
+#include <usbcamdi.h>
 
 namespace
 {
@@ -140,22 +148,63 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED const char* get_guid_name(_In_ const GUID &guid)
+{
+	PAGED_CODE();
+
+	struct {
+		const GUID &guid;
+		const char *name;
+	} const v[] = {
+		{GUID_D3COLD_SUPPORT_INTERFACE, "D3COLD_SUPPORT"},
+		{GUID_PNP_EXTENDED_ADDRESS_INTERFACE, "PNP_EXTENDED_ADDRESS"},
+		{GUID_PNP_LOCATION_INTERFACE, "PNP_LOCATION"},
+		{GUID_IOMMU_BUS_INTERFACE, "IOMMU_BUS"},
+		{GUID_BUS_INTERFACE_STANDARD, "BUS_INTERFACE_STANDARD"},
+		{GUID_USBCAMD_INTERFACE, "USBCAMD"},
+		{USB_BUS_INTERFACE_USBC_CONFIGURATION_GUID, "USB_BUS_INTERFACE_USBC_CONFIGURATION"},
+		{KSMEDIUMSETID_Standard, "KSMEDIUMSETID_Standard"},
+	};
+
+	for (auto &i: v) {
+		if (guid == i.guid) {
+			return i.name;
+		}
+	} 
+	
+	return nullptr;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
 {
 	PAGED_CODE();
+
 	auto st = ForwardIrpSynchronously(fltr, irp);
 
-	if (NT_ERROR(st)) {
-		Trace(TRACE_LEVEL_ERROR, "%!GUID!, Size %d, Version %d, %!STATUS!", 
-			qi.InterfaceType, qi.Size, qi.Version, st);
-	} else if (IsEqualGUID(*qi.InterfaceType, USB_BUS_INTERFACE_USBDI_GUID)) {
+	if (auto name = get_guid_name(*qi.InterfaceType); NT_ERROR(st)) {
+		if (name) {
+			Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, Size %d, Version %d, %!STATUS!", 
+				ptr04x(fltr.self), name, qi.Size, qi.Version, st);
+		} else {
+			Trace(TRACE_LEVEL_ERROR, "dev %04x, %!GUID!, Size %d, Version %d, %!STATUS!", 
+				ptr04x(fltr.self), qi.InterfaceType, qi.Size, qi.Version, st);
+		}
+	} else if (*qi.InterfaceType == USB_BUS_INTERFACE_USBDI_GUID) {
 		auto &v3 = *reinterpret_cast<USB_BUS_INTERFACE_USBDI_V3*>(qi.Interface); // highest
-		TraceDbg("USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d", qi.Size, qi.Version);
+
+		TraceDbg("dev %04x, USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d", 
+			  ptr04x(fltr.self), qi.Size, qi.Version);
+
 		query_interface(fltr, v3);
+
+	} else if (auto &i = *qi.Interface; name) {
+		TraceDbg("dev %04x, %s, Size %d, Version %d -> Size %d, Version %d", 
+			  ptr04x(fltr.self), name, qi.Size, qi.Version, i.Size, i.Version);
 	} else {
-		auto &i = *reinterpret_cast<INTERFACE*>(qi.Interface);
-		TraceDbg("%!GUID!, Size %d, Version %d -> Size %d, Version %d", 
-			  qi.InterfaceType, qi.Size, qi.Version, i.Size, i.Version);
+		TraceDbg("dev %04x, %!GUID!, Size %d, Version %d -> Size %d, Version %d", 
+			  ptr04x(fltr.self), qi.InterfaceType, qi.Size, qi.Version, i.Size, i.Version);
 	}
 
 	return CompleteRequest(irp, st);
