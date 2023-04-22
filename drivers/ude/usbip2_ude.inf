@@ -28,6 +28,10 @@ usbip2_ude.sys = 1,,
 [ude_Device.NT]
 CopyFiles=@usbip2_ude.sys
 
+[ude_Device.NT.HW]
+Include=machine.inf
+Needs=PciD3ColdSupported.HW
+
 [ude_Device.NT.Services]
 ; Flags: 0x00000002 (SPSVCINST_ASSOCSERVICE)
 AddService = usbip2_ude,2,ude_Device_Service_Inst
