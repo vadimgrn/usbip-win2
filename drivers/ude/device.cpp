@@ -445,9 +445,11 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
         UdecxUsbDeviceInitSetStateChangeCallbacks(init, &cb);
 
         auto speed = to_udex_speed(ext.dev.speed);
-        UdecxUsbDeviceInitSetSpeed(init, speed);
+        TraceDbg("%!usb_device_speed! -> %!UDECX_USB_DEVICE_SPEED!", ext.dev.speed, speed);
 
+        UdecxUsbDeviceInitSetSpeed(init, speed);
         UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
+
         return STATUS_SUCCESS;
 }
 

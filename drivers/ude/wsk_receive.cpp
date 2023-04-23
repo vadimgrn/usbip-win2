@@ -10,19 +10,13 @@
 #include "wsk_context.h"
 #include "device.h"
 #include "device_queue.h"
-#include "urbtransfer.h"
 #include "network.h"
 #include "driver.h"
 #include "ioctl.h"
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
-#include <libdrv\wsk_cpp.h>
 #include <libdrv\pdu.h>
-#include <libdrv\usbdsc.h>
-#include <libdrv\ch9.h>
-
-#include <usb.h>
 
 namespace
 {
@@ -52,35 +46,9 @@ PAGED void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
 	}
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
-{
-	TraceDbg("DeviceDescriptor(bLength %d, %!usb_descriptor_type!, bcdUSB %#x, "
-		"bDeviceClass %#x, bDeviceSubClass %#x, bDeviceProtocol %#x, bMaxPacketSize0 %d, "
-		"idVendor %#x, idProduct %#x, bcdDevice %#x, "
-		"iManufacturer %d, iProduct %d, iSerialNumber %d, "
-		"bNumConfigurations %d)",
-		d.bLength, d.bDescriptorType, d.bcdUSB,
-		d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, d.bMaxPacketSize0,
-		d.idVendor, d.idProduct, d.bcdDevice,
-		d.iManufacturer, d.iProduct, d.iSerialNumber,
-		d.bNumConfigurations);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
-{
-	TraceDbg("ConfigurationDescriptor(bLength %d, %!usb_descriptor_type!, wTotalLength %hu(%#x), "
-		 "bNumInterfaces %d, bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d)",
-		d.bLength, d.bDescriptorType, d.wTotalLength, d.wTotalLength,
-		d.bNumInterfaces, d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
-}
-
 constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
 {
-	return  actual_length >= 0 && ULONG(actual_length) <= TransferBufferLength ? 
+	return  actual_length >= 0 && static_cast<ULONG>(actual_length) <= TransferBufferLength ? 
 		STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
 }
 
@@ -225,70 +193,6 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 	return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto post_control_transfer(_In_ wsk_context &ctx, _In_ const _URB_CONTROL_TRANSFER &r)
-{
-	ULONG dsc_len;
-	USB_COMMON_DESCRIPTOR *dsc; // ctx.mdl_buf.sysaddr() can be used too
-
-	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
-		   is_transfer_dir_in(r) &&
-		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
-		   r.TransferBufferLength >= sizeof(*dsc);
-
-	if (!ok) {
-		return STATUS_SUCCESS;
-	}
-	
-	if (auto err = UdecxUrbRetrieveBuffer(ctx.request, reinterpret_cast<PUCHAR*>(&dsc), &dsc_len)) {
-		Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
-		return err;
-	}
-
-	NT_ASSERT(dsc_len == r.TransferBufferLength);
-
-	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", dsc->bLength, dsc->bDescriptorType, 
-		  WppBinary(dsc, USHORT(dsc_len)));
-
-	switch (dsc->bDescriptorType) {
-	case USB_DEVICE_DESCRIPTOR_TYPE:
-	{
-		auto &dd = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc);
-		if (dsc_len == sizeof(dd) && dd.bLength == dsc_len) {
-			NT_ASSERT(usbdlib::is_valid(dd));
-			log(dd);
-		}
-	}
-		break;
-	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
-	{
-		auto &cd = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
-		if (dsc_len > sizeof(cd) && cd.bLength == sizeof(cd) && cd.wTotalLength == dsc_len) {
-			NT_ASSERT(usbdlib::is_valid(cd));
-			log(cd);
-		}
-	}
-	        break;
-	}
-
-	return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto post_process_transfer_buffer(_In_ wsk_context &ctx, _In_ const URB &urb)
-{
-	switch (urb.UrbHeader.Function) {
-	case URB_FUNCTION_CONTROL_TRANSFER_EX:
-	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
-		static_assert(sizeof(urb.UrbControlTransfer) == sizeof(urb.UrbControlTransferEx));
-		return post_control_transfer(ctx, static_cast<const _URB_CONTROL_TRANSFER&>(urb.UrbControlTransfer));
-	}
-
-	return STATUS_SUCCESS;
-}
-
 /* 
  * UrbHeader.Status must be set before this call.
  * @see device_ioctl.cpp, send_complete 
@@ -326,12 +230,13 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit
 
 	auto st = STATUS_SUCCESS;
 
-	if (auto tr = TryAsUrbTransfer(&urb)) { // see UdecxUrbRetrieveBuffer, UdecxUrbSetBytesCompleted
-		if (tr->TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
-			st = assign(tr->TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
-		}
-		if (NT_SUCCESS(st)) {
-			st = post_process_transfer_buffer(ctx, urb);
+	UCHAR *TransferBuffer{};
+	ULONG TransferBufferLength{};
+
+	if (NT_SUCCESS(UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength))) { // if URB has transfer buffer
+		if (TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
+			st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+			UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 		}
 	}
 
@@ -391,17 +296,18 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb)
 {
 	mdl = nullptr;
-
-	auto tr = TryAsUrbTransfer(&urb);
-	if (!tr) {
-		auto fn = urb.UrbHeader.Function;
-		Trace(TRACE_LEVEL_ERROR, "%s(%#x) does not have TransferBuffer", urb_function_str(fn), fn);
-		return STATUS_INVALID_PARAMETER;
-	}
-
 	auto &ret = get_ret_submit(ctx);
 
 	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
+		return err;
+	}
+
+	UCHAR *TransferBuffer{};
+	ULONG TransferBufferLength{};
+
+	if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) { // URB must have transfer buffer
+		Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!", 
+			                  urb_function_str(urb.UrbHeader.Function), err);
 		return err;
 	}
 
@@ -409,14 +315,15 @@ auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload
-		fail = check(tr->TransferBufferLength, ret.actual_length); // do not change buffer length
+		fail = check(TransferBufferLength, ret.actual_length); // do not change buffer length
 	} else { // actual_length MUST be assigned, must not have payload for OUT
-		fail = assign(tr->TransferBufferLength, ret.actual_length) || dir_out; 
+		fail = assign(TransferBufferLength, ret.actual_length) || dir_out;
+		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 	}
 
-	if (fail || !tr->TransferBufferLength) {
+	if (fail || !TransferBufferLength) {
 		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
-			tr->TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
+			                  TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
