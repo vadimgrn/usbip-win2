@@ -59,7 +59,7 @@ PAGED void reclaim_all_ports(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = vhci::find_device(vhci, port)) {
+                if (auto dev = vhci::get_device(vhci, port)) {
                         vhci::reclaim_roothub_port(dev.get<UDECXUSBDEVICE>());
                 }
         }
@@ -426,7 +426,7 @@ void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
+wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 {
         wdf::ObjectRef dev;
         if (!is_valid_port(port)) {
@@ -452,7 +452,7 @@ PAGED void usbip::vhci::plugout_all_devices(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = find_device(vhci, port)) {
+                if (auto dev = get_device(vhci, port)) {
                         device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
                 }
         }

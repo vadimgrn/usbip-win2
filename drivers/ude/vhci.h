@@ -31,7 +31,7 @@ int claim_roothub_port(_In_ UDECXUSBDEVICE dev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef find_device(_In_ WDFDEVICE vhci, _In_ int port);
+wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

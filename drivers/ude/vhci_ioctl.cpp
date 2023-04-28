@@ -414,7 +414,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
                 vhci::plugout_all_devices(vhci);
         } else if (!is_valid_port(r->port)) {
                 return STATUS_INVALID_PARAMETER;
-        } else if (auto dev = vhci::find_device(vhci, r->port)) {
+        } else if (auto dev = vhci::get_device(vhci, r->port)) {
                 device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
         } else {
                 return STATUS_DEVICE_NOT_CONNECTED;
@@ -450,12 +450,12 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST request)
         ULONG cnt = 0;
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = vhci::find_device(vhci, port)) {
-                        if (cnt == max_cnt) {
-                                return STATUS_BUFFER_TOO_SMALL;
-                        } else if (auto ctx = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *ctx)) {
-                                return err;
-                        }
+                if (auto dev = vhci::get_device(vhci, port); !dev) {
+                        //
+                } else if (cnt == max_cnt) {
+                        return STATUS_BUFFER_TOO_SMALL;
+                } else if (auto ctx = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *ctx)) {
+                        return err;
                 }
         }
 
