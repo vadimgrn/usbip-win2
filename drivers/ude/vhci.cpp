@@ -52,18 +52,34 @@ void attach_thread_join(_In_ WDFDEVICE vhci)
         ObDereferenceObject(thread);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void reclaim_all_ports(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
+                if (auto dev = vhci::find_device(vhci, port)) {
+                        vhci::reclaim_roothub_port(dev.get<UDECXUSBDEVICE>());
+                }
+        }
+}
+
+/*
+ * WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE.
+ */
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGED void vhci_cleanup(_In_ WDFOBJECT Object)
 {
-        PAGED_CODE(); // WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE
+        PAGED_CODE();
 
         auto vhci = static_cast<WDFDEVICE>(Object);
         TraceDbg("vhci %04x", ptr04x(vhci));
         
         attach_thread_join(vhci);
-        vhci::destroy_all_devices(vhci);
+        reclaim_all_ports(vhci);
 }
 
 using init_func_t = NTSTATUS(WDFDEVICE);
@@ -134,13 +150,22 @@ NTSTATUS query_usb_capability(
         return st;
 }
 
+/*
+ * If TargetState is WdfPowerDeviceD3Final, you should assume that the system is being turned off, 
+ * the device is about to be removed, or a resource rebalance is in progress. 
+ */
 _Function_class_(EVT_WDF_DEVICE_D0_EXIT)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE TargetState)
+PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE vhci, _In_ WDF_POWER_DEVICE_STATE TargetState)
 {
         PAGED_CODE();
         TraceDbg("TargetState %!WDF_POWER_DEVICE_STATE!", TargetState);
+
+        if (TargetState == WdfPowerDeviceD3Final) {
+                reclaim_all_ports(vhci);
+        }
+
         return STATUS_SUCCESS;
 }
 
@@ -420,10 +445,9 @@ wdf::ObjectRef usbip::vhci::find_device(_In_ WDFDEVICE vhci, _In_ int port)
         return dev;
 }
 
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::destroy_all_devices(_In_ WDFDEVICE vhci)
+PAGED void usbip::vhci::plugout_all_devices(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 

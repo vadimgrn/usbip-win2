@@ -71,8 +71,8 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         TraceDbg("dev %04x", ptr04x(dev));
 
-        vhci::reclaim_roothub_port(dev);
         close_socket(ctx.ext->sock);
+        vhci::reclaim_roothub_port(dev);
 
         NT_ASSERT(WDF_IO_QUEUE_PURGED(WdfIoQueueGetState(ctx.queue, nullptr, nullptr)));
 }

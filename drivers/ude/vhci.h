@@ -39,6 +39,6 @@ void reclaim_roothub_port(_In_ UDECXUSBDEVICE dev);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void destroy_all_devices(_In_ WDFDEVICE vhci);
+PAGED void plugout_all_devices(_In_ WDFDEVICE vhci);
 
 } // namespace usbip::vhci

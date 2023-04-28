@@ -411,7 +411,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
         }
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
-                vhci::destroy_all_devices(vhci);
+                vhci::plugout_all_devices(vhci);
         } else if (!is_valid_port(r->port)) {
                 return STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::find_device(vhci, r->port)) {
@@ -574,6 +574,7 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
         cfg.EvtIoDeviceControl = device_control;
+        cfg.PowerManaged = WdfFalse;
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
