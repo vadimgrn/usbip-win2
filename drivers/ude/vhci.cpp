@@ -355,27 +355,28 @@ auto get_port_range(_In_ usb_device_speed speed)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
+int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
 {
-        auto &dev_ctx = *get_device_ctx(dev);
+        auto &dev = *get_device_ctx(device);
+        auto &vhci = *get_vhci_ctx(dev.vhci); 
 
-        auto vhci = dev_ctx.vhci;
-        auto &vhci_ctx = *get_vhci_ctx(vhci); 
+        NT_ASSERT(!dev.port);
+        int port = 0;
 
-        auto &port = dev_ctx.port;
-        NT_ASSERT(!port);
+        auto [begin, end] = get_port_range(dev.speed());
 
-        auto [begin, end] = get_port_range(dev_ctx.speed());
-
-        Lock lck(vhci_ctx.lock); // function must be resident, do not use PAGED
+        Lock lck(vhci.lock); // function must be resident, do not use PAGED
 
         for (auto i = begin; i < end; ++i) {
-                NT_ASSERT(i < ARRAYSIZE(vhci_ctx.devices));
-                auto &handle = vhci_ctx.devices[i];
-                if (!handle) {
-                        WdfObjectReference(handle = dev);
+                NT_ASSERT(i < ARRAYSIZE(vhci.devices));
+
+                if (auto &handle = vhci.devices[i]; !handle) {
+                        WdfObjectReference(handle = device);
+                        
                         port = i + 1;
                         NT_ASSERT(is_valid_port(port));
+
+                        dev.port = port;
                         break;
                 }
         }
@@ -383,7 +384,7 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
         lck.release();
 
         if (port) {
-                TraceDbg("dev %04x, port %d", ptr04x(dev), port);
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(device), port);
         }
 
         return port;
@@ -391,37 +392,33 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE dev)
+int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
 {
-        auto &dev_ctx = *get_device_ctx(dev);
+        auto &dev = *get_device_ctx(device);
+        auto &vhci = *get_vhci_ctx(dev.vhci); 
 
-        auto vhci = dev_ctx.vhci;
-        auto &vhci_ctx = *get_vhci_ctx(vhci); 
-
-        auto &port = dev_ctx.port;
+        static_assert(!is_valid_port(0));
         int old_port = 0;
-        bool removed = false;
 
-        Lock lck(vhci_ctx.lock); 
-        if (port) {
-                old_port = port;
-                removed = true;
-
+        Lock lck(vhci.lock); 
+        if (auto &port = dev.port) {
                 NT_ASSERT(is_valid_port(port));
-                auto &handle = vhci_ctx.devices[port - 1];
+                old_port = port;
 
-                NT_ASSERT(handle == dev);
+                auto &handle = vhci.devices[port - 1];
+                NT_ASSERT(handle == device);
+
                 handle = WDF_NO_HANDLE;
-
                 port = 0;
-                static_assert(!is_valid_port(0));
         }
         lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
-        if (removed) {
-                TraceDbg("dev %04x, port %ld", ptr04x(dev), old_port);
-                WdfObjectDereference(dev);
+        if (old_port) {
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %ld", ptr04x(device), old_port);
+                WdfObjectDereference(device);
         }
+
+        return old_port;
 }
 
 _IRQL_requires_same_
