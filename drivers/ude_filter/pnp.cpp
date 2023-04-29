@@ -133,7 +133,9 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
 
-	if (auto &h = fltr.device.usbd_handle) {
+	if (fltr.is_hub) {
+		//
+	} else if (auto &h = fltr.device.usbd_handle) {
 		USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
 		h = nullptr;
 	}

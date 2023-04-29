@@ -39,14 +39,14 @@ public:
 
         auto release()
         {
-                auto p = m_ptr;
+                auto ptr = m_ptr;
                 m_ptr = nullptr;
-                return p;
+                return ptr;
         }
 
         unique_ptr(_Inout_ unique_ptr&& p) : m_ptr(p.release()) {}
 
-        auto& operator=_Inout_ (unique_ptr&& p)
+        auto& operator=(_Inout_ unique_ptr&& p)
         {
                 reset(p.release());
                 return *this;

@@ -54,14 +54,10 @@ NTSTATUS on_send_request(
 	return StopCompletion;
 }
 
-/*
- * @param result must be free()-d if no longer required
- */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto make_irp(_Out_ IRP* &result, _In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ USHORT function)
+auto send_request(_In_ filter_ext &fltr, _Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
 {
-	result = nullptr;
 	auto target = fltr.target;
 
 	libdrv::irp_ptr irp(target->StackSize, false);
@@ -86,46 +82,23 @@ auto make_irp(_Out_ IRP* &result, _In_ filter_ext &fltr, _In_ void *TransferBuff
 		return err;
 	}
 
-	filter::pack_request(urb.get()->UrbControlTransferEx, TransferBuffer, function);
+	filter::pack_request(urb.get()->UrbControlTransferEx, TransferBuffer.release(), function);
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.release();
-	result = irp.release();
-
-	return STATUS_SUCCESS;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_same_
-auto send_request(_In_ filter_ext &fltr, _In_ void *TransferBuffer, _In_ USHORT function)
-{
-	IRP *irp{};
-	if (auto err = make_irp(irp, fltr, TransferBuffer, function)) {
-		return err;
-	}
-
-	auto st = IoCallDriver(fltr.target, irp);
-
-	if (NT_ERROR(st)) {
-		Trace(TRACE_LEVEL_ERROR, "IoCallDriver %!STATUS!", st);
-		free(fltr, irp);
-		irp = nullptr;
-	}
-
-	return st;
+	return IoCallDriver(fltr.target, irp.release()); // completion routine will be called anyway
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 {
-	auto &hdr = urb.UrbHeader;
-
-	if (unique_ptr buf(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, hdr.Length); !buf) {
+	if (auto &hdr = urb.UrbHeader;
+	    auto buf = unique_ptr(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, hdr.Length)) {
+		RtlCopyMemory(buf.get(), &urb, hdr.Length);
+		send_request(fltr, buf, hdr.Function);
+	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", hdr.Length);
-	} else if (RtlCopyMemory(buf.get(), &urb, hdr.Length); 
-		   NT_SUCCESS(send_request(fltr, buf.get(), hdr.Function))) {
-		buf.release();
 	}
 }
 
@@ -138,16 +111,13 @@ void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGUR
 {
 	{
 		char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), 
-			  libdrv::select_configuration_str(buf, sizeof(buf), &r));
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
 
-	ULONG len{};
-
-	if (unique_ptr buf = clone(len, r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag); !buf) {
+	if (ULONG len{}; unique_ptr buf = clone(len, r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag)) {
+		send_request(fltr, buf, r.Hdr.Function);
+	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
-	} else if (NT_SUCCESS(send_request(fltr, buf.get(), r.Hdr.Function))) {
-		buf.release();
 	}
 }
 
