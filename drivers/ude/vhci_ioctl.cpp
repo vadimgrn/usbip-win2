@@ -264,8 +264,9 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
 {
         PAGED_CODE();
 
-        port = vhci::claim_roothub_port(dev);
-        if (!port) {
+        if (port = vhci::claim_roothub_port(dev); port) {
+                TraceDbg("dev %04x -> port %d", ptr04x(dev), port);
+        } else {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERROR_USBIP_PORTFULL;
         }

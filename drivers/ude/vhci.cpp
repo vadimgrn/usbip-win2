@@ -382,11 +382,6 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
         }
 
         lck.release();
-
-        if (port) {
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(device), port);
-        }
-
         return port;
 }
 
@@ -398,12 +393,12 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
         auto &vhci = *get_vhci_ctx(dev.vhci); 
 
         static_assert(!is_valid_port(0));
-        int old_port = 0;
+        int portnum = 0;
 
         Lock lck(vhci.lock); 
         if (auto &port = dev.port) {
                 NT_ASSERT(is_valid_port(port));
-                old_port = port;
+                portnum = port;
 
                 auto &handle = vhci.devices[port - 1];
                 NT_ASSERT(handle == device);
@@ -413,12 +408,11 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
         }
         lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
-        if (old_port) {
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %ld", ptr04x(device), old_port);
+        if (portnum) {
                 WdfObjectDereference(device);
         }
 
-        return old_port;
+        return portnum;
 }
 
 _IRQL_requires_same_

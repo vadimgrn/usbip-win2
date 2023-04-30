@@ -24,6 +24,7 @@ using namespace usbip;
 
 /*
  * @param result of make_irp() 
+ * IO_REMOVE_LOCK must be used because IRP_MN_REMOVE_DEVICE can remove FiDO prior this callback.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -49,14 +50,18 @@ NTSTATUS on_send_request(
 	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
+
 	free(fltr, irp);
+	libdrv::RemoveLockGuard(fltr.remove_lock, libdrv::adopt_lock);
 
 	return StopCompletion;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto send_request(_In_ filter_ext &fltr, _Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
+auto send_request(
+	_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, 
+	_Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
 {
 	auto target = fltr.target;
 
@@ -82,21 +87,23 @@ auto send_request(_In_ filter_ext &fltr, _Inout_ unique_ptr &TransferBuffer, _In
 		return err;
 	}
 
+	lck.clear();
+
 	filter::pack_request(urb.get()->UrbControlTransferEx, TransferBuffer.release(), function);
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.release();
-	return IoCallDriver(fltr.target, irp.release()); // completion routine will be called anyway
+	return IoCallDriver(target, irp.release()); // completion routine will be called anyway
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
+void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const URB &urb)
 {
 	if (auto &hdr = urb.UrbHeader;
 	    auto buf = unique_ptr(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, hdr.Length)) {
 		RtlCopyMemory(buf.get(), &urb, hdr.Length);
-		send_request(fltr, buf, hdr.Function);
+		send_request(fltr, lck, buf, hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", hdr.Length);
 	}
@@ -107,7 +114,7 @@ void send_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGURATION &r)
+void select_configuration(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
 	{
 		char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
@@ -115,7 +122,7 @@ void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGUR
 	}
 
 	if (ULONG len{}; unique_ptr buf = clone(len, r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag)) {
-		send_request(fltr, buf, r.Hdr.Function);
+		send_request(fltr, lck, buf, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
 	}
@@ -123,7 +130,7 @@ void select_configuration(_In_ filter_ext &fltr, _In_ const _URB_SELECT_CONFIGUR
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
+void post_process_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const URB &urb)
 {
 	bool send{};
 	
@@ -151,14 +158,14 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
 		static_assert(is_request_function(URB_FUNCTION_SELECT_CONFIGURATION));
-		select_configuration(fltr, urb.UrbSelectConfiguration);
+		select_configuration(fltr, lck, urb.UrbSelectConfiguration);
 		break;
 	default:
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), urb_function_str(hdr.Function));
 	}
 
 	if (send) {
-		send_urb(fltr, urb);
+		send_urb(fltr, lck, urb);
 	}
 }
 
@@ -169,7 +176,7 @@ void post_process_urb(_In_ filter_ext &fltr, _In_ const URB &urb)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp)
+void post_process_irp(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ IRP *irp)
 {
 	auto status = irp->IoStatus.Status;
 
@@ -181,7 +188,7 @@ void post_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp)
 		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s, USBD_STATUS_%s, %!STATUS!", ptr04x(fltr.self), 
 			urb_function_str(hdr.Function), get_usbd_status(hdr.Status), status);
 	} else {
-		post_process_urb(fltr, *urb);
+		post_process_urb(fltr, lck, *urb);
 	}
 }
 
@@ -191,7 +198,9 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS irp_completed(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
-	post_process_irp(fltr, irp);
+	libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock);
+
+	post_process_irp(fltr, lck, irp);
 
 	if (irp->PendingReturned) {
 		IoMarkIrpPending(irp);
@@ -202,13 +211,15 @@ NTSTATUS irp_completed(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexp
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto pre_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp)
+auto pre_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ libdrv::RemoveLockGuard &lck)
 {
 	IoCopyCurrentIrpStackLocationToNext(irp);
 
 	if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, irp_completed, &fltr, true, true, true)) {
 		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
 		IoSkipCurrentIrpStackLocation(irp); // forward and forget
+	} else {
+		lck.clear();
 	}
 
 	return IoCallDriver(fltr.target, irp);
@@ -231,6 +242,5 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	auto f = fltr.is_hub ? ForwardIrp : pre_process_irp;
-	return f(fltr, irp);
+	return fltr.is_hub ? ForwardIrp(fltr, irp) : pre_process_irp(fltr, irp, lck);
 }

@@ -50,12 +50,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
+        auto dev = static_cast<UDECXUSBDEVICE>(Object);
 
-        auto device = static_cast<UDECXUSBDEVICE>(Object);
-        TraceDbg("dev %04x", ptr04x(device));
-
-        if (auto &dev = *get_device_ctx(device); auto ptr = dev.ext) {
-                free(ptr);
+        if (auto &ctx = *get_device_ctx(dev); auto p = ctx.ext) {
+                TraceDbg("dev %04x, %!USTR!:%!USTR!/%!USTR!", ptr04x(dev), &p->node_name, &p->service_name, &p->busid);
+                free(p);
         }
 }
 
@@ -67,14 +66,15 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         PAGED_CODE();
 
         auto dev = static_cast<UDECXUSBDEVICE>(Object);
-        auto &ctx = *get_device_ctx(dev);
-
         TraceDbg("dev %04x", ptr04x(dev));
 
-        close_socket(ctx.ext->sock);
-        vhci::reclaim_roothub_port(dev);
+        if (auto &ctx = *get_device_ctx(dev); auto p = ctx.ext) {
+                close_socket(p->sock);
+        }
 
-        NT_ASSERT(WDF_IO_QUEUE_PURGED(WdfIoQueueGetState(ctx.queue, nullptr, nullptr)));
+        if (auto port = vhci::reclaim_roothub_port(dev)) {
+                TraceDbg("port %d released", port);
+        }
 }
 
 /*
@@ -520,28 +520,28 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE dev)
+PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
-        auto &ctx = *get_device_ctx(dev);
-        static_assert(sizeof(ctx.unplugged) == sizeof(CHAR));
+        auto &dev = *get_device_ctx(device);
+        static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
 
-        if (InterlockedExchange8(PCHAR(&ctx.unplugged), true)) {
-                TraceDbg("dev %04x is already unplugged", ptr04x(dev));
+        if (InterlockedExchange8(PCHAR(&dev.unplugged), true)) {
+                TraceDbg("dev %04x is already unplugged", ptr04x(device));
                 return;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(dev), ctx.port);
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(device), dev.port);
 
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // caught BSOD on DISPATCH_LEVEL
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(dev), err);
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(device), err);
         }
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE dev)
+NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE device)
 {
         auto func = [] (auto WorkItem)
         {
@@ -557,12 +557,12 @@ NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE dev)
 
         WDF_OBJECT_ATTRIBUTES attrs;
         WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.ParentObject = dev;
+        attrs.ParentObject = device;
 
         WDFWORKITEM wi{};
         if (auto err = WdfWorkItemCreate(&cfg, &attrs, &wi)) {
                 if (err == STATUS_DELETE_PENDING) {
-                        TraceDbg("dev %04x %!STATUS!", ptr04x(dev), err);
+                        TraceDbg("dev %04x %!STATUS!", ptr04x(device), err);
                 } else {
                         Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
                 }
