@@ -50,12 +50,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
-        auto dev = static_cast<UDECXUSBDEVICE>(Object);
 
-        if (auto &ctx = *get_device_ctx(dev); auto p = ctx.ext) {
-                TraceDbg("dev %04x, %!USTR!:%!USTR!/%!USTR!", ptr04x(dev), &p->node_name, &p->service_name, &p->busid);
-                free(p);
-        }
+        auto device = static_cast<UDECXUSBDEVICE>(Object);
+        auto &ext = get_device_ctx(device)->ext;
+
+        TraceDbg("dev %04x, %!USTR!:%!USTR!/%!USTR!", ptr04x(device), &ext->node_name, &ext->service_name, &ext->busid);
+
+        free(ext);
+        ext = nullptr;
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -65,14 +67,15 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
 
-        auto dev = static_cast<UDECXUSBDEVICE>(Object);
-        TraceDbg("dev %04x", ptr04x(dev));
+        auto device = static_cast<UDECXUSBDEVICE>(Object);
+        auto &dev = *get_device_ctx(device);
 
-        if (auto &ctx = *get_device_ctx(dev); auto p = ctx.ext) {
-                close_socket(p->sock);
-        }
+        TraceDbg("dev %04x", ptr04x(device));
 
-        if (auto port = vhci::reclaim_roothub_port(dev)) {
+        set_unplugged(dev);
+        close_socket(dev.ext->sock);
+
+        if (auto port = vhci::reclaim_roothub_port(device)) {
                 TraceDbg("port %d released", port);
         }
 }
@@ -523,11 +526,9 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
-
         auto &dev = *get_device_ctx(device);
-        static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
 
-        if (InterlockedExchange8(PCHAR(&dev.unplugged), true)) {
+        if (set_unplugged(dev)) {
                 TraceDbg("dev %04x is already unplugged", ptr04x(device));
                 return;
         }
