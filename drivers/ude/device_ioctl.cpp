@@ -93,8 +93,9 @@ NTSTATUS send_complete(
                 complete(request, STATUS_CANCELLED);
         }
 
-        if (st.Status == STATUS_FILE_FORCED_CLOSED) {
-                auto hdev = get_device(ctx->dev);
+        if (auto dev = ctx->dev; st.Status == STATUS_FILE_FORCED_CLOSED && !dev->unplugged) {
+                auto hdev = get_device(dev);
+                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st.Status);
                 device::sched_plugout_and_delete(hdev);
         }
 

@@ -397,7 +397,8 @@ NTSTATUS on_receive(
 	}
 	NT_ASSERT(!ctx.request);
 
-	if (auto hdev = get_device(&dev)) {
+	if (!dev.unplugged) {
+		auto hdev = get_device(&dev);
 		TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st);
 		device::sched_plugout_and_delete(hdev);
 	}
@@ -505,13 +506,16 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 			ptr04x(ctx.request), get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
 	}
 
-	if (auto sz = get_payload_size(hdr)) {
+	if (auto sz = get_payload_size(hdr); sz && !ctx.dev->unplugged) {
 		auto f = ctx.request ? recv_payload : drain_payload;
 		return f(ctx, sz);
-	}
-
-	if (ctx.request) {
+	} else if (!ctx.request) {
+		//
+	} else if (!sz) [[likely]] {
 		ret_submit(ctx);
+	} else {
+		TraceDbg("dev %04x is unplugged, skip payload[%Iu]", ptr04x(ctx.dev), sz);
+		atomic_complete(ctx.request, STATUS_CANCELLED);
 	}
 
 	return RECV_NEXT_USBIP_HDR;

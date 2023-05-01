@@ -265,7 +265,7 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
         PAGED_CODE();
 
         if (port = vhci::claim_roothub_port(dev); port) {
-                TraceDbg("dev %04x -> port %d", ptr04x(dev), port);
+                TraceDbg("port %d claimed", port);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return ERROR_USBIP_PORTFULL;
@@ -357,7 +357,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
                 return err;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x -> port %d", ptr04x(dev), port);
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), port);
         return 0UL;
 }
 
