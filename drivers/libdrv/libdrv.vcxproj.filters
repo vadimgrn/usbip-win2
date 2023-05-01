@@ -45,6 +45,7 @@
     <ClInclude Include="handle.h" />
     <ClInclude Include="urb_ptr.h" />
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
+    <ClInclude Include="wait_timeout.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

@@ -9,6 +9,7 @@
 #include "context.h"
 
 #include <libdrv\strconv.h>
+#include <libdrv\wait_timeout.h>
 #include <resources/messages.h>
 
 #include <ntstrsafe.h>
@@ -122,16 +123,7 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED auto sleep(_Inout_ vhci_ctx &ctx, _In_ ULONG seconds)
 {
         PAGED_CODE();
-        
-        enum { 
-                _100_NSEC = 1,  // in units of 100 nanoseconds
-                USEC = 10*_100_NSEC, // microsecond
-                MSEC = 1000*USEC, // millisecond
-                SEC = 1000*MSEC, // second
-        };
-
-        LARGE_INTEGER timeout{ .QuadPart = seconds*SEC };
-        timeout.QuadPart *= -1; // relative
+        auto timeout = wdm::make_timeout(seconds*wdm::second, true);
 
         switch (auto st = KeWaitForSingleObject(&ctx.attach_thread_stop, Executive, KernelMode, false, &timeout)) {
         case STATUS_SUCCESS:

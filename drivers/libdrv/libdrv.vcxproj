@@ -160,6 +160,7 @@
     <ClInclude Include="strconv.h" />
     <ClInclude Include="usbd_helper.h" />
     <ClInclude Include="usb_util.h" />
+    <ClInclude Include="wait_timeout.h" />
     <ClInclude Include="wdf_cpp.h" />
     <ClInclude Include="wsk_cpp.h" />
   </ItemGroup>
