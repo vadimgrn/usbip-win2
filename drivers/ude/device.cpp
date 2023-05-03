@@ -244,6 +244,12 @@ NTSTATUS function_suspend_and_wake(
         return STATUS_SUCCESS;
 }
 
+/*
+ * Using power-managed queues for I/O requests that require the device to be in its working state, 
+ * and using queues that are not power-managed for all other requests.
+ * Virtual device does not require power. For that reason all queues are not power-managed. 
+ * @see Power Management for I/O Queues
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT endpoint)
@@ -252,6 +258,7 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential for EP0?
+        cfg.PowerManaged = WdfFalse;
         cfg.EvtIoInternalDeviceControl = device::internal_control;
 
         WDF_OBJECT_ATTRIBUTES attrs;

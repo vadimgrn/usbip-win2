@@ -196,14 +196,6 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *init)
                 WdfDeviceInitSetPnpPowerEventCallbacks(init, &cb);
         }
 
-/*
-        {
-                WDF_POWER_POLICY_EVENT_CALLBACKS cb;
-                WDF_POWER_POLICY_EVENT_CALLBACKS_INIT(&cb);
-                WdfDeviceInitSetPowerPolicyEventCallbacks(init, &cb);
-        }
-*/
-
         {
                 WDF_REMOVE_LOCK_OPTIONS opts;
                 WDF_REMOVE_LOCK_OPTIONS_INIT(&opts, WDF_REMOVE_LOCK_OPTION_ACQUIRE_FOR_IO);
