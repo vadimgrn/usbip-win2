@@ -133,11 +133,11 @@ port 1 is successfully detached
   - Reboot the system to apply
 - If an uninstaller is corrupted, run these commands as Administrator
 ```
-rem devcon classfilter usb upper !usbip2_filter
-"C:\Program Files\USBip\classfilter" remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
+rem "C:\Program Files\USBip\classfilter" remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
+devcon classfilter usb upper !usbip2_filter
 pnputil /remove-device /deviceid ROOT\USBIP_WIN2\UDE /subtree
 FOR /f %P IN ('findstr /M /L "Manufacturer=\"USBIP-WIN2\"" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
-del /Q "C:\Program Files\USBip"
+rd /S /Q "C:\Program Files\USBip"
 ```
 
 ## Obtaining USB/IP logs on Windows

@@ -42,6 +42,7 @@ PAGED void NTAPI workitem_destroy(_In_ WDFOBJECT Object)
 	TraceDbg("%04x", ptr04x(wi));
 
 	if (auto ctx = get_wsk_context(wi)) {
+		NT_ASSERT(!ctx->request); // must be completed and zeroed
 		free(ctx, true);
 	}
 }

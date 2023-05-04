@@ -513,6 +513,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
         ctx.vhci = vhci;
         ctx.ext = ext;
         ext->ctx = &ctx;
+
         KeInitializeSpinLock(&ctx.endpoint_list_lock);
 
         if (auto err = init_device(dev, ctx)) {
@@ -536,7 +537,7 @@ PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
         auto &dev = *get_device_ctx(device);
 
         if (set_unplugged(dev)) {
-                TraceDbg("dev %04x is already unplugged", ptr04x(device));
+                TraceDbg("dev %04x is already unplugged, port %d", ptr04x(device), dev.port);
                 return;
         }
 
