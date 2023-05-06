@@ -25,19 +25,19 @@ inline auto op_status_str(op_status_t st)
         return st >= 0 && st < sizeof(v)/sizeof(*v) ? v[st] : "op_status_str: out of range";
 }
 
-inline auto op_status_error(op_status_t st)
+inline auto op_status_error(_In_ op_status_t st)
 {
-        static const DWORD v[] = 
+        const USBIP_STATUS v[] = 
         {
-                0, // ST_OK
-                ERROR_USBIP_ST_NA,
-                ERROR_USBIP_ST_DEV_BUSY,
-                ERROR_USBIP_ST_DEV_ERR,
-                ERROR_USBIP_ST_NODEV,
-                ERROR_USBIP_ST_ERROR,
+                USBIP_ERROR_SUCCESS, // ST_OK
+                USBIP_ERROR_ST_NA,
+                USBIP_ERROR_ST_DEV_BUSY,
+                USBIP_ERROR_ST_DEV_ERR,
+                USBIP_ERROR_ST_NODEV,
+                USBIP_ERROR_ST_ERROR,
         };
 
-        return st >= 0 && st < sizeof(v)/sizeof(*v) ? v[st] : ERROR_USBIP_ST_ERROR;
+        return st >= 0 && st < sizeof(v)/sizeof(*v) ? v[st] : USBIP_ERROR_ST_ERROR;
 }
 
 } // namespace usbip

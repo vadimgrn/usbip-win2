@@ -100,12 +100,12 @@ auto get_path()
                                         assert(!path.empty());
                                 } else {
                                         libusbip::output("CM_Get_Device_Interface_List: {} paths returned", n);
-                                        SetLastError(ERROR_USBIP_DEVICE_INTERFACE_LIST);
+                                        SetLastError(USBIP_ERROR_DEVICE_INTERFACE_LIST);
                                 }
                         } else {
                                 assert(multi_sz.size() == 1); // if not found, returns CR_SUCCESS and ""
                                 assert(!multi_sz.front());
-                                SetLastError(ERROR_USBIP_VHCI_NOT_FOUND);
+                                SetLastError(USBIP_ERROR_VHCI_NOT_FOUND);
                         }
                         return path;
                 case CR_BUFFER_SMALL:
@@ -156,7 +156,7 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
                                     buf.data(), DWORD(buf.size()), &BytesReturned, nullptr)) {
 
                         if (BytesReturned < devices_offset) [[unlikely]] {
-                                SetLastError(ERROR_USBIP_DRIVER_RESPONSE);
+                                SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                                 return result;
                         }
                                 
@@ -173,7 +173,7 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
 
         if (!success) {
                 libusbip::output("{}: N*sizeof(imported_device) != {}", __func__, devices_size);
-                SetLastError(ERROR_USBIP_DRIVER_RESPONSE);
+                SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
         } else if (auto cnt = devices_size/sizeof(*r->devices)) {
                 assign(result, r->devices, cnt);
         }
@@ -195,7 +195,7 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
             DeviceIoControl(dev, ioctl::PLUGIN_HARDWARE, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
 
                 if (BytesReturned != outlen) [[unlikely]] {
-                        SetLastError(ERROR_USBIP_DRIVER_RESPONSE);
+                        SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
                 } else {
                         assert(r.port > 0);
                         return r.port;

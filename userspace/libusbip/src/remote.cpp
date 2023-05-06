@@ -146,11 +146,11 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 	}
 
 	if (r.version != USBIP_VERSION) {
-		return ERROR_USBIP_VERSION;
+		return USBIP_ERROR_VERSION;
 	}
 
 	if (r.code != expected_code) {
-		return ERROR_USBIP_PROTOCOL;
+		return USBIP_ERROR_PROTOCOL;
 	}
 
 	return op_status_error(static_cast<op_status_t>(r.status));

@@ -132,7 +132,7 @@ PAGED auto sleep(_Inout_ vhci_ctx &ctx, _In_ ULONG seconds)
         case STATUS_TIMEOUT:
                 break;
         default:
-                TraceDbg("KeWaitForSingleObject %!STATUS!", st);
+                Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", st);
         }
 
         return true;
@@ -142,12 +142,12 @@ PAGED auto sleep(_Inout_ vhci_ctx &ctx, _In_ ULONG seconds)
  * WskGetAddressInfo() can return STATUS_INTERNAL_ERROR(0xC00000E5), but after some delay it will succeed.
  * This can happen after reboot if dnscache(?) service is not ready yet.
  */
-constexpr auto can_retry(_In_ DWORD error)
+constexpr auto can_retry(_In_ NTSTATUS status)
 {
-        switch (error) {
-        case ERROR_USBIP_ADDRINFO:
-        case ERROR_USBIP_CONNECT:
-        case ERROR_USBIP_NETWORK:
+        switch (as_usbip_status(status)) {
+        case USBIP_ERROR_ADDRINFO:
+        case USBIP_ERROR_CONNECT:
+        case USBIP_ERROR_NETWORK:
                 return true;
         }
 

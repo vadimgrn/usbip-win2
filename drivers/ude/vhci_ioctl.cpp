@@ -14,7 +14,6 @@
 #include "persistent.h"
 
 #include <usbip\proto_op.h>
-#include <resources\messages.h>
 
 #include <libdrv\dbgcommon.h>
 #include <libdrv\strconv.h>
@@ -29,12 +28,6 @@ using namespace usbip;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
-
-constexpr auto as_ntstatus(_In_ DWORD code)
-{
-        static_assert(sizeof(code) == sizeof(NTSTATUS));
-        return static_cast<NTSTATUS>(code);
-}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -110,7 +103,7 @@ PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_
 
         if (auto err = recv(ext.sock, pool, &reply, sizeof(reply))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
-                return ERROR_USBIP_NETWORK;
+                return USBIP_ERROR_NETWORK;
         }
         PACK_OP_IMPORT_REPLY(false, &reply);
 
@@ -120,10 +113,10 @@ PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_
                 return err;
         } else if (strncmp(reply.udev.busid, busid, sizeof(busid))) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
-                return ERROR_USBIP_PROTOCOL;
+                return USBIP_ERROR_PROTOCOL;
         }
 
-        return 0UL;
+        return USBIP_ERROR_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -134,7 +127,7 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
 
         if (auto err = send_req_import(ext)) {
                 Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
-                return ERROR_USBIP_NETWORK;
+                return USBIP_ERROR_NETWORK;
         }
 
         op_import_reply reply;
@@ -152,7 +145,7 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
                 d->product = udev.idProduct;
         }
 
-        return 0UL;
+        return USBIP_ERROR_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -248,14 +241,14 @@ PAGED auto connect(_Inout_ device_ctx_ext &ext)
         ADDRINFOEXW *ai{};
         if (auto err = getaddrinfo(ai, ext)) {
                 Trace(TRACE_LEVEL_ERROR, "getaddrinfo %!STATUS!", err);
-                return ERROR_USBIP_ADDRINFO;
+                return USBIP_ERROR_ADDRINFO;
         }
 
         NT_ASSERT(!ext.sock);
         ext.sock = wsk::for_each(WSK_FLAG_CONNECTION_SOCKET, &ext, nullptr, ai, try_connect, nullptr);
 
         wsk::free(ai);
-        return ext.sock ? 0U : ERROR_USBIP_CONNECT;
+        return ext.sock ? USBIP_ERROR_SUCCESS : USBIP_ERROR_CONNECT;
 }
 
 _IRQL_requires_same_
@@ -268,7 +261,7 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
                 TraceDbg("port %d claimed", port);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
-                return ERROR_USBIP_PORTFULL;
+                return USBIP_ERROR_PORTFULL;
         }
 
         auto speed = get_device_ctx(dev)->speed();
@@ -281,10 +274,10 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
 
         if (auto err = UdecxUsbDevicePlugIn(dev, &options)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
-                return ERROR_USBIP_GENERAL;
+                return USBIP_ERROR_GENERAL;
         }
 
-        return 0UL;
+        return USBIP_ERROR_SUCCESS;
 }
 
 struct device_ctx_ext_ptr
@@ -317,7 +310,7 @@ PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
                 sched_receive_usbip_header(*dev);
         }
 
-        return 0UL;
+        return USBIP_ERROR_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -332,7 +325,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
 
         device_ctx_ext_ptr ext;
         if (NT_ERROR(create_device_ctx_ext(ext.ptr, r))) {
-                return ERROR_USBIP_GENERAL;
+                return USBIP_ERROR_GENERAL;
         }
 
         if (auto err = connect(*ext.ptr)) {
@@ -348,7 +341,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
 
         UDECXUSBDEVICE dev;
         if (NT_ERROR(device::create(dev, vhci, ext.ptr))) {
-                return ERROR_USBIP_GENERAL;
+                return USBIP_ERROR_GENERAL;
         }
         ext.release(); // now dev owns it
 
@@ -358,7 +351,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), port);
-        return 0UL;
+        return USBIP_ERROR_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -378,7 +371,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "plugin_hardware.size %lu != sizeof(plugin_hardware) %Iu", 
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(ERROR_USBIP_ABI);
+                return as_ntstatus(USBIP_ERROR_ABI);
         }
 
         if (auto vhci = get_vhci(request); auto err = plugin_hardware(vhci, *r)) {
@@ -408,7 +401,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "plugout_hardware.size %lu != sizeof(plugout_hardware) %Iu",
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(ERROR_USBIP_ABI);
+                return as_ntstatus(USBIP_ERROR_ABI);
         }
 
         TraceDbg("port %d", r->port);
@@ -441,7 +434,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "get_imported_devices.size %lu != sizeof(get_imported_devices) %Iu", 
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(ERROR_USBIP_ABI);
+                return as_ntstatus(USBIP_ERROR_ABI);
         }
 
         auto devices_size = outlen - offsetof(vhci::ioctl::get_imported_devices, devices); // size of array
@@ -488,7 +481,7 @@ PAGED auto driver_registry_path(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "driver_registry_path.size %lu != sizeof(driver_registry_path) %Iu", 
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(ERROR_USBIP_ABI);
+                return as_ntstatus(USBIP_ERROR_ABI);
         }
 
         auto path = WdfDriverGetRegistryPath(WdfGetDriver());

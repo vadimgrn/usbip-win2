@@ -47,26 +47,25 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED ULONG usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
+PAGED USBIP_STATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
 {
         PAGED_CODE();
-        static_assert(sizeof(ULONG) == sizeof(DWORD)); // return type
 
         op_common r{};
         if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
                 Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
-                return ERROR_USBIP_NETWORK;
+                return USBIP_ERROR_NETWORK;
         }
 	PACK_OP_COMMON(false, &r);
 
 	if (r.version != USBIP_VERSION) {
 		Trace(TRACE_LEVEL_ERROR, "version(%#x) != expected(%#x)", r.version, USBIP_VERSION);
-		return ERROR_USBIP_VERSION;
+		return USBIP_ERROR_VERSION;
 	}
 
         if (r.code != expected_code) {
                 Trace(TRACE_LEVEL_ERROR, "code(%#x) != expected(%#x)", r.code, expected_code);
-                return ERROR_USBIP_PROTOCOL;
+                return USBIP_ERROR_PROTOCOL;
         }
 
         auto st = static_cast<op_status_t>(r.status);
