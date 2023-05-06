@@ -14,6 +14,8 @@
 namespace usbip
 {
 
+enum class unplugged { ignore, set };
+
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -31,11 +33,11 @@ int claim_roothub_port(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
+int reclaim_roothub_port(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-int reclaim_roothub_port(_In_ UDECXUSBDEVICE device);
+wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port, _In_ unplugged action);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

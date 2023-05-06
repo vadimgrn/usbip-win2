@@ -19,9 +19,6 @@
 #include <usbdlib.h>
 #include <usbiodef.h>
 
-#include <wdfusb.h>
-#include <Udecx.h>
-
 namespace
 {
 
@@ -59,7 +56,7 @@ PAGED void reclaim_all_ports(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = vhci::get_device(vhci, port)) {
+                if (auto dev = vhci::get_device(vhci, port, unplugged::set)) {
                         vhci::reclaim_roothub_port(dev.get<UDECXUSBDEVICE>());
                 }
         }
@@ -403,29 +400,37 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
         if (portnum) {
                 WdfObjectDereference(device);
         }
-
+        
         return portnum;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
+wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port, _In_ unplugged action)
 {
-        wdf::ObjectRef dev;
+        wdf::ObjectRef ptr;
         if (!is_valid_port(port)) {
-                return dev;
+                return ptr;
         }
 
         auto &ctx = *get_vhci_ctx(vhci);
 
         Lock lck(ctx.lock); 
         if (auto handle = ctx.devices[port - 1]) {
-                NT_ASSERT(get_device_ctx(handle)->port == port);
-                dev.reset(handle); // adds reference
+
+                auto &dev = *get_device_ctx(handle);
+                NT_ASSERT(dev.port == port);
+
+                if (!dev.unplugged || action == unplugged::ignore) {
+                        ptr.reset(handle); // adds reference
+                        if (action == unplugged::set) {
+                                dev.unplugged = true;
+                        }
+                }
         }
         lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
-        return dev;
+        return ptr;
 }
 
 _IRQL_requires_same_
@@ -435,8 +440,8 @@ PAGED void usbip::vhci::plugout_all_devices(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = get_device(vhci, port)) {
-                        device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
+                if (auto dev = get_device(vhci, port, unplugged::set)) {
+                        device::plugout_and_delete(dev.get<UDECXUSBDEVICE>(), unplugged::ignore);
                 }
         }
 }

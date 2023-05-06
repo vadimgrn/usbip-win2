@@ -411,17 +411,19 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
                 return as_ntstatus(ERROR_USBIP_ABI);
         }
 
+        TraceDbg("port %d", r->port);
+
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 vhci::plugout_all_devices(vhci);
+                return STATUS_SUCCESS;
         } else if (!is_valid_port(r->port)) {
                 return STATUS_INVALID_PARAMETER;
-        } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
+        } else if (auto dev = vhci::get_device(vhci, r->port, unplugged::set)) {
+                return device::plugout_and_delete(dev.get<UDECXUSBDEVICE>(), unplugged::ignore);
         } else {
-                return STATUS_DEVICE_NOT_CONNECTED;
+                dev = vhci::get_device(vhci, r->port, unplugged::ignore);
+                return dev ? STATUS_OPERATION_IN_PROGRESS : STATUS_DEVICE_NOT_CONNECTED;
         }
-
-        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
@@ -451,7 +453,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST request)
         ULONG cnt = 0;
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = vhci::get_device(vhci, port); !dev) {
+                if (auto dev = vhci::get_device(vhci, port, unplugged::ignore); !dev) {
                         //
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;

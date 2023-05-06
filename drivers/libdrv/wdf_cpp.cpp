@@ -5,7 +5,7 @@
 #include "wdf_cpp.h"
 
 wdf::ObjectRef::ObjectRef(WDFOBJECT handle, bool add_ref) :
-        m_handle(handle) 
+        m_handle(handle)
 {
         if (m_handle && add_ref) {
                 WdfObjectReference(m_handle);

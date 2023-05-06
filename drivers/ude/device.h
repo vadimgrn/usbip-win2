@@ -4,12 +4,7 @@
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-#include <libdrv/wdf_cpp.h>
-
-#include <usb.h>
-#include <wdfusb.h>
-#include <UdeCx.h>
+#include "vhci.h"
 
 namespace usbip
 {
@@ -25,7 +20,7 @@ PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ devic
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugout_and_delete(_In_ UDECXUSBDEVICE device);
+PAGED NTSTATUS plugout_and_delete(_In_ UDECXUSBDEVICE device, _In_ unplugged action);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -14,6 +14,7 @@ pnputil /enum-drivers /class usb /files
 cd D:\usbip-win2\x64\Debug\package\
 
 certutil -f -p usbip -importPFX root ..\..\..\drivers\package\usbip.pfx
+rem certutil -f -p usbip -importPFX TrustedPublisher ..\..\..\drivers\package\usbip.pfx
 certutil -store root | findstr "USBip"
 
 pnputil /add-driver usbip2_filter.inf /install

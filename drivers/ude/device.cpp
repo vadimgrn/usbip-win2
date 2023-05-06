@@ -10,7 +10,6 @@
 #include "device_queue.h"
 #include "endpoint_list.h"
 #include "network.h"
-#include "vhci.h"
 #include "device_ioctl.h"
 #include "wsk_receive.h"
 #include "ioctl.h"
@@ -72,7 +71,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         TraceDbg("dev %04x", ptr04x(device));
 
-        set_unplugged(dev);
+        vhci::get_device(dev.vhci, dev.port, unplugged::set);
         close_socket(dev.ext->sock);
 
         if (auto port = vhci::reclaim_roothub_port(device)) {
@@ -526,26 +525,36 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
 
 /*
  * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
- * A device will be plugged out from a hub, delete can be delayed slightly.
  * After UdecxUsbDevicePlugOutAndDelete the client driver can no longer use UDECXUSBDEVICE.
+ * 
+ * FIXME: it does not delete UDECXUSBDEVICE immediately for unknown reason. 
+ *        UDECXUSBDEVICE.EvtCleanupCallback will be called on deletion of VHCI device only.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
+PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device, _In_ unplugged action)
 {
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
-        if (set_unplugged(dev)) {
-                TraceDbg("dev %04x is already unplugged, port %d", ptr04x(device), dev.port);
-                return;
+        if (action == unplugged::ignore) {
+                //
+        } else if (auto d = vhci::get_device(dev.vhci, dev.port, action); !d) {
+                TraceDbg("dev %04x not found on port %d, already unplugged?", ptr04x(device), dev.port);
+                return STATUS_NOT_FOUND;
+        } else if (d.get() != device) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, port %d occupied by %04x", ptr04x(device), dev.port, ptr04x(d.get()));
+                return STATUS_INVALID_DEVICE_REQUEST;
         }
 
+        NT_ASSERT(dev.unplugged);
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(device), dev.port);
 
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugOutAndDelete(dev=%04x) %!STATUS!", ptr04x(device), err);
+        auto err = UdecxUsbDevicePlugOutAndDelete(device); // caught BSOD on DISPATCH_LEVEL
+        if (err) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
         }
+        return err;
 }
 
 _IRQL_requires_same_
@@ -555,7 +564,7 @@ NTSTATUS usbip::device::sched_plugout_and_delete(_In_ UDECXUSBDEVICE device)
         auto func = [] (auto WorkItem)
         {
                 if (auto dev = (UDECXUSBDEVICE)WdfWorkItemGetParentObject(WorkItem)) {
-                        plugout_and_delete(dev);
+                        plugout_and_delete(dev, unplugged::set);
                 }
                 WdfObjectDelete(WorkItem); // can be omitted
         };

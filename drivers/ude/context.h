@@ -110,7 +110,7 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
 
-        volatile bool unplugged; // @see set_unplugged
+        volatile bool unplugged;
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
@@ -198,14 +198,6 @@ constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
         return (busnum << 16) | devnum;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto set_unplugged(_Inout_ device_ctx &ctx)
-{
-        static_assert(sizeof(ctx.unplugged) == sizeof(CHAR));
-        return InterlockedExchange8(PCHAR(&ctx.unplugged), true);
 }
 
 _IRQL_requires_same_
