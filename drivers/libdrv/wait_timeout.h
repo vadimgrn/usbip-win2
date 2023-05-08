@@ -19,13 +19,14 @@ enum wait_unit : LONGLONG
         hour = 60*minute,
 };
 
+enum class period { absolute, relative };
 /*
  * Timeout value for KeWaitForSingleObject and other. 
  */
-constexpr auto make_timeout(_In_ LONGLONG value, _In_ bool relative)
+constexpr auto make_timeout(_In_ LONGLONG value, _In_ period type)
 {
         static_assert(sizeof(value) == sizeof(LARGE_INTEGER::QuadPart));
-        return LARGE_INTEGER{ .QuadPart = relative ? -value : value};
+        return LARGE_INTEGER{ .QuadPart = type == period::relative ? -value : value};
 }
 
 } // namespace wdm

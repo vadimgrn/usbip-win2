@@ -123,7 +123,7 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED auto sleep(_Inout_ vhci_ctx &ctx, _In_ ULONG seconds)
 {
         PAGED_CODE();
-        auto timeout = wdm::make_timeout(seconds*wdm::second, true);
+        auto timeout = make_timeout(seconds*wdm::second, wdm::period::relative);
 
         switch (auto st = KeWaitForSingleObject(&ctx.attach_thread_stop, Executive, KernelMode, false, &timeout)) {
         case STATUS_SUCCESS:

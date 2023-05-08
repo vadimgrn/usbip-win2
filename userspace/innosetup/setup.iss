@@ -119,7 +119,6 @@ Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_ude.inf {#UdeHwid
 
 [UninstallRun]
 
-Filename: {app}\usbip.exe; Parameters: "detach --all"; RunOnceId: "DetachAll"; Flags: runhidden
 Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#UdeHwid} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
 Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#FilterClassGuid}"" {#FilterDriver}"; RunOnceId: "RemoveFromUpperFilters"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden

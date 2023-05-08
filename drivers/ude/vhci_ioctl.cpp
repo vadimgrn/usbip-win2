@@ -253,18 +253,19 @@ PAGED auto connect(_Inout_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
+PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
-        if (port = vhci::claim_roothub_port(dev); port) {
+        if (port = vhci::claim_roothub_port(device); port) {
                 TraceDbg("port %d claimed", port);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
                 return USBIP_ERROR_PORTFULL;
         }
 
-        auto speed = get_device_ctx(dev)->speed();
+        auto &dev = *get_device_ctx(device);
+        auto speed = dev.speed();
 
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS options; 
         UDECX_USB_DEVICE_PLUG_IN_OPTIONS_INIT(&options);
@@ -272,7 +273,7 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE dev)
         auto &portnum = speed < USB_SPEED_SUPER ? options.Usb20PortNumber : options.Usb30PortNumber;
         portnum = port;
 
-        if (auto err = UdecxUsbDevicePlugIn(dev, &options)) {
+        if (auto err = UdecxUsbDevicePlugIn(device, &options)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
                 return USBIP_ERROR_GENERAL;
         }
@@ -405,18 +406,19 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
         }
 
         TraceDbg("port %d", r->port);
+        auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
-                vhci::plugout_all_devices(vhci);
-                return STATUS_SUCCESS;
+                vhci::detach_all_devices(vhci);
         } else if (!is_valid_port(r->port)) {
-                return STATUS_INVALID_PARAMETER;
-        } else if (auto dev = vhci::get_device(vhci, r->port, unplugged::set)) {
-                return device::plugout_and_delete(dev.get<UDECXUSBDEVICE>(), unplugged::ignore);
+                st = STATUS_INVALID_PARAMETER;
+        } else if (auto dev = vhci::get_device(vhci, r->port)) {
+                device::detach(dev.get<UDECXUSBDEVICE>());
         } else {
-                dev = vhci::get_device(vhci, r->port, unplugged::ignore);
-                return dev ? STATUS_OPERATION_IN_PROGRESS : STATUS_DEVICE_NOT_CONNECTED;
+                st = STATUS_DEVICE_NOT_CONNECTED;
         }
+
+        return st;
 }
 
 _IRQL_requires_same_
@@ -446,7 +448,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST request)
         ULONG cnt = 0;
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = vhci::get_device(vhci, port, unplugged::ignore); !dev) {
+                if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;

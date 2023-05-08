@@ -5,7 +5,7 @@
 #pragma once
 
 #include <libdrv\codeseg.h>
-#include <libdrv/wdf_cpp.h>
+#include <libdrv\wdf_cpp.h>
 
 #include <usb.h>
 #include <wdfusb.h>
@@ -13,8 +13,6 @@
 
 namespace usbip
 {
-
-enum class unplugged { ignore, set };
 
 _Function_class_(EVT_WDF_DRIVER_DEVICE_ADD)
 _IRQL_requires_same_
@@ -37,10 +35,10 @@ int reclaim_roothub_port(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port, _In_ unplugged action);
+wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugout_all_devices(_In_ WDFDEVICE vhci);
+PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete = true);
 
 } // namespace usbip::vhci

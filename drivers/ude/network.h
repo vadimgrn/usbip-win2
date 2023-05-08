@@ -21,7 +21,7 @@ using wsk::SOCKET;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void close_socket(_Inout_ SOCKET* &sock);
+PAGED bool close_socket(_Inout_ SOCKET* &sock);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);

@@ -6,9 +6,9 @@
 #include "trace.h"
 #include "vhci.tmh"
 
+#include "context.h"
 #include "device.h"
 #include "vhci_ioctl.h"
-#include "context.h"
 #include "persistent.h"
 
 #include <libdrv/lock.h>
@@ -49,19 +49,6 @@ void attach_thread_join(_In_ WDFDEVICE vhci)
         ObDereferenceObject(thread);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void reclaim_all_ports(_In_ WDFDEVICE vhci)
-{
-        PAGED_CODE();
-
-        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = vhci::get_device(vhci, port, unplugged::set)) {
-                        vhci::reclaim_roothub_port(dev.get<UDECXUSBDEVICE>());
-                }
-        }
-}
-
 /*
  * WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE.
  */
@@ -76,7 +63,6 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT Object)
         TraceDbg("vhci %04x", ptr04x(vhci));
         
         attach_thread_join(vhci);
-        reclaim_all_ports(vhci);
 }
 
 using init_func_t = NTSTATUS(WDFDEVICE);
@@ -89,7 +75,7 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
 
-        KeInitializeSpinLock(&ctx.lock);
+        KeInitializeSpinLock(&ctx.devices_lock);
         KeInitializeEvent(&ctx.attach_thread_stop, NotificationEvent, false);
 
         return STATUS_SUCCESS;
@@ -160,7 +146,7 @@ PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE vhci, _In_ WDF_POWER_DEVICE_STA
         TraceDbg("TargetState %!WDF_POWER_DEVICE_STATE!", TargetState);
 
         if (TargetState == WdfPowerDeviceD3Final) {
-                reclaim_all_ports(vhci);
+                vhci::detach_all_devices(vhci, false); // do not call UdecxUsbDevicePlugOutAndDelete
         }
 
         return STATUS_SUCCESS;
@@ -354,7 +340,7 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
 
         auto [begin, end] = get_port_range(dev.speed());
 
-        Lock lck(vhci.lock); // function must be resident, do not use PAGED
+        Lock lck(vhci.devices_lock); // function must be resident, do not use PAGED
 
         for (auto i = begin; i < end; ++i) {
                 NT_ASSERT(i < ARRAYSIZE(vhci.devices));
@@ -384,7 +370,7 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
         static_assert(!is_valid_port(0));
         int portnum = 0;
 
-        Lock lck(vhci.lock); 
+        Lock lck(vhci.devices_lock); 
         if (auto &port = dev.port) {
                 NT_ASSERT(is_valid_port(port));
                 portnum = port;
@@ -406,7 +392,7 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port, _In_ unplugged action)
+wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 {
         wdf::ObjectRef ptr;
         if (!is_valid_port(port)) {
@@ -415,18 +401,10 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port, _In_ 
 
         auto &ctx = *get_vhci_ctx(vhci);
 
-        Lock lck(ctx.lock); 
+        Lock lck(ctx.devices_lock); 
         if (auto handle = ctx.devices[port - 1]) {
-
-                auto &dev = *get_device_ctx(handle);
-                NT_ASSERT(dev.port == port);
-
-                if (!dev.unplugged || action == unplugged::ignore) {
-                        ptr.reset(handle); // adds reference
-                        if (action == unplugged::set) {
-                                dev.unplugged = true;
-                        }
-                }
+                NT_ASSERT(get_device_ctx(handle)->port == port);
+                ptr.reset(handle); // adds reference
         }
         lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
@@ -435,13 +413,13 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port, _In_ 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::plugout_all_devices(_In_ WDFDEVICE vhci)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete)
 {
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = get_device(vhci, port, unplugged::set)) {
-                        device::plugout_and_delete(dev.get<UDECXUSBDEVICE>(), unplugged::ignore);
+                if (auto dev = get_device(vhci, port)) {
+                        device::detach(dev.get<UDECXUSBDEVICE>(), plugout_and_delete);
                 }
         }
 }

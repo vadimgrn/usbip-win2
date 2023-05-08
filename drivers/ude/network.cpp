@@ -150,22 +150,24 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::close_socket(_Inout_ SOCKET* &sock)
+PAGED bool usbip::close_socket(_Inout_ SOCKET* &sock)
 {
         PAGED_CODE();
 
         auto socket = (SOCKET*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&sock), nullptr);
         if (!socket) {
-                return;
+                return false;
         }
 
-        if (auto err = disconnect(socket)) {
+        if (auto err = disconnect(socket)) { // close must be called anyway
                 Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
         }
 
         if (auto err = close(socket)) {
                 Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
+                return false;
         }
 
+        return true;
 }
 

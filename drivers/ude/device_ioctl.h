@@ -15,7 +15,7 @@ namespace usbip::device
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request);
+void send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

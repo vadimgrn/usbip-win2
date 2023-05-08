@@ -96,7 +96,7 @@ NTSTATUS send_complete(
         if (auto dev = ctx->dev; st.Status == STATUS_FILE_FORCED_CLOSED && !dev->unplugged) {
                 auto hdev = get_device(dev);
                 TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st.Status);
-                device::sched_plugout_and_delete(hdev);
+                device::async_detach(hdev);
         }
 
         return StopCompletion;
@@ -450,15 +450,15 @@ auto send_ep0_out(
   */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::device::send_cmd_unlink(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
+void usbip::device::send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
 {
         auto &dev = *get_device_ctx(device);
         auto &req = *get_request_ctx(request);
 
         TraceDbg("dev %04x, seqnum %u", ptr04x(device), req.seqnum);
 
-        if (!dev.sock()) {
-                TraceDbg("Socket is closed");
+        if (dev.unplugged) {
+                TraceDbg("Unplugged, do not send unlink command");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
                 set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
