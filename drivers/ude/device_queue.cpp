@@ -52,7 +52,6 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBDEVICE);
 //      attr.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoCanceledOnQueue is used only
-        attr.ExecutionLevel = WdfExecutionLevelPassive; // for EvtIoQueueState, @see WdfIoQueuePurge
         attr.ParentObject = dev;
 
         attr.EvtCleanupCallback = [] (auto obj) 
@@ -77,6 +76,10 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const request_search &crit)
 {
         NT_ASSERT(crit.endpoint); // largest in union
+
+        if (!dev.queue) {
+                return WDF_NO_HANDLE;
+        }
 
         for (WDFREQUEST prev{}, cur; ; prev = cur) {
 

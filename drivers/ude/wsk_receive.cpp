@@ -401,7 +401,7 @@ NTSTATUS on_receive(
 	if (!dev.unplugged) {
 		auto hdev = get_device(&dev);
 		TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st);
-		device::async_detach(hdev);
+		device::async_plugout_and_delete(hdev);
 	}
 
 	return StopCompletion;

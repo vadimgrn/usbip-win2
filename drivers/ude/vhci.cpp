@@ -146,7 +146,7 @@ PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE vhci, _In_ WDF_POWER_DEVICE_STA
         TraceDbg("TargetState %!WDF_POWER_DEVICE_STATE!", TargetState);
 
         if (TargetState == WdfPowerDeviceD3Final) {
-                vhci::detach_all_devices(vhci, false); // do not call UdecxUsbDevicePlugOutAndDelete
+                vhci::detach_all_devices(vhci, true);
         }
 
         return STATUS_SUCCESS;
@@ -413,13 +413,17 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool PowerDeviceD3Final)
 {
         PAGED_CODE();
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
-                if (auto dev = get_device(vhci, port)) {
-                        device::detach(dev.get<UDECXUSBDEVICE>(), plugout_and_delete);
+                if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
+                        if (PowerDeviceD3Final) { 
+                                device::detach(hdev); // do not call UdecxUsbDevicePlugOutAndDelete, UDE will call it
+                        } else {
+                                device::plugout_and_delete(hdev);
+                        }
                 }
         }
 }

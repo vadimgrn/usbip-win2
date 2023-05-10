@@ -26,10 +26,14 @@ PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ devic
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void async_detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete = true);
+NTSTATUS async_plugout_and_delete(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete = true);
+PAGED NTSTATUS plugout_and_delete(_In_ UDECXUSBDEVICE device);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void detach(_In_ UDECXUSBDEVICE device);
 
 } // namespace usbip::device

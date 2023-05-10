@@ -39,6 +39,6 @@ wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete = true);
+PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool PowerDeviceD3Final = false);
 
 } // namespace usbip::vhci

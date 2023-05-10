@@ -62,10 +62,6 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
         ext = nullptr;
 }
 
-/*
- * All resources must already be freed except for device_ctx_ext*.
- * @see device_queue_purged
- */
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -76,7 +72,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         auto device = static_cast<UDECXUSBDEVICE>(Object);
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
 
-        if (auto dev = get_device_ctx(device)) {
+        if (auto dev = get_device_ctx(device)) { // all resources must be freed except for device_ctx_ext*
                 NT_ASSERT(dev->unplugged);
                 NT_ASSERT(!dev->sock());
                 NT_ASSERT(!dev->port);
@@ -483,6 +479,12 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
         return STATUS_SUCCESS;
 }
 
+inline auto set_unplugged(_Inout_ device_ctx &dev)
+{
+        static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
+        return InterlockedExchange8(PCHAR(&dev.unplugged), true);
+}
+
 /*
  * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
  * After UdecxUsbDevicePlugOutAndDelete the client driver can no longer use UDECXUSBDEVICE.
@@ -499,19 +501,17 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
  * FIXME: inability to delete UDECXUSBDEVICE causes leak of resources, drivers' memory consumption 
  * raises over the time. Driver Verifier cannot detect it because all will be freed on driver unload.
  */
-_Function_class_(EVT_WDF_IO_QUEUE_STATE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void NTAPI device_queue_purged(_In_ WDFQUEUE queue, _In_ WDFCONTEXT context)
+PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 {
-        PAGED_CODE(); // queue's ExecutionLevel must be WdfExecutionLevelPassive
-
-        bool plugout_and_delete = context;
-
-        auto device = get_device(queue);
-        TraceDbg("dev %04x, queue %04x", ptr04x(device), ptr04x(queue));
-
+        PAGED_CODE();
         auto &dev = *get_device_ctx(device);
+
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d, plugout&delete %d", 
+                ptr04x(device), dev.port, plugout_and_delete);
+
+        WdfIoQueuePurgeSynchronously(dev.queue);
 
         if (close_socket(dev.ext->sock)) {
                 TraceDbg("dev %04x, socket closed", ptr04x(device));
@@ -530,6 +530,62 @@ PAGED void NTAPI device_queue_purged(_In_ WDFQUEUE queue, _In_ WDFCONTEXT contex
         }
 
         NT_VERIFY(!KeSetEvent(&dev.queue_purged, IO_NO_INCREMENT, false)); // once
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ UDECXUSBDEVICE device)
+{
+        auto func = [] (auto WorkItem)
+        {
+                if (auto dev = (UDECXUSBDEVICE)WdfWorkItemGetParentObject(WorkItem)) {
+                        detach(dev, true);
+                }
+                WdfObjectDelete(WorkItem);
+        };
+
+        WDF_WORKITEM_CONFIG cfg;
+        WDF_WORKITEM_CONFIG_INIT(&cfg, func);
+        cfg.AutomaticSerialization = false;
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ParentObject = device;
+
+        auto st = WdfWorkItemCreate(&cfg, &attr, &wi);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, WdfWorkItemCreate %!STATUS!", ptr04x(device), st);
+                wi = WDF_NO_HANDLE;
+        }
+
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto wait_detach(_In_ UDECXUSBDEVICE device)
+{
+        PAGED_CODE();
+
+        auto dev = get_device_ctx(device);
+        auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
+
+        auto st = KeWaitForSingleObject(&dev->queue_purged, Executive, KernelMode, false, &timeout);
+
+        switch (st) {
+        case STATUS_SUCCESS:
+                TraceDbg("dev %04x, completed", ptr04x(device));
+                break;
+        case STATUS_TIMEOUT: // a bug in the driver
+                TraceDbg("dev %04x, timeout (purged WDFREQUEST is not completed?)", ptr04x(device));
+                static_assert(NT_SUCCESS(STATUS_TIMEOUT));
+                st = STATUS_OPERATION_IN_PROGRESS;
+                break;
+        default:
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), st);
+        }
+
+        return st;
 }
 
 } // namespace
@@ -577,22 +633,40 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
         return STATUS_SUCCESS;
 }
 
+/*
+ * WdfIoQueuePurge(,PurgeComplete,) could be used instead of WdfWorkItem if set queue's ExecutionLevel
+ * to WdfExecutionLevelPassive. But in this case WDF constantly use worker thread on DPC level:
+ *
+ * FxIoQueue::DispatchEvents:Thread FFFFB608248E1040 is processing WDFQUEUE 0x000049F7C9CD2758
+ * TRACE_LEVEL_WARNING FxIoQueue::CanThreadDispatchEventsLocked:Current thread 0xFFFFB608197AA040 is not
+ *      at the passive-level 0x00000002(DPC), posting to worker thread for WDFQUEUE 0x000049F7C9CD2758
+ * TRACE_LEVEL_VERBOSE FxIoQueue::_DeferredDispatchThreadThunk:Dispatching requests from worker thread
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::device::async_detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
+NTSTATUS usbip::device::async_plugout_and_delete(_In_ UDECXUSBDEVICE device)
 {
         auto &dev = *get_device_ctx(device);
-        static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
 
-        if (InterlockedExchange8(PCHAR(&dev.unplugged), true)) {
+        if (dev.unplugged) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
-                return;
+                return STATUS_SUCCESS;
+        }
+        
+        WDFWORKITEM wi{};
+        if (auto err = create_workitem(wi, device)) {
+                NT_ASSERT(!wi);
+                return err;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d", ptr04x(device), dev.port);
+        if (auto was_unplugged = set_unplugged(dev); !was_unplugged) {
+                WdfWorkItemEnqueue(wi);
+        } else {
+                TraceDbg("dev %04x, already unplugged", ptr04x(device));
+                WdfObjectDelete(wi);
+        }
 
-        auto ctx = reinterpret_cast<WDFCONTEXT>(static_cast<intptr_t>(plugout_and_delete));
-        WdfIoQueuePurge(dev.queue, device_queue_purged, ctx);
+        return STATUS_SUCCESS;
 }
 
 /*
@@ -600,36 +674,38 @@ void usbip::device::async_detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_a
  * regardless of the queue with which the event callback function is associated:
  * EvtIoDefault, EvtIoDeviceControl, EvtIoInternalDeviceControl, EvtIoRead, EvtIoWrite.
  *
- * Must wait for the completion because plugin_hardware can be called prior device_queue_purged.
+ * Must wait for the completion because plugin_hardware can be called prior ::detach().
  * In such case plugin_hardware will fail with USBIP_ERROR_ST_DEV_BUSY because the socket is still connected.
- *
- * All concurrent calls of this function will wait for the completion.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
+PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
-        async_detach(device, plugout_and_delete);
+        auto st = async_plugout_and_delete(device);
+        if (NT_SUCCESS(st)) {
+                st = wait_detach(device);
+        }
+        return st;
+}
 
+/*
+ * WdfIoQueuePurgeSynchronously can be called from this thread.
+ * UdecxUsbDevicePlugOutAndDelete will not be called.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void usbip::device::detach(_In_ UDECXUSBDEVICE device)
+{
+        PAGED_CODE();
         auto &dev = *get_device_ctx(device);
-        auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
 
-        auto st = KeWaitForSingleObject(&dev.queue_purged, Executive, KernelMode, false, &timeout);
-
-        switch (st) {
-        case STATUS_SUCCESS:
-                TraceDbg("dev %04x, completed", ptr04x(device));
-                break;
-        case STATUS_TIMEOUT:
-                TraceDbg("dev %04x, timeout (purged WDFREQUEST is not completed?)", ptr04x(device));
-                static_assert(NT_SUCCESS(STATUS_TIMEOUT));
-                st = STATUS_OPERATION_IN_PROGRESS;
-                break;
-        default:
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), st);
+        if (auto was_unplugged = set_unplugged(dev); !was_unplugged) {
+                ::detach(device, false);
+        } else {
+                TraceDbg("dev %04x, already unplugged", ptr04x(device));
         }
 
-        return st;
+        NT_VERIFY(NT_SUCCESS(wait_detach(device))); // concurrent calls wait for the completion
 }

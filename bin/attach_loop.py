@@ -9,13 +9,14 @@ random.seed()
 def run(args):
         subprocess.run(args, stderr=subprocess.STDOUT, text=True)
 
-def loop(usbip, remote, busid, max_timeout, count):
+def loop(usbip, remote, busid, max_delay, count):
         for i in range(count):
-                print(i)
+                print("#{}".format(i + 1))
                 run([usbip, "attach", "--remote", remote, "--bus-id", busid])
 
-                sec = random.randrange(max_timeout)
-                time.sleep(sec)
+                sec = random.randrange(max_delay)
+                if sec:
+                        time.sleep(sec)
 
                 run([usbip, "detach", "--all"])
 
@@ -29,8 +30,8 @@ def parse_args():
         p.add_argument('-b', '--bus-id', type=str, dest='busid', metavar='ID', required=True,
                         help='bus-id of USB device')
 
-        p.add_argument('-t', '--max-timeout', type=int, default=4, dest='max_timeout', metavar='SEC',
-                        help='max timeout before detach, seconds')
+        p.add_argument('-d', '--max-delay', type=int, default=3, dest='max_delay', metavar='SEC',
+                        help='max delay before detach, seconds')
 
         p.add_argument('-p', '--program', type=str, default=usbip_path, dest='usbip', metavar='PATH',
                         help='path to usbip.exe')
@@ -41,6 +42,6 @@ def parse_args():
 
 try:
         args = parse_args()
-        loop(args.usbip, args.remote, args.busid, args.max_timeout, args.count)
+        loop(args.usbip, args.remote, args.busid, args.max_delay + 1, args.count)
 except KeyboardInterrupt:
         pass

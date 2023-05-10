@@ -96,7 +96,7 @@ NTSTATUS send_complete(
         if (auto dev = ctx->dev; st.Status == STATUS_FILE_FORCED_CLOSED && !dev->unplugged) {
                 auto hdev = get_device(dev);
                 TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st.Status);
-                device::async_detach(hdev);
+                device::async_plugout_and_delete(hdev);
         }
 
         return StopCompletion;
