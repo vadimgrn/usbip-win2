@@ -607,22 +607,29 @@ void usbip::device::async_detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_a
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
+PAGED NTSTATUS usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 {
         PAGED_CODE();
 
         async_detach(device, plugout_and_delete);
-        auto &dev = *get_device_ctx(device);
 
-        switch (auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
-                auto st = KeWaitForSingleObject(&dev.queue_purged, Executive, KernelMode, false, &timeout)) {
+        auto &dev = *get_device_ctx(device);
+        auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
+
+        auto st = KeWaitForSingleObject(&dev.queue_purged, Executive, KernelMode, false, &timeout);
+
+        switch (st) {
         case STATUS_SUCCESS:
                 TraceDbg("dev %04x, completed", ptr04x(device));
                 break;
         case STATUS_TIMEOUT:
-                TraceDbg("dev %04x, timeout (some WDFREQUEST is not completed?)", ptr04x(device));
+                TraceDbg("dev %04x, timeout (purged WDFREQUEST is not completed?)", ptr04x(device));
+                static_assert(NT_SUCCESS(STATUS_TIMEOUT));
+                st = STATUS_OPERATION_IN_PROGRESS;
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), st);
         }
+
+        return st;
 }
