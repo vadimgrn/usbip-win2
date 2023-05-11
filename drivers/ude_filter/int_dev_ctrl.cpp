@@ -28,10 +28,13 @@ using namespace usbip;
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
+auto free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
 	auto urb = libdrv::argv<0, URB>(irp);
 	NT_ASSERT(urb);
+
+	auto tag = libdrv::argv<1>(irp);
+	NT_ASSERT(tag);
 
 	TraceDbg("dev %04x, urb %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
 		  ptr04x(urb), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
@@ -41,6 +44,8 @@ void free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 
 	libdrv::urb_ptr(fltr.device.usbd_handle, urb);
 	IoFreeIrp(irp);
+
+	return tag;
 }
 
 _Function_class_(IO_COMPLETION_ROUTINE)
@@ -51,8 +56,8 @@ NTSTATUS on_send_request(
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
 
-	free(fltr, irp);
-	libdrv::RemoveLockGuard(fltr.remove_lock, libdrv::adopt_lock);
+	auto tag = free(fltr, irp);
+	libdrv::RemoveLockGuard(fltr.remove_lock, libdrv::adopt_lock, tag);
 
 	return StopCompletion;
 }
@@ -87,12 +92,14 @@ auto send_request(
 		return err;
 	}
 
-	lck.clear();
-
 	filter::pack_request(urb.get()->UrbControlTransferEx, TransferBuffer.release(), function);
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
 	libdrv::argv<0>(irp.get()) = urb.release();
+
+	libdrv::argv<1>(irp.get()) = lck.tag();
+	lck.clear();
+
 	return IoCallDriver(target, irp.release()); // completion routine will be called anyway
 }
 
@@ -198,7 +205,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS irp_completed(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
 	auto &fltr = *static_cast<filter_ext*>(context);
-	libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock);
+	libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
 
 	post_process_irp(fltr, lck, irp);
 
@@ -236,7 +243,7 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(fltr.remove_lock);
+	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);

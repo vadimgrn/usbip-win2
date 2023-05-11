@@ -10,13 +10,15 @@ def run(args):
         subprocess.run(args, stderr=subprocess.STDOUT, text=True)
 
 def loop(usbip, remote, busid, max_delay, count):
+        stop = max_delay + 1
         for i in range(count):
                 print("#{}".format(i + 1))
                 run([usbip, "attach", "--remote", remote, "--bus-id", busid])
 
-                sec = random.randrange(max_delay)
-                if sec:
-                        time.sleep(sec)
+                if stop > 1:
+                        sec = random.randrange(stop)
+                        if sec:
+                                time.sleep(sec)
 
                 run([usbip, "detach", "--all"])
 
@@ -42,6 +44,8 @@ def parse_args():
 
 try:
         args = parse_args()
-        loop(args.usbip, args.remote, args.busid, args.max_delay + 1, args.count)
+        loop(args.usbip, args.remote, args.busid, args.max_delay, args.count)
 except KeyboardInterrupt:
         pass
+except Exception as e:
+        print(e)

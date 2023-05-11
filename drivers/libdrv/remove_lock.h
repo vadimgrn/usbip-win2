@@ -15,40 +15,45 @@ inline constexpr adopt_lock_t adopt_lock;
 class RemoveLockGuard
 {
 public:
-        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock) : 
-                m_result(IoAcquireRemoveLock(&lock, nullptr)),
-                m_lock(NT_SUCCESS(m_result) ? &lock : nullptr) {}
+        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock, _In_opt_ void *tag = nullptr) : 
+                m_acquired(IoAcquireRemoveLock(&lock, tag)),
+                m_lock(NT_SUCCESS(m_acquired) ? &lock : nullptr),
+                m_tag(tag) {}
 
-        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock, _In_ adopt_lock_t) : m_lock(&lock) {}
+        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock, _In_ adopt_lock_t, _In_opt_ void *tag = nullptr) : 
+                m_lock(&lock), m_tag(tag) {}
 
         ~RemoveLockGuard() 
         {
                 if (m_lock) {
-                        IoReleaseRemoveLock(m_lock, nullptr);
+                        IoReleaseRemoveLock(m_lock, m_tag);
                 }
         }
 
         RemoveLockGuard(const RemoveLockGuard&) = delete;
         RemoveLockGuard& operator =(const RemoveLockGuard&) = delete;
 
-        auto acquired() const { return m_result; }
-        
+        auto acquired() const { return m_acquired; }
+        auto tag() const { return m_tag; }
+
         void clear() 
         { 
-                m_result = STATUS_DEVICE_DOES_NOT_EXIST;
+                m_acquired = STATUS_INVALID_ADDRESS;
                 m_lock = nullptr; 
+                m_tag = nullptr; 
         }
 
         void release_and_wait()
         {
                 NT_ASSERT(m_lock);
-                IoReleaseRemoveLockAndWait(m_lock, nullptr);
+                IoReleaseRemoveLockAndWait(m_lock, m_tag);
                 clear();
         }
 
 private:
-        NTSTATUS m_result = STATUS_SUCCESS;
+        NTSTATUS m_acquired = STATUS_SUCCESS;
         IO_REMOVE_LOCK *m_lock{};
+        void *m_tag{};
 };
 
 } // namespace libdrv

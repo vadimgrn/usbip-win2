@@ -133,6 +133,8 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
 
+	lock.release_and_wait(); // USBD_HANDLE is no longer used after that
+
 	if (fltr.is_hub) {
 		//
 	} else if (auto &h = fltr.device.usbd_handle) {
@@ -141,10 +143,7 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 	}
 
 	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
-
-	lock.release_and_wait();
 	destroy(fltr);
-
 	return st;
 }
 
@@ -224,7 +223,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	PAGED_CODE();
 	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(fltr.remove_lock);
+	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
