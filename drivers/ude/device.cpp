@@ -260,16 +260,16 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoInternalDeviceControl = device::internal_control;
 
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, UDECXUSBENDPOINT);
-        attrs.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
-//      attrs.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoInternalDeviceControl is used only
-        attrs.ParentObject = endpoint;
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBENDPOINT);
+        attr.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
+//      attr.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoInternalDeviceControl is used only
+        attr.ParentObject = endpoint;
 
         auto &endp = *get_endpoint_ctx(endpoint);
         auto &dev = *get_device_ctx(endp.device); 
 
-        if (auto err = WdfIoQueueCreate(dev.vhci, &cfg, &attrs, &queue)) {
+        if (auto err = WdfIoQueueCreate(dev.vhci, &cfg, &attr, &queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
@@ -506,19 +506,16 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 {
         PAGED_CODE();
+
         auto &dev = *get_device_ctx(device);
-
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, port %d, plugout&delete %d", 
-                ptr04x(device), dev.port, plugout_and_delete);
-
         WdfIoQueuePurgeSynchronously(dev.queue);
 
         if (close_socket(dev.ext->sock)) {
-                TraceDbg("dev %04x, socket closed", ptr04x(device));
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
         }
 
         if (auto port = vhci::reclaim_roothub_port(device)) {
-                TraceDbg("port %d released", port);
+                Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
         if (!plugout_and_delete) {
@@ -526,7 +523,7 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
         } else if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
         } else {
-                TraceDbg("dev %04x, PlugOutAndDelete-d", ptr04x(device));
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
         }
 
         NT_VERIFY(!KeSetEvent(&dev.queue_purged, IO_NO_INCREMENT, false)); // once
@@ -563,14 +560,15 @@ auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ UDECXUSBDEVICE device)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto wait_detach(_In_ UDECXUSBDEVICE device)
+PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeout = nullptr)
 {
         PAGED_CODE();
+        TraceDbg("dev %04x", ptr04x(device));
 
-        auto dev = get_device_ctx(device);
-        auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
+        auto &dev = *get_device_ctx(device);
+        NT_ASSERT(dev.unplugged);
 
-        auto st = KeWaitForSingleObject(&dev->queue_purged, Executive, KernelMode, false, &timeout);
+        auto st = KeWaitForSingleObject(&dev.queue_purged, Executive, KernelMode, false, timeout);
 
         switch (st) {
         case STATUS_SUCCESS:
@@ -685,7 +683,8 @@ PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 
         auto st = async_plugout_and_delete(device);
         if (NT_SUCCESS(st)) {
-                st = wait_detach(device);
+                auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
+                st = wait_detach(device, &timeout);
         }
         return st;
 }

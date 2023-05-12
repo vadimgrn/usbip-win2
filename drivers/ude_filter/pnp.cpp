@@ -133,7 +133,7 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
 
-	lock.release_and_wait(); // USBD_HANDLE is no longer used after that
+	lock.release_and_wait(); // all allocated URBs are freed after this, USBD_HANDLE can be closed
 
 	if (fltr.is_hub) {
 		//
