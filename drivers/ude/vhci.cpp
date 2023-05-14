@@ -340,7 +340,7 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
 
         auto [begin, end] = get_port_range(dev.speed());
 
-        Lock lck(vhci.devices_lock); // function must be resident, do not use PAGED
+        wdm::Lock lck(vhci.devices_lock); // function must be resident, do not use PAGED
 
         for (auto i = begin; i < end; ++i) {
                 NT_ASSERT(i < ARRAYSIZE(vhci.devices));
@@ -370,7 +370,7 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
         static_assert(!is_valid_port(0));
         int portnum = 0;
 
-        Lock lck(vhci.devices_lock); 
+        wdm::Lock lck(vhci.devices_lock); 
         if (auto &port = dev.port) {
                 NT_ASSERT(is_valid_port(port));
                 portnum = port;
@@ -401,7 +401,7 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
         auto &ctx = *get_vhci_ctx(vhci);
 
-        Lock lck(ctx.devices_lock); 
+        wdm::Lock lck(ctx.devices_lock); 
         if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
                 ptr.reset(handle); // adds reference

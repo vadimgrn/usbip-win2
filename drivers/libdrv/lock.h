@@ -6,6 +6,9 @@
 
 #include <wdm.h>
 
+namespace wdm
+{
+
 class Lock
 {
 public:
@@ -15,25 +18,28 @@ public:
         Lock(_Inout_ KSPIN_LOCK &lock)
         { 
                 KeAcquireInStackQueuedSpinLock(&lock, &m_hlock); 
-                NT_ASSERT(acquired());
         }
 
         _IRQL_requires_(DISPATCH_LEVEL)
         _IRQL_restores_global_(QueuedSpinLock,m_hlock) // FIXME: annotations for destructors are ignored
         ~Lock() { release(); }
 
+        Lock(_In_ const Lock&) = delete;
+        Lock& operator=(_In_ const Lock&) = delete;
+
         _IRQL_requires_(DISPATCH_LEVEL)
         _IRQL_restores_global_(QueuedSpinLock,m_hlock)
         void release()
         {
-                if (acquired()) {
+                if (InterlockedExchange8(PCHAR(&m_acquired), false)) {
+                        static_assert(sizeof(m_acquired) == sizeof(CHAR));
                         KeReleaseInStackQueuedSpinLock(&m_hlock); 
-                        m_hlock.LockQueue.Lock = nullptr;
-                        NT_ASSERT(!acquired());
                 }
         }
 
 private:
         KLOCK_QUEUE_HANDLE m_hlock{};
-        bool acquired() const { return m_hlock.LockQueue.Lock; }
+        bool m_acquired = true;
 };
+
+} // namespace wdm
