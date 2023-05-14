@@ -4,6 +4,7 @@
 
 #include <ntddk.h>
 #include "wsk_cpp.h"
+#include "wait_timeout.h"
 
 #include <ntstrsafe.h>
 
@@ -184,21 +185,36 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
 
-        volatile LONG invoke_cnt;
-        volatile bool closing;
+        enum : LONG { // three highest bits are flags, lower bits comprise a counter
+                SIGN = 1 << 31,
+                EVENT_SET_OFFSET = 30, EVENT_SET = 1 << EVENT_SET_OFFSET,
+                CLOSING = 1 << 29,
+                COUNT_MASK = ~(SIGN | EVENT_SET | CLOSING)
+        };
+
+        LONG invoke_cnt;
+        KEVENT can_close;
 
         template<typename F, typename... Args>
         auto invoke(F&& f, Args&&... args) 
         {
-                if (closing) {
+                NTSTATUS ret;
+
+                if (auto n = InterlockedIncrement(&invoke_cnt); (n & COUNT_MASK) == COUNT_MASK) {
+                        ret = STATUS_INTEGER_OVERFLOW; // count will overflow on next increment
+                        DbgBreakPointWithStatus(DBG_STATUS_FATAL);
+                } else if (n & CLOSING) {
+                        ret = STATUS_CONNECTION_DISCONNECTED;
+                } else {
+                        ret = f(args...); 
                         using R = decltype(f(args...)); // @see std::invoke_result
-                        static_assert(sizeof(R) == sizeof(NTSTATUS)); // R must be NTSTATUS
-                        return STATUS_CONNECTION_DISCONNECTED;
+                        static_assert(sizeof(R) == sizeof(ret)); // R must be NTSTATUS
                 }
 
-                InterlockedIncrement(&invoke_cnt);
-                auto ret = f(args...); 
-                InterlockedDecrement(&invoke_cnt);
+                if (InterlockedDecrement(&invoke_cnt) == CLOSING && // count is zero, event is not set
+                    !InterlockedBitTestAndSet(&invoke_cnt, EVENT_SET_OFFSET)) {
+                        NT_VERIFY(!KeSetEvent(&can_close, IO_NO_INCREMENT, false)); // once
+                }
 
                 return ret;
         }
@@ -216,13 +232,15 @@ auto alloc_socket(_Out_ wsk::SOCKET* &sock)
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = sock->close_ctx.ctor();
-        if (err) {
+        
+        if (auto err = sock->close_ctx.ctor()) {
                 ExFreePoolWithTag(sock, WSK_POOL_TAG);
                 sock = nullptr;
+                return err;
         }
 
-        return err;
+        KeInitializeEvent(&sock->can_close, NotificationEvent, false);
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -232,23 +250,6 @@ void free(_In_ wsk::SOCKET *sock)
                 sock->close_ctx.dtor();
                 ExFreePoolWithTag(sock, WSK_POOL_TAG);
         }
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(APC_LEVEL)
-PAGED void wait_invokers(_In_ wsk::SOCKET *sock)
-{
-        PAGED_CODE();
-
-        NT_ASSERT(sock->closing);
-        enum { MS = 10'000 }; // millisecond in units of 100 nanoseconds
-
-        for (int i = 0; i < 100 && sock->invoke_cnt; ++i) { // ~10 sec. max
-                LARGE_INTEGER intv{ .QuadPart = -100*MS }; // relative
-                NT_VERIFY(NT_SUCCESS(KeDelayExecutionThread(KernelMode, false, &intv)));
-        }
-
-        NT_ASSERT(!sock->invoke_cnt);
 }
 
 PAGED auto setsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
@@ -290,6 +291,23 @@ PAGED auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG fla
         actual = NT_SUCCESS(err) ? ctx.irp()->IoStatus.Information : 0;
 
         return err;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(APC_LEVEL)
+PAGED void wait_invokers(_Inout_ wsk::SOCKET &s)
+{
+        PAGED_CODE();
+
+        if (auto n = InterlockedOr(&s.invoke_cnt, s.CLOSING)) { // count is not zero
+                NT_ASSERT((n & s.COUNT_MASK) == n);
+                auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
+                NT_VERIFY(!KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, &timeout));
+        } else {
+                InterlockedBitTestAndSet(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
+        }
+
+        NT_ASSERT(!(s.invoke_cnt & s.COUNT_MASK));
 }
 
 } // namespace
@@ -538,6 +556,7 @@ PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, b
  * function calls in progress to any of the socket's functions, including any extension functions, 
  * in any of the application's other threads. 
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
@@ -547,13 +566,10 @@ PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        static_assert(sizeof(sock->closing) == sizeof(CHAR));
-        InterlockedExchange8(PCHAR(&sock->closing), true); // @see KeMemoryBarrier
+        wait_invokers(*sock);
 
         auto &ctx = sock->close_ctx;
         ctx.reset();
-
-        wait_invokers(sock);
 
         auto err = sock->Basic->WskCloseSocket(sock->Self, ctx.irp());
         ctx.wait_for_completion(err);
