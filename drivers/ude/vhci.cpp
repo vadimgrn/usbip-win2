@@ -186,9 +186,9 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *init)
         }
 
         {
-                WDF_OBJECT_ATTRIBUTES attrs;
-                WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, request_ctx);
-                WdfDeviceInitSetRequestAttributes(init, &attrs);
+                WDF_OBJECT_ATTRIBUTES attr;
+                WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, request_ctx);
+                WdfDeviceInitSetRequestAttributes(init, &attr);
         }
 
         {
@@ -284,11 +284,11 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
 {
         PAGED_CODE();
 
-        WDF_OBJECT_ATTRIBUTES attrs; // default parent (WDFDRIVER) is OK
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, vhci_ctx);
-        attrs.EvtCleanupCallback = vhci_cleanup;
+        WDF_OBJECT_ATTRIBUTES attr; // default parent (WDFDRIVER) is OK
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, vhci_ctx);
+        attr.EvtCleanupCallback = vhci_cleanup;
 
-        if (auto err = WdfDeviceCreate(&init, &attrs, &vhci)) {
+        if (auto err = WdfDeviceCreate(&init, &attr, &vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
                 return err;
         }

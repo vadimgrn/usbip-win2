@@ -244,6 +244,12 @@ NTSTATUS function_suspend_and_wake(
 }
 
 /*
+ * UDE can call EvtIoInternalDeviceControl concurrently for different queues of the same device.
+ * I've caught concurrent CTRL and BULK transfer for a flash drive. 
+ * For that reason WdfSynchronizationScopeDevice is used to serialize calls of WskSend.
+ * Other values (Queue, None) cause BSOD in random third party driver sooner or later.
+ * FIXME: can UDE reorder requests?
+ * 
  * Using power-managed queues for I/O requests that require the device to be in its working state, 
  * and using queues that are not power-managed for all other requests.
  * Virtual device does not require power. For that reason all queues are not power-managed. 
@@ -258,12 +264,12 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential for EP0?
         cfg.PowerManaged = WdfFalse;
-        cfg.EvtIoInternalDeviceControl = device::internal_control;
+        cfg.EvtIoInternalDeviceControl = device::internal_control; // must be executed serially regardless of a queue
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBENDPOINT);
         attr.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
-//      attr.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoInternalDeviceControl is used only
+        attr.SynchronizationScope = WdfSynchronizationScopeDevice;
         attr.ParentObject = endpoint;
 
         auto &endp = *get_endpoint_ctx(endpoint);
@@ -374,8 +380,8 @@ PAGED NTSTATUS default_endpoint_add(_In_ UDECXUSBDEVICE dev, _In_ _UDECXUSBENDPO
  * WdfRequestGetIoQueue(request) returns queue that does not belong to the device (not its EP0 or others).
  * get_endpoint(WdfRequestGetIoQueue(request)) causes BSOD.
  *
- * If InterfaceSettingChange is called after UdecxUsbDevicePlugOutAndDelete, WDFREQUEST will be completed 
- * with error status. In such case UDECXUSBDEVICE will not be destroyed and the driver can't be unloaded.
+ * Completing a request with an error status after UdecxUsbDevicePlugOutAndDelete causes 
+ * hanging of the driver during the unloading because UDE will not destroy UDECXUSBDEVICE.
  *
  * UDEX does not call ConfigurationChange for composite devices.
  * UDEX passes wrong InterfaceNumber, NewInterfaceSetting for InterfaceSettingChange.

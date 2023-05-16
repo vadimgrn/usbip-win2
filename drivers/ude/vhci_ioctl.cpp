@@ -574,13 +574,13 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoDeviceControl = device_control;
 
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-        attrs.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); };
-        attrs.ParentObject = vhci;
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); };
+        attr.ParentObject = vhci;
 
         WDFQUEUE queue;
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attrs, &queue)) {
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &queue)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }

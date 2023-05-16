@@ -639,12 +639,12 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 	WDF_WORKITEM_CONFIG_INIT(&cfg, receive_usbip_header);
 	cfg.AutomaticSerialization = false;
 
-	WDF_OBJECT_ATTRIBUTES attrs; // WdfSynchronizationScopeNone is inherited from the driver object
-	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, PWSK_CONTEXT);
-	attrs.EvtDestroyCallback = workitem_destroy;
-	attrs.ParentObject = get_device(&ctx);
+	WDF_OBJECT_ATTRIBUTES attr; // WdfSynchronizationScopeNone is inherited from the driver object
+	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, PWSK_CONTEXT);
+	attr.EvtDestroyCallback = workitem_destroy;
+	attr.ParentObject = get_device(&ctx);
 
-	if (auto err = WdfWorkItemCreate(&cfg, &attrs, &ctx.recv_hdr)) {
+	if (auto err = WdfWorkItemCreate(&cfg, &attr, &ctx.recv_hdr)) {
 		Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
 		return err;
 	}

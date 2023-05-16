@@ -40,15 +40,15 @@ CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING
 {
 	PAGED_CODE();
 
-	WDF_OBJECT_ATTRIBUTES attrs;
-	WDF_OBJECT_ATTRIBUTES_INIT(&attrs);
-	attrs.EvtCleanupCallback = driver_cleanup;
+	WDF_OBJECT_ATTRIBUTES attr;
+	WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+	attr.EvtCleanupCallback = driver_cleanup;
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DeviceAdd);
 	cfg.DriverPoolTag = pooltag;
 
-	return WdfDriverCreate(DriverObject, RegistryPath, &attrs, &cfg, nullptr);
+	return WdfDriverCreate(DriverObject, RegistryPath, &attr, &cfg, nullptr);
 }
 
 _IRQL_requires_same_
