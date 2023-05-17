@@ -113,6 +113,7 @@ struct device_ctx
         seqnum_t seqnum; // @see next_seqnum
 
         volatile bool unplugged;
+        WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
 
         // for WSK receive
         WDFWORKITEM recv_hdr;

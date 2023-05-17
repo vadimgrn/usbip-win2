@@ -279,12 +279,32 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         return STATUS_SUCCESS;
 }
 
+/*
+ * UDE can call UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS despite UdecxUsbDevicePlugOutAndDelete was called.
+ * This can cause two BSODs:
+ * 1.WDF_VIOLATION -> in this driver
+ *   A NULL parameter was passed to a function that required a non-NULL value
+ *   udecx!Endpoint_UcxEndpointCleanup
+ * 2.IRQL_NOT_LESS_OR_EQUAL (a) -> in any system driver, but a memory address is always the same
+ *   Arg1: 0000000000000008, memory referenced
+ * 
+ * To fix both BSODs, callbacks and UdecxUsbDevicePlugOutAndDelete must be called serially.
+ * WdfObjectAcquireLock for UDECXUSBDEVICE can't be used, it will use spinlock that raises IRQL.
+ */
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_INIT_AND_METADATA *data)
 {
         PAGED_CODE();
+        
+        auto &dev = *get_device_ctx(device);
+        if (dev.unplugged) {
+                TraceDbg("dev %04x, unplugged", ptr04x(device));
+                return STATUS_DEVICE_NOT_CONNECTED;
+        }
+
+        wdf::WaitLock lck(dev.delete_lock);
 
         auto &epd = data->EndpointDescriptor ? *data->EndpointDescriptor : EP0;
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, epd.bEndpointAddress);
@@ -311,8 +331,6 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         endp.device = device;
         InitializeListHead(&endp.entry);
-
-        auto &dev = *get_device_ctx(device);
 
         if (auto len = data->EndpointDescriptorBufferLength) {
                 NT_ASSERT(epd.bLength == len);
@@ -374,6 +392,8 @@ void endpoints_configure(
         _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
         NT_ASSERT(!has_urb(request)); // but MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL
+
+//      wdf::WaitLock lck(dev.delete_lock); // not required, only logging here
 
         if (auto n = params->EndpointsToConfigureCount) {
                 TraceDbg("dev %04x, EndpointsToConfigure[%lu]%!BIN!", ptr04x(device), n, 
@@ -464,15 +484,40 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto init_device(_In_ UDECXUSBDEVICE dev, _Inout_ device_ctx &ctx)
+PAGED auto create_delete_lock(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
 
-        if (auto err = init_receive_usbip_header(ctx)) {
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ParentObject = device;
+
+        if (auto err = WdfWaitLockCreate(&attr, &dev.delete_lock)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
                 return err;
         }
 
-        if (auto err = device::create_queue(dev)) {
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
+{
+        PAGED_CODE();
+
+        KeInitializeEvent(&dev.queue_purged, NotificationEvent, false);
+        KeInitializeSpinLock(&dev.endpoint_list_lock);
+
+        if (auto err = create_delete_lock(device, dev)) {
+                return err;
+        }
+
+        if (auto err = init_receive_usbip_header(dev)) {
+                return err;
+        }
+
+        if (auto err = device::create_queue(device)) {
                 return err;
         }
 
@@ -520,7 +565,8 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 
         if (!plugout_and_delete) {
                 //
-        } else if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
+        } else if (wdf::WaitLock lck(dev.delete_lock);
+                   auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
         } else {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
@@ -591,10 +637,10 @@ PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeo
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
+PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
-        dev = WDF_NO_HANDLE;
+        device = WDF_NO_HANDLE;
 
         device_init_ptr init(vhci);
         if (auto err = init ? prepare_init(init.ptr, *ext) : STATUS_INSUFFICIENT_RESOURCES) {
@@ -602,32 +648,29 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &dev, _In_ WDFDEVICE v
                 return err;
         }
 
-        WDF_OBJECT_ATTRIBUTES attrs;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attrs, device_ctx);
-        attrs.EvtCleanupCallback = device_cleanup;
-        attrs.EvtDestroyCallback = device_destroy;
-        attrs.ParentObject = vhci; // FIXME: by default?
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, device_ctx);
+        attr.EvtCleanupCallback = device_cleanup;
+        attr.EvtDestroyCallback = device_destroy;
+        attr.ParentObject = vhci; // FIXME: by default?
 
-        if (auto err = UdecxUsbDeviceCreate(&init.ptr, &attrs, &dev)) {
+        if (auto err = UdecxUsbDeviceCreate(&init.ptr, &attr, &device)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
                 return err;
         }
 
         NT_ASSERT(!init); // zeroed by UdecxUsbDeviceCreate
-        auto &ctx = *get_device_ctx(dev);
+        auto &ctx = *get_device_ctx(device);
 
         ctx.vhci = vhci;
         ctx.ext = ext;
         ext->ctx = &ctx;
 
-        KeInitializeEvent(&ctx.queue_purged, NotificationEvent, false);
-        KeInitializeSpinLock(&ctx.endpoint_list_lock);
-
-        if (auto err = init_device(dev, ctx)) {
+        if (auto err = init_device(device, ctx)) {
                 return err;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(dev));
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
         return STATUS_SUCCESS;
 }
 
