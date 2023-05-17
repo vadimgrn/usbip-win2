@@ -52,11 +52,74 @@ private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
 
-
 inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 {
         a.swap(b);
 }
+
+
+class ObjectLock
+{
+public:
+        explicit ObjectLock(_In_ WDFOBJECT obj) : m_obj(obj)
+        { 
+                WdfObjectAcquireLock(m_obj);
+        }
+
+        ~ObjectLock() { release(); }
+
+        ObjectLock(_In_ const ObjectLock&) = delete;
+        ObjectLock& operator =(_In_ const ObjectLock&) = delete;
+
+        void release()
+        {
+                if (m_obj) {
+                        WdfObjectReleaseLock(m_obj);
+                        m_obj = WDF_NO_HANDLE;
+                }
+        }
+
+private:
+        WDFOBJECT m_obj = WDF_NO_HANDLE;
+};
+
+
+class WaitLock
+{
+public:
+        WaitLock() = default;
+                
+        _IRQL_requires_max_(PASSIVE_LEVEL)
+        explicit WaitLock(_In_ WDFWAITLOCK lock) : m_lock(lock) 
+        { 
+                PAGED_CODE();
+                WdfWaitLockAcquire(m_lock, nullptr); 
+        }
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        ~WaitLock() { release(); }
+
+        WaitLock(_In_ const WaitLock&) = delete;
+        WaitLock& operator =(_In_ const WaitLock&) = delete;
+
+        _When_(timeout == NULL, _IRQL_requires_max_(PASSIVE_LEVEL))
+        _When_(timeout != NULL && *timeout == 0, _IRQL_requires_max_(DISPATCH_LEVEL))
+        _When_(timeout != NULL && *timeout != 0, _IRQL_requires_max_(PASSIVE_LEVEL))
+        _When_(timeout != NULL, _Must_inspect_result_)
+        NTSTATUS acquire(_In_ WDFWAITLOCK lock, _In_opt_ LONGLONG *timeout = nullptr);
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void release()
+        {
+                if (m_lock) {
+                        WdfWaitLockRelease(m_lock);
+                        m_lock = WDF_NO_HANDLE;
+                }
+        }
+
+private:
+        WDFWAITLOCK m_lock = WDF_NO_HANDLE;
+};
 
 
 using usbip::generic_handle;

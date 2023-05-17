@@ -51,3 +51,16 @@ void wdf::ObjectRef::swap(_Inout_ ObjectRef &r)
         r.m_handle = m_handle;
         m_handle = tmp;
 }
+
+_When_(timeout == NULL, _IRQL_requires_max_(PASSIVE_LEVEL))
+_When_(timeout != NULL && *timeout == 0, _IRQL_requires_max_(DISPATCH_LEVEL))
+_When_(timeout != NULL && *timeout != 0, _IRQL_requires_max_(PASSIVE_LEVEL))
+_When_(timeout != NULL, _Must_inspect_result_)
+NTSTATUS wdf::WaitLock::acquire(_In_ WDFWAITLOCK lock, _In_opt_ LONGLONG *timeout)
+{
+        auto ret = m_lock ? STATUS_ALREADY_INITIALIZED : WdfWaitLockAcquire(lock, timeout); 
+        if (NT_SUCCESS(ret)) {
+                m_lock = lock;
+        }
+        return ret;
+}
