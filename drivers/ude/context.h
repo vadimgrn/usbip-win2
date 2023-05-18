@@ -48,7 +48,7 @@ constexpr auto is_valid_port(int port)
 struct vhci_ctx
 {
         UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
-        KSPIN_LOCK devices_lock;
+        WDFSPINLOCK devices_lock;
 
         _KTHREAD *attach_thread;
         KEVENT attach_thread_stop;
@@ -107,7 +107,7 @@ struct device_ctx
         KEVENT queue_purged;
 
         UDECXUSBENDPOINT ep0; // default control pipe
-        KSPIN_LOCK endpoint_list_lock; // for endpoint_ctx::entry
+        WDFSPINLOCK endpoint_list_lock; // for endpoint_ctx::entry
 
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum

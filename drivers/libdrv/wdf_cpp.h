@@ -58,32 +58,6 @@ inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 }
 
 
-class ObjectLock
-{
-public:
-        explicit ObjectLock(_In_ WDFOBJECT obj) : m_obj(obj)
-        { 
-                WdfObjectAcquireLock(m_obj);
-        }
-
-        ~ObjectLock() { release(); }
-
-        ObjectLock(_In_ const ObjectLock&) = delete;
-        ObjectLock& operator =(_In_ const ObjectLock&) = delete;
-
-        void release()
-        {
-                if (m_obj) {
-                        WdfObjectReleaseLock(m_obj);
-                        m_obj = WDF_NO_HANDLE;
-                }
-        }
-
-private:
-        WDFOBJECT m_obj = WDF_NO_HANDLE;
-};
-
-
 class WaitLock
 {
 public:
@@ -120,6 +94,71 @@ public:
 private:
         WDFWAITLOCK m_lock = WDF_NO_HANDLE;
 };
+
+
+/*
+ * Full specialization of these functions must be defined for each used type.
+ */
+template<typename T>
+void acquire_lock(_In_ T);
+
+template<typename T>
+void release_lock(_In_ T);
+
+
+template<typename T, auto None = T(WDF_NO_HANDLE)>
+class Lock
+{
+public:
+        using type = T;
+
+        explicit Lock(_In_ type obj) : m_lock(obj)
+        { 
+                acquire_lock(m_lock);
+        }
+
+        ~Lock() { release(); }
+
+        Lock(_In_ const Lock&) = delete;
+        Lock& operator =(_In_ const Lock&) = delete;
+
+        void release()
+        {
+                if (m_lock != None) {
+                        release_lock(m_lock);
+                        m_lock = None;
+                }
+        }
+
+private:
+        type m_lock = None;
+};
+
+
+template<>
+inline void acquire_lock(_In_ WDFOBJECT handle)
+{
+        WdfObjectAcquireLock(handle);
+}
+
+template<>
+inline void release_lock(_In_ WDFOBJECT handle)
+{
+        WdfObjectReleaseLock(handle);
+}
+
+
+template<>
+inline void acquire_lock(_In_ WDFSPINLOCK handle)
+{
+        WdfSpinLockAcquire(handle);
+}
+
+template<>
+inline void release_lock(_In_ WDFSPINLOCK handle)
+{
+        WdfSpinLockRelease(handle);
+}
 
 
 using usbip::generic_handle;

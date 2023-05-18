@@ -490,7 +490,7 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_delete_lock(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
+PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &handle, _In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
@@ -498,8 +498,26 @@ PAGED auto create_delete_lock(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &de
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = device;
 
-        if (auto err = WdfWaitLockCreate(&attr, &dev.delete_lock)) {
+        if (auto err = WdfWaitLockCreate(&attr, &handle)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto create_endpoint_list_lock(_Out_ WDFSPINLOCK &handle, _In_ UDECXUSBDEVICE device)
+{
+        PAGED_CODE();
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ParentObject = device;
+
+        if (auto err = WdfSpinLockCreate(&attr, &handle)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
                 return err;
         }
 
@@ -512,10 +530,11 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
 
-        KeInitializeEvent(&dev.queue_purged, NotificationEvent, false);
-        KeInitializeSpinLock(&dev.endpoint_list_lock);
+        if (auto err = create_endpoint_list_lock(dev.endpoint_list_lock, device)) {
+                return err;
+        }
 
-        if (auto err = create_delete_lock(device, dev)) {
+        if (auto err = create_delete_lock(dev.delete_lock, device)) {
                 return err;
         }
 
@@ -527,6 +546,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 return err;
         }
 
+        KeInitializeEvent(&dev.queue_purged, NotificationEvent, false);
         return STATUS_SUCCESS;
 }
 
