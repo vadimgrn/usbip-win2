@@ -18,6 +18,7 @@
 #include "filter_request.h"
 #include <ude_filter\request.h>
 
+#include <libdrv\irp.h>
 #include <libdrv\pdu.h>
 #include <libdrv\ch9.h>
 #include <libdrv\ch11.h>
@@ -169,15 +170,18 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
-        auto st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
-        NT_ASSERT(st != STATUS_NOT_SUPPORTED); // send_complete will not be called for this status only
-
-        if (st == STATUS_PENDING) {
-                TraceWSK("wsk irp %04x, %Iu bytes", ptr04x(wsk_irp), buf.Length);
-        } else {
-                TraceDbg("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, st);
+        switch (auto st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp)) {
+        case STATUS_PENDING:
+        case STATUS_SUCCESS:
+                TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, st);
+                break;
+        default:
+                Trace(TRACE_LEVEL_ERROR, "wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), st);
+                if (st == STATUS_NOT_SUPPORTED) { // WskSend does not complete IRP for this status only
+                        libdrv::CompleteRequest(wsk_irp, dev.unplugged ? STATUS_CANCELLED : st);
+                }
         }
-        
+
         return STATUS_PENDING;
 }
 

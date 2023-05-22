@@ -19,25 +19,60 @@ WSK_REGISTRATION g_Registration;
 enum { F_REGISTER, F_CAPTURE };
 LONG g_init_flags;
 
-class socket_async_context
+
+#if DBG
+
+class ConcurrencyCheck
 {
 public:
-        socket_async_context() { ctor(); } // works for allocations on stack only
-        ~socket_async_context() { dtor(); }
+        ConcurrencyCheck(_In_opt_ LONG64 *cnt) : m_cnt(cnt) {}
 
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        NTSTATUS ctor(); // use if an object is allocated on heap, f.e. by ExAllocatePool2
+        ~ConcurrencyCheck()
+        {
+                NT_ASSERT(!m_cnt || InterlockedIncrement64(m_cnt) == m_val + 1); // there were no concurrent calls
+        }
+
+        ConcurrencyCheck(const ConcurrencyCheck&) = delete;
+        ConcurrencyCheck& operator =(const ConcurrencyCheck&) = delete;
+
+private:
+        LONG64 *m_cnt{};
+        LONG64 m_val = m_cnt ? InterlockedIncrement64(m_cnt) : 0;
+};
+
+#else
+
+class ConcurrencyCheck
+{
+public:
+        ConcurrencyCheck(_In_opt_ LONG64*) {}
+};
+
+#endif // if DBG
+
+
+class irp_cls
+{
+public:
+        irp_cls() { ctor(); } // works for allocations on stack only
+        ~irp_cls() { dtor(); }
+
+        _IRQL_requires_max_(DISPATCH_LEVEL) // use if an object is allocated on heap, f.e. by ExAllocatePool2
+        NTSTATUS ctor();
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         void dtor();
 
-        socket_async_context(const socket_async_context &) = delete;
-        socket_async_context& operator=(const socket_async_context&) = delete;
+        irp_cls(_In_ const irp_cls &) = delete;
+        irp_cls& operator=(_In_ const irp_cls&) = delete;
 
         explicit operator bool() const { return m_irp; }
         auto operator !() const { return !m_irp; }
 
-        auto irp() const { NT_ASSERT(*this); return m_irp; }
+        auto get() const { return m_irp; }
+        auto operator ->() const { return m_irp; }
+
+        auto set_io_increment(_In_ KPRIORITY io_incr) { return InterlockedExchange(&m_io_increment, io_incr); }
 
         _IRQL_requires_max_(APC_LEVEL)
         PAGED NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
@@ -47,22 +82,23 @@ public:
 
 private:
         IRP *m_irp{};
-        KEVENT m_completion_event;
+        KEVENT m_event{};
+        LONG m_io_increment = IO_NO_INCREMENT;
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *Context);
+        static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context);
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         void set_completetion_routine()
         {
-                IoSetCompletionRoutine(m_irp, completion, &m_completion_event, true, true, true);
+                IoSetCompletionRoutine(m_irp, completion, this, true, true, true);
         }
 };
 
-static_assert(sizeof(socket_async_context) == 32);
+static_assert(sizeof(irp_cls) == 40);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS socket_async_context::ctor()
+NTSTATUS irp_cls::ctor()
 {
         NT_ASSERT(!*this);
 
@@ -71,14 +107,14 @@ NTSTATUS socket_async_context::ctor()
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        KeInitializeEvent(&m_completion_event, SynchronizationEvent, false);
+        KeInitializeEvent(&m_event, SynchronizationEvent, false);
         set_completetion_routine();
 
         return STATUS_SUCCESS;
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void socket_async_context::dtor()
+inline void irp_cls::dtor()
 {
         if (auto ptr = (IRP*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr)) {
                 IoFreeIrp(ptr);
@@ -86,36 +122,37 @@ void socket_async_context::dtor()
 }
 
 /*
- * KeClearEvent(&m_completion_event);
  * SynchronizationEvent is also called an autoreset or autoclearing event.
  * The kernel automatically resets the event to the not-signaled state each time a wait is satisfied.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void socket_async_context::reset()
+void irp_cls::reset()
 {
         NT_ASSERT(*this);
-        IoReuseIrp(m_irp, STATUS_UNSUCCESSFUL);
+        IoReuseIrp(m_irp, STATUS_SUCCESS);
         set_completetion_routine();
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS socket_async_context::completion(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_ void *Context)
+NTSTATUS irp_cls::completion(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_ void *context)
 {
+        auto &self = *static_cast<irp_cls*>(context);
+
         if (irp->PendingReturned) {
-                KeSetEvent(static_cast<KEVENT*>(Context), IO_NO_INCREMENT, false);
+                KeSetEvent(&self.m_event, self.m_io_increment, false);
         }
 
         return StopCompletion;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS socket_async_context::wait_for_completion(_Inout_ NTSTATUS &status)
+PAGED NTSTATUS irp_cls::wait_for_completion(_Inout_ NTSTATUS &status)
 {
         PAGED_CODE();
         NT_ASSERT(*this);
 
         if (status == STATUS_PENDING) {
-                KeWaitForSingleObject(&m_completion_event, Executive, KernelMode, false, nullptr);
+                NT_VERIFY(!KeWaitForSingleObject(&m_event, Executive, KernelMode, false, nullptr));
                 status = m_irp->IoStatus.Status;
         }
 
@@ -175,7 +212,10 @@ PAGED void ReleaseProviderNPI()
 struct wsk::SOCKET
 {
         WSK_SOCKET *Self;
-        socket_async_context close_ctx;
+
+        irp_cls recv_irp; // recv/send can be called concurrently
+        irp_cls send_irp;
+        irp_cls misc_irp;
 
         union { // shortcuts to Self->Dispatch
                 const WSK_PROVIDER_BASIC_DISPATCH *Basic;
@@ -185,34 +225,39 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
 
-        enum : LONG { // three highest bits are flags, lower bits comprise a counter
-                SIGN = 1 << 31,
-                EVENT_SET_OFFSET = 30, EVENT_SET = 1 << EVENT_SET_OFFSET,
-                CLOSING = 1 << 29,
+        using count_t = LONG64;
+
+        count_t recv_cnt;
+        count_t sent_cnt;
+        count_t misc_cnt;
+
+        enum : count_t { // three highest bits are flags, lower bits comprise a counter
+                SIGN = count_t(1) << 63,
+                EVENT_SET_OFFSET = 62, EVENT_SET = count_t(1) << EVENT_SET_OFFSET,
+                CLOSING = count_t(1) << 61,
                 COUNT_MASK = ~(SIGN | EVENT_SET | CLOSING)
         };
 
-        LONG invoke_cnt;
+        count_t invoke_cnt;
         KEVENT can_close;
 
         template<typename F, typename... Args>
-        auto invoke(F&& f, Args&&... args) 
+        auto invoke(count_t *cnt, F &&f, Args&&... args) 
         {
                 NTSTATUS ret;
 
-                if (auto n = InterlockedIncrement(&invoke_cnt); (n & COUNT_MASK) == COUNT_MASK) {
-                        ret = STATUS_INTEGER_OVERFLOW; // count will overflow on next increment
-                        DbgBreakPointWithStatus(DBG_STATUS_FATAL);
-                } else if (n & CLOSING) {
-                        ret = STATUS_CONNECTION_DISCONNECTED;
+                if (auto n = InterlockedIncrement64(&invoke_cnt); n & CLOSING) {
+                        ret = STATUS_NOT_SUPPORTED; // WSK callbacks do not complete IRP if this status is returned
                 } else {
-                        ret = f(args...); 
+                        ConcurrencyCheck chk(cnt);
+                        ret = f(args...);
+
                         using R = decltype(f(args...)); // @see std::invoke_result
                         static_assert(sizeof(R) == sizeof(ret)); // R must be NTSTATUS
                 }
 
-                if (InterlockedDecrement(&invoke_cnt) == CLOSING && // count is zero, event is not set
-                    !InterlockedBitTestAndSet(&invoke_cnt, EVENT_SET_OFFSET)) {
+                if (InterlockedDecrement64(&invoke_cnt) == CLOSING && // count is zero, event is not set
+                    !InterlockedBitTestAndSet64(&invoke_cnt, EVENT_SET_OFFSET)) {
                         NT_VERIFY(!KeSetEvent(&can_close, IO_NO_INCREMENT, false)); // once
                 }
 
@@ -224,41 +269,55 @@ struct wsk::SOCKET
 namespace
 {
 
+using namespace wsk;
+
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto alloc_socket(_Out_ wsk::SOCKET* &sock)
+void free(_Inout_ SOCKET* &sock)
 {
-        sock = (wsk::SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(wsk::SOCKET), WSK_POOL_TAG);
+        if (!sock) {
+                return;
+        }
+
+        sock->recv_irp.dtor();
+        sock->send_irp.dtor();
+        sock->misc_irp.dtor();
+
+        ExFreePoolWithTag(sock, WSK_POOL_TAG);
+        sock = nullptr;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto alloc_socket(_Out_ SOCKET* &sock)
+{
+        sock = (SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(SOCKET), WSK_POOL_TAG);
         if (!sock) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        
-        if (auto err = sock->close_ctx.ctor()) {
-                ExFreePoolWithTag(sock, WSK_POOL_TAG);
-                sock = nullptr;
-                return err;
+        irp_cls* v[] = {
+                &sock->recv_irp,
+                &sock->send_irp,
+                &sock->misc_irp,
+        };
+
+        for (auto irp: v) {
+                if (auto err = irp->ctor()) {
+                        free(sock);
+                        return err;
+                }
         }
 
         KeInitializeEvent(&sock->can_close, NotificationEvent, false);
         return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_In_ wsk::SOCKET *sock)
-{
-        if (sock) {
-                sock->close_ctx.dtor();
-                ExFreePoolWithTag(sock, WSK_POOL_TAG);
-        }
-}
-
-PAGED auto setsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
+PAGED auto setsockopt(_In_ SOCKET *sock, int level, int optname, void *optval, size_t optsize)
 {
         PAGED_CODE();
         return control(sock, WskSetOption, optname, level, optsize, optval, 0, nullptr, nullptr, true, nullptr);
 }
 
-PAGED auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optval, size_t optsize)
+PAGED auto getsockopt(_In_ SOCKET *sock, int level, int optname, void *optval, size_t optsize)
 {
         PAGED_CODE();
 
@@ -272,39 +331,46 @@ PAGED auto getsockopt(_In_ wsk::SOCKET *sock, int level, int optname, void *optv
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED auto transfer(_In_ wsk::SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, SIZE_T &actual, _In_ bool send)
+PAGED auto transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _Out_ SIZE_T &actual, _In_ bool send)
 {
         PAGED_CODE();
         NT_ASSERT(sock);
 
-        socket_async_context ctx;
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
+        irp_cls *irp;
+        SOCKET::count_t *cnt;
+        PFN_WSK_SEND func;
+
+        if (auto con = sock->Connection; send) {
+                irp = &sock->send_irp;
+                cnt = &sock->sent_cnt;
+                func = con->WskSend;
+        } else {
+                irp = &sock->recv_irp;
+                cnt = &sock->recv_cnt;
+                func = con->WskReceive;
         }
 
-        auto f = send ? sock->Connection->WskSend : sock->Connection->WskReceive;
+        irp->reset();
 
-        auto err = sock->invoke(f, sock->Self, buffer, flags, ctx.irp());
-        ctx.wait_for_completion(err);
+        auto st = sock->invoke(cnt, func, sock->Self, buffer, flags, irp->get());
+        irp->wait_for_completion(st);
 
-        NT_ASSERT(err != STATUS_NOT_SUPPORTED);
-        actual = NT_SUCCESS(err) ? ctx.irp()->IoStatus.Information : 0;
-
-        return err;
+        actual = NT_SUCCESS(st) ? (*irp)->IoStatus.Information : 0;
+        return st;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED void wait_invokers(_Inout_ wsk::SOCKET &s)
+PAGED void wait_invokers(_Inout_ SOCKET &s)
 {
         PAGED_CODE();
 
-        if (auto n = InterlockedOr(&s.invoke_cnt, s.CLOSING)) { // count is not zero
+        if (auto n = InterlockedOr64(&s.invoke_cnt, s.CLOSING)) { // count is not zero
                 NT_ASSERT((n & s.COUNT_MASK) == n);
                 auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
                 NT_VERIFY(!KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, &timeout));
         } else {
-                InterlockedBitTestAndSet(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
+                InterlockedBitTestAndSet64(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
         }
 
         NT_ASSERT(!(s.invoke_cnt & s.COUNT_MASK));
@@ -317,14 +383,19 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
         NT_ASSERT(sock);
-        return sock->invoke(sock->Connection->WskSend, sock->Self, buffer, flags, irp);
+        return sock->invoke(&sock->sent_cnt, sock->Connection->WskSend, sock->Self, buffer, flags, irp);
 }
 
+/*
+ * FIXME: 
+ * recv_cnt is commented out because WSK thread has high priority and completion handler is called
+ * before WSK function returns control.
+ */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
         NT_ASSERT(sock);
-        return sock->invoke(sock->Connection->WskReceive, sock->Self, buffer, flags, irp);
+        return sock->invoke(nullptr /*&sock->recv_cnt*/, sock->Connection->WskReceive, sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -332,14 +403,14 @@ PAGED NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG fla
 {
         PAGED_CODE();
 
-        SIZE_T actual = 0;
-        auto err = transfer(sock, buffer, flags, actual, true);
+        SIZE_T sent = 0;
+        auto st = transfer(sock, buffer, flags, sent, true);
 
-        if (NT_SUCCESS(err) && actual != buffer->Length) {
-                err = STATUS_PARTIAL_COPY;
+        if (NT_SUCCESS(st) && sent != buffer->Length) {
+                st = STATUS_PARTIAL_COPY;
         }
 
-        return err;
+        return st;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -352,15 +423,15 @@ PAGED NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG 
         }
 
         SIZE_T received = 0;
-        auto err = transfer(sock, buffer, flags, received, false);
+        auto st = transfer(sock, buffer, flags, received, false);
 
         if (actual) {
                 *actual = received;
-        } else if (NT_SUCCESS(err) && received != buffer->Length) {
-                err = STATUS_PARTIAL_COPY;
+        } else if (NT_SUCCESS(st) && received != buffer->Length) {
+                st = STATUS_RECEIVE_PARTIAL;
         }
 
-        return err;
+        return st;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -378,21 +449,21 @@ PAGED NTSTATUS wsk::getaddrinfo(
                 return STATUS_UNSUCCESSFUL;
         }
 
-        socket_async_context ctx;
-        if (!ctx) {
+        irp_cls irp;
+        if (!irp) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = prov->Dispatch->WskGetAddressInfo(prov->Client, NodeName, ServiceName,
+        auto st = prov->Dispatch->WskGetAddressInfo(prov->Client, NodeName, ServiceName,
                                                         0, // NameSpace
                                                         nullptr, // Provider
                                                         Hints,
                                                         &Result,
                                                         nullptr, // OwningProcess
                                                         nullptr, // OwningThread
-                                                        ctx.irp());
+                                                        irp.get());
 
-        return ctx.wait_for_completion(err);
+        return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -429,25 +500,24 @@ PAGED NTSTATUS wsk::socket(
                 return err;
         }
 
-        auto &ctx = sock->close_ctx;
+        auto &irp = sock->misc_irp;
 
-        auto err = prov->Dispatch->WskSocket(prov->Client, AddressFamily, SocketType, Protocol, Flags, SocketContext, Dispatch,
+        auto st = prov->Dispatch->WskSocket(prov->Client, AddressFamily, SocketType, Protocol, Flags, SocketContext, Dispatch,
                                                 nullptr, // OwningProcess
                                                 nullptr, // OwningThread
                                                 nullptr, // SecurityDescriptor
-                                                ctx.irp());
+                                                irp.get());
 
-        ctx.wait_for_completion(err);
+        irp.wait_for_completion(st);
 
-        if (!err) {
-                sock->Self = reinterpret_cast<WSK_SOCKET*>(ctx.irp()->IoStatus.Information);
+        if (NT_SUCCESS(st)) {
+                sock->Self = reinterpret_cast<WSK_SOCKET*>(irp->IoStatus.Information);
                 sock->Basic = static_cast<decltype(sock->Basic)>(sock->Self->Dispatch);
         } else {
                 ::free(sock);
-                sock = nullptr;
         }
 
-        return err;
+        return st;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -478,21 +548,21 @@ PAGED NTSTATUS wsk::control_client(
                                         OutputSize, OutputBuffer, OutputSizeReturned, nullptr);
         }
 
-        socket_async_context ctx;
-        if (!ctx) {
+        irp_cls irp;
+        if (!irp) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        auto err = WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer,
-                                    OutputSize, OutputBuffer, OutputSizeReturned, ctx.irp());
+        auto st = WskControlClient(prov->Client, ControlCode, InputSize, InputBuffer,
+                                    OutputSize, OutputBuffer, OutputSizeReturned, irp.get());
 
-        ctx.wait_for_completion(err);
+        irp.wait_for_completion(st);
 
-        if (NT_SUCCESS(err) && OutputSizeReturned) {
-                *OutputSizeReturned = ctx.irp()->IoStatus.Information;
+        if (NT_SUCCESS(st) && OutputSizeReturned) {
+                *OutputSizeReturned = irp->IoStatus.Information;
         }
 
-        return err;
+        return st;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -515,25 +585,26 @@ PAGED NTSTATUS wsk::control(
                 *OutputSizeReturnedIrp = 0;
         }
 
-        socket_async_context ctx;
-        if (!ctx && use_irp) {
-                return STATUS_INSUFFICIENT_RESOURCES;
+        auto &irp = sock->misc_irp;
+        if (use_irp) {
+                irp.reset();
         }
 
-        auto err = sock->invoke(sock->Basic->WskControlSocket, 
+        auto st = sock->invoke(&sock->misc_cnt,
+                                sock->Basic->WskControlSocket, 
                                 sock->Self, RequestType, ControlCode, Level,
                                 InputSize, InputBuffer,
                                 OutputSize, OutputBuffer, OutputSizeReturned,
-                                use_irp ? ctx.irp() : nullptr);
+                                use_irp ? irp.get() : nullptr);
 
         if (use_irp) {
-                ctx.wait_for_completion(err);
-                if (NT_SUCCESS(err) && OutputSizeReturnedIrp) {
-                        *OutputSizeReturnedIrp = ctx.irp()->IoStatus.Information;
+                irp.wait_for_completion(st);
+                if (NT_SUCCESS(st) && OutputSizeReturnedIrp) {
+                        *OutputSizeReturnedIrp = irp->IoStatus.Information;
                 }
         }
 
-        return err;
+        return st;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -558,7 +629,7 @@ PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, b
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
+PAGED NTSTATUS wsk::close(_Inout_ SOCKET* &sock)
 {
         PAGED_CODE();
 
@@ -568,14 +639,14 @@ PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 
         wait_invokers(*sock);
 
-        auto &ctx = sock->close_ctx;
-        ctx.reset();
+        auto &irp = sock->misc_irp;
+        irp.reset();
 
-        auto err = sock->Basic->WskCloseSocket(sock->Self, ctx.irp());
-        ctx.wait_for_completion(err);
+        auto st = sock->Basic->WskCloseSocket(sock->Self, irp.get());
+        irp.wait_for_completion(st);
 
         ::free(sock);
-        return err;
+        return st;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -583,13 +654,11 @@ PAGED NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
 {
         PAGED_CODE();
 
-        socket_async_context ctx;
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
+        auto &irp = sock->misc_irp;
+        irp.reset();
 
-        auto err = sock->invoke(sock->Connection->WskBind, sock->Self, LocalAddress, 0, ctx.irp());
-        return ctx.wait_for_completion(err);
+        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskBind, sock->Self, LocalAddress, 0, irp.get());
+        return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -597,13 +666,11 @@ PAGED NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
 {
         PAGED_CODE();
 
-        socket_async_context ctx;
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
+        auto &irp = sock->misc_irp;
+        irp.reset();
 
-        auto err = sock->invoke(sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, ctx.irp());
-        return ctx.wait_for_completion(err);
+        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, irp.get());
+        return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -611,19 +678,17 @@ PAGED NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_
 {
         PAGED_CODE();
 
-        socket_async_context ctx;
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
+        auto &irp = sock->misc_irp;
+        irp.reset();
 
-        auto err = sock->invoke(sock->Connection->WskDisconnect, sock->Self, buffer, flags, ctx.irp());
-        return ctx.wait_for_completion(err);
+        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskDisconnect, sock->Self, buffer, flags, irp.get());
+        return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication)
 {
-        return sock->invoke(sock->Connection->WskRelease, sock->Self, DataIndication);
+        return sock->invoke(&sock->misc_cnt, sock->Connection->WskRelease, sock->Self, DataIndication);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -631,13 +696,11 @@ PAGED NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress
 {
         PAGED_CODE();
 
-        socket_async_context ctx;
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
+        auto &irp = sock->misc_irp;
+        irp.reset();
 
-        auto err = sock->invoke(sock->Connection->WskGetLocalAddress, sock->Self, LocalAddress, ctx.irp());
-        return ctx.wait_for_completion(err);
+        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskGetLocalAddress, sock->Self, LocalAddress, irp.get());
+        return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -645,13 +708,11 @@ PAGED NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddre
 {
         PAGED_CODE();
 
-        socket_async_context ctx;
-        if (!ctx) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
+        auto &irp = sock->misc_irp;
+        irp.reset();
 
-        auto err = sock->invoke(sock->Connection->WskGetRemoteAddress, sock->Self, RemoteAddress, ctx.irp());
-        return ctx.wait_for_completion(err);
+        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskGetRemoteAddress, sock->Self, RemoteAddress, irp.get());
+        return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -665,8 +726,8 @@ PAGED auto wsk::for_each(
 
                 SOCKET *sock{};
 
-                if (socket(sock, static_cast<ADDRESS_FAMILY>(ai->ai_family), static_cast<USHORT>(ai->ai_socktype),
-                           ai->ai_protocol, Flags, SocketContext, Dispatch)) {
+                if (socket(sock, static_cast<ADDRESS_FAMILY>(ai->ai_family), 
+                           static_cast<USHORT>(ai->ai_socktype), ai->ai_protocol, Flags, SocketContext, Dispatch)) {
                         NT_ASSERT(!sock);
                 } else if (auto err = f(sock, *ai, ctx)) {
                         err = close(sock);
@@ -805,4 +866,12 @@ WSK_DATA_INDICATION* wsk::tail(_In_opt_ WSK_DATA_INDICATION *di)
 {
         for ( ; di && di->Next; di = di->Next);
         return di;
+}
+
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void wsk::set_io_increment(_In_ SOCKET *sock, _In_ KPRIORITY increment)
+{
+        PAGED_CODE();
+        sock->recv_irp.set_io_increment(increment);
+        sock->send_irp.set_io_increment(increment);
 }

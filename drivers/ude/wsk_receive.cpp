@@ -16,6 +16,7 @@
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
+#include <libdrv\irp.h>
 #include <libdrv\pdu.h>
 
 namespace
@@ -366,7 +367,7 @@ NTSTATUS free_drain_buffer(_Inout_ wsk_context &ctx)
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS on_receive(
+NTSTATUS receive_complete(
 	_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
 	auto &ctx = *static_cast<wsk_context*>(Context);
@@ -394,7 +395,7 @@ NTSTATUS on_receive(
 		free_drain_buffer(ctx);
 	} else if (auto &req = ctx.request) {
 		NT_ASSERT(dev.received != ret_submit); // never fails
-		atomic_complete(req, STATUS_CANCELLED);
+		atomic_complete(req, st);
 	}
 	NT_ASSERT(!ctx.request);
 
@@ -425,15 +426,18 @@ auto receive(_In_ WSK_BUF &buf, _In_ device_ctx::received_fn received, _In_ wsk_
 	auto irp = ctx.wsk_irp; // do not access ctx or wsk_irp after receive
 	IoReuseIrp(irp, STATUS_SUCCESS);
 
-	IoSetCompletionRoutine(irp, on_receive, &ctx, true, true, true);
+	IoSetCompletionRoutine(irp, receive_complete, &ctx, true, true, true);
 
-	auto st = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, irp);
-	NT_ASSERT(st != STATUS_NOT_SUPPORTED); // on_receive will not be called for this status only
-
-	if (st == STATUS_PENDING) {
-		TraceWSK("%Iu bytes", buf.Length);
-	} else {
-		TraceDbg("%Iu bytes, %!STATUS!", buf.Length, st);
+	switch (auto st = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, irp)) {
+	case STATUS_PENDING:
+	case STATUS_SUCCESS:
+		TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(irp), buf.Length, st);
+		break;
+	default:
+		Trace(TRACE_LEVEL_ERROR, "wsk irp %04x, %!STATUS!", ptr04x(irp), st);
+		if (st == STATUS_NOT_SUPPORTED) { // WskReceive does not complete IRP for this status only
+			libdrv::CompleteRequest(irp, dev.unplugged ? STATUS_CANCELLED : st);
+		}
 	}
 
 	return RECV_MORE_DATA_REQUIRED;

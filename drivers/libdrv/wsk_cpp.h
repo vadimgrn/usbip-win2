@@ -38,6 +38,9 @@ PAGED NTSTATUS socket(
         _In_opt_ void *SocketContext, 
         _In_opt_ const void *Dispatch);
 
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void set_io_increment(_In_ SOCKET *sock, _In_ KPRIORITY increment);
+
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS control(
         _In_ SOCKET *sock,
@@ -86,7 +89,7 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS close(_In_ SOCKET *sock);
+PAGED NTSTATUS close(_Inout_ SOCKET* &sock);
 
 //
 
