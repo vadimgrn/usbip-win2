@@ -760,17 +760,16 @@ PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 
 /*
  * WdfIoQueuePurgeSynchronously can be called from this thread.
- * UdecxUsbDevicePlugOutAndDelete will not be called.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::detach(_In_ UDECXUSBDEVICE device)
+PAGED void usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 {
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
         if (auto was_unplugged = set_unplugged(dev); !was_unplugged) {
-                ::detach(device, false);
+                ::detach(device, plugout_and_delete);
         } else {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
         }

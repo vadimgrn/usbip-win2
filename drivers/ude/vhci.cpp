@@ -24,7 +24,7 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-void attach_thread_join(_In_ WDFDEVICE vhci)
+/*PAGED*/ void attach_thread_join(_In_ WDFDEVICE vhci) // not PAGED, see KeSetEvent
 {
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
@@ -140,7 +140,13 @@ NTSTATUS query_usb_capability(
 
 /*
  * If TargetState is WdfPowerDeviceD3Final, you should assume that the system is being turned off, 
- * the device is about to be removed, or a resource rebalance is in progress. 
+ * the device is about to be removed, or a resource rebalance is in progress.
+ * 
+ * FIXME:
+ * WdfPowerDeviceD3Final does not occur during uninstallation of the driver while a device is in use.
+ * For example, try run the uninstaller while data is copying from a flash drive.
+ * The reason may be the low priority of a thread that calls this callback.
+ * There is no such issue if do not copy files during the uninstallation.
  */
 _Function_class_(EVT_WDF_DEVICE_D0_EXIT)
 _IRQL_requires_same_
@@ -424,8 +430,8 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool PowerD
 
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
-                        if (PowerDeviceD3Final) { 
-                                device::detach(hdev); // do not call UdecxUsbDevicePlugOutAndDelete, UDE will call it
+                        if (PowerDeviceD3Final) { // do not call UdecxUsbDevicePlugOutAndDelete, UDE will call it
+                                device::detach(hdev, false);
                         } else {
                                 device::plugout_and_delete(hdev);
                         }
