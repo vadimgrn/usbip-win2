@@ -4,11 +4,12 @@
 
 #pragma once
 
-#include <ntdef.h>
+#include <libdrv/unique_ptr.h>
 
 namespace usbip
 {
 
 const ULONG pooltag = 'ICHV';
+using unique_ptr = libdrv::unique_ptr<pooltag>;
 
 } // namespace usbip

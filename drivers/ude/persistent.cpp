@@ -373,7 +373,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
         if (HANDLE handle; 
             auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, 
                                             nullptr, persistent_devices_thread, vhci)) {
-                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
+                Trace(TRACE_LEVEL_ERROR, "IoCreateSystemThread %!STATUS!", err);
         } else {
                 PVOID thread;
                 NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
