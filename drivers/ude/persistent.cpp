@@ -287,7 +287,7 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
                 return;
         }
 
-        auto vhci = get_device(&ctx);
+        auto vhci = get_handle(&ctx);
 
         auto target = make_target(vhci);
         if (!target) {
@@ -368,7 +368,7 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
         PAGED_CODE();
 
         const auto access = THREAD_ALL_ACCESS;
-        auto fdo = WdfDeviceWdmGetDeviceObject(get_device(vhci));
+        auto fdo = WdfDeviceWdmGetDeviceObject(get_handle(vhci));
 
         if (HANDLE handle; 
             auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, 

@@ -36,18 +36,9 @@ using namespace usbip;
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  *
- * In general, you must not touch IRP that was put in Cancel-Safe Queue because it can be canceled at any moment.
- * You should remove IRP from the CSQ and then use it. BUT you can access IRP if you shure it is alive.
- *
- * To avoid copying of URB's transfer buffer, it must not be completed until this handler will be called.
- * This means that:
- * 1.EvtIoCanceledOnQueue must not complete IRP if it's called before send_complete because WskSend can still access
- *   IRP transfer buffer.
- * 2.WskReceive must not complete IRP if it's called before send_complete because send_complete modifies request_context.status.
- * 3.EvtIoCanceledOnQueue and WskReceive are mutually exclusive because IRP is dequeued from the CSQ.
- * 4.Thus, send_complete can run concurrently with EvtIoCanceledOnQueue or WskReceive.
- * 
- * @see wsk_receive.cpp, complete 
+ * The completion handler for WskReceive is executed by a high priority thread
+ * and is usually called before this handler.
+ * @see wsk_receive.cpp, find_request
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -55,48 +46,35 @@ NTSTATUS send_complete(
         _In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
 {
         wsk_context_ptr ctx(static_cast<wsk_context*>(Context), true);
-        auto request = ctx->request;
 
-        request_ctx *req_ctx;
-        seqnum_t seqnum;
-        request_status old_status;
+        auto request = ctx->request; // can be WDF_NO_HANDLE or already completed
+        auto &dev = *ctx->dev;
 
-        if (request) { // NULL for send_cmd_unlink
-                req_ctx = get_request_ctx(request);
-                seqnum = req_ctx->seqnum;
-                old_status = atomic_set_status(*req_ctx, REQ_SEND_COMPLETE);
-        } else {
-                req_ctx = nullptr;
-                seqnum = 0;
-                old_status = REQ_NO_HANDLE;
-        }
-
-        auto &st = wsk_irp->IoStatus;
-
-        TraceWSK("wsk irp %04x, seqnum %u, %!STATUS!, Information %Iu, %!request_status!", 
-                  ptr04x(wsk_irp), seqnum, st.Status, st.Information, old_status);
+        auto &wsk = wsk_irp->IoStatus;
+        TraceWSK("req %04x -> wsk irp %04x, %!STATUS!, Information %Iu", 
+                  ptr04x(request), ptr04x(wsk_irp), wsk.Status, wsk.Information);
 
         if (!request) {
                 // nothing to do
-        } else if (NT_SUCCESS(st.Status)) { // request has sent
-                switch (old_status) {
-                case REQ_RECV_COMPLETE: 
-                        complete(request);
+        } else if (NT_SUCCESS(wsk.Status)) { // request has sent
+                switch (auto st = device::move_egress_request_to_queue(dev, request)) {
+                case STATUS_NOT_FOUND: // WskReceive completion handler has already removed it
+                case STATUS_SUCCESS:
                         break;
-                case REQ_CANCELED:
-                        complete(request, STATUS_CANCELLED);
-                        break;
+                default:
+                        Trace(TRACE_LEVEL_ERROR, "req %04x, WdfRequestForwardToIoQueue %!STATUS!", ptr04x(request), st);
+                        complete(request, st);
                 }
-        } else if (auto victim = device::dequeue_request(*ctx->dev, seqnum)) { // ctx->hdr.base.seqnum is in network byte order
+        } else if (auto victim = device::remove_egress_request(dev, request)) {
                 NT_ASSERT(victim == request);
-                complete(victim, st.Status);
-        } else if (old_status == REQ_CANCELED) {
-                complete(request, STATUS_CANCELLED);
+                complete(victim, wsk.Status);
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "req %04x not found among egress", ptr04x(request));
         }
 
-        if (auto dev = ctx->dev; st.Status == STATUS_FILE_FORCED_CLOSED && !dev->unplugged) {
-                auto hdev = get_device(dev);
-                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st.Status);
+        if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !dev.unplugged) {
+                auto hdev = get_handle(&dev);
+                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), wsk.Status);
                 device::async_plugout_and_delete(hdev);
         }
 
@@ -133,9 +111,30 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
         return STATUS_SUCCESS;
 }
 
+/*
+ * WskSend reads data directly from URB transfer buffer. A request must not be added to Cancel-Safe IRP Queue
+ * until the completion handler is called, otherwise it could be cancelled while the buffer is being copied.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ device_ctx &dev,
+void add_egress_request(
+        _Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endpoint, _In_ seqnum_t seqnum)
+{
+        auto &req = *get_request_ctx(request);
+        InitializeListHead(&req.entry);
+
+        NT_ASSERT(endpoint);
+        req.endpoint = endpoint;
+
+        req.seqnum = seqnum;
+        NT_ASSERT(is_valid_seqnum(req.seqnum));
+
+        device::add_egress_request(dev, req);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
         WSK_BUF buf{};
@@ -148,21 +147,8 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _In_ de
                         ptr04x(ctx->request), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
-        if (auto request = ctx->request) { // can be WDF_NO_HANDLE
-                auto &req = *get_request_ctx(request); // FIXME: is not zeroed?
-
-                req.seqnum = ctx->hdr.base.seqnum;
-                NT_ASSERT(is_valid_seqnum(req.seqnum));
-
-                req.status = REQ_ZERO; // NT_ASSERT(req.status == REQ_ZERO) can fail
-
-                NT_ASSERT(endpoint);
-                req.endpoint = endpoint;
-
-                if (auto err = WdfRequestForwardToIoQueue(request, dev.queue)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
-                        return err;
-                }
+        if (auto req = ctx->request) { // can be WDF_NO_HANDLE
+                add_egress_request(dev, req, endpoint, ctx->hdr.base.seqnum);
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -462,7 +448,7 @@ void usbip::device::send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ 
         TraceDbg("dev %04x, seqnum %u", ptr04x(device), req.seqnum);
 
         if (dev.unplugged) {
-                TraceDbg("Unplugged, do not send unlink command");
+                TraceDbg("Unplugged, do not send unlink");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
                 set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
                 ::send(WDF_NO_HANDLE, ctx, dev, false); // ignore error
@@ -470,11 +456,7 @@ void usbip::device::send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ 
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, seqnum %u, wsk_context_ptr error", ptr04x(device), req.seqnum);
         }
 
-        if (auto old_status = atomic_set_status(req, REQ_CANCELED); old_status == REQ_SEND_COMPLETE) {
-                complete(request, STATUS_CANCELLED);
-        } else {
-                NT_ASSERT(old_status != REQ_RECV_COMPLETE);
-        }
+        complete(request, STATUS_CANCELLED);
 }
 
 _IRQL_requires_same_

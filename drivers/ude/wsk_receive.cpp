@@ -3,10 +3,10 @@
  */
 
 #include "wsk_receive.h"
-#include "context.h"
 #include "trace.h"
 #include "wsk_receive.tmh"
 
+#include "context.h"
 #include "wsk_context.h"
 #include "device.h"
 #include "device_queue.h"
@@ -195,26 +195,11 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 	return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
 }
 
-/* 
- * UrbHeader.Status must be set before this call.
- * @see device_ioctl.cpp, send_complete 
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void atomic_complete(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
+void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 {
-	if (auto irp = WdfRequestWdmGetIrp(request)) {
-		irp->IoStatus.Status = status; // request can be completed by send_complete()
-	}
-
-	auto &req = *get_request_ctx(request);
-	
-	if (auto old_status = atomic_set_status(req, REQ_RECV_COMPLETE); old_status == REQ_SEND_COMPLETE) {
-		complete(request, status);
-	} else {
-		NT_ASSERT(old_status != REQ_CANCELED);
-	}
-
+	complete(request, status);
 	request = WDF_NO_HANDLE;
 }
 
@@ -257,7 +242,7 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx)
 		  ret.status ? STATUS_UNSUCCESSFUL : 
 		  STATUS_SUCCESS;
 
-	atomic_complete(ctx.request, st);
+	complete_and_set_null(ctx.request, st);
 	return RECV_NEXT_USBIP_HDR;
 }
 
@@ -395,12 +380,12 @@ NTSTATUS receive_complete(
 		free_drain_buffer(ctx);
 	} else if (auto &req = ctx.request) {
 		NT_ASSERT(dev.received != ret_submit); // never fails
-		atomic_complete(req, st);
+		complete_and_set_null(req, st);
 	}
 	NT_ASSERT(!ctx.request);
 
 	if (!dev.unplugged) {
-		auto hdev = get_device(&dev);
+		auto hdev = get_handle(&dev);
 		TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), st);
 		device::async_plugout_and_delete(hdev);
 	}
@@ -486,6 +471,17 @@ NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 	return receive(buf, ret_submit, ctx);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto find_request(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum)
+{
+	auto req = device::remove_egress_request(dev, seqnum); // most of the time it's still there
+	if (!req) {
+		req = device::dequeue_request(dev, seqnum); // could be cancelled on queue
+	}
+	return req;
+}
+
 /*
  * For RET_UNLINK irp was completed right after CMD_UNLINK was issued.
  * @see send_cmd_unlink
@@ -503,7 +499,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 	auto &hdr = ctx.hdr;
 
 	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? // request must be completed
-		      device::dequeue_request(*ctx.dev, hdr.base.seqnum) : WDF_NO_HANDLE;
+		      find_request(*ctx.dev, hdr.base.seqnum) : WDF_NO_HANDLE;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];
@@ -520,7 +516,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 		ret_submit(ctx);
 	} else {
 		TraceDbg("dev %04x is unplugged, skip payload[%Iu]", ptr04x(ctx.dev), sz);
-		atomic_complete(ctx.request, STATUS_CANCELLED);
+		complete_and_set_null(ctx.request, STATUS_CANCELLED);
 	}
 
 	return RECV_NEXT_USBIP_HDR;
@@ -595,6 +591,9 @@ void NTAPI receive_usbip_header(_In_ WDFWORKITEM WorkItem)
 } // namespace
 
 
+/* 
+ * UrbHeader.Status must be set before this call.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
@@ -646,7 +645,7 @@ PAGED NTSTATUS usbip::init_receive_usbip_header(_In_ device_ctx &ctx)
 	WDF_OBJECT_ATTRIBUTES attr; // WdfSynchronizationScopeNone is inherited from the driver object
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, PWSK_CONTEXT);
 	attr.EvtDestroyCallback = workitem_destroy;
-	attr.ParentObject = get_device(&ctx);
+	attr.ParentObject = get_handle(&ctx);
 
 	if (auto err = WdfWorkItemCreate(&cfg, &attr, &ctx.recv_hdr)) {
 		Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);

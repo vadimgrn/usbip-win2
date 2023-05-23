@@ -55,7 +55,7 @@ struct vhci_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
-inline auto get_device(_In_ vhci_ctx *ctx)
+inline auto get_handle(_In_ vhci_ctx *ctx)
 {
         NT_ASSERT(ctx);
         return static_cast<WDFDEVICE>(WdfObjectContextGetObject(ctx));
@@ -91,7 +91,7 @@ struct device_ctx_ext
 };
 
 /*
- * Context space for UDECXUSBDEVICE -  virtual (emulated) USB device.
+ * Context space for UDECXUSBDEVICE - emulated USB device.
  */
 struct device_ctx
 {
@@ -103,11 +103,14 @@ struct device_ctx
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
-        WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
-        KEVENT queue_purged;
-
         UDECXUSBENDPOINT ep0; // default control pipe
         WDFSPINLOCK endpoint_list_lock; // for endpoint_ctx::entry
+
+        LIST_ENTRY egress_requests; // that are waiting for WskSend completion handler, head for request_ctx::entry
+        WDFSPINLOCK egress_requests_lock;
+
+        WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
+        KEVENT queue_purged;
 
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
@@ -123,7 +126,7 @@ struct device_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
-inline auto get_device(_In_ device_ctx *ctx)
+inline auto get_handle(_In_ device_ctx *ctx)
 {
         NT_ASSERT(ctx);
         return static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx));
@@ -158,28 +161,21 @@ inline auto& get_endpoint(_In_ WDFQUEUE queue) // use get_device() for device_ct
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
 
-enum request_status : LONG { REQ_ZERO, REQ_SEND_COMPLETE, REQ_RECV_COMPLETE, REQ_CANCELED, REQ_NO_HANDLE };
-
 /*
  * Context space for WDFREQUEST.
- * It's OK to get a context for request that the driver doesn't own if it isn't completed.
  */
 struct request_ctx
 {
-        seqnum_t seqnum;
-        request_status status;
+        LIST_ENTRY entry; // head is device_ctx::egress_requests
         UDECXUSBENDPOINT endpoint;
+        seqnum_t seqnum;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto atomic_set_status(_Inout_ request_ctx &ctx, _In_ request_status status)
+inline auto get_handle(_In_ request_ctx *ctx)
 {
-        NT_ASSERT(status != REQ_ZERO);
-        NT_ASSERT(status != REQ_NO_HANDLE);
-        static_assert(sizeof(ctx.status) == sizeof(LONG));
-        auto oldval = InterlockedCompareExchange(reinterpret_cast<LONG*>(&ctx.status), status, REQ_ZERO);
-        return static_cast<request_status>(oldval);
+        NT_ASSERT(ctx);
+        return static_cast<WDFREQUEST>(WdfObjectContextGetObject(ctx));
 }
 
 _IRQL_requires_same_
