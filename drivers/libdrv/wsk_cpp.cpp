@@ -272,21 +272,6 @@ namespace
 using namespace wsk;
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void free(_Inout_ SOCKET* &sock)
-{
-        if (!sock) {
-                return;
-        }
-
-        sock->recv_irp.dtor();
-        sock->send_irp.dtor();
-        sock->misc_irp.dtor();
-
-        ExFreePoolWithTag(sock, WSK_POOL_TAG);
-        sock = nullptr;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
 auto alloc_socket(_Out_ SOCKET* &sock)
 {
         sock = (SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(SOCKET), WSK_POOL_TAG);
@@ -361,11 +346,13 @@ PAGED auto transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _
 
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED void wait_invokers(_Inout_ SOCKET &s)
+PAGED auto wait_invokers(_Inout_ SOCKET &s)
 {
         PAGED_CODE();
 
-        if (auto n = InterlockedOr64(&s.invoke_cnt, s.CLOSING)) { // count is not zero
+        if (auto n = InterlockedOr64(&s.invoke_cnt, s.CLOSING); n & s.CLOSING) {
+                return STATUS_NOT_SUPPORTED; // must be called once
+        } else if (n) { // count is not zero
                 NT_ASSERT((n & s.COUNT_MASK) == n);
                 auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
                 NT_VERIFY(!KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, &timeout));
@@ -374,6 +361,7 @@ PAGED void wait_invokers(_Inout_ SOCKET &s)
         }
 
         NT_ASSERT(!(s.invoke_cnt & s.COUNT_MASK));
+        return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -514,7 +502,7 @@ PAGED NTSTATUS wsk::socket(
                 sock->Self = reinterpret_cast<WSK_SOCKET*>(irp->IoStatus.Information);
                 sock->Basic = static_cast<decltype(sock->Basic)>(sock->Self->Dispatch);
         } else {
-                ::free(sock);
+                free(sock);
         }
 
         return st;
@@ -625,11 +613,14 @@ PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, b
 /*
  * Before calling the WskCloseSocket function, a WSK application must ensure that there are no other 
  * function calls in progress to any of the socket's functions, including any extension functions, 
- * in any of the application's other threads. 
+ * in any of the application's other threads.
+ * 
+ * After this call, further calls must return STATUS_NOT_SUPPORTED.
+ * @see SOCKET::invoke
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::close(_Inout_ SOCKET* &sock)
+PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
 {
         PAGED_CODE();
 
@@ -637,7 +628,9 @@ PAGED NTSTATUS wsk::close(_Inout_ SOCKET* &sock)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        wait_invokers(*sock);
+        if (auto err = wait_invokers(*sock)) {
+                return err;
+        }
 
         auto &irp = sock->misc_irp;
         irp.reset();
@@ -645,8 +638,23 @@ PAGED NTSTATUS wsk::close(_Inout_ SOCKET* &sock)
         auto st = sock->Basic->WskCloseSocket(sock->Self, irp.get());
         irp.wait_for_completion(st);
 
-        ::free(sock);
         return st;
+}
+
+/*
+ * @param sock must be closed 
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void wsk::free(_Inout_ SOCKET* &sock)
+{
+        if (auto sk = (SOCKET*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&sock), nullptr)) {
+
+                sk->recv_irp.dtor();
+                sk->send_irp.dtor();
+                sk->misc_irp.dtor();
+
+                ExFreePoolWithTag(sk, WSK_POOL_TAG);
+        }
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -732,6 +740,7 @@ PAGED auto wsk::for_each(
                 } else if (auto err = f(sock, *ai, ctx)) {
                         err = close(sock);
                         NT_ASSERT(!err);
+                        free(sock);
                 } else {
                         return sock;
                 }

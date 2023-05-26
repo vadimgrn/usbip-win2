@@ -7,7 +7,9 @@
 #include "context.tmh"
 
 #include "driver.h"
+
 #include <libdrv\strconv.h>
+#include <libdrv\wsk_cpp.h>
 
  /*
   * First bit is reserved for direction of transfer (USBIP_DIR_OUT|USBIP_DIR_IN).
@@ -71,7 +73,7 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
         PAGED_CODE();
 
         NT_ASSERT(ext);
-        NT_ASSERT(!ext->sock);
+        free(ext->sock);
 
         RtlFreeUnicodeString(&ext->node_name);
         RtlFreeUnicodeString(&ext->service_name);

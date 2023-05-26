@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "mdl_cpp.h"
@@ -28,17 +28,10 @@ usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) :
         }
 }
 
-usbip::Mdl::Mdl(Mdl&& m) :
-        m_tail(m.m_tail),
-        m_mdl(m.release())
-{
-}
-
 auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 {
         if (m_mdl != m.m_mdl) {
-                auto tail = m.m_tail;
-                reset(m.release(), tail);
+                reset(m.release());
         }
 
         return *this;
@@ -46,26 +39,19 @@ auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 
 MDL* usbip::Mdl::release()
 {
-        m_tail = nullptr;
-
         auto m = m_mdl;
         m_mdl = nullptr;
         return m;
 }
 
-void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_opt_ MDL *tail)
+void usbip::Mdl::reset(_In_opt_ MDL *mdl)
 {
         if (m_mdl) {
-                if (managed()) {
-                        NT_ASSERT(m_mdl != mdl);
-                        do_unprepare(false);
-                        IoFreeMdl(m_mdl); // calls MmPrepareMdlForReuse
-                } else if (m_tail->Next) {
-                        m_tail->Next = nullptr;
-                }
+                NT_ASSERT(m_mdl != mdl);
+                unprepare();
+                IoFreeMdl(m_mdl); // calls MmPrepareMdlForReuse
         }
 
-        m_tail = tail;
         m_mdl = mdl;
 }
 
@@ -95,10 +81,6 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (nonmanaged()) {
-                return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
         if (nonpaged()) {
                 return STATUS_ALREADY_COMPLETE;
         }
@@ -111,28 +93,13 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
 
 NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
 {
-        if (!m_mdl) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        if (nonmanaged()) {
-                return STATUS_INVALID_DEVICE_REQUEST;
-        }
-
-        return lock(Operation);
-}
-
-void usbip::Mdl::unprepare()
-{
-        if (m_mdl && managed()) {
-                do_unprepare(true);
-        }
+        return m_mdl ? lock(Operation) : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 /*
  * nonpaged() and partial() can be set both.
  */
-void usbip::Mdl::do_unprepare(_In_ bool reuse_partial)
+void usbip::Mdl::unprepare()
 {
         if (locked()) {
                 NT_ASSERT(!nonpaged());
@@ -141,9 +108,7 @@ void usbip::Mdl::do_unprepare(_In_ bool reuse_partial)
                 NT_ASSERT(!locked());
         } else if (partial()) {
                 NT_ASSERT(!locked());
-                if (reuse_partial) {
-                        MmPrepareMdlForReuse(m_mdl); // it's safe to call several times
-                }
+                // MmPrepareMdlForReuse(m_mdl); // IoFreeMdl will call it
         } else if (nonpaged()) { // no "undo" operation is required for MmBuildMdlForNonPagedPool
                 NT_ASSERT(!locked());
         }

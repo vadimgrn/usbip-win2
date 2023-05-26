@@ -89,7 +89,10 @@ _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS close(_Inout_ SOCKET* &sock);
+PAGED NTSTATUS close(_In_ SOCKET *sock);
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void free(_Inout_ SOCKET* &sock);
 
 //
 

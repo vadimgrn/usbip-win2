@@ -110,7 +110,7 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
         NT_ASSERT(!ctx.mdl_buf);
 
         if (transfer_buffer && is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, ctx.is_isoc, IoReadAccess, *transfer_buffer)) {
+                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, IoReadAccess, *transfer_buffer)) {
                         Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
                         return err;
                 }

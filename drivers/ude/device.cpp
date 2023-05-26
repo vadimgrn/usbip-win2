@@ -74,7 +74,6 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         if (auto dev = get_device_ctx(device)) { // all resources must be freed except for device_ctx_ext*
                 NT_ASSERT(dev->unplugged);
-                NT_ASSERT(!dev->sock());
                 NT_ASSERT(!dev->port);
         }
 }
@@ -581,7 +580,7 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
         auto &dev = *get_device_ctx(device);
         WdfIoQueuePurgeSynchronously(dev.queue);
 
-        if (close_socket(dev.ext->sock)) {
+        if (close_socket(dev.sock())) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
         }
 
