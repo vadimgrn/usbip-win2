@@ -119,7 +119,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
                 return STATUS_SUCCESS;
         }
 
-        void *buf;
+        void *buf{};
         bool probe_and_lock;
 
         if (auto head = r.TransferBufferMDL) { // preferable case because it is locked-down, can be a chain

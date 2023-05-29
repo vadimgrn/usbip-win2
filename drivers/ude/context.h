@@ -106,6 +106,8 @@ struct device_ctx
         UDECXUSBENDPOINT ep0; // default control pipe
         WDFSPINLOCK endpoint_list_lock; // for endpoint_ctx::entry
 
+        WDFSPINLOCK send_lock; // for WskSend on sock()
+
         LIST_ENTRY egress_requests; // that are waiting for WskSend completion handler, head for request_ctx::entry
         WDFSPINLOCK egress_requests_lock;
 

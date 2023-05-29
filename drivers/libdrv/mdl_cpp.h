@@ -52,7 +52,7 @@ private:
 
         bool locked() const { return m_mdl->MdlFlags & MDL_PAGES_LOCKED; }
         bool nonpaged() const { return m_mdl->MdlFlags & MDL_SOURCE_IS_NONPAGED_POOL; }
-        bool partial() const { return m_mdl->MdlFlags & MDL_PARTIAL; } // MDL_PARTIAL_HAS_BEEN_MAPPED
+        bool partial() const { return m_mdl->MdlFlags & MDL_PARTIAL; }
 
         NTSTATUS lock(_In_ LOCK_OPERATION Operation);
         void unprepare();

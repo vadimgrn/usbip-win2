@@ -106,7 +106,7 @@ template<typename T>
 void release_lock(_In_ T);
 
 
-template<typename T, auto None = T(WDF_NO_HANDLE)>
+template<typename T>
 class Lock
 {
 public:
@@ -124,28 +124,14 @@ public:
 
         void release()
         {
-                if (m_lock != None) {
-                        release_lock(m_lock);
-                        m_lock = None;
+                if (auto handle = (type)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_lock), WDF_NO_HANDLE)) {
+                        release_lock(handle);
                 }
         }
 
 private:
-        type m_lock = None;
+        type m_lock = WDF_NO_HANDLE;
 };
-
-
-template<>
-inline void acquire_lock(_In_ WDFOBJECT handle)
-{
-        WdfObjectAcquireLock(handle);
-}
-
-template<>
-inline void release_lock(_In_ WDFOBJECT handle)
-{
-        WdfObjectReleaseLock(handle);
-}
 
 
 template<>
@@ -158,6 +144,22 @@ template<>
 inline void release_lock(_In_ WDFSPINLOCK handle)
 {
         WdfSpinLockRelease(handle);
+}
+
+/*
+ * Must be declared last, WDFOBJECT is typeless.
+ * WDFOBJECT -> HANDLE -> void*
+ */
+template<>
+inline void acquire_lock(_In_ WDFOBJECT handle)
+{
+        WdfObjectAcquireLock(handle);
+}
+
+template<>
+inline void release_lock(_In_ WDFOBJECT handle)
+{
+        WdfObjectReleaseLock(handle);
 }
 
 

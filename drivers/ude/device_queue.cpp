@@ -66,6 +66,9 @@ auto remove_egress_request_nolock(_Inout_ device_ctx &dev, _In_ const device::re
 } // namespace
 
 
+/*
+ * @see device.cpp, create_endpoint_queue
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
@@ -80,7 +83,7 @@ PAGED NTSTATUS usbip::device::create_queue(_In_ UDECXUSBDEVICE dev)
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBDEVICE);
-        attr.SynchronizationScope = WdfSynchronizationScopeDevice; // @see device.cpp, create_endpoint_queue
+//      attr.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoCanceledOnQueue is used only
         attr.ParentObject = dev;
 
         attr.EvtCleanupCallback = [] (auto obj) 
@@ -169,14 +172,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::move_egress_request_to_queue(_Inout_ device_ctx &dev, _In_ const request_search &crit)
 {
-        NTSTATUS st;
-
-        if (wdf::Lock lck(dev.egress_requests_lock);
-            auto request = remove_egress_request_nolock(dev, crit)) {
-                st = WdfRequestForwardToIoQueue(request, dev.queue);
-        } else {
-                st = STATUS_NOT_FOUND;
+        WDFREQUEST req;
+        {
+                wdf::Lock lck(dev.egress_requests_lock);
+                req = remove_egress_request_nolock(dev, crit);
         }
-
-        return st;
+        return req ? WdfRequestForwardToIoQueue(req, dev.queue) : STATUS_NOT_FOUND;
 }

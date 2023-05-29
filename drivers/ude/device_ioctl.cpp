@@ -33,6 +33,27 @@ namespace
 
 using namespace usbip;
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void move_request_to_queue(_Inout_ device_ctx &dev, _In_ WDFREQUEST request)
+{
+        auto st = device::move_egress_request_to_queue(dev, request);
+
+        switch (st) {
+        case STATUS_NOT_FOUND: // WskReceive completion handler has already removed it
+        case STATUS_SUCCESS:
+                return;
+        case STATUS_WDF_BUSY: // destination queue is not accepting new requests
+                TraceDbg("req %04x, queue is purged", ptr04x(request));
+                st = STATUS_CANCELLED;
+                break;
+        default:
+                Trace(TRACE_LEVEL_ERROR, "req %04x, WdfRequestForwardToIoQueue %!STATUS!", ptr04x(request), st);
+        }
+
+        complete(request, st);
+}
+
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  *
@@ -57,14 +78,7 @@ NTSTATUS send_complete(
         if (!request) {
                 // nothing to do
         } else if (NT_SUCCESS(wsk.Status)) { // request has sent
-                switch (auto st = device::move_egress_request_to_queue(dev, request)) {
-                case STATUS_NOT_FOUND: // WskReceive completion handler has already removed it
-                case STATUS_SUCCESS:
-                        break;
-                default:
-                        Trace(TRACE_LEVEL_ERROR, "req %04x, WdfRequestForwardToIoQueue %!STATUS!", ptr04x(request), st);
-                        complete(request, st);
-                }
+                move_request_to_queue(dev, request);
         } else if (auto victim = device::remove_egress_request(dev, request)) {
                 NT_ASSERT(victim == request);
                 complete(victim, wsk.Status);
@@ -132,23 +146,34 @@ void add_egress_request(
         device::add_egress_request(dev, req);
 }
 
+/*
+ * switch (wdf::Lock lck(...); auto st = send(...))
+ * is not used due to unspecified evaluation order of init-statement and condition.
+ * switch (init-statement; condition) {} can be treated as:
+ * {
+ *      auto c = condition;
+ *      init-statement;
+ *      switch (c) {}
+ * }
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
-        WSK_BUF buf{};
+        auto request = ctx->request; // can be WDF_NO_HANDLE, do not access after send
 
+        WSK_BUF buf{};
         if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
                 return err;
         } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x -> %Iu%s",
-                        ptr04x(ctx->request), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
+                        ptr04x(request), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
-        if (auto req = ctx->request) { // can be WDF_NO_HANDLE
-                add_egress_request(dev, req, endpoint, ctx->hdr.base.seqnum);
+        if (request) {
+                add_egress_request(dev, request, endpoint, ctx->hdr.base.seqnum);
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -156,13 +181,19 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
         auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
-        switch (auto st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp)) {
+        NTSTATUS st;
+        {
+                wdf::Lock lck(dev.send_lock); // EvtUsbEndpointPurge, EvtIoInternalDeviceControl on other queues
+                st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
+        }
+
+        switch (st) {
         case STATUS_PENDING:
         case STATUS_SUCCESS:
-                TraceWSK("wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(wsk_irp), buf.Length, st);
+                TraceWSK("req %04x -> wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(request), ptr04x(wsk_irp), buf.Length, st);
                 break;
         default:
-                Trace(TRACE_LEVEL_ERROR, "wsk irp %04x, %!STATUS!", ptr04x(wsk_irp), st);
+                Trace(TRACE_LEVEL_ERROR, "req %04x -> wsk irp %04x, %!STATUS!", ptr04x(request), ptr04x(wsk_irp), st);
                 if (st == STATUS_NOT_SUPPORTED) { // WskSend does not complete IRP for this status only
                         libdrv::CompleteRequest(wsk_irp, dev.unplugged ? STATUS_CANCELLED : st);
                 }

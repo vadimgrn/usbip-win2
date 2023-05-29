@@ -250,9 +250,13 @@ NTSTATUS function_suspend_and_wake(
 /*
  * UDE can call EvtIoInternalDeviceControl concurrently for different queues of the same device.
  * I've caught concurrent CTRL and BULK transfer for a flash drive. 
- * For that reason WdfSynchronizationScopeDevice is used to serialize calls of WskSend.
- * Other values (Queue, None) cause BSOD in random third party driver sooner or later.
  * FIXME: can UDE reorder requests?
+ *
+ * WdfSynchronizationScopeDevice can't be used to serialize calls of WskSend because 
+ * it can be called concurrently from UDECX_USB_ENDPOINT_CALLBACKS.EvtUsbEndpointPurge.
+ * If set SynchronizationScopeDevice for UDECXUSBENDPOINT, UdecxUsbEndpointCreate 
+ * will return STATUS_WDF_SYNCHRONIZATION_SCOPE_INVALID. For these reasons,
+ * explicit WDFSPINLOCK device_ctx.send_lock is used to serialize WskSend calls.
  * 
  * Using power-managed queues for I/O requests that require the device to be in its working state, 
  * and using queues that are not power-managed for all other requests.
@@ -268,12 +272,12 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         WDF_IO_QUEUE_CONFIG cfg;
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential for EP0?
         cfg.PowerManaged = WdfFalse;
-        cfg.EvtIoInternalDeviceControl = device::internal_control; // must be executed serially regardless of a queue
+        cfg.EvtIoInternalDeviceControl = device::internal_control;
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBENDPOINT);
         attr.EvtCleanupCallback = [] (auto obj) { TraceDbg("Queue %04x cleanup", ptr04x(obj)); };
-        attr.SynchronizationScope = WdfSynchronizationScopeDevice;
+//      attr.SynchronizationScope = WdfSynchronizationScopeQueue; // EvtIoInternalDeviceControl is used only
         attr.ParentObject = endpoint;
 
         auto &endp = *get_endpoint_ctx(endpoint);
@@ -403,7 +407,7 @@ void endpoints_configure(
 {
         NT_ASSERT(!has_urb(request)); // but MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL
 
-//      wdf::WaitLock lck(dev.delete_lock); // not required, only logging here
+//      wdf::WaitLock lck(dev.delete_lock); // not required, only logging there
 
         if (auto n = params->EndpointsToConfigureCount) {
                 TraceDbg("dev %04x, EndpointsToConfigure[%lu]%!BIN!", ptr04x(device), n, 
@@ -534,8 +538,16 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
 
-        if (auto err = create_spin_lock(dev.endpoint_list_lock, device)) {
-                return err;
+        WDFSPINLOCK *v[] = {
+                &dev.send_lock,
+                &dev.endpoint_list_lock,
+                &dev.egress_requests_lock,
+        };
+
+        for (auto i: v) {
+                if (auto err = create_spin_lock(*i, device)) {
+                        return err;
+                }
         }
 
         if (auto err = create_spin_lock(dev.egress_requests_lock, device)) {
@@ -603,13 +615,14 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        if (!plugout_and_delete) {
-                //
-        } else if (wdf::WaitLock lck(dev.delete_lock);
-                   auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
-        } else {
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
+        if (plugout_and_delete) {
+                wdf::WaitLock lck(dev.delete_lock);                        
+                if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
+                        Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", 
+                                                  ptr04x(device), err);
+                } else {
+                        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
+                }
         }
 
         NT_VERIFY(!KeSetEvent(&dev.queue_purged, IO_NO_INCREMENT, false)); // once
