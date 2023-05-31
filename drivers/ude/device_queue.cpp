@@ -172,10 +172,11 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::move_egress_request_to_queue(_Inout_ device_ctx &dev, _In_ const request_search &crit)
 {
-        WDFREQUEST req;
-        {
-                wdf::Lock lck(dev.egress_requests_lock);
-                req = remove_egress_request_nolock(dev, crit);
+        wdf::Lock lck(dev.egress_requests_lock);
+
+        if (auto request = remove_egress_request_nolock(dev, crit)) {
+                return WdfRequestForwardToIoQueue(request, dev.queue);
         }
-        return req ? WdfRequestForwardToIoQueue(req, dev.queue) : STATUS_NOT_FOUND;
+
+        return STATUS_NOT_FOUND;
 }
