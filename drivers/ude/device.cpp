@@ -295,14 +295,12 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
 
 /*
  * UDE can call UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS despite UdecxUsbDevicePlugOutAndDelete was called.
- * This can cause two BSODs:
- * 1.WDF_VIOLATION -> in this driver
- *   A NULL parameter was passed to a function that required a non-NULL value
- *   udecx!Endpoint_UcxEndpointCleanup
- * 2.IRQL_NOT_LESS_OR_EQUAL (a) -> in any system driver, but a memory address is always the same
- *   Arg1: 0000000000000008, memory referenced
+ * This can cause BSOD:
+ * WDF_VIOLATION
+ * A NULL parameter was passed to a function that required a non-NULL value
+ * udecx!Endpoint_UcxEndpointCleanup
  * 
- * To fix both BSODs, callbacks and UdecxUsbDevicePlugOutAndDelete must be called serially.
+ * To fix it, callbacks and UdecxUsbDevicePlugOutAndDelete must be called serially.
  * WdfObjectAcquireLock for UDECXUSBDEVICE can't be used, it will use spinlock that raises IRQL.
  */
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
@@ -516,7 +514,7 @@ PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &handle, _In_ UDECXUSBDEVICE dev
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_spin_lock(_Out_ WDFSPINLOCK &handle, _In_ UDECXUSBDEVICE device)
+PAGED auto create_spin_lock(_Out_ WDFSPINLOCK *handle, _In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
@@ -524,7 +522,7 @@ PAGED auto create_spin_lock(_Out_ WDFSPINLOCK &handle, _In_ UDECXUSBDEVICE devic
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = device;
 
-        if (auto err = WdfSpinLockCreate(&attr, &handle)) {
+        if (auto err = WdfSpinLockCreate(&attr, handle)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
                 return err;
         }
@@ -545,13 +543,9 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         };
 
         for (auto i: v) {
-                if (auto err = create_spin_lock(*i, device)) {
+                if (auto err = create_spin_lock(i, device)) {
                         return err;
                 }
-        }
-
-        if (auto err = create_spin_lock(dev.egress_requests_lock, device)) {
-                return err;
         }
 
         if (auto err = create_delete_lock(dev.delete_lock, device)) {
