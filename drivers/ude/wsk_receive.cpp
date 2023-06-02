@@ -16,6 +16,7 @@
 
 #include <libdrv\usbd_helper.h>
 #include <libdrv\dbgcommon.h>
+#include <libdrv\usbdsc.h>
 #include <libdrv\irp.h>
 #include <libdrv\pdu.h>
 
@@ -61,6 +62,28 @@ auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
 	auto err = check(TransferBufferLength, actual_length);
 	TransferBufferLength = err ? 0 : actual_length;
 	return err;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
+{
+	TraceUrb("DEV: bLength %d, bcdUSB %#x, bDeviceClass %#x, bDeviceSubClass %#x, bDeviceProtocol %#x, "
+		"bMaxPacketSize0 %d, idVendor %#x, idProduct %#x, bcdDevice %#x, "
+		"iManufacturer %d, iProduct %d, iSerialNumber %d, bNumConfigurations %d",
+		d.bLength, d.bcdUSB, d.bDeviceClass, d.bDeviceSubClass, d.bDeviceProtocol, 
+		d.bMaxPacketSize0, d.idVendor, d.idProduct, d.bcdDevice, 
+		d.iManufacturer, d.iProduct, d.iSerialNumber, d.bNumConfigurations);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
+{
+	TraceUrb("CFG: bLength %d, wTotalLength %hu(%#x), bNumInterfaces %d, "
+		 "bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d",
+		  d.bLength, d.wTotalLength, d.wTotalLength, d.bNumInterfaces, 
+		  d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
 }
 
 _IRQL_requires_same_
@@ -203,7 +226,54 @@ void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 	request = WDF_NO_HANDLE;
 }
 
-enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_control_transfer(_In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
+{
+	auto dsc = static_cast<USB_COMMON_DESCRIPTOR*>(TransferBuffer);
+	auto dsc_len = static_cast<UINT16>(r.TransferBufferLength);
+
+	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
+		is_transfer_dir_in(r) &&
+		get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+		dsc_len >= sizeof(*dsc);
+
+	if (!ok) {
+		return;
+	}
+
+	TraceUrb("bLength %d, %!usb_descriptor_type!%!BIN!", 
+		  dsc->bLength, dsc->bDescriptorType, WppBinary(dsc, dsc_len));
+
+	switch (dsc->bDescriptorType) {
+	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
+		if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
+		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
+			NT_ASSERT(usbdlib::is_valid(d));
+			log(d);
+		}
+		break;
+	case USB_DEVICE_DESCRIPTOR_TYPE:
+		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
+		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
+			NT_ASSERT(usbdlib::is_valid(d));
+			log(d);
+		}
+		break;
+	}
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_process_transfer_buffer(_In_ const URB &urb, _In_ void *TransferBuffer)
+{
+	switch (urb.UrbHeader.Function) {
+	case URB_FUNCTION_CONTROL_TRANSFER_EX:
+	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
+		static_assert(sizeof(urb.UrbControlTransfer) == sizeof(urb.UrbControlTransferEx));
+		post_control_transfer(urb.UrbControlTransfer, TransferBuffer);
+	}
+}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -216,19 +286,27 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit
 	}
 
 	auto st = STATUS_SUCCESS;
-
+	
 	UCHAR *TransferBuffer{};
 	ULONG TransferBufferLength{};
 
-	if (NT_SUCCESS(UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength))) { // if URB has transfer buffer
-		if (TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
-			st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
-			UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
-		}
+	if (NT_ERROR(UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength))) {
+		return st; // URB has no transfer buffer
+	}
+
+	if (TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
+		st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
+	}
+
+	if (NT_SUCCESS(st) && TransferBufferLength) {
+		post_process_transfer_buffer(urb, TransferBuffer);
 	}
 
 	return st;
 }
+
+enum { RECV_NEXT_USBIP_HDR = STATUS_SUCCESS, RECV_MORE_DATA_REQUIRED = STATUS_PENDING };
 
 _Function_class_(device_ctx::received_fn)
 _IRQL_requires_same_

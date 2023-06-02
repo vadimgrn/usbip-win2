@@ -27,7 +27,7 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
 
                 if (auto &p = intf.Pipes[i]; auto endp = find_endpoint(dev, compare_endpoint_descr(p))) {
-                        TraceDbg("interface %d.%d, pipe[%lu] {%s, addr %#x} -> PipeHandle %04x (was %04x)",
+                        TraceDbg("interface %d.%d, Pipes[%lu] {%s, addr %#x} -> PipeHandle %04x (was %04x)",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType), 
                                 p.EndpointAddress, ptr04x(p.PipeHandle), ptr04x(endp->PipeHandle));
 
@@ -35,7 +35,7 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
                         // endp->interface_number = intf.InterfaceNumber;
                         // endp->alternate_setting = intf.AlternateSetting;
                 } else {
-                        Trace(TRACE_LEVEL_ERROR, "interface %d.%d, pipe[%lu] {%s, addr %#x} -> not found",
+                        Trace(TRACE_LEVEL_ERROR, "interface %d.%d, Pipes[%lu] {%s, addr %#x} -> not found",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType),
                                 p.EndpointAddress);
                 }
@@ -76,7 +76,7 @@ auto select_configuration(
                 cfg = cd->bConfigurationValue;
 
                 auto intf = &r.Interface;
-                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = usbdlib::advance(intf)) {
+                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = usbdlib::next(intf)) {
                         update_pipe_properties(dev, *intf);
                 }
         }

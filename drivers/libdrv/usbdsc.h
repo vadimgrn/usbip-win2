@@ -16,61 +16,71 @@ struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 };
 static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
-constexpr auto is_valid(const USB_DEVICE_DESCRIPTOR &d)
+constexpr auto is_valid(_In_ const USB_DEVICE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) && 
 		d.bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
 }
 
-constexpr auto is_valid(const USB_CONFIGURATION_DESCRIPTOR &d)
+constexpr auto is_valid(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) &&
 		d.bDescriptorType == USB_CONFIGURATION_DESCRIPTOR_TYPE &&
 		d.wTotalLength > d.bLength;
 }
 
-constexpr auto is_valid(const USB_STRING_DESCRIPTOR &d)
+constexpr auto is_valid(_In_ const USB_INTERFACE_DESCRIPTOR &d)
+{
+	return  d.bLength == sizeof(d) &&
+		d.bDescriptorType == USB_INTERFACE_DESCRIPTOR_TYPE;
+}
+
+constexpr auto is_valid(_In_ const USB_STRING_DESCRIPTOR &d)
 {
 	return  d.bLength >= sizeof(USB_COMMON_DESCRIPTOR) && // string length can be zero
 		d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE;
 }
 
-bool is_valid(const USB_OS_STRING_DESCRIPTOR &d);
+bool is_valid(_In_ const USB_OS_STRING_DESCRIPTOR &d);
 
-inline auto next_descr(USB_COMMON_DESCRIPTOR *d)
+inline auto next(_In_ USB_COMMON_DESCRIPTOR *d)
 {
-	void *end = d ? (char*)d + d->bLength : nullptr;
-	return static_cast<USB_COMMON_DESCRIPTOR*>(end);
+	NT_ASSERT(d);
+	auto next = reinterpret_cast<char*>(d) + d->bLength;
+	return reinterpret_cast<USB_COMMON_DESCRIPTOR*>(next);
 }
 
-inline auto advance(_In_ const USBD_INTERFACE_INFORMATION *intf)
+inline auto next(_In_ const USBD_INTERFACE_INFORMATION *d)
 {
-	auto next = reinterpret_cast<const char*>(intf) + intf->Length;
+	NT_ASSERT(d);
+	auto next = reinterpret_cast<const char*>(d) + d->Length;
 	return reinterpret_cast<const USBD_INTERFACE_INFORMATION*>(next);
 }
 
 USB_COMMON_DESCRIPTOR *find_next_descr(
-	USB_CONFIGURATION_DESCRIPTOR *cfg, LONG type, USB_COMMON_DESCRIPTOR *prev = nullptr);
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *prev = nullptr);
 
 USB_INTERFACE_DESCRIPTOR *find_next_intf(
-	USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *prev = nullptr, 
-	LONG intf_num = -1, LONG alt_setting = -1, LONG _class = -1, LONG subclass = -1, LONG proto = -1);
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ USB_INTERFACE_DESCRIPTOR *prev = nullptr, 
+	_In_ LONG intf_num = -1, _In_ LONG alt_setting = -1, 
+	_In_ LONG _class = -1, _In_ LONG subclass = -1, _In_ LONG proto = -1);
 
-int get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG intf_num);
+int get_intf_num_altsetting(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG intf_num);
 
-USB_INTERFACE_DESCRIPTOR* find_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_ENDPOINT_DESCRIPTOR &epd);
+USB_INTERFACE_DESCRIPTOR* find_intf(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ const USB_ENDPOINT_DESCRIPTOR &epd);
 
 using for_each_intf_alt_fn = NTSTATUS (_In_ USB_INTERFACE_DESCRIPTOR&, _In_opt_ void*);
 NTSTATUS for_each_intf_alt(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ for_each_intf_alt_fn func, _In_opt_ void *data);
 
 using for_each_ep_fn = NTSTATUS (int, USB_ENDPOINT_DESCRIPTOR&, void*);
-NTSTATUS for_each_endp(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *ifd, for_each_ep_fn func, void *data);
+NTSTATUS for_each_endp(
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ USB_INTERFACE_DESCRIPTOR *ifd, 
+	_In_ for_each_ep_fn func, _In_ void *data);
 
-inline auto get_string(USB_STRING_DESCRIPTOR &d)
+inline auto get_string(_In_ USB_STRING_DESCRIPTOR &d)
 {
 	USHORT len = d.bLength - sizeof(USB_COMMON_DESCRIPTOR);
-	UNICODE_STRING s{ len, len, d.bString };
-	return s;
+	return UNICODE_STRING{ len, len, d.bString };
 }
 
 inline void terminate_by_zero(_Inout_ USB_STRING_DESCRIPTOR &d)

@@ -8,10 +8,10 @@ extern "C" {
 namespace
 {
 
-inline auto get_start(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_COMMON_DESCRIPTOR *prev)
+inline auto get_start(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ USB_COMMON_DESCRIPTOR *prev)
 {
 	NT_ASSERT(cfg);
-	auto start = prev ? usbdlib::next_descr(prev) : static_cast<void*>(cfg);
+	auto start = prev ? usbdlib::next(prev) : static_cast<void*>(cfg);
 
 	NT_ASSERT(start >= cfg);
 	NT_ASSERT(start <= reinterpret_cast<char*>(cfg) + cfg->wTotalLength);
@@ -23,15 +23,16 @@ inline auto get_start(USB_CONFIGURATION_DESCRIPTOR *cfg, USB_COMMON_DESCRIPTOR *
 
 
 USB_COMMON_DESCRIPTOR *usbdlib::find_next_descr(
-USB_CONFIGURATION_DESCRIPTOR *cfg, LONG type, USB_COMMON_DESCRIPTOR *prev)
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *prev)
 {
 	auto start = get_start(cfg, prev);
 	return USBD_ParseDescriptors(cfg, cfg->wTotalLength, start, type);
 }
 
 USB_INTERFACE_DESCRIPTOR* usbdlib::find_next_intf(
-	USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *prev, 
-	LONG intf_num, LONG alt_setting, LONG _class, LONG subclass, LONG proto)
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ USB_INTERFACE_DESCRIPTOR *prev, 
+	_In_ LONG intf_num, _In_ LONG alt_setting,
+	_In_ LONG _class, _In_ LONG subclass, _In_ LONG proto)
 {
 	auto start = get_start(cfg, reinterpret_cast<USB_COMMON_DESCRIPTOR*>(prev));
 	return USBD_ParseConfigurationDescriptorEx(cfg, start, intf_num, alt_setting, _class, subclass, proto);
@@ -40,7 +41,7 @@ USB_INTERFACE_DESCRIPTOR* usbdlib::find_next_intf(
 /*
  * @return number of alternate settings for given interface
  */
-int usbdlib::get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG intf_num)
+int usbdlib::get_intf_num_altsetting(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG intf_num)
 {
 	int cnt = 0;
 	for (USB_INTERFACE_DESCRIPTOR *cur{}; bool(cur = find_next_intf(cfg, cur, intf_num)); ++cnt);
@@ -50,7 +51,8 @@ int usbdlib::get_intf_num_altsetting(USB_CONFIGURATION_DESCRIPTOR *cfg, LONG int
 /*
  * For each pair bInterfaceNumber/bAlternateSetting.
  */
-NTSTATUS usbdlib::for_each_intf_alt(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ for_each_intf_alt_fn func, _In_opt_ void *data)
+NTSTATUS usbdlib::for_each_intf_alt(
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ for_each_intf_alt_fn func, _In_opt_ void *data)
 {
 	int cnt = 0;
 
@@ -68,7 +70,8 @@ NTSTATUS usbdlib::for_each_intf_alt(_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_
 }
 
 NTSTATUS usbdlib::for_each_endp(
-	USB_CONFIGURATION_DESCRIPTOR *cfg, USB_INTERFACE_DESCRIPTOR *ifd, for_each_ep_fn func, void *data)
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ USB_INTERFACE_DESCRIPTOR *ifd, 
+	_In_ for_each_ep_fn func, _In_ void *data)
 {
 	auto cur = (USB_COMMON_DESCRIPTOR*)ifd;
 
@@ -89,7 +92,8 @@ NTSTATUS usbdlib::for_each_endp(
 	return STATUS_SUCCESS;
 }
 
-USB_INTERFACE_DESCRIPTOR* usbdlib::find_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, const USB_ENDPOINT_DESCRIPTOR &epd)
+USB_INTERFACE_DESCRIPTOR* usbdlib::find_intf(
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ const USB_ENDPOINT_DESCRIPTOR &epd)
 {
 	struct Context
 	{
@@ -116,7 +120,7 @@ USB_INTERFACE_DESCRIPTOR* usbdlib::find_intf(USB_CONFIGURATION_DESCRIPTOR *cfg, 
 	return ret == STATUS_PENDING ? ctx.ifd : nullptr;
 }
 
-bool usbdlib::is_valid(const USB_OS_STRING_DESCRIPTOR &d)
+bool usbdlib::is_valid(_In_ const USB_OS_STRING_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) && 
 		d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && 
@@ -157,4 +161,3 @@ bool usbdlib::is_composite(_In_ const USB_DEVICE_DESCRIPTOR &dd, _In_ const USB_
 	       dd.bDeviceSubClass == 0x02 && // common class
 	       dd.bDeviceProtocol == 0x01); // IAD composite device
 }
-
