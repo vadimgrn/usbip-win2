@@ -20,6 +20,10 @@
 #include <libdrv\irp.h>
 #include <libdrv\pdu.h>
 
+EXTERN_C_START
+#include <usbdlib.h>
+EXTERN_C_END
+
 namespace
 {
 
@@ -84,6 +88,28 @@ void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 		 "bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d",
 		  d.bLength, d.wTotalLength, d.wTotalLength, d.bNumInterfaces, 
 		  d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void validate(_In_ USB_CONFIGURATION_DESCRIPTOR &d)
+{
+	enum level { basic = 1, full, extra };
+	UCHAR *position{};
+
+	auto st = USBD_ValidateConfigurationDescriptor(&d, d.wTotalLength, extra, &position, pooltag);
+	if (USBD_SUCCESS(st)) {
+		return;
+	}
+
+	auto offset = position - (UCHAR*)&d;
+	NT_ASSERT(offset >= 0);
+
+	auto length = d.wTotalLength - offset;
+	NT_ASSERT(length > 0);
+
+	Trace(TRACE_LEVEL_WARNING, "USBD_STATUS_%s, offset %#Ix(%Id)%!BIN!", 
+		get_usbd_status(st), offset, offset, WppBinary(position, USHORT(length)));
 }
 
 _IRQL_requires_same_
@@ -251,6 +277,7 @@ void post_control_transfer(_In_ const _URB_CONTROL_TRANSFER &r, _In_ void *Trans
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
 			NT_ASSERT(usbdlib::is_valid(d));
 			log(d);
+			validate(d);
 		}
 		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:

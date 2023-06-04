@@ -70,7 +70,7 @@ const char *brequest_str(UCHAR bRequest)
 	case USB_REQUEST_ISOCH_DELAY: return "ISOCH_DELAY";
 	}
 
-	return "USB_REQUEST_?";
+	return "?";
 }
 
 const char *get_usbd_status(USBD_STATUS status)
@@ -198,7 +198,7 @@ const char *get_usbd_status(USBD_STATUS status)
 		return "BAD_ENDPOINT_ADDRESS";
 	}
 
-	return "USBD_STATUS_?";
+	return "?";
 }
 
 /*
@@ -233,7 +233,7 @@ const char *usbuser_request_name(_In_ ULONG UsbUserRequest)
 	case USBUSER_INVALID_REQUEST: return "INVALID_REQUEST";
 	}
 
-	return "USBUSER_?";
+	return "?";
 }
 
 /*
@@ -282,7 +282,7 @@ const char *device_control_name(ULONG ioctl_code)
 	case IOCTL_USB_GET_NODE_CONNECTION_DRIVERKEY_NAME: return "USB_GET_NODE_CONNECTION_DRIVERKEY_NAME";
 	}
 
-	return "IOCTL_USB_?";
+	return "?";
 }
 
 /*
@@ -321,7 +321,7 @@ const char *internal_device_control_name(ULONG ioctl_code)
 	case IOCTL_INTERNAL_USB_FAIL_GET_STATUS_FROM_DEVICE: return "INTERNAL_USB_FAIL_GET_STATUS_FROM_DEVICE";
 	}
 
-	return "IOCTL_INTERNAL_USB_?";
+	return "?";
 }
 
 const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
