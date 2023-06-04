@@ -33,14 +33,16 @@ struct request_search
         request_search(_In_ UDECXUSBENDPOINT endp) : endpoint(endp), what(ENDPOINT) {}
 
         request_search(_In_ seqnum_t n) : 
-                endpoint(reinterpret_cast<UDECXUSBENDPOINT>(static_cast<uintptr_t>(n))),
-                what(SEQNUM) {}
+                request(reinterpret_cast<WDFREQUEST>(static_cast<uintptr_t>(n))), // for operator bool correctness
+                what(SEQNUM) { NT_ASSERT(seqnum == n); }
+
+        explicit operator bool() const { return request; }; // largest in union
+        auto operator !() const { return !request; }
 
         union {
                 WDFREQUEST request{};
                 UDECXUSBENDPOINT endpoint;
                 seqnum_t seqnum;
-                static_assert(sizeof(request) >= sizeof(seqnum));
         };
 
         enum what_t { ANY, REQUEST, ENDPOINT, SEQNUM };

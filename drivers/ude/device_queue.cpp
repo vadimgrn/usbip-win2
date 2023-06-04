@@ -29,7 +29,7 @@ auto matches(_In_ request_ctx *req, _In_ const device::request_search &crit)
                 return true;
         }
 
-        Trace(TRACE_LEVEL_ERROR, !"Invalid union's member selector %d", crit.what);
+        Trace(TRACE_LEVEL_ERROR, "Invalid union's member selector %d", crit.what);
         return false;
 }
 
@@ -107,7 +107,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::dequeue_request(_In_ device_ctx &dev, _In_ const request_search &crit)
 {
-        NT_ASSERT(crit.request); // largest in union
+        NT_ASSERT(crit);
 
         if (!dev.queue) {
                 return WDF_NO_HANDLE;

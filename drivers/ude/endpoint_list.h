@@ -9,26 +9,24 @@
 namespace usbip
 {
 
-struct compare_endpoint
+struct endpoint_search
 {
-        // virtual ~compare_endpoint() {} // unresolved "void operator delete(void *,unsigned __int64)"
-        virtual bool operator() (const endpoint_ctx &endp) const = 0;
-};
+        endpoint_search(USBD_PIPE_HANDLE h) : handle(h), what(HANDLE) { NT_ASSERT(handle); }
+        
+        endpoint_search(UINT8 addr) : 
+                handle(reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<uintptr_t>(addr))), // for operator bool correctness
+                what(ADDRESS) { NT_ASSERT(address == addr); }
 
-struct compare_endpoint_handle : compare_endpoint
-{
-        explicit compare_endpoint_handle(USBD_PIPE_HANDLE h) : handle(h) { NT_ASSERT(handle); }
-        constexpr bool operator() (const endpoint_ctx &endp) const override { return endp.PipeHandle == handle; }
+        explicit operator bool() const { return handle; }; // largest in union
+        auto operator !() const { return !handle; }
 
-        USBD_PIPE_HANDLE handle;
-};
+        union {
+                USBD_PIPE_HANDLE handle;
+                UINT8 address;
+        };
 
-struct compare_endpoint_descr : compare_endpoint
-{
-        compare_endpoint_descr(const USBD_PIPE_INFORMATION &p) : pipe(p) {}
-        bool operator()(const endpoint_ctx &endp) const override;
-
-        USBD_PIPE_INFORMATION pipe;
+        enum what_t { HANDLE, ADDRESS };
+        what_t what; // union's member selector
 };
 
 _IRQL_requires_same_
@@ -41,6 +39,6 @@ void remove_endpoint_list(_In_ endpoint_ctx &endp);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-endpoint_ctx *find_endpoint(_In_ device_ctx &dev, _In_ const compare_endpoint &compare);
+endpoint_ctx *find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_search &crit);
 
 } // namespace usbip

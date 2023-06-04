@@ -13,6 +13,21 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+auto matches(_In_ const endpoint_ctx &endp, _In_ const endpoint_search &crit)
+{
+        switch (crit.what) {
+        case crit.HANDLE:
+                return crit.handle == endp.PipeHandle;
+        case crit.ADDRESS:
+                return crit.address == endp.descriptor.bEndpointAddress;
+        }
+
+        Trace(TRACE_LEVEL_ERROR, "Invalid union's member selector %d", crit.what);
+        return false;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_endpoint_list_head(_In_ device_ctx &dev)
 {
         auto ep0 = get_endpoint_ctx(dev.ep0);
@@ -50,7 +65,7 @@ void usbip::remove_endpoint_list(_In_ endpoint_ctx &endp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const compare_endpoint &compare) -> endpoint_ctx*
+auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_search &crit) -> endpoint_ctx*
 {
         auto head = get_endpoint_list_head(dev);
 
@@ -58,20 +73,10 @@ auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const compare_endpoint &com
 
         for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto endp = CONTAINING_RECORD(entry, endpoint_ctx, entry);
-                if (compare(*endp)) {
+                if (matches(*endp, crit)) {
                         return endp;
                 }
         }
 
         return nullptr;
-}
-
-bool usbip::compare_endpoint_descr::operator() (const endpoint_ctx &endp) const
-{
-        auto &d = endp.descriptor;
-
-        return  d.bEndpointAddress == pipe.EndpointAddress &&
-                d.wMaxPacketSize == pipe.MaximumPacketSize &&
-                d.bInterval == pipe.Interval &&
-                usb_endpoint_type(d) == pipe.PipeType;
 }
