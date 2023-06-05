@@ -72,8 +72,6 @@ public:
         auto get() const { return m_irp; }
         auto operator ->() const { return m_irp; }
 
-        auto set_io_increment(_In_ KPRIORITY io_incr) { return InterlockedExchange(&m_io_increment, io_incr); }
-
         _IRQL_requires_max_(APC_LEVEL)
         PAGED NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
 
@@ -83,7 +81,6 @@ public:
 private:
         IRP *m_irp{};
         KEVENT m_event{};
-        LONG m_io_increment = IO_NO_INCREMENT;
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context);
@@ -94,8 +91,6 @@ private:
                 IoSetCompletionRoutine(m_irp, completion, this, true, true, true);
         }
 };
-
-static_assert(sizeof(irp_cls) == 40);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS irp_cls::ctor()
@@ -139,7 +134,7 @@ NTSTATUS irp_cls::completion(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_ void *cont
         auto &self = *static_cast<irp_cls*>(context);
 
         if (irp->PendingReturned) {
-                KeSetEvent(&self.m_event, self.m_io_increment, false);
+                KeSetEvent(&self.m_event, IO_NO_INCREMENT, false);
         }
 
         return StopCompletion;
@@ -875,12 +870,4 @@ WSK_DATA_INDICATION* wsk::tail(_In_opt_ WSK_DATA_INDICATION *di)
 {
         for ( ; di && di->Next; di = di->Next);
         return di;
-}
-
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void wsk::set_io_increment(_In_ SOCKET *sock, _In_ KPRIORITY increment)
-{
-        PAGED_CODE();
-        sock->recv_irp.set_io_increment(increment);
-        sock->send_irp.set_io_increment(increment);
 }
