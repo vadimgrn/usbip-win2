@@ -22,25 +22,84 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr CCHAR get_priority_boost(_In_ int cls, _In_ int subclass, _In_ int proto)
+{
+        switch (cls) {
+        case USB_DEVICE_CLASS_STORAGE:
+                return IO_DISK_INCREMENT;
+        case USB_DEVICE_CLASS_AUDIO:
+                return IO_SOUND_INCREMENT;
+        case USB_DEVICE_CLASS_VIDEO:
+                return IO_VIDEO_INCREMENT;
+        case USB_DEVICE_CLASS_AUDIO_VIDEO:
+                switch (subclass) {
+                case 2: // AVData Video Streaming Interface
+                        return IO_VIDEO_INCREMENT;
+                case 3: // AVData Audio Streaming Interface
+                        return IO_SOUND_INCREMENT;
+                }
+                break;
+        case USB_DEVICE_CLASS_HUMAN_INTERFACE:
+                static_assert(IO_MOUSE_INCREMENT == IO_KEYBOARD_INCREMENT);
+                return IO_KEYBOARD_INCREMENT;
+        case USB_DEVICE_CLASS_WIRELESS_CONTROLLER:
+                return IO_NETWORK_INCREMENT;
+        case USB_DEVICE_CLASS_COMMUNICATIONS:
+        case USB_DEVICE_CLASS_PRINTER:
+        case USB_DEVICE_CLASS_SMART_CARD:
+                return IO_SERIAL_INCREMENT;
+        case USB_DEVICE_CLASS_MISCELLANEOUS:
+                switch (subclass) {
+                case 4: // RNDIS over XXX
+                        return IO_NETWORK_INCREMENT;
+                case 5: // Machine Vision Device conforming to the USB3 Vision specification
+                        switch (proto) {
+                        case 2: // USB3 Vision Streaming Interface
+                                return IO_VIDEO_INCREMENT;
+                        }
+                        break;
+                }
+                break;
+        }
+
+        return IO_NO_INCREMENT;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFORMATION &intf)
 {
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
+                auto &pipe = intf.Pipes[i];
 
-                if (auto &p = intf.Pipes[i]; auto endp = find_endpoint(dev, p.EndpointAddress)) {
-                        NT_ASSERT(usb_endpoint_type(endp->descriptor) == p.PipeType); // that's him!
+                auto endp = find_endpoint(dev, pipe.EndpointAddress);
+                if (!endp) {
+                        Trace(TRACE_LEVEL_ERROR, 
+                                "interface %d.%d, Pipes[%lu], EndpointAddress %#x{%s} -> not found",
+                                intf.InterfaceNumber, intf.AlternateSetting, i, pipe.EndpointAddress, 
+                                usbd_pipe_type_str(pipe.PipeType));
 
-                        TraceDbg("interface %d.%d, Pipes[%lu] {%s, addr %#x} -> PipeHandle %04x (was %04x)",
-                                intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType), 
-                                p.EndpointAddress, ptr04x(p.PipeHandle), ptr04x(endp->PipeHandle));
-
-                        endp->PipeHandle = p.PipeHandle;
-                        // endp->interface_number = intf.InterfaceNumber;
-                        // endp->alternate_setting = intf.AlternateSetting;
-                } else {
-                        Trace(TRACE_LEVEL_ERROR, "interface %d.%d, Pipes[%lu] {%s, addr %#x} -> not found",
-                                intf.InterfaceNumber, intf.AlternateSetting, i, usbd_pipe_type_str(p.PipeType),
-                                p.EndpointAddress);
+                        continue;
                 }
+
+                NT_ASSERT(usb_endpoint_type(endp->descriptor) == pipe.PipeType);
+
+                if (pipe.PipeType == UsbdPipeTypeControl) {
+                        //
+                } else if (auto boost = get_priority_boost(intf.Class, intf.SubClass, intf.Protocol)) {
+                        endp->priority_boost = boost;
+                }
+
+                TraceDbg("interface %d.%d, %#x/%#x/%#x, Pipes[%lu], EndpointAddress %#x{%s %s[%d]} -> "
+                         "PipeHandle %04x (was %04x), PriorityBoost %d",
+                        intf.InterfaceNumber, intf.AlternateSetting, intf.Class, intf.SubClass, intf.Protocol,
+                        i, pipe.EndpointAddress, usbd_pipe_type_str(pipe.PipeType),
+                        usb_endpoint_dir_out(endp->descriptor) ? "Out" : "In", usb_endpoint_num(endp->descriptor),
+                        ptr04x(pipe.PipeHandle), ptr04x(endp->PipeHandle), endp->priority_boost);
+
+                endp->PipeHandle = pipe.PipeHandle;
+                // endp->interface_number = intf.InterfaceNumber;
+                // endp->alternate_setting = intf.AlternateSetting;
         }
 }
 

@@ -105,7 +105,7 @@ void validate(_In_ USB_CONFIGURATION_DESCRIPTOR &d)
 	auto offset = position - (UCHAR*)&d;
 	NT_ASSERT(offset >= 0);
 
-	auto length = d.wTotalLength - offset;
+	auto length = min(d.wTotalLength - offset, 16);
 	NT_ASSERT(length > 0);
 
 	Trace(TRACE_LEVEL_WARNING, "USBD_STATUS_%s, offset %#Ix(%Id)%!BIN!", 
@@ -703,37 +703,38 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
-	auto &req = *get_request_ctx(request);
-
 	auto irp = WdfRequestWdmGetIrp(request);
 
 	auto info = irp->IoStatus.Information;
 	NT_ASSERT(info == WdfRequestGetInformation(request));
 
+	auto &req = *get_request_ctx(request);
+
 	if (!libdrv::has_urb(irp)) {
 		if (status) {
-			TraceDbg("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
+			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
 		WdfRequestComplete(request, status);
 		return;
 	}
 
 	auto &urb = *libdrv::urb_from_irp(irp);
-	auto urb_st = urb.UrbHeader.Status;
+	auto &urb_st = urb.UrbHeader.Status;
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is that really required?
 	}
 
 	if (status || urb_st) {
-		TraceDbg("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
-			req.seqnum, get_usbd_status(urb_st), status, info);
+		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
+			  req.seqnum, get_usbd_status(urb_st), status, info);
 	}
 
-	if (NT_SUCCESS(status)) {
-		UdecxUrbComplete(request, urb_st);
+	if (auto endp = get_endpoint_ctx(req.endpoint); auto boost = endp->priority_boost) {
+		WdfRequestCompleteWithPriorityBoost(request, status, boost); // UdecxUrbComplete has no PriorityBoost
 	} else {
 		UdecxUrbCompleteWithNtStatus(request, status);
+		static_assert(!IO_NO_INCREMENT);
 	}
 }
 
