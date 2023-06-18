@@ -4,12 +4,7 @@
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
 - Works with Linux USB/IP server at least for kernels 4.19 - 5.19
 - **Is not ready for production use**, can cause BSOD
-- There is no "official" USB/IP client for Windows
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
-- You can donate to purchase Extended Validation Code Signing Certificate
-
-  [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/R5R8JD80B)
-  [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/white_img.png)](https://www.buymeacoffee.com/usbip)
 
 ## Two implementations
 - [UDE driver](https://github.com/vadimgrn/usbip-win2/tree/master) (version 0.9.5 and later)
