@@ -5,27 +5,48 @@
 #include "strconv.h"
 
 /*
- * RtlFreeUnicodeString must be used to release memory.
+ * @param utf8 null-terminated utf8 string
+ * @param maxlen maximum size in bytes of the buffer to which "utf8" points 
+          (this is not a length/size of "utf8" itself)
+ * @return RtlFreeUnicodeString must be used to release a memory
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8)
+PAGED NTSTATUS libdrv::utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8, _In_ USHORT maxlen)
 {
         PAGED_CODE();
 
-        UTF8_STRING s;
-        RtlInitUTF8String(&s, utf8);
+        if (!utf8) {
+                return STATUS_INVALID_PARAMETER_2;
+        }
 
-        return RtlUTF8StringToUnicodeString(&dst, &s, true);
+        UTF8_STRING src { // @see RtlInitUTF8StringEx
+                .Length = static_cast<USHORT>(strnlen(utf8, maxlen)), // bytes
+                .MaximumLength = maxlen,
+                .Buffer = const_cast<char*>(utf8)
+        };
+
+        return RtlUTF8StringToUnicodeString(&dst, &src, true);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
-        UTF8_STRING s{ .MaximumLength = len, .Buffer = dest };
-        return RtlUnicodeStringToUTF8String(&s, &src, false);
+
+        if (!utf8) {
+                return STATUS_INVALID_PARAMETER_1;
+        }
+
+        UTF8_STRING s { .MaximumLength = maxlen, .Buffer = utf8 };
+        auto st = RtlUnicodeStringToUTF8String(&s, &src, false);
+
+        if (s.Length < s.MaximumLength) {
+                s.Buffer[s.Length] = '\0'; // null-terminated
+        }
+
+        return st;
 }
 
 _IRQL_requires_same_

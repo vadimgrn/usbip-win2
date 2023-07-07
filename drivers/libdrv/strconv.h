@@ -11,11 +11,11 @@ namespace libdrv
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8);
+PAGED NTSTATUS utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8, _In_ USHORT maxlen);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS unicode_to_utf8(_Out_ char *dest, _In_ USHORT len, _In_ const UNICODE_STRING &src);
+PAGED NTSTATUS unicode_to_utf8(_Out_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src);
 
 constexpr auto empty(_In_ const UNICODE_STRING &s) { return !s.Length; }
 
