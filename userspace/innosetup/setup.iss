@@ -67,7 +67,7 @@ WizardImageAlphaFormat=defined
 WizardImageStretch=no
 ; UninstallDisplayIcon={app}\usbip.exe
 
-; Windows 10 2004
+; Windows 10, version 2004
 MinVersion=10.0.19041
 
 [Messages]
@@ -76,32 +76,30 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 [Components]
 Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
 Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
+Name: "pdb"; Description: "Program DataBase files"; Types: full custom
 
 [Files]
-Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
-Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
 Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
-Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "libusbip.dll"}; DestDir: "{tmp}"; Components: main
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
+Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 
-Source: {#BuildDir + "libusbip.*"}; DestDir: "{app}\lib"; Excludes: "libusbip.idb, libusbip.dll"; Components: sdk
+Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
+Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
+Source: {#BuildDir + "libusbip.lib"}; DestDir: "{app}\lib"; Components: sdk
+Source: {#BuildDir + "libusbip.exp"}; DestDir: "{app}\lib"; Components: sdk
 
-Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
-
-#if Configuration == "Debug"
- Source: {#BuildDir + "*.pdb"}; DestDir: "{app}\pdb"; Excludes: "devnode.pdb, libusbip.pdb, libusbip_check.pdb"; Components: main
- Source: {#BuildDir + "devnode.pdb"}; DestDir: "{app}\pdb"; DestName: "classfilter.pdb"; Components: main
- Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}\pdb"; Components: main and not sdk
-#endif
+Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip.pdb, libusbip_check.pdb"; Components: pdb
+Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"

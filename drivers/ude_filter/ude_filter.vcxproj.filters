@@ -6,6 +6,7 @@
     <ClCompile Include="pnp.cpp" />
     <ClCompile Include="int_dev_ctrl.cpp" />
     <ClCompile Include="request.cpp" />
+    <ClCompile Include="query_interface.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="driver.h" />
@@ -15,7 +16,7 @@
     <ClInclude Include="int_dev_ctrl.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="request.h" />
-    <ClInclude Include="smartptr.h" />
+    <ClInclude Include="query_interface.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_filter.inf" />

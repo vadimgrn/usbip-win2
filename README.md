@@ -21,7 +21,7 @@
 - UDE and WDM drivers can be installed and used together on the same PC, just make sure you use the appropriate usbip.exe for each one
 
 ## Requirements
-- Windows 10 x64 Version [2004](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlisntddiversionavailable) (OS build 19041) and later
+- Windows 10 x64 Version [2004](https://en.wikipedia.org/wiki/Windows_10,_version_2004) (OS build 19041) and later
 - Server must support USB/IP protocol v.1.1.1
 
 ## Key features
@@ -41,18 +41,13 @@
 - Userspace code is fully rewritten (libusbip and usbip utility)
 - SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
-- Windows 10 v.2004 or later is required
+- Windows 10, version 2004 or later is required
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
 - Server (stub driver) is removed
-- x86 build is removed
+- x64 build only
 
 ## Build
-
-### Notes
-- Driver is configured for Windows 10 v.2004 target
-- x86 platform is not supported
-- Build is tested on the latest Windows 11 Pro
 
 ### Build Tools
 - The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
@@ -138,28 +133,27 @@ rd /S /Q "C:\Program Files\USBip"
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
-- These tools are included in the Windows Driver Kit (WDK)
-- Start log sessions for drivers (copy commands to .bat file and run it as Admin)
+- These tools are included in the [Windows Driver Kit](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-step-3-install-windows-11-version-22h2-wdk)
+- **Pick "Select Components/Program DataBase files" during USBip installation**
+- Start log sessions for drivers (run commands as Administrator)
 ```
-@echo off
 set NAME=usbip
 
 tracelog.exe -stop %NAME%-flt
 tracelog.exe -stop %NAME%-ude
 
-rm %NAME%-*.*
-tracepdb.exe -f "C:\Program Files\USBip\pdb\*.pdb" -s -p %TEMP%\%NAME%
+del /F %NAME%-*.*
+tracepdb.exe -f "C:\Program Files\USBip\*.pdb" -s -p %TEMP%\%NAME%
 
 tracelog.exe -start %NAME%-flt -guid #90c336ed-69fb-43d6-b800-1552d72d200b -f %NAME%-flt.etl -flag 0x3 -level 5
 tracelog.exe -start %NAME%-ude -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %NAME%-ude.etl -flag 0xF -level 5
 ```
 - Reproduce the issue
-- Stop log sessions and get plain text logs (copy commands to .bat file and run it as Admin)
-- If you copy/paste commands directly, use `set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:`
+- Stop log sessions and get plain text logs (run commands as Administrator)
+- **If you copy commands to .bat file, double '%' in TRACE_FORMAT_PREFIX**
 ```
-@echo off
 set NAME=usbip
-set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
+set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:
 
 tracelog.exe -stop %NAME%-flt
 tracelog.exe -stop %NAME%-ude
@@ -169,7 +163,7 @@ tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME%-ude.txt %NAME%-ude.etl
 
 rem sed -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-*.txt
 rem sed -i "s/`anonymous namespace':://" %NAME%-*.txt
-rem rm sed*
+rem del /F sed*
 ```
 
 ## Debugging [BSOD](https://en.wikipedia.org/wiki/Blue_screen_of_death)
@@ -208,8 +202,9 @@ dmesg --follow | tee ~/usbip.log
 - Run verifier.exe as Administrator
 - Enable testing
 ```
-verifier /rc 1 2 4 5 6 9 10 11 12 14 15 16 18 20 24 26 33 34 35 36 /driver usbip2_filter.sys usbip2_ude.sys
+verifier /rc 1 2 4 5 6 8 9 12 18 34  10 11 14 15 16 17 20 24 26 33 35 36 /driver usbip2_filter.sys usbip2_ude.sys
 ```
+- Be aware that rule class 26 "Code integrity checking" forces to use NonPagedPoolNx instead of NonPagedPool
 - Query driver statistics
 ```
 verifier /query

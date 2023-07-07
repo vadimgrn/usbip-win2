@@ -1,7 +1,7 @@
 ; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;
 ; usbip2_filter.inf
-; Upper-level class filter primitive driver
+; Upper-level class filter primitive driver (since Windows 10 version 1903)
 
 [Version]
 Signature="$WINDOWS NT$"

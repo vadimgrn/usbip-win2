@@ -27,7 +27,7 @@ reg add %LOG_FLT% /v Guid /t REG_SZ /d {8440db8a-0637-4712-bdd5-9da510ef14e6} /f
 reg add %LOG_UDE% /v Start /t REG_DWORD /d 1 /f
 reg add %LOG_FLT% /v Start /t REG_DWORD /d 1 /f
 
-tracepdb.exe -f "C:\Program Files\USBip\pdb\*.pdb" -s -p %TEMP%\%NAME%
+tracepdb.exe -f "C:\Program Files\USBip\*.pdb" -s -p %TEMP%\%NAME%
 
 echo ##########################################
 echo ### Reboot the system to start logging ###

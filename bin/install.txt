@@ -19,4 +19,4 @@ certutil -store root | findstr "USBip"
 
 pnputil /add-driver usbip2_filter.inf /install
 ..\classfilter add upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
-..\devnode install usbip2_ide.inf ROOT\USBIP_WIN2\UDE
+..\devnode install .\usbip2_ude.inf ROOT\USBIP_WIN2\UDE

@@ -20,9 +20,11 @@ DefaultDestDir = 13 ; Driver package isolation
 usbip2_ude.sys = 1,,
 
 [Manufacturer]
-%Manufacturer%=Standard,NT$ARCH$.10.0 ; for Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
+; Windows 10, version 2004 and later
+; For Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
+%Manufacturer%=Standard,NT$ARCH$.10.0...19041
 
-[Standard.NT$ARCH$.10.0]
+[Standard.NT$ARCH$.10.0...19041]
 %DisplayName%=ude_Device, ROOT\USBIP_WIN2\UDE
 
 [ude_Device.NT]
