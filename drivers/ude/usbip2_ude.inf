@@ -5,7 +5,7 @@
 [Version]
 Signature="$WINDOWS NT$"
 Class=USB
-ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; USB host controllers and USB hubs
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; Devguid.h, GUID_DEVCLASS_USB, USB host controllers and USB hubs
 Provider=%Manufacturer%
 CatalogFile=usbip2_ude.cat
 PnpLockDown=1

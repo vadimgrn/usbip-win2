@@ -32,10 +32,9 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
+#define ClassGuid "{{36FC9E60-C465-11CF-8056-444553540000}" ; see usbip2_ude.inf, usbip2_filter.inf
 #define UdeHwid "ROOT\USBIP_WIN2\UDE"
-
 #define FilterDriver "usbip2_filter"
-#define FilterClassGuid "{{36FC9E60-C465-11CF-8056-444553540000}" ; see usbip2_filter.inf
 
 #define CertFile "usbip.pfx"
 #define CertName "USBip"
@@ -67,6 +66,9 @@ WizardImageAlphaFormat=defined
 WizardImageStretch=no
 ; UninstallDisplayIcon={app}\usbip.exe
 
+; this app can't be installed more than once
+MissingRunOnceIdsWarning=no 
+
 ; Windows 10, version 2004
 MinVersion=10.0.19041
 
@@ -83,15 +85,14 @@ Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Com
 
 Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "libusbip.dll"}; DestDir: "{tmp}"; Components: main
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; DestName: "classfilter.exe"; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
@@ -111,17 +112,23 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
-Filename: {app}\classfilter.exe; Parameters: "add upper ""{#FilterClassGuid}"" {#FilterDriver}"; Flags: runhidden
 
-Filename: {tmp}\devnode.exe; Parameters: "install {tmp}\usbip2_ude.inf {#UdeHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "add upper ""{#ClassGuid}"" {#FilterDriver}"; Flags: runhidden
+
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip2_ude.inf {#UdeHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
 
 [UninstallRun]
 
-Filename: {app}\usbip.exe; Parameters: "detach --all"; RunOnceId: "DetachAll"; Flags: runhidden
-Filename: {sys}\pnputil.exe; Parameters: "/remove-device /deviceid {#UdeHwid} /subtree"; RunOnceId: "RemoveDevice"; Flags: runhidden
-Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#FilterClassGuid}"" {#FilterDriver}"; RunOnceId: "RemoveFromUpperFilters"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; RunOnceId: "DeleteDrivers"; Flags: runhidden
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; RunOnceId: "DelStoreRoot"; Flags: runhidden
+Filename: {app}\usbip.exe; Parameters: "detach --all"; Flags: runhidden
+
+Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#ClassGuid}"" {#FilterDriver}"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
+
+Filename: {app}\devnode.exe; Parameters: "remove {#UdeHwid} ""{#ClassGuid}"" root"; Flags: runhidden
+
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
 
 [Code]
 
