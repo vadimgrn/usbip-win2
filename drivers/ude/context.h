@@ -82,6 +82,7 @@ struct device_ctx_ext
         wsk::SOCKET *sock;
 
         // from ioctl::plugin_hardware
+        // .Buffer-s are allocated in PagedPool, see create_device_ctx_ext
         UNICODE_STRING node_name;
         UNICODE_STRING service_name;
         UNICODE_STRING busid;

@@ -269,7 +269,7 @@ using namespace wsk;
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto alloc_socket(_Out_ SOCKET* &sock)
 {
-        sock = (SOCKET*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(SOCKET), WSK_POOL_TAG);
+        sock = (SOCKET*)ExAllocatePoolZero(NonPagedPoolNx, sizeof(SOCKET), WSK_POOL_TAG);
         if (!sock) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }

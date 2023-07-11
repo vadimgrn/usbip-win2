@@ -135,12 +135,12 @@ const char* libdrv::select_interface_str(char *buf, size_t len, const _URB_SELEC
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _URB_SELECT_CONFIGURATION* libdrv::clone(
-	_Out_ ULONG &size, _In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag)
+	_Out_ ULONG &size, _In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_TYPE pool_type, _In_ ULONG pooltag)
 {
 	auto cd_len = src.ConfigurationDescriptor ? src.ConfigurationDescriptor->wTotalLength : 0;
 	size = src.Hdr.Length + cd_len;
 
-	auto dst = (_URB_SELECT_CONFIGURATION*)ExAllocatePool2(flags | POOL_FLAG_UNINITIALIZED, size, pooltag);
+	auto dst = (_URB_SELECT_CONFIGURATION*)ExAllocatePoolUninitialized(pool_type, size, pooltag);
 	if (!dst) {
 		return dst;
 	}

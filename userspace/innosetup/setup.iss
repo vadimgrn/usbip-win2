@@ -32,9 +32,10 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define ClassGuid "{{36FC9E60-C465-11CF-8056-444553540000}" ; see usbip2_ude.inf, usbip2_filter.inf
+#define ClassName "USB" ; see usbip2_ude.inf, usbip2_filter.inf
 #define UdeHwid "ROOT\USBIP_WIN2\UDE"
 #define FilterDriver "usbip2_filter"
+#define UdeDriver "usbip2_ude"
 
 #define CertFile "usbip.pfx"
 #define CertName "USBip"
@@ -69,8 +70,8 @@ WizardImageStretch=no
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no 
 
-; Windows 10, version 2004
-MinVersion=10.0.19041
+; Windows 10, version 1809
+MinVersion=10.0.17763
 
 [Messages]
 WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
@@ -83,11 +84,12 @@ Name: "pdb"; Description: "Program DataBase files"; Types: full custom
 [Files]
 Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
 
+Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "libusbip.dll"}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
-Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 
+Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
@@ -111,23 +113,34 @@ Name: modifypath; Description: "Add to &PATH environment variable for all users"
 Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist 
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultInstall 128 {tmp}\{#FilterDriver}.inf"; Flags: runhidden
 
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
-Filename: {app}\classfilter.exe; Parameters: "add upper ""{#ClassGuid}"" {#FilterDriver}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "add upper {#ClassName} {#FilterDriver}"; Flags: runhidden
 
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\usbip2_ude.inf {#UdeHwid}"; WorkingDir: "{tmp}"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#UdeHwid}"; Flags: runhidden
 
 [UninstallRun]
 
 Filename: {app}\usbip.exe; Parameters: "detach --all"; Flags: runhidden
 
-Filename: {app}\classfilter.exe; Parameters: "remove upper ""{#ClassGuid}"" {#FilterDriver}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "remove upper {#ClassName} {#FilterDriver}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
-Filename: {app}\devnode.exe; Parameters: "remove {#UdeHwid} ""{#ClassGuid}"" root"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove {#UdeHwid} root"; Flags: runhidden
 
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""Manufacturer=\""USBIP-WIN2\"""" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+; FIXME: usbip2_ude service is not deleted on Win10 version 1809
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""CatalogFile={#UdeDriver}.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+
+; FIXME: C:\WINDOWS\system32\DRIVERS\usbip2_filter.sys is left after uninstall.
+; The first command detects that "usbip2_filter.sys still in use by 1 source" and reinstalls(!) usbip2_filter.
+; As a result, the driver package is removed, but usbip2_filter service and usbip2_filter.sys are left.
+; The second command removes the service, but still can't remove usbip2_filter.sys (Error 5: Access is denied).
+; @see C:\Windows\INF\setupapi.*.log
+
+Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 {app}\{#FilterDriver}.inf"; Flags: runhidden
+Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 {app}\{#FilterDriver}.inf"; Flags: runhidden
+
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
 
 [Code]

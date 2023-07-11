@@ -43,12 +43,12 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
 
 _IRQL_requires_same_
 _Function_class_(allocate_function_ex)
-void *allocate_function_ex(_In_ [[maybe_unused]] POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
+void *allocate_function_ex(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {
         NT_ASSERT(PoolType == NonPagedPoolNx);
         NT_ASSERT(Tag == g_tag);
 
-        auto ctx = (wsk_context*)ExAllocatePool2(POOL_FLAG_NON_PAGED, NumberOfBytes, Tag);
+        auto ctx = (wsk_context*)ExAllocatePoolZero(PoolType, NumberOfBytes, Tag);
         if (!ctx) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", NumberOfBytes);
                 return nullptr;
@@ -177,7 +177,7 @@ NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         ULONG isoc_len = NumberOfPackets*sizeof(*ctx.isoc);
 
         if (ctx.isoc_alloc_cnt < NumberOfPackets) {
-                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePool2(POOL_FLAG_NON_PAGED, isoc_len, g_tag);
+                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePoolZero(NonPagedPoolNx, isoc_len, g_tag);
                 if (!isoc) {
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }

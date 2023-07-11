@@ -39,7 +39,6 @@ struct devnode_install_args
 struct devnode_remove_args
 {
         std::wstring hwid;
-        std::wstring class_guid;
         std::wstring enumerator;
         bool dry_run;
 };
@@ -47,7 +46,7 @@ struct devnode_remove_args
 struct classfilter_args
 {
         std::string_view level;
-        std::wstring class_guid;
+        std::wstring class_name;
         std::wstring driver_name;
 };
 
@@ -123,6 +122,21 @@ auto read_multi_z(_In_ HKEY key, _In_ LPCWSTR val_name, _Out_ std::vector<WCHAR>
                         return false;
                 }
         }
+}
+
+auto get_class_guid(_Out_ GUID &guid, _In_ const std::wstring &name)
+{
+        DWORD guids_cnt{};
+        bool ok = SetupDiClassGuidsFromName(name.c_str(), &guid, 1, &guids_cnt);
+
+        if (!ok) {
+                errmsg("SetupDiClassGuidsFromName", name.c_str());
+        } else if (ok = guids_cnt == 1; !ok) {
+                fwprintf(stderr, L"SetupDiClassGuidsFromName: %lu GUIDs associated with the class name '%s'\n", 
+                                   guids_cnt, name.c_str());
+        }
+
+        return ok;
 }
 
 void prompt_reboot()
@@ -211,7 +225,7 @@ auto install_devnode_and_driver(_In_ devnode_install_args &r)
 
         hdevinfo dev_list(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
         if (!dev_list) {
-                errmsg("SetupDiCreateDeviceInfoList");
+                errmsg("SetupDiCreateDeviceInfoList", ClassName);
                 return false;
         }
 
@@ -240,21 +254,21 @@ auto install_devnode_and_driver(_In_ devnode_install_args &r)
                 errmsg("SetupDiGetDeviceInstallParams");
                 return false;
         }
-        bool reboot_required = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
+        bool reboot = params.Flags & (DI_NEEDREBOOT | DI_NEEDRESTART);
 
-        // the same as "pnputil /add-driver usbip2_vhci.inf /install"
+        // the same as "pnputil /add-driver usbip2_ude.inf /install"
 
         BOOL RebootRequired{};
-        if (!UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired)) {
+        bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
+        if (!ok) {
                 errmsg("UpdateDriverForPlugAndPlayDevices");
-                return false;
         }
 
-        if (reboot_required || RebootRequired) {
+        if (reboot || RebootRequired) {
                 prompt_reboot();
         }
 
-        return true;
+        return ok;
 }
 
 auto uninstall_device(
@@ -291,25 +305,19 @@ auto uninstall_device(
  * pnputil /remove-device /deviceid <HWID>
  * a) /remove-device is available since Windows 10 version 2004
  * b) /deviceid flag is available since Windows 11 version 21H2
+ * 
+ * DIGCF_ALLCLASSES is used to find devices without a driver (Class = Unknown or Class = NoDriver).
  *
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
 auto remove_devnode(_In_ devnode_remove_args &r)
 {
-        auto clsid = r.class_guid.c_str();
-
-        CLSID ClassGUID{};
-        if (auto ret = CLSIDFromString(clsid, &ClassGUID); FAILED(ret)) {
-                errmsg("CLSIDFromString", clsid, ret);
-                return false;
-        }
-
         auto enumerator = r.enumerator.empty() ? nullptr : r.enumerator.c_str();
 
-        hdevinfo di(SetupDiGetClassDevs(&ClassGUID, enumerator, nullptr, DIGCF_PRESENT));
+        hdevinfo di(SetupDiGetClassDevs(nullptr, enumerator, nullptr, DIGCF_ALLCLASSES));
         if (!di) {
-                errmsg("SetupDiGetClassDevs", clsid);
+                errmsg("SetupDiGetClassDevs");
                 return false;
         }
 
@@ -336,17 +344,14 @@ auto remove_devnode(_In_ devnode_remove_args &r)
  */
 auto classfilter(_In_ classfilter_args &r, _In_ bool add)
 {
-        auto clsid = r.class_guid.c_str();
-
-        CLSID ClassGUID;
-        if (auto ret = CLSIDFromString(clsid, &ClassGUID); FAILED(ret)) {
-                errmsg("CLSIDFromString", clsid, ret);
+        GUID ClassGUID{};
+        if (!get_class_guid(ClassGUID, r.class_name)) {
                 return false;
         }
 
         HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
         if (!key) {
-                errmsg("SetupDiOpenClassRegKeyEx", clsid);
+                errmsg("SetupDiOpenClassRegKeyEx", r.class_name.c_str());
                 return false;
         }
 
@@ -398,7 +403,6 @@ void add_devnode_remove_cmd(_In_ CLI::App &app)
         auto cmd = app.add_subcommand("remove", "Uninstall a device and remove its device nodes");
 
         cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
-        cmd->add_option("ClassGuid", r.class_guid, "A GUID for a device setup class")->required();
         cmd->add_option("enumerator", r.enumerator, "An identifier of a Plug and Play enumerator");
 
         cmd->add_flag("-n,--dry-run", r.dry_run, 
@@ -427,7 +431,7 @@ void add_classfilter_cmds(_In_ CLI::App &app)
                         ->check(CLI::IsMember({opt_upper, "lower"}))
                         ->required();
 
-                cmd->add_option("ClassGuid", r.class_guid, "A GUID for a device setup class")->required();
+                cmd->add_option("ClassName", r.class_name, "A name of a device setup class")->required();
                 cmd->add_option("DriverName", r.driver_name, "Filter driver name")->required();
 
                 auto f = [&r = r, add = action == cmd_add] { return classfilter(r, add); };

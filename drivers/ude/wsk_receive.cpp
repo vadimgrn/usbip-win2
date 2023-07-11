@@ -410,7 +410,7 @@ inline auto alloc_drain_buffer(_Inout_ wsk_context &ctx, _In_ size_t length)
 {  
 	auto &buf = ctx.request;
 	NT_ASSERT(!buf);
-	return buf = (WDFREQUEST)ExAllocatePool2(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, length, pooltag); 
+	return buf = (WDFREQUEST)ExAllocatePoolUninitialized(NonPagedPoolNx, length, pooltag); 
 }
 
 _Function_class_(device_ctx::received_fn)

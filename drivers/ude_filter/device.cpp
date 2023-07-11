@@ -71,7 +71,7 @@ PAGED bool driver_name_equal(
 	PAGED_CODE();
 
 	const auto buf_sz = 1024UL;
-	unique_ptr buf(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, buf_sz);
+	unique_ptr buf(libdrv::uninitialized, PagedPool, buf_sz);
 	if (!buf) {
 		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", buf_sz);
 		return false;

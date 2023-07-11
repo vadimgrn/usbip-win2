@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2022 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+* Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 */
 
 #pragma once
@@ -10,6 +10,10 @@
 namespace libdrv
 {
 
+struct uninitialized_t { explicit uninitialized_t() = default; };
+inline constexpr uninitialized_t uninitialized;
+
+
 template<ULONG PoolTag>
 class unique_ptr
 {
@@ -19,8 +23,11 @@ public:
         constexpr unique_ptr() = default;
         unique_ptr(_In_ void *ptr) : m_ptr(ptr) {}
 
-        unique_ptr(_In_ POOL_FLAGS Flags, _In_ SIZE_T NumberOfBytes) :
-                m_ptr(ExAllocatePool2(Flags, NumberOfBytes, pooltag)) {}
+        unique_ptr(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
+                m_ptr(ExAllocatePoolZero(PoolType, NumberOfBytes, pooltag)) {}
+
+        unique_ptr(_In_ const uninitialized_t&, _In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
+                m_ptr(ExAllocatePoolUninitialized(PoolType, NumberOfBytes, pooltag)) {}
 
         ~unique_ptr() 
         {

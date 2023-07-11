@@ -53,6 +53,8 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_STRING *RegistryPath)
 {
+	ExInitializeDriverRuntime(0); // @see ExAllocatePool2
+
 	WPP_INIT_TRACING(drvobj, RegistryPath);
 	Trace(TRACE_LEVEL_INFORMATION, "%04x, '%!USTR!'", ptr04x(drvobj), RegistryPath);
 

@@ -39,7 +39,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
 {
         PAGED_CODE();
 
-        ext = (device_ctx_ext*)ExAllocatePool2(POOL_FLAG_NON_PAGED, sizeof(*ext), pooltag);
+        ext = (device_ctx_ext*)ExAllocatePoolZero(NonPagedPoolNx, sizeof(*ext), pooltag);
         if (!ext) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate device_ctx_ext");
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -58,7 +58,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         for (auto &[dst, src, maxlen]: v) {
                 if (!*src) {
                         // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
-                } else if (auto err = libdrv::utf8_to_unicode(dst, src, maxlen)) {
+                } else if (auto err = libdrv::utf8_to_unicode(dst, src, maxlen, PagedPool, pooltag)) {
                         Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, err);
                         return err;
                 }
@@ -76,9 +76,9 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
         NT_ASSERT(ext);
         free(ext->sock);
 
-        RtlFreeUnicodeString(&ext->node_name);
-        RtlFreeUnicodeString(&ext->service_name);
-        RtlFreeUnicodeString(&ext->busid);
+        libdrv::FreeUnicodeString(ext->node_name, pooltag); // @see RtlFreeUnicodeString
+        libdrv::FreeUnicodeString(ext->service_name, pooltag);
+        libdrv::FreeUnicodeString(ext->busid, pooltag);
 
         ExFreePoolWithTag(ext, pooltag);
 }
