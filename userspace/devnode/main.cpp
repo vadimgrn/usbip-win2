@@ -154,30 +154,39 @@ DWORD enum_device_info(_In_ HDEVINFO di, _In_ const device_visitor_f &func)
                 } else if (auto err = GetLastError(); err == ERROR_NO_MORE_ITEMS) {
                         return ERROR_SUCCESS;
                 } else {
-                        errmsg("SetupDiEnumDeviceInfo", L"", err);
                         return err;
                 }
         }
 }
 
-auto get_device_property(
+DWORD get_device_property(
         _In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd, 
-        _In_ const DEVPROPKEY &key, _In_ DWORD maxsize_hint,
-        _Out_ DEVPROPTYPE &type)
+        _In_ const DEVPROPKEY &key,
+        _Out_ DEVPROPTYPE &type,
+        _Inout_ std::vector<BYTE> &prop)
 {
-        for (std::vector<BYTE> v(maxsize_hint); ; ) {
+        for (;;) {
                 if (DWORD actual{}; // bytes
-                    SetupDiGetDeviceProperty(di, &dd, &key, &type, v.data(), DWORD(v.size()), &actual, 0)) {
-                        v.resize(actual);
-                        return v;
+                    SetupDiGetDeviceProperty(di, &dd, &key, &type, prop.data(), DWORD(prop.size()), &actual, 0)) {
+                        prop.resize(actual);
+                        return ERROR_SUCCESS;
                 } else if (auto err = GetLastError(); err == ERROR_INSUFFICIENT_BUFFER) {
-                        v.resize(actual);
+                        prop.resize(actual);
                 } else {
-                        errmsg("SetupDiGetDeviceProperty", L"", err);
-                        v.clear();
-                        return v;
+                        prop.clear();
+                        return err;
                 }
         }
+}
+
+template<typename... Args>
+inline auto get_device_property_ex(Args&&... args)
+{
+        auto err = get_device_property(std::forward<Args>(args)...);
+        if (err) {
+                errmsg("SetupDiGetDeviceProperty", L"", err);
+        }
+        return !err;
 }
 
 inline auto as_wstring_view(_In_ std::vector<BYTE> &v) noexcept
@@ -252,17 +261,19 @@ auto uninstall_device(
         _In_ HDEVINFO di, _In_  SP_DEVINFO_DATA &dd, _In_ const devnode_remove_args &r, _Inout_ bool &reboot)
 {
         DEVPROPTYPE type = DEVPROP_TYPE_EMPTY;
-        auto prop = get_device_property(di, dd, DEVPKEY_Device_HardwareIds, REGSTR_VAL_MAX_HCID_LEN, type);
-        if (prop.empty()) {
+        std::vector<BYTE> prop(REGSTR_VAL_MAX_HCID_LEN);
+
+        if (!get_device_property_ex(di, dd, DEVPKEY_Device_HardwareIds, type, prop) || prop.empty()) {
                 return false;
         }
+
         assert(type == DEVPROP_TYPE_STRING_LIST);
         
         if (as_wstring_view(prop) != r.hwid) {
                 //
         } else if (r.dry_run) {
-                prop = get_device_property(di, dd, DEVPKEY_Device_InstanceId, MAX_DEVICE_ID_LEN, type); 
-                if (!prop.empty()) {
+                prop.resize(MAX_DEVICE_ID_LEN);
+                if (get_device_property_ex(di, dd, DEVPKEY_Device_InstanceId, type, prop) && !prop.empty()) {
                         assert(type == DEVPROP_TYPE_STRING);
                         auto id = as_wstring_view(prop);
                         wprintf(L"%s\n", id.data());
@@ -274,7 +285,7 @@ auto uninstall_device(
         }
 
         return false;
-};
+}
 
 /*
  * pnputil /remove-device /deviceid <HWID>
@@ -307,7 +318,10 @@ auto remove_devnode(_In_ devnode_remove_args &r)
         bool reboot{};
         auto f = [&r, &reboot] (auto di, auto &dd) { return uninstall_device(di, dd, r, reboot); };
 
-        enum_device_info(di.get(), f);
+        if (auto err = enum_device_info(di.get(), f)) {
+                errmsg("SetupDiEnumDeviceInfo", L"", err);
+        }
+                
         if (reboot) {
                 prompt_reboot();
         }
