@@ -14,10 +14,10 @@ PnpLockDown=1
 DefaultDestDir = 13 ; Driver package isolation
 
 [SourceDisksNames]
-1 = "USBip UDE Installation Disk",,,""
+1 = "USBip UDE Installation Disk"
 
 [SourceDisksFiles]
-usbip2_ude.sys = 1,,
+usbip2_ude.sys = 1
 
 [Manufacturer]
 ; Windows 10, version 2004 and later
@@ -44,7 +44,7 @@ ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
 ServiceBinary  = %13%\usbip2_ude.sys ; Driver package isolation
-Dependencies   = ucx01000, udecx, tcpip ; usbip2_filter
+Dependencies   = ucx01000, udecx, tcpip
 AddReg         = ude_Device_Service_AddReg
 
 [ude_Device_Service_AddReg]
