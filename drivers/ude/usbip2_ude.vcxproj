@@ -81,7 +81,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
     <SupportsPackaging>
     </SupportsPackaging>
     <UdeDriver>true</UdeDriver>
@@ -90,14 +90,14 @@
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
     <KMDF_MINIMUM_VERSION_REQUIRED>
     </KMDF_MINIMUM_VERSION_REQUIRED>
-    <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
+    <KMDF_VERSION_MINOR>27</KMDF_VERSION_MINOR>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
     <SupportsPackaging>
     </SupportsPackaging>
     <UdeDriver>true</UdeDriver>
@@ -106,7 +106,7 @@
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
     <KMDF_MINIMUM_VERSION_REQUIRED>
     </KMDF_MINIMUM_VERSION_REQUIRED>
-    <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
+    <KMDF_VERSION_MINOR>27</KMDF_VERSION_MINOR>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -137,6 +137,7 @@
       <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
       <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <DriverSign>
       <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
@@ -157,6 +158,7 @@
       <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
       <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <DriverSign>
       <FileDigestAlgorithm>certHash</FileDigestAlgorithm>

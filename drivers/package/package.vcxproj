@@ -38,7 +38,7 @@
     <SupportsPackaging>
     </SupportsPackaging>
     <TargetVersion>Windows10</TargetVersion>
-    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -51,7 +51,7 @@
     <SupportsPackaging>
     </SupportsPackaging>
     <TargetVersion>Windows10</TargetVersion>
-    <_NT_TARGET_VERSION>0xA000008</_NT_TARGET_VERSION>
+    <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>

@@ -21,7 +21,7 @@
 - UDE and WDM drivers can be installed and used together on the same PC, just make sure you use the appropriate usbip.exe for each one
 
 ## Requirements
-- Windows 10 x64 Version [2004](https://en.wikipedia.org/wiki/Windows_10,_version_2004) (OS build 19041) and later
+- Windows 10 x64 Version [1809](https://en.wikipedia.org/wiki/Windows_10,_version_1809) (OS build 17763) and later
 - Server must support USB/IP protocol v.1.1.1
 
 ## Key features
@@ -41,7 +41,7 @@
 - Userspace code is fully rewritten (libusbip and usbip utility)
 - SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
-- Windows 10, version 2004 or later is required
+- Windows 10 version 1809 or later is required
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
 - Server (stub driver) is removed
@@ -122,12 +122,25 @@ port 1 is successfully detached
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
 - If an uninstaller is corrupted, run these commands as Administrator
+- **If you copy commands to a .bat file, double '%' in FOR statement**
 ```
-rem "C:\Program Files\USBip\classfilter" remove upper "{36FC9E60-C465-11CF-8056-444553540000}" usbip2_filter
-devcon classfilter usb upper !usbip2_filter
-pnputil /remove-device /deviceid ROOT\USBIP_WIN2\UDE /subtree
-FOR /f %P IN ('findstr /M /L "Manufacturer=\"USBIP-WIN2\"" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
-rd /S /Q "C:\Program Files\USBip"
+set APPDIR=C:\Program Files\USBip
+set FILTER=usbip2_filter
+
+classfilter remove upper USB %FILTER%
+rem devcon classfilter usb upper !%FILTER%
+
+devnode remove ROOT\USBIP_WIN2\UDE root
+rem pnputil /remove-device /deviceid ROOT\USBIP_WIN2\UDE /subtree
+
+rem WARNING: '%' must be doubled if you run this command in a .bat file
+FOR /f %P IN ('findstr /M /L "CatalogFile=usbip2_ude.cat" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
+
+rem path with spaces, two commands, it's OK
+RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 %APPDIR%\%FILTER%.inf
+RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 %APPDIR%\%FILTER%.inf
+
+rd /S /Q "%APPDIR%"
 ```
 
 ## Obtaining USB/IP logs on Windows
@@ -150,7 +163,7 @@ tracelog.exe -start %NAME%-ude -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %N
 ```
 - Reproduce the issue
 - Stop log sessions and get plain text logs (run commands as Administrator)
-- **If you copy commands to .bat file, double '%' in TRACE_FORMAT_PREFIX**
+- **If you copy commands to a .bat file, double '%' in TRACE_FORMAT_PREFIX**
 ```
 set NAME=usbip
 set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:

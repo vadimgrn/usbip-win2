@@ -108,7 +108,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const URB &urb)
 {
 	if (auto &hdr = urb.UrbHeader;
-	    auto buf = unique_ptr(POOL_FLAG_NON_PAGED | POOL_FLAG_UNINITIALIZED, hdr.Length)) {
+	    auto buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, hdr.Length)) {
 		RtlCopyMemory(buf.get(), &urb, hdr.Length);
 		send_request(fltr, lck, buf, hdr.Function);
 	} else {
@@ -128,7 +128,7 @@ void select_configuration(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
 
-	if (ULONG len{}; unique_ptr buf = clone(len, r, POOL_FLAG_NON_PAGED, unique_ptr::pooltag)) {
+	if (ULONG len{}; unique_ptr buf = clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)) {
 		send_request(fltr, lck, buf, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);

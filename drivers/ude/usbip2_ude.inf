@@ -7,7 +7,7 @@ Signature="$WINDOWS NT$"
 Class=USB
 ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; Devguid.h, GUID_DEVCLASS_USB, USB host controllers and USB hubs
 Provider=%Manufacturer%
-CatalogFile=usbip2_ude.cat
+CatalogFile=usbip2_ude.cat ; do not modify, used by setup.iss for searching drivers for uninstallation
 PnpLockDown=1
 
 [DestinationDirs]
@@ -20,11 +20,11 @@ DefaultDestDir = 13 ; Driver package isolation
 usbip2_ude.sys = 1
 
 [Manufacturer]
-; Windows 10, version 2004 and later
+; Windows 10, version 1809 and later
 ; For Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
-%Manufacturer%=Standard,NT$ARCH$.10.0...19041
+%Manufacturer%=Standard,NT$ARCH$.10.0...17763
 
-[Standard.NT$ARCH$.10.0...19041]
+[Standard.NT$ARCH$.10.0...17763]
 %DisplayName%=ude_Device, ROOT\USBIP_WIN2\UDE
 
 [ude_Device.NT]
@@ -56,5 +56,5 @@ HKR,Parameters\Wdf,VerboseOn,0x00010001,1
 ; HKR,Parameters,ImportedDevices,0x00010000,"192.168.1.15,3240,3-1","192.168.1.15,3240,1-1.3"
 
 [Strings]
-Manufacturer="USBIP-WIN2" ; do not modify, used by setup.iss for searching drivers for uninstallation
+Manufacturer="USBIP-WIN2"
 DisplayName="USBip 3.X Emulated Host Controller" ; for device and service

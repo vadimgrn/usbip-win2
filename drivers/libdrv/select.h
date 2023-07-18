@@ -28,6 +28,6 @@ const char *select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERF
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _URB_SELECT_CONFIGURATION *clone(
-	_Out_ ULONG &size, _In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_FLAGS flags, _In_ ULONG pooltag);
+	_Out_ ULONG &size, _In_ const _URB_SELECT_CONFIGURATION &src, _In_ POOL_TYPE pool_type, _In_ ULONG pooltag);
 
 } // namespace libdrv

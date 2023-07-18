@@ -44,7 +44,7 @@ PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 	PAGED_CODE();
 
 	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
-	auto dst = (DEVICE_RELATIONS*)ExAllocatePool2(POOL_FLAG_PAGED | POOL_FLAG_UNINITIALIZED, sz, pooltag);
+	auto dst = (DEVICE_RELATIONS*)ExAllocatePoolUninitialized(PagedPool, sz, pooltag);
 
 	if (dst) {
 		RtlCopyMemory(dst, &src, sz);

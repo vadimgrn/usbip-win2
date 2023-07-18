@@ -11,11 +11,26 @@ namespace libdrv
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS utf8_to_unicode(_Out_ UNICODE_STRING &dst, _In_ const char *utf8, _In_ USHORT maxlen);
+PAGED NTSTATUS unicode_to_utf8(_Out_ UTF8_STRING &dst, _In_ const UNICODE_STRING &src);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS unicode_to_utf8(_Out_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS utf8_to_unicode(
+        _Out_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS utf8_to_unicode(
+        _Out_ UNICODE_STRING &dst, _In_ const char *utf8, _In_ USHORT maxlen, 
+        _In_ POOL_TYPE pooltype, _In_ ULONG pooltag);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void FreeUnicodeString(_Inout_ UNICODE_STRING &s, _In_ ULONG pooltag);
 
 constexpr auto empty(_In_ const UNICODE_STRING &s) { return !s.Length; }
 
