@@ -2,7 +2,7 @@
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USB/IP server at least for kernels 4.19 - 5.19
+- Works with Linux USB/IP server at least for kernels 4.19 - 6.2
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 
@@ -134,7 +134,7 @@ devnode remove ROOT\USBIP_WIN2\UDE root
 rem pnputil /remove-device /deviceid ROOT\USBIP_WIN2\UDE /subtree
 
 rem WARNING: '%' must be doubled if you run this command in a .bat file
-FOR /f %P IN ('findstr /M /L "CatalogFile=usbip2_ude.cat" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
+FOR /f %P IN ('findstr /M /L ROOT\USBIP_WIN2\UDE C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
 
 rem path with spaces, two commands, it's OK
 RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 %APPDIR%\%FILTER%.inf

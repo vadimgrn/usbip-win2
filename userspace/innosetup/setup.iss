@@ -33,7 +33,7 @@
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
 #define ClassName "USB" ; see usbip2_ude.inf, usbip2_filter.inf
-#define UdeHwid "ROOT\USBIP_WIN2\UDE"
+#define HWID "ROOT\USBIP_WIN2\UDE"
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
 
@@ -82,16 +82,12 @@ Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 Name: "pdb"; Description: "Program DataBase files"; Types: full custom
 
 [Files]
+
 Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
 
-Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
-Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
-Source: {#BuildDir + "libusbip.dll"}; DestDir: "{tmp}"; Components: main
-Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
-
-Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
+Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
@@ -103,6 +99,10 @@ Source: {#BuildDir + "libusbip.exp"}; DestDir: "{app}\lib"; Components: sdk
 
 Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip.pdb, libusbip_check.pdb"; Components: pdb
 Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
+
+Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
+Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
+Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
@@ -118,7 +118,7 @@ Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection Defau
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
 Filename: {app}\classfilter.exe; Parameters: "add upper {#ClassName} {#FilterDriver}"; Flags: runhidden
 
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#UdeHwid}"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#HWID}"; Flags: runhidden
 
 [UninstallRun]
 
@@ -127,10 +127,10 @@ Filename: {app}\usbip.exe; Parameters: "detach --all"; Flags: runhidden
 Filename: {app}\classfilter.exe; Parameters: "remove upper {#ClassName} {#FilterDriver}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
-Filename: {app}\devnode.exe; Parameters: "remove {#UdeHwid} root"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove {#HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""CatalogFile={#UdeDriver}.cat"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
 ; FIXME: C:\WINDOWS\system32\DRIVERS\usbip2_filter.sys is left after uninstall.
 ; The first command detects that "usbip2_filter.sys still in use by 1 source" and reinstalls(!) usbip2_filter.
