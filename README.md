@@ -142,6 +142,19 @@ RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 %APPDIR%\%FILT
 
 rd /S /Q "%APPDIR%"
 ```
+### Enable test signing without removing USB/IP
+- usbip2_filter driver must be disabled, otherwise all USB controllers/devices will not work
+```
+bcdedit.exe /set testsigning off
+"C:\Program Files\USBip\classfilter.exe" remove upper USB usbip2_filter
+```
+- To enable it again
+```
+bcdedit.exe /set testsigning on
+"C:\Program Files\USBip\classfilter.exe" add upper USB usbip2_filter
+```
+- See also
+  - HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class{36fc9e60-c465-11cf-8056-444553540000}, UpperFilters
 
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used
