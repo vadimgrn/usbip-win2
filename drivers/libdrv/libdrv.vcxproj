@@ -91,7 +91,7 @@
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\..\userspace;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/kernel /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
@@ -114,7 +114,7 @@
       <WppKernelMode>true</WppKernelMode>
       <AdditionalIncludeDirectories>..\..\include;..\..\userspace;$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <PreprocessorDefinitions>_NO_CRT_STDIO_INLINE;POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/kernel /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
