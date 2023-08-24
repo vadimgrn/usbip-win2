@@ -7,7 +7,7 @@
 #include "generic_handle.h"
 
 #include <cassert>
-#include <windows.h>
+#include <winreg.h>
 
 namespace usbip
 {

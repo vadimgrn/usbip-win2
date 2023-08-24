@@ -6,10 +6,10 @@
 #include <cfgmgr32.h>
 #include <newdev.h>
 #include <regstr.h>
-#include <combaseapi.h>
+#include <ks.h>
 
 #include <libusbip\hkey.h>
-#include <libusbip\hdevinfo.h>
+#include <libusbip\setupapi.h>
 #include <libusbip\format_message.h>
 
 #include <libusbip\src\strconv.h>
@@ -45,12 +45,9 @@ struct devnode_remove_args
 
 struct classfilter_args
 {
-        std::string_view level;
-        std::wstring class_name;
-        std::wstring driver_name;
+        std::wstring infpath;
+        std::wstring section_name;
 };
-
-auto &opt_upper = "upper";
 
 using command_f = std::function<bool()>;
 
@@ -77,23 +74,6 @@ auto get_version(_In_ const wchar_t *program)
         return wchar_to_utf8(ver); // CLI::narrow(ver)
 }
 
-auto split_multi_sz(_In_opt_ PCWSTR str, _In_ std::wstring_view exclude, _Inout_ bool &excluded)
-{
-        std::vector<std::wstring> v;
-
-        while (str && *str) {
-                std::wstring_view s(str);
-                if (s == exclude) {
-                        excluded = true;
-                } else {
-                        v.emplace_back(s);
-                }
-                str += s.size() + 1; // skip L'\0'
-        }
-
-        return v;
-}
-
 /*
  * @return REG_MULTI_SZ 
  */
@@ -104,39 +84,18 @@ auto make_hwid(_In_ std::wstring hwid)
         return hwid;
 }
 
-auto read_multi_z(_In_ HKEY key, _In_ LPCWSTR val_name, _Out_ std::vector<WCHAR> &val)
+auto get_class_guid(_Out_ std::wstring &class_name, _In_ PCWSTR infname)
 {
-        for (auto val_sz = DWORD(val.size()); ; ) {
-                switch (auto err = RegGetValue(key, nullptr, val_name, RRF_RT_REG_MULTI_SZ, nullptr, 
-                                               reinterpret_cast<BYTE*>(val.data()), &val_sz)) {
-                case ERROR_FILE_NOT_FOUND: // val_name
-                        val.clear();
-                        [[fallthrough]];
-                case ERROR_SUCCESS:
-                        return true;
-                case ERROR_MORE_DATA:
-                        val.resize(val_sz);
-                        break;
-                default:
-                        errmsg("RegGetValue", val_name, err);
-                        return false;
-                }
-        }
-}
+        auto guid = GUID_NULL;
 
-auto get_class_guid(_Out_ GUID &guid, _In_ const std::wstring &name)
-{
-        DWORD guids_cnt{};
-        bool ok = SetupDiClassGuidsFromName(name.c_str(), &guid, 1, &guids_cnt);
-
-        if (!ok) {
-                errmsg("SetupDiClassGuidsFromName", name.c_str());
-        } else if (ok = guids_cnt == 1; !ok) {
-                fwprintf(stderr, L"SetupDiClassGuidsFromName: %lu GUIDs associated with the class name '%s'\n", 
-                                   guids_cnt, name.c_str());
+        if (WCHAR name[MAX_CLASS_NAME_LEN]; SetupDiGetINFClass(infname, &guid, name, ARRAYSIZE(name), nullptr)) {
+                class_name = name;
+        } else {
+                errmsg("SetupDiGetINFClass", infname);
+                assert(guid == GUID_NULL);
         }
 
-        return ok;
+        return guid;
 }
 
 void prompt_reboot()
@@ -214,23 +173,22 @@ inline auto as_wstring_view(_In_ std::vector<BYTE> &v) noexcept
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-auto install_devnode_and_driver(_In_ devnode_install_args &r)
+auto install_devnode_and_driver(_In_ const devnode_install_args &r)
 {
-        GUID ClassGUID;
-        WCHAR ClassName[MAX_CLASS_NAME_LEN];
-        if (!SetupDiGetINFClass(r.infpath.c_str(), &ClassGUID, ClassName, ARRAYSIZE(ClassName), 0)) {
-                errmsg("SetupDiGetINFClass", r.infpath.c_str());
+        std::wstring class_name;
+        auto class_guid = get_class_guid(class_name, r.infpath.c_str());
+        if (class_guid == GUID_NULL) {
                 return false;
         }
 
-        hdevinfo dev_list(SetupDiCreateDeviceInfoList(&ClassGUID, nullptr));
+        hdevinfo dev_list(SetupDiCreateDeviceInfoList(&class_guid, nullptr));
         if (!dev_list) {
-                errmsg("SetupDiCreateDeviceInfoList", ClassName);
+                errmsg("SetupDiCreateDeviceInfoList", class_name.c_str());
                 return false;
         }
 
         SP_DEVINFO_DATA dev_data{ .cbSize = sizeof(dev_data) };
-        if (!SetupDiCreateDeviceInfo(dev_list.get(), ClassName, &ClassGUID, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
+        if (!SetupDiCreateDeviceInfo(dev_list.get(), class_name.c_str(), &class_guid, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
                 errmsg("SetupDiCreateDeviceInfo");
                 return false;
         }
@@ -338,48 +296,121 @@ auto remove_devnode(_In_ devnode_remove_args &r)
 }
 
 /*
- * devcon classfilter usb upper ; query
- * devcon classfilter usb upper !usbip2_filter ; remove
- * @see devcon, cmdClassFilter
+ * Performs CopyFiles, DelFiles, RenFiles sections that are listed by an Install section.
  */
-auto classfilter(_In_ classfilter_args &r, _In_ bool add)
+auto install_files(_In_ HINF hinf, _In_ const std::wstring &section_name, _In_ bool install)
 {
-        GUID ClassGUID{};
-        if (!get_class_guid(ClassGUID, r.class_name)) {
+        HspFileQ fileq(SetupOpenFileQueue());
+        if (!fileq) {
+                errmsg("SetupOpenFileQueue");
                 return false;
         }
 
-        HKey key(SetupDiOpenClassRegKeyEx(&ClassGUID, KEY_QUERY_VALUE | KEY_SET_VALUE, DIOCR_INSTALLER, nullptr, nullptr));
-        if (!key) {
-                errmsg("SetupDiOpenClassRegKeyEx", r.class_name.c_str());
+        if (UINT copy_flags = install ? SP_COPY_IN_USE_NEEDS_REBOOT | SP_COPY_NOSKIP : 0;
+            !SetupInstallFilesFromInfSection(hinf, nullptr, fileq.get(), section_name.c_str(), nullptr, copy_flags)) {
+                errmsg("SetupInstallFilesFromInfSection", section_name.c_str());
                 return false;
         }
 
-        auto val_name = r.level == opt_upper ? REGSTR_VAL_UPPERFILTERS : REGSTR_VAL_LOWERFILTERS;
-        std::vector<WCHAR> val(4096);
-        if (!read_multi_z(key.get(), val_name, val)) {
+        using ctx_t = std::unique_ptr<void, decltype(SetupTermDefaultQueueCallback)&>;
+
+        ctx_t ctx(SetupInitDefaultQueueCallback(nullptr), SetupTermDefaultQueueCallback);
+        if (!ctx) {
+                errmsg("SetupInitDefaultQueueCallback");
                 return false;
         }
 
-        auto modified = add;
-        auto filters = split_multi_sz(val.empty() ? nullptr : val.data(), r.driver_name, modified);
-        if (add) {
-                filters.emplace_back(r.driver_name);
-        }
-
-        if (!modified) {
-                return true;
-        }
-
-        if (auto str = make_multi_sz(filters); 
-            auto err = RegSetValueEx(key.get(), val_name, 0, REG_MULTI_SZ,
-                                     reinterpret_cast<const BYTE*>(str.data()), 
-                                     DWORD(str.length()*sizeof(str[0])))) {
-                errmsg("RegSetValueEx", val_name, err);
+        if (!SetupCommitFileQueue(nullptr, fileq.get(), SetupDefaultQueueCallback, ctx.get())) {
+                errmsg("SetupCommitFileQueue");
                 return false;
         }
 
         return true;
+}
+
+/*
+ * Performs service installation and deletion operations that are specified 
+ * in the Service Install sections listed in the Service section of an INF file.
+ */
+auto install_services(
+        _Out_ bool &reboot_required, _In_ HINF hinf, _In_ std::wstring section_name, _In_ bool install)
+{
+        section_name += L".Services";
+        DWORD flags = install ? 0 : SPSVCINST_STOPSERVICE;
+
+        if (SetLastError(ERROR_SUCCESS);
+            !SetupInstallServicesFromInfSection(hinf, section_name.c_str(), flags)) {
+                errmsg("SetupInstallServicesFromInfSection", section_name.c_str());
+                return false;
+        }
+
+        reboot_required = GetLastError() == ERROR_SUCCESS_REBOOT_REQUIRED;
+        return true;
+}
+
+/*
+ * Perform registry operations AddReg, DelReg in the Install section being processed.
+ */
+auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
+{
+        std::wstring class_name;
+        auto class_guid = get_class_guid(class_name, r.infpath.c_str());
+        if (class_guid == GUID_NULL) {
+                return false; 
+        }
+
+        HKey key(SetupDiOpenClassRegKey(&class_guid, KEY_ALL_ACCESS));
+        if (!key) {
+                errmsg("SetupDiOpenClassRegKey", class_name.c_str());
+                return false;
+        }
+
+        if (!SetupInstallFromInfSection(nullptr, hinf, r.section_name.c_str(), SPINST_REGISTRY, key.get(),
+                        nullptr, // SourceRootPath
+                        0, // CopyFlags if Flags includes SPINST_FILES
+                        nullptr, // MsgHandler
+                        nullptr, // Context
+                        nullptr, // DeviceInfoSet
+                        nullptr)) { // DeviceInfoData
+                errmsg("SetupInstallFromInfSection", r.section_name.c_str());
+                return false;
+        }
+
+        return true;
+}
+
+/*
+ * RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultInstall 128 usbip2_filter.inf
+ * does the same except for:
+ * 1.AddReg is not executed for [DefaultInstall.NT$ARCH$].
+ * 2.The driver package is installed in the driver store.
+ *
+ * RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 usbip2_filter.inf
+ * The first command detects that "usbip2_filter.sys still in use by 1 source" and reinstalls usbip2_filter.
+ * As a result, the driver package is removed, but usbip2_filter service and usbip2_filter.sys are left.
+ * The second command removes the service, but still can't remove usbip2_filter.sys (Error 5: Access is denied).
+ * 
+ * @see C:\Windows\INF\setupapi.*.log
+ */
+auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
+{
+        HInf inf(SetupOpenInfFile(r.infpath.c_str(), nullptr, INF_STYLE_WIN4, nullptr));
+        if (!inf) {
+                errmsg("SetupOpenInfFile", r.infpath.c_str());
+                return false;
+        }
+
+        bool reboot_required{};
+
+        auto ok = install_files(inf.get(), r.section_name, install) &&
+                  install_services(reboot_required, inf.get(), r.section_name, install) &&
+                  install_registry(inf.get(), r);
+
+        if (ok && reboot_required) {
+                prompt_reboot();
+        }
+        
+        return ok;
 }
 
 void add_devnode_install_cmd(_In_ CLI::App &app)
@@ -387,7 +418,7 @@ void add_devnode_install_cmd(_In_ CLI::App &app)
         static devnode_install_args r;
         auto cmd = app.add_subcommand("install", "Install a device node and its driver");
 
-        cmd->add_option("infpath", r.infpath, "Path to driver .inf file")
+        cmd->add_option("infpath", r.infpath, "Path to the driver's .inf file")
                 ->check(CLI::ExistingFile)
                 ->required();
 
@@ -421,20 +452,20 @@ void add_devnode_cmds(_In_ CLI::App &app)
 void add_classfilter_cmds(_In_ CLI::App &app)
 {
         static classfilter_args r;
-        auto &cmd_add = "add";
+        auto &install = "install";
 
-        for (auto action: {cmd_add, "remove"}) {
-
+        for (auto action: {install, "uninstall"}) {
                 auto cmd = app.add_subcommand(action, std::string(action) + " class filter driver");
 
-                cmd->add_option("Level", r.level)
-                        ->check(CLI::IsMember({opt_upper, "lower"}))
+                cmd->add_option("infpath", r.infpath, "Path to the driver's .inf file")
+                        ->check(CLI::ExistingFile)
                         ->required();
 
-                cmd->add_option("ClassName", r.class_name, "A name of a device setup class")->required();
-                cmd->add_option("DriverName", r.driver_name, "Filter driver name")->required();
+                cmd->add_option("section_name", r.section_name, 
+                        "The name of the " + std::string(action) + " section that lists CopyFiles/DelFiles/RenFiles sections")
+                        ->required();
 
-                auto f = [&r = r, add = action == cmd_add] { return classfilter(r, add); };
+                auto f = [&r = r, install = action == install] { return classfilter_install(r, install); };
                 cmd->callback(pack(std::move(f)));
         }
 }

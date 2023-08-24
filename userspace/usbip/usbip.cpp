@@ -6,7 +6,7 @@
 #include "resource.h"
 
 #include <libusbip\output.h>
-#include <libusbip\hmodule.h>
+#include <libusbip\win_handle.h>
 #include <libusbip\win_socket.h>
 #include <libusbip\format_message.h>
 #include <libusbip\vhci.h>

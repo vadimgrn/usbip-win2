@@ -122,23 +122,20 @@ port 1 is successfully detached
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
 - If an uninstaller is corrupted, run these commands as Administrator
-- **If you copy commands to a .bat file, double '%' in FOR statement**
+- **If you copy commands to a .bat file, double '%' in FOR statements**
 ```
+set HWID=ROOT\USBIP_WIN2\UDE
 set APPDIR=C:\Program Files\USBip
-set FILTER=usbip2_filter
+set OEMDIR=C:\WINDOWS\INF\oem*.inf
 
-classfilter remove upper USB %FILTER%
-rem devcon classfilter usb upper !%FILTER%
+"%APPDIR%\usbip.exe" detach --all
 
-devnode remove ROOT\USBIP_WIN2\UDE root
-rem pnputil /remove-device /deviceid ROOT\USBIP_WIN2\UDE /subtree
+"%APPDIR%\devnode.exe" remove %HWID% root
+rem pnputil.exe /remove-device /deviceid %HWID% /subtree
 
 rem WARNING: '%' must be doubled if you run this command in a .bat file
-FOR /f %P IN ('findstr /M /L ROOT\USBIP_WIN2\UDE C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
-
-rem path with spaces, two commands, it's OK
-RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 %APPDIR%\%FILTER%.inf
-RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 %APPDIR%\%FILTER%.inf
+FOR /f %P IN ('findstr /M /L %HWID% %OEMDIR%') DO pnputil.exe /delete-driver %~nxP /uninstall
+FOR /f %P IN ('findstr /M /L usbip2_filter.cat %OEMDIR%') DO "%APPDIR%\classfilter.exe" uninstall "%P" DefaultUninstall.NTamd64 & pnputil.exe /delete-driver %~nxP
 
 rd /S /Q "%APPDIR%"
 ```

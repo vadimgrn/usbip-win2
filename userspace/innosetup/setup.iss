@@ -12,6 +12,10 @@
         #error Use option /DConfiguration=<cfg>
 #endif
 
+#ifndef CpuArch
+        #error Use option /DCpuArch=<ARCH>
+#endif
+
 #ifdef ExePath
         #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 #else
@@ -32,7 +36,7 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define ClassName "USB" ; see usbip2_ude.inf, usbip2_filter.inf
+#define INF_DIR "{win}\INF\oem*.inf"
 #define HWID "ROOT\USBIP_WIN2\UDE"
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
@@ -87,7 +91,6 @@ Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Com
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
-Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
@@ -113,33 +116,22 @@ Name: modifypath; Description: "Add to &PATH environment variable for all users"
 Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist 
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
-Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultInstall 128 {tmp}\{#FilterDriver}.inf"; Flags: runhidden
-
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
-Filename: {app}\classfilter.exe; Parameters: "add upper {#ClassName} {#FilterDriver}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden
 
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf"; Flags: runhidden
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#HWID}"; Flags: runhidden
 
 [UninstallRun]
 
 Filename: {app}\usbip.exe; Parameters: "detach --all"; Flags: runhidden
-
-Filename: {app}\classfilter.exe; Parameters: "remove upper {#ClassName} {#FilterDriver}"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
-
 Filename: {app}\devnode.exe; Parameters: "remove {#HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {#INF_DIR}') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
-; FIXME: C:\WINDOWS\system32\DRIVERS\usbip2_filter.sys is left after uninstall.
-; The first command detects that "usbip2_filter.sys still in use by 1 source" and reinstalls(!) usbip2_filter.
-; As a result, the driver package is removed, but usbip2_filter service and usbip2_filter.sys are left.
-; The second command removes the service, but still can't remove usbip2_filter.sys (Error 5: Access is denied).
-; @see C:\Windows\INF\setupapi.*.log
-
-Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 {app}\{#FilterDriver}.inf"; Flags: runhidden
-Filename: {sys}\RUNDLL32.EXE; Parameters: "SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 {app}\{#FilterDriver}.inf"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#FilterDriver}.cat {#INF_DIR}') DO ""{app}\classfilter.exe"" uninstall ""%P"" DefaultUninstall.NT{#CpuArch} & {sys}\pnputil.exe /delete-driver %~nxP"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
 
