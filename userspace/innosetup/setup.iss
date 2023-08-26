@@ -36,10 +36,10 @@
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 
-#define INF_DIR "{win}\INF\oem*.inf"
-#define HWID "ROOT\USBIP_WIN2\UDE"
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
+
+#define HWID "ROOT\USBIP_WIN2\UDE"
 
 #define CertFile "usbip.pfx"
 #define CertName "USBip"
@@ -91,6 +91,7 @@ Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Com
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
+Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
@@ -119,7 +120,6 @@ Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root 
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
 Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf"; Flags: runhidden
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#HWID}"; Flags: runhidden
 
 [UninstallRun]
@@ -128,9 +128,9 @@ Filename: {app}\usbip.exe; Parameters: "detach --all"; Flags: runhidden
 Filename: {app}\devnode.exe; Parameters: "remove {#HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {#INF_DIR}') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#FilterDriver}.cat {#INF_DIR}') DO ""{app}\classfilter.exe"" uninstall ""%P"" DefaultUninstall.NT{#CpuArch} & {sys}\pnputil.exe /delete-driver %~nxP"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden

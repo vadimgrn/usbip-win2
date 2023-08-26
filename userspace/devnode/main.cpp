@@ -306,8 +306,8 @@ auto install_files(_In_ HINF hinf, _In_ const std::wstring &section_name, _In_ b
                 return false;
         }
 
-        if (UINT copy_flags = install ? SP_COPY_IN_USE_NEEDS_REBOOT | SP_COPY_NOSKIP : 0;
-            !SetupInstallFilesFromInfSection(hinf, nullptr, fileq.get(), section_name.c_str(), nullptr, copy_flags)) {
+        if (UINT flags = install ? SP_COPY_IN_USE_NEEDS_REBOOT | SP_COPY_NOSKIP : 0;
+            !SetupInstallFilesFromInfSection(hinf, nullptr, fileq.get(), section_name.c_str(), nullptr, flags)) {
                 errmsg("SetupInstallFilesFromInfSection", section_name.c_str());
                 return false;
         }
@@ -336,10 +336,9 @@ auto install_services(
         _Out_ bool &reboot_required, _In_ HINF hinf, _In_ std::wstring section_name, _In_ bool install)
 {
         section_name += L".Services";
-        DWORD flags = install ? 0 : SPSVCINST_STOPSERVICE;
 
         if (SetLastError(ERROR_SUCCESS);
-            !SetupInstallServicesFromInfSection(hinf, section_name.c_str(), flags)) {
+            !SetupInstallServicesFromInfSection(hinf, section_name.c_str(), install ? 0 : SPSVCINST_STOPSERVICE)) {
                 errmsg("SetupInstallServicesFromInfSection", section_name.c_str());
                 return false;
         }
@@ -359,7 +358,7 @@ auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
                 return false; 
         }
 
-        HKey key(SetupDiOpenClassRegKey(&class_guid, KEY_ALL_ACCESS));
+        HKey key(SetupDiOpenClassRegKey(&class_guid, KEY_WRITE));
         if (!key) {
                 errmsg("SetupDiOpenClassRegKey", class_name.c_str());
                 return false;
@@ -380,17 +379,10 @@ auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
 }
 
 /*
- * RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultInstall 128 usbip2_filter.inf
- * does the same except for:
- * 1.AddReg is not executed for [DefaultInstall.NT$ARCH$].
- * 2.The driver package is installed in the driver store.
- *
- * RUNDLL32.EXE SETUPAPI.DLL,InstallHinfSection DefaultUninstall 128 usbip2_filter.inf
- * The first command detects that "usbip2_filter.sys still in use by 1 source" and reinstalls usbip2_filter.
- * As a result, the driver package is removed, but usbip2_filter service and usbip2_filter.sys are left.
- * The second command removes the service, but still can't remove usbip2_filter.sys (Error 5: Access is denied).
- * 
- * @see C:\Windows\INF\setupapi.*.log
+ * Install a class filter driver
+ * To install a class-wide upper- or lower-filter for a device setup class,
+ * you can supply a device installation application that installs the necessary services. 
+ * @see https://learn.microsoft.com/en-us/windows-hardware/drivers/install/installing-a-filter-driver
  */
 auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
 {
@@ -401,12 +393,19 @@ auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
         }
 
         bool reboot_required{};
+        auto ok = true;
 
-        auto ok = install_files(inf.get(), r.section_name, install) &&
-                  install_services(reboot_required, inf.get(), r.section_name, install) &&
-                  install_registry(inf.get(), r);
+        if (install) {
+                ok = install_files(inf.get(), r.section_name, install) &&
+                     install_services(reboot_required, inf.get(), r.section_name, install) &&
+                     install_registry(inf.get(), r);
+        } else { // ignore errors
+                ok &= install_registry(inf.get(), r);
+                ok &= install_services(reboot_required, inf.get(), r.section_name, install);
+                ok &= install_files(inf.get(), r.section_name, install);
+        }
 
-        if (ok && reboot_required) {
+        if (reboot_required) {
                 prompt_reboot();
         }
         

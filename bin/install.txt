@@ -17,6 +17,4 @@ certutil -f -p usbip -importPFX root ..\..\drivers\package\usbip.pfx
 certutil -store root | findstr "USBip"
 
 classfilter install package\usbip2_filter.inf DefaultInstall.NTamd64
-pnputil /add-driver package\usbip2_filter.inf
-
 devnode install package\usbip2_ude.inf ROOT\USBIP_WIN2\UDE

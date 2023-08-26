@@ -26,22 +26,25 @@ DefaultDestDir = 12
 usbip2_filter.sys = 1
 
 [DefaultInstall.NT$ARCH$]
-CopyFiles = files_list
-AddReg = upperfilter_addreg
+CopyFiles = usbip2_filter_CopyFiles
+AddReg = usbip2_filter_AddReg
 
 [DefaultUninstall.NT$ARCH$]
 LegacyUninstall = 1
-DelFiles = files_list
-DelReg = upperfilter_delreg
+DelFiles = usbip2_filter_DelFiles
+DelReg = usbip2_filter_DelReg
 
-[files_list]
-usbip2_filter.sys
+[usbip2_filter_CopyFiles]
+usbip2_filter.sys,,,0x00004000 ; COPYFLG_IN_USE_RENAME
 
-[upperfilter_addreg]
+[usbip2_filter_DelFiles]
+usbip2_filter.sys,,,0x00000001 ; DELFLG_IN_USE
+
+[usbip2_filter_AddReg]
 ; append this service to existing REG_MULTI_SZ list, if any
 HKR,,UpperFilters,0x00010008,usbip2_filter
 
-[upperfilter_delreg]
+[usbip2_filter_DelReg]
 ; within a multistring registry entry, delete all strings matching a string value specified by value
 HKR,,UpperFilters,0x00018002,usbip2_filter
 

@@ -122,36 +122,37 @@ port 1 is successfully detached
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
 - If an uninstaller is corrupted, run these commands as Administrator
-- **If you copy commands to a .bat file, double '%' in FOR statements**
+- **If you copy commands to a .bat file, use %%P and %%~nxP in FOR statement**
 ```
-set HWID=ROOT\USBIP_WIN2\UDE
 set APPDIR=C:\Program Files\USBip
-set OEMDIR=C:\WINDOWS\INF\oem*.inf
+set HWID=ROOT\USBIP_WIN2\UDE
 
 "%APPDIR%\usbip.exe" detach --all
 
 "%APPDIR%\devnode.exe" remove %HWID% root
 rem pnputil.exe /remove-device /deviceid %HWID% /subtree
 
-rem WARNING: '%' must be doubled if you run this command in a .bat file
-FOR /f %P IN ('findstr /M /L %HWID% %OEMDIR%') DO pnputil.exe /delete-driver %~nxP /uninstall
-FOR /f %P IN ('findstr /M /L usbip2_filter.cat %OEMDIR%') DO "%APPDIR%\classfilter.exe" uninstall "%P" DefaultUninstall.NTamd64 & pnputil.exe /delete-driver %~nxP
+rem WARNING: use %%P and %%~nxP if you run this command in a .bat file
+FOR /f %P IN ('findstr /M /L %HWID% C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
 
+"%APPDIR%\classfilter.exe" uninstall "%APPDIR%\usbip2_filter.inf" DefaultUninstall.NTamd64
 rd /S /Q "%APPDIR%"
 ```
-### Enable test signing without removing USB/IP
+### Disable Windows Test Signing Mode without removing USB/IP
 - usbip2_filter driver must be disabled, otherwise all USB controllers/devices will not work
 ```
+devcon.exe classfilter usb upper !usbip2_filter
 bcdedit.exe /set testsigning off
-"C:\Program Files\USBip\classfilter.exe" remove upper USB usbip2_filter
 ```
 - To enable it again
 ```
+devcon.exe classfilter usb upper +usbip2_filter
 bcdedit.exe /set testsigning on
-"C:\Program Files\USBip\classfilter.exe" add upper USB usbip2_filter
 ```
-- See also
-  - HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{36fc9e60-c465-11cf-8056-444553540000}, UpperFilters
+- If devcon.exe is not installed
+  - Run regedit.exe
+  - Open key HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\\{36fc9e60-c465-11cf-8056-444553540000}
+  - Add or remove 'usbip2_filter' line to/from 'UpperFilters' multi-string value
 
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used
