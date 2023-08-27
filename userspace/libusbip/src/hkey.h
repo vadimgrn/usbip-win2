@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "generic_handle.h"
+#include "..\generic_handle.h"
 
 #include <cassert>
 #include <winreg.h>

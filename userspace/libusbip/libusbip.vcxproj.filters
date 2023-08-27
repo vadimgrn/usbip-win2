@@ -41,7 +41,6 @@
   <ItemGroup>
     <ClInclude Include="format_message.h" />
     <ClInclude Include="generic_handle.h" />
-    <ClInclude Include="hkey.h" />
     <ClInclude Include="output.h" />
     <ClInclude Include="remote.h" />
     <ClInclude Include="vhci.h" />
@@ -70,9 +69,16 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="persistent.h" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="generic_handle_ex.h" />
-    <ClInclude Include="setupapi.h" />
+    <ClInclude Include="setupapi.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="hkey.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="src">

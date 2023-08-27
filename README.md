@@ -152,7 +152,8 @@ bcdedit.exe /set testsigning on
 - If devcon.exe is not installed
   - Run regedit.exe
   - Open key HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\\{36fc9e60-c465-11cf-8056-444553540000}
-  - Add or remove 'usbip2_filter' line to/from 'UpperFilters' multi-string value
+  - Remove ```usbip2_filter``` line from ```UpperFilters``` multi-string value to disable the driver
+  - Add this line to enable the driver
 
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used

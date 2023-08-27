@@ -8,10 +8,10 @@
 #include <regstr.h>
 #include <ks.h>
 
-#include <libusbip\hkey.h>
-#include <libusbip\setupapi.h>
 #include <libusbip\format_message.h>
 
+#include <libusbip\src\hkey.h>
+#include <libusbip\src\setupapi.h>
 #include <libusbip\src\strconv.h>
 #include <libusbip\src\file_ver.h>
 

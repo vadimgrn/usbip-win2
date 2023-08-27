@@ -5,9 +5,9 @@
 // Test libusbip API for C++17 compatibility.
 
 #include <libusbip\format_message.h>
-#include <libusbip\setupapi.h>
 #include <libusbip\win_handle.h>
-#include <libusbip\hkey.h>
+#include <libusbip\src\setupapi.h>
+#include <libusbip\src\hkey.h>
 #include <libusbip\output.h>
 #include <libusbip\remote.h>
 #include <libusbip\vhci.h>
