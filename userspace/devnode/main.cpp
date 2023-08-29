@@ -379,9 +379,7 @@ auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
 }
 
 /*
- * Install a class filter driver
- * To install a class-wide upper- or lower-filter for a device setup class,
- * you can supply a device installation application that installs the necessary services. 
+ * Install a class filter driver.
  * @see https://learn.microsoft.com/en-us/windows-hardware/drivers/install/installing-a-filter-driver
  */
 auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
