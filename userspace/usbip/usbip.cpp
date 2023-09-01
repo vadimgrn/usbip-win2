@@ -121,14 +121,14 @@ void add_cmd_port(CLI::App &app)
 
 void init(CLI::App &app, const wchar_t *program)
 {
+	app.option_defaults()->always_capture_default();
 	app.set_version_flag("-V,--version", get_version(program));
 
 	app.add_flag("-d,--debug", 
 		     [] (auto) { spdlog::set_level(spdlog::level::debug); }, "Debug output");
 
 	app.add_option("-t,--tcp-port", global_args.tcp_port, "TCP/IP port number of USB/IP server")
-		->check(CLI::Range(1024, USHRT_MAX))
-		->capture_default_str();
+		->check(CLI::Range(1024, USHRT_MAX));
 }
 
 auto &msgtable_dll = L"resources"; // resource-only DLL that contains RT_MESSAGETABLE

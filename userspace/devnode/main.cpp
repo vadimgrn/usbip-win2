@@ -63,7 +63,8 @@ auto pack(command_f cmd)
 
 void errmsg(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastError())
 {
-        auto msg = wformat_message(err);
+        auto msg_id = HRESULT_FROM_SETUPAPI(err);
+        auto msg = wformat_message(msg_id);
         fwprintf(stderr, L"%S(%s) error %#lx %s\n", api, str, err, msg.c_str());
 }
 
@@ -473,6 +474,8 @@ void add_classfilter_cmds(_In_ CLI::App &app)
 int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
 {
         CLI::App app("usbip2 drivers installation utility");
+        
+        app.option_defaults()->always_capture_default();
         app.set_version_flag("-V,--version", get_version(*argv));
 
         auto &devnode = L"devnode";
