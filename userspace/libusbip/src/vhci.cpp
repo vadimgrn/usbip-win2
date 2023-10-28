@@ -18,16 +18,16 @@ namespace
 
 using namespace usbip;
 
-auto init(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const device_location &loc)
+auto assign(_Out_ vhci::imported_device_location &dst, _In_ const device_location &src)
 {
         struct {
                 char *dst;
                 size_t len;
                 const std::string &src;
         } const v[] = {
-                { r.busid, ARRAYSIZE(r.busid), loc.busid },
-                { r.service, ARRAYSIZE(r.service), loc.service },
-                { r.host, ARRAYSIZE(r.host), loc.hostname },
+                { dst.busid, ARRAYSIZE(dst.busid), src.busid },
+                { dst.service, ARRAYSIZE(dst.service), src.service },
+                { dst.host, ARRAYSIZE(dst.host), src.hostname },
         };
 
         for (auto &i: v) {
@@ -41,37 +41,54 @@ auto init(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const device_location &loc
         return true;
 }
 
+void assign(_Out_ device_location &dst, _In_ const vhci::imported_device_location &src)
+{
+        struct {
+                std::string &dst;
+                const char *src;
+                size_t maxlen;
+        } const v[] = {
+                { dst.hostname, src.host, ARRAYSIZE(src.host) },
+                { dst.service, src.service, ARRAYSIZE(src.service) },
+                { dst.busid, src.busid, ARRAYSIZE(src.busid) },
+        };
+
+        for (auto &i: v) {
+                i.dst.assign(i.src, strnlen(i.src, i.maxlen));
+        }
+}
+
+auto make_imported_device(_In_ const vhci::imported_device &s)
+{
+        imported_device d { 
+                // imported_device_location
+                .port = s.port,
+                // imported_device_properties
+                .devid = s.devid,
+                .speed = win_speed(s.speed),
+                .vendor = s.vendor,
+                .product = s.product,
+        };
+
+        assign(d.location, s);
+        return d;
+}
+
+auto make_device_state(_In_ const vhci::device_state &r)
+{
+        return device_state {
+                .device = make_imported_device(r),
+                .state = static_cast<device_state_t>(r.state)
+        };
+}
+
 void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_device *src, _In_ size_t cnt)
 {
         assert(dst.empty());
         dst.reserve(cnt);
 
         for (size_t i = 0; i < cnt; ++i) {
-                auto &s = src[i];
-                imported_device d { 
-                        // imported_device_location
-                        .port = s.port,
-                        // imported_device_properties
-                        .devid = s.devid,
-                        .speed = win_speed(s.speed),
-                        .vendor = s.vendor,
-                        .product = s.product,
-                };
-
-                {       // imported_device_location
-                        auto &loc = d.location;
-
-                        loc.hostname = s.host;
-                        assert(loc.hostname.size() < ARRAYSIZE(s.host));
-
-                        loc.service = s.service;
-                        assert(loc.service.size() < ARRAYSIZE(s.service));
-
-                        loc.busid = s.busid;
-                        assert(loc.busid.size() < ARRAYSIZE(s.busid));
-                }
-                
-                dst.push_back(std::move(d));
+                dst.push_back(make_imported_device(src[i]));
         }
 }
 
@@ -184,7 +201,7 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
 int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
 {
         ioctl::plugin_hardware r {{ .size = sizeof(r) }};
-        if (!init(r, location)) {
+        if (!assign(r, location)) {
                 SetLastError(ERROR_INVALID_PARAMETER);
                 return 0;
         }
@@ -212,4 +229,46 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 
         DWORD BytesReturned; // must be set if the last arg is NULL
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
+}
+
+#pragma warning(push)
+#pragma warning(disable:5054) // operator '==': deprecated between enumerations of different types
+static_assert(usbip::device_state_t::unplugged == usbip::vhci::device_state_t::unplugged);
+static_assert(usbip::device_state_t::connecting == usbip::vhci::device_state_t::connecting);
+static_assert(usbip::device_state_t::connected == usbip::vhci::device_state_t::connected);
+static_assert(usbip::device_state_t::plugged == usbip::vhci::device_state_t::plugged);
+static_assert(usbip::device_state_t::disconnected == usbip::vhci::device_state_t::disconnected);
+static_assert(usbip::device_state_t::unplugging == usbip::vhci::device_state_t::unplugging);
+#pragma warning(pop)
+
+USBIP_API DWORD usbip::vhci::get_device_state_size() noexcept
+{
+        return sizeof(vhci::device_state);
+}
+
+USBIP_API bool usbip::vhci::get_device_state(
+        _Out_ usbip::device_state &result, _In_ const void *data, _In_ DWORD length)
+{
+        auto r = reinterpret_cast<const vhci::device_state*>(data);
+        assert(get_device_state_size() == sizeof(*r));
+
+        if (!(r && length == sizeof(*r))) {
+                SetLastError(STATUS_INVALID_PARAMETER);
+                return false;
+        } else if (r->size != sizeof(*r)) {
+                SetLastError(USBIP_ERROR_ABI);
+                return false;
+        }
+
+        result = make_device_state(*r);
+        return true;
+}
+
+bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Out_ usbip::device_state &result)
+{
+        vhci::device_state r;
+        DWORD actual;
+
+        return ReadFile(dev, &r, sizeof(r), &actual, nullptr) && 
+               get_device_state(result, &r, actual);
 }

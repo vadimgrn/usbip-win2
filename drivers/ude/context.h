@@ -50,6 +50,10 @@ struct vhci_ctx
         UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 
+        LIST_ENTRY fileobjects; // @see fileobject_ctx::entry
+        WDFQUEUE read_requests; // IRP_MJ_READ
+        WDFWAITLOCK events_lock;
+
         _KTHREAD *attach_thread;
         KEVENT attach_thread_stop;
 };
@@ -141,6 +145,7 @@ inline auto& get_device(_In_ WDFQUEUE queue) // for device_ctx.queue
         return *WdfObjectGet_UDECXUSBDEVICE(queue);
 }
 
+
 /*
  * Context space for UDECXUSBENDPOINT.
  */
@@ -167,6 +172,7 @@ inline auto& get_endpoint(_In_ WDFQUEUE queue) // use get_device() for device_ct
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
 
+
 /*
  * Context space for WDFREQUEST.
  */
@@ -191,6 +197,29 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
         auto queue = WdfRequestGetIoQueue(Request);
         return WdfIoQueueGetDevice(queue);
 }
+
+
+/*
+ * Context space for WDFFILEOBJECT.
+ * @see WdfFileObjectGetDevice
+ */
+struct fileobject_ctx
+{
+        LIST_ENTRY entry; // head is vhci_ctx::fileobjects
+
+        WDFCOLLECTION events; // WDFMEMORY(device_state) that are waiting for IRP_MJ_READ
+        enum { MAX_EVENTS = 2*TOTAL_PORTS }; // arbitrary
+
+        bool process_events; // if IRP_MJ_READ was issued
+};
+WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
+
+inline auto get_handle(_In_ fileobject_ctx *ctx)
+{
+        NT_ASSERT(ctx);
+        return static_cast<WDFFILEOBJECT>(WdfObjectContextGetObject(ctx));
+}
+
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

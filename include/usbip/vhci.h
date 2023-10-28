@@ -28,6 +28,11 @@ namespace usbip::vhci
 DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
+struct base
+{
+        ULONG size; // IN, self size
+};
+
 struct imported_device_location
 {
         int port; // OUT, >= 1 or zero if an error
@@ -51,6 +56,13 @@ struct imported_device_properties
 };
 
 struct imported_device : imported_device_location, imported_device_properties {};
+
+enum device_state_t : int { unplugged, connecting, connected, plugged, disconnected, unplugging };
+
+struct device_state : base, imported_device
+{
+        device_state_t state;
+};
 
 } // namespace usbip::vhci
 
@@ -76,11 +88,6 @@ enum {
         PLUGOUT_HARDWARE     = make(function::plugout_hardware),
         GET_IMPORTED_DEVICES = make(function::get_imported_devices),
         DRIVER_REGISTRY_PATH = make(function::driver_registry_path),
-};
-
-struct base
-{
-        ULONG size; // IN, self size
 };
 
 struct plugin_hardware : base, imported_device_location {};

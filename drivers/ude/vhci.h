@@ -4,12 +4,7 @@
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-#include <libdrv\wdf_cpp.h>
-
-#include <usb.h>
-#include <wdfusb.h>
-#include <UdeCx.h>
+#include "context.h"
 
 namespace usbip
 {
@@ -40,5 +35,30 @@ wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool PowerDeviceD3Final = false);
+
+struct imported_device;
+enum device_state_t : int;
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS fill(_Out_ imported_device &dev, _In_ const device_ctx_ext &ext, _In_ int port);
+
+inline auto fill(_Out_ imported_device &dev, _In_ const device_ctx &ctx)
+{
+        return fill(dev, *ctx.ext, ctx.port);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY evt);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void device_state_changed(_In_ WDFDEVICE vhci, _In_ const device_ctx_ext &ext, _In_ int port, _In_ device_state_t state);
+
+inline void device_state_changed(_In_ WDFDEVICE vhci, _In_ const device_ctx &dev, _In_ device_state_t state)
+{
+        device_state_changed(vhci, *dev.ext, dev.port, state);
+}
 
 } // namespace usbip::vhci

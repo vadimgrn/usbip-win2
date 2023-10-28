@@ -599,18 +599,22 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 
         if (close_socket(dev.sock())) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
+                device_state_changed(dev.vhci, dev, vhci::device_state_t::disconnected);
         }
 
         while (auto request = remove_egress_request(dev, device::request_search())) {
                 complete(request, STATUS_CANCELLED);
         }
 
-        if (auto port = vhci::reclaim_roothub_port(device)) {
+        auto port = vhci::reclaim_roothub_port(device);
+        if (port) {
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
         if (plugout_and_delete) {
+                device_state_changed(dev.vhci, *dev.ext, port, vhci::device_state_t::unplugging);
                 wdf::WaitLock lck(dev.delete_lock);                        
+
                 if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
                         Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", 
                                                   ptr04x(device), err);
@@ -666,6 +670,7 @@ PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeo
         switch (st) {
         case STATUS_SUCCESS:
                 TraceDbg("dev %04x, completed", ptr04x(device));
+                device_state_changed(dev.vhci, dev, vhci::device_state_t::unplugged);
                 break;
         case STATUS_TIMEOUT: // a bug in the driver
                 TraceDbg("dev %04x, timeout (purged WDFREQUEST is not completed?)", ptr04x(device));

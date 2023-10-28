@@ -43,26 +43,6 @@ PAGED void log(_In_ const usbip_usb_device &d)
                 d.bConfigurationValue, d.bNumConfigurations, d.bNumInterfaces);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto fill(_Out_ vhci::imported_device &dev, _In_ const device_ctx &ctx)
-{
-        PAGED_CODE();
-        auto &src = *ctx.ext;
-
-//      imported_device_location
-        dev.port = ctx.port;
-        if (auto err = copy(dev.host, sizeof(dev.host), src.node_name, 
-                            dev.service, sizeof(dev.service), src.service_name,  
-                            dev.busid, sizeof(dev.busid), src.busid)) {
-                return err;
-        }
-        //
-
-        static_cast<vhci::imported_device_properties&>(dev) = src.dev;
-        return STATUS_SUCCESS;
-}
-
 /*
  * @see <linux>/tools/usb/usbip/src/usbipd.c, recv_request_import
  */
@@ -283,17 +263,24 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
 
 struct device_ctx_ext_ptr
 {
-        ~device_ctx_ext_ptr() 
+        explicit device_ctx_ext_ptr(_In_ WDFDEVICE vhci) : m_vhci(vhci) {}
+
+        ~device_ctx_ext_ptr()
         { 
                 if (ptr) {
                         close_socket(ptr->sock);
+                        device_state_changed(m_vhci, *ptr, 0, vhci::device_state_t::disconnected);
                         free(ptr); 
                 }
         }
 
+        auto get() const { return ptr; }
         auto operator ->() const { return ptr; }
+        auto& operator *() const { return *ptr; }
+
         void release() { ptr = nullptr; }
 
+        WDFDEVICE m_vhci{};
         device_ctx_ext *ptr{};
 };
 
@@ -324,24 +311,27 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
         auto &port = r.port;
         r.port = 0;
 
-        device_ctx_ext_ptr ext;
+        device_ctx_ext_ptr ext(vhci);
         if (NT_ERROR(create_device_ctx_ext(ext.ptr, r))) {
                 return USBIP_ERROR_GENERAL;
         }
 
-        if (auto err = connect(*ext.ptr)) {
+        device_state_changed(vhci, *ext, port, vhci::device_state_t::connecting);
+
+        if (auto err = connect(*ext)) {
                 Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
                 return err;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
+        device_state_changed(vhci, *ext, port, vhci::device_state_t::connected);
 
-        if (auto err = import_remote_device(*ext.ptr)) {
+        if (auto err = import_remote_device(*ext)) {
                 return err;
         }
 
         UDECXUSBDEVICE dev;
-        if (NT_ERROR(device::create(dev, vhci, ext.ptr))) {
+        if (NT_ERROR(device::create(dev, vhci, ext.get()))) {
                 return USBIP_ERROR_GENERAL;
         }
         ext.release(); // now dev owns it
@@ -352,6 +342,11 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), port);
+
+        if (auto ctx = get_device_ctx(dev)) {
+                device_state_changed(vhci, *ctx, vhci::device_state_t::plugged);
+        }
+
         return USBIP_ERROR_SUCCESS;
 }
 
@@ -515,13 +510,15 @@ PAGED auto driver_registry_path(_In_ WDFREQUEST request)
 _Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void device_control(
+PAGED void device_control(
         _In_ WDFQUEUE Queue,
         _In_ WDFREQUEST Request,
         _In_ size_t OutputBufferLength,
         _In_ size_t InputBufferLength,
         _In_ ULONG IoControlCode)
 {
+        PAGED_CODE();
+
         TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
                   device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
 
@@ -560,6 +557,40 @@ void device_control(
         }
 }
 
+_Function_class_(EVT_WDF_IO_QUEUE_IO_READ)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGED void device_read(_In_ WDFQUEUE, _In_ WDFREQUEST request, _In_ size_t length)
+{
+        PAGED_CODE();
+
+        auto fileobj = WdfRequestGetFileObject(request);
+        TraceDbg("fobj %04x, request %04x, length %Iu", ptr04x(fileobj), ptr04x(request), length);
+
+        if (length != sizeof(vhci::device_state)) {
+                WdfRequestCompleteWithInformation(request, STATUS_INVALID_BUFFER_SIZE, 0);
+                return;
+        }
+
+        auto &fobj = *get_fileobject_ctx(fileobj);
+        if (auto &val = fobj.process_events; !val) {
+                val = true;
+        }
+
+        auto vhci = get_vhci(request);
+        auto &ctx = *get_vhci_ctx(vhci);
+        
+        wdf::WaitLock lck(ctx.events_lock);
+
+        if (auto evt = (WDFMEMORY)WdfCollectionGetFirstItem(fobj.events)) {
+                vhci::complete_read(request, evt);
+                WdfCollectionRemove(fobj.events, evt); // decrements reference count
+        } else if (auto err = WdfRequestForwardToIoQueue(request, ctx.read_requests)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
+                WdfRequestCompleteWithInformation(request, err, 0);
+        }
+}
+
 } // namespace
 
 
@@ -573,10 +604,12 @@ PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
         WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoDeviceControl = device_control;
+        cfg.EvtIoRead = device_read;
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); };
+        attr.ExecutionLevel = WdfExecutionLevelPassive;
         attr.ParentObject = vhci;
 
         WDFQUEUE queue;

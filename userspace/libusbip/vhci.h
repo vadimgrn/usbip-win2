@@ -37,6 +37,14 @@ struct imported_device
         UINT16 product;
 };
 
+enum device_state_t : int { unplugged, connecting, connected, plugged, disconnected, unplugging };
+
+struct device_state
+{
+        imported_device device;
+        device_state_t state;
+};
+
 } // namespace usbip
 
 
@@ -69,5 +77,26 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
  * @return call GetLastError() if false is returned
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
+
+/**
+ * Read this number of bytes and pass them to get_device_state()
+ * @return bytes to read from the device handle, constant
+ */
+USBIP_API DWORD get_device_state_size() noexcept;
+
+/**
+ * @param result constructed from passed data
+ * @param data that was read from the device handle
+ * @param length data length, must be equal to get_device_state_size()
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool get_device_state(_Out_ device_state &result, _In_ const void *data, _In_ DWORD length);
+
+/**
+ * @param dev handle of the driver device
+ * @param result data that was obtained by read operation on the given handle
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool read_device_state(_In_ HANDLE dev, _Out_ device_state &result);
 
 } // namespace usbip::vhci
