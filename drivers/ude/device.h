@@ -34,6 +34,6 @@ PAGED NTSTATUS plugout_and_delete(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete);
+PAGED NTSTATUS detach(_In_ UDECXUSBDEVICE device);
 
 } // namespace usbip::device

@@ -344,7 +344,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), port);
 
         if (auto ctx = get_device_ctx(dev)) {
-                device_state_changed(vhci, *ctx, vhci::device_state_t::plugged);
+                device_state_changed(*ctx, vhci::device_state_t::plugged);
         }
 
         return USBIP_ERROR_SUCCESS;
@@ -404,7 +404,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
         auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
-                vhci::detach_all_devices(vhci);
+                detach_all_devices(vhci, vhci::detach_call::async_wait); // detach_call::direct can't be used here
         } else if (!is_valid_port(r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
@@ -587,6 +587,9 @@ PAGED void device_read(_In_ WDFQUEUE, _In_ WDFREQUEST request, _In_ size_t lengt
                 WdfCollectionRemove(fobj.events, evt); // decrements reference count
         } else if (auto err = WdfRequestForwardToIoQueue(request, ctx.read_requests)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
+                if (err == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
+                        err = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero
+                }
                 WdfRequestCompleteWithInformation(request, err, 0);
         }
 }

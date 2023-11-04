@@ -48,11 +48,11 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void NTAPI device_destroy(_In_ WDFOBJECT Object)
+PAGED void NTAPI device_destroy(_In_ WDFOBJECT object)
 {
         PAGED_CODE();
 
-        auto device = static_cast<UDECXUSBDEVICE>(Object);
+        auto device = static_cast<UDECXUSBDEVICE>(object);
         auto &ext = get_device_ctx(device)->ext;
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, %!USTR!:%!USTR!/%!USTR!", 
@@ -561,7 +561,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         }
 
         InitializeListHead(&dev.egress_requests);
-        KeInitializeEvent(&dev.queue_purged, NotificationEvent, false);
+        KeInitializeEvent(&dev.detached, NotificationEvent, false);
 
         return STATUS_SUCCESS;
 }
@@ -570,6 +570,20 @@ inline auto set_unplugged(_Inout_ device_ctx &dev)
 {
         static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
         return InterlockedExchange8(PCHAR(&dev.unplugged), true);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto plugout_and_delete(_In_ UDECXUSBDEVICE dev, _In_ WDFWAITLOCK delete_lock)
+{
+        PAGED_CODE();
+
+        wdf::WaitLock lck(delete_lock);
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(dev)) { // caught BSOD on DISPATCH_LEVEL
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(dev), err);
+                return false;
+        }
+        return true;
 }
 
 /*
@@ -590,7 +604,7 @@ inline auto set_unplugged(_Inout_ device_ctx &dev)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
+PAGED void detach(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
@@ -599,7 +613,7 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 
         if (close_socket(dev.sock())) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
-                device_state_changed(dev.vhci, dev, vhci::device_state_t::disconnected);
+                device_state_changed(dev, vhci::device_state_t::disconnected);
         }
 
         while (auto request = remove_egress_request(dev, device::request_search())) {
@@ -611,19 +625,14 @@ PAGED void detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        if (plugout_and_delete) {
-                device_state_changed(dev.vhci, *dev.ext, port, vhci::device_state_t::unplugging);
-                wdf::WaitLock lck(dev.delete_lock);                        
+        device_state_changed(dev.vhci, *dev.ext, port, vhci::device_state_t::unplugging);
 
-                if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) { // caught BSOD on DISPATCH_LEVEL
-                        Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", 
-                                                  ptr04x(device), err);
-                } else {
-                        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
-                }
+        if (plugout_and_delete(device, dev.delete_lock)) {
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
+                device_state_changed(dev.vhci, *dev.ext, port, vhci::device_state_t::unplugged);
         }
 
-        NT_VERIFY(!KeSetEvent(&dev.queue_purged, IO_NO_INCREMENT, false)); // once
+        NT_VERIFY(!KeSetEvent(&dev.detached, IO_NO_INCREMENT, false)); // once
 }
 
 _IRQL_requires_same_
@@ -633,7 +642,7 @@ auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ UDECXUSBDEVICE device)
         auto func = [] (auto WorkItem)
         {
                 if (auto dev = (UDECXUSBDEVICE)WdfWorkItemGetParentObject(WorkItem)) {
-                        detach(dev, true);
+                        detach(dev);
                 }
                 WdfObjectDelete(WorkItem);
         };
@@ -665,12 +674,11 @@ PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeo
         auto &dev = *get_device_ctx(device);
         NT_ASSERT(dev.unplugged);
 
-        auto st = KeWaitForSingleObject(&dev.queue_purged, Executive, KernelMode, false, timeout);
+        auto st = KeWaitForSingleObject(&dev.detached, Executive, KernelMode, false, timeout);
 
         switch (st) {
         case STATUS_SUCCESS:
                 TraceDbg("dev %04x, completed", ptr04x(device));
-                device_state_changed(dev.vhci, dev, vhci::device_state_t::unplugged);
                 break;
         case STATUS_TIMEOUT: // a bug in the driver
                 TraceDbg("dev %04x, timeout (purged WDFREQUEST is not completed?)", ptr04x(device));
@@ -682,6 +690,11 @@ PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeo
         }
 
         return st;
+}
+
+constexpr auto wait_detach_timeout()
+{
+        return make_timeout(30*wdm::second, wdm::period::relative);
 }
 
 } // namespace
@@ -739,11 +752,12 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::async_plugout_and_delete(_In_ UDECXUSBDEVICE device)
 {
-        auto &dev = *get_device_ctx(device);
+        static_assert(NT_SUCCESS(STATUS_PENDING));
 
+        auto &dev = *get_device_ctx(device);
         if (dev.unplugged) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
-                return STATUS_SUCCESS;
+                return STATUS_PENDING;
         }
         
         WDFWORKITEM wi{};
@@ -752,13 +766,13 @@ NTSTATUS usbip::device::async_plugout_and_delete(_In_ UDECXUSBDEVICE device)
                 return err;
         }
 
-        if (auto was_unplugged = set_unplugged(dev); !was_unplugged) {
-                WdfWorkItemEnqueue(wi);
-        } else {
+        if (auto was_unplugged = set_unplugged(dev)) { // double-checked pattern
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
                 WdfObjectDelete(wi);
+                return STATUS_PENDING;
         }
 
+        WdfWorkItemEnqueue(wi);
         return STATUS_SUCCESS;
 }
 
@@ -778,27 +792,29 @@ PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 
         auto st = async_plugout_and_delete(device);
         if (NT_SUCCESS(st)) {
-                auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
+                auto timeout = wait_detach_timeout();
                 st = wait_detach(device, &timeout);
         }
         return st;
 }
 
 /*
- * WdfIoQueuePurgeSynchronously can be called from this thread.
+ * It must be OK to call WdfIoQueuePurgeSynchronously from this thread.
+ * @see plugout_and_delete
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
+PAGED NTSTATUS usbip::device::detach(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
-        if (auto was_unplugged = set_unplugged(dev); !was_unplugged) {
-                ::detach(device, plugout_and_delete);
-        } else {
+        if (auto was_unplugged = set_unplugged(dev)) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
+        } else {
+                ::detach(device); // calls WdfIoQueuePurgeSynchronously
         }
 
-        NT_VERIFY(NT_SUCCESS(wait_detach(device))); // concurrent calls wait for the completion
+        auto timeout = wait_detach_timeout();
+        return wait_detach(device, &timeout); // concurrent calls wait for the completion
 }

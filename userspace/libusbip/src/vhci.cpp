@@ -253,7 +253,7 @@ USBIP_API bool usbip::vhci::get_device_state(
         assert(get_device_state_size() == sizeof(*r));
 
         if (!(r && length == sizeof(*r))) {
-                SetLastError(STATUS_INVALID_PARAMETER);
+                SetLastError(ERROR_INVALID_PARAMETER);
                 return false;
         } else if (r->size != sizeof(*r)) {
                 SetLastError(USBIP_ERROR_ABI);
@@ -264,11 +264,20 @@ USBIP_API bool usbip::vhci::get_device_state(
         return true;
 }
 
+/*
+ * ReadFile returns TRUE for STATUS_END_OF_FILE.
+ * @see UDE driver, EVT_WDF_IO_QUEUE_IO_READ
+ */
 bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Out_ usbip::device_state &result)
 {
         vhci::device_state r;
-        DWORD actual;
 
-        return ReadFile(dev, &r, sizeof(r), &actual, nullptr) && 
-               get_device_state(result, &r, actual);
+        if (DWORD actual; !ReadFile(dev, &r, sizeof(r), &actual, nullptr)) {
+                return false;
+        } else if (!actual) {
+                SetLastError(ERROR_HANDLE_EOF);
+                return false;
+        } else {
+                return get_device_state(result, &r, actual);
+        }
 }

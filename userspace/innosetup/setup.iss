@@ -124,7 +124,6 @@ Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#HWID}
 
 [UninstallRun]
 
-Filename: {app}\usbip.exe; Parameters: "detach --all"; Flags: runhidden
 Filename: {app}\devnode.exe; Parameters: "remove {#HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809

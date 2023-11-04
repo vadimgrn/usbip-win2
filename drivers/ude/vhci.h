@@ -32,9 +32,11 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 
+enum class detach_call { async_wait, async_nowait, direct };
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool PowerDeviceD3Final = false);
+PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how);
 
 struct imported_device;
 enum device_state_t : int;
@@ -56,9 +58,9 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void device_state_changed(_In_ WDFDEVICE vhci, _In_ const device_ctx_ext &ext, _In_ int port, _In_ device_state_t state);
 
-inline void device_state_changed(_In_ WDFDEVICE vhci, _In_ const device_ctx &dev, _In_ device_state_t state)
+inline void device_state_changed(_In_ const device_ctx &dev, _In_ device_state_t state)
 {
-        device_state_changed(vhci, *dev.ext, dev.port, state);
+        device_state_changed(dev.vhci, *dev.ext, dev.port, state);
 }
 
 } // namespace usbip::vhci

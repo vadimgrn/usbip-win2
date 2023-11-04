@@ -72,7 +72,7 @@ void NTAPI canceled_on_queue(_In_ WDFQUEUE, _In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_queue(_Out_ WDFQUEUE &queue, _In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ WDFDEVICE vhci)
+PAGED auto create_read_queue(_Out_ WDFQUEUE &queue, _In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 
@@ -114,7 +114,7 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        if (auto err = create_queue(ctx.read_requests, attr, vhci)) {
+        if (auto err = create_read_queue(ctx.read_requests, attr, vhci)) {
                 return err;
         }
 
@@ -180,24 +180,18 @@ NTSTATUS query_usb_capability(
  * If TargetState is WdfPowerDeviceD3Final, you should assume that the system is being turned off, 
  * the device is about to be removed, or a resource rebalance is in progress.
  * 
- * FIXME:
- * WdfPowerDeviceD3Final does not occur during uninstallation of the driver while a device is in use.
- * For example, try run the uninstaller while data is copying from a flash drive.
- * The reason may be the low priority of a thread that calls this callback.
- * There is no such issue if do not copy files during the uninstallation.
+ * Cannot be used for actions that are done in EVT_WDF_DEVICE_QUERY_REMOVE 
+ * because if the device is in D1-3 state, this callback will not be called again. 
+ * The second reason is that if something (app, driver) holds a reference to WDFDEVICE, 
+ * EVT_WDF_DEVICE_D0_EXIT(WdfPowerDeviceD3Final) will not be called.
  */
 _Function_class_(EVT_WDF_DEVICE_D0_EXIT)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE vhci, _In_ WDF_POWER_DEVICE_STATE TargetState)
+PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE TargetState)
 {
         PAGED_CODE();
         TraceDbg("TargetState %!WDF_POWER_DEVICE_STATE!", TargetState);
-
-        if (TargetState == WdfPowerDeviceD3Final) {
-                vhci::detach_all_devices(vhci, true);
-        }
-
         return STATUS_SUCCESS;
 }
 
@@ -208,6 +202,44 @@ PAGED NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE P
 {
         PAGED_CODE();
         TraceDbg("PreviousState %!WDF_POWER_DEVICE_STATE!", PreviousState);
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        auto &ctx = *get_vhci_ctx(vhci);
+        TraceDbg("%04x", ptr04x(ctx.read_requests));
+
+        wdf::WaitLock lck(ctx.events_lock);
+        WdfIoQueuePurgeSynchronously(ctx.read_requests);
+}
+
+/* 
+ * This callback determines whether a specified device can be stopped and removed.
+ * The framework does not synchronize the EvtDeviceQueryRemove callback function 
+ * with other PnP and power management callback functions.
+ * 
+ * VHCI device will not be removed until all FILEOBJECT-s will be closed.
+ * The uninstaller will block on the command that removes VHCI device node.
+ * Cancelling read requests forces apps to close handle of VHCI device.
+ * 
+ * FIXME: can be called several times (if IRP_MN_CANCEL_REMOVE_DEVICE was issued?).
+ */
+_Function_class_(EVT_WDF_DEVICE_QUERY_REMOVE)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+        TraceDbg("%04x", ptr04x(vhci));
+
+        detach_all_devices(vhci, vhci::detach_call::async_nowait); // must not block this callback for long time
+        purge_read_queue(vhci); // detach notifications will not be received due to detach_call::async_nowait
+
         return STATUS_SUCCESS;
 }
 
@@ -277,8 +309,11 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *init)
         {
                 WDF_PNPPOWER_EVENT_CALLBACKS cb;
                 WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&cb);
+
                 cb.EvtDeviceD0Exit = vhci_d0_exit;
                 cb.EvtDeviceD0Entry = vhci_d0_entry;
+                cb.EvtDeviceQueryRemove = vhci_query_remove;
+
                 WdfDeviceInitSetPnpPowerEventCallbacks(init, &cb);
         }
 
@@ -481,19 +516,43 @@ PAGED void process_event(_In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_
         case STATUS_NO_MORE_ENTRIES:
                 if (auto err = WdfCollectionAdd(fobj.events, evt)) { // append and increment reference count
                         Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", err);
-                } else if (auto cnt = WdfCollectionGetCount(fobj.events); cnt <= fobj.MAX_EVENTS) {
-                        TraceDbg("fobj %04x, add %04x[%lu]", ptr04x(fileobj), ptr04x(evt), cnt - 1);
-                } else {
+                } else if (auto cnt = WdfCollectionGetCount(fobj.events); cnt > fobj.MAX_EVENTS) {
                         auto head = WdfCollectionGetFirstItem(fobj.events);
                         WdfCollectionRemove(fobj.events, head); // decrements reference count
 
                         TraceDbg("fobj %04x, drop %04x[0], add %04x[%lu]",
                                   ptr04x(fileobj), ptr04x(head), ptr04x(evt), --cnt - 1);
+                } else {
+                        TraceDbg("fobj %04x, add %04x[%lu]", ptr04x(fileobj), ptr04x(evt), cnt - 1);
                 }
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueRetrieveRequestByFileObject %!STATUS!", st);
         }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto get_detach_function(_In_ vhci::detach_call how)
+{
+        PAGED_CODE();
+        decltype(device::detach) *f{};
+
+        switch (how) {
+                using enum vhci::detach_call;
+        case async_wait:
+                f = device::plugout_and_delete;
+                break;
+        case async_nowait:
+                f = device::async_plugout_and_delete;
+                break;
+        case direct:
+                f = device::detach;
+                break;
+        }
+
+        NT_ASSERT(f);
+        return f;
 }
 
 } // namespace
@@ -587,17 +646,16 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool PowerDeviceD3Final)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how)
 {
         PAGED_CODE();
 
+        TraceDbg("%04x", ptr04x(vhci));
+        auto detach = get_detach_function(how);
+
         for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
-                        if (PowerDeviceD3Final) { // do not call UdecxUsbDevicePlugOutAndDelete, UDE will call it
-                                device::detach(hdev, false);
-                        } else {
-                                device::plugout_and_delete(hdev);
-                        }
+                        detach(hdev);
                 }
         }
 }
@@ -661,7 +719,7 @@ PAGED void usbip::vhci::device_state_changed(
 
         auto evt = make_device_state(vhci, ext, port, state);
         if (!evt) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state for %!device_state_t!", state);
+                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state '%!device_state_t!'", state);
                 return;
         }
 

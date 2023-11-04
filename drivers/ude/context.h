@@ -117,7 +117,7 @@ struct device_ctx
         WDFSPINLOCK egress_requests_lock;
 
         WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
-        KEVENT queue_purged;
+        KEVENT detached;
 
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
