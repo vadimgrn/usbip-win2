@@ -560,11 +560,13 @@ PAGED void device_control(
 _Function_class_(EVT_WDF_IO_QUEUE_IO_READ)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void device_read(_In_ WDFQUEUE, _In_ WDFREQUEST request, _In_ size_t length)
+PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t length)
 {
         PAGED_CODE();
 
         auto fileobj = WdfRequestGetFileObject(request);
+        auto &fobj = *get_fileobject_ctx(fileobj);
+
         TraceDbg("fobj %04x, request %04x, length %Iu", ptr04x(fileobj), ptr04x(request), length);
 
         if (length != sizeof(vhci::device_state)) {
@@ -572,20 +574,20 @@ PAGED void device_read(_In_ WDFQUEUE, _In_ WDFREQUEST request, _In_ size_t lengt
                 return;
         }
 
-        auto &fobj = *get_fileobject_ctx(fileobj);
+        auto device = WdfIoQueueGetDevice(queue);
+        auto &vhci = *get_vhci_ctx(device);
+        
+        wdf::WaitLock lck(vhci.events_lock);
+
         if (auto &val = fobj.process_events; !val) {
+                ++vhci.events_subscribers;
                 val = true;
         }
-
-        auto vhci = get_vhci(request);
-        auto &ctx = *get_vhci_ctx(vhci);
-        
-        wdf::WaitLock lck(ctx.events_lock);
 
         if (auto evt = (WDFMEMORY)WdfCollectionGetFirstItem(fobj.events)) {
                 vhci::complete_read(request, evt);
                 WdfCollectionRemove(fobj.events, evt); // decrements reference count
-        } else if (auto err = WdfRequestForwardToIoQueue(request, ctx.read_requests)) {
+        } else if (auto err = WdfRequestForwardToIoQueue(request, vhci.reads)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
                 if (err == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
                         err = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero

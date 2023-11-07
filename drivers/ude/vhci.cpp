@@ -114,7 +114,7 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        if (auto err = create_read_queue(ctx.read_requests, attr, vhci)) {
+        if (auto err = create_read_queue(ctx.reads, attr, vhci)) {
                 return err;
         }
 
@@ -212,10 +212,10 @@ PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
         PAGED_CODE();
 
         auto &ctx = *get_vhci_ctx(vhci);
-        TraceDbg("%04x", ptr04x(ctx.read_requests));
+        TraceDbg("%04x", ptr04x(ctx.reads));
 
         wdf::WaitLock lck(ctx.events_lock);
-        WdfIoQueuePurgeSynchronously(ctx.read_requests);
+        WdfIoQueuePurgeSynchronously(ctx.reads);
 }
 
 /* 
@@ -289,11 +289,15 @@ PAGED void file_cleanup(_In_ WDFFILEOBJECT fileobj)
 
         auto &fobj = *get_fileobject_ctx(fileobj); 
         auto vhci = WdfFileObjectGetDevice(fileobj);
+        auto &ctx = *get_vhci_ctx(vhci);
 
-        if (auto ctx = get_vhci_ctx(vhci)) {
-                wdf::WaitLock lck(ctx->events_lock);
-                RemoveEntryList(&fobj.entry);
-                InitializeListHead(&fobj.entry);
+        wdf::WaitLock lck(ctx.events_lock);
+
+        RemoveEntryList(&fobj.entry);
+        InitializeListHead(&fobj.entry);
+        
+        if (fobj.process_events) {
+                --ctx.events_subscribers;
         }
 }
 
@@ -533,6 +537,26 @@ PAGED void process_event(_In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
+{
+        PAGED_CODE();
+
+        int cnt = 0;
+        wdf::WaitLock lck(vhci.events_lock);
+
+        for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
+                auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
+                if (fobj.process_events) {
+                        process_event(vhci.reads, fobj, evt);
+                        ++cnt;
+                }
+        }
+
+        NT_ASSERT(cnt == vhci.events_subscribers);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_detach_function(_In_ vhci::detach_call how)
 {
         PAGED_CODE();
@@ -714,26 +738,25 @@ PAGED void usbip::vhci::device_state_changed(
 {
         PAGED_CODE();
 
-        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!device_state_t!", 
-                  &ext.node_name, &ext.service_name, &ext.busid, port, state);
-
-        auto evt = make_device_state(vhci, ext, port, state);
-        if (!evt) {
-                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state '%!device_state_t!'", state);
-                return;
-        }
-
         auto &ctx = *get_vhci_ctx(vhci);
-        wdf::WaitLock lck(ctx.events_lock);
+        auto subscribers = ctx.events_subscribers;
 
-        for (auto head = &ctx.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
-                auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
-                if (fobj.process_events) {
-                        process_event(ctx.read_requests, fobj, evt);
+        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!device_state_t!, subscribers %d", 
+                  &ext.node_name, &ext.service_name, &ext.busid, port, state, subscribers);
+
+        if (!subscribers) {
+                wdf::WaitLock lck(ctx.events_lock);
+                if (!ctx.events_subscribers) {
+                        return; // don't create device_state unnecessarily
                 }
         }
 
-        WdfObjectDelete(evt); // will be deleted after its reference count becomes zero
+        if (auto evt = make_device_state(vhci, ext, port, state)) {
+                process_event(ctx, evt);
+                WdfObjectDelete(evt); // will be deleted after its reference count becomes zero
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state '%!device_state_t!'", state);
+        }
 }
 
 /*

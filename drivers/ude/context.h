@@ -51,7 +51,8 @@ struct vhci_ctx
         WDFSPINLOCK devices_lock;
 
         LIST_ENTRY fileobjects; // @see fileobject_ctx::entry
-        WDFQUEUE read_requests; // IRP_MJ_READ
+        WDFQUEUE reads; // IRP_MJ_READ
+        int events_subscribers; // SUM(fileobject_ctx::process_events)
         WDFWAITLOCK events_lock;
 
         _KTHREAD *attach_thread;
@@ -210,7 +211,7 @@ struct fileobject_ctx
         WDFCOLLECTION events; // WDFMEMORY(device_state) that are waiting for IRP_MJ_READ
         enum { MAX_EVENTS = 2*TOTAL_PORTS }; // arbitrary
 
-        bool process_events; // if IRP_MJ_READ was issued
+        bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
 
