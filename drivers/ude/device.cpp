@@ -561,7 +561,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         }
 
         InitializeListHead(&dev.egress_requests);
-        KeInitializeEvent(&dev.detached, NotificationEvent, false);
+        KeInitializeEvent(&dev.detach_completed, NotificationEvent, false);
 
         return STATUS_SUCCESS;
 }
@@ -609,6 +609,8 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
         PAGED_CODE();
 
         auto &dev = *get_device_ctx(device);
+	NT_ASSERT(dev.unplugged);
+
         WdfIoQueuePurgeSynchronously(dev.queue);
 
         if (close_socket(dev.sock())) {
@@ -632,7 +634,7 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
                 device_state_changed(dev.vhci, *dev.ext, port, vhci::device_state_t::unplugged);
         }
 
-        NT_VERIFY(!KeSetEvent(&dev.detached, IO_NO_INCREMENT, false)); // once
+        NT_VERIFY(!KeSetEvent(&dev.detach_completed, IO_NO_INCREMENT, false)); // once
 }
 
 _IRQL_requires_same_
@@ -674,7 +676,7 @@ PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeo
         auto &dev = *get_device_ctx(device);
         NT_ASSERT(dev.unplugged);
 
-        auto st = KeWaitForSingleObject(&dev.detached, Executive, KernelMode, false, timeout);
+        auto st = KeWaitForSingleObject(&dev.detach_completed, Executive, KernelMode, false, timeout);
 
         switch (st) {
         case STATUS_SUCCESS:

@@ -117,14 +117,14 @@ struct device_ctx
         LIST_ENTRY egress_requests; // that are waiting for WskSend completion handler, head for request_ctx::entry
         WDFSPINLOCK egress_requests_lock;
 
-        WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
-        KEVENT detached;
-
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
 
-        volatile bool unplugged;
+        volatile bool unplugged; // initiated detach that may still be ongoing
+        KEVENT detach_completed;
+
         WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
+        WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
