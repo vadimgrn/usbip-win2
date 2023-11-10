@@ -471,7 +471,7 @@ auto get_port_range(_In_ usb_device_speed speed)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED auto make_device_state(
-        _In_ WDFOBJECT parent, _In_ const device_ctx_ext &ext, _In_ int port, _In_ vhci::device_state_t state)
+        _In_ WDFOBJECT parent, _In_ const device_ctx_ext &ext, _In_ int port, _In_ vhci::state state)
 {
         PAGED_CODE();
 
@@ -734,14 +734,14 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::vhci::device_state_changed(
-        _In_ WDFDEVICE vhci, _In_ const device_ctx_ext& ext, _In_ int port, _In_ device_state_t state)
+        _In_ WDFDEVICE vhci, _In_ const device_ctx_ext& ext, _In_ int port, _In_ state state)
 {
         PAGED_CODE();
 
         auto &ctx = *get_vhci_ctx(vhci);
         auto subscribers = ctx.events_subscribers;
 
-        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!device_state_t!, subscribers %d", 
+        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d", 
                   &ext.node_name, &ext.service_name, &ext.busid, port, int(state), subscribers);
 
         if (!subscribers) {
@@ -755,7 +755,7 @@ PAGED void usbip::vhci::device_state_changed(
                 process_event(ctx, evt);
                 WdfObjectDelete(evt); // will be deleted after its reference count becomes zero
         } else {
-                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state '%!device_state_t!'", int(state));
+                Trace(TRACE_LEVEL_ERROR, "Failed to create state '%!vhci_state!'", int(state));
         }
 }
 

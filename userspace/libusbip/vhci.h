@@ -37,13 +37,12 @@ struct imported_device
         UINT16 product;
 };
 
-enum class device_state_t { unplugged, connecting, connected, plugged, disconnected, unplugging };
-USBIP_API const char* get_device_state_str(_In_ device_state_t state) noexcept;
+enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
 struct device_state
 {
         imported_device device;
-        device_state_t state;
+        state state;
 };
 
 } // namespace usbip
@@ -78,6 +77,11 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
  * @return call GetLastError() if false is returned
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
+
+/**
+ * @return textual representaion of the given constant
+ */
+USBIP_API const char* get_state_str(_In_ state state) noexcept;
 
 /**
  * Read this number of bytes and pass them to get_device_state()

@@ -78,7 +78,7 @@ auto make_device_state(_In_ const vhci::device_state &r)
 {
         return device_state {
                 .device = make_imported_device(r),
-                .state = static_cast<device_state_t>(r.state)
+                .state = static_cast<state>(r.state)
         };
 }
 
@@ -139,21 +139,21 @@ auto get_path()
 } // namespace
 
 
-static_assert(int(usbip::device_state_t::unplugged) == int(usbip::vhci::device_state_t::unplugged));
-static_assert(int(usbip::device_state_t::connecting) == int(usbip::vhci::device_state_t::connecting));
-static_assert(int(usbip::device_state_t::connected) == int(usbip::vhci::device_state_t::connected));
-static_assert(int(usbip::device_state_t::plugged) == int(usbip::vhci::device_state_t::plugged));
-static_assert(int(usbip::device_state_t::disconnected) == int(usbip::vhci::device_state_t::disconnected));
-static_assert(int(usbip::device_state_t::unplugging) == int(usbip::vhci::device_state_t::unplugging));
-
-const char* usbip::get_device_state_str(_In_ device_state_t state) noexcept
+const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
 {
-        static_assert(int(device_state_t::unplugged) == 0);
-        static_assert(int(device_state_t::connecting) == 1);
-        static_assert(int(device_state_t::connected) == 2);
-        static_assert(int(device_state_t::plugged) == 3);
-        static_assert(int(device_state_t::disconnected) == 4);
-        static_assert(int(device_state_t::unplugging) == 5);
+        static_assert(int(state::unplugged) == int(vhci::state::unplugged));
+        static_assert(int(state::connecting) == int(vhci::state::connecting));
+        static_assert(int(state::connected) == int(vhci::state::connected));
+        static_assert(int(state::plugged) == int(vhci::state::plugged));
+        static_assert(int(state::disconnected) == int(vhci::state::disconnected));
+        static_assert(int(state::unplugging) == int(vhci::state::unplugging));
+
+        static_assert(int(state::unplugged) == 0);
+        static_assert(int(state::connecting) == 1);
+        static_assert(int(state::connected) == 2);
+        static_assert(int(state::plugged) == 3);
+        static_assert(int(state::disconnected) == 4);
+        static_assert(int(state::unplugging) == 5);
 
         const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
 

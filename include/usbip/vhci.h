@@ -57,11 +57,11 @@ struct imported_device_properties
 
 struct imported_device : imported_device_location, imported_device_properties {};
 
-enum class device_state_t { unplugged, connecting, connected, plugged, disconnected, unplugging };
+enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
 struct device_state : base, imported_device
 {
-        device_state_t state;
+        state state;
 };
 
 } // namespace usbip::vhci

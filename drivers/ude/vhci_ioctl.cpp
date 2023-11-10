@@ -269,7 +269,7 @@ struct device_ctx_ext_ptr
         { 
                 if (ptr) {
                         close_socket(ptr->sock);
-                        device_state_changed(m_vhci, *ptr, 0, vhci::device_state_t::disconnected);
+                        device_state_changed(m_vhci, *ptr, 0, vhci::state::disconnected);
                         free(ptr); 
                 }
         }
@@ -316,7 +316,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
                 return USBIP_ERROR_GENERAL;
         }
 
-        device_state_changed(vhci, *ext, port, vhci::device_state_t::connecting);
+        device_state_changed(vhci, *ext, port, vhci::state::connecting);
 
         if (auto err = connect(*ext)) {
                 Trace(TRACE_LEVEL_ERROR, "Can't connect to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
@@ -324,7 +324,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
-        device_state_changed(vhci, *ext, port, vhci::device_state_t::connected);
+        device_state_changed(vhci, *ext, port, vhci::state::connected);
 
         if (auto err = import_remote_device(*ext)) {
                 return err;
@@ -344,7 +344,7 @@ PAGED auto plugin_hardware(_In_ WDFDEVICE vhci, _Inout_ vhci::ioctl::plugin_hard
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), port);
 
         if (auto ctx = get_device_ctx(dev)) {
-                device_state_changed(*ctx, vhci::device_state_t::plugged);
+                device_state_changed(*ctx, vhci::state::plugged);
         }
 
         return USBIP_ERROR_SUCCESS;
