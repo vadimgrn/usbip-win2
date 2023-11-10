@@ -742,7 +742,7 @@ PAGED void usbip::vhci::device_state_changed(
         auto subscribers = ctx.events_subscribers;
 
         TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!device_state_t!, subscribers %d", 
-                  &ext.node_name, &ext.service_name, &ext.busid, port, state, subscribers);
+                  &ext.node_name, &ext.service_name, &ext.busid, port, int(state), subscribers);
 
         if (!subscribers) {
                 wdf::WaitLock lck(ctx.events_lock);
@@ -755,7 +755,7 @@ PAGED void usbip::vhci::device_state_changed(
                 process_event(ctx, evt);
                 WdfObjectDelete(evt); // will be deleted after its reference count becomes zero
         } else {
-                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state '%!device_state_t!'", state);
+                Trace(TRACE_LEVEL_ERROR, "Failed to create device_state '%!device_state_t!'", int(state));
         }
 }
 

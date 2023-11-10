@@ -39,7 +39,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how);
 
 struct imported_device;
-enum device_state_t : int;
+enum class device_state_t;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

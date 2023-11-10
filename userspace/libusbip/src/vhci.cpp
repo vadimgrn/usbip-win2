@@ -139,6 +139,28 @@ auto get_path()
 } // namespace
 
 
+static_assert(int(usbip::device_state_t::unplugged) == int(usbip::vhci::device_state_t::unplugged));
+static_assert(int(usbip::device_state_t::connecting) == int(usbip::vhci::device_state_t::connecting));
+static_assert(int(usbip::device_state_t::connected) == int(usbip::vhci::device_state_t::connected));
+static_assert(int(usbip::device_state_t::plugged) == int(usbip::vhci::device_state_t::plugged));
+static_assert(int(usbip::device_state_t::disconnected) == int(usbip::vhci::device_state_t::disconnected));
+static_assert(int(usbip::device_state_t::unplugging) == int(usbip::vhci::device_state_t::unplugging));
+
+const char* usbip::get_device_state_str(_In_ device_state_t state) noexcept
+{
+        static_assert(int(device_state_t::unplugged) == 0);
+        static_assert(int(device_state_t::connecting) == 1);
+        static_assert(int(device_state_t::connected) == 2);
+        static_assert(int(device_state_t::plugged) == 3);
+        static_assert(int(device_state_t::disconnected) == 4);
+        static_assert(int(device_state_t::unplugging) == 5);
+
+        const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
+
+        auto idx = static_cast<int>(state);
+        return idx >= 0 && idx < ARRAYSIZE(v) ? v[idx] : "";
+}
+
 auto usbip::vhci::open() -> Handle
 {
         Handle h;
@@ -230,16 +252,6 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
         DWORD BytesReturned; // must be set if the last arg is NULL
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
-
-#pragma warning(push)
-#pragma warning(disable:5054) // operator '==': deprecated between enumerations of different types
-static_assert(usbip::device_state_t::unplugged == usbip::vhci::device_state_t::unplugged);
-static_assert(usbip::device_state_t::connecting == usbip::vhci::device_state_t::connecting);
-static_assert(usbip::device_state_t::connected == usbip::vhci::device_state_t::connected);
-static_assert(usbip::device_state_t::plugged == usbip::vhci::device_state_t::plugged);
-static_assert(usbip::device_state_t::disconnected == usbip::vhci::device_state_t::disconnected);
-static_assert(usbip::device_state_t::unplugging == usbip::vhci::device_state_t::unplugging);
-#pragma warning(pop)
 
 USBIP_API DWORD usbip::vhci::get_device_state_size() noexcept
 {

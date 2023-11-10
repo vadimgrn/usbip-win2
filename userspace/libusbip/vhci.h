@@ -37,7 +37,8 @@ struct imported_device
         UINT16 product;
 };
 
-enum device_state_t : int { unplugged, connecting, connected, plugged, disconnected, unplugging };
+enum class device_state_t { unplugged, connecting, connected, plugged, disconnected, unplugging };
+USBIP_API const char* get_device_state_str(_In_ device_state_t state) noexcept;
 
 struct device_state
 {

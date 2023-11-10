@@ -57,7 +57,7 @@ struct imported_device_properties
 
 struct imported_device : imported_device_location, imported_device_properties {};
 
-enum device_state_t : int { unplugged, connecting, connected, plugged, disconnected, unplugging };
+enum class device_state_t { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
 struct device_state : base, imported_device
 {
