@@ -12,6 +12,8 @@
 
 #include <usbip\proto_op.h>
 
+#include <chrono>
+
 #include <ws2tcpip.h>
 #include <mstcpip.h>
 

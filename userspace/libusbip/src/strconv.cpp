@@ -21,7 +21,7 @@ std::wstring usbip::utf8_to_wchar(_In_ std::string_view s)
         auto cch = f(s, nullptr, 0);
         if (!cch) {
                 auto err = GetLastError();
-                return L"MultiByteToWideChar error " + std::format(L"{:#x}", err);
+                return ws = L"MultiByteToWideChar error " + std::format(L"{:#x}", err);
         }
 
         ws.resize(cch);
@@ -46,7 +46,7 @@ std::string usbip::wchar_to_utf8(_In_ std::wstring_view ws)
         auto cb = f(ws, nullptr, 0);
         if (!cb) {
                 auto err = GetLastError();
-                return "WideCharToMultiByte error " + std::format("{:#x}", err);
+                return s = "WideCharToMultiByte error " + std::format("{:#x}", err);
         }
 
         s.resize(cb);
