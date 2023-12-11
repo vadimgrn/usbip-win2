@@ -53,9 +53,10 @@ namespace usbip::vhci
 
 /**
  * Open driver's device interface
+ * @param overlapped open the device for asynchronous I/O
  * @return handle, call GetLastError() if it is invalid
  */
-USBIP_API Handle open();
+USBIP_API Handle open(_In_ bool overlapped = false);
 
 /**
  * @param dev handle of the driver device
@@ -98,7 +99,7 @@ USBIP_API DWORD get_device_state_size() noexcept;
 USBIP_API bool get_device_state(_Out_ device_state &result, _In_ const void *data, _In_ DWORD length);
 
 /**
- * @param dev handle of the driver device
+ * @param dev handle of the driver device that must be opened for serialized I/O
  * @param result data that was obtained by read operation on the given handle
  * @return call GetLastError() if false is returned
  */

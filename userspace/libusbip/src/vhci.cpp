@@ -161,14 +161,18 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         return idx >= 0 && idx < ARRAYSIZE(v) ? v[idx] : "";
 }
 
-auto usbip::vhci::open() -> Handle
+auto usbip::vhci::open(_In_ bool overlapped) -> Handle
 {
         Handle h;
 
         if (auto path = get_path(); !path.empty()) {
-                h.reset(CreateFile(path.c_str(), GENERIC_READ | GENERIC_WRITE, 
-                                   FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, 
-                                   OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+                h.reset(CreateFile(path.c_str(), 
+                                GENERIC_READ | GENERIC_WRITE, 
+                                FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                                nullptr, // lpSecurityAttributes
+                                OPEN_EXISTING, 
+                                overlapped ? FILE_FLAG_OVERLAPPED : FILE_ATTRIBUTE_NORMAL,
+                                nullptr)); // hTemplateFile
         }
 
         return h;
