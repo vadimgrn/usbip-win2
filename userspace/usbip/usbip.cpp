@@ -36,9 +36,9 @@ auto get_ids_data()
 	return r.str();
 }
 
-auto get_version(_In_ const wchar_t *program)
+auto get_version()
 {
-	win::FileVersion fv(program);
+	win::FileVersion fv;
 	auto ver = fv.GetFileVersion();
 	return wchar_to_utf8(ver); // CLI::narrow(ver)
 }
@@ -119,10 +119,10 @@ void add_cmd_port(CLI::App &app)
 		->expected(1, MAX_HUB_PORTS);
 }
 
-void init(CLI::App &app, const wchar_t *program)
+void init(CLI::App &app)
 {
 	app.option_defaults()->always_capture_default();
-	app.set_version_flag("-V,--version", get_version(program));
+	app.set_version_flag("-V,--version", get_version());
 
 	app.add_flag("-d,--debug", 
 		     [] (auto) { spdlog::set_level(spdlog::level::debug); }, "Debug output");
@@ -189,7 +189,7 @@ int wmain(int argc, wchar_t *argv[])
 	}
 
 	CLI::App app("USB/IP client");
-	init(app, *argv);
+	init(app);
 
 	add_cmd_attach(app);
 	add_cmd_detach(app);

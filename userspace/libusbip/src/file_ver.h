@@ -15,7 +15,7 @@ namespace win
 class USBIP_API FileVersion 
 {
 public:
-        FileVersion(std::wstring_view path);
+        FileVersion(std::wstring_view filename = L"");
         ~FileVersion();
 
         FileVersion(const FileVersion&) = delete;

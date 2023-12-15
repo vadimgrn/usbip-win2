@@ -14,7 +14,7 @@
 class win::FileVersion::Impl
 {
 public:
-        Impl(std::wstring_view path) { SetFile(path); }
+        Impl(std::wstring_view filename);
 
         explicit operator bool () const { return !m_info.empty(); }
         auto operator !() const { return m_info.empty(); }
@@ -53,6 +53,20 @@ private:
         std::wstring_view VerQueryValue(const wchar_t *val) const;
 };
 
+win::FileVersion::Impl::Impl(std::wstring_view filename)
+{
+        if (filename.empty()) {
+                if (wchar_t *val{}; auto err = _get_wpgmptr(&val)) { // FIXME: for wmain only
+                        throw std::exception("win::FileVersion: _get_wpgmptr error");
+                } else {
+                        filename = val;
+                }
+        }
+
+        if (auto err = SetFile(filename)) {
+                throw std::exception("win::FileVersion: SetFile error");
+        }
+}
 
 DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
 {
@@ -68,7 +82,7 @@ DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
         } 
 
         SetDefTranslation();
-        return 0;
+        return ERROR_SUCCESS;
 }
 
 void win::FileVersion::Impl::SetTranslation(WORD lang_id, UINT code_page)
@@ -197,7 +211,7 @@ void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) cons
         code_page = LOWORD(dw);
 }
 
-win::FileVersion::FileVersion(std::wstring_view path) : m_impl(new Impl(path)) {}
+win::FileVersion::FileVersion(std::wstring_view filename) : m_impl(new Impl(filename)) {}
 win::FileVersion::~FileVersion() { delete m_impl; }
 
 auto win::FileVersion::operator =(FileVersion&& obj) noexcept -> FileVersion&
