@@ -154,8 +154,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::device::add_egress_request(_Inout_ device_ctx &dev, _Inout_ request_ctx &req)
 {
-        NT_ASSERT(IsListEmpty(&req.entry));
-
         wdf::Lock lck(dev.egress_requests_lock);
         AppendTailList(&dev.egress_requests, &req.entry);
 }

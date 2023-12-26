@@ -387,11 +387,36 @@ auto isoch_transfer(
         return send(endpoint, ctx, dev, false, &urb);
 }
 
+/*
+ * @see WdfRequestForwardToParentDeviceIoQueue
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto allocate_request_ctx(_In_ WDFREQUEST request)
+{
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, request_ctx); // as for WdfDeviceInitSetRequestAttributes
+
+        if (auto err = WdfObjectAllocateContext(request, &attr, nullptr)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfObjectAllocateContext %!STATUS!", err);
+                return err;
+        }
+
+        TraceDbg("req %04x", ptr04x(request));
+        return STATUS_SUCCESS;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usb_submit_urb(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp, _In_ WDFREQUEST request)
 {
+        if (get_request_ctx(request)) [[likely]] {
+                // NULL for xbox gamepad
+        } else if (auto err = allocate_request_ctx(request)) {
+                return err;
+        }
+
         auto &urb = get_urb(request);
         urb_function_t *handler{};
 
