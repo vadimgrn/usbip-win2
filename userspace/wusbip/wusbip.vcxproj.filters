@@ -16,4 +16,7 @@
   <ItemGroup>
     <ResourceCompile Include="wusbip.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>
