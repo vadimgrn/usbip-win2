@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<wxFormBuilder_Project>
+  <FileVersion major="1" minor="17"/>
+  <object class="Project" expanded="true">
+    <property name="class_decoration">; </property>
+    <property name="code_generation">C++</property>
+    <property name="disconnect_events">1</property>
+    <property name="disconnect_mode">source_name</property>
+    <property name="disconnect_php_events">0</property>
+    <property name="disconnect_python_events">0</property>
+    <property name="embedded_files_path">res</property>
+    <property name="encoding">UTF-8</property>
+    <property name="event_generation">connect</property>
+    <property name="file">frame</property>
+    <property name="first_id">1000</property>
+    <property name="help_provider">none</property>
+    <property name="image_path_wrapper_function_name"></property>
+    <property name="indent_with_spaces"></property>
+    <property name="internationalize">1</property>
+    <property name="name">wusbip</property>
+    <property name="namespace"></property>
+    <property name="path">.</property>
+    <property name="precompiled_header"></property>
+    <property name="relative_path">1</property>
+    <property name="skip_lua_events">1</property>
+    <property name="skip_php_events">1</property>
+    <property name="skip_python_events">1</property>
+    <property name="ui_table">UI</property>
+    <property name="use_array_enum">1</property>
+    <property name="use_enum">1</property>
+    <property name="use_microsoft_bom">1</property>
+    <object class="Frame" expanded="true">
+      <property name="aui_managed">1</property>
+      <property name="aui_manager_style">wxAUI_MGR_DEFAULT</property>
+      <property name="bg"></property>
+      <property name="center">wxBOTH</property>
+      <property name="context_help"></property>
+      <property name="context_menu">1</property>
+      <property name="drag_accept_files">0</property>
+      <property name="enabled">1</property>
+      <property name="event_handler">impl_virtual</property>
+      <property name="extra_style"></property>
+      <property name="fg"></property>
+      <property name="font"></property>
+      <property name="hidden">0</property>
+      <property name="id">wxID_ANY</property>
+      <property name="maximum_size"></property>
+      <property name="minimum_size"></property>
+      <property name="name">Frame</property>
+      <property name="pos"></property>
+      <property name="size">500,300</property>
+      <property name="style">wxDEFAULT_FRAME_STYLE</property>
+      <property name="subclass">; ; forward_declare</property>
+      <property name="title">USBIP</property>
+      <property name="tooltip"></property>
+      <property name="two_step_creation">0</property>
+      <property name="window_extra_style"></property>
+      <property name="window_name"></property>
+      <property name="window_style">wxTAB_TRAVERSAL</property>
+      <property name="xrc_skip_sizer">1</property>
+    </object>
+  </object>
+</wxFormBuilder_Project>

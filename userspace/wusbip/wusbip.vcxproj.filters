@@ -5,5 +5,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />
+    <ClCompile Include="frame.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="wusbip.h" />
+    <ClInclude Include="frame.h" />
   </ItemGroup>
 </Project>
