@@ -11,4 +11,7 @@
     <ClInclude Include="wusbip.h" />
     <ClInclude Include="frame.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="readme.txt" />
+  </ItemGroup>
 </Project>

@@ -45,6 +45,8 @@
 #define CertName "USBip"
 #define CertPwd "usbip"
 
+#define wxWidgetsDLL "wxmsw32u*_vc"
+
 [Setup]
 AppName={#ProductName}
 AppVersion={#AppVersion}
@@ -82,6 +84,7 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 
 [Components]
 Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
+Name: "gui"; Description: "GUI App"; Types: full custom;
 Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 Name: "pdb"; Description: "Program DataBase files"; Types: full custom
 
@@ -94,15 +97,20 @@ Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Fl
 Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Excludes: "{#wxWidgetsDLL}.dll"; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 Source: {#BuildDir + "libusbip.lib"}; DestDir: "{app}\lib"; Components: sdk
 Source: {#BuildDir + "libusbip.exp"}; DestDir: "{app}\lib"; Components: sdk
 
-Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip.pdb, libusbip_check.pdb"; Components: pdb
+; wxmsw32u?_vc.pdb is too large
+Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip*.pdb, wusbip.pdb, {#wxWidgetsDLL}.pdb"; Components: pdb
 Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
+Source: {#BuildDir + "wusbip.pdb"}; DestDir: "{app}"; Components: pdb and gui
+
+Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
+Source: {#BuildDir}{#wxWidgetsDLL + ".dll"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main

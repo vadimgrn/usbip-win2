@@ -95,6 +95,9 @@
     <ClInclude Include="frame.h" />
     <ClInclude Include="wusbip.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="readme.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\packages\wxWidgets.3.2.2.1\build\wxWidgets.targets" Condition="Exists('..\..\packages\wxWidgets.3.2.2.1\build\wxWidgets.targets')" />
