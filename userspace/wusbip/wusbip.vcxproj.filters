@@ -6,10 +6,12 @@
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />
     <ClCompile Include="frame.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wusbip.h" />
     <ClInclude Include="frame.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

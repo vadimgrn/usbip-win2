@@ -9,5 +9,11 @@
 class MainFrame : public Frame
 {
 public:
-        MainFrame();
+	MainFrame() : Frame(nullptr) {}
+private:
+	void on_exit(wxCommandEvent &event) override;
+	void on_list(wxCommandEvent &event) override;
+	void on_attach(wxCommandEvent &event) override;
+	void on_detach(wxCommandEvent &event) override;
+	void on_port(wxCommandEvent &event) override;
 };
