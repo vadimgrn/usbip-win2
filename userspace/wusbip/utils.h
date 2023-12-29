@@ -5,13 +5,12 @@
 #pragma once
 
 #include <libusbip/win_handle.h>
-#include <string>
+#include <wx/string.h>
 
 namespace usbip
 {
 
-std::string GetLastErrorMsg(unsigned long msg_id = ~0UL);
-
+wxString GetLastErrorMsg(DWORD msg_id = ~0UL);
 Handle& get_vhci();
 
 } // namespace usbip

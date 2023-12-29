@@ -39,6 +39,7 @@ class Frame : public wxFrame
 		wxMenu* m_menubar_commands;
 
 		// Virtual event handlers, override them in your derived class
+		virtual void on_idle( wxIdleEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_list( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }

@@ -9,7 +9,8 @@
 
 #include <wx/app.h>
 #include <wx/msgdlg.h>
-#include <wx/log.h> 
+
+#include <format>
 
 namespace
 {
@@ -24,25 +25,19 @@ public:
 
 bool App::OnInit()
 {
-        if (!get_vhci()) {
-                auto s = GetLastErrorMsg();
-                wxMessageBox(s, _("Critical error"), wxICON_ERROR);
-                return false;
-        }
-
         if (!wxApp::OnInit()) {
                 return false;
         }
 
-        auto frame = new MainFrame;
-        frame->Show(true);
-
-        return true;
-}
-
-void log_last_error(const char *what, DWORD msg_id = GetLastError())
-{
-        wxLogError("{}: {}", what, GetLastErrorMsg(msg_id));
+        if (auto read = usbip::vhci::open(true); read && get_vhci()) {
+                auto frame = new MainFrame(std::move(read));
+                frame->Show(true);
+                return true;
+        } else {
+                auto s = GetLastErrorMsg();
+                wxMessageBox(s, _("Critical error"), wxICON_ERROR);
+                return false;
+        }
 }
 
 } // namespace
@@ -50,9 +45,23 @@ void log_last_error(const char *what, DWORD msg_id = GetLastError())
 
 wxIMPLEMENT_APP(App);
 
+
+MainFrame::MainFrame(usbip::Handle read) : 
+        Frame(nullptr),
+        m_read(std::move(read))
+{
+}
+
 void MainFrame::on_exit(wxCommandEvent&)
 {
         Close(true);
+}
+
+void MainFrame::log_last_error(const char *what, DWORD msg_id)
+{
+        auto s = GetLastErrorMsg(msg_id);
+        auto text = wxString::Format("%s: %s", what, s);
+        SetStatusText(text);
 }
 
 void MainFrame::on_list(wxCommandEvent&)
@@ -75,11 +84,20 @@ void MainFrame::on_port(wxCommandEvent&)
         wxMessageBox(__func__);
 }
 
+void MainFrame::on_idle(wxIdleEvent&)
+{
+        static bool once;
+        if (!once) {
+                once = true;
+                async_read();
+        }
+
+        SleepEx(100, true);
+}
+
 bool MainFrame::async_read()
 {
-        auto &vhci = get_vhci();
-
-        if (!ReadFileEx(vhci.get(), m_read_buf.data(), DWORD(m_read_buf.size()), &m_overlapped, on_read)) {
+        if (!ReadFileEx(m_read.get(), m_read_buf.data(), DWORD(m_read_buf.size()), &m_overlapped, on_read)) {
                 log_last_error("ReadFileEx");
                 return false;
         }
@@ -94,35 +112,32 @@ bool MainFrame::async_read()
         }
 }
 
-void MainFrame::on_read(DWORD errcode, DWORD /*NumberOfBytesTransfered*/, OVERLAPPED *overlapped)
+void MainFrame::on_read(DWORD errcode)
 {
-        if ( errcode != ERROR_SUCCESS ) {
+        if (errcode != ERROR_SUCCESS) {
                 log_last_error(__func__, errcode);
                 return;
         }
 
-        auto &self = *static_cast<MainFrame*>(overlapped->hEvent);
-
         DWORD actual{};
-        if (auto &dev = get_vhci(); !GetOverlappedResult(dev.get(), overlapped, &actual, false)) {
+        if (!GetOverlappedResult(m_read.get(), &m_overlapped, &actual, false)) {
                 log_last_error("GetOverlappedResult");
                 return;
         }
 
-        assert(actual <= self.m_read_buf.size());
+        assert(actual <= m_read_buf.size());
 
-        usbip::device_state st;
-        if (!vhci::get_device_state(st, self.m_read_buf.data(), actual)) {
+        if (usbip::device_state st; !vhci::get_device_state(st, m_read_buf.data(), actual)) {
                 log_last_error("vhci::get_device_state");
-                return;
+        } else {
+                state_changed(st);
+                async_read();
         } 
-
-        self.state_changed(st);
-        self.async_read();
 }
 
 void MainFrame::state_changed(const usbip::device_state &st)
 {
-        auto s = usbip::vhci::get_state_str(st.state);
-        SetStatusText(s);
+        auto &loc = st.device.location;
+        auto s = std::format("{}:{}/{} {}", loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state));
+        SetStatusText(wxString::FromUTF8(s));
 }
