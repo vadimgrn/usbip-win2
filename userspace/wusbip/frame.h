@@ -20,8 +20,10 @@
 #include <wx/image.h>
 #include <wx/icon.h>
 #include <wx/menu.h>
-#include <wx/frame.h>
 #include <wx/aui/aui.h>
+#include <wx/aui/auibar.h>
+#include <wx/treectrl.h>
+#include <wx/frame.h>
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +39,11 @@ class Frame : public wxFrame
 		wxMenuBar* m_menubar;
 		wxMenu* m_menu_file;
 		wxMenu* m_menubar_commands;
+		wxAuiToolBar* m_auiToolBar;
+		wxAuiToolBarItem* m_toolPort;
+		wxAuiToolBarItem* m_toolAttach;
+		wxAuiToolBarItem* m_toolDetach;
+		wxTreeCtrl* m_treeCtrlList;
 
 		// Virtual event handlers, override them in your derived class
 		virtual void on_idle( wxIdleEvent& event ) { event.Skip(); }

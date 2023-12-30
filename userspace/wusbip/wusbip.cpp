@@ -29,15 +29,20 @@ bool App::OnInit()
                 return false;
         }
 
-        if (auto read = usbip::vhci::open(true); read && get_vhci()) {
-                auto frame = new MainFrame(std::move(read));
+        wxString err;
+
+        if (auto handle = init(err) ? vhci::open(true) : Handle()) {
+                auto frame = new MainFrame(std::move(handle));
                 frame->Show(true);
                 return true;
-        } else {
-                auto s = GetLastErrorMsg();
-                wxMessageBox(s, _("Critical error"), wxICON_ERROR);
-                return false;
         }
+
+        if (err.empty()) {
+                err = GetLastErrorMsg();
+        }
+
+        wxMessageBox(err, _("Critical error"), wxICON_ERROR);
+        return false;
 }
 
 } // namespace
@@ -66,7 +71,25 @@ void MainFrame::log_last_error(const char *what, DWORD msg_id)
 
 void MainFrame::on_list(wxCommandEvent&)
 {
-        wxMessageBox(__func__);
+        m_treeCtrlList->DeleteAllItems();
+
+        auto sock = connect("pc", usbip::get_tcp_port());
+        if (!sock) {
+                log_last_error("usbip::connect");
+                return;
+        }
+
+        auto dev = [this] (auto /*idx*/, auto &dev)
+        {
+                auto busid = wxString::FromUTF8(dev.busid);
+                m_treeCtrlList->AddRoot(busid);
+        };
+
+        auto intf = [this] (auto /*dev_idx*/, auto& /*dev*/, auto /*idx*/, auto& /*intf*/) {};
+
+        if (!enum_exportable_devices(sock.get(), dev, intf)) {
+                log_last_error("usbip::enum_exportable_devices");
+        }
 }
 
 void MainFrame::on_attach(wxCommandEvent&)

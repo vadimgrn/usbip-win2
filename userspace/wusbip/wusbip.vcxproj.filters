@@ -2,6 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="..\usbip\usb.ids" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />
@@ -12,8 +13,12 @@
     <ClInclude Include="wusbip.h" />
     <ClInclude Include="frame.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="wusbip.rc" />
   </ItemGroup>
 </Project>
