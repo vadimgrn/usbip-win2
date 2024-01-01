@@ -5,37 +5,41 @@
 #pragma once
 
 #include "frame.h"
-#include <libusbip/vhci.h>
 
-#include <vector>
+
+#include <libusbip/vhci.h>
+#include <thread>
+
+class DeviceStateEvent;
+wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent); 
 
 class MainFrame : public Frame
 {
 public:
-	MainFrame(usbip::Handle read);
+	MainFrame(_In_ usbip::Handle read);
+	~MainFrame();
+
+	auto ok() const noexcept { return static_cast<bool>(m_iocp); }
 
 private:
-	OVERLAPPED m_overlapped{ 0, 0, {0}, this }; // see ReadFileEx
-	std::vector<char> m_read_buf = std::vector<char>( usbip::vhci::get_device_state_size() );
-	usbip::Handle m_read; // for ReadFileEx
+	enum { CompletionKey, CompletionKeyQuit, ConcurrentThreads = 1 };
 
+	usbip::Handle m_read; // for ReadFile
+	usbip::Handle m_iocp{ CreateIoCompletionPort(m_read.get(), nullptr, CompletionKey, ConcurrentThreads) };
+
+	std::thread m_thread;
+
+	void on_close(wxCloseEvent &event) override; 
 	void on_exit(wxCommandEvent &event) override;
 	void on_list(wxCommandEvent &event) override;
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
 	void on_port(wxCommandEvent &event) override;
+	void on_device_state(_In_ DeviceStateEvent &event);
 
-	void on_idle(wxIdleEvent &event) override;
-
-	void log_last_error(const char *what, DWORD msg_id = GetLastError());
+	void log_last_error(_In_ const char *what, _In_ DWORD msg_id = GetLastError());
 	
-	bool async_read();
-	void on_read(DWORD errcode);
-	
-	static void on_read(DWORD errcode, DWORD /*NumberOfBytesTransfered*/, OVERLAPPED *overlapped)
-	{
-		static_cast<MainFrame*>(overlapped->hEvent)->on_read(errcode);
-	}
-
-	void state_changed(const usbip::device_state &st);
+	void join();
+	void read_loop();
+	DWORD read(_In_ void *buf, _In_ DWORD len);
 };

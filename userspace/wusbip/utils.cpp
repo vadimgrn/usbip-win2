@@ -31,12 +31,8 @@ auto get_ids_data()
 } // namespace
 
 
-wxString usbip::GetLastErrorMsg(DWORD msg_id)
+wxString usbip::GetLastErrorMsg(_In_ DWORD msg_id)
 {
-        if (msg_id == ~0UL) {
-                msg_id = GetLastError();
-        }
-
         auto &mod = get_resource_module();
         return wformat_message(mod.get(), msg_id);
 }

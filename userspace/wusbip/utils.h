@@ -12,7 +12,7 @@ namespace usbip
 
 bool init(_Out_ wxString &err);
 
-wxString GetLastErrorMsg(_In_ DWORD msg_id = ~0UL);
+wxString GetLastErrorMsg(_In_ DWORD msg_id = GetLastError());
 Handle& get_vhci();
 
 class UsbIds;

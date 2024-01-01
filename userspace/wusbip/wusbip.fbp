@@ -58,7 +58,7 @@
       <property name="window_name"></property>
       <property name="window_style">wxTAB_TRAVERSAL</property>
       <property name="xrc_skip_sizer">1</property>
-      <event name="OnIdle">on_idle</event>
+      <event name="OnClose">on_close</event>
       <object class="wxStatusBar" expanded="true">
         <property name="bg"></property>
         <property name="context_help"></property>

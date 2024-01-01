@@ -46,7 +46,7 @@ class Frame : public wxFrame
 		wxTreeCtrl* m_treeCtrlList;
 
 		// Virtual event handlers, override them in your derived class
-		virtual void on_idle( wxIdleEvent& event ) { event.Skip(); }
+		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_list( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
