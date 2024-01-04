@@ -144,6 +144,18 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         SetStatusText(wxString::FromUTF8(s));
 }
 
+void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
+{
+        auto f = m_log->GetFrame();
+        event.Check(f->IsVisible());
+}
+
+void MainFrame::on_log_show(wxCommandEvent &event)
+{
+        bool checked = event.GetInt();
+        m_log->Show(checked);
+}
+
 void MainFrame::on_list(wxCommandEvent&)
 {
         m_treeCtrlList->DeleteAllItems();

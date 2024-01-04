@@ -6,7 +6,10 @@
 
 #include "frame.h"
 
+#include <wx/log.h>
+
 #include <libusbip/win_handle.h>
+
 #include <thread>
 #include <mutex>
 
@@ -20,6 +23,8 @@ public:
 	~MainFrame();
 
 private:
+	wxLogWindow *m_log = new wxLogWindow(this, _("Log records"), false);
+
 	usbip::Handle m_read;
 	std::mutex m_read_close_mtx;
 
@@ -31,6 +36,10 @@ private:
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
 	void on_port(wxCommandEvent &event) override;
+	
+	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
+	void on_log_show(wxCommandEvent &event) override;
+
 	void on_device_state(_In_ DeviceStateEvent &event);
 
 	void log_last_error(_In_ const char *what, _In_ DWORD msg_id = GetLastError());

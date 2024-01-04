@@ -35,10 +35,16 @@ class Frame : public wxFrame
 	private:
 
 	protected:
+		enum
+		{
+			ID_ANY = 1000
+		};
+
 		wxStatusBar* m_statusBar;
 		wxMenuBar* m_menubar;
 		wxMenu* m_menu_file;
-		wxMenu* m_menubar_commands;
+		wxMenu* m_menu_commands;
+		wxMenu* m_menu_log;
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_toolPort;
 		wxAuiToolBarItem* m_toolAttach;
@@ -52,6 +58,8 @@ class Frame : public wxFrame
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_port( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 
 
 	public:
