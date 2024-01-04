@@ -6,6 +6,7 @@
 #include "utils.h"
 
 #include <libusbip/remote.h>
+#include <libusbip/vhci.h>
 
 #include <wx/app.h>
 #include <wx/event.h>
@@ -32,9 +33,8 @@ bool App::OnInit()
 
         wxString err;
 
-        if (auto read = init(err) ? vhci::open(true) : Handle(); !read) {
-                //
-        } else if (auto frame = new MainFrame(std::move(read)); frame->ok()) {
+        if (auto read = init(err) ? vhci::open() : Handle()) {
+                auto frame = new MainFrame(std::move(read));
                 frame->Show(true);
                 return true;
         }
@@ -72,41 +72,18 @@ MainFrame::MainFrame(_In_ usbip::Handle read) :
         m_read(std::move(read))
 {
         wxASSERT(m_read);
-
-        if (m_iocp) {
-                Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
-                m_thread = std::thread(&MainFrame::read_loop, this);
-        }
+        Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 }
 
 MainFrame::~MainFrame() 
 {
-        if (m_iocp) {
-                Unbind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
-        }
-}
-
-void MainFrame::join()
-{
-        wxASSERT(m_iocp);
-
-        if (!PostQueuedCompletionStatus(m_iocp.get(), 0, CompletionKeyQuit, nullptr)) { // signal to quit read_loop()
-                log_last_error("PostQueuedCompletionStatus"); 
-                m_iocp.close(); // "dirty" way to quit
-        } 
-
-        try {
-                m_thread.join();
-        } catch (std::exception &e) {
-                wxLogError("%s exception: %s", e.what(), __func__);
-        }
+        Unbind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 }
 
 void MainFrame::on_close(wxCloseEvent &event)
 {
-        if (m_thread.joinable()) {
-                join();
-        } 
+        break_read_loop();
+        m_read_thread.join();
 
         Frame::on_close(event);
 }
@@ -123,39 +100,38 @@ void MainFrame::log_last_error(_In_ const char *what, _In_ DWORD msg_id)
         SetStatusText(text);
 }
 
-DWORD MainFrame::read(_In_ void *buf, _In_ DWORD len)
-{
-        DWORD actual{};
-
-        if (OVERLAPPED overlapped{}, *pov{}; !ReadFile(m_read.get(), buf, len, &actual, &overlapped)) {
-
-                if (auto err = GetLastError(); err != ERROR_IO_PENDING) {
-                        log_last_error("ReadFile", err);
-                        wxASSERT(!actual);
-                } else if (ULONG_PTR key{}; !GetQueuedCompletionStatus(m_iocp.get(), &actual, &key, &pov, INFINITE)) {
-                        log_last_error("GetQueuedCompletionStatus");
-                } else if (key == CompletionKeyQuit) {
-                        wxASSERT(!actual);
-                }
-        }
-
-        wxASSERT(actual <= len);
-        return actual;
-}
-
 void MainFrame::read_loop()
 {
-        auto len = usbip::vhci::get_device_state_size();
-        auto buf = std::make_unique_for_overwrite<char[]>(len);
+        auto on_exit = [] (auto frame)
+        {
+                std::lock_guard<std::mutex> lock(frame->m_read_close_mtx);
+                frame->m_read.close();
+        };
 
-        while (auto actual = read(buf.get(), len)) {
+        std::unique_ptr<MainFrame, decltype(on_exit)> ptr(this, on_exit);
 
-                if (usbip::device_state st; !vhci::get_device_state(st, buf.get(), actual)) {
-                        log_last_error("vhci::get_device_state");
+        for (usbip::device_state st; vhci::read_device_state(m_read.get(), st); ) {
+                auto evt = new DeviceStateEvent(std::move(st));
+                QueueEvent(evt); // see on_device_state()
+        }
+
+        if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED) { // see CancelSynchronousIo
+                log_last_error("vhci::read_device_state", err);
+        }
+}
+
+void MainFrame::break_read_loop()
+{
+        auto cancel_read = [this] // CancelSynchronousIo hangs if thread was terminated
+        {
+                std::lock_guard<std::mutex> lock(m_read_close_mtx);
+                return !m_read || CancelSynchronousIo(m_read_thread.native_handle());
+        };
+
+        for (int i = 0; i < 300 && !cancel_read(); ++i, std::this_thread::sleep_for(std::chrono::milliseconds(100))) {
+                if (auto err = GetLastError(); err != ERROR_NOT_FOUND) { // cannot find a request to cancel
+                        log_last_error("CancelSynchronousIo", err);
                         break;
-                } else {
-                        auto evt = new DeviceStateEvent(std::move(st));
-                        QueueEvent(evt); // see on_device_state()
                 }
         }
 }

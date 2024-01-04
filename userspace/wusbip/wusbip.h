@@ -6,9 +6,9 @@
 
 #include "frame.h"
 
-
-#include <libusbip/vhci.h>
+#include <libusbip/win_handle.h>
 #include <thread>
+#include <mutex>
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent); 
@@ -19,15 +19,11 @@ public:
 	MainFrame(_In_ usbip::Handle read);
 	~MainFrame();
 
-	auto ok() const noexcept { return static_cast<bool>(m_iocp); }
-
 private:
-	enum { CompletionKey, CompletionKeyQuit, ConcurrentThreads = 1 };
+	usbip::Handle m_read;
+	std::mutex m_read_close_mtx;
 
-	usbip::Handle m_read; // for ReadFile
-	usbip::Handle m_iocp{ CreateIoCompletionPort(m_read.get(), nullptr, CompletionKey, ConcurrentThreads) };
-
-	std::thread m_thread;
+	std::thread m_read_thread{ &MainFrame::read_loop, this };
 
 	void on_close(wxCloseEvent &event) override; 
 	void on_exit(wxCommandEvent &event) override;
@@ -39,7 +35,6 @@ private:
 
 	void log_last_error(_In_ const char *what, _In_ DWORD msg_id = GetLastError());
 	
-	void join();
 	void read_loop();
-	DWORD read(_In_ void *buf, _In_ DWORD len);
+	void break_read_loop();
 };
