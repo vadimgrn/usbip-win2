@@ -36,11 +36,13 @@ private:
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
 	void on_port(wxCommandEvent &event) override;
-	
+	void on_log_level(wxCommandEvent &event) override;
+
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
-
+	
 	void on_device_state(_In_ DeviceStateEvent &event);
+	void set_log_level();
 
 	void read_loop();
 	void break_read_loop();

@@ -37,7 +37,12 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_ANY = 1000
+			ID_LOG_SHOW = 1000,
+			ID_LOG_LEVEL_ERROR,
+			ID_LOG_LEVEL_WARNING,
+			ID_LOG_LEVEL_MESSAGE,
+			ID_LOG_LEVEL_STATUS,
+			ID_LOG_LEVEL_INFO
 		};
 
 		wxStatusBar* m_statusBar;
@@ -60,6 +65,7 @@ class Frame : public wxFrame
 		virtual void on_port( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
 
 
 	public:

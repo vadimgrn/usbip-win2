@@ -10,6 +10,7 @@
 
 #include <wx/app.h>
 #include <wx/event.h>
+#include <wx/msgdlg.h>
 
 #include <format>
 
@@ -42,7 +43,7 @@ bool App::OnInit()
                 err = GetLastErrorMsg();
         }
 
-        wxSafeShowMessage(err, _("Critical error"));
+        wxSafeShowMessage(err, _("Fatal error"));
         return false;
 }
 
@@ -71,6 +72,7 @@ MainFrame::MainFrame(_In_ usbip::Handle read) :
         m_read(std::move(read))
 {
         wxASSERT(m_read);
+        set_log_level();
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 }
 
@@ -92,6 +94,26 @@ void MainFrame::on_exit(wxCommandEvent&)
         Close(true);
 }
 
+void MainFrame::set_log_level()
+{
+        auto verbose = m_log->GetVerbose(); // --verbose option has passed
+        if (!verbose) {
+                m_log->SetVerbose(true); // produce messages for wxLOG_Info
+        }
+
+        auto lvl = verbose ? wxLOG_Info : wxLOG_Status;
+        m_log->SetLogLevel(lvl);
+
+        auto id = ID_LOG_LEVEL_ERROR + (lvl - wxLOG_Error);
+        wxASSERT(id <= ID_LOG_LEVEL_INFO);
+
+        auto item = m_menu_log->FindItem(id);
+        wxASSERT(item);
+
+        wxASSERT(item->IsRadio());
+        item->Check(true);
+}
+
 void MainFrame::read_loop()
 {
         auto on_exit = [] (auto frame)
@@ -108,7 +130,7 @@ void MainFrame::read_loop()
         }
 
         if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED) { // see CancelSynchronousIo
-                wxLogWarning("vhci::read_device_state error %lu %s", err, GetLastErrorMsg(err));
+                wxLogWarning("vhci::read_device_state error %lu: %s", err, GetLastErrorMsg(err));
         }
 }
 
@@ -148,6 +170,14 @@ void MainFrame::on_log_show(wxCommandEvent &event)
         m_log->Show(checked);
 }
 
+void MainFrame::on_log_level(wxCommandEvent &event)
+{
+        auto lvl = static_cast<wxLogLevelValues>(wxLOG_Error + (event.GetId() - ID_LOG_LEVEL_ERROR));
+        wxASSERT(lvl >= wxLOG_Error && lvl <= wxLOG_Info);
+
+        m_log->SetLogLevel(lvl);
+}
+
 void MainFrame::on_list(wxCommandEvent&)
 {
         m_treeCtrlList->DeleteAllItems();
@@ -158,7 +188,7 @@ void MainFrame::on_list(wxCommandEvent&)
         auto sock = connect(host, port);
         if (!sock) {
                 auto err = GetLastError();
-                wxLogError("connect %s:%s error %lu %s", host, port, err, GetLastErrorMsg(err));
+                wxLogError("connect %s:%s error %lu: %s", host, port, err, GetLastErrorMsg(err));
                 return;
         }
 
@@ -172,7 +202,7 @@ void MainFrame::on_list(wxCommandEvent&)
 
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
-                wxLogError("enum_exportable_devices error %lu %s", err, GetLastErrorMsg(err));
+                wxLogError("enum_exportable_devices error %lu: %s", err, GetLastErrorMsg(err));
         }
 }
 
@@ -188,5 +218,20 @@ void MainFrame::on_detach(wxCommandEvent&)
 
 void MainFrame::on_port(wxCommandEvent&)
 {
-        wxLogStatus(__func__);
+        m_treeCtrlList->DeleteAllItems();
+        auto &vhci = get_vhci();
+
+        bool ok{};
+        auto devices = usbip::vhci::get_imported_devices(vhci.get(), ok);
+        if (!ok) {
+                auto err = GetLastError();
+                wxLogError("get_imported_devices error %lu: %s", err, GetLastErrorMsg(err));
+                return;
+        }
+
+        for (auto &i: devices) {
+                auto &loc = i.location;
+                auto s = std::format("{}:{}/{}", loc.hostname, loc.service, loc.busid);
+                m_treeCtrlList->AddRoot(wxString::FromUTF8(s));        
+        }
 }

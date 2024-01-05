@@ -114,7 +114,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help"></property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">wxID_EXIT</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Exit</property>
             <property name="name">m_file_exit</property>
@@ -193,8 +193,8 @@
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_ANY</property>
+            <property name="help">Show window with log records</property>
+            <property name="id">ID_LOG_SHOW</property>
             <property name="kind">wxITEM_CHECK</property>
             <property name="label">Show</property>
             <property name="name">m_log_show</property>
@@ -212,66 +212,71 @@
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_ANY</property>
+            <property name="help">A serious error, user must be informed about it</property>
+            <property name="id">ID_LOG_LEVEL_ERROR</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Error</property>
             <property name="name">m_log_level_error</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_level</event>
           </object>
           <object class="wxMenuItem" expanded="true">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_ANY</property>
+            <property name="help">User is normally informed about it but may be ignored</property>
+            <property name="id">ID_LOG_LEVEL_WARNING</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Warning</property>
             <property name="name">m_log_level_warning</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_level</event>
           </object>
           <object class="wxMenuItem" expanded="true">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_ANY</property>
+            <property name="help">Normal message</property>
+            <property name="id">ID_LOG_LEVEL_MESSAGE</property>
             <property name="kind">wxITEM_RADIO</property>
-            <property name="label">Information</property>
+            <property name="label">Message</property>
+            <property name="name">m_log_level_message</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_level</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap"></property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Informational: might go to the status bar</property>
+            <property name="id">ID_LOG_LEVEL_STATUS</property>
+            <property name="kind">wxITEM_RADIO</property>
+            <property name="label">Status</property>
+            <property name="name">m_log_level_status</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_level</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap"></property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Informational message (a.k.a. &apos;Verbose&apos;)</property>
+            <property name="id">ID_LOG_LEVEL_INFO</property>
+            <property name="kind">wxITEM_RADIO</property>
+            <property name="label">Info</property>
             <property name="name">m_log_level_info</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
-          </object>
-          <object class="wxMenuItem" expanded="true">
-            <property name="bitmap"></property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_ANY</property>
-            <property name="kind">wxITEM_RADIO</property>
-            <property name="label">Debug</property>
-            <property name="name">m_log_level_debug</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-          </object>
-          <object class="wxMenuItem" expanded="true">
-            <property name="bitmap"></property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_ANY</property>
-            <property name="kind">wxITEM_RADIO</property>
-            <property name="label">Verbose</property>
-            <property name="name">m_log_level_verbose</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_level</event>
           </object>
         </object>
       </object>

@@ -19,7 +19,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menubar = new wxMenuBar( 0 );
 	m_menu_file = new wxMenu();
 	wxMenuItem* m_file_exit;
-	m_file_exit = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Exit") ) , wxEmptyString, wxITEM_NORMAL );
+	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("Exit") ) , wxEmptyString, wxITEM_NORMAL );
 	m_menu_file->Append( m_file_exit );
 
 	m_menubar->Append( m_menu_file, _("File") );
@@ -45,30 +45,30 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_log = new wxMenu();
 	wxMenuItem* m_log_show;
-	m_log_show = new wxMenuItem( m_menu_log, ID_ANY, wxString( _("Show") ) , wxEmptyString, wxITEM_CHECK );
+	m_log_show = new wxMenuItem( m_menu_log, ID_LOG_SHOW, wxString( _("Show") ) , _("Show window with log records"), wxITEM_CHECK );
 	m_menu_log->Append( m_log_show );
 
 	m_menu_log->AppendSeparator();
 
 	wxMenuItem* m_log_level_error;
-	m_log_level_error = new wxMenuItem( m_menu_log, ID_ANY, wxString( _("Error") ) , wxEmptyString, wxITEM_RADIO );
+	m_log_level_error = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_ERROR, wxString( _("Error") ) , _("A serious error, user must be informed about it"), wxITEM_RADIO );
 	m_menu_log->Append( m_log_level_error );
 
 	wxMenuItem* m_log_level_warning;
-	m_log_level_warning = new wxMenuItem( m_menu_log, ID_ANY, wxString( _("Warning") ) , wxEmptyString, wxITEM_RADIO );
+	m_log_level_warning = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_WARNING, wxString( _("Warning") ) , _("User is normally informed about it but may be ignored"), wxITEM_RADIO );
 	m_menu_log->Append( m_log_level_warning );
 
+	wxMenuItem* m_log_level_message;
+	m_log_level_message = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_MESSAGE, wxString( _("Message") ) , _("Normal message"), wxITEM_RADIO );
+	m_menu_log->Append( m_log_level_message );
+
+	wxMenuItem* m_log_level_status;
+	m_log_level_status = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_STATUS, wxString( _("Status") ) , _("Informational: might go to the status bar"), wxITEM_RADIO );
+	m_menu_log->Append( m_log_level_status );
+
 	wxMenuItem* m_log_level_info;
-	m_log_level_info = new wxMenuItem( m_menu_log, ID_ANY, wxString( _("Information") ) , wxEmptyString, wxITEM_RADIO );
+	m_log_level_info = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_INFO, wxString( _("Info") ) , _("Informational message (a.k.a. 'Verbose')"), wxITEM_RADIO );
 	m_menu_log->Append( m_log_level_info );
-
-	wxMenuItem* m_log_level_debug;
-	m_log_level_debug = new wxMenuItem( m_menu_log, ID_ANY, wxString( _("Debug") ) , wxEmptyString, wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_debug );
-
-	wxMenuItem* m_log_level_verbose;
-	m_log_level_verbose = new wxMenuItem( m_menu_log, ID_ANY, wxString( _("Verbose") ) , wxEmptyString, wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_verbose );
 
 	m_menubar->Append( m_menu_log, _("Log") );
 
@@ -100,6 +100,11 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_port ), this, m_cmd_port->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_show ), this, m_log_show->GetId());
 	this->Connect( m_log_show->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_error->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_warning->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_message->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_status->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_info->GetId());
 	this->Connect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
 	this->Connect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Connect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
@@ -109,7 +114,7 @@ Frame::~Frame()
 {
 	// Disconnect Events
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
-	this->Disconnect( ID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
+	this->Disconnect( ID_LOG_SHOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
 	this->Disconnect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
