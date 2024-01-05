@@ -42,8 +42,6 @@ private:
 
 	void on_device_state(_In_ DeviceStateEvent &event);
 
-	void log_last_error(_In_ const char *what, _In_ DWORD msg_id = GetLastError());
-	
 	void read_loop();
 	void break_read_loop();
 };
