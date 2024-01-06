@@ -13,8 +13,13 @@
 #include <thread>
 #include <mutex>
 
+namespace usbip
+{
+	struct device_location;
+}
+
 class DeviceStateEvent;
-wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent); 
+wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 class MainFrame : public Frame
 {
@@ -23,6 +28,7 @@ public:
 	~MainFrame();
 
 private:
+	enum { COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE }; // m_treeListCtrl
 	wxLogWindow *m_log = new wxLogWindow(this, _("Log records"), false);
 
 	usbip::Handle m_read;
@@ -35,7 +41,7 @@ private:
 	void on_list(wxCommandEvent &event) override;
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
-	void on_port(wxCommandEvent &event) override;
+	void on_refresh(wxCommandEvent &event) override;
 	void on_log_level(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
@@ -46,4 +52,6 @@ private:
 
 	void read_loop();
 	void break_read_loop();
+
+	wxTreeListItem find_server(_In_ const usbip::device_location &loc, _In_ bool append);
 };

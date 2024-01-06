@@ -68,3 +68,14 @@ bool usbip::init(_Out_ wxString &err)
 
         return static_cast<bool>(get_vhci());
 }
+
+const char* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
+{
+        static_assert(UsbLowSpeed == 0);
+        static_assert(UsbFullSpeed == 1);
+        static_assert(UsbHighSpeed == 2);
+        static_assert(UsbSuperSpeed == 3);
+
+        const char *str[] { "Low", "Full", "High", "Super" };
+        return speed >= 0 && speed < ARRAYSIZE(str) ? str[speed] : "?";
+}

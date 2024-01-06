@@ -105,7 +105,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">File</property>
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
@@ -175,21 +175,21 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help"></property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_CMD_REFRESH</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Port</property>
-            <property name="name">m_cmd_port</property>
+            <property name="label">Refresh</property>
+            <property name="name">m_cmd_refresh</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_port</event>
+            <event name="OnMenuSelection">on_refresh</event>
           </object>
         </object>
         <object class="wxMenu" expanded="true">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -204,11 +204,11 @@
             <event name="OnMenuSelection">on_log_show</event>
             <event name="OnUpdateUI">on_log_show_update_ui</event>
           </object>
-          <object class="separator" expanded="true">
+          <object class="separator" expanded="false">
             <property name="name">m_separator1</property>
             <property name="permission">none</property>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -222,7 +222,7 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_log_level</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -236,7 +236,7 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_log_level</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -250,7 +250,7 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_log_level</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -264,7 +264,7 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_log_level</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -280,7 +280,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="true">
+      <object class="wxAuiToolBar" expanded="false">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -340,7 +340,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap"></property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -352,7 +352,7 @@
           <property name="tooltip"></property>
           <event name="OnToolClicked">on_port</event>
         </object>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap"></property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -364,7 +364,7 @@
           <property name="tooltip"></property>
           <event name="OnToolClicked">on_attach</event>
         </object>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap"></property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -377,7 +377,7 @@
           <event name="OnToolClicked">on_detach</event>
         </object>
       </object>
-      <object class="wxTreeCtrl" expanded="true">
+      <object class="wxTreeListCtrl" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -390,12 +390,12 @@
         <property name="bg"></property>
         <property name="caption"></property>
         <property name="caption_visible">1</property>
-        <property name="center_pane">1</property>
+        <property name="center_pane">0</property>
         <property name="close_button">1</property>
         <property name="context_help"></property>
         <property name="context_menu">1</property>
         <property name="default_pane">0</property>
-        <property name="dock">Float</property>
+        <property name="dock">Dock</property>
         <property name="dock_fixed">0</property>
         <property name="docking">Center</property>
         <property name="drag_accept_files">0</property>
@@ -413,23 +413,59 @@
         <property name="minimize_button">0</property>
         <property name="minimum_size"></property>
         <property name="moveable">1</property>
-        <property name="name">m_treeCtrlList</property>
+        <property name="name">m_treeListCtrl</property>
         <property name="pane_border">1</property>
-        <property name="pane_position">395,277</property>
-        <property name="pane_size">504,242</property>
+        <property name="pane_position"></property>
+        <property name="pane_size"></property>
         <property name="permission">protected</property>
         <property name="pin_button">1</property>
         <property name="pos"></property>
         <property name="resize">Resizable</property>
         <property name="show">1</property>
         <property name="size"></property>
-        <property name="style">wxTR_DEFAULT_STYLE</property>
+        <property name="style">wxTL_DEFAULT_STYLE</property>
         <property name="subclass">; ; forward_declare</property>
         <property name="toolbar_pane">0</property>
         <property name="tooltip"></property>
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Server / Bus-Id</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_RIGHT</property>
+          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Port</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">USB Speed</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Vendor</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Product</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">State</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
       </object>
     </object>
   </object>

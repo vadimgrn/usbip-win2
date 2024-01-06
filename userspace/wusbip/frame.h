@@ -22,7 +22,7 @@
 #include <wx/menu.h>
 #include <wx/aui/aui.h>
 #include <wx/aui/auibar.h>
-#include <wx/treectrl.h>
+#include <wx/treelist.h>
 #include <wx/frame.h>
 
 ///////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,8 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_LOG_SHOW = 1000,
+			ID_CMD_REFRESH = 1000,
+			ID_LOG_SHOW,
 			ID_LOG_LEVEL_ERROR,
 			ID_LOG_LEVEL_WARNING,
 			ID_LOG_LEVEL_MESSAGE,
@@ -54,7 +55,7 @@ class Frame : public wxFrame
 		wxAuiToolBarItem* m_toolPort;
 		wxAuiToolBarItem* m_toolAttach;
 		wxAuiToolBarItem* m_toolDetach;
-		wxTreeCtrl* m_treeCtrlList;
+		wxTreeListCtrl* m_treeListCtrl;
 
 		// Virtual event handlers, override them in your derived class
 		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
@@ -62,10 +63,11 @@ class Frame : public wxFrame
 		virtual void on_list( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_port( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_port( wxCommandEvent& event ) { event.Skip(); }
 
 
 	public:

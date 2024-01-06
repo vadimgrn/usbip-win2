@@ -7,6 +7,7 @@
 
 #include <libusbip/remote.h>
 #include <libusbip/vhci.h>
+#include <libusbip/src/usb_ids.h>
 
 #include <wx/app.h>
 #include <wx/event.h>
@@ -47,9 +48,16 @@ bool App::OnInit()
         return false;
 }
 
+auto make_server_url(_In_ const usbip::device_location &loc)
+{
+        auto s = std::format("{}:{}", loc.hostname, loc.service);
+        return wxString::FromUTF8(s);
+}
+
 } // namespace
 
 wxIMPLEMENT_APP(App);
+
 
 class DeviceStateEvent : public wxEvent
 {
@@ -72,8 +80,12 @@ MainFrame::MainFrame(_In_ usbip::Handle read) :
         m_read(std::move(read))
 {
         wxASSERT(m_read);
+
         set_log_level();
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
+
+        wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, ID_CMD_REFRESH);
+        wxPostEvent(m_menu_commands, evt);
 }
 
 MainFrame::~MainFrame() 
@@ -180,6 +192,7 @@ void MainFrame::on_log_level(wxCommandEvent &event)
 
 void MainFrame::on_list(wxCommandEvent&)
 {
+/*
         m_treeCtrlList->DeleteAllItems();
 
         auto host = "pc";
@@ -192,18 +205,19 @@ void MainFrame::on_list(wxCommandEvent&)
                 return;
         }
 
-        auto dev = [this] (auto /*idx*/, auto &dev)
+        auto dev = [this] (auto, auto &dev)
         {
                 auto busid = wxString::FromUTF8(dev.busid);
                 m_treeCtrlList->AddRoot(busid);
         };
-
-        auto intf = [this] (auto /*dev_idx*/, auto& /*dev*/, auto /*idx*/, auto& /*intf*/) {};
-
+*/
+        //auto intf = [this] (auto /*dev_idx*/, auto& /*dev*/, auto /*idx*/, auto& /*intf*/) {};
+/*
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
                 wxLogError("enum_exportable_devices error %lu: %s", err, GetLastErrorMsg(err));
         }
+*/
 }
 
 void MainFrame::on_attach(wxCommandEvent&)
@@ -216,22 +230,66 @@ void MainFrame::on_detach(wxCommandEvent&)
         wxLogStatus(__func__);
 }
 
-void MainFrame::on_port(wxCommandEvent&)
+void MainFrame::on_refresh(wxCommandEvent&)
 {
-        m_treeCtrlList->DeleteAllItems();
-        auto &vhci = get_vhci();
+        auto &tree = *m_treeListCtrl;
+        tree.DeleteAllItems();
 
         bool ok{};
-        auto devices = usbip::vhci::get_imported_devices(vhci.get(), ok);
+        auto devices = usbip::vhci::get_imported_devices(get_vhci().get(), ok);
         if (!ok) {
                 auto err = GetLastError();
                 wxLogError("get_imported_devices error %lu: %s", err, GetLastErrorMsg(err));
                 return;
         }
 
-        for (auto &i: devices) {
-                auto &loc = i.location;
-                auto s = std::format("{}:{}/{}", loc.hostname, loc.service, loc.busid);
-                m_treeCtrlList->AddRoot(wxString::FromUTF8(s));        
+        auto &ids = usbip::get_ids();
+
+        auto st = vhci::get_state_str(usbip::state::connected);
+        auto connected = _(wxString::FromAscii(st));
+
+        auto str = [] (auto id, auto sv)
+        {
+                return sv.empty() ? wxString::Format("%04x", id) : wxString::FromAscii(sv.data(), sv.size());
+        };
+
+        for (auto &d: devices) {
+                auto srv = find_server(d.location, true);
+
+                static_assert(!COL_BUSID);
+                auto dev = tree.AppendItem(srv, wxString::FromUTF8(d.location.busid));
+
+                tree.SetItemText(dev, COL_PORT, wxString::Format("%02d", d.port)); // XX for proper sorting
+                tree.SetItemText(dev, COL_SPEED, usbip::get_speed_str(d.speed));
+
+                auto [vendor, product] = ids.find_product(d.vendor, d.product);
+                tree.SetItemText(dev, COL_VID, str(d.vendor, vendor));
+                tree.SetItemText(dev, COL_PID, str(d.product, product));
+
+                tree.SetItemText(dev, COL_STATE, connected);
+                
+                if (!tree.IsExpanded(srv)) {
+                        tree.Expand(srv);
+                }
         }
+}
+
+wxTreeListItem MainFrame::find_server(_In_ const usbip::device_location &loc, _In_ bool append)
+{
+        auto url = make_server_url(loc);
+
+        auto &tree = *m_treeListCtrl;
+        wxTreeListItem server;
+
+        for (auto item = tree.GetFirstItem(); item.IsOk(); item = tree.GetNextSibling(item)) {
+                if (tree.GetItemText(item) == url) {
+                        return server = item;
+                }
+        }
+
+        if (append) {
+                server = tree.AppendItem(tree.GetRootItem(), url);
+        }
+
+        return server;
 }

@@ -37,9 +37,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_cmd_detach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Detach") ) , wxEmptyString, wxITEM_NORMAL );
 	m_menu_commands->Append( m_cmd_detach );
 
-	wxMenuItem* m_cmd_port;
-	m_cmd_port = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Port") ) , wxEmptyString, wxITEM_NORMAL );
-	m_menu_commands->Append( m_cmd_port );
+	wxMenuItem* m_cmd_refresh;
+	m_cmd_refresh = new wxMenuItem( m_menu_commands, ID_CMD_REFRESH, wxString( _("Refresh") ) , wxEmptyString, wxITEM_NORMAL );
+	m_menu_commands->Append( m_cmd_refresh );
 
 	m_menubar->Append( m_menu_commands, _("Commands") );
 
@@ -84,8 +84,15 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_auiToolBar->Realize();
 	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Left() .PinButton( true ).Dock().Resizable().FloatingSize( wxDefaultSize ) );
 
-	m_treeCtrlList = new wxTreeCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTR_DEFAULT_STYLE );
-	m_mgr.AddPane( m_treeCtrlList, wxAuiPaneInfo() .Center() .PinButton( true ).Float().FloatingPosition( wxPoint( 395,277 ) ).Resizable().FloatingSize( wxSize( 504,242 ) ).CentrePane() );
+	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_DEFAULT_STYLE );
+	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .PinButton( true ).Dock().Resizable().FloatingSize( wxDefaultSize ) );
+
+	m_treeListCtrl->AppendColumn( _("Server / Bus-Id"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Port"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_RIGHT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("USB Speed"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Vendor"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Product"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
 
 
 	m_mgr.Update();
@@ -97,7 +104,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_list ), this, m_cmd_list->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_port ), this, m_cmd_port->GetId());
+	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_show ), this, m_log_show->GetId());
 	this->Connect( m_log_show->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_error->GetId());
