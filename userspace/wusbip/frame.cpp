@@ -50,25 +50,25 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_log->AppendSeparator();
 
-	wxMenuItem* m_log_level_error;
-	m_log_level_error = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_ERROR, wxString( _("Error") ) , _("A serious error, user must be informed about it"), wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_error );
+	wxMenuItem* m_loglevel_error;
+	m_loglevel_error = new wxMenuItem( m_menu_log, ID_LOGLEVEL_ERROR, wxString( _("Error") ) , _("A serious error, user must be informed about it"), wxITEM_RADIO );
+	m_menu_log->Append( m_loglevel_error );
 
-	wxMenuItem* m_log_level_warning;
-	m_log_level_warning = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_WARNING, wxString( _("Warning") ) , _("User is normally informed about it but may be ignored"), wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_warning );
+	wxMenuItem* m_loglevel_warning;
+	m_loglevel_warning = new wxMenuItem( m_menu_log, ID_LOGLEVEL_WARNING, wxString( _("Warning") ) , _("User is normally informed about it but may be ignored"), wxITEM_RADIO );
+	m_menu_log->Append( m_loglevel_warning );
 
-	wxMenuItem* m_log_level_message;
-	m_log_level_message = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_MESSAGE, wxString( _("Message") ) , _("Normal message"), wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_message );
+	wxMenuItem* m_loglevel_message;
+	m_loglevel_message = new wxMenuItem( m_menu_log, ID_LOGLEVEL_MESSAGE, wxString( _("Message") ) , _("Normal message"), wxITEM_RADIO );
+	m_menu_log->Append( m_loglevel_message );
 
-	wxMenuItem* m_log_level_status;
-	m_log_level_status = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_STATUS, wxString( _("Status") ) , _("Informational: might go to the status bar"), wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_status );
+	wxMenuItem* m_loglevel_status;
+	m_loglevel_status = new wxMenuItem( m_menu_log, ID_LOGLEVEL_STATUS, wxString( _("Status") ) , _("Informational: might go to the status bar"), wxITEM_RADIO );
+	m_menu_log->Append( m_loglevel_status );
 
-	wxMenuItem* m_log_level_info;
-	m_log_level_info = new wxMenuItem( m_menu_log, ID_LOG_LEVEL_INFO, wxString( _("Info") ) , _("Informational message (a.k.a. 'Verbose')"), wxITEM_RADIO );
-	m_menu_log->Append( m_log_level_info );
+	wxMenuItem* m_loglevel_info;
+	m_loglevel_info = new wxMenuItem( m_menu_log, ID_LOGLEVEL_INFO, wxString( _("Verbose") ) , _("Displayed only in the log window"), wxITEM_RADIO );
+	m_menu_log->Append( m_loglevel_info );
 
 	m_menubar->Append( m_menu_log, _("Log") );
 
@@ -107,11 +107,11 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_show ), this, m_log_show->GetId());
 	this->Connect( m_log_show->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
-	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_error->GetId());
-	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_warning->GetId());
-	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_message->GetId());
-	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_status->GetId());
-	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_log_level_info->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_error->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_warning->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_message->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_status->GetId());
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_info->GetId());
 	this->Connect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
 	this->Connect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Connect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );

@@ -1,22 +1,16 @@
 ﻿/*
- * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include "frame.h"
-
-#include <wx/log.h>
-
-#include <libusbip/win_handle.h>
+#include <libusbip/vhci.h>
 
 #include <thread>
 #include <mutex>
 
-namespace usbip
-{
-	struct device_location;
-}
+class LogWindow;
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
@@ -29,7 +23,7 @@ public:
 
 private:
 	enum { COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE }; // m_treeListCtrl
-	wxLogWindow *m_log = new wxLogWindow(this, _("Log records"), false);
+	LogWindow *m_log{};
 
 	usbip::Handle m_read;
 	std::mutex m_read_close_mtx;
@@ -54,4 +48,8 @@ private:
 	void break_read_loop();
 
 	wxTreeListItem find_server(_In_ const usbip::device_location &loc, _In_ bool append);
+	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
+
+	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::device_state &state);
+	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::imported_device &d);
 };
