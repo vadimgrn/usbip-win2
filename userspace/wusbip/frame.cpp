@@ -26,27 +26,27 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_commands = new wxMenu();
 	wxMenuItem* m_cmd_list;
-	m_cmd_list = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("List") ) , wxEmptyString, wxITEM_NORMAL );
+	m_cmd_list = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Find") ) + wxT('\t') + wxT("CTRL+F"), _("FInd exportable USB devices on remote host"), wxITEM_NORMAL );
 	m_menu_commands->Append( m_cmd_list );
 
 	wxMenuItem* m_cmd_attach;
-	m_cmd_attach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Attach") ) , wxEmptyString, wxITEM_NORMAL );
+	m_cmd_attach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+A"), _("Attach an exportable USB device"), wxITEM_NORMAL );
 	m_menu_commands->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_detach;
-	m_cmd_detach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Detach") ) , wxEmptyString, wxITEM_NORMAL );
+	m_cmd_detach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach an imported USB device"), wxITEM_NORMAL );
 	m_menu_commands->Append( m_cmd_detach );
 
 	wxMenuItem* m_cmd_refresh;
-	m_cmd_refresh = new wxMenuItem( m_menu_commands, ID_CMD_REFRESH, wxString( _("Refresh") ) , wxEmptyString, wxITEM_NORMAL );
+	m_cmd_refresh = new wxMenuItem( m_menu_commands, ID_CMD_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh the list of imported USB devices"), wxITEM_NORMAL );
 	m_menu_commands->Append( m_cmd_refresh );
 
-	m_menubar->Append( m_menu_commands, _("Commands") );
+	m_menubar->Append( m_menu_commands, _("Devices") );
 
 	m_menu_log = new wxMenu();
-	wxMenuItem* m_log_show;
-	m_log_show = new wxMenuItem( m_menu_log, ID_LOG_SHOW, wxString( _("Show") ) , _("Show window with log records"), wxITEM_CHECK );
-	m_menu_log->Append( m_log_show );
+	wxMenuItem* m_log_toggle;
+	m_log_toggle = new wxMenuItem( m_menu_log, ID_LOG_TOGGLE, wxString( _("Toggle window") ) + wxT('\t') + wxT("CTRL+L"), _("Show/hide the window with log records"), wxITEM_CHECK );
+	m_menu_log->Append( m_log_toggle );
 
 	m_menu_log->AppendSeparator();
 
@@ -85,7 +85,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Left() .PinButton( true ).Dock().Resizable().FloatingSize( wxDefaultSize ) );
 
 	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_DEFAULT_STYLE );
-	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .PinButton( true ).Dock().Resizable().FloatingSize( wxDefaultSize ) );
+	m_treeListCtrl->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ) );
+
+	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .Caption( _("Imported USB devices") ).CloseButton( false ).Movable( false ).Dock().Resizable().FloatingSize( wxDefaultSize ).DockFixed( true ).BottomDockable( false ).TopDockable( false ).LeftDockable( false ).RightDockable( false ).Floatable( false ) );
 
 	m_treeListCtrl->AppendColumn( _("Server / Bus-Id"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Port"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_RIGHT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
@@ -105,8 +107,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
-	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_show ), this, m_log_show->GetId());
-	this->Connect( m_log_show->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_show ), this, m_log_toggle->GetId());
+	this->Connect( m_log_toggle->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_error->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_warning->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_message->GetId());
@@ -121,7 +123,7 @@ Frame::~Frame()
 {
 	// Disconnect Events
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
-	this->Disconnect( ID_LOG_SHOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
+	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
 	this->Disconnect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );

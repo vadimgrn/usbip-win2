@@ -81,10 +81,25 @@ wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 class LogWindow : public wxLogWindow
 {
 public:
-        LogWindow(_In_ wxWindow *parent) : wxLogWindow(parent, _("Log records"), false) {}
+        LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toogle);
+
 private:
         void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
 };
+
+LogWindow::LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toggle) : 
+        wxLogWindow(parent, _("Log records"), false)
+{
+        wxASSERT(log_toggle);
+
+        auto acc = log_toggle->GetAccel();
+        wxASSERT(acc);
+
+        wxAcceleratorEntry entry(acc->GetFlags(), acc->GetKeyCode(), wxID_CLOSE);
+        wxAcceleratorTable table(1, &entry);
+
+        GetFrame()->SetAcceleratorTable(table);        
+}
 
 void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info)
 {
@@ -107,7 +122,7 @@ void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In
 MainFrame::MainFrame(_In_ usbip::Handle read) : 
         Frame(nullptr),
         m_read(std::move(read)),
-        m_log(new LogWindow(this))
+        m_log(new LogWindow(this, m_menu_log->FindItem(ID_LOG_TOGGLE)))
 {
         wxASSERT(m_read);
 
@@ -125,6 +140,8 @@ MainFrame::~MainFrame()
 
 void MainFrame::on_close(wxCloseEvent &event)
 {
+        wxLogVerbose(__func__);
+
         break_read_loop();
         m_read_thread.join();
 
@@ -221,12 +238,16 @@ void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
 
 void MainFrame::on_log_show(wxCommandEvent &event)
 {
+        wxLogVerbose(__func__);
+
         bool checked = event.GetInt();
         m_log->Show(checked);
 }
 
 void MainFrame::on_log_level(wxCommandEvent &event)
 {
+        wxLogVerbose(__func__);
+
         auto lvl = static_cast<wxLogLevelValues>(wxLOG_Error + (event.GetId() - ID_LOGLEVEL_ERROR));
         wxASSERT(lvl >= wxLOG_Error && lvl <= wxLOG_Info);
 
@@ -235,6 +256,7 @@ void MainFrame::on_log_level(wxCommandEvent &event)
 
 void MainFrame::on_list(wxCommandEvent&)
 {
+        wxLogVerbose(__func__);
 /*
         m_treeCtrlList->DeleteAllItems();
 
@@ -265,16 +287,18 @@ void MainFrame::on_list(wxCommandEvent&)
 
 void MainFrame::on_attach(wxCommandEvent&)
 {
-        wxLogStatus(__func__);
+        wxLogVerbose(__func__);
 }
 
 void MainFrame::on_detach(wxCommandEvent&)
 {
-        wxLogStatus(__func__);
+        wxLogVerbose(__func__);
 }
 
 void MainFrame::on_refresh(wxCommandEvent&)
 {
+        wxLogVerbose(__func__);
+
         auto &tree = *m_treeListCtrl;
         tree.DeleteAllItems();
 

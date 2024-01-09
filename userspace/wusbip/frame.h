@@ -38,7 +38,7 @@ class Frame : public wxFrame
 		enum
 		{
 			ID_CMD_REFRESH = 1000,
-			ID_LOG_SHOW,
+			ID_LOG_TOGGLE,
 			ID_LOGLEVEL_ERROR,
 			ID_LOGLEVEL_WARNING,
 			ID_LOGLEVEL_MESSAGE,
