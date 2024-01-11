@@ -49,8 +49,8 @@ private:
 
         std::wstring GetTranslation(bool original = false) const;
 
-        void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const;
-        std::wstring_view VerQueryValue(const wchar_t *val) const;
+        const void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const;
+        std::wstring_view VerQueryValue(const wchar_t *value) const;
 };
 
 win::FileVersion::Impl::Impl(std::wstring_view filename)
@@ -91,7 +91,7 @@ void win::FileVersion::Impl::SetTranslation(WORD lang_id, UINT code_page)
         m_def_transl = MakeTransl(transl);
 }
 
-void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_sz) const
+const void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_sz) const
 {
         if (m_info.empty()) {
                 throw std::exception("win::FileVersion::VerQueryValue: not initialized");
@@ -107,16 +107,19 @@ void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_s
         return buf;
 }
 
-std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *val) const
+std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *value) const
 {
         std::wstring_view res;
-        auto s = L"\\StringFileInfo\\" + GetTranslation() + L'\\' + val;
+        auto key = L"\\StringFileInfo\\" + GetTranslation() + L'\\' + value;
 
-        UINT buf_sz;
-        auto buf = VerQueryValue(s, buf_sz);
+        UINT cch{};
+        auto ws = static_cast<const wchar_t*>(VerQueryValue(key, cch));
 
-        if (buf && buf_sz) {
-                res = std::wstring_view(static_cast<const wchar_t*>(buf), buf_sz);
+        if (ws && cch) {
+                if (ws[cch - 1] == L'\0') {
+                        --cch;
+                }
+                res = std::wstring_view(ws, cch);
         }
 
         return res;
@@ -124,7 +127,7 @@ std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *val) cons
 
 std::wstring win::FileVersion::Impl::VerLanguageName() const
 {
-        WORD wLang = 0;
+        WORD wLang{};
 
         std::wistringstream is(std::wstring(m_def_transl, m_def_transl.size() >> 1));
         if (!(is >> std::hex >> wLang)) {
@@ -186,13 +189,12 @@ std::wstring win::FileVersion::Impl::GetTranslation(bool original) const
 
         std::wstring s;
 
-        UINT buf_sz;
-        auto buf = VerQueryValue(L"\\VarFileInfo\\Translation", buf_sz);
+        UINT buf_sz{};
+        auto ptr = reinterpret_cast<const DWORD*>(VerQueryValue(L"\\VarFileInfo\\Translation", buf_sz)); // first always must be present
 
-        if (buf && buf_sz) {
-                auto dw = *reinterpret_cast<DWORD*>(buf); // first always must present
-                assert(buf_sz == sizeof(dw));
-                s = MakeTransl(dw);
+        if (ptr && buf_sz) {
+                assert(buf_sz == sizeof(*ptr));
+                s = MakeTransl(*ptr);
         }
 
         return s;
