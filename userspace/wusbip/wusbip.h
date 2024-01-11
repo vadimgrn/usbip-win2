@@ -50,6 +50,7 @@ private:
 
 	wxTreeListItem find_server(_In_ const usbip::device_location &loc, _In_ bool append);
 	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
+	void remove_device(_In_ wxTreeListItem dev);
 
 	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::device_state &state);
 	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::imported_device &d);

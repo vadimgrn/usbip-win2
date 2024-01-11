@@ -63,10 +63,20 @@ void App::set_names()
         SetVendorName(wx_string(v.GetCompanyName()));
 }
 
-auto make_server_url(_In_ const usbip::device_location &loc)
+auto make_server_url(_In_ const device_location &loc)
 {
         auto s = std::format("{}:{}", loc.hostname, loc.service);
         return wxString::FromUTF8(s);
+}
+
+auto is_filled(_In_ const imported_device &d) noexcept
+{
+        return d.port > 0 && d.devid && d.vendor && d.product;
+}
+
+inline auto is_empty(_In_ const imported_device &d) noexcept
+{
+        return !is_filled(d);
 }
 
 } // namespace
@@ -237,7 +247,9 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto [dev, appended] = find_device(loc, true);
         update_device(dev, st);
 
-        if (auto &tree = *m_treeListCtrl; !appended) {
+        if (st.state == usbip::state::disconnected && is_empty(st.device)) {
+                remove_device(dev);
+        } else if (auto &tree = *m_treeListCtrl; !appended) {
                 // as is
         } else if (auto server = tree.GetItemParent(dev); !tree.IsExpanded(server)) {
                 tree.Expand(server);
@@ -380,6 +392,19 @@ std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const usbip::device_
         }
 
         return res;
+}
+
+void MainFrame::remove_device(_In_ wxTreeListItem device)
+{
+        wxASSERT(device.IsOk());
+        auto &tree = *m_treeListCtrl;
+
+        auto server = tree.GetItemParent(device);
+        tree.DeleteItem(device);
+
+        if (auto child = tree.GetFirstChild(server); !child.IsOk()) { // has no children
+                tree.DeleteItem(server);
+        }
 }
 
 void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &st)
