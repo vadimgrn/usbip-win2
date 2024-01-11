@@ -7,11 +7,13 @@
 
 #include <libusbip/remote.h>
 #include <libusbip/src/usb_ids.h>
+#include <libusbip/src/file_ver.h>
 
+#include <wx/log.h>
 #include <wx/app.h>
 #include <wx/event.h>
 #include <wx/msgdlg.h>
-#include <wx/log.h>
+#include <wx/aboutdlg.h>
 
 #include <format>
 
@@ -24,6 +26,9 @@ class App : public wxApp
 {
 public:
         bool OnInit() override;
+
+private:
+        void set_names();
 };
 
 bool App::OnInit()
@@ -35,7 +40,9 @@ bool App::OnInit()
         wxString err;
 
         if (auto read = init(err) ? vhci::open() : Handle()) {
+                set_names(); // after init()
                 auto frame = new MainFrame(std::move(read));
+                frame->SetTitle(GetAppDisplayName());
                 frame->Show(true);
                 return true;
         }
@@ -48,6 +55,14 @@ bool App::OnInit()
         return false;
 }
 
+void App::set_names()
+{
+        auto &v = win::get_file_version();
+
+        SetAppName(wx_string(v.GetProductName()));
+        SetVendorName(wx_string(v.GetCompanyName()));
+}
+
 auto make_server_url(_In_ const usbip::device_location &loc)
 {
         auto s = std::format("{}:{}", loc.hostname, loc.service);
@@ -55,7 +70,6 @@ auto make_server_url(_In_ const usbip::device_location &loc)
 }
 
 } // namespace
-
 
 wxIMPLEMENT_APP(App);
 
@@ -397,4 +411,26 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::impo
 {
         usbip::device_state st{ .device = d, .state = usbip::state::plugged };
         update_device(device, st);
+}
+
+void MainFrame::on_help_about(wxCommandEvent&)
+{
+        using usbip::wx_string;
+        auto &v = win::get_file_version();
+ 
+        wxAboutDialogInfo d;
+
+        d.SetVersion(wx_string(v.GetProductVersion()));
+        d.SetDescription(wx_string(v.GetFileDescription()));
+        d.SetCopyright(wx_string(v.GetLegalCopyright()));
+
+        d.AddDeveloper(wxString::FromAscii("Vadym Hrynchyshyn\t<vadimgrn@gmail.com>"));
+
+        d.SetWebSite(wxString::FromAscii("https://github.com/vadimgrn/usbip-win2"), 
+                     _(wxString::FromAscii("GitHub project page")));
+
+        d.SetLicence(wxString::FromAscii("GNU General Public License v3.0"));
+        //d.SetIcon();
+
+        wxAboutBox(d, this);
 }

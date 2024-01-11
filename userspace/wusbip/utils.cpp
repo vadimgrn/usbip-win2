@@ -9,6 +9,7 @@
 #include <libusbip/win_socket.h>
 #include <libusbip/format_message.h>
 #include <libusbip/src/usb_ids.h>
+#include <libusbip/src/file_ver.h>
 
 namespace
 {
@@ -24,12 +25,32 @@ auto& get_resource_module() noexcept
 auto get_ids_data()
 {
         win::Resource r(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDR_USB_IDS), RT_RCDATA);
-        assert(r);
+        wxASSERT(r);
         return r.str();
+}
+
+/*
+ * @see GetModuleFileName
+ */
+auto get_module_filename(_Out_ wxString &path)
+{
+        char *val{};
+        auto err = _get_pgmptr(&val); // wxWidgets uses WinMain
+        if (!err) {
+                path = val; // FIXME: what encoding of val?
+        }
+        return err;
 }
 
 } // namespace
 
+
+auto win::get_file_version(_In_ std::wstring_view path) -> const FileVersion&
+{
+        static FileVersion v(path);
+        wxASSERT(v);
+        return v;
+}
 
 wxString usbip::GetLastErrorMsg(_In_ DWORD msg_id)
 {
@@ -46,18 +67,26 @@ auto usbip::get_vhci() -> Handle&
 auto usbip::get_ids() -> const UsbIds&
 {
         static UsbIds ids(get_ids_data());
-        assert(ids);
+        wxASSERT(ids);
         return ids;
 }
 
 bool usbip::init(_Out_ wxString &err)
 {
-        assert(err.empty());
+        wxASSERT(err.empty());
 
         if (!get_resource_module()) {
                 auto ec = GetLastError();
-                err = wxString::Format("Can't load '%s.dll', error %#x %s", msgtable_dll, err, wformat_message(ec));
+                err = wxString::Format("Can't load '%s.dll', error %lu: %s", msgtable_dll, err, wformat_message(ec));
                 return false;
+        }
+
+        if (wxString path; auto errc = get_module_filename(path)) {
+                err = wxString::Format("_get_pgmptr error %d: %s", errc, strerror(errc));
+                return false;
+        } else {
+                auto sv = wstring_view(path);
+                win::get_file_version(sv); // must be the first call
         }
 
         static InitWinSock2 ws2;

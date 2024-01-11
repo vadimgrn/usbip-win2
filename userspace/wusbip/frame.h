@@ -51,6 +51,7 @@ class Frame : public wxFrame
 		wxMenu* m_menu_file;
 		wxMenu* m_menu_commands;
 		wxMenu* m_menu_log;
+		wxMenu* m_menu_log_help;
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_toolPort;
 		wxAuiToolBarItem* m_toolAttach;
@@ -67,12 +68,13 @@ class Frame : public wxFrame
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_port( wxCommandEvent& event ) { event.Skip(); }
 
 
 	public:
 
-		Frame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("USBIP"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,300 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+		Frame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 500,300 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 		wxAuiManager m_mgr;
 
 		~Frame();

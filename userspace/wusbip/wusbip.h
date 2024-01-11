@@ -37,6 +37,7 @@ private:
 	void on_detach(wxCommandEvent &event) override;
 	void on_refresh(wxCommandEvent &event) override;
 	void on_log_level(wxCommandEvent &event) override;
+	void on_help_about(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
