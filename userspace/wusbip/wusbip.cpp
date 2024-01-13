@@ -247,13 +247,24 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto [dev, appended] = find_device(loc, true);
         update_device(dev, st);
 
-        if (st.state == usbip::state::disconnected && is_empty(st.device)) {
+        if (st.state == usbip::state::disconnected && is_empty(st.device) && !is_persistent(dev)) {
                 remove_device(dev);
         } else if (auto &tree = *m_treeListCtrl; !appended) {
                 // as is
         } else if (auto server = tree.GetItemParent(dev); !tree.IsExpanded(server)) {
                 tree.Expand(server);
         }
+}
+
+bool MainFrame::is_persistent(_In_ wxTreeListItem device)
+{
+        auto &tree = *m_treeListCtrl;
+   
+        wxASSERT(tree.GetItemParent(device).IsOk()); // server
+        wxASSERT(!tree.GetFirstChild(device).IsOk());
+
+        auto &s = tree.GetItemText(device, COL_PERSISTENT);
+        return !s.empty();
 }
 
 void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
@@ -264,8 +275,6 @@ void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
 
 void MainFrame::on_log_show(wxCommandEvent &event)
 {
-        wxLogVerbose(__func__);
-
         bool checked = event.GetInt();
         m_log->Show(checked);
 }
@@ -458,4 +467,19 @@ void MainFrame::on_help_about(wxCommandEvent&)
         //d.SetIcon();
 
         wxAboutBox(d, this);
+}
+
+void MainFrame::on_tree_item_checked(wxTreeListEvent &event)
+{
+        auto &tree = *m_treeListCtrl;
+
+        auto item = event.GetItem();
+        auto st = tree.GetCheckedState(item);
+        
+        if (auto parent = tree.GetItemParent(item); parent == tree.GetRootItem()) { // server
+                tree.CheckItemRecursively(item, st);
+        } else if (tree.GetCheckedState(parent) != st && 
+                   (st == wxCHK_UNCHECKED || tree.AreAllChildrenInState(parent, st))) {
+                tree.CheckItem(parent, st);
+        }
 }

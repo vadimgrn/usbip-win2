@@ -22,7 +22,7 @@ public:
 	~MainFrame();
 
 private:
-	enum { COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE }; // m_treeListCtrl
+	enum { COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE, COL_PERSISTENT }; // m_treeListCtrl
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -38,6 +38,7 @@ private:
 	void on_refresh(wxCommandEvent &event) override;
 	void on_log_level(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
+	void on_tree_item_checked(wxTreeListEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
@@ -51,6 +52,8 @@ private:
 	wxTreeListItem find_server(_In_ const usbip::device_location &loc, _In_ bool append);
 	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
 	void remove_device(_In_ wxTreeListItem dev);
+
+	bool is_persistent(_In_ wxTreeListItem device);
 
 	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::device_state &state);
 	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::imported_device &d);

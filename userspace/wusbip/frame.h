@@ -70,6 +70,7 @@ class Frame : public wxFrame
 		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_port( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_tree_item_checked( wxTreeListEvent& event ) { event.Skip(); }
 
 
 	public:
