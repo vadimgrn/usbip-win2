@@ -32,29 +32,31 @@ private:
 
 	void on_close(wxCloseEvent &event) override; 
 	void on_exit(wxCommandEvent &event) override;
-	void on_list(wxCommandEvent &event) override;
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
 	void on_refresh(wxCommandEvent &event) override;
 	void on_log_level(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
 	void on_tree_item_checked(wxTreeListEvent &event) override;
+	void add_exported_devices(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
 	
 	void on_device_state(_In_ DeviceStateEvent &event);
+
+	void init();
 	void set_log_level();
 
 	void read_loop();
 	void break_read_loop();
 
-	wxTreeListItem find_server(_In_ const usbip::device_location &loc, _In_ bool append);
+	wxTreeListItem find_server(_In_ const wxString &url, _In_ bool append);
 	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
 	void remove_device(_In_ wxTreeListItem dev);
 
 	bool is_persistent(_In_ wxTreeListItem device);
 
-	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::device_state &state);
-	void update_device(_In_ wxTreeListItem dev, _In_ const usbip::imported_device &d);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state);
 };

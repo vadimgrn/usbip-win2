@@ -32,6 +32,20 @@ const UsbIds& get_ids();
 
 const char* get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept;
 
+struct usb_device;
+struct imported_device;
+imported_device make_imported_device(_In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev);
+
+struct device_location;
+wxString make_server_url(_In_ const device_location &loc);
+
+wxString make_server_url(_In_ const wxString &hostname, _In_ const wxString &service);
+
+constexpr UINT32 make_devid(_In_ int busnum, _In_ int devnum) noexcept
+{
+        return (busnum << 16) | (devnum & USHRT_MAX);
+}
+
 inline auto wstring_view(_In_ const wxString &s) noexcept
 {
         return std::wstring_view(s.wx_str(), s.length());

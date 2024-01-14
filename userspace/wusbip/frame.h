@@ -22,6 +22,10 @@
 #include <wx/menu.h>
 #include <wx/aui/aui.h>
 #include <wx/aui/auibar.h>
+#include <wx/stattext.h>
+#include <wx/textctrl.h>
+#include <wx/spinctrl.h>
+#include <wx/button.h>
 #include <wx/treelist.h>
 #include <wx/frame.h>
 
@@ -37,8 +41,7 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_CMD_REFRESH = 1000,
-			ID_LOG_TOGGLE,
+			ID_LOG_TOGGLE = 1000,
 			ID_LOGLEVEL_ERROR,
 			ID_LOGLEVEL_WARNING,
 			ID_LOGLEVEL_MESSAGE,
@@ -56,12 +59,18 @@ class Frame : public wxFrame
 		wxAuiToolBarItem* m_toolPort;
 		wxAuiToolBarItem* m_toolAttach;
 		wxAuiToolBarItem* m_toolDetach;
+		wxAuiToolBar* m_auiToolBarAdd;
+		wxStaticText* m_staticTextServer;
+		wxTextCtrl* m_textCtrlServer;
+		wxStaticText* m_staticTextPort;
+		wxSpinCtrl* m_spinCtrlPort;
+		wxButton* m_button_add;
 		wxTreeListCtrl* m_treeListCtrl;
 
 		// Virtual event handlers, override them in your derived class
 		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_list( wxCommandEvent& event ) { event.Skip(); }
+		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }

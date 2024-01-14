@@ -25,9 +25,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menubar->Append( m_menu_file, _("File") );
 
 	m_menu_commands = new wxMenu();
-	wxMenuItem* m_cmd_list;
-	m_cmd_list = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Find") ) + wxT('\t') + wxT("CTRL+F"), _("FInd exportable USB devices on remote host"), wxITEM_NORMAL );
-	m_menu_commands->Append( m_cmd_list );
+	wxMenuItem* m_cmd_add;
+	m_cmd_add = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Add") ) + wxT('\t') + wxT("CTRL+F"), _("Add exported USB devices on remote host"), wxITEM_NORMAL );
+	m_menu_commands->Append( m_cmd_add );
 
 	wxMenuItem* m_cmd_attach;
 	m_cmd_attach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+A"), _("Attach an exportable USB device"), wxITEM_NORMAL );
@@ -38,7 +38,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_commands->Append( m_cmd_detach );
 
 	wxMenuItem* m_cmd_refresh;
-	m_cmd_refresh = new wxMenuItem( m_menu_commands, ID_CMD_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh the list of imported USB devices"), wxITEM_NORMAL );
+	m_cmd_refresh = new wxMenuItem( m_menu_commands, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh the list of imported USB devices"), wxITEM_NORMAL );
 	m_menu_commands->Append( m_cmd_refresh );
 
 	m_menubar->Append( m_menu_commands, _("Devices") );
@@ -89,7 +89,32 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_toolDetach = m_auiToolBar->AddTool( wxID_ANY, _("Detach"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL );
 
 	m_auiToolBar->Realize();
-	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Left() .PinButton( true ).Dock().Resizable().FloatingSize( wxDefaultSize ) );
+	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Left() .PinButton( true ).Dock().Resizable().FloatingSize( wxSize( 95,141 ) ).Row( 0 ).Layer( 2 ) );
+
+	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_HORZ_LAYOUT );
+	m_auiToolBarAdd->SetToolPacking( 10 );
+	m_staticTextServer = new wxStaticText( m_auiToolBarAdd, wxID_ANY, _("Server"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL );
+	m_staticTextServer->Wrap( -1 );
+	m_staticTextServer->SetToolTip( _("USBIP server hostname or IP address") );
+
+	m_auiToolBarAdd->AddControl( m_staticTextServer );
+	m_textCtrlServer = new wxTextCtrl( m_auiToolBarAdd, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+	m_textCtrlServer->SetToolTip( _("Hostname or IP address") );
+
+	m_auiToolBarAdd->AddControl( m_textCtrlServer );
+	m_staticTextPort = new wxStaticText( m_auiToolBarAdd, wxID_ANY, _("Port"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL );
+	m_staticTextPort->Wrap( -1 );
+	m_staticTextPort->SetToolTip( _("TCP/IP port number") );
+
+	m_auiToolBarAdd->AddControl( m_staticTextPort );
+	m_spinCtrlPort = new wxSpinCtrl( m_auiToolBarAdd, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT|wxSP_ARROW_KEYS|wxSP_WRAP, 1025, 65535, 0 );
+	m_spinCtrlPort->SetToolTip( _("TCP/IP port number") );
+
+	m_auiToolBarAdd->AddControl( m_spinCtrlPort );
+	m_button_add = new wxButton( m_auiToolBarAdd, wxID_ADD, _("Add"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_auiToolBarAdd->AddControl( m_button_add );
+	m_auiToolBarAdd->Realize();
+	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Bottom() .Caption( _("Add exported devices") ).PinButton( true ).Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).Row( 0 ).Layer( 1 ) );
 
 	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_CHECKBOX|wxTL_DEFAULT_STYLE );
 	m_treeListCtrl->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
@@ -112,7 +137,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	// Connect Events
 	this->Connect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_list ), this, m_cmd_list->GetId());
+	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
 	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
@@ -127,6 +152,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
 	this->Connect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Connect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
+	m_button_add->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
 	m_treeListCtrl->Connect( wxEVT_TREELIST_ITEM_CHECKED, wxTreeListEventHandler( Frame::on_tree_item_checked ), NULL, this );
 }
 
@@ -138,6 +164,7 @@ Frame::~Frame()
 	this->Disconnect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
 	this->Disconnect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
+	m_button_add->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
 	m_treeListCtrl->Disconnect( wxEVT_TREELIST_ITEM_CHECKED, wxTreeListEventHandler( Frame::on_tree_item_checked ), NULL, this );
 
 	m_mgr.UnInit();

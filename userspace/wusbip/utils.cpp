@@ -6,10 +6,13 @@
 #include "resource.h"
 
 #include <libusbip/vhci.h>
+#include <libusbip/remote.h>
 #include <libusbip/win_socket.h>
 #include <libusbip/format_message.h>
 #include <libusbip/src/usb_ids.h>
 #include <libusbip/src/file_ver.h>
+
+#include <format>
 
 namespace
 {
@@ -107,4 +110,33 @@ const char* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
 
         const char *str[] { "Low", "Full", "High", "Super" };
         return speed >= 0 && speed < ARRAYSIZE(str) ? str[speed] : "?";
+}
+
+auto usbip::make_imported_device(
+        _In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev) -> imported_device
+{
+        return imported_device {
+                .location = {
+                        .hostname = std::move(hostname), 
+                        .service = std::move(service), 
+                        .busid = dev.busid 
+                },
+
+                .devid = make_devid(dev.busnum, dev.devnum),
+                .speed = dev.speed,
+
+                .vendor = dev.idVendor,
+                .product = dev.idProduct 
+        };
+}
+
+wxString usbip::make_server_url(_In_ const device_location &loc)
+{
+        auto url = std::format("{}:{}", loc.hostname, loc.service);
+        return wxString::FromUTF8(url);
+}
+
+wxString usbip::make_server_url(_In_ const wxString &hostname, _In_ const wxString &service)
+{
+        return hostname + wxT(':') + service;
 }
