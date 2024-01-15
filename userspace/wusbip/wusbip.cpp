@@ -107,7 +107,7 @@ private:
 };
 
 LogWindow::LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toggle) : 
-        wxLogWindow(parent, _(L"Log records"), false)
+        wxLogWindow(parent, _("Log records"), false)
 {
         wxASSERT(log_toggle);
 
@@ -169,7 +169,7 @@ void MainFrame::init()
 
 void MainFrame::on_close(wxCloseEvent &event)
 {
-        wxLogVerbose(__func__);
+        wxLogVerbose(wxString::FromAscii(__func__));
 
         break_read_loop();
         m_read_thread.join();
@@ -218,7 +218,7 @@ void MainFrame::read_loop()
         }
 
         if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED) { // see CancelSynchronousIo
-                wxLogVerbose(_(L"vhci::read_device_state error %lu: %s"), err, GetLastErrorMsg(err));
+                wxLogError(_("vhci::read_device_state error %lu\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
@@ -232,8 +232,8 @@ void MainFrame::break_read_loop()
 
         for (int i = 0; i < 300 && !cancel_read(); ++i, std::this_thread::sleep_for(std::chrono::milliseconds(100))) {
                 if (auto err = GetLastError(); err != ERROR_NOT_FOUND) { // cannot find a request to cancel
-                        wxLogSysError(err, L"CancelSynchronousIo"); // FIXME: do not show MessageBox
-                        break;
+                        wxLogError(L"CancelSynchronousIo error %lu\n%s", err, wxSysErrorMsg(err));
+                        break; // wxLogSysError does not compile if wxNO_IMPLICIT_WXSTRING_ENCODING is set
                 }
         }
 }
@@ -286,7 +286,7 @@ void MainFrame::on_log_show(wxCommandEvent &event)
 
 void MainFrame::on_log_level(wxCommandEvent &event)
 {
-        wxLogVerbose(__func__);
+        wxLogVerbose(wxString::FromAscii(__func__));
 
         auto lvl = static_cast<wxLogLevelValues>(wxLOG_Error + (event.GetId() - ID_LOGLEVEL_ERROR));
         wxASSERT(lvl >= wxLOG_Error && lvl <= wxLOG_Info);
@@ -296,17 +296,17 @@ void MainFrame::on_log_level(wxCommandEvent &event)
 
 void MainFrame::on_attach(wxCommandEvent&)
 {
-        wxLogVerbose(__func__);
+        wxLogVerbose(wxString::FromAscii(__func__));
 }
 
 void MainFrame::on_detach(wxCommandEvent&)
 {
-        wxLogVerbose(__func__);
+        wxLogVerbose(wxString::FromAscii(__func__));
 }
 
 void MainFrame::on_refresh(wxCommandEvent&)
 {
-        wxLogVerbose(__func__);
+        wxLogVerbose(wxString::FromAscii(__func__));
 
         auto &tree = *m_treeListCtrl;
         tree.DeleteAllItems();
@@ -315,7 +315,7 @@ void MainFrame::on_refresh(wxCommandEvent&)
         auto devices = usbip::vhci::get_imported_devices(get_vhci().get(), ok);
         if (!ok) {
                 auto err = GetLastError();
-                wxLogError("get_imported_devices error %lu: %s", err, GetLastErrorMsg(err));
+                wxLogError(_("get_imported_devices error %lu\n%s"), err, GetLastErrorMsg(err));
                 return;
         }
 
@@ -411,7 +411,7 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::devi
         tree.SetItemText(device, COL_PID, str(dev.product, product));
 
         auto state_str = vhci::get_state_str(st.state);
-        tree.SetItemText(device, COL_STATE, _(wxString::FromAscii(state_str)));
+        tree.SetItemText(device, COL_STATE, _(state_str));
 }
 
 void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state)
@@ -432,9 +432,9 @@ void MainFrame::on_help_about(wxCommandEvent&)
         d.SetCopyright(wx_string(v.GetLegalCopyright()));
 
         d.AddDeveloper(L"Vadym Hrynchyshyn\t<vadimgrn@gmail.com>");
-        d.SetWebSite(L"https://github.com/vadimgrn/usbip-win2", _(L"GitHub project page"));
+        d.SetWebSite(L"https://github.com/vadimgrn/usbip-win2", _("GitHub project page"));
 
-        d.SetLicence(L"GNU General Public License v3.0");
+        d.SetLicence(_("GNU General Public License v3.0"));
         //d.SetIcon();
 
         wxAboutBox(d, this);
@@ -460,7 +460,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto host = m_textCtrlServer->GetValue();
         auto port = wxString::Format(L"%d", m_spinCtrlPort->GetValue());
 
-        wxLogVerbose(L"%s, host='%s', port='%s'", __func__, host, port);
+        wxLogVerbose(L"%s, host='%s', port='%s'", wxString::FromAscii(__func__), host, port);
 
         auto u8_host = host.ToStdString(wxConvUTF8);
         auto u8_port = port.ToStdString(wxConvUTF8);
@@ -468,14 +468,14 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         Socket sock;
         {
                 wxWindowDisabler dis;
-                wxBusyInfo wait(wxString::Format(_(L"Connecting to %s:%s"), host, port), this);
+                wxBusyInfo wait(wxString::Format(_("Connecting to %s:%s"), host, port), this);
 
                 sock = connect(u8_host.c_str(), u8_port.c_str());
         }
 
         if (!sock) {
                 auto err = GetLastError();
-                wxLogError(_(L"Cannot connect to %s:%s\nError %lu\n%s"), host, port, err, GetLastErrorMsg(err));
+                wxLogError(_("Cannot connect to %s:%s\nError %lu\n%s"), host, port, err, GetLastErrorMsg(err));
                 return;
         }
 
@@ -491,7 +491,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
-                wxLogError(_(L"enum_exportable_devices error %lu: %s"), err, GetLastErrorMsg(err));
+                wxLogError(_("enum_exportable_devices error %lu\n%s"), err, GetLastErrorMsg(err));
         }
 
         auto url = make_server_url(host, port);

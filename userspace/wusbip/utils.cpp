@@ -12,6 +12,7 @@
 #include <libusbip/src/usb_ids.h>
 #include <libusbip/src/file_ver.h>
 
+#include <wx/translation.h>
 #include <format>
 
 namespace
@@ -40,7 +41,7 @@ auto get_module_filename(_Out_ wxString &path)
         char *val{};
         auto err = _get_pgmptr(&val); // wxWidgets uses WinMain
         if (!err) {
-                path = val; // FIXME: what encoding of val?
+                path = wxString(val, wxConvLocal); // FIXME: what encoding of val?
         }
         return err;
 }
@@ -80,12 +81,12 @@ bool usbip::init(_Out_ wxString &err)
 
         if (!get_resource_module()) {
                 auto ec = GetLastError();
-                err = wxString::Format("Can't load '%s.dll', error %lu: %s", msgtable_dll, err, wformat_message(ec));
+                err = wxString::Format(_("Cannot load '%s.dll'\nError %lu\n%s"), msgtable_dll, err, wformat_message(ec));
                 return false;
         }
 
         if (wxString path; auto errc = get_module_filename(path)) {
-                err = wxString::Format("_get_pgmptr error %d: %s", errc, strerror(errc));
+                err = wxString::Format(_("_get_pgmptr error %d\n%s"), errc, _wcserror(errc));
                 return false;
         } else {
                 auto sv = wstring_view(path);
@@ -94,22 +95,22 @@ bool usbip::init(_Out_ wxString &err)
 
         static InitWinSock2 ws2;
         if (!ws2) {
-                err = wxString::Format("Can't initialize Windows Sockets 2, %s", GetLastErrorMsg());
+                err = wxString::Format(_("WSAStartup error\n%s"), GetLastErrorMsg());
                 return false;
         }
 
         return static_cast<bool>(get_vhci());
 }
 
-const char* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
+const wchar_t* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
 {
         static_assert(UsbLowSpeed == 0);
         static_assert(UsbFullSpeed == 1);
         static_assert(UsbHighSpeed == 2);
         static_assert(UsbSuperSpeed == 3);
 
-        const char *str[] { "Low", "Full", "High", "Super" };
-        return speed >= 0 && speed < ARRAYSIZE(str) ? str[speed] : "?";
+        const wchar_t *str[] { L"Low", L"Full", L"High", L"Super" };
+        return speed >= 0 && speed < ARRAYSIZE(str) ? str[speed] : L"?";
 }
 
 auto usbip::make_imported_device(
@@ -138,5 +139,5 @@ wxString usbip::make_server_url(_In_ const device_location &loc)
 
 wxString usbip::make_server_url(_In_ const wxString &hostname, _In_ const wxString &service)
 {
-        return hostname + wxT(':') + service;
+        return hostname + L':' + service;
 }
