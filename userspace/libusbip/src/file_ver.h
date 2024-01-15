@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2001 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -12,10 +12,16 @@
 namespace win
 {
 
+/*
+ * Call GetLastError if empty string is returned. 
+ */
+USBIP_API std::wstring get_module_filename();
+
+
 class USBIP_API FileVersion 
 {
 public:
-        FileVersion(std::wstring_view filename = L"");
+        FileVersion(std::wstring_view filename = get_module_filename());
         ~FileVersion();
 
         FileVersion(const FileVersion&) = delete;

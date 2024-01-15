@@ -12,7 +12,9 @@
 #include <libusbip/src/usb_ids.h>
 #include <libusbip/src/file_ver.h>
 
+#include <wx/log.h>
 #include <wx/translation.h>
+
 #include <format>
 
 namespace
@@ -33,29 +35,20 @@ auto get_ids_data()
         return r.str();
 }
 
-/*
- * @see GetModuleFileName
- */
-auto get_module_filename(_Out_ wxString &path)
-{
-        char *val{};
-        auto err = _get_pgmptr(&val); // wxWidgets uses WinMain
-        if (!err) {
-                path = wxString(val, wxConvLocal); // FIXME: what encoding of val?
-        }
-        return err;
-}
-
 } // namespace
 
 
-auto win::get_file_version(_In_ std::wstring_view path) -> const FileVersion&
+auto win::get_file_version() -> const FileVersion&
 {
-        static FileVersion v(path);
+        static FileVersion v;
         wxASSERT(v);
         return v;
 }
 
+/*
+ * Use for libusbip.dll errors only. 
+ * @see wxSysErrorMsg
+ */
 wxString usbip::GetLastErrorMsg(_In_ DWORD msg_id)
 {
         auto &mod = get_resource_module();
@@ -85,17 +78,10 @@ bool usbip::init(_Out_ wxString &err)
                 return false;
         }
 
-        if (wxString path; auto errc = get_module_filename(path)) {
-                err = wxString::Format(_("_get_pgmptr error %d\n%s"), errc, _wcserror(errc));
-                return false;
-        } else {
-                auto sv = wstring_view(path);
-                win::get_file_version(sv); // must be the first call
-        }
-
         static InitWinSock2 ws2;
         if (!ws2) {
-                err = wxString::Format(_("WSAStartup error\n%s"), GetLastErrorMsg());
+                auto ec = GetLastError();
+                err = wxString::Format(_("WSAStartup error %lu\n%s"), ec, wxSysErrorMsg(ec));
                 return false;
         }
 

@@ -52,7 +52,7 @@ bool App::OnInit()
                 err = GetLastErrorMsg();
         }
 
-        wxSafeShowMessage(err, _("Fatal error"));
+        wxSafeShowMessage(_("Fatal error"), err);
         return false;
 }
 

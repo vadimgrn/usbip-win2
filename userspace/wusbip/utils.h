@@ -14,7 +14,7 @@ namespace win
 {
 
 class FileVersion;
-const FileVersion& get_file_version(_In_ std::wstring_view path = L"");
+const FileVersion& get_file_version();
 
 } // namespace win
 
