@@ -129,10 +129,24 @@
           <property name="name">m_menu_commands</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Refresh list of remote devices</property>
+            <property name="id">wxID_REFRESH</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Refresh</property>
+            <property name="name">m_cmd_refresh</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+R</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_refresh</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Add exported USB devices on remote host</property>
+            <property name="help">Add remote devices</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Add</property>
@@ -142,11 +156,15 @@
             <property name="unchecked_bitmap">Load From File; </property>
             <event name="OnMenuSelection">add_exported_devices</event>
           </object>
+          <object class="separator" expanded="false">
+            <property name="name">m_separator2</property>
+            <property name="permission">none</property>
+          </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Attach an exportable USB device</property>
+            <property name="help">Attach remote device(s)</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Attach</property>
@@ -160,7 +178,7 @@
             <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Detach an imported USB device</property>
+            <property name="help">Detach remote device(s)</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Detach</property>
@@ -170,27 +188,31 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_detach</event>
           </object>
+          <object class="separator" expanded="false">
+            <property name="name">m_separator21</property>
+            <property name="permission">none</property>
+          </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
+            <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Refresh the list of imported USB devices</property>
-            <property name="id">wxID_REFRESH</property>
+            <property name="help">Detach all remote devices</property>
+            <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Refresh</property>
-            <property name="name">m_cmd_refresh</property>
+            <property name="label">Detach All</property>
+            <property name="name">m_cmd_detach_all</property>
             <property name="permission">none</property>
-            <property name="shortcut">CTRL+R</property>
+            <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_refresh</event>
+            <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
+            <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Show/hide the window with log records</property>
@@ -279,12 +301,12 @@
             <event name="OnMenuSelection">on_log_level</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Help</property>
           <property name="name">m_menu_log_help</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
+            <property name="bitmap">Load From Art Provider; wxART_INFORMATION; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help"></property>
@@ -368,7 +390,7 @@
           <property name="name">m_tool_refresh</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Refresh the list of imported USB devices</property>
+          <property name="tooltip">Refresh list of remote devices</property>
           <event name="OnToolClicked">on_refresh</event>
         </object>
         <object class="tool" expanded="false">
@@ -380,7 +402,7 @@
           <property name="name">m_tool_attach</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Attach an exportable USB device</property>
+          <property name="tooltip">Attach remote device(s)</property>
           <event name="OnToolClicked">on_attach</event>
         </object>
         <object class="tool" expanded="false">
@@ -392,8 +414,20 @@
           <property name="name">m_tool_detach</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Detach an imported USB device</property>
+          <property name="tooltip">Detach remote device(s)</property>
           <event name="OnToolClicked">on_detach</event>
+        </object>
+        <object class="tool" expanded="true">
+          <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_TOOLBAR</property>
+          <property name="context_menu">0</property>
+          <property name="id">wxID_ANY</property>
+          <property name="kind">wxITEM_NORMAL</property>
+          <property name="label">Detach All</property>
+          <property name="name">m_tool_detach_all</property>
+          <property name="permission">protected</property>
+          <property name="statusbar"></property>
+          <property name="tooltip">Detach all remote devices</property>
+          <event name="OnToolClicked">on_detach_all</event>
         </object>
       </object>
       <object class="wxAuiToolBar" expanded="true">
@@ -408,7 +442,7 @@
         <property name="best_size"></property>
         <property name="bg"></property>
         <property name="bitmapsize"></property>
-        <property name="caption">Add exported devices</property>
+        <property name="caption">Add remote devices</property>
         <property name="caption_visible">1</property>
         <property name="center_pane">0</property>
         <property name="close_button">1</property>
@@ -449,7 +483,7 @@
         <property name="size"></property>
         <property name="style"></property>
         <property name="subclass">; ; forward_declare</property>
-        <property name="toolbar_label">Add exported devices</property>
+        <property name="toolbar_label"></property>
         <property name="toolbar_pane">0</property>
         <property name="tooltip"></property>
         <property name="use_explicit_ids">0</property>
@@ -513,7 +547,7 @@
           <property name="window_style"></property>
           <property name="wrap">-1</property>
         </object>
-        <object class="wxTextCtrl" expanded="true">
+        <object class="wxTextCtrl" expanded="false">
           <property name="BottomDockable">1</property>
           <property name="LeftDockable">1</property>
           <property name="RightDockable">1</property>
@@ -568,7 +602,7 @@
           <property name="validator_style">wxFILTER_NONE</property>
           <property name="validator_type">wxDefaultValidator</property>
           <property name="validator_variable"></property>
-          <property name="value"></property>
+          <property name="value">pc</property>
           <property name="window_extra_style"></property>
           <property name="window_name"></property>
           <property name="window_style"></property>
@@ -630,7 +664,7 @@
           <property name="window_style"></property>
           <property name="wrap">-1</property>
         </object>
-        <object class="wxSpinCtrl" expanded="true">
+        <object class="wxSpinCtrl" expanded="false">
           <property name="BottomDockable">1</property>
           <property name="LeftDockable">1</property>
           <property name="RightDockable">1</property>
@@ -759,7 +793,7 @@
           <event name="OnButtonClick">add_exported_devices</event>
         </object>
       </object>
-      <object class="wxTreeListCtrl" expanded="false">
+      <object class="wxTreeListCtrl" expanded="true">
         <property name="BottomDockable">0</property>
         <property name="LeftDockable">0</property>
         <property name="RightDockable">0</property>
@@ -770,7 +804,7 @@
         <property name="aui_row"></property>
         <property name="best_size"></property>
         <property name="bg">wxSYS_COLOUR_WINDOW</property>
-        <property name="caption">Imported USB devices</property>
+        <property name="caption">Remote devices</property>
         <property name="caption_visible">1</property>
         <property name="center_pane">0</property>
         <property name="close_button">0</property>
@@ -805,14 +839,13 @@
         <property name="resize">Resizable</property>
         <property name="show">1</property>
         <property name="size"></property>
-        <property name="style">wxTL_CHECKBOX|wxTL_DEFAULT_STYLE</property>
+        <property name="style">wxTL_DEFAULT_STYLE|wxTL_MULTIPLE</property>
         <property name="subclass">; ; forward_declare</property>
         <property name="toolbar_pane">0</property>
         <property name="tooltip"></property>
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <event name="OnTreelistItemChecked">on_tree_item_checked</event>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>

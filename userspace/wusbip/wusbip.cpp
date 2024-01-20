@@ -147,9 +147,7 @@ MainFrame::MainFrame(_In_ usbip::Handle read) :
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 
         init();
-
-        wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
-        wxPostEvent(m_menu_commands, evt);
+        post_refresh();
 }
 
 MainFrame::~MainFrame() 
@@ -165,6 +163,12 @@ void MainFrame::init()
 
         auto port = usbip::get_tcp_port();
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
+}
+
+void MainFrame::post_refresh()
+{
+        wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
+        wxPostEvent(m_menu_commands, evt);
 }
 
 void MainFrame::on_close(wxCloseEvent &event)
@@ -218,7 +222,7 @@ void MainFrame::read_loop()
         }
 
         if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED) { // see CancelSynchronousIo
-                wxLogError(_("vhci::read_device_state error %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("vhci::read_device_state error %#lx\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
@@ -294,14 +298,95 @@ void MainFrame::on_log_level(wxCommandEvent &event)
         m_log->SetLogLevel(lvl);
 }
 
+bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
+{
+        wxString hostname;
+        wxString service;
+
+        if (!split_server_url(url, hostname, service)) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
+        device_location loc {
+                .hostname = hostname.ToStdString(wxConvUTF8),
+                .service = service.ToStdString(wxConvUTF8),
+                .busid = busid.ToStdString(wxConvUTF8),
+        };
+
+        wxWindowDisabler dis;
+        wxBusyInfo wait(wxString::Format(_("Attaching %s/%s"), url, busid), this);
+
+        auto &vhci = get_vhci(); 
+        return vhci::attach(vhci.get(), loc);
+}
+
 void MainFrame::on_attach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
+        auto &tree = *m_treeListCtrl;
+
+        wxTreeListItems selected;
+        tree.GetSelections(selected);
+
+        for (auto &item: selected) {
+                auto parent = tree.GetItemParent(item);
+                if (parent == tree.GetRootItem()) {
+                        continue;
+                }
+
+                auto url = tree.GetItemText(parent); // server
+                auto busid = tree.GetItemText(item, COL_BUSID);
+
+                if (!attach(url,  busid)) {
+                        auto err = GetLastError();
+                        wxLogError(_("Cannot attach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
+                }
+        }
 }
 
 void MainFrame::on_detach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
+        auto &tree = *m_treeListCtrl;
+
+        wxTreeListItems selected;
+        tree.GetSelections(selected);
+
+        for (auto &item: selected) {
+                auto parent = tree.GetItemParent(item);
+                if (parent == tree.GetRootItem()) {
+                        continue;
+                }
+
+                auto port_str = tree.GetItemText(item, COL_PORT);
+
+                int port{};
+                if (!(port_str.ToInt(&port) && port)) {
+                        continue;
+                }
+
+                if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(),  port)) {
+                        auto err = GetLastError();
+
+                        auto url = tree.GetItemText(parent); // server
+                        auto busid = tree.GetItemText(item, COL_BUSID);
+
+                        wxLogError(_("Cannot detach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
+                }
+        }
+}
+
+void MainFrame::on_detach_all(wxCommandEvent&) 
+{
+        wxLogVerbose(wxString::FromAscii(__func__));
+
+        if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), -1)) {
+                auto err = GetLastError();
+                wxLogError(_("Cannot detach all devices\nError %#lx\n%s"), err, GetLastErrorMsg(err));
+        }
+
+        post_refresh();
 }
 
 void MainFrame::on_refresh(wxCommandEvent&)
@@ -315,7 +400,7 @@ void MainFrame::on_refresh(wxCommandEvent&)
         auto devices = usbip::vhci::get_imported_devices(get_vhci().get(), ok);
         if (!ok) {
                 auto err = GetLastError();
-                wxLogError(_("get_imported_devices error %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("get_imported_devices error %#lx\n%s"), err, GetLastErrorMsg(err));
                 return;
         }
 
@@ -440,21 +525,6 @@ void MainFrame::on_help_about(wxCommandEvent&)
         wxAboutBox(d, this);
 }
 
-void MainFrame::on_tree_item_checked(wxTreeListEvent &event)
-{
-        auto &tree = *m_treeListCtrl;
-
-        auto item = event.GetItem();
-        auto st = tree.GetCheckedState(item);
-        
-        if (auto parent = tree.GetItemParent(item); parent == tree.GetRootItem()) { // server
-                tree.CheckItemRecursively(item, st);
-        } else if (tree.GetCheckedState(parent) != st && 
-                   (st == wxCHK_UNCHECKED || tree.AreAllChildrenInState(parent, st))) {
-                tree.CheckItem(parent, st);
-        }
-}
-
 void MainFrame::add_exported_devices(wxCommandEvent&)
 {
         auto host = m_textCtrlServer->GetValue();
@@ -475,7 +545,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
         if (!sock) {
                 auto err = GetLastError();
-                wxLogError(_("Cannot connect to %s:%s\nError %lu\n%s"), host, port, err, GetLastErrorMsg(err));
+                wxLogError(_("Cannot connect to %s:%s\nError %#lx\n%s"), host, port, err, GetLastErrorMsg(err));
                 return;
         }
 
@@ -491,7 +561,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
-                wxLogError(_("enum_exportable_devices error %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("enum_exportable_devices error %#lx\n%s"), err, GetLastErrorMsg(err));
         }
 
         auto url = make_server_url(host, port);

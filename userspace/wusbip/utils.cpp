@@ -127,3 +127,16 @@ wxString usbip::make_server_url(_In_ const wxString &hostname, _In_ const wxStri
 {
         return hostname + L':' + service;
 }
+
+bool usbip::split_server_url(_In_ const wxString &url, _Out_ wxString &hostname, _Out_ wxString &service)
+{
+        auto pos = url.find_last_of(L':');
+        auto found = pos != url.npos;
+        
+        if (found) {
+                hostname = url.substr(0, pos);
+                service = url.substr(++pos);
+        }
+
+        return found;
+}

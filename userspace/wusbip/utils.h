@@ -41,6 +41,8 @@ wxString make_server_url(_In_ const device_location &loc);
 
 wxString make_server_url(_In_ const wxString &hostname, _In_ const wxString &service);
 
+bool split_server_url(_In_ const wxString &url, _Out_ wxString &hostname, _Out_ wxString &service);
+
 constexpr UINT32 make_devid(_In_ int busnum, _In_ int devnum) noexcept
 {
         return (busnum << 16) | (devnum & USHRT_MAX);

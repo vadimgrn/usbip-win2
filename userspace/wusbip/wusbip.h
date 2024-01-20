@@ -34,10 +34,10 @@ private:
 	void on_exit(wxCommandEvent &event) override;
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
+	void on_detach_all(wxCommandEvent &event) override;
 	void on_refresh(wxCommandEvent &event) override;
 	void on_log_level(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
-	void on_tree_item_checked(wxTreeListEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
@@ -54,6 +54,9 @@ private:
 	wxTreeListItem find_server(_In_ const wxString &url, _In_ bool append);
 	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
 	void remove_device(_In_ wxTreeListItem dev);
+	
+	bool attach(_In_ const wxString &url, _In_ const wxString &busid);
+	void post_refresh();
 
 	bool is_persistent(_In_ wxTreeListItem device);
 
