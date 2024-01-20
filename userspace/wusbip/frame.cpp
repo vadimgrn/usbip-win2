@@ -29,57 +29,57 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menubar->Append( m_menu_file, _("File") );
 
-	m_menu_commands = new wxMenu();
+	m_menu_devices = new wxMenu();
 	wxMenuItem* m_cmd_refresh;
-	m_cmd_refresh = new wxMenuItem( m_menu_commands, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of remote devices"), wxITEM_NORMAL );
+	m_cmd_refresh = new wxMenuItem( m_menu_devices, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of remote devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_refresh->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_cmd_refresh->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
 	#endif
-	m_menu_commands->Append( m_cmd_refresh );
+	m_menu_devices->Append( m_cmd_refresh );
 
 	wxMenuItem* m_cmd_add;
-	m_cmd_add = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Add") ) + wxT('\t') + wxT("CTRL+F"), _("Add remote devices"), wxITEM_NORMAL );
+	m_cmd_add = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Add") ) + wxT('\t') + wxT("CTRL+F"), _("Add remote devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_add->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_MENU )), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_cmd_add->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_MENU )) );
 	#endif
-	m_menu_commands->Append( m_cmd_add );
+	m_menu_devices->Append( m_cmd_add );
 
-	m_menu_commands->AppendSeparator();
+	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_attach;
-	m_cmd_attach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+A"), _("Attach remote device(s)"), wxITEM_NORMAL );
+	m_cmd_attach = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+A"), _("Attach remote device(s)"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_attach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_cmd_attach->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
 	#endif
-	m_menu_commands->Append( m_cmd_attach );
+	m_menu_devices->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_detach;
-	m_cmd_detach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach remote device(s)"), wxITEM_NORMAL );
+	m_cmd_detach = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach remote device(s)"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_detach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_CROSS_MARK ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_cmd_detach->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_CROSS_MARK ), wxASCII_STR( wxART_MENU )) );
 	#endif
-	m_menu_commands->Append( m_cmd_detach );
+	m_menu_devices->Append( m_cmd_detach );
 
-	m_menu_commands->AppendSeparator();
+	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_detach_all;
-	m_cmd_detach_all = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Detach All") ) , _("Detach all remote devices"), wxITEM_NORMAL );
+	m_cmd_detach_all = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach All") ) , _("Detach all remote devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_detach_all->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_DELETE ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_cmd_detach_all->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_DELETE ), wxASCII_STR( wxART_MENU )) );
 	#endif
-	m_menu_commands->Append( m_cmd_detach_all );
+	m_menu_devices->Append( m_cmd_detach_all );
 
-	m_menubar->Append( m_menu_commands, _("Devices") );
+	m_menubar->Append( m_menu_devices, _("Devices") );
 
 	m_menu_log = new wxMenu();
 	wxMenuItem* m_log_toggle;
@@ -114,6 +114,53 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_log->Append( m_loglevel_info );
 
 	m_menubar->Append( m_menu_log, _("Log") );
+
+	m_menu_view = new wxMenu();
+	wxMenuItem* m_view_busid;
+	m_view_busid = new wxMenuItem( m_menu_view, ID_COL_BUSID, wxString( _("Bus-Id") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_busid );
+	m_view_busid->Check( true );
+
+	wxMenuItem* m_view_port;
+	m_view_port = new wxMenuItem( m_menu_view, ID_COL_PORT, wxString( _("Port") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_port );
+	m_view_port->Enable( false );
+	m_view_port->Check( true );
+
+	wxMenuItem* m_view_speed;
+	m_view_speed = new wxMenuItem( m_menu_view, ID_COL_SPEED, wxString( _("Speed") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_speed );
+	m_view_speed->Check( true );
+
+	wxMenuItem* m_view_vid;
+	m_view_vid = new wxMenuItem( m_menu_view, ID_COL_VID, wxString( _("Vendor") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_vid );
+	m_view_vid->Check( true );
+
+	wxMenuItem* m_view_pid;
+	m_view_pid = new wxMenuItem( m_menu_view, ID_COL_PID, wxString( _("Product") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_pid );
+	m_view_pid->Check( true );
+
+	wxMenuItem* m_view_state;
+	m_view_state = new wxMenuItem( m_menu_view, ID_COL_STATE, wxString( _("State") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_state );
+	m_view_state->Enable( false );
+	m_view_state->Check( true );
+
+	m_menu_view->AppendSeparator();
+
+	wxMenuItem* m_view_toolbar;
+	m_view_toolbar = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Toolbar") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_toolbar );
+	m_view_toolbar->Check( true );
+
+	wxMenuItem* m_view_toolbar_add;
+	m_view_toolbar_add = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Add") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_view->Append( m_view_toolbar_add );
+	m_view_toolbar_add->Check( true );
+
+	m_menubar->Append( m_menu_view, _("View") );
 
 	m_menu_log_help = new wxMenu();
 	wxMenuItem* m_help_about;
@@ -192,11 +239,11 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	// Connect Events
 	this->Connect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
-	m_menu_commands->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach_all ), this, m_cmd_detach_all->GetId());
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach_all ), this, m_cmd_detach_all->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_show ), this, m_log_toggle->GetId());
 	this->Connect( m_log_toggle->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_error->GetId());
@@ -204,6 +251,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_message->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_status->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_info->GetId());
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_busid->GetId());
+	this->Connect( m_view_busid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_port->GetId());
+	this->Connect( m_view_port->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_speed->GetId());
+	this->Connect( m_view_speed->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_vid->GetId());
+	this->Connect( m_view_vid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_pid->GetId());
+	this->Connect( m_view_pid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_state->GetId());
+	this->Connect( m_view_state->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
 	this->Connect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
@@ -217,6 +276,12 @@ Frame::~Frame()
 	// Disconnect Events
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
+	this->Disconnect( ID_COL_BUSID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_PORT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_SPEED, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_VID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_PID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_STATE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );

@@ -11,6 +11,7 @@
 #include <mutex>
 
 class LogWindow;
+class wxDataViewColumn;
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
@@ -22,7 +23,11 @@ public:
 	~MainFrame();
 
 private:
-	enum { COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE, COL_PERSISTENT }; // m_treeListCtrl
+	enum tree_column_t : unsigned int // m_treeListCtrl
+	{
+		COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE, COL_PERSISTENT 
+	};
+	
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -42,7 +47,10 @@ private:
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
-	
+
+	void on_view_column_update_ui(wxUpdateUIEvent &event) override;
+	void on_view_column(wxCommandEvent &event) override;
+
 	void on_device_state(_In_ DeviceStateEvent &event);
 
 	void init();
@@ -62,4 +70,6 @@ private:
 
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state);
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state);
+
+	wxDataViewColumn& get_column(_In_ tree_column_t pos) const noexcept;
 };

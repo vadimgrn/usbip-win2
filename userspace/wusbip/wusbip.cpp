@@ -15,6 +15,7 @@
 #include <wx/msgdlg.h>
 #include <wx/aboutdlg.h>
 #include <wx/busyinfo.h>
+#include <wx/dataview.h>
 
 #include <format>
 
@@ -168,7 +169,7 @@ void MainFrame::init()
 void MainFrame::post_refresh()
 {
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
-        wxPostEvent(m_menu_commands, evt);
+        wxPostEvent(m_menu_devices, evt);
 }
 
 void MainFrame::on_close(wxCloseEvent &event)
@@ -570,4 +571,37 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         if (auto &tree = *m_treeListCtrl; server.IsOk() && !tree.IsExpanded(server)) {
                 tree.Expand(server);
         }
+}
+
+wxDataViewColumn& MainFrame::get_column(_In_ tree_column_t pos) const noexcept
+{
+        auto &view = *m_treeListCtrl->GetDataView();
+        wxASSERT(view.GetColumnCount() > pos);
+        
+        auto col = view.GetColumn(pos);
+        wxASSERT(col);
+
+        return *col;
+}
+
+void MainFrame::on_view_column_update_ui(wxUpdateUIEvent &event)
+{
+        auto pos = static_cast<tree_column_t>(event.GetId() - ID_COL_BUSID);
+        wxASSERT(pos >= COL_BUSID);
+        wxASSERT(pos <= COL_STATE);
+
+        auto &col = get_column(pos);
+        event.Check(col.IsShown());
+}
+
+void MainFrame::on_view_column(wxCommandEvent &event)
+{
+        auto pos = static_cast<tree_column_t>(event.GetId() - ID_COL_BUSID);
+        wxASSERT(pos >= COL_BUSID);
+        wxASSERT(pos <= COL_STATE);
+
+        auto &col = get_column(pos);
+
+        bool checked = event.GetInt();
+        col.SetHidden(!checked);
 }

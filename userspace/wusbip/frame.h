@@ -46,14 +46,21 @@ class Frame : public wxFrame
 			ID_LOGLEVEL_WARNING,
 			ID_LOGLEVEL_MESSAGE,
 			ID_LOGLEVEL_STATUS,
-			ID_LOGLEVEL_INFO
+			ID_LOGLEVEL_INFO,
+			ID_COL_BUSID,
+			ID_COL_PORT,
+			ID_COL_SPEED,
+			ID_COL_VID,
+			ID_COL_PID,
+			ID_COL_STATE
 		};
 
 		wxStatusBar* m_statusBar;
 		wxMenuBar* m_menubar;
 		wxMenu* m_menu_file;
-		wxMenu* m_menu_commands;
+		wxMenu* m_menu_devices;
 		wxMenu* m_menu_log;
+		wxMenu* m_menu_view;
 		wxMenu* m_menu_log_help;
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_tool_refresh;
@@ -79,6 +86,8 @@ class Frame : public wxFrame
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 
 
