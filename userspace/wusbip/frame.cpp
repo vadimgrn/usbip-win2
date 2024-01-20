@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.0.0-0-g0efcecf)
+// C++ code generated with wxFormBuilder (version 4.0.0-eea61759)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -20,6 +20,11 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file = new wxMenu();
 	wxMenuItem* m_file_exit;
 	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("Exit") ) , wxEmptyString, wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_file_exit->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_QUIT ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_file_exit->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_QUIT ), wxASCII_STR( wxART_MENU )) );
+	#endif
 	m_menu_file->Append( m_file_exit );
 
 	m_menubar->Append( m_menu_file, _("File") );
@@ -27,18 +32,38 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_commands = new wxMenu();
 	wxMenuItem* m_cmd_add;
 	m_cmd_add = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Add") ) + wxT('\t') + wxT("CTRL+F"), _("Add exported USB devices on remote host"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_add->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_MENU )), wxNullBitmap );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_add->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_MENU )) );
+	#endif
 	m_menu_commands->Append( m_cmd_add );
 
 	wxMenuItem* m_cmd_attach;
 	m_cmd_attach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+A"), _("Attach an exportable USB device"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_attach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_attach->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
+	#endif
 	m_menu_commands->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_detach;
 	m_cmd_detach = new wxMenuItem( m_menu_commands, wxID_ANY, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach an imported USB device"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_detach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_CROSS_MARK ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_detach->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_CROSS_MARK ), wxASCII_STR( wxART_MENU )) );
+	#endif
 	m_menu_commands->Append( m_cmd_detach );
 
 	wxMenuItem* m_cmd_refresh;
 	m_cmd_refresh = new wxMenuItem( m_menu_commands, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh the list of imported USB devices"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_refresh->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_refresh->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
+	#endif
 	m_menu_commands->Append( m_cmd_refresh );
 
 	m_menubar->Append( m_menu_commands, _("Devices") );
@@ -81,17 +106,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	this->SetMenuBar( m_menubar );
 
-	m_auiToolBar = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_HORZ_LAYOUT );
-	m_toolPort = m_auiToolBar->AddTool( wxID_ANY, _("Port"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL );
+	m_auiToolBar = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE );
+	m_auiToolBar->SetToolSeparation( 1 );
+	m_tool_refresh = m_auiToolBar->AddTool( wxID_ANY, _("Refresh"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Refresh the list of imported USB devices"), wxEmptyString, NULL );
 
-	m_toolAttach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL );
+	m_tool_attach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Attach an exportable USB device"), wxEmptyString, NULL );
 
-	m_toolDetach = m_auiToolBar->AddTool( wxID_ANY, _("Detach"), wxNullBitmap, wxNullBitmap, wxITEM_NORMAL, wxEmptyString, wxEmptyString, NULL );
+	m_tool_detach = m_auiToolBar->AddTool( wxID_ANY, _("Detach"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_CROSS_MARK ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Detach an imported USB device"), wxEmptyString, NULL );
 
 	m_auiToolBar->Realize();
-	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Left() .PinButton( true ).Dock().Resizable().FloatingSize( wxSize( 95,141 ) ).Row( 0 ).Layer( 2 ) );
+	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Row( 0 ).Layer( 1 ).ToolbarPane() );
 
-	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_HORZ_LAYOUT );
+	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0|wxTAB_TRAVERSAL );
 	m_auiToolBarAdd->SetToolPacking( 10 );
 	m_staticTextServer = new wxStaticText( m_auiToolBarAdd, wxID_ANY, _("Server"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL );
 	m_staticTextServer->Wrap( -1 );
@@ -112,9 +138,13 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_auiToolBarAdd->AddControl( m_spinCtrlPort );
 	m_button_add = new wxButton( m_auiToolBarAdd, wxID_ADD, _("Add"), wxDefaultPosition, wxDefaultSize, 0 );
+
+	m_button_add->SetDefault();
+
+	m_button_add->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_BUTTON )) );
 	m_auiToolBarAdd->AddControl( m_button_add );
 	m_auiToolBarAdd->Realize();
-	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Bottom() .Caption( _("Add exported devices") ).PinButton( true ).Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).Row( 0 ).Layer( 1 ) );
+	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .Caption( _("Add exported devices") ).PinButton( true ).PaneBorder( false ).Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).DockFixed( true ).Row( 0 ).Layer( 1 ).DefaultPane() );
 
 	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_CHECKBOX|wxTL_DEFAULT_STYLE );
 	m_treeListCtrl->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
@@ -149,9 +179,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_status->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_info->GetId());
 	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
-	this->Connect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
-	this->Connect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
-	this->Connect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
+	this->Connect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
+	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
+	this->Connect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	m_button_add->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
 	m_treeListCtrl->Connect( wxEVT_TREELIST_ITEM_CHECKED, wxTreeListEventHandler( Frame::on_tree_item_checked ), NULL, this );
 }
@@ -161,9 +191,9 @@ Frame::~Frame()
 	// Disconnect Events
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
-	this->Disconnect( m_toolPort->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_port ) );
-	this->Disconnect( m_toolAttach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
-	this->Disconnect( m_toolDetach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
+	this->Disconnect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
+	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
+	this->Disconnect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	m_button_add->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
 	m_treeListCtrl->Disconnect( wxEVT_TREELIST_ITEM_CHECKED, wxTreeListEventHandler( Frame::on_tree_item_checked ), NULL, this );
 
