@@ -1,4 +1,8 @@
 @echo off
+
+rem change to your WDK version
+set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64
+
 set NAME=usbip
 set TRACE_FORMAT_PREFIX=[%%9]%%3!04x! %%!LEVEL! %%!FUNC!:
 
