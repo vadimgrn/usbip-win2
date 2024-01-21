@@ -106,7 +106,7 @@ auto parse_device_location(_In_ const std::string &str)
         return dl;
 }
 
-auto get_persistant_devices(_In_ HANDLE dev, _Out_ bool &success)
+auto get_persistent_devices(_In_ HANDLE dev, _Out_ bool &success)
 {
         success = false;
         std::wstring multi_sz;
@@ -177,7 +177,7 @@ auto usbip::vhci::get_persistent(_In_ HANDLE dev, _Out_ bool &success) -> std::v
 {
         std::vector<device_location> devs;
 
-        auto multi_sz = get_persistant_devices(dev, success);
+        auto multi_sz = get_persistent_devices(dev, success);
         if (multi_sz.empty()) {
                 if (!success && GetLastError() == ERROR_FILE_NOT_FOUND) { // persistent_devices_value_name is absent
                         success = true; // not saved yet
