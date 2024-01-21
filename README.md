@@ -163,6 +163,8 @@ bcdedit.exe /set testsigning on
 - **Pick "Select Components/Program DataBase files" during USBip installation**
 - Start log sessions for drivers (run commands as Administrator)
 ```
+:: change to your WDK version
+set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64
 set NAME=usbip
 
 tracelog.exe -stop %NAME%-flt
