@@ -5,6 +5,7 @@
 - Works with Linux USB/IP server at least for kernels 4.19 - 6.2
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
+- You can **donate to purchase an EV certificate** which is required for signing the driver, please read [this](https://github.com/vadimgrn/usbip-win2/issues/48#issuecomment-1888655412) thread
 
 ## Two implementations
 - [UDE driver](https://github.com/vadimgrn/usbip-win2/tree/master) (version 0.9.5 and later)
