@@ -461,6 +461,21 @@
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
           </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap"></property>
+            <property name="checked">1</property>
+            <property name="enabled">1</property>
+            <property name="help"></property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_CHECK</property>
+            <property name="label">Labels</property>
+            <property name="name">m_view_labels</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_view_labels</event>
+            <event name="OnUpdateUI">on_view_labels_update_ui</event>
+          </object>
         </object>
         <object class="wxMenu" expanded="false">
           <property name="label">Help</property>
@@ -533,7 +548,7 @@
         <property name="separation">1</property>
         <property name="show">1</property>
         <property name="size"></property>
-        <property name="style">wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER</property>
+        <property name="style">wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER|wxAUI_TB_TEXT</property>
         <property name="subclass">; ; forward_declare</property>
         <property name="toolbar_label"></property>
         <property name="toolbar_pane">1</property>

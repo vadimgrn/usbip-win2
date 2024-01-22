@@ -620,3 +620,16 @@ void MainFrame::on_item_activated(wxTreeListEvent &event)
                 on_detach(event);
         }
 }
+
+void MainFrame::on_view_labels_update_ui(wxUpdateUIEvent &event)
+{
+        auto shown = m_auiToolBar->HasFlag(wxAUI_TB_TEXT);
+        event.Check(shown);
+}
+
+void MainFrame::on_view_labels(wxCommandEvent &)
+{
+        auto &tb = *m_auiToolBar;
+        tb.ToggleWindowStyle(wxAUI_TB_TEXT);
+        tb.Refresh();
+}

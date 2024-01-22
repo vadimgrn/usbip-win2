@@ -49,6 +49,9 @@ private:
 	void on_device_state(_In_ DeviceStateEvent &event);
 	void on_item_activated(wxTreeListEvent &event) override;
 
+	void on_view_labels(wxCommandEvent &event) override;
+	void on_view_labels_update_ui(wxUpdateUIEvent &event) override;
+
 	void init();
 	void set_log_level();
 
