@@ -92,6 +92,7 @@ class Frame : public wxFrame
 		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_item_activated( wxTreeListEvent& event ) { event.Skip(); }
 
 
 	public:

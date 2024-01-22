@@ -119,7 +119,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_columns = new wxMenu();
 	wxMenuItem* m_menu_columnsItem = new wxMenuItem( m_menu_view, wxID_ANY, _("Columns"), wxEmptyString, wxITEM_NORMAL, m_menu_columns );
 	#if (defined( __WXMSW__ ) || defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_menu_columnsItem->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_LIST_VIEW ), wxASCII_STR( wxART_MENU )) );
+	m_menu_columnsItem->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REPORT_VIEW ), wxASCII_STR( wxART_MENU )) );
 	#endif
 
 	wxMenuItem* m_view_busid;
@@ -194,7 +194,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	this->SetMenuBar( m_menubar );
 
-	m_auiToolBar = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE );
+	m_auiToolBar = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER );
 	m_auiToolBar->SetToolSeparation( 1 );
 	m_tool_refresh = m_auiToolBar->AddTool( wxID_ANY, _("Refresh"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Refresh list of remote devices"), wxEmptyString, NULL );
 
@@ -205,9 +205,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_tool_detach_all = m_auiToolBar->AddTool( wxID_ANY, _("Detach All"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_DELETE ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Detach all remote devices"), wxEmptyString, NULL );
 
 	m_auiToolBar->Realize();
-	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Row( 0 ).Layer( 1 ).ToolbarPane() );
+	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Row( 0 ).Layer( 1 ).ToolbarPane() );
 
-	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxTAB_TRAVERSAL );
+	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER|wxTAB_TRAVERSAL );
 	m_auiToolBarAdd->SetToolPacking( 10 );
 	m_staticTextServer = new wxStaticText( m_auiToolBarAdd, wxID_ANY, _("Server"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL );
 	m_staticTextServer->Wrap( -1 );
@@ -234,7 +234,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_button_add->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_BUTTON )) );
 	m_auiToolBarAdd->AddControl( m_button_add );
 	m_auiToolBarAdd->Realize();
-	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .Caption( _("Add USB devices") ).PinButton( true ).Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).DockFixed( true ).Row( 0 ).Layer( 1 ).DefaultPane() );
+	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).Row( 0 ).Layer( 1 ).ToolbarPane() );
 
 	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_DEFAULT_STYLE|wxTL_MULTIPLE );
 	m_treeListCtrl->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
@@ -292,6 +292,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	this->Connect( m_tool_detach_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach_all ) );
 	m_button_add->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
+	m_treeListCtrl->Connect( wxEVT_TREELIST_ITEM_ACTIVATED, wxTreeListEventHandler( Frame::on_item_activated ), NULL, this );
 }
 
 Frame::~Frame()
@@ -312,6 +313,7 @@ Frame::~Frame()
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	this->Disconnect( m_tool_detach_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach_all ) );
 	m_button_add->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
+	m_treeListCtrl->Disconnect( wxEVT_TREELIST_ITEM_ACTIVATED, wxTreeListEventHandler( Frame::on_item_activated ), NULL, this );
 
 	m_mgr.UnInit();
 

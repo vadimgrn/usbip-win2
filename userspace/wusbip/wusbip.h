@@ -47,6 +47,7 @@ private:
 	void on_view_column(wxCommandEvent &event) override;
 
 	void on_device_state(_In_ DeviceStateEvent &event);
+	void on_item_activated(wxTreeListEvent &event) override;
 
 	void init();
 	void set_log_level();
@@ -63,8 +64,8 @@ private:
 
 	bool is_persistent(_In_ wxTreeListItem device);
 
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state);
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ bool update_state);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ bool update_state);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 

@@ -75,6 +75,13 @@ inline auto is_empty(_In_ const imported_device &d) noexcept
         return !is_filled(d);
 }
 
+auto get_selections(_In_ wxTreeListCtrl &tree)
+{
+        wxTreeListItems v;
+        tree.GetSelections(v);
+        return v;
+}
+
 } // namespace
 
 wxIMPLEMENT_APP(App);
@@ -254,7 +261,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         }
 
         auto [dev, appended] = find_device(loc, true);
-        update_device(dev, st);
+        update_device(dev, st, true);
 
         if (st.state == state::disconnected && is_empty(st.device) && !is_persistent(dev)) {
                 remove_device(dev);
@@ -324,19 +331,16 @@ bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
 void MainFrame::on_attach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
-        auto &tree = *m_treeListCtrl;
+        
+        for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
 
-        wxTreeListItems selected;
-        tree.GetSelections(selected);
-
-        for (auto &item: selected) {
                 auto parent = tree.GetItemParent(item);
                 if (parent == tree.GetRootItem()) {
                         continue;
                 }
 
                 auto url = tree.GetItemText(parent); // server
-                auto busid = tree.GetItemText(item, get_column_pos<ID_COL_BUSID>());
+                auto busid = tree.GetItemText(item); // get_column_pos<ID_COL_BUSID>()
 
                 if (!attach(url,  busid)) {
                         auto err = GetLastError();
@@ -348,12 +352,9 @@ void MainFrame::on_attach(wxCommandEvent&)
 void MainFrame::on_detach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
-        auto &tree = *m_treeListCtrl;
+        
+        for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
 
-        wxTreeListItems selected;
-        tree.GetSelections(selected);
-
-        for (auto &item: selected) {
                 auto parent = tree.GetItemParent(item);
                 if (parent == tree.GetRootItem()) {
                         continue;
@@ -370,7 +371,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                         auto err = GetLastError();
 
                         auto url = tree.GetItemText(parent); // server
-                        auto busid = tree.GetItemText(item, get_column_pos<ID_COL_BUSID>());
+                        auto busid = tree.GetItemText(item); // get_column_pos<ID_COL_BUSID>()
 
                         wxLogError(_("Cannot detach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
                 }
@@ -408,7 +409,7 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 auto [item, appended] = find_device(dev.location, true);
                 wxASSERT(appended);
 
-                update_device(item, dev, state::plugged);
+                update_device(item, dev, state::plugged, true);
 
                 if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
                         tree.Expand(server);
@@ -474,7 +475,7 @@ void MainFrame::remove_device(_In_ wxTreeListItem device)
         }
 }
 
-void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &st)
+void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &st, _In_ bool update_state)
 {
         auto &dev = st.device;
         auto &tree = *m_treeListCtrl;
@@ -495,14 +496,18 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::devi
         tree.SetItemText(device, get_column_pos<ID_COL_VENDOR>(), str(dev.vendor, vendor));
         tree.SetItemText(device, get_column_pos<ID_COL_PRODUCT>(), str(dev.product, product));
 
-        auto state_str = vhci::get_state_str(st.state);
-        tree.SetItemText(device, get_column_pos<ID_COL_STATE>(), _(state_str));
+        if (update_state) {
+                auto state_str = vhci::get_state_str(st.state);
+                tree.SetItemText(device, get_column_pos<ID_COL_STATE>(), _(state_str));
+        }
 }
 
-void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state)
+void MainFrame::update_device(
+        _In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, 
+        _In_ usbip::state state, _In_ bool update_state)
 {
         usbip::device_state st{ .device = dev, .state = state };
-        update_device(device, st);
+        update_device(device, st, update_state);
 }
 
 void MainFrame::on_help_about(wxCommandEvent&)
@@ -554,7 +559,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 auto dev = make_imported_device(std::move(host), std::move(port), device);
 
                 auto [item, appended] = find_device(dev.location, true);
-                update_device(item, dev, state::unplugged);
+                update_device(item, dev, state::unplugged, appended);
         };
 
         auto intf = [this] (auto /*dev_idx*/, auto& /*dev*/, auto /*idx*/, auto& /*intf*/) {};
@@ -600,4 +605,18 @@ void MainFrame::on_view_column(wxCommandEvent &event)
 
         bool checked = event.GetInt();
         col.SetHidden(!checked);
+}
+
+void MainFrame::on_item_activated(wxTreeListEvent &event)
+{
+        auto &tree = *m_treeListCtrl;
+        
+        if (auto item = event.GetItem(); tree.GetItemParent(item) == tree.GetRootItem()) {
+                // item is a server
+        } else if (auto state = tree.GetItemText(item, get_column_pos<ID_COL_STATE>());
+                   state == _(vhci::get_state_str(state::unplugged))) {
+                on_attach(event);
+        } else if (state == _(vhci::get_state_str(state::plugged))) {
+                on_detach(event);
+        }
 }
