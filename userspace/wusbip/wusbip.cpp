@@ -138,7 +138,6 @@ void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In
         }
 }
 
-
 MainFrame::MainFrame(_In_ usbip::Handle read) : 
         Frame(nullptr),
         m_read(std::move(read)),
@@ -273,7 +272,7 @@ bool MainFrame::is_persistent(_In_ wxTreeListItem device)
         wxASSERT(tree.GetItemParent(device).IsOk()); // server
         wxASSERT(!tree.GetFirstChild(device).IsOk());
 
-        auto &s = tree.GetItemText(device, COL_PERSISTENT);
+        auto &s = tree.GetItemText(device, get_column_pos<ID_COL_PERSISTENT>());
         return !s.empty();
 }
 
@@ -337,7 +336,7 @@ void MainFrame::on_attach(wxCommandEvent&)
                 }
 
                 auto url = tree.GetItemText(parent); // server
-                auto busid = tree.GetItemText(item, COL_BUSID);
+                auto busid = tree.GetItemText(item, get_column_pos<ID_COL_BUSID>());
 
                 if (!attach(url,  busid)) {
                         auto err = GetLastError();
@@ -360,7 +359,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                         continue;
                 }
 
-                auto port_str = tree.GetItemText(item, COL_PORT);
+                auto port_str = tree.GetItemText(item, get_column_pos<ID_COL_PORT>());
 
                 int port{};
                 if (!(port_str.ToInt(&port) && port)) {
@@ -371,7 +370,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                         auto err = GetLastError();
 
                         auto url = tree.GetItemText(parent); // server
-                        auto busid = tree.GetItemText(item, COL_BUSID);
+                        auto busid = tree.GetItemText(item, get_column_pos<ID_COL_BUSID>());
 
                         wxLogError(_("Cannot detach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
                 }
@@ -489,15 +488,15 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::devi
                 return sv.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(sv.data(), sv.size());
         };
 
-        tree.SetItemText(device, COL_PORT, wxString::Format(L"%02d", dev.port)); // XX for proper sorting
-        tree.SetItemText(device, COL_SPEED, usbip::get_speed_str(dev.speed));
+        tree.SetItemText(device, get_column_pos<ID_COL_PORT>(), wxString::Format(L"%02d", dev.port)); // XX for proper sorting
+        tree.SetItemText(device, get_column_pos<ID_COL_SPEED>(), usbip::get_speed_str(dev.speed));
 
         auto [vendor, product] = usbip::get_ids().find_product(dev.vendor, dev.product);
-        tree.SetItemText(device, COL_VID, str(dev.vendor, vendor));
-        tree.SetItemText(device, COL_PID, str(dev.product, product));
+        tree.SetItemText(device, get_column_pos<ID_COL_VENDOR>(), str(dev.vendor, vendor));
+        tree.SetItemText(device, get_column_pos<ID_COL_PRODUCT>(), str(dev.product, product));
 
         auto state_str = vhci::get_state_str(st.state);
-        tree.SetItemText(device, COL_STATE, _(state_str));
+        tree.SetItemText(device, get_column_pos<ID_COL_STATE>(), _(state_str));
 }
 
 void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state)
@@ -573,10 +572,12 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         }
 }
 
-wxDataViewColumn& MainFrame::get_column(_In_ tree_column_t pos) const noexcept
+wxDataViewColumn& MainFrame::get_column(_In_ int col_id) const noexcept
 {
         auto &view = *m_treeListCtrl->GetDataView();
-        wxASSERT(view.GetColumnCount() > pos);
+
+        auto pos = get_column_pos(col_id);
+        wxASSERT(pos < view.GetColumnCount());
         
         auto col = view.GetColumn(pos);
         wxASSERT(col);
@@ -586,21 +587,16 @@ wxDataViewColumn& MainFrame::get_column(_In_ tree_column_t pos) const noexcept
 
 void MainFrame::on_view_column_update_ui(wxUpdateUIEvent &event)
 {
-        auto pos = static_cast<tree_column_t>(event.GetId() - ID_COL_BUSID);
-        wxASSERT(pos >= COL_BUSID);
-        wxASSERT(pos <= COL_STATE);
+        auto col_id = event.GetId();
+        auto &col = get_column(col_id);
 
-        auto &col = get_column(pos);
         event.Check(col.IsShown());
 }
 
 void MainFrame::on_view_column(wxCommandEvent &event)
 {
-        auto pos = static_cast<tree_column_t>(event.GetId() - ID_COL_BUSID);
-        wxASSERT(pos >= COL_BUSID);
-        wxASSERT(pos <= COL_STATE);
-
-        auto &col = get_column(pos);
+        auto col_id = event.GetId();
+        auto &col = get_column(col_id);
 
         bool checked = event.GetInt();
         col.SetHidden(!checked);

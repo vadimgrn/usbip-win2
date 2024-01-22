@@ -207,7 +207,7 @@
             <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
@@ -305,95 +305,131 @@
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">1</property>
-            <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_COL_BUSID</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Bus-Id</property>
-            <property name="name">m_view_busid</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_view_column</event>
-            <event name="OnUpdateUI">on_view_column_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">1</property>
-            <property name="enabled">0</property>
-            <property name="help"></property>
-            <property name="id">ID_COL_PORT</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Port</property>
-            <property name="name">m_view_port</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_view_column</event>
-            <event name="OnUpdateUI">on_view_column_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">1</property>
-            <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_COL_SPEED</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Speed</property>
-            <property name="name">m_view_speed</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_view_column</event>
-            <event name="OnUpdateUI">on_view_column_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">1</property>
-            <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_COL_VID</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Vendor</property>
-            <property name="name">m_view_vid</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_view_column</event>
-            <event name="OnUpdateUI">on_view_column_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">1</property>
-            <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">ID_COL_PID</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Product</property>
-            <property name="name">m_view_pid</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_view_column</event>
-            <event name="OnUpdateUI">on_view_column_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">1</property>
-            <property name="enabled">0</property>
-            <property name="help"></property>
-            <property name="id">ID_COL_STATE</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">State</property>
-            <property name="name">m_view_state</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_view_column</event>
-            <event name="OnUpdateUI">on_view_column_update_ui</event>
+          <object class="submenu" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_LIST_VIEW; wxART_MENU</property>
+            <property name="label">Columns</property>
+            <property name="name">m_menu_columns</property>
+            <property name="permission">protected</property>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_BUSID</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">Bus-Id</property>
+              <property name="name">m_view_busid</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">0</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_PORT</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">Port</property>
+              <property name="name">m_view_port</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_SPEED</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">Speed</property>
+              <property name="name">m_view_speed</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_VENDOR</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">Vendor</property>
+              <property name="name">m_view_vendor</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_PRODUCT</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">Product</property>
+              <property name="name">m_view_product</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">0</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_STATE</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">State</property>
+              <property name="name">m_view_state</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="true">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_PERSISTENT</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">AA</property>
+              <property name="name">m_view_persistent</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="true">
+              <property name="bitmap"></property>
+              <property name="checked">1</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">ID_COL_COMMENTS</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">Comments</property>
+              <property name="name">m_view_comment</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
           </object>
           <object class="separator" expanded="false">
             <property name="name">m_separator4</property>
@@ -426,7 +462,7 @@
             <property name="unchecked_bitmap"></property>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Help</property>
           <property name="name">m_menu_log_help</property>
           <property name="permission">protected</property>
@@ -555,7 +591,7 @@
           <event name="OnToolClicked">on_detach_all</event>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="true">
+      <object class="wxAuiToolBar" expanded="false">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -567,7 +603,7 @@
         <property name="best_size"></property>
         <property name="bg"></property>
         <property name="bitmapsize"></property>
-        <property name="caption">Add remote devices</property>
+        <property name="caption">Add USB devices</property>
         <property name="caption_visible">1</property>
         <property name="center_pane">0</property>
         <property name="close_button">1</property>
@@ -596,7 +632,7 @@
         <property name="moveable">1</property>
         <property name="name">m_auiToolBarAdd</property>
         <property name="packing">10</property>
-        <property name="pane_border">0</property>
+        <property name="pane_border">1</property>
         <property name="pane_position">434,482</property>
         <property name="pane_size">137,137</property>
         <property name="permission">protected</property>
@@ -606,7 +642,7 @@
         <property name="separation">5</property>
         <property name="show">1</property>
         <property name="size"></property>
-        <property name="style"></property>
+        <property name="style">wxAUI_TB_DEFAULT_STYLE</property>
         <property name="subclass">; ; forward_declare</property>
         <property name="toolbar_label"></property>
         <property name="toolbar_pane">0</property>
@@ -861,7 +897,7 @@
           <property name="bg"></property>
           <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_BUTTON</property>
           <property name="caption"></property>
-          <property name="caption_visible">1</property>
+          <property name="caption_visible">0</property>
           <property name="center_pane">0</property>
           <property name="close_button">1</property>
           <property name="context_help"></property>
@@ -882,7 +918,7 @@
           <property name="gripper">0</property>
           <property name="hidden">0</property>
           <property name="id">wxID_ADD</property>
-          <property name="label">Add</property>
+          <property name="label">Add devices</property>
           <property name="margins"></property>
           <property name="markup">0</property>
           <property name="max_size"></property>
@@ -929,7 +965,7 @@
         <property name="aui_row"></property>
         <property name="best_size"></property>
         <property name="bg">wxSYS_COLOUR_WINDOW</property>
-        <property name="caption">Remote devices</property>
+        <property name="caption">USB devices</property>
         <property name="caption_visible">1</property>
         <property name="center_pane">0</property>
         <property name="close_button">0</property>
@@ -973,44 +1009,50 @@
         <property name="window_style"></property>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Server / Bus-Id</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_RIGHT</property>
-          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Port</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">USB Speed</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Vendor</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Product</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">State</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_HIDDEN</property>
-          <property name="name">Persistent</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">AA</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Comments</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
       </object>

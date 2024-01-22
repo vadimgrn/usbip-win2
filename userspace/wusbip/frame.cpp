@@ -116,37 +116,55 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menubar->Append( m_menu_log, _("Log") );
 
 	m_menu_view = new wxMenu();
+	m_menu_columns = new wxMenu();
+	wxMenuItem* m_menu_columnsItem = new wxMenuItem( m_menu_view, wxID_ANY, _("Columns"), wxEmptyString, wxITEM_NORMAL, m_menu_columns );
+	#if (defined( __WXMSW__ ) || defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_menu_columnsItem->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_LIST_VIEW ), wxASCII_STR( wxART_MENU )) );
+	#endif
+
 	wxMenuItem* m_view_busid;
-	m_view_busid = new wxMenuItem( m_menu_view, ID_COL_BUSID, wxString( _("Bus-Id") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_busid );
+	m_view_busid = new wxMenuItem( m_menu_columns, ID_COL_BUSID, wxString( _("Bus-Id") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_busid );
 	m_view_busid->Check( true );
 
 	wxMenuItem* m_view_port;
-	m_view_port = new wxMenuItem( m_menu_view, ID_COL_PORT, wxString( _("Port") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_port );
+	m_view_port = new wxMenuItem( m_menu_columns, ID_COL_PORT, wxString( _("Port") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_port );
 	m_view_port->Enable( false );
 	m_view_port->Check( true );
 
 	wxMenuItem* m_view_speed;
-	m_view_speed = new wxMenuItem( m_menu_view, ID_COL_SPEED, wxString( _("Speed") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_speed );
+	m_view_speed = new wxMenuItem( m_menu_columns, ID_COL_SPEED, wxString( _("Speed") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_speed );
 	m_view_speed->Check( true );
 
-	wxMenuItem* m_view_vid;
-	m_view_vid = new wxMenuItem( m_menu_view, ID_COL_VID, wxString( _("Vendor") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_vid );
-	m_view_vid->Check( true );
+	wxMenuItem* m_view_vendor;
+	m_view_vendor = new wxMenuItem( m_menu_columns, ID_COL_VENDOR, wxString( _("Vendor") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_vendor );
+	m_view_vendor->Check( true );
 
-	wxMenuItem* m_view_pid;
-	m_view_pid = new wxMenuItem( m_menu_view, ID_COL_PID, wxString( _("Product") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_pid );
-	m_view_pid->Check( true );
+	wxMenuItem* m_view_product;
+	m_view_product = new wxMenuItem( m_menu_columns, ID_COL_PRODUCT, wxString( _("Product") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_product );
+	m_view_product->Check( true );
 
 	wxMenuItem* m_view_state;
-	m_view_state = new wxMenuItem( m_menu_view, ID_COL_STATE, wxString( _("State") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_state );
+	m_view_state = new wxMenuItem( m_menu_columns, ID_COL_STATE, wxString( _("State") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_state );
 	m_view_state->Enable( false );
 	m_view_state->Check( true );
+
+	wxMenuItem* m_view_persistent;
+	m_view_persistent = new wxMenuItem( m_menu_columns, ID_COL_PERSISTENT, wxString( _("AA") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_persistent );
+	m_view_persistent->Check( true );
+
+	wxMenuItem* m_view_comment;
+	m_view_comment = new wxMenuItem( m_menu_columns, ID_COL_COMMENTS, wxString( _("Comments") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_comment );
+	m_view_comment->Check( true );
+
+	m_menu_view->Append( m_menu_columnsItem );
 
 	m_menu_view->AppendSeparator();
 
@@ -189,7 +207,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_auiToolBar->Realize();
 	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Row( 0 ).Layer( 1 ).ToolbarPane() );
 
-	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0|wxTAB_TRAVERSAL );
+	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxTAB_TRAVERSAL );
 	m_auiToolBarAdd->SetToolPacking( 10 );
 	m_staticTextServer = new wxStaticText( m_auiToolBarAdd, wxID_ANY, _("Server"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL );
 	m_staticTextServer->Wrap( -1 );
@@ -209,28 +227,29 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_spinCtrlPort->SetToolTip( _("TCP/IP port number") );
 
 	m_auiToolBarAdd->AddControl( m_spinCtrlPort );
-	m_button_add = new wxButton( m_auiToolBarAdd, wxID_ADD, _("Add"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_button_add = new wxButton( m_auiToolBarAdd, wxID_ADD, _("Add devices"), wxDefaultPosition, wxDefaultSize, 0 );
 
 	m_button_add->SetDefault();
 
 	m_button_add->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PLUS ), wxASCII_STR( wxART_BUTTON )) );
 	m_auiToolBarAdd->AddControl( m_button_add );
 	m_auiToolBarAdd->Realize();
-	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .Caption( _("Add remote devices") ).PinButton( true ).PaneBorder( false ).Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).DockFixed( true ).Row( 0 ).Layer( 1 ).DefaultPane() );
+	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .Caption( _("Add USB devices") ).PinButton( true ).Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).DockFixed( true ).Row( 0 ).Layer( 1 ).DefaultPane() );
 
 	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_DEFAULT_STYLE|wxTL_MULTIPLE );
 	m_treeListCtrl->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
 	m_treeListCtrl->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ) );
 
-	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .Caption( _("Remote devices") ).CloseButton( false ).Movable( false ).Dock().Resizable().FloatingSize( wxDefaultSize ).DockFixed( true ).BottomDockable( false ).TopDockable( false ).LeftDockable( false ).RightDockable( false ).Floatable( false ) );
+	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .Caption( _("USB devices") ).CloseButton( false ).Movable( false ).Dock().Resizable().FloatingSize( wxDefaultSize ).DockFixed( true ).BottomDockable( false ).TopDockable( false ).LeftDockable( false ).RightDockable( false ).Floatable( false ) );
 
-	m_treeListCtrl->AppendColumn( _("Server / Bus-Id"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("Port"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_RIGHT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("USB Speed"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("Vendor"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("Product"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("Persistent"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
+	m_treeListCtrl->AppendColumn( _("Server / Bus-Id"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Port"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_RIGHT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("USB Speed"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Vendor"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Product"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("AA"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Comments"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 
 
 	m_mgr.Update();
@@ -251,18 +270,22 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_message->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_status->GetId());
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_level ), this, m_loglevel_info->GetId());
-	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_busid->GetId());
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_busid->GetId());
 	this->Connect( m_view_busid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_port->GetId());
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_port->GetId());
 	this->Connect( m_view_port->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_speed->GetId());
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_speed->GetId());
 	this->Connect( m_view_speed->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_vid->GetId());
-	this->Connect( m_view_vid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_pid->GetId());
-	this->Connect( m_view_pid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_state->GetId());
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_vendor->GetId());
+	this->Connect( m_view_vendor->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_product->GetId());
+	this->Connect( m_view_product->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_state->GetId());
 	this->Connect( m_view_state->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_persistent->GetId());
+	this->Connect( m_view_persistent->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_comment->GetId());
+	this->Connect( m_view_comment->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
 	this->Connect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
@@ -279,9 +302,11 @@ Frame::~Frame()
 	this->Disconnect( ID_COL_BUSID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( ID_COL_PORT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( ID_COL_SPEED, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_VID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_PID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_VENDOR, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_PRODUCT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( ID_COL_STATE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_PERSISTENT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_COMMENTS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );

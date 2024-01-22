@@ -50,9 +50,11 @@ class Frame : public wxFrame
 			ID_COL_BUSID,
 			ID_COL_PORT,
 			ID_COL_SPEED,
-			ID_COL_VID,
-			ID_COL_PID,
-			ID_COL_STATE
+			ID_COL_VENDOR,
+			ID_COL_PRODUCT,
+			ID_COL_STATE,
+			ID_COL_PERSISTENT,
+			ID_COL_COMMENTS
 		};
 
 		wxStatusBar* m_statusBar;
@@ -61,6 +63,7 @@ class Frame : public wxFrame
 		wxMenu* m_menu_devices;
 		wxMenu* m_menu_log;
 		wxMenu* m_menu_view;
+		wxMenu* m_menu_columns;
 		wxMenu* m_menu_log_help;
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_tool_refresh;

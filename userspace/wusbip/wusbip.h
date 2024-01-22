@@ -23,11 +23,6 @@ public:
 	~MainFrame();
 
 private:
-	enum tree_column_t : unsigned int // m_treeListCtrl
-	{
-		COL_BUSID, COL_PORT, COL_SPEED, COL_VID, COL_PID, COL_STATE, COL_PERSISTENT 
-	};
-	
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -71,5 +66,24 @@ private:
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state);
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state);
 
-	wxDataViewColumn& get_column(_In_ tree_column_t pos) const noexcept;
+	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
+
+	static constexpr auto get_column_pos(_In_ int col_id)
+	{
+		if (!std::is_constant_evaluated()) {
+			wxASSERT(col_id >= ID_COL_BUSID);
+			wxASSERT(col_id <= ID_COL_COMMENTS);
+		}
+
+		return static_cast<unsigned int>(col_id - ID_COL_BUSID);
+	}
+
+	template<auto col_id>
+	static consteval auto get_column_pos()
+	{
+		static_assert(col_id >= ID_COL_BUSID);
+		static_assert(col_id <= ID_COL_COMMENTS);
+
+		return get_column_pos(col_id);
+	}
 };
