@@ -67,8 +67,8 @@ private:
 
 	bool is_persistent(_In_ wxTreeListItem device);
 
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ bool update_state);
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ bool update_state);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ bool set_state);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ bool set_state);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 

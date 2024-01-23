@@ -48,7 +48,7 @@
       <property name="minimum_size"></property>
       <property name="name">Frame</property>
       <property name="pos"></property>
-      <property name="size">595,301</property>
+      <property name="size">680,462</property>
       <property name="style">wxDEFAULT_FRAME_STYLE</property>
       <property name="subclass">; ; forward_declare</property>
       <property name="title"></property>
@@ -502,7 +502,7 @@
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
         <property name="TopDockable">1</property>
-        <property name="aui_layer">1</property>
+        <property name="aui_layer">10</property>
         <property name="aui_name"></property>
         <property name="aui_position"></property>
         <property name="aui_row">0</property>
@@ -611,7 +611,7 @@
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
         <property name="TopDockable">1</property>
-        <property name="aui_layer">1</property>
+        <property name="aui_layer">10</property>
         <property name="aui_name"></property>
         <property name="aui_position"></property>
         <property name="aui_row">0</property>
@@ -1006,7 +1006,7 @@
         <property name="minimum_size"></property>
         <property name="moveable">0</property>
         <property name="name">m_treeListCtrl</property>
-        <property name="pane_border">1</property>
+        <property name="pane_border">0</property>
         <property name="pane_position"></property>
         <property name="pane_size"></property>
         <property name="permission">protected</property>

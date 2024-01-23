@@ -17,6 +17,9 @@
 #include <wx/busyinfo.h>
 #include <wx/dataview.h>
 
+#include <wx/persist.h>
+#include <wx/persist/toplevel.h>
+
 #include <format>
 
 namespace
@@ -35,16 +38,16 @@ private:
 
 bool App::OnInit()
 {
-        if (!wxApp::OnInit()) {
+        if (wxApp::OnInit()) {
+                set_names();
+        } else {
                 return false;
         }
 
         wxString err;
 
         if (auto read = init(err) ? vhci::open() : Handle()) {
-                set_names(); // after init()
                 auto frame = new MainFrame(std::move(read));
-                frame->SetTitle(GetAppDisplayName());
                 frame->Show(true);
                 return true;
         }
@@ -125,7 +128,7 @@ LogWindow::LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toggle) :
         wxAcceleratorEntry entry(acc->GetFlags(), acc->GetKeyCode(), wxID_CLOSE);
         wxAcceleratorTable table(1, &entry);
 
-        GetFrame()->SetAcceleratorTable(table);        
+        GetFrame()->SetAcceleratorTable(table); 
 }
 
 void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info)
@@ -164,12 +167,16 @@ MainFrame::~MainFrame()
 
 void MainFrame::init()
 {
-        set_log_level();
+        auto app_name = wxGetApp().GetAppDisplayName();
+        SetTitle(app_name);
 
+        set_log_level();
         m_textCtrlServer->SetMaxLength(NI_MAXHOST);
 
         auto port = usbip::get_tcp_port();
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
+
+        wxPersistentRegisterAndRestore(this, app_name);
 }
 
 void MainFrame::post_refresh()
@@ -475,7 +482,7 @@ void MainFrame::remove_device(_In_ wxTreeListItem device)
         }
 }
 
-void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &st, _In_ bool update_state)
+void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &st, _In_ bool set_state)
 {
         auto &dev = st.device;
         auto &tree = *m_treeListCtrl;
@@ -496,18 +503,21 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const usbip::devi
         tree.SetItemText(device, get_column_pos<ID_COL_VENDOR>(), str(dev.vendor, vendor));
         tree.SetItemText(device, get_column_pos<ID_COL_PRODUCT>(), str(dev.product, product));
 
-        if (update_state) {
+        if (set_state) {
                 auto state_str = vhci::get_state_str(st.state);
                 tree.SetItemText(device, get_column_pos<ID_COL_STATE>(), _(state_str));
         }
+
+        tree.SetItemText(device, get_column_pos<ID_COL_PERSISTENT>(), L"Yes");
+        tree.SetItemText(device, get_column_pos<ID_COL_COMMENTS>(), tree.GetItemText(device, get_column_pos<ID_COL_PRODUCT>()));
 }
 
 void MainFrame::update_device(
         _In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, 
-        _In_ usbip::state state, _In_ bool update_state)
+        _In_ usbip::state state, _In_ bool set_state)
 {
         usbip::device_state st{ .device = dev, .state = state };
-        update_device(device, st, update_state);
+        update_device(device, st, set_state);
 }
 
 void MainFrame::on_help_about(wxCommandEvent&)
