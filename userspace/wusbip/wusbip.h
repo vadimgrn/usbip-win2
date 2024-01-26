@@ -23,6 +23,7 @@ public:
 	~MainFrame();
 
 private:
+	enum { ID_COL_SAVED_STATE = ID_COL_COMMENTS + 1, ID_COL_MAX }; // hidden columns
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -71,23 +72,24 @@ private:
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ bool set_state);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
+	int get_port(_In_ wxTreeListItem dev) const;
 
-	static constexpr auto get_column_pos(_In_ int col_id)
+	static constexpr auto position(_In_ int col_id)
 	{
 		if (!std::is_constant_evaluated()) {
-			wxASSERT(col_id >= ID_COL_BUSID);
-			wxASSERT(col_id <= ID_COL_COMMENTS);
+			wxASSERT(col_id >= static_cast<int>(ID_COL_BUSID));
+			wxASSERT(col_id < static_cast<int>(ID_COL_MAX));
 		}
 
 		return static_cast<unsigned int>(col_id - ID_COL_BUSID);
 	}
 
 	template<auto col_id>
-	static consteval auto get_column_pos()
+	static consteval auto position()
 	{
-		static_assert(col_id >= ID_COL_BUSID);
-		static_assert(col_id <= ID_COL_COMMENTS);
+		static_assert(col_id >= static_cast<int>(ID_COL_BUSID));
+		static_assert(col_id < static_cast<int>(ID_COL_MAX));
 
-		return get_column_pos(col_id);
+		return position(col_id);
 	}
 };

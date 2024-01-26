@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2021 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -80,7 +80,7 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 
 /**
- * @return textual representaion of the given constant
+ * @return textual representation of the given constant
  */
 USBIP_API const char* get_state_str(_In_ state state) noexcept;
 
