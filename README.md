@@ -212,11 +212,13 @@ rem del /F sed*
   - Press Ctrl+D to open crash dump in C:\Windows
   - Run following commands and copy the output
 ```
-!analyze -v
+.sympath+ C:\Program Files\USBip
+!wmitrace.searchpath +%TEMP%\usbip
 !wdfkd.wdfsearchpath %TEMP%\USBip
 !wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wdfkd.wdflogdump usbip2_ude -d
 !wdfkd.wdflogdump usbip2_ude -f
+!analyze -v
 ```
 
 ## Obtaining USB/IP log on Linux
