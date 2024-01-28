@@ -16,6 +16,7 @@
 #include <wx/aboutdlg.h>
 #include <wx/busyinfo.h>
 #include <wx/dataview.h>
+#include <wx/config.h>
 
 #include <wx/persist.h>
 #include <wx/persist/toplevel.h>
@@ -182,6 +183,10 @@ MainFrame::~MainFrame()
 
 void MainFrame::init()
 {
+        if (auto cfg = wxConfig::Get()) {
+                cfg->SetStyle(wxCONFIG_USE_LOCAL_FILE);
+        }
+
         auto app_name = wxGetApp().GetAppDisplayName();
         SetTitle(app_name);
 
@@ -691,4 +696,82 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
 
         int port;
         return str.ToInt(&port) ? port : 0;
+}
+
+void MainFrame::on_save(wxCommandEvent&)
+{
+        auto &cfg = *wxConfig::Get();
+
+        auto &devices = L"/devices";
+        cfg.DeleteGroup(devices);
+        cfg.SetPath(devices);
+
+        int cnt = 0;
+        for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
+
+                auto parent = tree.GetItemParent(item);
+                if (parent == tree.GetRootItem()) {
+                        continue;
+                }
+
+                cfg.SetPath(wxString::Format(L"%d", cnt++));
+                cfg.Write(L"url", tree.GetItemText(parent)); // server
+
+                struct {
+                        const wchar_t *key;
+                        int pos;
+                } static const v[] = {
+                        { L"busid", position<ID_COL_BUSID>() },
+                        { L"port", position<ID_COL_PORT>() },
+                        { L"speed", position<ID_COL_SPEED>() },
+                        { L"vendor", position<ID_COL_VENDOR>() },
+                        { L"product", position<ID_COL_PRODUCT>() },
+                        { L"comments", position<ID_COL_COMMENTS>() },
+                };
+
+                for (auto [key, pos] : v) {
+                        auto value = tree.GetItemText(item, pos);
+                        cfg.Write(key, value);
+                }
+
+                cfg.SetPath(L"..");
+        }
+
+        cfg.SetPath(L"/");
+        cfg.Flush();
+
+        wxLogVerbose(L"Saved");
+}
+
+void MainFrame::on_load(wxCommandEvent&) 
+{
+        auto &tree = *m_treeListCtrl;
+        tree.DeleteAllItems();
+
+        auto &cfg = *wxConfig::Get();
+        cfg.SetPath(L"/devices");
+
+        for (size_t n = cfg.GetNumberOfGroups(), i = 0; i < n; ++i) {
+
+                cfg.SetPath(wxString::Format(L"/devices/%zu", i));
+
+                struct {
+                        const wchar_t *key;
+                        int pos;
+                } static const v[] = {
+                        { L"busid", position<ID_COL_BUSID>() },
+                        { L"port", position<ID_COL_PORT>() },
+                        { L"speed", position<ID_COL_SPEED>() },
+                        { L"vendor", position<ID_COL_VENDOR>() },
+                        { L"product", position<ID_COL_PRODUCT>() },
+                        { L"comments", position<ID_COL_COMMENTS>() },
+                };
+
+                for (auto [key, pos] : v) {
+                        auto value = cfg.Read(key);
+                        wxLogVerbose(L"#%zu: %s -> %s", i, key,  value);
+                }
+        }
+
+        cfg.SetPath(L"/");
 }

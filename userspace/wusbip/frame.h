@@ -70,6 +70,8 @@ class Frame : public wxFrame
 		wxAuiToolBarItem* m_tool_attach;
 		wxAuiToolBarItem* m_tool_detach;
 		wxAuiToolBarItem* m_tool_detach_all;
+		wxAuiToolBarItem* m_tool_save;
+		wxAuiToolBarItem* m_tool_load;
 		wxAuiToolBar* m_auiToolBarAdd;
 		wxStaticText* m_staticTextServer;
 		wxTextCtrl* m_textCtrlServer;
@@ -80,6 +82,8 @@ class Frame : public wxFrame
 
 		// Virtual event handlers, override them in your derived class
 		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
+		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }

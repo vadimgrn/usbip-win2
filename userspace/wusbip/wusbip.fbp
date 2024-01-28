@@ -105,10 +105,42 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">File</property>
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help"></property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Save</property>
+            <property name="name">m_file_save</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_save</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_PASTE; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help"></property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Load</property>
+            <property name="name">m_file_load</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_load</event>
+          </object>
+          <object class="separator" expanded="false">
+            <property name="name">m_separator5</property>
+            <property name="permission">none</property>
+          </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_QUIT; wxART_MENU</property>
             <property name="checked">0</property>
@@ -497,7 +529,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -604,6 +636,33 @@
           <property name="statusbar"></property>
           <property name="tooltip">Detach all remote devices</property>
           <event name="OnToolClicked">on_detach_all</event>
+        </object>
+        <object class="toolSeparator" expanded="true">
+          <property name="permission">protected</property>
+        </object>
+        <object class="tool" expanded="true">
+          <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_TOOLBAR</property>
+          <property name="context_menu">0</property>
+          <property name="id">wxID_ANY</property>
+          <property name="kind">wxITEM_NORMAL</property>
+          <property name="label">Save</property>
+          <property name="name">m_tool_save</property>
+          <property name="permission">protected</property>
+          <property name="statusbar"></property>
+          <property name="tooltip">Save</property>
+          <event name="OnToolClicked">on_save</event>
+        </object>
+        <object class="tool" expanded="true">
+          <property name="bitmap">Load From Art Provider; wxART_PASTE; wxART_TOOLBAR</property>
+          <property name="context_menu">0</property>
+          <property name="id">wxID_ANY</property>
+          <property name="kind">wxITEM_NORMAL</property>
+          <property name="label">Load</property>
+          <property name="name">m_tool_load</property>
+          <property name="permission">protected</property>
+          <property name="statusbar"></property>
+          <property name="tooltip">Load</property>
+          <event name="OnToolClicked">on_load</event>
         </object>
       </object>
       <object class="wxAuiToolBar" expanded="false">
