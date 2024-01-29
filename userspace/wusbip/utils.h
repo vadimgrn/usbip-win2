@@ -31,6 +31,7 @@ class UsbIds;
 const UsbIds& get_ids();
 
 const wchar_t* get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept;
+bool get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept;
 
 struct usb_device;
 struct imported_device;

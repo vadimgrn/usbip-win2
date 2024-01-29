@@ -85,6 +85,7 @@ class Frame : public wxFrame
 		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }

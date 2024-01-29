@@ -19,7 +19,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menubar = new wxMenuBar( 0 );
 	m_menu_file = new wxMenu();
 	wxMenuItem* m_file_save;
-	m_file_save = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Save") ) , wxEmptyString, wxITEM_NORMAL );
+	m_file_save = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Save") ) + wxT('\t') + wxT("CTRL+S"), _("Save selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_file_save->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_FILE_SAVE ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -28,7 +28,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->Append( m_file_save );
 
 	wxMenuItem* m_file_load;
-	m_file_load = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Load") ) , wxEmptyString, wxITEM_NORMAL );
+	m_file_load = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Load") ) + wxT('\t') + wxT("CTRL+L"), _("Load saved devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_file_load->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_PASTE ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -50,8 +50,17 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menubar->Append( m_menu_file, _("File") );
 
 	m_menu_devices = new wxMenu();
+	wxMenuItem* m_select_all;
+	m_select_all = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Select All") ) + wxT('\t') + wxT("CTRL+A"), _("Select all devices"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_select_all->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_FULL_SCREEN ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_select_all->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_FULL_SCREEN ), wxASCII_STR( wxART_MENU )) );
+	#endif
+	m_menu_devices->Append( m_select_all );
+
 	wxMenuItem* m_cmd_refresh;
-	m_cmd_refresh = new wxMenuItem( m_menu_devices, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of remote devices"), wxITEM_NORMAL );
+	m_cmd_refresh = new wxMenuItem( m_menu_devices, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_refresh->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -71,7 +80,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_attach;
-	m_cmd_attach = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+A"), _("Attach remote device(s)"), wxITEM_NORMAL );
+	m_cmd_attach = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+T"), _("Attach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_attach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -80,7 +89,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_detach;
-	m_cmd_detach = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach remote device(s)"), wxITEM_NORMAL );
+	m_cmd_detach = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_detach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_CROSS_MARK ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -91,7 +100,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_detach_all;
-	m_cmd_detach_all = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach All") ) , _("Detach all remote devices"), wxITEM_NORMAL );
+	m_cmd_detach_all = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach All") ) , _("Detach all devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_detach_all->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_DELETE ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -282,6 +291,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_treeListCtrl->AppendColumn( _("AA"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Comments"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Saved State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
+	m_treeListCtrl->AppendColumn( _("Loaded"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
 
 
 	m_mgr.Update();
@@ -292,6 +302,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_save ), this, m_file_save->GetId());
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_load ), this, m_file_load->GetId());
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_select_all ), this, m_select_all->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());

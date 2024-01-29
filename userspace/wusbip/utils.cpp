@@ -20,6 +20,13 @@
 namespace
 {
 
+static_assert(UsbLowSpeed == 0);
+static_assert(UsbFullSpeed == 1);
+static_assert(UsbHighSpeed == 2);
+static_assert(UsbSuperSpeed == 3);
+
+const wchar_t *g_usb_speed_str[] { L"Low", L"Full", L"High", L"Super" }; // indexed by enum USB_DEVICE_SPEED
+
 auto &msgtable_dll = L"resources"; // resource-only DLL that contains RT_MESSAGETABLE
 
 auto& get_resource_module() noexcept
@@ -90,13 +97,19 @@ bool usbip::init(_Out_ wxString &err)
 
 const wchar_t* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
 {
-        static_assert(UsbLowSpeed == 0);
-        static_assert(UsbFullSpeed == 1);
-        static_assert(UsbHighSpeed == 2);
-        static_assert(UsbSuperSpeed == 3);
+        return speed >= 0 && speed < ARRAYSIZE(g_usb_speed_str) ? g_usb_speed_str[speed] : L"?";
+}
 
-        const wchar_t *str[] { L"Low", L"Full", L"High", L"Super" };
-        return speed >= 0 && speed < ARRAYSIZE(str) ? str[speed] : L"?";
+bool usbip::get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept
+{
+        for (int i = 0; i < ARRAYSIZE(g_usb_speed_str); ++i) {
+                if (speed.IsSameAs(g_usb_speed_str[i], false)) {
+                        val = static_cast<USB_DEVICE_SPEED>(i);
+                        return true;
+                }
+        }
+
+        return false;
 }
 
 auto usbip::make_imported_device(

@@ -23,10 +23,26 @@
 
 #include <format>
 
+struct device_columns
+{
+        wxString url;
+        wxString busid;
+        wxString port;
+        wxString speed;
+        wxString vendor;
+        wxString product;
+        wxString state;
+        wxString persistent;
+        wxString comments;
+};
+
 namespace
 {
 
 using namespace usbip;
+
+auto &g_key_devices = L"/devices";
+auto &g_key_url = L"url";
 
 class App : public wxApp
 {
@@ -318,6 +334,11 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         }
 }
 
+void MainFrame::on_select_all(wxCommandEvent&)
+{
+        m_treeListCtrl->SelectAll();
+}
+
 bool MainFrame::is_persistent(_In_ wxTreeListItem device)
 {
         auto &tree = *m_treeListCtrl;
@@ -479,10 +500,10 @@ wxTreeListItem MainFrame::find_server(_In_ const wxString &url, _In_ bool append
         return server;
 }
 
-std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const device_location &loc, _In_ bool append)
+std::pair<wxTreeListItem, bool> MainFrame::find_device(
+        _In_ const wxString &url, _In_ const wxString &busid, _In_ bool append)
 {
         std::pair<wxTreeListItem, bool> res;
-        auto url = make_server_url(loc);
 
         auto server = find_server(url, append);
         if (!server.IsOk()) {
@@ -490,7 +511,6 @@ std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const device_locatio
         }
 
         auto &tree = *m_treeListCtrl;
-        auto busid = wxString::FromUTF8(loc.busid);
 
         for (auto item = tree.GetFirstChild(server); item.IsOk(); item = tree.GetNextSibling(item)) {
                 if (tree.GetItemText(item) == busid) {
@@ -506,6 +526,14 @@ std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const device_locatio
         return res;
 }
 
+std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const device_location &loc, _In_ bool append)
+{
+        auto url = make_server_url(loc);
+        auto busid = wxString::FromUTF8(loc.busid);
+
+        return find_device(url, busid, append);
+}
+
 void MainFrame::remove_device(_In_ wxTreeListItem device)
 {
         wxASSERT(device.IsOk());
@@ -519,31 +547,58 @@ void MainFrame::remove_device(_In_ wxTreeListItem device)
         }
 }
 
+void MainFrame::update_device(
+        _In_ wxTreeListItem dev, _In_ const device_columns &d, _In_ unsigned int flags)
+{
+        auto &tree = *m_treeListCtrl;
+
+        wxASSERT(dev.IsOk());
+        wxASSERT(tree.GetItemText(dev) == d.busid);
+        wxASSERT(tree.GetItemText(tree.GetItemParent(dev)) == d.url);
+
+        if (flags & SET_OTHERS) {
+                tree.SetItemText(dev, position<ID_COL_PORT>(), d.port);
+                tree.SetItemText(dev, position<ID_COL_SPEED>(), d.speed);
+                tree.SetItemText(dev, position<ID_COL_VENDOR>(), d.vendor);
+                tree.SetItemText(dev, position<ID_COL_PRODUCT>(), d.product);
+                tree.SetItemText(dev, position<ID_COL_COMMENTS>(), d.comments);
+        }
+
+        if (flags & SET_STATE) {
+                tree.SetItemText(dev, position<ID_COL_STATE>(), d.state);
+        }
+
+        if (flags & SET_LOADED) {
+                tree.SetItemText(dev, position<ID_COL_LOADED>(), L"Yes");
+        }
+}
+
 void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_state &st, _In_ bool set_state)
 {
         auto &dev = st.device;
-        auto &tree = *m_treeListCtrl;
 
-        wxASSERT(device.IsOk());
-        wxASSERT(tree.GetItemText(device) == wxString::FromUTF8(dev.location.busid)); // COL_BUSID
-        wxASSERT(tree.GetItemText(tree.GetItemParent(device)) == make_server_url(dev.location));
+        device_columns dc {
+                .url = make_server_url(dev.location),
+                .busid = wxString::FromUTF8(dev.location.busid),
+        };
+
+        unsigned int flags{};
 
         if (set_state) {
-                auto state_str = vhci::get_state_str(st.state);
-                tree.SetItemText(device, position<ID_COL_STATE>(), _(state_str));
+                flags |= SET_STATE;
+                dc.state = _(vhci::get_state_str(st.state));
         }
 
         if (is_empty(st.device)) {
+                update_device(device, dc, flags);
                 return;
         }
 
-        wxString port;
         if (dev.port && st.state != state::unplugged) {
-                port = wxString::Format(L"%02d", dev.port); // XX for proper sorting
+                dc.port = wxString::Format(L"%02d", dev.port); // XX for proper sorting
         }
-        tree.SetItemText(device, position<ID_COL_PORT>(), port);
 
-        tree.SetItemText(device, position<ID_COL_SPEED>(), get_speed_str(dev.speed));
+        dc.speed = get_speed_str(dev.speed);
 
         auto str = [] (auto id, auto sv)
         {
@@ -552,8 +607,10 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_stat
 
         auto [vendor, product] = get_ids().find_product(dev.vendor, dev.product);
 
-        tree.SetItemText(device, position<ID_COL_VENDOR>(), str(dev.vendor, vendor));
-        tree.SetItemText(device, position<ID_COL_PRODUCT>(), str(dev.product, product));
+        dc.vendor = str(dev.vendor, vendor);
+        dc.product = str(dev.product, product);
+
+        update_device(device, dc, flags | SET_OTHERS);
 }
 
 void MainFrame::update_device(
@@ -698,38 +755,42 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         return str.ToInt(&port) ? port : 0;
 }
 
+auto& MainFrame::get_keys()
+{
+        struct {
+                const wchar_t *key;
+                unsigned int pos;
+        } static const v[] = {
+                { L"busid", position<ID_COL_BUSID>() },
+                { L"speed", position<ID_COL_SPEED>() },
+                { L"vendor", position<ID_COL_VENDOR>() },
+                { L"product", position<ID_COL_PRODUCT>() },
+                { L"comments", position<ID_COL_COMMENTS>() },
+        };
+
+        return v;
+}
+
 void MainFrame::on_save(wxCommandEvent&)
 {
         auto &cfg = *wxConfig::Get();
+        auto path = cfg.GetPath();
 
-        auto &devices = L"/devices";
-        cfg.DeleteGroup(devices);
-        cfg.SetPath(devices);
+        cfg.DeleteGroup(g_key_devices);
+        cfg.SetPath(g_key_devices);
 
         int cnt = 0;
         for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
 
                 auto parent = tree.GetItemParent(item);
-                if (parent == tree.GetRootItem()) {
+                if (parent == tree.GetRootItem()) { // server
                         continue;
                 }
 
-                cfg.SetPath(wxString::Format(L"%d", cnt++));
-                cfg.Write(L"url", tree.GetItemText(parent)); // server
+                cfg.SetPath(wxString::Format(L"%d", ++cnt));
+                cfg.Write(g_key_url, tree.GetItemText(parent)); // server
 
-                struct {
-                        const wchar_t *key;
-                        int pos;
-                } static const v[] = {
-                        { L"busid", position<ID_COL_BUSID>() },
-                        { L"port", position<ID_COL_PORT>() },
-                        { L"speed", position<ID_COL_SPEED>() },
-                        { L"vendor", position<ID_COL_VENDOR>() },
-                        { L"product", position<ID_COL_PRODUCT>() },
-                        { L"comments", position<ID_COL_COMMENTS>() },
-                };
-
-                for (auto [key, pos] : v) {
+                for (auto [key, pos] : get_keys()) {
                         auto value = tree.GetItemText(item, pos);
                         cfg.Write(key, value);
                 }
@@ -737,10 +798,10 @@ void MainFrame::on_save(wxCommandEvent&)
                 cfg.SetPath(L"..");
         }
 
-        cfg.SetPath(L"/");
         cfg.Flush();
+        cfg.SetPath(path);
 
-        wxLogVerbose(L"Saved");
+        SetStatusText(wxString::Format(_("%d device(s) saved"), cnt));
 }
 
 void MainFrame::on_load(wxCommandEvent&) 
@@ -749,29 +810,82 @@ void MainFrame::on_load(wxCommandEvent&)
         tree.DeleteAllItems();
 
         auto &cfg = *wxConfig::Get();
-        cfg.SetPath(L"/devices");
 
-        for (size_t n = cfg.GetNumberOfGroups(), i = 0; i < n; ++i) {
+        auto path = cfg.GetPath();
+        cfg.SetPath(g_key_devices);
 
-                cfg.SetPath(wxString::Format(L"/devices/%zu", i));
+        int cnt = 0;
+        wxString name;
+        long idx;
 
-                struct {
-                        const wchar_t *key;
-                        int pos;
-                } static const v[] = {
-                        { L"busid", position<ID_COL_BUSID>() },
-                        { L"port", position<ID_COL_PORT>() },
-                        { L"speed", position<ID_COL_SPEED>() },
-                        { L"vendor", position<ID_COL_VENDOR>() },
-                        { L"product", position<ID_COL_PRODUCT>() },
-                        { L"comments", position<ID_COL_COMMENTS>() },
+        for (auto ok = cfg.GetFirstGroup(name, idx); ok; cfg.SetPath(L".."), ok = cfg.GetNextGroup(name, idx)) {
+
+                cfg.SetPath(name);
+
+                device_columns dev { 
+                        .url = cfg.Read(g_key_url),
+                        .state = _(vhci::get_state_str(state::unplugged))
                 };
 
-                for (auto [key, pos] : v) {
-                        auto value = cfg.Read(key);
-                        wxLogVerbose(L"#%zu: %s -> %s", i, key,  value);
+                if (dev.url.empty()) {
+                        continue;
+                }
+
+                for (auto [key, pos] : get_keys()) {
+                        if (auto dst = get_member(dev, pos)) {
+                                *dst = cfg.Read(key);
+                        }
+                }
+
+                if (dev.busid.empty()) {
+                        continue;
+                }
+
+                auto [device, appended] = find_device(dev.url, dev.busid, true);
+                update_device(device, dev, SET_STATE | SET_LOADED | SET_OTHERS);
+                cnt += appended;
+
+                if (auto server = tree.GetItemParent(device); !tree.IsExpanded(server)) {
+                        tree.Expand(server);
                 }
         }
 
-        cfg.SetPath(L"/");
+        cfg.SetPath(path);
+        SetStatusText(wxString::Format(_("%d device(s) loaded"), cnt));
 }
+
+wxString* MainFrame::get_member(_In_ device_columns &d, _In_ unsigned int pos) noexcept
+{
+        wxString *s{};
+
+        switch (pos) {
+        case position<ID_COL_BUSID>():
+                s = &d.busid;
+                break;
+        case position<ID_COL_PORT>():
+                s = &d.port;
+                break;
+        case position<ID_COL_SPEED>():
+                s = &d.speed;
+                break;
+        case position<ID_COL_VENDOR>():
+                s = &d.vendor;
+                break;
+        case position<ID_COL_PRODUCT>():
+                s = &d.product;
+                break;
+        case position<ID_COL_STATE>():
+                s = &d.state;
+                break;
+        case position<ID_COL_PERSISTENT>():
+                s = &d.persistent;
+                break;
+        case position<ID_COL_COMMENTS>():
+                s = &d.comments;
+                break;
+        }
+
+        wxASSERT(s);
+        return s;
+}
+
