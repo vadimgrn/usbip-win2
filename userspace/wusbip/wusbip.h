@@ -34,6 +34,7 @@ private:
 
 	void on_close(wxCloseEvent &event) override; 
 	void on_exit(wxCommandEvent &event) override;
+
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
 	void on_detach_all(wxCommandEvent &event) override;
@@ -42,6 +43,8 @@ private:
 	void on_help_about(wxCommandEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
 	void on_select_all(wxCommandEvent &event) override;
+	void on_has_items_update_ui(wxUpdateUIEvent &event) override;
+	void on_has_selections_update_ui(wxUpdateUIEvent &event) override;
 
 	void on_save(wxCommandEvent &event) override;
 	void on_load(wxCommandEvent &event) override;

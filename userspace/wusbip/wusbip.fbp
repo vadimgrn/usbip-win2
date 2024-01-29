@@ -173,6 +173,7 @@
             <property name="shortcut">CTRL+A</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_select_all</event>
+            <event name="OnUpdateUI">on_has_items_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
@@ -188,6 +189,10 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_refresh</event>
           </object>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator6</property>
+            <property name="permission">none</property>
+          </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_MENU</property>
             <property name="checked">0</property>
@@ -202,8 +207,8 @@
             <property name="unchecked_bitmap">Load From File; </property>
             <event name="OnMenuSelection">add_exported_devices</event>
           </object>
-          <object class="separator" expanded="false">
-            <property name="name">m_separator2</property>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator12</property>
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
@@ -219,6 +224,7 @@
             <property name="shortcut">CTRL+T</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_attach</event>
+            <event name="OnUpdateUI">on_has_selections_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_MENU</property>
@@ -233,6 +239,7 @@
             <property name="shortcut">CTRL+D</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_detach</event>
+            <event name="OnUpdateUI">on_has_selections_update_ui</event>
           </object>
           <object class="separator" expanded="false">
             <property name="name">m_separator21</property>
@@ -253,7 +260,7 @@
             <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
@@ -267,7 +274,7 @@
             <property name="label">Toggle window</property>
             <property name="name">m_log_toggle</property>
             <property name="permission">none</property>
-            <property name="shortcut">CTRL+L</property>
+            <property name="shortcut">CTRL+W</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_log_show</event>
             <event name="OnUpdateUI">on_log_show_update_ui</event>
@@ -626,6 +633,7 @@
           <property name="statusbar"></property>
           <property name="tooltip">Attach remote device(s)</property>
           <event name="OnToolClicked">on_attach</event>
+          <event name="OnUpdateUI">on_has_selections_update_ui</event>
         </object>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_TOOLBAR</property>
@@ -638,6 +646,7 @@
           <property name="statusbar"></property>
           <property name="tooltip">Detach remote device(s)</property>
           <event name="OnToolClicked">on_detach</event>
+          <event name="OnUpdateUI">on_has_selections_update_ui</event>
         </object>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_TOOLBAR</property>
@@ -663,7 +672,7 @@
           <property name="name">m_tool_save</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Save</property>
+          <property name="tooltip">Save selected devices</property>
           <event name="OnToolClicked">on_save</event>
         </object>
         <object class="tool" expanded="true">
@@ -675,7 +684,7 @@
           <property name="name">m_tool_load</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Load</property>
+          <property name="tooltip">Load saved devices</property>
           <event name="OnToolClicked">on_load</event>
         </object>
       </object>

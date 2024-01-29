@@ -44,6 +44,7 @@ using namespace usbip;
 auto &g_key_devices = L"/devices";
 auto &g_key_url = L"url";
 
+
 class App : public wxApp
 {
 public:
@@ -115,6 +116,11 @@ auto get_selections(_In_ wxTreeListCtrl &tree)
         wxTreeListItems v;
         tree.GetSelections(v);
         return v;
+}
+
+auto has_items(_In_ const wxTreeListCtrl &t) noexcept
+{
+        return t.GetFirstItem().IsOk();
 }
 
 } // namespace
@@ -332,6 +338,18 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         } else if (auto server = tree.GetItemParent(dev); !tree.IsExpanded(server)) {
                 tree.Expand(server);
         }
+}
+
+void MainFrame::on_has_items_update_ui(wxUpdateUIEvent &event)
+{
+        auto ok = has_items(*m_treeListCtrl);
+        event.Enable(ok);
+}
+
+void MainFrame::on_has_selections_update_ui(wxUpdateUIEvent &event)
+{
+        auto v = get_selections(*m_treeListCtrl);
+        event.Enable(!v.empty());
 }
 
 void MainFrame::on_select_all(wxCommandEvent&)
@@ -780,7 +798,9 @@ void MainFrame::on_save(wxCommandEvent&)
         cfg.SetPath(g_key_devices);
 
         int cnt = 0;
-        for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
+        auto &tree = *m_treeListCtrl;
+ 
+        for (auto &item: get_selections(tree)) {
 
                 auto parent = tree.GetItemParent(item);
                 if (parent == tree.GetRootItem()) { // server
@@ -802,6 +822,10 @@ void MainFrame::on_save(wxCommandEvent&)
         cfg.SetPath(path);
 
         SetStatusText(wxString::Format(_("%d device(s) saved"), cnt));
+
+        if (!cnt && has_items(tree)) {
+                wxMessageBox(_("No selections were made"), _("Nothing to save"), wxICON_WARNING);
+        }
 }
 
 void MainFrame::on_load(wxCommandEvent&) 

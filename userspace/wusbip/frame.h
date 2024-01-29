@@ -86,9 +86,11 @@ class Frame : public wxFrame
 		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_has_items_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_has_selections_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
