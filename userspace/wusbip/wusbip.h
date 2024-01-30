@@ -9,10 +9,10 @@
 
 #include <thread>
 #include <mutex>
+#include <array>
 
 class LogWindow;
 class wxDataViewColumn;
-struct device_columns;
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
@@ -24,7 +24,19 @@ public:
 	~MainFrame();
 
 private:
-	enum { ID_COL_SAVED_STATE = ID_COL_COMMENTS + 1, ID_COL_LOADED, ID_COL_MAX }; // hidden columns
+	enum { // hidden columns
+		ID_COL_FIRST = ID_COL_BUSID, 
+		ID_COL_LAST_VISIBLE = ID_COL_COMMENTS, 
+		ID_COL_SAVED_STATE, 
+		ID_COL_LOADED, 
+		ID_COL_MAX };
+	
+	enum { // for device_columns only
+		DEV_COL_URL = ID_COL_LAST_VISIBLE + 1, // use get_url()
+		DEV_COL_CNT = DEV_COL_URL - int(ID_COL_FIRST) + 1
+	};
+	using device_columns = std::array<wxString, DEV_COL_CNT>; // indexed by visible columns only and DEV_COL_URL
+
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -88,31 +100,38 @@ private:
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 	int get_port(_In_ wxTreeListItem dev) const;
 
-	static wxString* get_member(_In_ device_columns &d, _In_ unsigned int pos) noexcept;
+	template<typename Array>
+	static auto& get_url(_In_ Array &ar) noexcept;
 
 	static auto& get_keys();
-	static constexpr auto position(_In_ int col_id);
+	static constexpr auto col(_In_ int col_id);
 
 	template<auto col_id>
-	static consteval auto position();
+	static consteval auto col();
 };
 
 
-inline constexpr auto MainFrame::position(_In_ int col_id)
+inline constexpr auto MainFrame::col(_In_ int col_id)
 {
 	if (!std::is_constant_evaluated()) {
-		wxASSERT(col_id >= static_cast<int>(ID_COL_BUSID));
+		wxASSERT(col_id >= static_cast<int>(ID_COL_FIRST));
 		wxASSERT(col_id < static_cast<int>(ID_COL_MAX));
 	}
 
-	return static_cast<unsigned int>(col_id - ID_COL_BUSID);
+	return static_cast<unsigned int>(col_id - ID_COL_FIRST);
 }
 
 template<auto col_id>
-inline consteval auto MainFrame::position()
+inline consteval auto MainFrame::col()
 {
-	static_assert(col_id >= static_cast<int>(ID_COL_BUSID));
+	static_assert(col_id >= static_cast<int>(ID_COL_FIRST));
 	static_assert(col_id < static_cast<int>(ID_COL_MAX));
 
-	return position(col_id);
+	return col(col_id);
+}
+
+template<typename Array>
+inline auto& MainFrame::get_url(_In_ Array &ar) noexcept 
+{ 
+	return ar[col<DEV_COL_URL>()];
 }

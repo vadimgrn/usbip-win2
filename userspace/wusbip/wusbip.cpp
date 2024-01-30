@@ -23,19 +23,6 @@
 
 #include <format>
 
-struct device_columns
-{
-        wxString url;
-        wxString busid;
-        wxString port;
-        wxString speed;
-        wxString vendor;
-        wxString product;
-        wxString state;
-        wxString persistent;
-        wxString comments;
-};
-
 namespace
 {
 
@@ -311,20 +298,20 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto set_state = true;
 
         if (st.state == state::connecting) {
-                auto state = tree.GetItemText(dev, position<ID_COL_STATE>()); // can be empty
-                tree.SetItemText(dev, position<ID_COL_SAVED_STATE>(), state);
+                auto state = tree.GetItemText(dev, col<ID_COL_STATE>()); // can be empty
+                tree.SetItemText(dev, col<ID_COL_SAVED_STATE>(), state);
                 wxLogVerbose(_("current state='%s' saved"), state);
         }
 
         if (!(st.state == state::disconnected && is_empty(st.device))) { // connection has failed/closed
                 //
-        } else if (auto saved_state = tree.GetItemText(dev, position<ID_COL_SAVED_STATE>()); saved_state.empty()) {
+        } else if (auto saved_state = tree.GetItemText(dev, col<ID_COL_SAVED_STATE>()); saved_state.empty()) {
                 wxLogVerbose(_("remove transient device"));
                 remove_device(dev);
                 appended = false;
                 update = false;
         } else {
-                tree.SetItemText(dev, position<ID_COL_STATE>(), saved_state);
+                tree.SetItemText(dev, col<ID_COL_STATE>(), saved_state);
                 wxLogVerbose(_("saved state='%s' restored"), saved_state);
                 set_state = false;
         }
@@ -364,7 +351,7 @@ bool MainFrame::is_persistent(_In_ wxTreeListItem device)
         wxASSERT(tree.GetItemParent(device).IsOk()); // server
         wxASSERT(!tree.GetFirstChild(device).IsOk());
 
-        auto &s = tree.GetItemText(device, position<ID_COL_PERSISTENT>());
+        auto &s = tree.GetItemText(device, col<ID_COL_PERSISTENT>());
         return !s.empty();
 }
 
@@ -425,7 +412,7 @@ void MainFrame::on_attach(wxCommandEvent&)
                 }
 
                 auto url = tree.GetItemText(parent); // server
-                auto busid = tree.GetItemText(item); // position<ID_COL_BUSID>()
+                auto busid = tree.GetItemText(item); // column<ID_COL_BUSID>()
 
                 if (!attach(url,  busid)) {
                         auto err = GetLastError();
@@ -454,7 +441,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                         auto err = GetLastError();
 
                         auto url = tree.GetItemText(parent); // server
-                        auto busid = tree.GetItemText(item); // position<ID_COL_BUSID>()
+                        auto busid = tree.GetItemText(item); // column<ID_COL_BUSID>()
 
                         wxLogError(_("Cannot detach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
                 }
@@ -566,28 +553,28 @@ void MainFrame::remove_device(_In_ wxTreeListItem device)
 }
 
 void MainFrame::update_device(
-        _In_ wxTreeListItem dev, _In_ const device_columns &d, _In_ unsigned int flags)
+        _In_ wxTreeListItem dev, _In_ const device_columns &dc, _In_ unsigned int flags)
 {
         auto &tree = *m_treeListCtrl;
 
         wxASSERT(dev.IsOk());
-        wxASSERT(tree.GetItemText(dev) == d.busid);
-        wxASSERT(tree.GetItemText(tree.GetItemParent(dev)) == d.url);
+        wxASSERT(tree.GetItemText(dev) == dc[col<ID_COL_BUSID>()]);
+        wxASSERT(tree.GetItemText(tree.GetItemParent(dev)) == get_url(dc));
 
         if (flags & SET_OTHERS) {
-                tree.SetItemText(dev, position<ID_COL_PORT>(), d.port);
-                tree.SetItemText(dev, position<ID_COL_SPEED>(), d.speed);
-                tree.SetItemText(dev, position<ID_COL_VENDOR>(), d.vendor);
-                tree.SetItemText(dev, position<ID_COL_PRODUCT>(), d.product);
-                tree.SetItemText(dev, position<ID_COL_COMMENTS>(), d.comments);
+                for (auto col: { col<ID_COL_PORT>(), col<ID_COL_SPEED>(), col<ID_COL_VENDOR>(), 
+                                 col<ID_COL_PRODUCT>(), col<ID_COL_COMMENTS>() }) {
+                        tree.SetItemText(dev, col, dc[col]);
+                }
         }
 
         if (flags & SET_STATE) {
-                tree.SetItemText(dev, position<ID_COL_STATE>(), d.state);
+                constexpr auto idx = col<ID_COL_STATE>();
+                tree.SetItemText(dev, idx, dc[idx]);
         }
 
         if (flags & SET_LOADED) {
-                tree.SetItemText(dev, position<ID_COL_LOADED>(), L"Yes");
+                tree.SetItemText(dev, col<ID_COL_LOADED>(), L"Yes");
         }
 }
 
@@ -595,16 +582,15 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_stat
 {
         auto &dev = st.device;
 
-        device_columns dc {
-                .url = make_server_url(dev.location),
-                .busid = wxString::FromUTF8(dev.location.busid),
-        };
+        device_columns dc;
+        get_url(dc) = make_server_url(dev.location);
+        dc[col<ID_COL_BUSID>()] = wxString::FromUTF8(dev.location.busid);
 
         unsigned int flags{};
 
         if (set_state) {
                 flags |= SET_STATE;
-                dc.state = _(vhci::get_state_str(st.state));
+                dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(st.state));
         }
 
         if (is_empty(st.device)) {
@@ -613,10 +599,10 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_stat
         }
 
         if (dev.port && st.state != state::unplugged) {
-                dc.port = wxString::Format(L"%02d", dev.port); // XX for proper sorting
+                dc[col<ID_COL_PORT>()] = wxString::Format(L"%02d", dev.port); // XX for proper sorting
         }
 
-        dc.speed = get_speed_str(dev.speed);
+        dc[col<ID_COL_SPEED>()] = get_speed_str(dev.speed);
 
         auto str = [] (auto id, auto sv)
         {
@@ -625,8 +611,8 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_stat
 
         auto [vendor, product] = get_ids().find_product(dev.vendor, dev.product);
 
-        dc.vendor = str(dev.vendor, vendor);
-        dc.product = str(dev.product, product);
+        dc[col<ID_COL_VENDOR>()] = str(dev.vendor, vendor);
+        dc[col<ID_COL_PRODUCT>()] = str(dev.product, product);
 
         update_device(device, dc, flags | SET_OTHERS);
 }
@@ -709,7 +695,7 @@ wxDataViewColumn& MainFrame::get_column(_In_ int col_id) const noexcept
 {
         auto &view = *m_treeListCtrl->GetDataView();
 
-        auto pos = position(col_id);
+        auto pos = col(col_id);
         wxASSERT(pos < view.GetColumnCount());
         
         auto col = view.GetColumn(pos);
@@ -741,7 +727,7 @@ void MainFrame::on_item_activated(wxTreeListEvent &event)
         
         if (auto item = event.GetItem(); tree.GetItemParent(item) == tree.GetRootItem()) {
                 // item is a server
-        } else if (auto state = tree.GetItemText(item, position<ID_COL_STATE>());
+        } else if (auto state = tree.GetItemText(item, col<ID_COL_STATE>());
                    state == _(vhci::get_state_str(state::unplugged))) {
                 on_attach(event);
         } else if (state == _(vhci::get_state_str(state::plugged))) {
@@ -767,7 +753,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         auto &tree = *m_treeListCtrl;
 
         wxASSERT(!tree.GetFirstChild(dev).IsOk());
-        auto str = tree.GetItemText(dev, position<ID_COL_PORT>());
+        auto str = tree.GetItemText(dev, col<ID_COL_PORT>());
 
         int port;
         return str.ToInt(&port) ? port : 0;
@@ -777,13 +763,13 @@ auto& MainFrame::get_keys()
 {
         struct {
                 const wchar_t *key;
-                unsigned int pos;
+                unsigned int col;
         } static const v[] = {
-                { L"busid", position<ID_COL_BUSID>() },
-                { L"speed", position<ID_COL_SPEED>() },
-                { L"vendor", position<ID_COL_VENDOR>() },
-                { L"product", position<ID_COL_PRODUCT>() },
-                { L"comments", position<ID_COL_COMMENTS>() },
+                { L"busid", col<ID_COL_BUSID>() },
+                { L"speed", col<ID_COL_SPEED>() },
+                { L"vendor", col<ID_COL_VENDOR>() },
+                { L"product", col<ID_COL_PRODUCT>() },
+                { L"comments", col<ID_COL_COMMENTS>() },
         };
 
         return v;
@@ -810,8 +796,8 @@ void MainFrame::on_save(wxCommandEvent&)
                 cfg.SetPath(wxString::Format(L"%d", ++cnt));
                 cfg.Write(g_key_url, tree.GetItemText(parent)); // server
 
-                for (auto [key, pos] : get_keys()) {
-                        auto value = tree.GetItemText(item, pos);
+                for (auto [key, col] : get_keys()) {
+                        auto value = tree.GetItemText(item, col);
                         cfg.Write(key, value);
                 }
 
@@ -846,26 +832,25 @@ void MainFrame::on_load(wxCommandEvent&)
 
                 cfg.SetPath(name);
 
-                device_columns dev { 
-                        .url = cfg.Read(g_key_url),
-                        .state = _(vhci::get_state_str(state::unplugged))
-                };
+                device_columns dev;
+                auto &url = get_url(dev);
 
-                if (dev.url.empty()) {
+                url = cfg.Read(g_key_url);
+                if (url.empty()) {
                         continue;
                 }
 
-                for (auto [key, pos] : get_keys()) {
-                        if (auto dst = get_member(dev, pos)) {
-                                *dst = cfg.Read(key);
-                        }
+                dev[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
+
+                for (auto [key, col] : get_keys()) {
+                        dev[col] = cfg.Read(key);
                 }
 
-                if (dev.busid.empty()) {
+                if (dev[col<ID_COL_BUSID>()].empty()) {
                         continue;
                 }
 
-                auto [device, appended] = find_device(dev.url, dev.busid, true);
+                auto [device, appended] = find_device(url, dev[col<ID_COL_BUSID>()], true);
                 update_device(device, dev, SET_STATE | SET_LOADED | SET_OTHERS);
                 cnt += appended;
 
@@ -877,39 +862,3 @@ void MainFrame::on_load(wxCommandEvent&)
         cfg.SetPath(path);
         SetStatusText(wxString::Format(_("%d device(s) loaded"), cnt));
 }
-
-wxString* MainFrame::get_member(_In_ device_columns &d, _In_ unsigned int pos) noexcept
-{
-        wxString *s{};
-
-        switch (pos) {
-        case position<ID_COL_BUSID>():
-                s = &d.busid;
-                break;
-        case position<ID_COL_PORT>():
-                s = &d.port;
-                break;
-        case position<ID_COL_SPEED>():
-                s = &d.speed;
-                break;
-        case position<ID_COL_VENDOR>():
-                s = &d.vendor;
-                break;
-        case position<ID_COL_PRODUCT>():
-                s = &d.product;
-                break;
-        case position<ID_COL_STATE>():
-                s = &d.state;
-                break;
-        case position<ID_COL_PERSISTENT>():
-                s = &d.persistent;
-                break;
-        case position<ID_COL_COMMENTS>():
-                s = &d.comments;
-                break;
-        }
-
-        wxASSERT(s);
-        return s;
-}
-
