@@ -807,7 +807,7 @@ void MainFrame::on_save(wxCommandEvent&)
         cfg.Flush();
         cfg.SetPath(path);
 
-        SetStatusText(wxString::Format(_("%d device(s) saved"), cnt));
+        wxLogStatus(_("%d device(s) saved"), cnt);
 
         if (!cnt && has_items(tree)) {
                 wxMessageBox(_("No selections were made"), _("Nothing to save"), wxICON_WARNING);
@@ -860,5 +860,5 @@ void MainFrame::on_load(wxCommandEvent&)
         }
 
         cfg.SetPath(path);
-        SetStatusText(wxString::Format(_("%d device(s) loaded"), cnt));
+        wxLogStatus(_("%d device(s) loaded"), cnt);
 }
