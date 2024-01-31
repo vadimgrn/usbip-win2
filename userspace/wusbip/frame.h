@@ -52,14 +52,15 @@ class Frame : public wxFrame
 			ID_COL_SPEED,
 			ID_COL_VENDOR,
 			ID_COL_PRODUCT,
-			ID_COL_STATE,
 			ID_COL_PERSISTENT,
+			ID_COL_STATE,
 			ID_COL_COMMENTS
 		};
 
 		wxStatusBar* m_statusBar;
 		wxMenuBar* m_menubar;
 		wxMenu* m_menu_file;
+		wxMenu* m_menu_edit;
 		wxMenu* m_menu_devices;
 		wxMenu* m_menu_log;
 		wxMenu* m_menu_view;
@@ -85,9 +86,10 @@ class Frame : public wxFrame
 		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_items_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_toogle_persistent( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_selections_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }

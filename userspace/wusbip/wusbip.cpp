@@ -6,6 +6,7 @@
 #include "utils.h"
 
 #include <libusbip/remote.h>
+#include <libusbip/persistent.h>
 #include <libusbip/src/usb_ids.h>
 #include <libusbip/src/file_ver.h>
 
@@ -110,6 +111,22 @@ auto has_items(_In_ const wxTreeListCtrl &t) noexcept
         return t.GetFirstItem().IsOk();
 }
 
+auto make_device_location(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem server, _In_ wxTreeListItem device)
+{
+        auto url = tree.GetItemText(server);
+        auto busid = tree.GetItemText(device);
+
+        wxString hostname;
+        wxString service;
+        split_server_url(url, hostname, service);
+
+        return device_location {
+                .hostname = hostname.ToStdString(wxConvUTF8), 
+                .service = service.ToStdString(wxConvUTF8), 
+                .busid = busid.ToStdString(wxConvUTF8), 
+        };
+}
+
 } // namespace
 
 wxIMPLEMENT_APP(App);
@@ -211,7 +228,7 @@ void MainFrame::init()
 void MainFrame::post_refresh()
 {
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
-        wxPostEvent(m_menu_devices, evt);
+        wxPostEvent(m_menu_edit, evt);
 }
 
 void MainFrame::on_close(wxCloseEvent &event)
@@ -355,6 +372,21 @@ bool MainFrame::is_persistent(_In_ wxTreeListItem device)
         return !s.empty();
 }
 
+void MainFrame::set_persistent(_In_ wxTreeListItem device, _In_ bool persistent)
+{
+        auto &tree = *m_treeListCtrl;
+
+        wxASSERT(tree.GetItemParent(device).IsOk()); // server
+        wxASSERT(!tree.GetFirstChild(device).IsOk());
+
+        wxString val;
+        if (persistent) {
+                val = L"\u2713"; // CHECK MARK, 2714 HEAVY CHECK MARK
+        }
+
+        tree.SetItemText(device, col<ID_COL_PERSISTENT>(), val);
+}
+
 void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
 {
         auto f = m_log->GetFrame();
@@ -460,12 +492,10 @@ void MainFrame::on_detach_all(wxCommandEvent&)
         post_refresh();
 }
 
-void MainFrame::on_refresh(wxCommandEvent&)
+void MainFrame::on_refresh(wxCommandEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
-
-        auto &tree = *m_treeListCtrl;
-        tree.DeleteAllItems();
+        on_load(event);
 
         bool ok{};
         auto devices = vhci::get_imported_devices(get_vhci().get(), ok);
@@ -475,10 +505,9 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 return;
         }
 
-        for (auto &dev: devices) {
-                auto [item, appended] = find_device(dev.location, true);
-                wxASSERT(appended);
+        for (auto &tree = *m_treeListCtrl; auto &dev: devices) {
 
+                auto [item, appended] = find_device(dev.location, true);
                 update_device(item, dev, state::plugged, true);
 
                 if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
@@ -783,6 +812,8 @@ void MainFrame::on_save(wxCommandEvent&)
         cfg.DeleteGroup(g_key_devices);
         cfg.SetPath(g_key_devices);
 
+        std::vector<device_location> loc;
+
         int cnt = 0;
         auto &tree = *m_treeListCtrl;
  
@@ -794,13 +825,19 @@ void MainFrame::on_save(wxCommandEvent&)
                 }
 
                 cfg.SetPath(wxString::Format(L"%d", ++cnt));
-                cfg.Write(g_key_url, tree.GetItemText(parent)); // server
+
+                auto url = tree.GetItemText(parent); // server
+                cfg.Write(g_key_url, url);
 
                 for (auto [key, col] : get_keys()) {
                         auto value = tree.GetItemText(item, col);
                         cfg.Write(key, value);
                 }
 
+                if (is_persistent(item)) {
+                        loc.emplace_back(make_device_location(tree, parent, item));
+                }
+                
                 cfg.SetPath(L"..");
         }
 
@@ -812,12 +849,19 @@ void MainFrame::on_save(wxCommandEvent&)
         if (!cnt && has_items(tree)) {
                 wxMessageBox(_("No selections were made"), _("Nothing to save"), wxICON_WARNING);
         }
+
+        if (!vhci::set_persistent(get_vhci().get(), loc)) {
+                auto err = GetLastError();
+                wxLogError(_("vhci::set_persistent error %#lx\n%s"), err, GetLastErrorMsg(err));
+        }
 }
 
 void MainFrame::on_load(wxCommandEvent&) 
 {
         auto &tree = *m_treeListCtrl;
         tree.DeleteAllItems();
+
+        load_persistent();
 
         auto &cfg = *wxConfig::Get();
 
@@ -861,4 +905,31 @@ void MainFrame::on_load(wxCommandEvent&)
 
         cfg.SetPath(path);
         wxLogStatus(_("%d device(s) loaded"), cnt);
+}
+
+void MainFrame::load_persistent()
+{
+        bool ok;
+        auto lst = vhci::get_persistent(get_vhci().get(), ok);
+        if (!ok) {
+                auto err = GetLastError();
+                wxLogError(_("vhci::get_persistent error %#lx\n%s"), err, GetLastErrorMsg(err));
+                return;
+        }
+
+        for (auto &loc: lst) {
+                auto [device, appended] = find_device(loc, true);
+                set_persistent(device, true);
+        }
+}
+
+void MainFrame::on_toogle_persistent(wxCommandEvent&)
+{
+        for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
+
+                if (tree.GetItemParent(item) != tree.GetRootItem()) { // server
+                        auto ok = is_persistent(item);
+                        set_persistent(item, !ok);
+                }
+        }
 }

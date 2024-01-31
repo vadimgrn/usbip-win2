@@ -157,9 +157,23 @@
           </object>
         </object>
         <object class="wxMenu" expanded="true">
-          <property name="label">Devices</property>
-          <property name="name">m_menu_devices</property>
+          <property name="label">Edit</property>
+          <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Refresh list of devices</property>
+            <property name="id">wxID_REFRESH</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Refresh</property>
+            <property name="name">m_cmd_refresh</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+R</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_refresh</event>
+          </object>
           <object class="wxMenuItem" expanded="true">
             <property name="bitmap">Load From Art Provider; wxART_FULL_SCREEN; wxART_MENU</property>
             <property name="checked">0</property>
@@ -175,24 +189,25 @@
             <event name="OnMenuSelection">on_select_all</event>
             <event name="OnUpdateUI">on_has_items_update_ui</event>
           </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_ADD_BOOKMARK; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Refresh list of devices</property>
-            <property name="id">wxID_REFRESH</property>
+            <property name="help">Toggle persistent</property>
+            <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Refresh</property>
-            <property name="name">m_cmd_refresh</property>
+            <property name="label">Toggle persistent</property>
+            <property name="name">m_toggle_persistent</property>
             <property name="permission">none</property>
-            <property name="shortcut">CTRL+R</property>
+            <property name="shortcut">CTRL+P</property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_refresh</event>
+            <event name="OnMenuSelection">on_toogle_persistent</event>
           </object>
-          <object class="separator" expanded="true">
-            <property name="name">m_separator6</property>
-            <property name="permission">none</property>
-          </object>
+        </object>
+        <object class="wxMenu" expanded="true">
+          <property name="label">Devices</property>
+          <property name="name">m_menu_devices</property>
+          <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_MENU</property>
             <property name="checked">0</property>
@@ -354,7 +369,7 @@
             <event name="OnMenuSelection">on_log_level</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
@@ -441,12 +456,12 @@
             <object class="wxMenuItem" expanded="false">
               <property name="bitmap"></property>
               <property name="checked">1</property>
-              <property name="enabled">0</property>
+              <property name="enabled">1</property>
               <property name="help"></property>
-              <property name="id">ID_COL_STATE</property>
+              <property name="id">ID_COL_PERSISTENT</property>
               <property name="kind">wxITEM_CHECK</property>
-              <property name="label">State</property>
-              <property name="name">m_view_state</property>
+              <property name="label">AA</property>
+              <property name="name">m_view_persistent</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -456,12 +471,12 @@
             <object class="wxMenuItem" expanded="false">
               <property name="bitmap"></property>
               <property name="checked">1</property>
-              <property name="enabled">1</property>
+              <property name="enabled">0</property>
               <property name="help"></property>
-              <property name="id">ID_COL_PERSISTENT</property>
+              <property name="id">ID_COL_STATE</property>
               <property name="kind">wxITEM_CHECK</property>
-              <property name="label">AA</property>
-              <property name="name">m_view_persistent</property>
+              <property name="label">State</property>
+              <property name="name">m_view_state</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -1136,15 +1151,15 @@
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
-          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="alignment">wxALIGN_CENTER</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
-          <property name="name">State</property>
+          <property name="name">Auto</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
-          <property name="name">AA</property>
+          <property name="name">State</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="true">

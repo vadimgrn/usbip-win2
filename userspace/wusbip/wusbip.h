@@ -57,6 +57,7 @@ private:
 	void on_select_all(wxCommandEvent &event) override;
 	void on_has_items_update_ui(wxUpdateUIEvent &event) override;
 	void on_has_selections_update_ui(wxUpdateUIEvent &event) override;
+	void on_toogle_persistent(wxCommandEvent &event) override;
 
 	void on_save(wxCommandEvent &event) override;
 	void on_load(wxCommandEvent &event) override;
@@ -85,12 +86,13 @@ private:
 	std::pair<wxTreeListItem, bool> find_device(_In_ const wxString &url, _In_ const wxString &busid, _In_ bool append);
 
 	void remove_device(_In_ wxTreeListItem dev);
-	
+
 	bool attach(_In_ const wxString &url, _In_ const wxString &busid);
 	void post_refresh();
 
 	bool is_persistent(_In_ wxTreeListItem device);
-	
+	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
+
 	enum { SET_STATE = 1, SET_LOADED = 2, SET_OTHERS = 4, }; // flags
 	void update_device(_In_ wxTreeListItem dev, _In_ const device_columns &d, _In_ unsigned int flags);
 
@@ -99,6 +101,8 @@ private:
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 	int get_port(_In_ wxTreeListItem dev) const;
+
+	void load_persistent();
 
 	template<typename Array>
 	static auto& get_url(_In_ Array &ar) noexcept;
