@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "vhci_ioctl.h"
@@ -463,37 +463,65 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto driver_registry_path(_In_ WDFREQUEST request)
+PAGED auto set_persistent(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
 
-        vhci::ioctl::driver_registry_path *r;
-
-        if (size_t length;
-            auto err = WdfRequestRetrieveOutputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
-                return err;
-        } else if (length != sizeof(*r)) {
-                return STATUS_INVALID_BUFFER_SIZE;
-        } else if (r->size != sizeof(*r)) {
-                Trace(TRACE_LEVEL_ERROR, "driver_registry_path.size %lu != sizeof(driver_registry_path) %Iu", 
-                                          r->size, sizeof(*r));
-
-                return as_ntstatus(USBIP_ERROR_ABI);
-        }
-
-        auto path = WdfDriverGetRegistryPath(WdfGetDriver());
-
-        NTSTRSAFE_PWSTR end; // points to L'\0'
-        if (auto err = RtlStringCchCopyExW(r->path, ARRAYSIZE(r->path), path, &end, 0, 0)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCchCopyExW('%S') %!STATUS!", path, err);
+        void *buf{};
+        size_t length{};
+        if (auto err = WdfRequestRetrieveInputBuffer(request, 0, &buf, &length)) {
                 return err;
         }
 
-        auto written = reinterpret_cast<char*>(end) - reinterpret_cast<char*>(r);
-        WdfRequestSetInformation(request, written);
+        Registry key;
+        if (auto err = open_parameters_key(key, KEY_SET_VALUE)) {
+                return err;
+        }
 
-        TraceDbg("%S", path);
-        return STATUS_SUCCESS;
+        UNICODE_STRING val_name;
+        RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
+
+        auto st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(length), buf);
+        if (st) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
+        }
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto get_persistent(_In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+
+        void *buf{};
+        size_t length{};
+        if (auto err = WdfRequestRetrieveOutputBuffer(request, 0, &buf, &length)) {
+                return err;
+        }
+
+        Registry key;
+        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
+                return err;
+        }
+
+        UNICODE_STRING val_name;
+        RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
+
+        ULONG actual{};
+        auto type = REG_NONE;
+        auto st = WdfRegistryQueryValue(key.get(), &val_name, ULONG(length), buf, &actual, &type);
+
+        if (st) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
+        } else if (type != REG_MULTI_SZ) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!): type(%ul) != REG_MULTI_SZ(%ul)", &val_name, type, REG_MULTI_SZ);
+                st = STATUS_INVALID_CONFIG_VALUE;
+                actual = 0;
+        }
+
+        WdfRequestSetInformation(request, actual);
+        return st;
 }
 
 /*
@@ -535,8 +563,11 @@ PAGED void device_control(
         case vhci::ioctl::GET_IMPORTED_DEVICES:
                 st = get_imported_devices(Request);
                 break;
-        case vhci::ioctl::DRIVER_REGISTRY_PATH:
-                st = driver_registry_path(Request);
+        case vhci::ioctl::SET_PERSISTENT:
+                st = set_persistent(Request);
+                break;
+        case vhci::ioctl::GET_PERSISTENT:
+                st = get_persistent(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));

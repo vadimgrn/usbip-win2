@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2021 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -74,20 +74,21 @@ enum class function { // 12 bit
         plugin_hardware = 0x800, // values of less than 0x800 are reserved for Microsoft
         plugout_hardware, 
         get_imported_devices,
-        driver_registry_path,
+        set_persistent,
+        get_persistent,
 };
 
 constexpr auto make(function id)
 {
-        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, 
-                        FILE_READ_DATA | FILE_WRITE_DATA);
+        return CTL_CODE(FILE_DEVICE_UNKNOWN, static_cast<int>(id), METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA);
 }
 
 enum {
-        PLUGIN_HARDWARE      = make(function::plugin_hardware),
-        PLUGOUT_HARDWARE     = make(function::plugout_hardware),
+        PLUGIN_HARDWARE = make(function::plugin_hardware),
+        PLUGOUT_HARDWARE = make(function::plugout_hardware),
         GET_IMPORTED_DEVICES = make(function::get_imported_devices),
-        DRIVER_REGISTRY_PATH = make(function::driver_registry_path),
+        SET_PERSISTENT = make(function::set_persistent),
+        GET_PERSISTENT = make(function::get_persistent),
 };
 
 struct plugin_hardware : base, imported_device_location {};
@@ -106,14 +107,5 @@ constexpr auto get_imported_devices_size(_In_ ULONG n)
 {
         return offsetof(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
 }
-
-/*
- * The key name includes the absolute path of the key in the registry, 
- * always starting at a base key, for example, HKEY_LOCAL_MACHINE. 
- */
-struct driver_registry_path : base
-{
-        WCHAR path[MAX_PATH]; // key name max size is 255
-};
 
 } // namespace usbip::vhci::ioctl

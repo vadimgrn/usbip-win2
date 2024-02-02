@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "..\persistent.h"
@@ -13,53 +13,6 @@ namespace
 {
 
 using namespace usbip;
-
-auto &parameters_key_name = L"\\Parameters"; // @see WdfDriverOpenParametersRegistryKey
-
-/*
- * @see Registry Key Object Routines 
- */
-auto make_key_path(_In_ std::wstring_view abspath)
-{
-        std::pair<HKEY, std::wstring> result(HKEY(), abspath);
-        auto &path = result.second;
-
-        std::wstring_view prefix(L"\\REGISTRY\\MACHINE\\");
-
-        if (auto cch = DWORD(prefix.size()); path.size() >= cch) {
-                if (auto n = CharUpperBuff(path.data(), cch); n != cch) {
-                        libusbip::output(L"CharUpperBuff('{}', {}) -> {}", path, cch, n);
-                        path = abspath; // revert
-                }
-        }
-
-        if (path.starts_with(prefix)) {
-                result.first = HKEY_LOCAL_MACHINE;
-                abspath.remove_prefix(prefix.size());
-        }
-
-        path = abspath;
-        return result;
-}
-
-auto driver_registry_path(_In_ HANDLE dev)
-{
-        using namespace vhci;
-        std::pair<HKEY, std::wstring> result;
-
-        const auto path_offset = offsetof(ioctl::driver_registry_path, path);
-        ioctl::driver_registry_path r{{ .size = sizeof(r) }};
-
-        if (DWORD BytesReturned; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::DRIVER_REGISTRY_PATH, 
-                            &r, path_offset, &r, sizeof(r), &BytesReturned, nullptr)) {
-
-                std::wstring_view abspath(r.path, (BytesReturned - path_offset)/sizeof(*r.path));
-                result = make_key_path(abspath);
-        }
-
-        return result;
-}
 
 auto is_malformed(_In_ const device_location &d)
 {
@@ -108,38 +61,25 @@ auto parse_device_location(_In_ const std::string &str)
 
 auto get_persistent_devices(_In_ HANDLE dev, _Out_ bool &success)
 {
-        success = false;
-        std::wstring multi_sz;
+        std::wstring val(512, L'\0');
 
-        auto [key, subkey] = driver_registry_path(dev);
-        if (subkey.empty()) {
-                return multi_sz;
-        }
+        for (DWORD BytesReturned; ; ) { // must be set if the last arg is NULL
 
-        subkey += parameters_key_name;
+                success = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
+                                          val.data(), DWORD(val.size()*sizeof(val[0])), 
+                                          &BytesReturned, nullptr);
 
-        for (DWORD bytes = 1024, stop = false; ; ) {
+                val.resize(BytesReturned/sizeof(val[0]));
 
-                multi_sz.resize(bytes/sizeof(multi_sz[0]));
-                if (stop) {
+                if (success) {
+                        break;
+                } else if (GetLastError() != ERROR_MORE_DATA) { // WdfRegistryQueryValue -> STATUS_BUFFER_OVERFLOW
+                        val.clear();
                         break;
                 }
-
-                auto err = RegGetValue(key, subkey.c_str(), persistent_devices_value_name, 
-                                       RRF_RT_REG_MULTI_SZ, nullptr, multi_sz.data(), &bytes);
-
-                if (err == ERROR_MORE_DATA) {
-                        // continue;
-                } else if (stop = true, success = !err; !success) {
-                        libusbip::output(L"RegGetValue('{}', value_name='{}') error {:#x}",
-                                         subkey, persistent_devices_value_name, err);
-
-                        SetLastError(err);
-                        bytes = 0; // clear result
-                }
         }
 
-        return multi_sz;
+        return val;
 }
 
 } // namespace
@@ -147,30 +87,18 @@ auto get_persistent_devices(_In_ HANDLE dev, _Out_ bool &success)
 
 bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_location> &devices)
 {
-        std::wstring value;
-        if (auto err = ::make_multi_sz(value, devices)) {
+        std::wstring val;
+        if (auto err = ::make_multi_sz(val, devices)) {
                 SetLastError(err);
                 return false;
         }
 
-        auto [key, subkey] = driver_registry_path(dev);
-        if (subkey.empty()) {
-                return false;
-        }
+        DWORD BytesReturned; // must be set if the last arg is NULL
+        auto ok = DeviceIoControl(dev, ioctl::SET_PERSISTENT, val.data(), DWORD(val.size()*sizeof(val[0])),
+                                  nullptr, 0, &BytesReturned, nullptr);
 
-        subkey += parameters_key_name;
-
-        auto err = RegSetKeyValue(key, subkey.c_str(), persistent_devices_value_name, 
-                                  REG_MULTI_SZ, value.data(), DWORD(value.size()*sizeof(value[0])));
-
-        if (err) {
-                libusbip::output(L"RegSetKeyValue('{}', value_name='{}') error {:#x}", 
-                                 subkey, persistent_devices_value_name, err);
-
-                SetLastError(err);
-        }
-
-        return !err;
+        assert(!BytesReturned);
+        return ok;
 }
 
 auto usbip::vhci::get_persistent(_In_ HANDLE dev, _Out_ bool &success) -> std::vector<device_location>

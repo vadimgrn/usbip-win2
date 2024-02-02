@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "persistent.h"
@@ -24,7 +24,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
-        wdf::ObjectDelete col;
+        ObjectDelete col;
         
         if (WDFCOLLECTION h{};
             auto err = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &h)) {
@@ -89,7 +89,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto make_target(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-        wdf::ObjectDelete target;
+        ObjectDelete target;
 
         if (WDFIOTARGET t; auto err = WdfIoTargetCreate(vhci, WDF_NO_OBJECT_ATTRIBUTES, &t)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoTargetCreate %!STATUS!", err);
@@ -190,24 +190,6 @@ PAGED auto plugin_hardware(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto open_parameters_key()
-{
-        PAGED_CODE();
-        wdf::Registry key;
-
-        if (WDFKEY h; 
-            auto err = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), KEY_QUERY_VALUE, 
-                                                          WDF_NO_OBJECT_ATTRIBUTES, &h)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey %!STATUS!", err);
-        } else {
-                key.reset(h);
-        }
-
-        return key;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto contains(_In_ WDFCOLLECTION col, _In_ const UNICODE_STRING &str)
 {
         PAGED_CODE();
@@ -277,8 +259,8 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 {
         PAGED_CODE();
 
-        auto key = open_parameters_key();
-        if (!key) {
+        Registry key;
+        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
                 return;
         }
 
@@ -412,4 +394,21 @@ PAGED NTSTATUS usbip::copy(
         }
 
         return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK DesiredAccess)
+{
+        PAGED_CODE();
+
+        WDFKEY k{}; 
+        auto st = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), DesiredAccess, WDF_NO_OBJECT_ATTRIBUTES, &k);
+        if (st) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey(DesiredAccess=%lu) %!STATUS!", 
+                                          DesiredAccess, st);
+        }
+
+        key.reset(k);
+        return st;
 }
