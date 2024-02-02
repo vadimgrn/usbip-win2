@@ -492,21 +492,22 @@ void MainFrame::on_detach_all(wxCommandEvent&)
         post_refresh();
 }
 
-void MainFrame::on_refresh(wxCommandEvent &event)
+void MainFrame::on_refresh(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
-        on_load(event);
+
+        auto &tree = *m_treeListCtrl;
+        tree.DeleteAllItems();
 
         bool ok{};
         auto devices = vhci::get_imported_devices(get_vhci().get(), ok);
         if (!ok) {
                 auto err = GetLastError();
-                wxLogError(_("get_imported_devices error %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Cannot get imported devices\nError %#lx\n%s"), err, GetLastErrorMsg(err));
                 return;
         }
 
-        for (auto &tree = *m_treeListCtrl; auto &dev: devices) {
-
+        for (auto &dev: devices) {
                 auto [item, appended] = find_device(dev.location, true);
                 update_device(item, dev, state::plugged, true);
 
@@ -812,7 +813,7 @@ void MainFrame::on_save(wxCommandEvent&)
         cfg.DeleteGroup(g_key_devices);
         cfg.SetPath(g_key_devices);
 
-        std::vector<device_location> loc;
+        std::vector<device_location> persistent;
 
         int cnt = 0;
         auto &tree = *m_treeListCtrl;
@@ -835,7 +836,7 @@ void MainFrame::on_save(wxCommandEvent&)
                 }
 
                 if (is_persistent(item)) {
-                        loc.emplace_back(make_device_location(tree, parent, item));
+                        persistent.emplace_back(make_device_location(tree, parent, item));
                 }
                 
                 cfg.SetPath(L"..");
@@ -850,19 +851,14 @@ void MainFrame::on_save(wxCommandEvent&)
                 wxMessageBox(_("No selections were made"), _("Nothing to save"), wxICON_WARNING);
         }
 
-        if (!vhci::set_persistent(get_vhci().get(), loc)) {
+        if (!vhci::set_persistent(get_vhci().get(), persistent)) {
                 auto err = GetLastError();
-                wxLogError(_("vhci::set_persistent error %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Cannot save persistent info\nError %#lx\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
 void MainFrame::on_load(wxCommandEvent&) 
 {
-        auto &tree = *m_treeListCtrl;
-        tree.DeleteAllItems();
-
-        load_persistent();
-
         auto &cfg = *wxConfig::Get();
 
         auto path = cfg.GetPath();
@@ -884,8 +880,6 @@ void MainFrame::on_load(wxCommandEvent&)
                         continue;
                 }
 
-                dev[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
-
                 for (auto [key, col] : get_keys()) {
                         dev[col] = cfg.Read(key);
                 }
@@ -895,9 +889,17 @@ void MainFrame::on_load(wxCommandEvent&)
                 }
 
                 auto [device, appended] = find_device(url, dev[col<ID_COL_BUSID>()], true);
-                update_device(device, dev, SET_STATE | SET_LOADED | SET_OTHERS);
-                cnt += appended;
 
+                auto flags = SET_LOADED | SET_OTHERS;
+                if (appended) {
+                        dev[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
+                        flags |= SET_STATE;
+                        ++cnt;
+                }
+
+                update_device(device, dev, flags);
+
+                auto &tree = *m_treeListCtrl;
                 if (auto server = tree.GetItemParent(device); !tree.IsExpanded(server)) {
                         tree.Expand(server);
                 }
@@ -905,6 +907,8 @@ void MainFrame::on_load(wxCommandEvent&)
 
         cfg.SetPath(path);
         wxLogStatus(_("%d device(s) loaded"), cnt);
+
+        load_persistent();
 }
 
 void MainFrame::load_persistent()
@@ -913,13 +917,18 @@ void MainFrame::load_persistent()
         auto lst = vhci::get_persistent(get_vhci().get(), ok);
         if (!ok) {
                 auto err = GetLastError();
-                wxLogError(_("vhci::get_persistent error %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Cannot load persistent info\nError %#lx\n%s"), err, GetLastErrorMsg(err));
                 return;
         }
 
-        for (auto &loc: lst) {
+        for (auto &tree = *m_treeListCtrl; auto &loc: lst) {
+
                 auto [device, appended] = find_device(loc, true);
                 set_persistent(device, true);
+
+                if (auto server = tree.GetItemParent(device); !tree.IsExpanded(server)) {
+                        tree.Expand(server);
+                }
         }
 }
 

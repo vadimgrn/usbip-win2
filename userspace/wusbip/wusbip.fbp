@@ -1127,7 +1127,7 @@
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
-          <property name="alignment">wxALIGN_RIGHT</property>
+          <property name="alignment">wxALIGN_CENTER</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Port</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
@@ -1135,7 +1135,7 @@
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
-          <property name="name">USB Speed</property>
+          <property name="name">Speed</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">

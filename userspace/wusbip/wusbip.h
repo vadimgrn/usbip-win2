@@ -93,7 +93,7 @@ private:
 	bool is_persistent(_In_ wxTreeListItem device);
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
 
-	enum { SET_STATE = 1, SET_LOADED = 2, SET_OTHERS = 4, }; // flags
+	enum : unsigned int { SET_STATE = 1, SET_LOADED = 2, SET_OTHERS = 4, }; // flags
 	void update_device(_In_ wxTreeListItem dev, _In_ const device_columns &d, _In_ unsigned int flags);
 
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ bool set_state);
