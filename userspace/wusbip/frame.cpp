@@ -73,18 +73,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_toggle_persistent;
 	m_toggle_persistent = new wxMenuItem( m_menu_edit, wxID_ANY, wxString( _("Toggle persistent") ) + wxT('\t') + wxT("CTRL+P"), _("Toggle persistent"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_toggle_persistent->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
+	m_toggle_persistent->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_toggle_persistent->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
+	m_toggle_persistent->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_MENU )) );
 	#endif
 	m_menu_edit->Append( m_toggle_persistent );
 
 	wxMenuItem* m_edit_notes;
 	m_edit_notes = new wxMenuItem( m_menu_edit, wxID_ANY, wxString( _("Notes") ) + wxT('\t') + wxT("CTRL+N"), _("Edit notes for a device"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_edit_notes->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
+	m_edit_notes->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_EDIT ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_edit_notes->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
+	m_edit_notes->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_EDIT ), wxASCII_STR( wxART_MENU )) );
 	#endif
 	m_menu_edit->Append( m_edit_notes );
 
@@ -146,23 +146,23 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_log->AppendSeparator();
 
 	wxMenuItem* m_loglevel_error;
-	m_loglevel_error = new wxMenuItem( m_menu_log, ID_LOGLEVEL_ERROR, wxString( _("Error") ) , _("A serious error, user must be informed about it"), wxITEM_RADIO );
+	m_loglevel_error = new wxMenuItem( m_menu_log, ID_LOGLEVEL_ERROR, wxString( _("Error") ) , _("Show error messages only"), wxITEM_RADIO );
 	m_menu_log->Append( m_loglevel_error );
 
 	wxMenuItem* m_loglevel_warning;
-	m_loglevel_warning = new wxMenuItem( m_menu_log, ID_LOGLEVEL_WARNING, wxString( _("Warning") ) , _("User is normally informed about it but may be ignored"), wxITEM_RADIO );
+	m_loglevel_warning = new wxMenuItem( m_menu_log, ID_LOGLEVEL_WARNING, wxString( _("Warning") ) , _("Show error and warning messages"), wxITEM_RADIO );
 	m_menu_log->Append( m_loglevel_warning );
 
 	wxMenuItem* m_loglevel_message;
-	m_loglevel_message = new wxMenuItem( m_menu_log, ID_LOGLEVEL_MESSAGE, wxString( _("Message") ) , _("Normal message"), wxITEM_RADIO );
+	m_loglevel_message = new wxMenuItem( m_menu_log, ID_LOGLEVEL_MESSAGE, wxString( _("Message") ) , _("Show all messages"), wxITEM_RADIO );
 	m_menu_log->Append( m_loglevel_message );
 
 	wxMenuItem* m_loglevel_status;
-	m_loglevel_status = new wxMenuItem( m_menu_log, ID_LOGLEVEL_STATUS, wxString( _("Status") ) , _("Informational: might go to the status bar"), wxITEM_RADIO );
+	m_loglevel_status = new wxMenuItem( m_menu_log, ID_LOGLEVEL_STATUS, wxString( _("Status") ) , _("All above and messages in the status bar"), wxITEM_RADIO );
 	m_menu_log->Append( m_loglevel_status );
 
 	wxMenuItem* m_loglevel_info;
-	m_loglevel_info = new wxMenuItem( m_menu_log, ID_LOGLEVEL_INFO, wxString( _("Verbose") ) , _("Displayed only in the log window"), wxITEM_RADIO );
+	m_loglevel_info = new wxMenuItem( m_menu_log, ID_LOGLEVEL_INFO, wxString( _("Verbose") ) , _("All above and debug messages in the log window"), wxITEM_RADIO );
 	m_menu_log->Append( m_loglevel_info );
 
 	m_menubar->Append( m_menu_log, _("Log") );
@@ -201,7 +201,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_view_product->Check( true );
 
 	wxMenuItem* m_view_persistent;
-	m_view_persistent = new wxMenuItem( m_menu_columns, ID_COL_PERSISTENT, wxString( _("AA") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_persistent = new wxMenuItem( m_menu_columns, ID_COL_PERSISTENT, wxString( _("Auto") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_persistent );
 	m_view_persistent->Check( true );
 
@@ -314,7 +314,6 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Notes"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Saved State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
-	m_treeListCtrl->AppendColumn( _("Loaded"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
 
 
 	m_mgr.Update();
@@ -329,6 +328,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_items_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toogle_persistent ), this, m_toggle_persistent->GetId());
+	this->Connect( m_toggle_persistent->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
 	this->Connect( m_edit_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
@@ -358,7 +358,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_view_persistent->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_state->GetId());
 	this->Connect( m_view_state->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_notes ), this, m_view_notes->GetId());
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_notes->GetId());
 	this->Connect( m_view_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_labels ), this, m_view_labels->GetId());
 	this->Connect( m_view_labels->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
@@ -380,6 +380,7 @@ Frame::~Frame()
 	// Disconnect Events
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_items_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );

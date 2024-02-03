@@ -15,8 +15,6 @@
 #include <wx/log.h>
 #include <wx/translation.h>
 
-#include <format>
-
 namespace
 {
 
@@ -130,9 +128,14 @@ auto usbip::make_imported_device(
         };
 }
 
+std::string usbip::make_device_url(_In_ const device_location &loc)
+{
+        return loc.hostname + ':' + loc.service + '/' + loc.busid;
+}
+
 wxString usbip::make_server_url(_In_ const device_location &loc)
 {
-        auto url = std::format("{}:{}", loc.hostname, loc.service);
+        auto url = loc.hostname + ':' + loc.service;
         return wxString::FromUTF8(url);
 }
 

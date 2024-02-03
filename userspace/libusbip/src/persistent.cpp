@@ -66,8 +66,7 @@ auto get_persistent_devices(_In_ HANDLE dev, _Out_ bool &success)
         for (DWORD BytesReturned; ; ) { // must be set if the last arg is NULL
 
                 success = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
-                                          val.data(), DWORD(val.size()*sizeof(val[0])), 
-                                          &BytesReturned, nullptr);
+                                          val.data(), DWORD(size_bytes(val)), &BytesReturned, nullptr);
 
                 val.resize(BytesReturned/sizeof(val[0]));
 
@@ -94,7 +93,7 @@ bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_
         }
 
         DWORD BytesReturned; // must be set if the last arg is NULL
-        auto ok = DeviceIoControl(dev, ioctl::SET_PERSISTENT, val.data(), DWORD(val.size()*sizeof(val[0])),
+        auto ok = DeviceIoControl(dev, ioctl::SET_PERSISTENT, val.data(), DWORD(size_bytes(val)),
                                   nullptr, 0, &BytesReturned, nullptr);
 
         assert(!BytesReturned);

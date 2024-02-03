@@ -194,7 +194,7 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="true">
-            <property name="bitmap">Load From Art Provider; wxART_ADD_BOOKMARK; wxART_MENU</property>
+            <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Toggle persistent</property>
@@ -206,9 +206,10 @@
             <property name="shortcut">CTRL+P</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_toogle_persistent</event>
+            <event name="OnUpdateUI">on_has_selections_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="true">
-            <property name="bitmap">Load From Art Provider; wxART_ADD_BOOKMARK; wxART_MENU</property>
+            <property name="bitmap">Load From Art Provider; wxART_EDIT; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Edit notes for a device</property>
@@ -318,10 +319,10 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From File; </property>
+            <property name="bitmap">Load From Art Provider; wxART_ERROR; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">A serious error, user must be informed about it</property>
+            <property name="help">Show error messages only</property>
             <property name="id">ID_LOGLEVEL_ERROR</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Error</property>
@@ -332,10 +333,10 @@
             <event name="OnMenuSelection">on_log_level</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From File; </property>
+            <property name="bitmap">Load From Art Provider; wxART_WARNING; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">User is normally informed about it but may be ignored</property>
+            <property name="help">Show error and warning messages</property>
             <property name="id">ID_LOGLEVEL_WARNING</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Warning</property>
@@ -346,10 +347,10 @@
             <event name="OnMenuSelection">on_log_level</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From File; </property>
+            <property name="bitmap">Load From Art Provider; wxART_INFORMATION; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Normal message</property>
+            <property name="help">Show all messages</property>
             <property name="id">ID_LOGLEVEL_MESSAGE</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Message</property>
@@ -363,7 +364,7 @@
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Informational: might go to the status bar</property>
+            <property name="help">All above and messages in the status bar</property>
             <property name="id">ID_LOGLEVEL_STATUS</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Status</property>
@@ -377,7 +378,7 @@
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Displayed only in the log window</property>
+            <property name="help">All above and debug messages in the log window</property>
             <property name="id">ID_LOGLEVEL_INFO</property>
             <property name="kind">wxITEM_RADIO</property>
             <property name="label">Verbose</property>
@@ -479,7 +480,7 @@
               <property name="help"></property>
               <property name="id">ID_COL_PERSISTENT</property>
               <property name="kind">wxITEM_CHECK</property>
-              <property name="label">AA</property>
+              <property name="label">Auto</property>
               <property name="name">m_view_persistent</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
@@ -514,7 +515,7 @@
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
-              <event name="OnMenuSelection">on_view_notes</event>
+              <event name="OnMenuSelection">on_view_column</event>
               <event name="OnUpdateUI">on_view_column_update_ui</event>
             </object>
           </object>
@@ -1191,12 +1192,6 @@
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_HIDDEN</property>
           <property name="name">Saved State</property>
-          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
-        </object>
-        <object class="wxTreeListCtrlColumn" expanded="true">
-          <property name="alignment">wxALIGN_LEFT</property>
-          <property name="flag">wxCOL_HIDDEN</property>
-          <property name="name">Loaded</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
       </object>

@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <array>
+#include <set>
 
 class LogWindow;
 class wxDataViewColumn;
@@ -17,25 +18,29 @@ class wxDataViewColumn;
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
+using device_columns = std::array<wxString, 9>; // indexed by visible columns only and DEV_COL_URL
+
+
 class MainFrame : public Frame
 {
 public:
 	MainFrame(_In_ usbip::Handle read);
 	~MainFrame();
 
+	static wxString make_cmp_key(_In_ const device_columns &dc);
+
 private:
 	enum { // hidden columns
 		ID_COL_FIRST = ID_COL_BUSID, 
 		ID_COL_LAST_VISIBLE = ID_COL_NOTES, 
 		ID_COL_SAVED_STATE, 
-		ID_COL_LOADED, 
 		ID_COL_MAX };
-	
+
 	enum { // for device_columns only
 		DEV_COL_URL = ID_COL_LAST_VISIBLE + 1, // use get_url()
 		DEV_COL_CNT = DEV_COL_URL - int(ID_COL_FIRST) + 1
 	};
-	using device_columns = std::array<wxString, DEV_COL_CNT>; // indexed by visible columns only and DEV_COL_URL
+	static_assert(std::tuple_size<device_columns>() == DEV_COL_CNT);
 
 	LogWindow *m_log{};
 
@@ -96,11 +101,10 @@ private:
 	bool is_persistent(_In_ wxTreeListItem device);
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
 
-	enum : unsigned int { SET_STATE = 1, SET_LOADED = 2, SET_OTHERS = 4, }; // flags
-	void update_device(_In_ wxTreeListItem dev, _In_ const device_columns &d, _In_ unsigned int flags);
-
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ bool set_state);
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ bool set_state);
+	enum { SET_STATE = 1, SET_NOTES = 2, SET_OTHERS = 4, }; // flags
+	void update_device(_In_ wxTreeListItem dev, _In_ const device_columns &dc, _In_ unsigned int flags);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ unsigned int flags);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ unsigned int flags);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 	int get_port(_In_ wxTreeListItem dev) const;
@@ -108,14 +112,16 @@ private:
 	void load_persistent();
 	wxTreeListItem get_edit_notes_device();
 
-	template<typename Array>
-	static auto& get_url(_In_ Array &ar) noexcept;
+	static std::set<device_columns> get_saved();
 
 	static auto& get_keys();
 	static constexpr auto col(_In_ int col_id);
 
 	template<auto col_id>
 	static consteval auto col();
+
+	template<typename Array>
+	static auto& get_url(_In_ Array &v) noexcept;
 };
 
 

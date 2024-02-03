@@ -38,8 +38,20 @@ struct imported_device;
 imported_device make_imported_device(_In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev);
 
 struct device_location;
-wxString make_server_url(_In_ const device_location &loc);
 
+std::string make_device_url(_In_ const device_location &loc);
+
+inline auto operator <=> (_In_ const device_location &a, _In_ const device_location &b)
+{
+        return make_device_url(a) <=> make_device_url(b);
+}
+
+inline auto operator == (_In_ const device_location &a, _In_ const device_location &b)
+{
+        return make_device_url(a) == make_device_url(b);
+}
+
+wxString make_server_url(_In_ const device_location &loc);
 wxString make_server_url(_In_ const wxString &hostname, _In_ const wxString &service);
 
 bool split_server_url(_In_ const wxString &url, _Out_ wxString &hostname, _Out_ wxString &service);
