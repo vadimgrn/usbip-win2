@@ -50,15 +50,6 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menubar->Append( m_menu_file, _("File") );
 
 	m_menu_edit = new wxMenu();
-	wxMenuItem* m_cmd_refresh;
-	m_cmd_refresh = new wxMenuItem( m_menu_edit, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of devices"), wxITEM_NORMAL );
-	#ifdef __WXMSW__
-	m_cmd_refresh->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
-	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_cmd_refresh->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
-	#endif
-	m_menu_edit->Append( m_cmd_refresh );
-
 	wxMenuItem* m_select_all;
 	m_select_all = new wxMenuItem( m_menu_edit, wxID_ANY, wxString( _("Select All") ) + wxT('\t') + wxT("CTRL+A"), _("Select all devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
@@ -68,6 +59,17 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	#endif
 	m_menu_edit->Append( m_select_all );
 
+	wxMenuItem* m_cmd_refresh;
+	m_cmd_refresh = new wxMenuItem( m_menu_edit, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of devices"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_refresh->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_refresh->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
+	#endif
+	m_menu_edit->Append( m_cmd_refresh );
+
+	m_menu_edit->AppendSeparator();
+
 	wxMenuItem* m_toggle_persistent;
 	m_toggle_persistent = new wxMenuItem( m_menu_edit, wxID_ANY, wxString( _("Toggle persistent") ) + wxT('\t') + wxT("CTRL+P"), _("Toggle persistent"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
@@ -76,6 +78,15 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_toggle_persistent->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
 	#endif
 	m_menu_edit->Append( m_toggle_persistent );
+
+	wxMenuItem* m_edit_notes;
+	m_edit_notes = new wxMenuItem( m_menu_edit, wxID_ANY, wxString( _("Notes") ) + wxT('\t') + wxT("CTRL+N"), _("Edit notes for a device"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_edit_notes->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_edit_notes->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR( wxART_ADD_BOOKMARK ), wxASCII_STR( wxART_MENU )) );
+	#endif
+	m_menu_edit->Append( m_edit_notes );
 
 	m_menubar->Append( m_menu_edit, _("Edit") );
 
@@ -200,10 +211,10 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_view_state->Enable( false );
 	m_view_state->Check( true );
 
-	wxMenuItem* m_view_comment;
-	m_view_comment = new wxMenuItem( m_menu_columns, ID_COL_COMMENTS, wxString( _("Comments") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_columns->Append( m_view_comment );
-	m_view_comment->Check( true );
+	wxMenuItem* m_view_notes;
+	m_view_notes = new wxMenuItem( m_menu_columns, ID_COL_NOTES, wxString( _("Notes") ) , wxEmptyString, wxITEM_CHECK );
+	m_menu_columns->Append( m_view_notes );
+	m_view_notes->Check( true );
 
 	m_menu_view->Append( m_menu_columnsItem );
 
@@ -301,7 +312,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_treeListCtrl->AppendColumn( _("Product"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Auto"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("Comments"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("Notes"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Saved State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
 	m_treeListCtrl->AppendColumn( _("Loaded"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
 
@@ -314,10 +325,12 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_save ), this, m_file_save->GetId());
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_load ), this, m_file_load->GetId());
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
-	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_select_all ), this, m_select_all->GetId());
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_items_update_ui ) );
+	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_refresh ), this, m_cmd_refresh->GetId());
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toogle_persistent ), this, m_toggle_persistent->GetId());
+	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
+	this->Connect( m_edit_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
 	this->Connect( m_cmd_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
@@ -345,8 +358,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_view_persistent->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_state->GetId());
 	this->Connect( m_view_state->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_comment->GetId());
-	this->Connect( m_view_comment->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_notes ), this, m_view_notes->GetId());
+	this->Connect( m_view_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_labels ), this, m_view_labels->GetId());
 	this->Connect( m_view_labels->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
@@ -367,6 +380,7 @@ Frame::~Frame()
 	// Disconnect Events
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_items_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
@@ -377,7 +391,7 @@ Frame::~Frame()
 	this->Disconnect( ID_COL_PRODUCT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( ID_COL_PERSISTENT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( ID_COL_STATE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_COMMENTS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( ID_COL_NOTES, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	this->Disconnect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );

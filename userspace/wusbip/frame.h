@@ -54,7 +54,7 @@ class Frame : public wxFrame
 			ID_COL_PRODUCT,
 			ID_COL_PERSISTENT,
 			ID_COL_STATE,
-			ID_COL_COMMENTS
+			ID_COL_NOTES
 		};
 
 		wxStatusBar* m_statusBar;
@@ -86,10 +86,12 @@ class Frame : public wxFrame
 		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_items_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_toogle_persistent( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_edit_notes( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_edit_notes_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_selections_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
@@ -100,6 +102,7 @@ class Frame : public wxFrame
 		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_notes( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }

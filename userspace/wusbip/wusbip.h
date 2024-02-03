@@ -26,7 +26,7 @@ public:
 private:
 	enum { // hidden columns
 		ID_COL_FIRST = ID_COL_BUSID, 
-		ID_COL_LAST_VISIBLE = ID_COL_COMMENTS, 
+		ID_COL_LAST_VISIBLE = ID_COL_NOTES, 
 		ID_COL_SAVED_STATE, 
 		ID_COL_LOADED, 
 		ID_COL_MAX };
@@ -74,6 +74,9 @@ private:
 	void on_view_labels(wxCommandEvent &event) override;
 	void on_view_labels_update_ui(wxUpdateUIEvent &event) override;
 
+	void on_edit_notes(wxCommandEvent &event) override;
+	void on_edit_notes_update_ui(wxUpdateUIEvent &event) override;
+
 	void init();
 	void set_log_level();
 
@@ -103,6 +106,7 @@ private:
 	int get_port(_In_ wxTreeListItem dev) const;
 
 	void load_persistent();
+	wxTreeListItem get_edit_notes_device();
 
 	template<typename Array>
 	static auto& get_url(_In_ Array &ar) noexcept;
@@ -135,7 +139,7 @@ inline consteval auto MainFrame::col()
 }
 
 template<typename Array>
-inline auto& MainFrame::get_url(_In_ Array &ar) noexcept 
+inline auto& MainFrame::get_url(_In_ Array &v) noexcept 
 { 
-	return ar[col<DEV_COL_URL>()];
+	return v[col<DEV_COL_URL>()];
 }

@@ -18,6 +18,7 @@
 #include <wx/busyinfo.h>
 #include <wx/dataview.h>
 #include <wx/config.h>
+#include <wx/textdlg.h>
 
 #include <wx/persist.h>
 #include <wx/persist/toplevel.h>
@@ -361,6 +362,54 @@ void MainFrame::on_select_all(wxCommandEvent&)
         m_treeListCtrl->SelectAll();
 }
 
+wxTreeListItem MainFrame::get_edit_notes_device()
+{
+        auto &tree = *m_treeListCtrl;
+        wxTreeListItem item;
+
+        if (auto v = get_selections(tree);
+            v.size() == 1 && tree.GetItemParent(v.front()) != tree.GetRootItem()) { // server
+                item = v.front();
+        }
+
+        return item;
+}
+
+void MainFrame::on_edit_notes_update_ui(wxUpdateUIEvent &event)
+{
+        auto item = get_edit_notes_device();
+        event.Enable(item.IsOk());
+}
+
+void MainFrame::on_edit_notes(wxCommandEvent&)
+{
+        auto dev = get_edit_notes_device();
+        if (!dev.IsOk()) {
+                return;
+        }
+
+        auto &tree = *m_treeListCtrl;
+        auto server = tree.GetItemParent(dev);
+
+        auto url = tree.GetItemText(server);
+        auto busid = tree.GetItemText(dev, col<ID_COL_BUSID>());
+        auto caption = wxString::Format(_("Notes for %s/%s"), url, busid);
+
+        auto vendor = tree.GetItemText(dev, col<ID_COL_VENDOR>());
+        auto product = tree.GetItemText(dev, col<ID_COL_PRODUCT>());
+        auto message = wxString::Format(L"%s\n%s", vendor, product);
+
+        auto notes = tree.GetItemText(dev, col<ID_COL_NOTES>());
+
+        wxTextEntryDialog dlg(this, message, caption, notes, wxTextEntryDialogStyle);
+        dlg.SetMaxLength(256);
+
+        if (dlg.ShowModal() == wxID_OK) {
+                notes = dlg.GetValue();
+                tree.SetItemText(dev, col<ID_COL_NOTES>(), notes);
+        }
+}
+
 bool MainFrame::is_persistent(_In_ wxTreeListItem device)
 {
         auto &tree = *m_treeListCtrl;
@@ -593,7 +642,7 @@ void MainFrame::update_device(
 
         if (flags & SET_OTHERS) {
                 for (auto col: { col<ID_COL_PORT>(), col<ID_COL_SPEED>(), col<ID_COL_VENDOR>(), 
-                                 col<ID_COL_PRODUCT>(), col<ID_COL_COMMENTS>() }) {
+                                 col<ID_COL_PRODUCT>(), col<ID_COL_NOTES>() }) {
                         tree.SetItemText(dev, col, dc[col]);
                 }
         }
@@ -799,7 +848,7 @@ auto& MainFrame::get_keys()
                 { L"speed", col<ID_COL_SPEED>() },
                 { L"vendor", col<ID_COL_VENDOR>() },
                 { L"product", col<ID_COL_PRODUCT>() },
-                { L"comments", col<ID_COL_COMMENTS>() },
+                { L"notes", col<ID_COL_NOTES>() },
         };
 
         return v;
