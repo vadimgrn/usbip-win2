@@ -1,4 +1,4 @@
-; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
 #if Ver < EncodeVer(6,2,0,0)
         #error This script requires Inno Setup 6.2 or later
@@ -264,7 +264,7 @@ end;
 
 // UninsIS.dll
 // https://github.com/Bill-Stewart/UninsIS
-// Code is copied from [Code] section of UninsIS.iss, following modifications are made:
+// Code is copied from [Code] section of UninsIS-Sample.iss, following modifications are made:
 // 1) CompareISPackageVersion is removed because it MUST always be uninstalled
 // 2) PrepareToInstall does not call it
 
