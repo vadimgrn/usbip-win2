@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <array>
+#include <tuple>
 #include <set>
 
 class LogWindow;
@@ -27,7 +28,7 @@ public:
 	MainFrame(_In_ usbip::Handle read);
 	~MainFrame();
 
-	static wxString make_cmp_key(_In_ const device_columns &dc);
+	static std::tuple<std::wstring, std::wstring, std::wstring> make_cmp_key(_In_ const device_columns &dc);
 
 private:
 	enum { // hidden columns
@@ -101,8 +102,17 @@ private:
 	bool is_persistent(_In_ wxTreeListItem device);
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
 
-	enum { SET_STATE = 1, SET_NOTES = 2, SET_OTHERS = 4, }; // flags
-	void update_device(_In_ wxTreeListItem dev, _In_ const device_columns &dc, _In_ unsigned int flags);
+	enum : unsigned int { // flags
+		SET_PORT       = 0b00000001, // ID_COL_PORT
+		SET_SPEED      = 0b00000010, // ID_COL_SPEED
+		SET_VENDOR     = 0b00000100, // ID_COL_VENDOR,
+		SET_PRODUCT    = 0b00001000, // ID_COL_PRODUCT
+		SET_STATE      = 0b00010000, // ID_COL_STATE
+		SET_PERSISTENT = 0b00100000, // ID_COL_PERSISTENT
+		SET_NOTES      = 0b01000000, // ID_COL_NOTES
+	};
+	
+	void update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags);
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ unsigned int flags);
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ unsigned int flags);
 
@@ -112,9 +122,13 @@ private:
 	void load_persistent();
 	wxTreeListItem get_edit_notes_device();
 
+	static bool is_same_device(_In_ const device_columns &a, _In_ const device_columns &b) noexcept;
+	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::device_state& st);
+	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
 	static std::set<device_columns> get_saved();
 
-	static auto& get_keys();
+	static auto& get_flags() noexcept;
+	static auto& get_keys() noexcept;
 	static constexpr auto col(_In_ int col_id);
 
 	template<auto col_id>
@@ -124,6 +138,19 @@ private:
 	static auto& get_url(_In_ Array &v) noexcept;
 };
 
+
+/*
+ * FIXME: wxString does not have operator <=> 
+ */
+inline auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
+{
+	return MainFrame::make_cmp_key(a) <=> MainFrame::make_cmp_key(b);
+}
+
+inline auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
+{
+	return MainFrame::make_cmp_key(a) == MainFrame::make_cmp_key(b);
+}
 
 inline constexpr auto MainFrame::col(_In_ int col_id)
 {

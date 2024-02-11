@@ -32,7 +32,7 @@ using namespace usbip;
 
 auto &g_key_devices = L"/devices";
 auto &g_key_url = L"url";
-
+auto &g_persistent_mark = L"\u2713"; // CHECK MARK, 2714 HEAVY CHECK MARK
 
 class App : public wxApp
 {
@@ -75,23 +75,11 @@ void App::set_names()
         SetVendorName(wx_string(v.GetCompanyName()));
 }
 
-auto make_cmp_key(_In_ const device_columns &dc)
-{
-        auto key = MainFrame::make_cmp_key(dc);
-        return key.ToStdWstring();
-}
 
-/*
- * FIXME: wxString does not have operator <=> 
- */
-auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
+inline auto equal(_In_ const device_columns &a, _In_ const device_columns &b, _In_ unsigned int col) noexcept
 {
-        return make_cmp_key(a) <=> make_cmp_key(b);
-}
-
-auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-        return MainFrame::make_cmp_key(a) == MainFrame::make_cmp_key(b);
+        wxASSERT(col < std::tuple_size<device_columns>());
+        return a[col] == b[col];
 }
 
 /*
@@ -147,21 +135,18 @@ auto make_device_location(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem server,
         };
 }
 
-auto get_persistent(_Out_ std::set<device_location> &result)
+auto get_persistent(_Out_ bool &success)
 {
-        wxASSERT(result.empty());
-
-        bool ok;
-        auto lst = vhci::get_persistent(get_vhci().get(), ok);
-
-        if (!ok) {
+        std::set<device_location> result;
+        
+        if (auto lst = vhci::get_persistent(get_vhci().get(), success); !success) {
                 auto err = GetLastError();
                 wxLogError(_("Cannot load persistent info\nError %#lx\n%s"), err, GetLastErrorMsg(err));
         } else for (auto &i: lst) {
                 result.insert(std::move(i));
         }
 
-        return ok;
+        return result;
 }
 
 } // namespace
@@ -381,6 +366,36 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         }
 }
 
+auto& MainFrame::get_keys() noexcept
+{
+        static const std::initializer_list<std::pair<const wchar_t*, unsigned int>> lst 
+        {
+                { L"busid", col<ID_COL_BUSID>() },
+                { L"speed", col<ID_COL_SPEED>() },
+                { L"vendor", col<ID_COL_VENDOR>() },
+                { L"product", col<ID_COL_PRODUCT>() },
+                { L"notes", col<ID_COL_NOTES>() },
+        };
+
+        return lst;
+}
+
+auto& MainFrame::get_flags() noexcept
+{
+        static const std::initializer_list<std::pair<unsigned int, unsigned int>> lst
+        {
+                { SET_PORT, col<ID_COL_PORT>() }, 
+                { SET_SPEED, col<ID_COL_SPEED>() }, 
+                { SET_VENDOR, col<ID_COL_VENDOR>() }, 
+                { SET_PRODUCT, col<ID_COL_PRODUCT>() }, 
+                { SET_STATE, col<ID_COL_STATE>() }, 
+                { SET_PERSISTENT, col<ID_COL_PERSISTENT>() }, 
+                { SET_NOTES, col<ID_COL_NOTES>() },
+        };
+
+        return lst;
+}
+
 void MainFrame::on_has_items_update_ui(wxUpdateUIEvent &event)
 {
         auto ok = has_items(*m_treeListCtrl);
@@ -466,7 +481,7 @@ void MainFrame::set_persistent(_In_ wxTreeListItem device, _In_ bool persistent)
 
         wxString val;
         if (persistent) {
-                val = L"\u2713"; // CHECK MARK, 2714 HEAVY CHECK MARK
+                val = g_persistent_mark; // CHECK MARK, 2714 HEAVY CHECK MARK
         }
 
         tree.SetItemText(device, col<ID_COL_PERSISTENT>(), val);
@@ -642,25 +657,18 @@ void MainFrame::remove_device(_In_ wxTreeListItem device)
         }
 }
 
-void MainFrame::update_device(
-        _In_ wxTreeListItem dev, _In_ const device_columns &dc, _In_ unsigned int flags)
+void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags)
 {
         auto &tree = *m_treeListCtrl;
 
-        wxASSERT(dev.IsOk());
-        wxASSERT(tree.GetItemText(dev) == dc[col<ID_COL_BUSID>()]);
-        wxASSERT(tree.GetItemText(tree.GetItemParent(dev)) == get_url(dc));
+        wxASSERT(device.IsOk());
+        wxASSERT(tree.GetItemText(device) == dc[col<ID_COL_BUSID>()]);
+        wxASSERT(tree.GetItemText(tree.GetItemParent(device)) == get_url(dc));
 
-        if (flags & SET_OTHERS) {
-                for (auto col: { col<ID_COL_PORT>(), col<ID_COL_SPEED>(), col<ID_COL_VENDOR>(), 
-                                 col<ID_COL_PRODUCT>(), col<ID_COL_NOTES>() }) {
-                        tree.SetItemText(dev, col, dc[col]);
+        for (auto [flag, col]: get_flags()) { 
+                if (flags & flag) {
+                        tree.SetItemText(device, col, dc[col]);
                 }
-        }
-
-        if (flags & SET_STATE) {
-                constexpr auto idx = col<ID_COL_STATE>();
-                tree.SetItemText(dev, idx, dc[idx]);
         }
 }
 
@@ -697,7 +705,7 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_stat
         dc[col<ID_COL_VENDOR>()] = str(dev.vendor, vendor);
         dc[col<ID_COL_PRODUCT>()] = str(dev.product, product);
 
-        update_device(device, dc, flags | SET_OTHERS);
+        update_device(device, dc, flags);
 }
 
 void MainFrame::update_device(
@@ -842,22 +850,6 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         return str.ToInt(&port) ? port : 0;
 }
 
-auto& MainFrame::get_keys()
-{
-        struct {
-                const wchar_t *key;
-                unsigned int col;
-        } static const v[] = {
-                { L"busid", col<ID_COL_BUSID>() },
-                { L"speed", col<ID_COL_SPEED>() },
-                { L"vendor", col<ID_COL_VENDOR>() },
-                { L"product", col<ID_COL_PRODUCT>() },
-                { L"notes", col<ID_COL_NOTES>() },
-        };
-
-        return v;
-}
-
 void MainFrame::on_toogle_persistent(wxCommandEvent&)
 {
         for (auto &tree = *m_treeListCtrl; auto &item: get_selections(tree)) {
@@ -954,7 +946,7 @@ void MainFrame::on_load(wxCommandEvent&)
 
                 auto [device, appended] = find_device(url, dev[col<ID_COL_BUSID>()], true);
 
-                unsigned int flags = SET_OTHERS;
+                unsigned int flags = 0;
                 if (appended) {
                         dev[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
                         flags |= SET_STATE;
@@ -1011,19 +1003,37 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 return;
         }
 
+        auto saved = get_saved();
+        auto persistent = get_persistent(ok);
+
         for (auto &dev: devices) {
                 auto [item, appended] = find_device(dev.location, true);
-                update_device(item, dev, state::plugged, true);
+                wxASSERT(appended);
+                
+                device_state st { 
+                        .device = std::move(dev), 
+                        .state = state::plugged 
+                };
+
+                auto [dc, flags] = make_device_columns(st);
+
+                if (persistent.contains(st.device.location)) {
+                        dc[col<ID_COL_PERSISTENT>()] = g_persistent_mark;
+                        flags |= SET_PERSISTENT;
+                }
+
+                if (auto i = saved.find(dc); i != saved.end() && is_same_device(dc, *i)) {
+                        constexpr auto idx = col<ID_COL_NOTES>();
+                        dc[idx] = (*i)[idx];
+                        flags |= SET_NOTES;
+                }
+
+                update_device(item, dc, flags);
 
                 if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
                         tree.Expand(server);
                 }
         }
-}
-
-wxString MainFrame::make_cmp_key(_In_ const device_columns &dc)
-{
-        return get_url(dc) + L'/' + dc[col<ID_COL_BUSID>()];
 }
 
 std::set<device_columns> MainFrame::get_saved()
@@ -1062,4 +1072,65 @@ std::set<device_columns> MainFrame::get_saved()
 
         cfg.SetPath(path);
         return result;
+}
+
+device_columns MainFrame::make_cmp_key(_In_ const device_location &loc)
+{
+        device_columns dc;
+
+        get_url(dc) = make_server_url(loc);
+        dc[col<ID_COL_BUSID>()] = wxString::FromUTF8(loc.busid);
+
+        return dc;
+}
+
+/*
+ * FIXME: wxString does not have operator <=> 
+ */
+std::tuple<std::wstring, std::wstring, std::wstring> MainFrame::make_cmp_key(_In_ const device_columns &dc)
+{
+        auto &url = get_url(dc);
+        auto &busid = dc[col<ID_COL_BUSID>()];
+
+        wxString hostname;
+        wxString service;
+        auto ok = split_server_url(url, hostname, service);
+        wxASSERT(ok);
+
+        return { hostname.ToStdWstring(), service.ToStdWstring(), busid.ToStdWstring() };
+}
+
+std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const usbip::device_state &st)
+{
+        auto &dev = st.device;
+        auto dc = make_cmp_key(dev.location);
+
+        dc[col<ID_COL_PORT>()] = wxString::Format(L"%02d", dev.port); // XX for proper sorting
+        dc[col<ID_COL_SPEED>()] = get_speed_str(dev.speed);
+        dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(st.state));
+
+        auto str = [] (auto id, auto sv)
+        {
+                return sv.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(sv.data(), sv.size());
+        };
+
+        auto [vendor, product] = get_ids().find_product(dev.vendor, dev.product);
+
+        dc[col<ID_COL_VENDOR>()] = str(dev.vendor, vendor);
+        dc[col<ID_COL_PRODUCT>()] = str(dev.product, product);
+
+        return { dc, SET_PORT | SET_SPEED | SET_STATE | SET_VENDOR | SET_PRODUCT };
+}
+
+bool MainFrame::is_same_device(_In_ const device_columns &a, _In_ const device_columns &b) noexcept
+{
+        wxASSERT(a == b);
+ 
+        for (auto col: { col<ID_COL_VENDOR>(), col<ID_COL_PRODUCT>(), col<ID_COL_SPEED>() }) {
+                if (!equal(a, b, col)) {
+                        return false;
+                }
+        }
+        
+        return true;
 }

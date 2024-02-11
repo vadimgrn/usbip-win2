@@ -476,12 +476,12 @@
             <object class="wxMenuItem" expanded="false">
               <property name="bitmap"></property>
               <property name="checked">1</property>
-              <property name="enabled">1</property>
+              <property name="enabled">0</property>
               <property name="help"></property>
-              <property name="id">ID_COL_PERSISTENT</property>
+              <property name="id">ID_COL_STATE</property>
               <property name="kind">wxITEM_CHECK</property>
-              <property name="label">Auto</property>
-              <property name="name">m_view_persistent</property>
+              <property name="label">State</property>
+              <property name="name">m_view_state</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -491,12 +491,12 @@
             <object class="wxMenuItem" expanded="false">
               <property name="bitmap"></property>
               <property name="checked">1</property>
-              <property name="enabled">0</property>
+              <property name="enabled">1</property>
               <property name="help"></property>
-              <property name="id">ID_COL_STATE</property>
+              <property name="id">ID_COL_PERSISTENT</property>
               <property name="kind">wxITEM_CHECK</property>
-              <property name="label">State</property>
-              <property name="name">m_view_state</property>
+              <property name="label">Auto</property>
+              <property name="name">m_view_persistent</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -1171,15 +1171,15 @@
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
-          <property name="alignment">wxALIGN_CENTER</property>
-          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
-          <property name="name">Auto</property>
-          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
-        </object>
-        <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">State</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="false">
+          <property name="alignment">wxALIGN_CENTER</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Auto</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="true">

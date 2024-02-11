@@ -52,8 +52,8 @@ class Frame : public wxFrame
 			ID_COL_SPEED,
 			ID_COL_VENDOR,
 			ID_COL_PRODUCT,
-			ID_COL_PERSISTENT,
 			ID_COL_STATE,
+			ID_COL_PERSISTENT,
 			ID_COL_NOTES
 		};
 
