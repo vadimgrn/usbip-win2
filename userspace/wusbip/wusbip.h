@@ -40,7 +40,7 @@ private:
 		DEV_COL_URL = ID_COL_LAST_VISIBLE + 1, // use get_url()
 		DEV_COL_CNT = DEV_COL_URL - int(ID_COL_FIRST) + 1
 	};
-	static_assert(std::tuple_size<device_columns>() == DEV_COL_CNT);
+	static_assert(std::tuple_size_v<device_columns> == DEV_COL_CNT);
 
 	LogWindow *m_log{};
 

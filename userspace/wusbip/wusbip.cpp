@@ -77,7 +77,7 @@ void App::set_names()
 
 inline auto equal(_In_ const device_columns &a, _In_ const device_columns &b, _In_ unsigned int col) noexcept
 {
-        wxASSERT(col < std::tuple_size<device_columns>());
+        wxASSERT(col < std::tuple_size_v<device_columns>);
         return a[col] == b[col];
 }
 
@@ -141,8 +141,14 @@ auto get_persistent(_Out_ bool &success)
         if (auto lst = vhci::get_persistent(get_vhci().get(), success); !success) {
                 auto err = GetLastError();
                 wxLogError(_("Cannot load persistent info\nError %#lx\n%s"), err, GetLastErrorMsg(err));
-        } else for (auto &i: lst) {
-                result.insert(std::move(i));
+        } else for (auto &loc: lst) {
+                if (auto [i, inserted] = result.insert(std::move(loc)); !inserted) {
+                        wxLogVerbose(_("%s: failed to insert %s:%s/%s"), 
+                                        wxString::FromAscii(__func__),
+                                        wxString::FromUTF8(i->hostname), 
+                                        wxString::FromUTF8(i->service), 
+                                        wxString::FromUTF8(i->busid));
+                }
         }
 
         return result;
@@ -717,7 +723,6 @@ void MainFrame::update_device(
 
 void MainFrame::on_help_about(wxCommandEvent&)
 {
-        using usbip::wx_string;
         auto &v = win::get_file_version();
  
         wxAboutDialogInfo d;
@@ -1067,7 +1072,12 @@ std::set<device_columns> MainFrame::get_saved()
                         continue;
                 }
 
-                result.insert(std::move(dev));
+                if (auto [i, inserted] = result.insert(std::move(dev)); !inserted) {
+                        auto key = get_cmp_key(*i);
+                        static_assert(std::tuple_size_v<decltype(key)> == 2);
+                        wxLogVerbose(_("%s: failed to insert %s/%s"), 
+                                        wxString::FromAscii(__func__), std::get<0>(key), std::get<1>(key));
+                }
         }
 
         cfg.SetPath(path);
@@ -1087,7 +1097,7 @@ device_columns MainFrame::make_cmp_key(_In_ const device_location &loc)
         return dc;
 }
 
-std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const usbip::device_state &st)
+std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const device_state &st)
 {
         auto &dev = st.device;
         auto dc = make_cmp_key(dev.location);
