@@ -3,7 +3,6 @@
  */
 
 #include "wusbip.h"
-#include "utils.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -152,6 +151,7 @@ auto get_persistent(_Out_ bool &success)
 } // namespace
 
 wxIMPLEMENT_APP(App);
+
 
 class DeviceStateEvent : public wxEvent
 {
@@ -1074,6 +1074,9 @@ std::set<device_columns> MainFrame::get_saved()
         return result;
 }
 
+/*
+ * @see get_cmp_key 
+ */
 device_columns MainFrame::make_cmp_key(_In_ const device_location &loc)
 {
         device_columns dc;
@@ -1082,22 +1085,6 @@ device_columns MainFrame::make_cmp_key(_In_ const device_location &loc)
         dc[col<ID_COL_BUSID>()] = wxString::FromUTF8(loc.busid);
 
         return dc;
-}
-
-/*
- * FIXME: wxString does not have operator <=> 
- */
-std::tuple<std::wstring, std::wstring, std::wstring> MainFrame::make_cmp_key(_In_ const device_columns &dc)
-{
-        auto &url = get_url(dc);
-        auto &busid = dc[col<ID_COL_BUSID>()];
-
-        wxString hostname;
-        wxString service;
-        auto ok = split_server_url(url, hostname, service);
-        wxASSERT(ok);
-
-        return { hostname.ToStdWstring(), service.ToStdWstring(), busid.ToStdWstring() };
 }
 
 std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const usbip::device_state &st)

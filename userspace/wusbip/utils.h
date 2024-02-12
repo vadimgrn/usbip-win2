@@ -13,6 +13,8 @@
 
 #include <wx/string.h>
 
+std::strong_ordering operator <=> (_In_ const wxString &a, _In_ const wxString &b);
+
 namespace win
 {
 

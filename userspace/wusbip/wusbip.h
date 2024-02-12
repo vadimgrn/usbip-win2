@@ -5,12 +5,11 @@
 #pragma once
 
 #include "frame.h"
-#include <libusbip/vhci.h>
+#include "utils.h"
 
 #include <thread>
 #include <mutex>
 #include <array>
-#include <tuple>
 #include <set>
 
 class LogWindow;
@@ -28,7 +27,7 @@ public:
 	MainFrame(_In_ usbip::Handle read);
 	~MainFrame();
 
-	static std::tuple<std::wstring, std::wstring, std::wstring> make_cmp_key(_In_ const device_columns &dc);
+	static auto get_cmp_key(_In_ const device_columns &dc) noexcept;
 
 private:
 	enum { // hidden columns
@@ -139,19 +138,6 @@ private:
 };
 
 
-/*
- * FIXME: wxString does not have operator <=> 
- */
-inline auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-	return MainFrame::make_cmp_key(a) <=> MainFrame::make_cmp_key(b);
-}
-
-inline auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-	return MainFrame::make_cmp_key(a) == MainFrame::make_cmp_key(b);
-}
-
 inline constexpr auto MainFrame::col(_In_ int col_id)
 {
 	if (!std::is_constant_evaluated()) {
@@ -175,4 +161,22 @@ template<typename Array>
 inline auto& MainFrame::get_url(_In_ Array &v) noexcept 
 { 
 	return v[col<DEV_COL_URL>()];
+}
+
+/*
+ * @see make_cmp_key
+ */
+inline auto MainFrame::get_cmp_key(_In_ const device_columns &dc) noexcept
+{
+	return std::tie(get_url(dc), dc[col<ID_COL_BUSID>()]); // tuple of lvalue references
+}
+
+inline auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
+{
+	return MainFrame::get_cmp_key(a) <=> MainFrame::get_cmp_key(b);
+}
+
+inline auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
+{
+	return MainFrame::get_cmp_key(a) == MainFrame::get_cmp_key(b);
 }
