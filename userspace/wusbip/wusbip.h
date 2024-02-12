@@ -10,6 +10,7 @@
 #include <thread>
 #include <mutex>
 #include <array>
+#include <vector>
 #include <set>
 
 class LogWindow;
@@ -92,6 +93,7 @@ private:
 
 	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
 	std::pair<wxTreeListItem, bool> find_device(_In_ const wxString &url, _In_ const wxString &busid, _In_ bool append);
+	std::pair<wxTreeListItem, bool> find_device(_In_ const device_columns &dc, _In_ bool append);
 
 	void remove_device(_In_ wxTreeListItem dev);
 
@@ -109,22 +111,25 @@ private:
 		SET_STATE      = 0b00010000, // ID_COL_STATE
 		SET_PERSISTENT = 0b00100000, // ID_COL_PERSISTENT
 		SET_NOTES      = 0b01000000, // ID_COL_NOTES
+		SET_VID_PID_SPEED = SET_VENDOR | SET_PRODUCT | SET_SPEED,
 	};
 	
 	void update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags);
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::imported_device &dev, _In_ usbip::state state, _In_ unsigned int flags);
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ unsigned int flags);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 	int get_port(_In_ wxTreeListItem dev) const;
 
-	void load_persistent();
 	wxTreeListItem get_edit_notes_device();
 
 	static bool is_same_device(_In_ const device_columns &a, _In_ const device_columns &b) noexcept;
-	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::device_state& st);
+	static usbip::device_location make_device_location(_In_ const device_columns &dc);
+
+	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::device_state &st);
+	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::imported_device &dev);
+
 	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
-	static std::set<device_columns> get_saved();
+	static std::vector<device_columns> get_saved();
 
 	static auto& get_flags() noexcept;
 	static auto& get_keys() noexcept;
