@@ -88,7 +88,6 @@ class Frame : public wxFrame
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_items_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_toogle_persistent( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_selections_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes( wxCommandEvent& event ) { event.Skip(); }
@@ -104,6 +103,7 @@ class Frame : public wxFrame
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_item_activated( wxTreeListEvent& event ) { event.Skip(); }
 

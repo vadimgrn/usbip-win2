@@ -33,6 +33,7 @@ auto &g_key_devices = L"/devices";
 auto &g_key_url = L"url";
 auto &g_persistent_mark = L"\u2713"; // CHECK MARK, 2714 HEAVY CHECK MARK
 
+
 class App : public wxApp
 {
 public:
@@ -95,6 +96,9 @@ auto is_filled(_In_ const imported_device &d) noexcept
         return d.vendor && d.product; // d.devid
 }
 
+/*
+ * @see MainFrame::is_empty 
+ */
 inline auto is_empty(_In_ const imported_device &d) noexcept
 {
         return !is_filled(d);
@@ -178,7 +182,9 @@ public:
                 m_state(std::move(st)) {}
 
         wxEvent *Clone() const override { return new DeviceStateEvent(*this); }
+
         auto& get() const noexcept { return m_state; }
+        auto& get() noexcept { return m_state; }
 
 private:
         device_state m_state;
@@ -267,7 +273,7 @@ void MainFrame::init()
 void MainFrame::post_refresh()
 {
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
-        wxPostEvent(m_menu_edit, evt);
+        wxPostEvent(m_menu_view, evt);
 }
 
 void MainFrame::on_close(wxCloseEvent &event)
@@ -359,7 +365,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 wxLogVerbose(_("current state='%s' saved"), state);
         }
 
-        if (!(st.state == state::disconnected && is_empty(st.device))) { // connection has failed/closed
+        if (!(st.state == state::disconnected && ::is_empty(st.device))) { // connection has failed/closed
                 //
         } else if (auto saved_state = tree.GetItemText(dev, col<ID_COL_SAVED_STATE>()); saved_state.empty()) {
                 wxLogVerbose(_("remove transient device"));
@@ -373,7 +379,24 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         }
 
         if (update) {
-                update_device(dev, st, set_state);
+                switch (st.state) {
+                case state::unplugged:
+                case state::connecting:
+                case state::connected:
+                        st.device.port = 0;
+                }
+
+                auto [dc, flags] = make_device_columns(st);
+
+                if (added) {
+                        bool ok{};
+                        auto persistent = get_persistent(ok);
+
+                        auto saved = as_set(get_saved());
+                        flags = update_persistent_notes(dc, flags, persistent, &saved);
+                }
+
+                update_device(dev, dc, flags);
         }
 
         if (!added) {
@@ -392,22 +415,6 @@ auto& MainFrame::get_keys() noexcept
                 { L"vendor", col<ID_COL_VENDOR>() },
                 { L"product", col<ID_COL_PRODUCT>() },
                 { L"notes", col<ID_COL_NOTES>() },
-        };
-
-        return lst;
-}
-
-auto& MainFrame::get_flags() noexcept
-{
-        static const std::initializer_list<std::pair<unsigned int, unsigned int>> lst
-        {
-                { SET_PORT, col<ID_COL_PORT>() }, 
-                { SET_SPEED, col<ID_COL_SPEED>() }, 
-                { SET_VENDOR, col<ID_COL_VENDOR>() }, 
-                { SET_PRODUCT, col<ID_COL_PRODUCT>() }, 
-                { SET_STATE, col<ID_COL_STATE>() }, 
-                { SET_PERSISTENT, col<ID_COL_PERSISTENT>() }, 
-                { SET_NOTES, col<ID_COL_NOTES>() },
         };
 
         return lst;
@@ -681,47 +688,26 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_colu
         wxASSERT(tree.GetItemText(device) == dc[col<ID_COL_BUSID>()]);
         wxASSERT(tree.GetItemText(tree.GetItemParent(device)) == get_url(dc));
 
-        for (auto [flag, col]: get_flags()) { 
-                if (flags & flag) {
-                        tree.SetItemText(device, col, dc[col]);
-                }
-        }
-}
-
-void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_state &st, _In_ unsigned int flags)
-{
-        auto &dev = st.device;
-
-        device_columns dc;
-        get_url(dc) = make_server_url(dev.location);
-        dc[col<ID_COL_BUSID>()] = wxString::FromUTF8(dev.location.busid);
-
-        if (flags & SET_STATE) {
-                dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(st.state));
-        }
-
-        if (is_empty(st.device)) {
-                update_device(device, dc, flags);
+        if (!flags) {
                 return;
         }
 
-        if (dev.port && st.state != state::unplugged) {
-                dc[col<ID_COL_PORT>()] = wxString::Format(L"%02d", dev.port); // XX for proper sorting
-        }
-
-        dc[col<ID_COL_SPEED>()] = get_speed_str(dev.speed);
-
-        auto str = [] (auto id, auto sv)
+        static const std::initializer_list<std::pair<unsigned int, unsigned int>> lst
         {
-                return sv.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(sv.data(), sv.size());
+                { SET_PORT, col<ID_COL_PORT>() },
+                { SET_SPEED, col<ID_COL_SPEED>() },
+                { SET_VENDOR, col<ID_COL_VENDOR>() },
+                { SET_PRODUCT, col<ID_COL_PRODUCT>() },
+                { SET_STATE, col<ID_COL_STATE>() },
+                { SET_PERSISTENT, col<ID_COL_PERSISTENT>() },
+                { SET_NOTES, col<ID_COL_NOTES>() },
         };
 
-        auto [vendor, product] = get_ids().find_product(dev.vendor, dev.product);
-
-        dc[col<ID_COL_VENDOR>()] = str(dev.vendor, vendor);
-        dc[col<ID_COL_PRODUCT>()] = str(dev.product, product);
-
-        update_device(device, dc, flags);
+        for (auto [col_bit, col]: lst) { 
+                if (flags & col_bit) {
+                        tree.SetItemText(device, col, dc[col]);
+                }
+        }
 }
 
 void MainFrame::on_help_about(wxCommandEvent&)
@@ -930,7 +916,7 @@ void MainFrame::on_save(wxCommandEvent&)
         }
 }
 
-void MainFrame::on_load(wxCommandEvent&) 
+void MainFrame::on_load(wxCommandEvent&)
 {
         auto &tree = *m_treeListCtrl;
         int cnt = 0;
@@ -943,18 +929,15 @@ void MainFrame::on_load(wxCommandEvent&)
                 unsigned int flags{};
                 auto [item, added] = find_or_add_device(dc);
 
-                if (added) {
+                if (added || is_empty(dc)) {
                         dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
-                        flags = SET_VID_PID_SPEED | SET_STATE | SET_NOTES;
-                        
-                        if (auto loc = make_device_location(dc); persistent.contains(loc)) {
-                                dc[col<ID_COL_PERSISTENT>()] = g_persistent_mark;
-                                flags |= SET_PERSISTENT;
-                        }
+                        flags = update_persistent_notes(dc, SET_VID_PID_SPEED | SET_STATE | SET_NOTES, persistent);
 
                         if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
                                 tree.Expand(server);
                         }
+                } else {
+                        wxLogVerbose(_("Skip loading existing device %s/%s"), get_url(dc), dc[col<ID_COL_BUSID>()]);
                 }
 
                 update_device(item, dc, flags);
@@ -962,6 +945,27 @@ void MainFrame::on_load(wxCommandEvent&)
         }
 
         wxLogStatus(_("%d device(s) loaded"), cnt);
+}
+
+unsigned int MainFrame::update_persistent_notes(
+        _Inout_ device_columns &dc, _In_ unsigned int flags,
+        _In_ const std::set<device_location> &persistent, 
+        _In_opt_ const std::set<device_columns> *saved)
+{
+        if (auto loc = make_device_location(dc); persistent.contains(loc)) {
+                dc[col<ID_COL_PERSISTENT>()] = g_persistent_mark;
+                flags |= SET_PERSISTENT;
+        }
+
+        if (!saved) {
+                //
+        } else if (auto i = saved->find(dc); i != saved->end()) {
+                constexpr auto idx = col<ID_COL_NOTES>();
+                dc[idx] = (*i)[idx];
+                flags |= SET_NOTES;
+        }
+
+        return flags;
 }
 
 void MainFrame::on_refresh(wxCommandEvent&)
@@ -979,8 +983,8 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 return;
         }
 
-        auto saved = as_set(get_saved());
         auto persistent = get_persistent(ok);
+        auto saved = as_set(get_saved());
 
         for (auto &dev: devices) {
                 auto [item, added] = find_or_add_device(dev.location);
@@ -992,17 +996,7 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
-
-                if (persistent.contains(st.device.location)) {
-                        dc[col<ID_COL_PERSISTENT>()] = g_persistent_mark;
-                        flags |= SET_PERSISTENT;
-                }
-
-                if (auto i = saved.find(dc); i != saved.end() && is_same_device(dc, *i)) {
-                        constexpr auto idx = col<ID_COL_NOTES>();
-                        dc[idx] = (*i)[idx];
-                        flags |= SET_NOTES;
-                }
+                flags = update_persistent_notes(dc, flags, persistent, &saved);
 
                 update_device(item, dc, flags);
 
@@ -1067,7 +1061,12 @@ std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ cons
 {
         auto dc = make_cmp_key(dev.location);
 
-        dc[col<ID_COL_PORT>()] = wxString::Format(L"%02d", dev.port); // XX for proper sorting
+        if (auto &port = dc[col<ID_COL_PORT>()]; dev.port) {
+                port = wxString::Format(L"%02d", dev.port); // XX for proper sorting
+        } else {
+                port.clear();
+        }
+        
         dc[col<ID_COL_SPEED>()] = get_speed_str(dev.speed);
 
         auto str = [] (auto id, auto sv)
@@ -1094,17 +1093,18 @@ std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ cons
         return ret;
 }
 
-bool MainFrame::is_same_device(_In_ const device_columns &a, _In_ const device_columns &b) noexcept
+/*
+ * @see is_empty(const imported_device&)
+ */
+bool MainFrame::is_empty(_In_ const device_columns &dc) noexcept
 {
-        wxASSERT(a == b);
- 
         for (auto col: { col<ID_COL_VENDOR>(), col<ID_COL_PRODUCT>() }) {
-                if (!equal(a, b, col)) {
-                        return false;
+                if (dc[col].empty()) {
+                        return true;
                 }
         }
-        
-        return true;
+
+        return false;
 }
 
 device_location MainFrame::make_device_location(_In_ const device_columns &dc)

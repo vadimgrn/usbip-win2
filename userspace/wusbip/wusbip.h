@@ -115,24 +115,25 @@ private:
 	};
 	
 	void update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags);
-	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_state &state, _In_ unsigned int flags);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
 	int get_port(_In_ wxTreeListItem dev) const;
 
 	wxTreeListItem get_edit_notes_device();
-
-	static bool is_same_device(_In_ const device_columns &a, _In_ const device_columns &b) noexcept;
+	
+	static bool is_empty(_In_ const device_columns &dc) noexcept;
 	static usbip::device_location make_device_location(_In_ const device_columns &dc);
 
 	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::device_state &st);
 	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::imported_device &dev);
 
+	static auto& get_keys() noexcept;
 	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
 	static std::vector<device_columns> get_saved();
 
-	static auto& get_flags() noexcept;
-	static auto& get_keys() noexcept;
+	static unsigned int update_persistent_notes(_Inout_ device_columns &dc, _In_ unsigned int flags,
+		_In_ const std::set<usbip::device_location> &persistent, _In_opt_ const std::set<device_columns> *saved = nullptr);
+
 	static constexpr auto col(_In_ int col_id);
 
 	template<auto col_id>
