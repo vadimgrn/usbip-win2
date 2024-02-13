@@ -348,7 +348,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto &st = event.get();
         log(st);
 
-        auto [dev, appended] = find_device(st.device.location, true);
+        auto [dev, added] = find_or_add_device(st.device.location);
 
         auto update = true;
         auto set_state = true;
@@ -364,7 +364,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         } else if (auto saved_state = tree.GetItemText(dev, col<ID_COL_SAVED_STATE>()); saved_state.empty()) {
                 wxLogVerbose(_("remove transient device"));
                 remove_device(dev);
-                appended = false;
+                added = false;
                 update = false;
         } else {
                 tree.SetItemText(dev, col<ID_COL_STATE>(), saved_state);
@@ -376,7 +376,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 update_device(dev, st, set_state);
         }
 
-        if (!appended) {
+        if (!added) {
                 // as is
         } else if (auto server = tree.GetItemParent(dev); !tree.IsExpanded(server)) {
                 tree.Expand(server);
@@ -627,17 +627,12 @@ wxTreeListItem MainFrame::find_server(_In_ const wxString &url, _In_ bool append
         return server;
 }
 
-std::pair<wxTreeListItem, bool> MainFrame::find_device(
-        _In_ const wxString &url, _In_ const wxString &busid, _In_ bool append)
+std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid)
 {
         std::pair<wxTreeListItem, bool> res;
 
-        auto server = find_server(url, append);
-        if (!server.IsOk()) {
-                return res;
-        }
-
         auto &tree = *m_treeListCtrl;
+        auto server = find_server(url, true);
 
         for (auto item = tree.GetFirstChild(server); item.IsOk(); item = tree.GetNextSibling(item)) {
                 if (tree.GetItemText(item) == busid) {
@@ -645,28 +640,24 @@ std::pair<wxTreeListItem, bool> MainFrame::find_device(
                 }
         }
 
-        if (append) {
-                auto item = tree.AppendItem(server, busid);
-                res = std::make_pair(item, true);
-        }
-
-        return res;
+        auto item = tree.AppendItem(server, busid);
+        return res = std::make_pair(item, true);
 }
 
-std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const device_location &loc, _In_ bool append)
+std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const device_location &loc)
 {
         auto url = make_server_url(loc);
         auto busid = wxString::FromUTF8(loc.busid);
 
-        return find_device(url, busid, append);
+        return find_or_add_device(url, busid);
 }
 
-std::pair<wxTreeListItem, bool> MainFrame::find_device(_In_ const device_columns &dc, _In_ bool append)
+std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const device_columns &dc)
 {
         auto &url = get_url(dc);
         auto &busid = dc[col<ID_COL_BUSID>()];
 
-        return find_device(url, busid, append);
+        return find_or_add_device(url, busid);
 }
 
 void MainFrame::remove_device(_In_ wxTreeListItem device)
@@ -785,8 +776,8 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
                 auto [dc, flags] = make_device_columns(st);
 
-                auto [item, appended] = find_device(dc, true);
-                if (!appended) {
+                auto [item, added] = find_or_add_device(dc);
+                if (!added) {
                         flags &= ~SET_STATE; // clear
                 }
                 
@@ -950,9 +941,9 @@ void MainFrame::on_load(wxCommandEvent&)
         for (auto &dc: get_saved()) {
 
                 unsigned int flags{};
-                auto [item, appended] = find_device(dc, true);
+                auto [item, added] = find_or_add_device(dc);
 
-                if (appended) {
+                if (added) {
                         dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
                         flags = SET_VID_PID_SPEED | SET_STATE | SET_NOTES;
                         
@@ -992,8 +983,8 @@ void MainFrame::on_refresh(wxCommandEvent&)
         auto persistent = get_persistent(ok);
 
         for (auto &dev: devices) {
-                auto [item, appended] = find_device(dev.location, true);
-                wxASSERT(appended);
+                auto [item, added] = find_or_add_device(dev.location);
+                wxASSERT(added);
                 
                 device_state st { 
                         .device = std::move(dev), 
@@ -1107,7 +1098,7 @@ bool MainFrame::is_same_device(_In_ const device_columns &a, _In_ const device_c
 {
         wxASSERT(a == b);
  
-        for (auto col: { col<ID_COL_VENDOR>(), col<ID_COL_PRODUCT>(), col<ID_COL_SPEED>() }) {
+        for (auto col: { col<ID_COL_VENDOR>(), col<ID_COL_PRODUCT>() }) {
                 if (!equal(a, b, col)) {
                         return false;
                 }

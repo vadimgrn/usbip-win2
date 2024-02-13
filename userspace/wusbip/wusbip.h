@@ -91,9 +91,9 @@ private:
 
 	wxTreeListItem find_server(_In_ const wxString &url, _In_ bool append);
 
-	std::pair<wxTreeListItem, bool> find_device(_In_ const usbip::device_location &loc, _In_ bool append);
-	std::pair<wxTreeListItem, bool> find_device(_In_ const wxString &url, _In_ const wxString &busid, _In_ bool append);
-	std::pair<wxTreeListItem, bool> find_device(_In_ const device_columns &dc, _In_ bool append);
+	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_location &loc);
+	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid);
+	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const device_columns &dc);
 
 	void remove_device(_In_ wxTreeListItem dev);
 
