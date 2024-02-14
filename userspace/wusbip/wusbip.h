@@ -103,17 +103,6 @@ private:
 	bool is_persistent(_In_ wxTreeListItem device);
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
 
-	enum : unsigned int { // flags
-		SET_PORT       = 0b00000001, // ID_COL_PORT
-		SET_SPEED      = 0b00000010, // ID_COL_SPEED
-		SET_VENDOR     = 0b00000100, // ID_COL_VENDOR,
-		SET_PRODUCT    = 0b00001000, // ID_COL_PRODUCT
-		SET_STATE      = 0b00010000, // ID_COL_STATE
-		SET_PERSISTENT = 0b00100000, // ID_COL_PERSISTENT
-		SET_NOTES      = 0b01000000, // ID_COL_NOTES
-		SET_VID_PID_SPEED = SET_VENDOR | SET_PRODUCT | SET_SPEED,
-	};
-	
 	void update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags);
 
 	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
@@ -128,12 +117,15 @@ private:
 	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::imported_device &dev);
 
 	static auto& get_keys() noexcept;
-	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
 	static std::vector<device_columns> get_saved();
+	static unsigned int get_saved_flags() noexcept;
 
-	static unsigned int update_persistent_notes(_Inout_ device_columns &dc, _In_ unsigned int flags,
+	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
+
+	static unsigned int set_persistent_notes(_Inout_ device_columns &dc, _In_ unsigned int flags,
 		_In_ const std::set<usbip::device_location> &persistent, _In_opt_ const std::set<device_columns> *saved = nullptr);
 
+	static consteval auto mkflag(_In_ unsigned int col_id);
 	static constexpr auto col(_In_ int col_id);
 
 	template<auto col_id>
@@ -161,6 +153,11 @@ inline consteval auto MainFrame::col()
 	static_assert(col_id < static_cast<int>(ID_COL_MAX));
 
 	return col(col_id);
+}
+
+inline consteval auto MainFrame::mkflag(_In_ unsigned int col_id) // ID_COL_XXX
+{ 
+	return 1U << col(col_id); 
 }
 
 template<typename Array>

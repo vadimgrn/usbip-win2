@@ -229,7 +229,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->AppendSeparator();
 
 	wxMenuItem* m_cmd_refresh;
-	m_cmd_refresh = new wxMenuItem( m_menu_view, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of devices"), wxITEM_NORMAL );
+	m_cmd_refresh = new wxMenuItem( m_menu_view, wxID_REFRESH, wxString( _("Refresh") ) + wxT('\t') + wxT("CTRL+R"), _("Refresh list of attached devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_refresh->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -255,7 +255,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_auiToolBar = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER|wxAUI_TB_TEXT );
 	m_auiToolBar->SetToolSeparation( 1 );
-	m_tool_refresh = m_auiToolBar->AddTool( wxID_ANY, _("Refresh"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Refresh list of remote devices"), wxEmptyString, NULL );
+	m_tool_refresh = m_auiToolBar->AddTool( wxID_ANY, _("Refresh"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_REDO ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Refresh list of attached devices"), wxEmptyString, NULL );
 
 	m_tool_attach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxArtProvider::GetBitmap( wxASCII_STR( wxART_TICK_MARK ), wxASCII_STR( wxART_TOOLBAR )), wxNullBitmap, wxITEM_NORMAL, _("Attach remote device(s)"), wxEmptyString, NULL );
 

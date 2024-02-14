@@ -558,7 +558,7 @@
             <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Refresh list of devices</property>
+            <property name="help">Refresh list of attached devices</property>
             <property name="id">wxID_REFRESH</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Refresh</property>
@@ -658,7 +658,7 @@
           <property name="name">m_tool_refresh</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Refresh list of remote devices</property>
+          <property name="tooltip">Refresh list of attached devices</property>
           <event name="OnToolClicked">on_refresh</event>
         </object>
         <object class="tool" expanded="false">

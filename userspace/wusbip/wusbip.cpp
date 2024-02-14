@@ -75,6 +75,25 @@ void App::set_names()
         SetVendorName(wx_string(v.GetCompanyName()));
 }
 
+/*
+ * For device_state.state 
+ */
+constexpr auto is_port_residual(_In_ state st)
+{
+        switch (st) {
+        using enum state;
+        case unplugged: // port > 0 if previous state was unplugging
+        case connecting: // port is zero
+        case connected: // port is zero
+                return true;
+        case plugged: // port > 0
+        case disconnected: // port > 0 if previous state was plugged
+        case unplugging: // port > 0
+        default:
+                return false;
+        }
+}
+
 inline auto equal(_In_ const device_columns &a, _In_ const device_columns &b, _In_ unsigned int col) noexcept
 {
         wxASSERT(col < std::tuple_size_v<device_columns>);
@@ -149,9 +168,10 @@ auto make_device_location(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem server,
         return make_device_location(url, busid);
 }
 
-auto get_persistent(_Out_ bool &success)
+auto get_persistent()
 {
         std::set<device_location> result;
+        bool success{};
         
         if (auto lst = vhci::get_persistent(get_vhci().get(), success); !success) {
                 auto err = GetLastError();
@@ -159,10 +179,8 @@ auto get_persistent(_Out_ bool &success)
         } else for (auto &loc: lst) {
                 if (auto [i, inserted] = result.insert(std::move(loc)); !inserted) {
                         wxLogVerbose(_("%s: failed to insert %s:%s/%s"), 
-                                        wxString::FromAscii(__func__),
-                                        wxString::FromUTF8(i->hostname), 
-                                        wxString::FromUTF8(i->service), 
-                                        wxString::FromUTF8(i->busid));
+                                        wxString::FromAscii(__func__), wxString::FromUTF8(i->hostname), 
+                                        wxString::FromUTF8(i->service), wxString::FromUTF8(i->busid));
                 }
         }
 
@@ -273,6 +291,7 @@ void MainFrame::init()
 void MainFrame::post_refresh()
 {
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
+        wxASSERT(m_menu_view->FindItem(wxID_REFRESH)); // command belongs to this menu
         wxPostEvent(m_menu_view, evt);
 }
 
@@ -379,21 +398,19 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         }
 
         if (update) {
-                switch (st.state) {
-                case state::unplugged:
-                case state::connecting:
-                case state::connected:
+                if (is_port_residual(st.state)) {
                         st.device.port = 0;
                 }
 
                 auto [dc, flags] = make_device_columns(st);
 
                 if (added) {
-                        bool ok{};
-                        auto persistent = get_persistent(ok);
-
+                        auto persistent = get_persistent();
+                        
                         auto saved = as_set(get_saved());
-                        flags = update_persistent_notes(dc, flags, persistent, &saved);
+                        wxASSERT(get_saved_flags() & mkflag(ID_COL_NOTES));
+
+                        flags = set_persistent_notes(dc, flags, persistent, &saved);
                 }
 
                 update_device(dev, dc, flags);
@@ -612,8 +629,6 @@ void MainFrame::on_detach_all(wxCommandEvent&)
                 auto err = GetLastError();
                 wxLogError(_("Cannot detach all devices\nError %#lx\n%s"), err, GetLastErrorMsg(err));
         }
-
-        post_refresh();
 }
 
 wxTreeListItem MainFrame::find_server(_In_ const wxString &url, _In_ bool append)
@@ -691,21 +706,21 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_colu
         if (!flags) {
                 return;
         }
-
-        static const std::initializer_list<std::pair<unsigned int, unsigned int>> lst
-        {
-                { SET_PORT, col<ID_COL_PORT>() },
-                { SET_SPEED, col<ID_COL_SPEED>() },
-                { SET_VENDOR, col<ID_COL_VENDOR>() },
-                { SET_PRODUCT, col<ID_COL_PRODUCT>() },
-                { SET_STATE, col<ID_COL_STATE>() },
-                { SET_PERSISTENT, col<ID_COL_PERSISTENT>() },
-                { SET_NOTES, col<ID_COL_NOTES>() },
+        
+        const unsigned int columns[] = {
+                col<ID_COL_PORT>(),
+                col<ID_COL_SPEED>(),
+                col<ID_COL_VENDOR>(),
+                col<ID_COL_PRODUCT>(),
+                col<ID_COL_STATE>(),
+                col<ID_COL_PERSISTENT>(),
+                col<ID_COL_NOTES>(),
         };
 
-        for (auto [col_bit, col]: lst) { 
-                if (flags & col_bit) {
-                        tree.SetItemText(device, col, dc[col]);
+        for (auto col: columns) {
+                if (auto &new_val = dc[col]; 
+                    (flags & (1U << col)) && new_val != tree.GetItemText(device, col)) { // see mkflag
+                        tree.SetItemText(device, col, new_val);
                 }
         }
 }
@@ -753,7 +768,12 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 return;
         }
 
-        auto dev = [this, host = std::move(u8_host), port = std::move(u8_port)] (auto, auto &device)
+        auto persistent = get_persistent();
+
+        auto saved = as_set(get_saved());
+        wxASSERT(get_saved_flags() & mkflag(ID_COL_NOTES));
+
+        auto dev = [this, host = std::move(u8_host), port = std::move(u8_port), &persistent, &saved] (auto, auto &device)
         {
                 device_state st {
                         .device = make_imported_device(std::move(host), std::move(port), device),
@@ -761,12 +781,13 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
+                flags = set_persistent_notes(dc, flags, persistent, &saved);
 
                 auto [item, added] = find_or_add_device(dc);
                 if (!added) {
-                        flags &= ~SET_STATE; // clear
+                        flags &= ~mkflag(ID_COL_STATE); // clear
                 }
-                
+
                 update_device(item, dc, flags);
         };
 
@@ -921,17 +942,21 @@ void MainFrame::on_load(wxCommandEvent&)
         auto &tree = *m_treeListCtrl;
         int cnt = 0;
 
-        bool ok{};
-        auto persistent = get_persistent(ok);
+        auto persistent = get_persistent();
+        
+        for (auto saved_flags = get_saved_flags(); auto &dc: get_saved()) {
 
-        for (auto &dc: get_saved()) {
-
-                unsigned int flags{};
+                auto flags = saved_flags;
                 auto [item, added] = find_or_add_device(dc);
 
                 if (added || is_empty(dc)) {
-                        dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(state::unplugged));
-                        flags = update_persistent_notes(dc, SET_VID_PID_SPEED | SET_STATE | SET_NOTES, persistent);
+                        constexpr auto idx = col<ID_COL_STATE>();
+
+                        constexpr auto state_flag = 1U << idx;
+                        wxASSERT(!(saved_flags & state_flag));
+
+                        dc[idx] = _(vhci::get_state_str(state::unplugged));
+                        flags = set_persistent_notes(dc, flags | state_flag, persistent);
 
                         if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
                                 tree.Expand(server);
@@ -947,14 +972,18 @@ void MainFrame::on_load(wxCommandEvent&)
         wxLogStatus(_("%d device(s) loaded"), cnt);
 }
 
-unsigned int MainFrame::update_persistent_notes(
+unsigned int MainFrame::set_persistent_notes(
         _Inout_ device_columns &dc, _In_ unsigned int flags,
         _In_ const std::set<device_location> &persistent, 
         _In_opt_ const std::set<device_columns> *saved)
 {
         if (auto loc = make_device_location(dc); persistent.contains(loc)) {
-                dc[col<ID_COL_PERSISTENT>()] = g_persistent_mark;
-                flags |= SET_PERSISTENT;
+                constexpr auto idx = col<ID_COL_PERSISTENT>();
+                dc[idx] = g_persistent_mark;
+
+                auto pers_flag = 1U << idx;
+                wxASSERT(!(flags & pers_flag));
+                flags |= pers_flag;
         }
 
         if (!saved) {
@@ -962,13 +991,16 @@ unsigned int MainFrame::update_persistent_notes(
         } else if (auto i = saved->find(dc); i != saved->end()) {
                 constexpr auto idx = col<ID_COL_NOTES>();
                 dc[idx] = (*i)[idx];
-                flags |= SET_NOTES;
+
+                auto notes_flag = 1U << idx;
+                wxASSERT(!(flags & notes_flag));
+                flags |= notes_flag;
         }
 
         return flags;
 }
 
-void MainFrame::on_refresh(wxCommandEvent&)
+void MainFrame::on_refresh(wxCommandEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
@@ -983,8 +1015,10 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 return;
         }
 
-        auto persistent = get_persistent(ok);
+        auto persistent = get_persistent();
+
         auto saved = as_set(get_saved());
+        wxASSERT(get_saved_flags() & mkflag(ID_COL_NOTES));
 
         for (auto &dev: devices) {
                 auto [item, added] = find_or_add_device(dev.location);
@@ -996,13 +1030,18 @@ void MainFrame::on_refresh(wxCommandEvent&)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
-                flags = update_persistent_notes(dc, flags, persistent, &saved);
+                flags = set_persistent_notes(dc, flags, persistent, &saved);
 
                 update_device(item, dc, flags);
 
                 if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
                         tree.Expand(server);
                 }
+        }
+
+        if (static bool once; !once) {
+                once = true;
+                on_load(event);
         }
 }
 
@@ -1044,6 +1083,17 @@ std::vector<device_columns> MainFrame::get_saved()
         return result;
 }
 
+unsigned int MainFrame::get_saved_flags() noexcept
+{
+        unsigned int flags{};
+
+        for (auto [key, col]: get_keys()) {
+                flags |= 1U << col;
+        }
+
+        return flags;
+}
+
 /*
  * @see get_cmp_key 
  */
@@ -1061,13 +1111,18 @@ std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ cons
 {
         auto dc = make_cmp_key(dev.location);
 
-        if (auto &port = dc[col<ID_COL_PORT>()]; dev.port) {
+        auto idx = col<ID_COL_PORT>();
+        auto flags = 1U << idx;
+
+        if (auto &port = dc[idx]; dev.port) {
                 port = wxString::Format(L"%02d", dev.port); // XX for proper sorting
         } else {
                 port.clear();
         }
-        
-        dc[col<ID_COL_SPEED>()] = get_speed_str(dev.speed);
+
+        idx = col<ID_COL_SPEED>();
+        dc[idx] = get_speed_str(dev.speed);
+        flags |= 1U << idx;
 
         auto str = [] (auto id, auto sv)
         {
@@ -1076,10 +1131,15 @@ std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ cons
 
         auto [vendor, product] = get_ids().find_product(dev.vendor, dev.product);
 
-        dc[col<ID_COL_VENDOR>()] = str(dev.vendor, vendor);
-        dc[col<ID_COL_PRODUCT>()] = str(dev.product, product);
+        idx = col<ID_COL_VENDOR>();
+        dc[idx] = str(dev.vendor, vendor);
+        flags |= 1U << idx;
 
-        return { dc, SET_PORT | SET_VID_PID_SPEED };
+        idx = col<ID_COL_PRODUCT>();
+        dc[idx] = str(dev.product, product);
+        flags |= 1U << idx;
+
+        return {dc, flags};
 }
 
 std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const device_state &st)
@@ -1087,8 +1147,10 @@ std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ cons
         auto ret = make_device_columns(st.device);
         auto &[dc, flags] = ret;
         
-        dc[col<ID_COL_STATE>()] = _(vhci::get_state_str(st.state));
-        flags |= SET_STATE;
+        constexpr auto idx = col<ID_COL_STATE>();
+
+        dc[idx] = _(vhci::get_state_str(st.state));
+        flags |= 1U << idx;
 
         return ret;
 }
