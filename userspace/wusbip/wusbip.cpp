@@ -233,7 +233,8 @@ LogWindow::LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toggle) :
         wxAcceleratorEntry entry(acc->GetFlags(), acc->GetKeyCode(), wxID_CLOSE);
         wxAcceleratorTable table(1, &entry);
 
-        GetFrame()->SetAcceleratorTable(table); 
+        GetFrame()->SetAcceleratorTable(table);
+        wxPersistentRegisterAndRestore(GetFrame(), wxString::FromAscii(__func__));
 }
 
 void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info)
@@ -408,7 +409,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                         auto persistent = get_persistent();
                         
                         auto saved = as_set(get_saved());
-                        wxASSERT(get_saved_flags() & mkflag(ID_COL_NOTES));
+                        static_assert(get_saved_flags() & mkflag(ID_COL_NOTES));
 
                         flags = set_persistent_notes(dc, flags, persistent, &saved);
                 }
@@ -421,20 +422,6 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         } else if (auto server = tree.GetItemParent(dev); !tree.IsExpanded(server)) {
                 tree.Expand(server);
         }
-}
-
-auto& MainFrame::get_keys() noexcept
-{
-        static const std::initializer_list<std::pair<const wchar_t*, unsigned int>> lst 
-        {
-                { L"busid", col<ID_COL_BUSID>() },
-                { L"speed", col<ID_COL_SPEED>() },
-                { L"vendor", col<ID_COL_VENDOR>() },
-                { L"product", col<ID_COL_PRODUCT>() },
-                { L"notes", col<ID_COL_NOTES>() },
-        };
-
-        return lst;
 }
 
 void MainFrame::on_has_items_update_ui(wxUpdateUIEvent &event)
@@ -769,9 +756,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         }
 
         auto persistent = get_persistent();
-
         auto saved = as_set(get_saved());
-        wxASSERT(get_saved_flags() & mkflag(ID_COL_NOTES));
 
         auto dev = [this, host = std::move(u8_host), port = std::move(u8_port), &persistent, &saved] (auto, auto &device)
         {
@@ -781,6 +766,8 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
+
+                static_assert(get_saved_flags() & mkflag(ID_COL_NOTES));
                 flags = set_persistent_notes(dc, flags, persistent, &saved);
 
                 auto [item, added] = find_or_add_device(dc);
@@ -910,7 +897,7 @@ void MainFrame::on_save(wxCommandEvent&)
                 auto url = tree.GetItemText(parent); // server
                 cfg.Write(g_key_url, url);
 
-                for (auto [key, col] : get_keys()) {
+                for (auto [key, col] : get_saved_keys()) {
                         auto value = tree.GetItemText(item, col);
                         cfg.Write(key, value);
                 }
@@ -944,16 +931,16 @@ void MainFrame::on_load(wxCommandEvent&)
 
         auto persistent = get_persistent();
         
-        for (auto saved_flags = get_saved_flags(); auto &dc: get_saved()) {
+        for (auto &dc: get_saved()) {
 
-                auto flags = saved_flags;
+                auto flags = get_saved_flags();
                 auto [item, added] = find_or_add_device(dc);
 
                 if (added || is_empty(dc)) {
                         constexpr auto idx = col<ID_COL_STATE>();
 
                         constexpr auto state_flag = 1U << idx;
-                        wxASSERT(!(saved_flags & state_flag));
+                        static_assert(!(get_saved_flags() & state_flag));
 
                         dc[idx] = _(vhci::get_state_str(state::unplugged));
                         flags = set_persistent_notes(dc, flags | state_flag, persistent);
@@ -1016,9 +1003,7 @@ void MainFrame::on_refresh(wxCommandEvent &event)
         }
 
         auto persistent = get_persistent();
-
         auto saved = as_set(get_saved());
-        wxASSERT(get_saved_flags() & mkflag(ID_COL_NOTES));
 
         for (auto &dev: devices) {
                 auto [item, added] = find_or_add_device(dev.location);
@@ -1030,6 +1015,8 @@ void MainFrame::on_refresh(wxCommandEvent &event)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
+
+                static_assert(get_saved_flags() & mkflag(ID_COL_NOTES));
                 flags = set_persistent_notes(dc, flags, persistent, &saved);
 
                 update_device(item, dc, flags);
@@ -1068,7 +1055,7 @@ std::vector<device_columns> MainFrame::get_saved()
                         continue;
                 }
 
-                for (auto [key, col] : get_keys()) {
+                for (auto [key, col] : get_saved_keys()) {
                         dev[col] = cfg.Read(key);
                 }
 
@@ -1081,17 +1068,6 @@ std::vector<device_columns> MainFrame::get_saved()
 
         cfg.SetPath(path);
         return result;
-}
-
-unsigned int MainFrame::get_saved_flags() noexcept
-{
-        unsigned int flags{};
-
-        for (auto [key, col]: get_keys()) {
-                flags |= 1U << col;
-        }
-
-        return flags;
 }
 
 /*

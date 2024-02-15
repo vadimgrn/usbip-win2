@@ -116,9 +116,9 @@ private:
 	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::device_state &st);
 	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::imported_device &dev);
 
-	static auto& get_keys() noexcept;
+	static consteval auto get_saved_keys();
+	static consteval auto get_saved_flags();
 	static std::vector<device_columns> get_saved();
-	static unsigned int get_saved_flags() noexcept;
 
 	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
 
@@ -164,6 +164,30 @@ template<typename Array>
 inline auto& MainFrame::get_url(_In_ Array &v) noexcept 
 { 
 	return v[col<DEV_COL_URL>()];
+}
+
+inline consteval auto MainFrame::get_saved_keys()
+{
+	using key_val = std::pair<const wchar_t* const, unsigned int>;
+
+	return std::to_array<key_val>({
+		std::make_pair(L"busid", col<ID_COL_BUSID>()),
+		{ L"speed", col<ID_COL_SPEED>() },
+		{ L"vendor", col<ID_COL_VENDOR>() },
+		{ L"product", col<ID_COL_PRODUCT>() },
+		{ L"notes", col<ID_COL_NOTES>() },
+	});
+}
+
+inline consteval auto MainFrame::get_saved_flags()
+{
+	unsigned int flags{};
+
+	for (auto [key, col]: get_saved_keys()) {
+		flags |= 1U << col;
+	}
+
+	return flags;
 }
 
 /*
