@@ -2,7 +2,7 @@
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USB/IP server at least for kernels 4.19 - 6.2
+- Works with Linux USB/IP server at least for kernels 4.19 - 6.5
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - You can **donate to purchase an EV certificate** which is required for signing the driver, please read [this](https://github.com/vadimgrn/usbip-win2/issues/48#issuecomment-1888655412) thread
@@ -214,11 +214,11 @@ rem del /F sed*
 ```
 .sympath+ C:\Program Files\USBip
 !wmitrace.searchpath +%TEMP%\usbip
+!analyze -v
 !wdfkd.wdfsearchpath %TEMP%\USBip
 !wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wdfkd.wdflogdump usbip2_ude -d
 !wdfkd.wdflogdump usbip2_ude -f
-!analyze -v
 ```
 
 ## Obtaining USB/IP log on Linux
