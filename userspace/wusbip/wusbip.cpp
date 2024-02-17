@@ -20,6 +20,7 @@
 #include <wx/textdlg.h>
 
 #include <wx/persist.h>
+#include <wx/persist/dataview.h>
 #include <wx/persist/toplevel.h>
 
 #include <format>
@@ -263,6 +264,7 @@ MainFrame::MainFrame(_In_ Handle read) :
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 
         init();
+        restore_state();
         post_refresh();
 }
 
@@ -285,8 +287,12 @@ void MainFrame::init()
 
         auto port = get_tcp_port();
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
+}
 
-        wxPersistentRegisterAndRestore(this, app_name);
+void MainFrame::restore_state()
+{
+        wxPersistentRegisterAndRestore(m_treeListCtrl->GetDataView(), m_treeListCtrl->GetName());
+        wxPersistentRegisterAndRestore(this, L"MainFrame");
 }
 
 void MainFrame::post_refresh()

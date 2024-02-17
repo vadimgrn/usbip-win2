@@ -3,6 +3,7 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="..\usbip\usb.ids" />
+    <None Include="wxpatch.bat" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />

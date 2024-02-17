@@ -1,0 +1,42 @@
+--- dataview.h.org	2023-09-29 22:46:06.000000000 +0300
++++ dataview.h	2024-02-17 09:41:58.217604100 +0200
+@@ -16,6 +16,8 @@
+ 
+ #include "wx/dataview.h"
+ 
++#include <map>
++
+ // ----------------------------------------------------------------------------
+ // String constants used by wxPersistentDataViewCtrl.
+ // ----------------------------------------------------------------------------
+@@ -94,6 +96,7 @@
+ 
+     virtual bool Restore() wxOVERRIDE
+     {
++        std::map<int, wxDataViewColumn*> order;
+         wxDataViewCtrl* const control = Get();
+ 
+         for ( unsigned int col = 0; col < control->GetColumnCount(); col++ )
+@@ -115,7 +118,21 @@
+             if ( RestoreValue(columnPrefix + wxASCII_STR(wxPERSIST_DVC_WIDTH), &width) )
+                 column->SetWidth(width);
+ 
+-            // TODO: Set the column's view position.
++            // Retrieve the column's view position.
++            int pos;
++            if ( RestoreValue(columnPrefix + wxASCII_STR(wxPERSIST_DVC_POS), &pos) )
++                order.emplace(pos, column);
++        }
++
++        // Restore columns' position.
++        int new_pos = 0; // do not trust saved values from registry
++        for ( auto &i: order ) {
++            auto column = i.second;
++            auto pos = control->GetColumnPosition(column);
++            if ( pos != new_pos && control->DeleteColumn(column) ) {
++                control->InsertColumn(new_pos, column); // wxASSERT(pos > new_pos);
++            }
++            ++new_pos;
+         }
+ 
+         // Restore the sort key and order if there is a valid model and sort

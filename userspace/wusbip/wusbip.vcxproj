@@ -62,8 +62,8 @@
       <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib;CfgMgr32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>..\..\bin\sed.exe -i -f log.h.sed  ..\..\packages\wxWidgets.3.2.2.1\include\wx\log.h</Command>
-      <Message>Patching wx\log.h</Message>
+      <Command>wxpatch.bat</Command>
+      <Message>Patching wxWidgets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -89,8 +89,8 @@
       <AdditionalDependencies>shlwapi.lib;setupapi.lib;advapi32.lib;ws2_32.lib;wintrust.lib;crypt32.lib;newdev.lib;CfgMgr32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>..\..\bin\sed.exe -i -f log.h.sed  ..\..\packages\wxWidgets.3.2.2.1\include\wx\log.h</Command>
-      <Message>Patching wx\log.h</Message>
+      <Command>wxpatch.bat</Command>
+      <Message>Patching wxWidgets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -101,6 +101,7 @@
   <ItemGroup>
     <None Include="..\usbip\usb.ids" />
     <None Include="packages.config" />
+    <None Include="wxpatch.bat" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="frame.cpp" />
