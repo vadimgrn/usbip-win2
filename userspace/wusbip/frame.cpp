@@ -166,44 +166,44 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	#endif
 
 	wxMenuItem* m_view_busid;
-	m_view_busid = new wxMenuItem( m_menu_columns, ID_COL_BUSID, wxString( _("Bus-Id") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_busid = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_busid );
 	m_view_busid->Check( true );
 
 	wxMenuItem* m_view_port;
-	m_view_port = new wxMenuItem( m_menu_columns, ID_COL_PORT, wxString( _("Port") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_port = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_port );
 	m_view_port->Enable( false );
 	m_view_port->Check( true );
 
 	wxMenuItem* m_view_speed;
-	m_view_speed = new wxMenuItem( m_menu_columns, ID_COL_SPEED, wxString( _("Speed") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_speed = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_speed );
 	m_view_speed->Check( true );
 
 	wxMenuItem* m_view_vendor;
-	m_view_vendor = new wxMenuItem( m_menu_columns, ID_COL_VENDOR, wxString( _("Vendor") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_vendor = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_vendor );
 	m_view_vendor->Check( true );
 
 	wxMenuItem* m_view_product;
-	m_view_product = new wxMenuItem( m_menu_columns, ID_COL_PRODUCT, wxString( _("Product") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_product = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_product );
 	m_view_product->Check( true );
 
 	wxMenuItem* m_view_state;
-	m_view_state = new wxMenuItem( m_menu_columns, ID_COL_STATE, wxString( _("State") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_state = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_state );
 	m_view_state->Enable( false );
 	m_view_state->Check( true );
 
 	wxMenuItem* m_view_persistent;
-	m_view_persistent = new wxMenuItem( m_menu_columns, ID_COL_PERSISTENT, wxString( _("Auto") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_persistent = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_persistent );
 	m_view_persistent->Check( true );
 
 	wxMenuItem* m_view_notes;
-	m_view_notes = new wxMenuItem( m_menu_columns, ID_COL_NOTES, wxString( _("Notes") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_notes = new wxMenuItem( m_menu_columns, wxID_ANY, wxString( _("?") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_columns->Append( m_view_notes );
 	m_view_notes->Check( true );
 
@@ -387,14 +387,14 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );
 	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
-	this->Disconnect( ID_COL_BUSID, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_PORT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_SPEED, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_VENDOR, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_PRODUCT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_STATE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_PERSISTENT, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_COL_NOTES, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	this->Disconnect( m_tool_refresh->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_refresh ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );

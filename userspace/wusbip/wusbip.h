@@ -31,15 +31,22 @@ public:
 	static auto get_cmp_key(_In_ const device_columns &dc) noexcept;
 
 private:
-	enum { // hidden columns
-		ID_COL_FIRST = ID_COL_BUSID, 
-		ID_COL_LAST_VISIBLE = ID_COL_NOTES, 
-		ID_COL_SAVED_STATE, 
-		ID_COL_MAX };
+	enum column_pos_t { // the order in the designer
+		COL_BUSID,
+		COL_PORT,
+		COL_SPEED,
+		COL_VENDOR,
+		COL_PRODUCT,
+		COL_STATE,
+		COL_PERSISTENT,
+		COL_NOTES,
+		COL_LAST_VISIBLE = COL_NOTES,
+		COL_SAVED_STATE, // hidden
+	};
 
 	enum { // for device_columns only
-		DEV_COL_URL = ID_COL_LAST_VISIBLE + 1, // use get_url()
-		DEV_COL_CNT = DEV_COL_URL - int(ID_COL_FIRST) + 1
+		DEV_COL_URL = COL_LAST_VISIBLE + 1, // use get_url()
+		DEV_COL_CNT
 	};
 	static_assert(std::tuple_size_v<device_columns> == DEV_COL_CNT);
 
@@ -106,11 +113,13 @@ private:
 
 	void update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags);
 
-	wxDataViewColumn& get_column(_In_ int col_id) const noexcept;
-	int get_port(_In_ wxTreeListItem dev) const;
+	wxDataViewColumn* find_column(_In_ const wxString &title) const noexcept;
+	wxDataViewColumn* find_column(_In_ int item_id) const noexcept;
+	void set_menu_columns_labels();
 
+	int get_port(_In_ wxTreeListItem dev) const;
 	wxTreeListItem get_edit_notes_device();
-	
+
 	static bool is_empty(_In_ const device_columns &dc) noexcept;
 	static usbip::device_location make_device_location(_In_ const device_columns &dc);
 
@@ -126,57 +135,23 @@ private:
 	static unsigned int set_persistent_notes(_Inout_ device_columns &dc, _In_ unsigned int flags,
 		_In_ const std::set<usbip::device_location> &persistent, _In_opt_ const std::set<device_columns> *saved = nullptr);
 
-	static consteval auto mkflag(_In_ unsigned int col_id);
-	static constexpr auto col(_In_ int col_id);
-
-	template<auto col_id>
-	static consteval auto col();
+	static constexpr auto mkflag(_In_ column_pos_t col) { return 1U << col; }
 
 	template<typename Array>
-	static auto& get_url(_In_ Array &v) noexcept;
+	static auto& get_url(_In_ Array &v) noexcept { return v[DEV_COL_URL]; }
 };
 
-
-inline constexpr auto MainFrame::col(_In_ int col_id)
-{
-	if (!std::is_constant_evaluated()) {
-		wxASSERT(col_id >= static_cast<int>(ID_COL_FIRST));
-		wxASSERT(col_id < static_cast<int>(ID_COL_MAX));
-	}
-
-	return static_cast<unsigned int>(col_id - ID_COL_FIRST);
-}
-
-template<auto col_id>
-inline consteval auto MainFrame::col()
-{
-	static_assert(col_id >= static_cast<int>(ID_COL_FIRST));
-	static_assert(col_id < static_cast<int>(ID_COL_MAX));
-
-	return col(col_id);
-}
-
-inline consteval auto MainFrame::mkflag(_In_ unsigned int col_id) // ID_COL_XXX
-{ 
-	return 1U << col(col_id); 
-}
-
-template<typename Array>
-inline auto& MainFrame::get_url(_In_ Array &v) noexcept 
-{ 
-	return v[col<DEV_COL_URL>()];
-}
 
 inline consteval auto MainFrame::get_saved_keys()
 {
 	using key_val = std::pair<const wchar_t* const, unsigned int>;
 
 	return std::to_array<key_val>({
-		std::make_pair(L"busid", col<ID_COL_BUSID>()),
-		{ L"speed", col<ID_COL_SPEED>() },
-		{ L"vendor", col<ID_COL_VENDOR>() },
-		{ L"product", col<ID_COL_PRODUCT>() },
-		{ L"notes", col<ID_COL_NOTES>() },
+		std::make_pair(L"busid", COL_BUSID),
+		{ L"speed", COL_SPEED },
+		{ L"vendor", COL_VENDOR },
+		{ L"product", COL_PRODUCT },
+		{ L"notes", COL_NOTES },
 	});
 }
 
@@ -196,7 +171,7 @@ inline consteval auto MainFrame::get_saved_flags()
  */
 inline auto MainFrame::get_cmp_key(_In_ const device_columns &dc) noexcept
 {
-	return std::tie(get_url(dc), dc[col<ID_COL_BUSID>()]); // tuple of lvalue references
+	return std::tie(get_url(dc), dc[COL_BUSID]); // tuple of lvalue references
 }
 
 inline auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
