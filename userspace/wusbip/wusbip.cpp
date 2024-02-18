@@ -3,10 +3,10 @@
  */
 
 #include "wusbip.h"
+#include "utils.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
-#include <libusbip/src/usb_ids.h>
 #include <libusbip/src/file_ver.h>
 
 #include <wx/log.h>
@@ -24,6 +24,7 @@
 #include <wx/persist/toplevel.h>
 
 #include <format>
+#include <set>
 
 namespace
 {
@@ -76,6 +77,30 @@ void App::set_names()
         SetVendorName(wx_string(v.GetCompanyName()));
 }
 
+consteval auto get_saved_keys()
+{
+        using key_val = std::pair<const wchar_t* const, column_pos_t>;
+
+        return std::to_array<key_val>({
+                std::make_pair(L"busid", COL_BUSID),
+                { L"speed", COL_SPEED },
+                { L"vendor", COL_VENDOR },
+                { L"product", COL_PRODUCT },
+                { L"notes", COL_NOTES },
+                });
+}
+
+consteval auto get_saved_flags()
+{
+        unsigned int flags{};
+
+        for (auto [key, col]: get_saved_keys()) {
+                flags |= mkflag(col);
+        }
+
+        return flags;
+}
+
 /*
  * For device_state.state 
  */
@@ -95,10 +120,10 @@ constexpr auto is_port_residual(_In_ state st)
         }
 }
 
-inline auto equal(_In_ const device_columns &a, _In_ const device_columns &b, _In_ unsigned int col) noexcept
+inline auto equal(_In_ const device_columns &a, _In_ const device_columns &b, _In_ column_pos_t pos)
 {
-        wxASSERT(col < std::tuple_size_v<device_columns>);
-        return a[col] == b[col];
+        wxASSERT(pos < std::tuple_size_v<device_columns>);
+        return a[pos] == b[pos];
 }
 
 auto as_set(_In_ std::vector<device_columns> v)
@@ -117,7 +142,7 @@ auto is_filled(_In_ const imported_device &d) noexcept
 }
 
 /*
- * @see MainFrame::is_empty 
+ * @see is_empty(const device_columns&) 
  */
 inline auto is_empty(_In_ const imported_device &d) noexcept
 {
@@ -136,6 +161,32 @@ void log(_In_ const device_state &st)
         wxLogVerbose(wxString::FromUTF8(s));
 }
 
+auto set_persistent_notes(
+        _Inout_ device_columns &dc, _In_ unsigned int flags,
+        _In_ const std::set<device_location> &persistent, 
+        _In_opt_ const std::set<device_columns> *saved = nullptr)
+{
+        if (auto loc = make_device_location(dc); persistent.contains(loc)) {
+                dc[COL_PERSISTENT] = g_persistent_mark;
+
+                constexpr auto pers_flag = mkflag(COL_PERSISTENT);
+                wxASSERT(!(flags & pers_flag));
+                flags |= pers_flag;
+        }
+
+        if (!saved) {
+                //
+        } else if (auto i = saved->find(dc); i != saved->end()) {
+                dc[COL_NOTES] = (*i)[COL_NOTES];
+
+                constexpr auto notes_flag = mkflag(COL_NOTES);
+                wxASSERT(!(flags & notes_flag));
+                flags |= notes_flag;
+        }
+
+        return flags;
+}
+
 auto get_selections(_In_ wxTreeListCtrl &tree)
 {
         wxTreeListItems v;
@@ -148,25 +199,12 @@ auto has_items(_In_ const wxTreeListCtrl &t) noexcept
         return t.GetFirstItem().IsOk();
 }
 
-auto make_device_location(_In_ const wxString &url, _In_ const wxString &busid)
-{
-        wxString hostname;
-        wxString service;
-        split_server_url(url, hostname, service);
-
-        return device_location {
-                .hostname = hostname.ToStdString(wxConvUTF8), 
-                .service = service.ToStdString(wxConvUTF8), 
-                .busid = busid.ToStdString(wxConvUTF8), 
-        };
-}
-
 auto make_device_location(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem server, _In_ wxTreeListItem device)
 {
         auto &url = tree.GetItemText(server);
         auto &busid = tree.GetItemText(device);
 
-        return make_device_location(url, busid);
+        return usbip::make_device_location(url, busid);
 }
 
 auto get_persistent()
@@ -185,6 +223,44 @@ auto get_persistent()
                 }
         }
 
+        return result;
+}
+
+auto get_saved()
+{
+        auto &cfg = *wxConfig::Get();
+
+        auto path = cfg.GetPath();
+        cfg.SetPath(g_key_devices);
+
+        std::vector<device_columns> result;
+        wxString name;
+        long idx;
+
+        for (auto ok = cfg.GetFirstGroup(name, idx); ok; cfg.SetPath(L".."), ok = cfg.GetNextGroup(name, idx)) {
+
+                cfg.SetPath(name);
+
+                device_columns dev;
+                auto &url = get_url(dev);
+
+                url = cfg.Read(g_key_url);
+                if (url.empty()) {
+                        continue;
+                }
+
+                for (auto [key, col] : get_saved_keys()) {
+                        dev[col] = cfg.Read(key);
+                }
+
+                if (dev[COL_BUSID].empty()) {
+                        continue;
+                }
+
+                result.push_back(std::move(dev));
+        }
+
+        cfg.SetPath(path);
         return result;
 }
 
@@ -394,7 +470,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 wxLogVerbose(_("current state='%s' saved"), state);
         }
 
-        if (!(st.state == state::disconnected && ::is_empty(st.device))) { // connection has failed/closed
+        if (!(st.state == state::disconnected && is_empty(st.device))) { // connection has failed/closed
                 //
         } else if (auto saved_state = tree.GetItemText(dev, COL_SAVED_STATE); saved_state.empty()) {
                 wxLogVerbose(_("remove transient device"));
@@ -930,7 +1006,7 @@ void MainFrame::on_save(wxCommandEvent&)
                 }
 
                 if (is_persistent(item)) {
-                        persistent.emplace_back(::make_device_location(tree, parent, item));
+                        persistent.emplace_back(make_device_location(tree, parent, item));
                 }
 
                 cfg.SetPath(L"..");
@@ -984,32 +1060,6 @@ void MainFrame::on_load(wxCommandEvent&)
         wxLogStatus(_("%d device(s) loaded"), cnt);
 }
 
-unsigned int MainFrame::set_persistent_notes(
-        _Inout_ device_columns &dc, _In_ unsigned int flags,
-        _In_ const std::set<device_location> &persistent, 
-        _In_opt_ const std::set<device_columns> *saved)
-{
-        if (auto loc = make_device_location(dc); persistent.contains(loc)) {
-                dc[COL_PERSISTENT] = g_persistent_mark;
-
-                constexpr auto pers_flag = mkflag(COL_PERSISTENT);
-                wxASSERT(!(flags & pers_flag));
-                flags |= pers_flag;
-        }
-
-        if (!saved) {
-                //
-        } else if (auto i = saved->find(dc); i != saved->end()) {
-                dc[COL_NOTES] = (*i)[COL_NOTES];
-
-                constexpr auto notes_flag = mkflag(COL_NOTES);
-                wxASSERT(!(flags & notes_flag));
-                flags |= notes_flag;
-        }
-
-        return flags;
-}
-
 void MainFrame::on_refresh(wxCommandEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
@@ -1055,114 +1105,3 @@ void MainFrame::on_refresh(wxCommandEvent &event)
         }
 }
 
-std::vector<device_columns> MainFrame::get_saved()
-{
-        auto &cfg = *wxConfig::Get();
-
-        auto path = cfg.GetPath();
-        cfg.SetPath(g_key_devices);
-
-        std::vector<device_columns> result;
-        wxString name;
-        long idx;
-
-        for (auto ok = cfg.GetFirstGroup(name, idx); ok; cfg.SetPath(L".."), ok = cfg.GetNextGroup(name, idx)) {
-
-                cfg.SetPath(name);
-
-                device_columns dev;
-                auto &url = get_url(dev);
-
-                url = cfg.Read(g_key_url);
-                if (url.empty()) {
-                        continue;
-                }
-
-                for (auto [key, col] : get_saved_keys()) {
-                        dev[col] = cfg.Read(key);
-                }
-
-                if (dev[COL_BUSID].empty()) {
-                        continue;
-                }
-
-                result.push_back(std::move(dev));
-        }
-
-        cfg.SetPath(path);
-        return result;
-}
-
-/*
- * @see get_cmp_key 
- */
-device_columns MainFrame::make_cmp_key(_In_ const device_location &loc)
-{
-        device_columns dc;
-
-        get_url(dc) = make_server_url(loc);
-        dc[COL_BUSID] = wxString::FromUTF8(loc.busid);
-
-        return dc;
-}
-
-std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const imported_device &dev)
-{
-        auto dc = make_cmp_key(dev.location);
-        auto flags = mkflag(COL_PORT);
-
-        if (auto &port = dc[COL_PORT]; dev.port) {
-                port = wxString::Format(L"%02d", dev.port); // XX for proper sorting
-        } else {
-                port.clear();
-        }
-
-        dc[COL_SPEED] = get_speed_str(dev.speed);
-        flags |= mkflag(COL_SPEED);
-
-        auto str = [] (auto id, auto sv)
-        {
-                return sv.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(sv.data(), sv.size());
-        };
-
-        auto [vendor, product] = get_ids().find_product(dev.vendor, dev.product);
-
-        dc[COL_VENDOR] = str(dev.vendor, vendor);
-        flags |= mkflag(COL_VENDOR);
-
-        dc[COL_PRODUCT] = str(dev.product, product);
-        flags |= mkflag(COL_PRODUCT);
-
-        return {dc, flags};
-}
-
-std::pair<device_columns, unsigned int> MainFrame::make_device_columns(_In_ const device_state &st)
-{
-        auto ret = make_device_columns(st.device);
-        auto &[dc, flags] = ret;
-        
-        dc[COL_STATE] = _(vhci::get_state_str(st.state));
-        flags |= mkflag(COL_STATE);
-
-        return ret;
-}
-
-/*
- * @see is_empty(const imported_device&)
- */
-bool MainFrame::is_empty(_In_ const device_columns &dc) noexcept
-{
-        for (auto col: {COL_VENDOR, COL_PRODUCT}) {
-                if (dc[col].empty()) {
-                        return true;
-                }
-        }
-
-        return false;
-}
-
-device_location MainFrame::make_device_location(_In_ const device_columns &dc)
-{
-        auto &url = get_url(dc);
-        return ::make_device_location(url, dc[COL_BUSID]);
-}

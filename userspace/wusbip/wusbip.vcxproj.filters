@@ -9,12 +9,14 @@
     <ClCompile Include="wusbip.cpp" />
     <ClCompile Include="frame.cpp" />
     <ClCompile Include="utils.cpp" />
+    <ClCompile Include="device_columns.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wusbip.h" />
     <ClInclude Include="frame.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="device_columns.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

@@ -5,21 +5,18 @@
 #pragma once
 
 #include "frame.h"
-#include "utils.h"
+#include "device_columns.h"
+
+#include <libusbip/win_handle.h>
 
 #include <thread>
 #include <mutex>
-#include <array>
-#include <vector>
-#include <set>
 
 class LogWindow;
 class wxDataViewColumn;
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
-
-using device_columns = std::array<wxString, 9>; // indexed by visible columns only and DEV_COL_URL
 
 
 class MainFrame : public Frame
@@ -28,28 +25,7 @@ public:
 	MainFrame(_In_ usbip::Handle read);
 	~MainFrame();
 
-	static auto get_cmp_key(_In_ const device_columns &dc) noexcept;
-
 private:
-	enum column_pos_t { // the order in the designer
-		COL_BUSID,
-		COL_PORT,
-		COL_SPEED,
-		COL_VENDOR,
-		COL_PRODUCT,
-		COL_STATE,
-		COL_PERSISTENT,
-		COL_NOTES,
-		COL_LAST_VISIBLE = COL_NOTES,
-		COL_SAVED_STATE, // hidden
-	};
-
-	enum { // for device_columns only
-		DEV_COL_URL = COL_LAST_VISIBLE + 1, // use get_url()
-		DEV_COL_CNT
-	};
-	static_assert(std::tuple_size_v<device_columns> == DEV_COL_CNT);
-
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -99,9 +75,9 @@ private:
 
 	wxTreeListItem find_server(_In_ const wxString &url, _In_ bool append);
 
-	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_location &loc);
 	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid);
-	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const device_columns &dc);
+	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_location &loc);
+	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_columns &dc);
 
 	void remove_device(_In_ wxTreeListItem dev);
 
@@ -111,7 +87,7 @@ private:
 	bool is_persistent(_In_ wxTreeListItem device);
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
 
-	void update_device(_In_ wxTreeListItem device, _In_ const device_columns &dc, _In_ unsigned int flags);
+	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_columns &dc, _In_ unsigned int flags);
 
 	wxDataViewColumn* find_column(_In_ const wxString &title) const noexcept;
 	wxDataViewColumn* find_column(_In_ int item_id) const noexcept;
@@ -119,67 +95,4 @@ private:
 
 	int get_port(_In_ wxTreeListItem dev) const;
 	wxTreeListItem get_edit_notes_device();
-
-	static bool is_empty(_In_ const device_columns &dc) noexcept;
-	static usbip::device_location make_device_location(_In_ const device_columns &dc);
-
-	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::device_state &st);
-	static std::pair<device_columns, unsigned int> make_device_columns(_In_ const usbip::imported_device &dev);
-
-	static consteval auto get_saved_keys();
-	static consteval auto get_saved_flags();
-	static std::vector<device_columns> get_saved();
-
-	static device_columns make_cmp_key(_In_ const usbip::device_location &loc);
-
-	static unsigned int set_persistent_notes(_Inout_ device_columns &dc, _In_ unsigned int flags,
-		_In_ const std::set<usbip::device_location> &persistent, _In_opt_ const std::set<device_columns> *saved = nullptr);
-
-	static constexpr auto mkflag(_In_ column_pos_t col) { return 1U << col; }
-
-	template<typename Array>
-	static auto& get_url(_In_ Array &v) noexcept { return v[DEV_COL_URL]; }
 };
-
-
-inline consteval auto MainFrame::get_saved_keys()
-{
-	using key_val = std::pair<const wchar_t* const, unsigned int>;
-
-	return std::to_array<key_val>({
-		std::make_pair(L"busid", COL_BUSID),
-		{ L"speed", COL_SPEED },
-		{ L"vendor", COL_VENDOR },
-		{ L"product", COL_PRODUCT },
-		{ L"notes", COL_NOTES },
-	});
-}
-
-inline consteval auto MainFrame::get_saved_flags()
-{
-	unsigned int flags{};
-
-	for (auto [key, col]: get_saved_keys()) {
-		flags |= 1U << col;
-	}
-
-	return flags;
-}
-
-/*
- * @see make_cmp_key
- */
-inline auto MainFrame::get_cmp_key(_In_ const device_columns &dc) noexcept
-{
-	return std::tie(get_url(dc), dc[COL_BUSID]); // tuple of lvalue references
-}
-
-inline auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-	return MainFrame::get_cmp_key(a) <=> MainFrame::get_cmp_key(b);
-}
-
-inline auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-	return MainFrame::get_cmp_key(a) == MainFrame::get_cmp_key(b);
-}
