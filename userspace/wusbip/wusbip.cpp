@@ -461,34 +461,41 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 
         auto [dev, added] = find_or_add_device(st.device.location);
 
-        auto update = true;
-        auto set_state = true;
-
         if (st.state == state::connecting) {
                 auto state = tree.GetItemText(dev, COL_STATE); // can be empty
                 tree.SetItemText(dev, COL_SAVED_STATE, state);
                 wxLogVerbose(_("current state='%s' saved"), state);
         }
 
-        if (!(st.state == state::disconnected && is_empty(st.device))) { // connection has failed/closed
-                //
+        unsigned int flags_mask{};
+        auto empty = is_empty(st.device);
+
+        if (!(st.state == state::disconnected && empty)) { // connection has failed/closed
+                switch (st.state) {
+                case state::connecting:
+                case state::connected:
+                        wxASSERT(empty);
+                        flags_mask = mkflag(COL_STATE);
+                        break;
+                default:
+                        flags_mask = ~0U;
+                }
         } else if (auto saved_state = tree.GetItemText(dev, COL_SAVED_STATE); saved_state.empty()) {
                 wxLogVerbose(_("remove transient device"));
                 remove_device(dev);
                 added = false;
-                update = false;
         } else {
                 tree.SetItemText(dev, COL_STATE, saved_state);
                 wxLogVerbose(_("saved state='%s' restored"), saved_state);
-                set_state = false;
         }
 
-        if (update) {
+        if (flags_mask) {
                 if (is_port_residual(st.state)) {
                         st.device.port = 0;
                 }
 
                 auto [dc, flags] = make_device_columns(st);
+                flags &= flags_mask;
 
                 if (added) {
                         auto persistent = get_persistent();

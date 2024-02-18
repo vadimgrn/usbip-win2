@@ -52,24 +52,6 @@ constexpr auto mkflags(_In_ std::initializer_list<column_pos_t> columns)
 
 device_columns make_cmp_key(_In_ const device_location &loc);
 
-/*
- * @see make_cmp_key
- */
-constexpr auto get_cmp_key(_In_ const device_columns &dc)
-{
-	return std::tie(get_url(dc), dc[COL_BUSID]); // tuple of lvalue references
-}
-
-constexpr auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-	return get_cmp_key(a) <=> get_cmp_key(b);
-}
-
-constexpr auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
-{
-	return get_cmp_key(a) == get_cmp_key(b);
-}
-
 device_location make_device_location(_In_ const device_columns &dc);
 device_location make_device_location(_In_ const wxString &url, _In_ const wxString &busid);
 
@@ -78,4 +60,29 @@ std::pair<device_columns, unsigned int> make_device_columns(_In_ const imported_
 
 bool is_empty(_In_ const device_columns &dc) noexcept;
 
+/*
+ * @see make_cmp_key
+ */
+constexpr auto get_cmp_key(_In_ const device_columns &dc)
+{
+	return std::tie(get_url(dc), dc[COL_BUSID]); // tuple of lvalue references
+}
+
+constexpr auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
+{
+	return get_cmp_key(a) == get_cmp_key(b);
+}
+
+constexpr auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
+{
+	return get_cmp_key(a) <=> get_cmp_key(b);
+}
+
 } // namespace usbip
+
+
+namespace std
+{
+	using usbip::operator ==; // ADL will not work because std::tuple is defined in namespace std
+	using usbip::operator <=>;
+}
