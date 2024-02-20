@@ -39,7 +39,7 @@ private:
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
 	void on_detach_all(wxCommandEvent &event) override;
-	void on_refresh(wxCommandEvent &event) override;
+	void on_reload(wxCommandEvent &event) override;
 	void on_log_level(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
@@ -73,7 +73,7 @@ private:
 	void read_loop();
 	void break_read_loop();
 
-	wxTreeListItem find_server(_In_ const wxString &url, _In_ bool append);
+	wxTreeListItem find_or_add_server(_In_ const wxString &url);
 
 	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid);
 	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_location &loc);

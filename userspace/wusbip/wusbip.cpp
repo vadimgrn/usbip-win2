@@ -87,7 +87,7 @@ consteval auto get_saved_keys()
                 { L"vendor", COL_VENDOR },
                 { L"product", COL_PRODUCT },
                 { L"notes", COL_NOTES },
-                });
+        });
 }
 
 consteval auto get_saved_flags()
@@ -99,6 +99,28 @@ consteval auto get_saved_flags()
         }
 
         return flags;
+}
+
+void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &saved)
+{
+        for (auto [key, col]: get_saved_keys()) {
+                dc[col] = saved[col];
+        }
+}
+
+/*
+ * @see is_empty(_In_ const device_columns &dc)
+ * @see is_empty(_In_ const imported_device &d)
+ */
+auto is_empty(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem dev) noexcept
+{
+        for (auto col: {COL_VENDOR, COL_PRODUCT}) {
+                if (auto &s = tree.GetItemText(dev, col); s.empty()) {
+                        return true;
+                }
+        }
+
+        return false;
 }
 
 /*
@@ -120,33 +142,11 @@ constexpr auto is_port_residual(_In_ state st)
         }
 }
 
-inline auto equal(_In_ const device_columns &a, _In_ const device_columns &b, _In_ column_pos_t pos)
-{
-        wxASSERT(pos < std::tuple_size_v<device_columns>);
-        return a[pos] == b[pos];
-}
-
 auto as_set(_In_ std::vector<device_columns> v)
 {
         return std::set<device_columns>(
                 std::make_move_iterator(v.begin()), 
                 std::make_move_iterator(v.end()));
-}
-
-/*
- * port can be zero, speed can be UsbLowSpeed aka zero.
- */
-auto is_filled(_In_ const imported_device &d) noexcept
-{
-        return d.vendor && d.product; // d.devid
-}
-
-/*
- * @see is_empty(const device_columns&) 
- */
-inline auto is_empty(_In_ const imported_device &d) noexcept
-{
-        return !is_filled(d);
 }
 
 void log(_In_ const device_state &st)
@@ -161,27 +161,61 @@ void log(_In_ const device_state &st)
         wxLogVerbose(wxString::FromUTF8(s));
 }
 
-auto set_persistent_notes(
+void log(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wxString &prefix)
+{
+        auto server = tree.GetItemParent(dev);
+        auto &url = tree.GetItemText(server);
+
+        auto s = wxString::Format(
+                        L"%s: %s/%s, port '%s', speed '%s', vendor '%s', product '%s', "
+                        L"state '%s', saved state '%s', auto '%s', notes '%s'", 
+                        prefix, url,
+                        tree.GetItemText(dev, COL_BUSID),
+                        tree.GetItemText(dev, COL_PORT),
+                        tree.GetItemText(dev, COL_SPEED),
+                        tree.GetItemText(dev, COL_VENDOR), 
+                        tree.GetItemText(dev, COL_PRODUCT), 
+                        tree.GetItemText(dev, COL_STATE), 
+                        tree.GetItemText(dev, COL_SAVED_STATE), 
+                        tree.GetItemText(dev, COL_PERSISTENT), 
+                        tree.GetItemText(dev, COL_NOTES));
+
+        wxLogVerbose(s);
+}
+
+auto update_from_saved(
         _Inout_ device_columns &dc, _In_ unsigned int flags,
         _In_ const std::set<device_location> &persistent, 
         _In_opt_ const std::set<device_columns> *saved = nullptr)
 {
+        constexpr auto saved_flags = get_saved_flags();
+
+        static_assert(saved_flags & mkflag(COL_NOTES));
+        static_assert(!(saved_flags & mkflag(COL_PERSISTENT)));
+
+        if (!saved) {
+                //
+        } else if (auto i = saved->find(dc); i != saved->end()) {
+
+                if (usbip::is_empty(dc)) {
+                        set_saved_columns(dc, *i);
+                        flags |= saved_flags;
+                } else {
+                        dc[COL_NOTES] = (*i)[COL_NOTES];
+
+                        constexpr auto notes_flag = mkflag(COL_NOTES);
+                        wxASSERT(!(flags & notes_flag));
+                        flags |= notes_flag;
+                }
+        }
+
         if (auto loc = make_device_location(dc); persistent.contains(loc)) {
                 dc[COL_PERSISTENT] = g_persistent_mark;
 
                 constexpr auto pers_flag = mkflag(COL_PERSISTENT);
                 wxASSERT(!(flags & pers_flag));
+
                 flags |= pers_flag;
-        }
-
-        if (!saved) {
-                //
-        } else if (auto i = saved->find(dc); i != saved->end()) {
-                dc[COL_NOTES] = (*i)[COL_NOTES];
-
-                constexpr auto notes_flag = mkflag(COL_NOTES);
-                wxASSERT(!(flags & notes_flag));
-                flags |= notes_flag;
         }
 
         return flags;
@@ -365,7 +399,6 @@ void MainFrame::init()
 
         auto port = get_tcp_port();
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
-
 }
 
 void MainFrame::restore_state()
@@ -377,8 +410,8 @@ void MainFrame::restore_state()
 void MainFrame::post_refresh()
 {
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
-        wxASSERT(m_menu_view->FindItem(wxID_REFRESH)); // command belongs to this menu
-        wxPostEvent(m_menu_view, evt);
+        wxASSERT(m_menu_devices->FindItem(wxID_REFRESH)); // command belongs to this menu
+        wxPostEvent(m_menu_devices, evt);
 }
 
 void MainFrame::on_close(wxCloseEvent &event)
@@ -457,63 +490,55 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto &tree = *m_treeListCtrl;
 
         auto &st = event.get();
+        auto st_empty = is_empty(st.device);
+
         log(st);
 
         auto [dev, added] = find_or_add_device(st.device.location);
 
+        if (added) {
+                auto server = tree.GetItemParent(dev);
+                auto &url = tree.GetItemText(server);
+                auto &busid = tree.GetItemText(dev);
+                wxLogVerbose(_("Added %s/%s"), url, busid);
+        } else {
+                log(tree, dev, _("Before"));
+        }
+
         if (st.state == state::connecting) {
                 auto state = tree.GetItemText(dev, COL_STATE); // can be empty
                 tree.SetItemText(dev, COL_SAVED_STATE, state);
-                wxLogVerbose(_("current state='%s' saved"), state);
+                wxLogVerbose(_("Current state '%s' saved"), state);
         }
 
-        unsigned int flags_mask{};
-        auto empty = is_empty(st.device);
-
-        if (!(st.state == state::disconnected && empty)) { // connection has failed/closed
-                switch (st.state) {
-                case state::connecting:
-                case state::connected:
-                        wxASSERT(empty);
-                        flags_mask = mkflag(COL_STATE);
-                        break;
-                default:
-                        flags_mask = ~0U;
-                }
+        if (!(st_empty && st.state == state::disconnected)) { // connection has failed/closed
+                //
         } else if (auto saved_state = tree.GetItemText(dev, COL_SAVED_STATE); saved_state.empty()) {
-                wxLogVerbose(_("remove transient device"));
+                wxLogVerbose(_("Transient device removed"));
                 remove_device(dev);
-                added = false;
+                return;
         } else {
                 tree.SetItemText(dev, COL_STATE, saved_state);
-                wxLogVerbose(_("saved state='%s' restored"), saved_state);
+                wxLogVerbose(_("Saved state '%s' restored"), saved_state);
+                return;
         }
 
-        if (flags_mask) {
-                if (is_port_residual(st.state)) {
-                        st.device.port = 0;
-                }
+        auto [dc, flags] = make_device_columns(st);
+        wxASSERT(flags);
 
-                auto [dc, flags] = make_device_columns(st);
-                flags &= flags_mask;
-
-                if (added) {
-                        auto persistent = get_persistent();
-                        
-                        auto saved = as_set(get_saved());
-                        static_assert(get_saved_flags() & mkflag(COL_NOTES));
-
-                        flags = set_persistent_notes(dc, flags, persistent, &saved);
-                }
-
-                update_device(dev, dc, flags);
+        if (auto &port = dc[COL_PORT]; !port.empty() && is_port_residual(st.state)) {
+                port.clear();
+                flags |= mkflag(COL_PORT);
         }
 
-        if (!added) {
-                // as is
-        } else if (auto server = tree.GetItemParent(dev); !tree.IsExpanded(server)) {
-                tree.Expand(server);
+        if (added || st_empty) {
+                auto persistent = get_persistent();
+                auto saved = as_set(get_saved());
+                flags = update_from_saved(dc, flags, persistent, &saved);
         }
+
+        update_device(dev, dc, flags);
+        log(tree, dev, _("After"));
 }
 
 void MainFrame::on_has_items_update_ui(wxUpdateUIEvent &event)
@@ -710,7 +735,7 @@ void MainFrame::on_detach_all(wxCommandEvent&)
         }
 }
 
-wxTreeListItem MainFrame::find_server(_In_ const wxString &url, _In_ bool append)
+wxTreeListItem MainFrame::find_or_add_server(_In_ const wxString &url)
 {
         auto &tree = *m_treeListCtrl;
         wxTreeListItem server;
@@ -721,11 +746,7 @@ wxTreeListItem MainFrame::find_server(_In_ const wxString &url, _In_ bool append
                 }
         }
 
-        if (append) {
-                server = tree.AppendItem(tree.GetRootItem(), url);
-        }
-
-        return server;
+        return server = tree.AppendItem(tree.GetRootItem(), url);
 }
 
 std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid)
@@ -733,7 +754,7 @@ std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const wxStrin
         std::pair<wxTreeListItem, bool> res;
 
         auto &tree = *m_treeListCtrl;
-        auto server = find_server(url, true);
+        auto server = find_or_add_server(url);
 
         for (auto item = tree.GetFirstChild(server); item.IsOk(); item = tree.GetNextSibling(item)) {
                 if (tree.GetItemText(item) == busid) {
@@ -741,8 +762,13 @@ std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const wxStrin
                 }
         }
 
-        auto item = tree.AppendItem(server, busid);
-        return res = std::make_pair(item, true);
+        auto device = tree.AppendItem(server, busid);
+
+        if (!tree.IsExpanded(server)) {
+                tree.Expand(server);
+        }
+
+        return res = std::make_pair(device, true);
 }
 
 std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const device_location &loc)
@@ -814,8 +840,12 @@ void MainFrame::on_help_about(wxCommandEvent&)
 void MainFrame::add_exported_devices(wxCommandEvent&)
 {
         auto host = m_textCtrlServer->GetValue();
-        auto port = wxString::Format(L"%d", m_spinCtrlPort->GetValue());
+        if (host.empty()) {
+                m_textCtrlServer->SetFocus();
+                return;
+        }
 
+        auto port = wxString::Format(L"%d", m_spinCtrlPort->GetValue());
         wxLogVerbose(L"%s, host='%s', port='%s'", wxString::FromAscii(__func__), host, port);
 
         auto u8_host = host.ToStdString(wxConvUTF8);
@@ -846,9 +876,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
-
-                static_assert(get_saved_flags() & mkflag(COL_NOTES));
-                flags = set_persistent_notes(dc, flags, persistent, &saved);
+                flags = update_from_saved(dc, flags, persistent, &saved);
 
                 auto [item, added] = find_or_add_device(dc);
                 if (!added) {
@@ -863,13 +891,6 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
                 wxLogError(_("enum_exportable_devices error %#lx\n%s"), err, GetLastErrorMsg(err));
-        }
-
-        auto url = make_server_url(host, port);
-        auto server = find_server(url, false);
-        
-        if (auto &tree = *m_treeListCtrl; server.IsOk() && !tree.IsExpanded(server)) {
-                tree.Expand(server);
         }
 }
 
@@ -1039,35 +1060,30 @@ void MainFrame::on_load(wxCommandEvent&)
         auto &tree = *m_treeListCtrl;
         int cnt = 0;
 
-        auto persistent = get_persistent();
-        
-        for (auto &dc: get_saved()) {
+        for (auto persistent = get_persistent(); auto &dc: get_saved()) {
 
                 auto flags = get_saved_flags();
-                auto [item, added] = find_or_add_device(dc);
+                auto [dev, added] = find_or_add_device(dc);
 
-                if (added || is_empty(dc)) {
-                        constexpr auto state_flag = mkflag(COL_STATE);
-                        static_assert(!(get_saved_flags() & state_flag));
-
-                        dc[COL_STATE] = _(vhci::get_state_str(state::unplugged));
-                        flags = set_persistent_notes(dc, flags | state_flag, persistent);
-
-                        if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
-                                tree.Expand(server);
-                        }
-                } else {
+                if (!(added || is_empty(tree, dev))) {
                         wxLogVerbose(_("Skip loading existing device %s/%s"), get_url(dc), dc[COL_BUSID]);
+                        continue;
                 }
 
-                update_device(item, dc, flags);
+                constexpr auto state_flag = mkflag(COL_STATE);
+                static_assert(!(get_saved_flags() & state_flag));
+
+                dc[COL_STATE] = _(vhci::get_state_str(state::unplugged));
+                flags = update_from_saved(dc, flags | state_flag, persistent);
+
+                update_device(dev, dc, flags);
                 ++cnt;
         }
 
         wxLogStatus(_("%d device(s) loaded"), cnt);
 }
 
-void MainFrame::on_refresh(wxCommandEvent &event)
+void MainFrame::on_reload(wxCommandEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
@@ -1095,15 +1111,9 @@ void MainFrame::on_refresh(wxCommandEvent &event)
                 };
 
                 auto [dc, flags] = make_device_columns(st);
-
-                static_assert(get_saved_flags() & mkflag(COL_NOTES));
-                flags = set_persistent_notes(dc, flags, persistent, &saved);
+                flags = update_from_saved(dc, flags, persistent, &saved);
 
                 update_device(item, dc, flags);
-
-                if (auto server = tree.GetItemParent(item); !tree.IsExpanded(server)) {
-                        tree.Expand(server);
-                }
         }
 
         if (static bool once; !once) {

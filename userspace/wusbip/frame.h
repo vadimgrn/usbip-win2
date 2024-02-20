@@ -59,7 +59,7 @@ class Frame : public wxFrame
 		wxMenu* m_menu_columns;
 		wxMenu* m_menu_log_help;
 		wxAuiToolBar* m_auiToolBar;
-		wxAuiToolBarItem* m_tool_refresh;
+		wxAuiToolBarItem* m_tool_reload;
 		wxAuiToolBarItem* m_tool_attach;
 		wxAuiToolBarItem* m_tool_detach;
 		wxAuiToolBarItem* m_tool_detach_all;
@@ -84,6 +84,7 @@ class Frame : public wxFrame
 		virtual void on_has_selections_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_reload( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
@@ -95,14 +96,13 @@ class Frame : public wxFrame
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_refresh( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_item_activated( wxTreeListEvent& event ) { event.Skip(); }
 
 
 	public:
 
-		Frame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 680,462 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+		Frame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 752,462 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 		wxAuiManager m_mgr;
 
 		~Frame();

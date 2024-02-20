@@ -62,17 +62,17 @@ inline auto wx_string(_In_ std::wstring_view s)
         return wxString(s.data(), s.length());
 }
 
-inline auto tie(_In_ const device_location &loc) noexcept
+constexpr auto tie(_In_ const device_location &loc)
 {
         return std::tie(loc.hostname, loc.service, loc.busid); // tuple of lvalue references
 }
 
-inline auto operator == (_In_ const device_location &a, _In_ const device_location &b) noexcept
+constexpr auto operator == (_In_ const device_location &a, _In_ const device_location &b)
 {
         return tie(a) == tie(b);
 }
 
-inline auto operator <=> (_In_ const device_location &a, _In_ const device_location &b) noexcept
+constexpr auto operator <=> (_In_ const device_location &a, _In_ const device_location &b)
 {
         return tie(a) <=> tie(b);
 }
