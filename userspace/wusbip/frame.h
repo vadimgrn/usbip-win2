@@ -46,7 +46,8 @@ class Frame : public wxFrame
 			ID_LOGLEVEL_WARNING,
 			ID_LOGLEVEL_MESSAGE,
 			ID_LOGLEVEL_STATUS,
-			ID_LOGLEVEL_INFO
+			ID_LOGLEVEL_INFO,
+			ID_VIEW_LABELS
 		};
 
 		wxStatusBar* m_statusBar;

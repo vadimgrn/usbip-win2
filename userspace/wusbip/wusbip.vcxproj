@@ -106,12 +106,14 @@
   <ItemGroup>
     <ClCompile Include="device_columns.cpp" />
     <ClCompile Include="frame.cpp" />
+    <ClCompile Include="persist.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="wusbip.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device_columns.h" />
     <ClInclude Include="frame.h" />
+    <ClInclude Include="persist.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="wusbip.h" />

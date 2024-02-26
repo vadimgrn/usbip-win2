@@ -12,11 +12,25 @@
 #include <thread>
 #include <mutex>
 
-class LogWindow;
+#include <wx/log.h>
+
 class wxDataViewColumn;
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
+
+
+/*
+ * Do not show dialog box for wxLOG_Info aka Verbose.
+ */
+class LogWindow : public wxLogWindow
+{
+public:
+	LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toogle);
+
+private:
+	void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
+};
 
 
 class MainFrame : public Frame
@@ -26,6 +40,7 @@ public:
 	~MainFrame();
 
 private:
+	friend class wxPersistentMainFrame;
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -68,7 +83,8 @@ private:
 
 	void init();
 	void restore_state();
-	void set_log_level();
+	void post_restore_state();
+	void adjust_log_level();
 
 	void read_loop();
 	void break_read_loop();

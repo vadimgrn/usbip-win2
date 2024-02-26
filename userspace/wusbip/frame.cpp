@@ -39,7 +39,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->AppendSeparator();
 
 	wxMenuItem* m_file_exit;
-	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("Exit") ) , wxEmptyString, wxITEM_NORMAL );
+	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("E&xit") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_file_exit->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR( wxART_QUIT ), wxASCII_STR( wxART_MENU )) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -219,7 +219,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_menu_columnsItem );
 
 	wxMenuItem* m_view_labels;
-	m_view_labels = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Labels") ) , wxEmptyString, wxITEM_CHECK );
+	m_view_labels = new wxMenuItem( m_menu_view, ID_VIEW_LABELS, wxString( _("Labels") ) , _("Show toolbar labels"), wxITEM_CHECK );
 	m_menu_view->Append( m_view_labels );
 	m_view_labels->Check( true );
 
@@ -267,7 +267,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_staticTextServer->SetToolTip( _("USBIP server hostname or IP address") );
 
 	m_auiToolBarAdd->AddControl( m_staticTextServer );
-	m_textCtrlServer = new wxTextCtrl( m_auiToolBarAdd, wxID_ANY, _("pc"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_textCtrlServer = new wxTextCtrl( m_auiToolBarAdd, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
 	m_textCtrlServer->SetToolTip( _("Hostname or IP address") );
 
 	m_auiToolBarAdd->AddControl( m_textCtrlServer );
@@ -383,7 +383,7 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
+	this->Disconnect( ID_VIEW_LABELS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	this->Disconnect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selections_update_ui ) );

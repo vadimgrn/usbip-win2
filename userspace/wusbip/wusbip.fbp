@@ -105,7 +105,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">File</property>
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
@@ -148,7 +148,7 @@
             <property name="help"></property>
             <property name="id">wxID_EXIT</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Exit</property>
+            <property name="label">E&amp;xit</property>
             <property name="name">m_file_exit</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
@@ -295,7 +295,7 @@
             <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
@@ -389,7 +389,7 @@
             <event name="OnMenuSelection">on_log_level</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
@@ -523,8 +523,8 @@
             <property name="bitmap"></property>
             <property name="checked">1</property>
             <property name="enabled">1</property>
-            <property name="help"></property>
-            <property name="id">wxID_ANY</property>
+            <property name="help">Show toolbar labels</property>
+            <property name="id">ID_VIEW_LABELS</property>
             <property name="kind">wxITEM_CHECK</property>
             <property name="label">Labels</property>
             <property name="name">m_view_labels</property>
@@ -535,7 +535,7 @@
             <event name="OnUpdateUI">on_view_labels_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Help</property>
           <property name="name">m_menu_log_help</property>
           <property name="permission">protected</property>
@@ -696,7 +696,7 @@
           <event name="OnToolClicked">on_load</event>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -868,7 +868,7 @@
           <property name="validator_style">wxFILTER_NONE</property>
           <property name="validator_type">wxDefaultValidator</property>
           <property name="validator_variable"></property>
-          <property name="value">pc</property>
+          <property name="value"></property>
           <property name="window_extra_style"></property>
           <property name="window_name"></property>
           <property name="window_style"></property>

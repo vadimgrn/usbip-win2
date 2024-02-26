@@ -2,14 +2,13 @@
  * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "wusbip.h"
+#include "persist.h"
 #include "utils.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
 #include <libusbip/src/file_ver.h>
 
-#include <wx/log.h>
 #include <wx/app.h>
 #include <wx/event.h>
 #include <wx/msgdlg.h>
@@ -19,9 +18,7 @@
 #include <wx/config.h>
 #include <wx/textdlg.h>
 
-#include <wx/persist.h>
 #include <wx/persist/dataview.h>
-#include <wx/persist/toplevel.h>
 
 #include <format>
 #include <set>
@@ -321,18 +318,6 @@ private:
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 
-/*
- * Do not show dialog box for wxLOG_Info aka Verbose.
- */
-class LogWindow : public wxLogWindow
-{
-public:
-        LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toogle);
-
-private:
-        void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
-};
-
 LogWindow::LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toggle) : 
         wxLogWindow(parent, _("Log records"), false)
 {
@@ -374,7 +359,10 @@ MainFrame::MainFrame(_In_ Handle read) :
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 
         init();
+        
         restore_state();
+        post_restore_state();
+
         post_refresh();
 }
 
@@ -392,9 +380,7 @@ void MainFrame::init()
         auto app_name = wxGetApp().GetAppDisplayName();
         SetTitle(app_name);
 
-        set_log_level();
         set_menu_columns_labels();
-
         m_textCtrlServer->SetMaxLength(NI_MAXHOST);
 
         auto port = get_tcp_port();
@@ -403,8 +389,17 @@ void MainFrame::init()
 
 void MainFrame::restore_state()
 {
+        wxPersistentRegisterAndRestore(this, L"MainFrame"); // @see persist.h
         wxPersistentRegisterAndRestore(m_treeListCtrl->GetDataView(), m_treeListCtrl->GetName());
-        wxPersistentRegisterAndRestore(this, L"MainFrame");
+
+        for (auto i: {m_auiToolBar, m_auiToolBarAdd}) {
+                wxPersistentRegisterAndRestore(i, i->GetName());
+        }
+}
+
+void MainFrame::post_restore_state()
+{
+        adjust_log_level();
 }
 
 void MainFrame::post_refresh()
@@ -429,15 +424,19 @@ void MainFrame::on_exit(wxCommandEvent&)
         Close(true);
 }
 
-void MainFrame::set_log_level()
+void MainFrame::adjust_log_level()
 {
         auto verbose = m_log->GetVerbose(); // --verbose option has passed
         if (!verbose) {
                 m_log->SetVerbose(true); // produce messages for wxLOG_Info
         }
 
-        auto lvl = verbose ? wxLOG_Info : wxLOG_Status;
-        m_log->SetLogLevel(lvl);
+        auto lvl = m_log->GetLogLevel();
+
+        if (!(lvl >= wxLOG_Error && lvl <= wxLOG_Info)) {
+                lvl = verbose ? wxLOG_Info : wxLOG_Status;
+                m_log->SetLogLevel(lvl);
+        }
 
         auto id = ID_LOGLEVEL_ERROR + (lvl - wxLOG_Error);
         wxASSERT(id <= ID_LOGLEVEL_INFO);

@@ -127,7 +127,7 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
 Name: modifypath; Description: "Add to &PATH environment variable for all users"
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Run]
 
