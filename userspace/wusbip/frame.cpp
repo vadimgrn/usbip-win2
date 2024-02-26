@@ -218,24 +218,10 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_view->Append( m_menu_columnsItem );
 
-	m_menu_view->AppendSeparator();
-
-	wxMenuItem* m_view_toolbar;
-	m_view_toolbar = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Toolbar") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_toolbar );
-	m_view_toolbar->Check( true );
-
-	wxMenuItem* m_view_toolbar_add;
-	m_view_toolbar_add = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Add") ) , wxEmptyString, wxITEM_CHECK );
-	m_menu_view->Append( m_view_toolbar_add );
-	m_view_toolbar_add->Check( true );
-
 	wxMenuItem* m_view_labels;
 	m_view_labels = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Labels") ) , wxEmptyString, wxITEM_CHECK );
 	m_menu_view->Append( m_view_labels );
 	m_view_labels->Check( true );
-
-	m_menu_view->AppendSeparator();
 
 	m_menubar->Append( m_menu_view, _("View") );
 
@@ -307,7 +293,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_treeListCtrl->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );
 	m_treeListCtrl->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_WINDOW ) );
 
-	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .Caption( _("&USB devices") ).CloseButton( false ).PaneBorder( false ).Movable( false ).Dock().Resizable().FloatingSize( wxDefaultSize ).DockFixed( true ).BottomDockable( false ).TopDockable( false ).LeftDockable( false ).RightDockable( false ).Floatable( false ) );
+	m_mgr.AddPane( m_treeListCtrl, wxAuiPaneInfo() .Center() .Caption( _("USB devices") ).CloseButton( false ).PaneBorder( false ).Movable( false ).Dock().Resizable().FloatingSize( wxDefaultSize ).DockFixed( true ).BottomDockable( false ).TopDockable( false ).LeftDockable( false ).RightDockable( false ).Floatable( false ) );
 
 	m_treeListCtrl->AppendColumn( _("Server / Bus-Id"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Port"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );

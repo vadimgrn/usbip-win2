@@ -1121,4 +1121,3 @@ void MainFrame::on_reload(wxCommandEvent &event)
                 on_load(event);
         }
 }
-

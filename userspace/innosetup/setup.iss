@@ -28,6 +28,9 @@
 
 #define VCToolsRedistExe "vc_redist.x64.exe"
 
+#define AppExeName ExtractFileName(ExePath)
+; #define OutputDir  ExtractFilePath(AppExePath)
+
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
 #define AppVersion GetVersionNumbersString(ExePath)
@@ -88,6 +91,11 @@ Name: "gui"; Description: "GUI App"; Types: full custom;
 Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 Name: "pdb"; Description: "Program DataBase files"; Types: full custom
 
+[Icons]
+Name: "{group}\{#ProductName}"; Filename: "{app}\{#AppExeName}"; Components: gui
+Name: "{group}\{cm:UninstallProgram,{#ProductName}}"; Filename: "{uninstallexe}"; Components: main
+Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#AppExeName}"; Components: gui; Tasks: desktopicon
+
 [Files]
 
 Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
@@ -119,6 +127,7 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
 Name: modifypath; Description: "Add to &PATH environment variable for all users"
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checked
 
 [Run]
 
