@@ -12,25 +12,11 @@
 #include <thread>
 #include <mutex>
 
-#include <wx/log.h>
-
+class LogWindow;
 class wxDataViewColumn;
 
 class DeviceStateEvent;
 wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
-
-
-/*
- * Do not show dialog box for wxLOG_Info aka Verbose.
- */
-class LogWindow : public wxLogWindow
-{
-public:
-	LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toogle);
-
-private:
-	void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
-};
 
 
 class MainFrame : public Frame

@@ -5,9 +5,7 @@
 #pragma once
 
 #include <wx/string.h>
-
 #include <array>
-#include <initializer_list>
 
 namespace usbip
 {

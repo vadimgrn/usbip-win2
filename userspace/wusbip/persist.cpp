@@ -3,6 +3,34 @@
  */
 
 #include "persist.h"
+#include "wusbip.h"
+#include "log.h"
+
+namespace
+{
+
+auto try_catch(_In_ const char *function, _In_ const std::function<void()> &func)
+{
+        try {
+                func();
+        } catch (std::exception &e) {
+                wxLogError(_("%s exception: %s"), wxString::FromAscii(function), wxString(e.what(), wxConvLibc));
+                return false;
+        }
+
+        return true;
+}
+
+} // namespace
+
+
+wxPersistentMainFrame::wxPersistentMainFrame(_In_ MainFrame *frame) : 
+        wxPersistentTLW(frame) {}
+
+MainFrame* wxPersistentMainFrame::Get() const 
+{ 
+        return static_cast<MainFrame*>(wxPersistentTLW::Get()); 
+}
 
 void wxPersistentMainFrame::Save() const
 {
@@ -37,20 +65,12 @@ void wxPersistentMainFrame::Save() const
 
 bool wxPersistentMainFrame::Restore()
 {
-        try {
-                return do_restore();
-        } catch (std::exception &e) {
-                wxLogError(_("%s exception: %s"), wxString::FromAscii(__func__), wxString(e.what(), wxConvLibc));
-                return false;
-        }
+        return  wxPersistentTLW::Restore() && 
+                try_catch(__func__, [this] { do_restore(); } );
 }
 
-bool wxPersistentMainFrame::do_restore()
+void wxPersistentMainFrame::do_restore()
 {
-        if (!wxPersistentTLW::Restore()) {
-                return false;
-        }
-
         auto &frame = *Get();
                 
         if (wxString val; RestoreValue(m_server, &val)) {
@@ -78,25 +98,4 @@ bool wxPersistentMainFrame::do_restore()
                 wxCommandEvent evt;
                 frame.on_view_labels(evt);
         }
-
-        return true;
-}
-
-void wxPersistentAuiToolBar::Save() const 
-{
-}
-
-bool wxPersistentAuiToolBar::Restore() 
-{ 
-        try {
-                return do_restore();
-        } catch (std::exception &e) {
-                wxLogError(_("%s exception: %s"), wxString::FromAscii(__func__), wxString(e.what(), wxConvLibc));
-                return false;
-        }
-}
-
-bool wxPersistentAuiToolBar::do_restore() 
-{ 
-        return true;
 }

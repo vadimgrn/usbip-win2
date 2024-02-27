@@ -2,8 +2,10 @@
  * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "persist.h"
+#include "wusbip.h"
 #include "utils.h"
+#include "persist.h"
+#include "log.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -318,38 +320,6 @@ private:
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 
-LogWindow::LogWindow(_In_ wxWindow *parent, _In_ const wxMenuItem *log_toggle) : 
-        wxLogWindow(parent, _("Log records"), false)
-{
-        wxASSERT(log_toggle);
-
-        auto acc = log_toggle->GetAccel();
-        wxASSERT(acc);
-
-        wxAcceleratorEntry entry(acc->GetFlags(), acc->GetKeyCode(), wxID_CLOSE);
-        wxAcceleratorTable table(1, &entry);
-
-        GetFrame()->SetAcceleratorTable(table);
-        wxPersistentRegisterAndRestore(GetFrame(), wxString::FromAscii(__func__));
-}
-
-void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info)
-{
-        bool pass{};
-        auto verbose = level == wxLOG_Info;
-
-        if (verbose) {
-                pass = IsPassingMessages();
-                PassMessages(false);
-        }
-
-        wxLogWindow::DoLogRecord(level, msg, info);
-
-        if (verbose) {
-                PassMessages(pass);
-        }
-}
-
 MainFrame::MainFrame(_In_ Handle read) : 
         Frame(nullptr),
         m_read(std::move(read)),
@@ -391,10 +361,6 @@ void MainFrame::restore_state()
 {
         wxPersistentRegisterAndRestore(this, L"MainFrame"); // @see persist.h
         wxPersistentRegisterAndRestore(m_treeListCtrl->GetDataView(), m_treeListCtrl->GetName());
-
-        for (auto i: {m_auiToolBar, m_auiToolBarAdd}) {
-                wxPersistentRegisterAndRestore(i, i->GetName());
-        }
 }
 
 void MainFrame::post_restore_state()
