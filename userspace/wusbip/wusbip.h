@@ -68,8 +68,11 @@ private:
 	void on_edit_notes_update_ui(wxUpdateUIEvent &event) override;
 
 	void init();
+	void init_tree_list();
+	
 	void restore_state();
 	void post_restore_state();
+	
 	void adjust_log_level();
 
 	void read_loop();

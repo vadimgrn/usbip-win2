@@ -19,7 +19,9 @@
 #include <wx/dataview.h>
 #include <wx/config.h>
 #include <wx/textdlg.h>
-
+#include <wx/itemattr.h>
+#include <wx/colour.h>
+#include <wx/gdicmn.h>
 #include <wx/persist/dataview.h>
 
 #include <format>
@@ -355,6 +357,26 @@ void MainFrame::init()
 
         auto port = get_tcp_port();
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
+
+        init_tree_list();
+}
+
+void MainFrame::init_tree_list()
+{
+        auto &dv = *m_treeListCtrl->GetDataView();
+
+        {
+                wxItemAttr attr;
+                auto font = attr.GetFont();
+
+                font.MakeBold();
+                attr.SetFont(font);
+
+                dv.SetHeaderAttr(attr);
+        }
+
+        dv.SetAlternateRowColour(*wxYELLOW);
+        dv.ToggleWindowStyle(wxDV_ROW_LINES | wxDV_HORIZ_RULES | wxDV_VERT_RULES);
 }
 
 void MainFrame::restore_state()
