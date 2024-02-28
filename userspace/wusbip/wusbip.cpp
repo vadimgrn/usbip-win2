@@ -19,9 +19,7 @@
 #include <wx/dataview.h>
 #include <wx/config.h>
 #include <wx/textdlg.h>
-#include <wx/itemattr.h>
-#include <wx/colour.h>
-#include <wx/gdicmn.h>
+#include <wx/headerctrl.h>
 #include <wx/persist/dataview.h>
 
 #include <format>
@@ -361,22 +359,23 @@ void MainFrame::init()
         init_tree_list();
 }
 
+/*
+ * FIXME: set first column bold. 
+ */
 void MainFrame::init_tree_list()
 {
         auto &dv = *m_treeListCtrl->GetDataView();
 
-        {
-                wxItemAttr attr;
-                auto font = attr.GetFont();
-
+        if (auto hdr = dv.GenericGetHeader()) { // see dv.SetHeaderAttr()
+                auto font = hdr->GetFont();
                 font.MakeBold();
-                attr.SetFont(font);
-
-                dv.SetHeaderAttr(attr);
+                hdr->SetFont(font);
         }
 
-        dv.SetAlternateRowColour(*wxYELLOW);
-        dv.ToggleWindowStyle(wxDV_ROW_LINES | wxDV_HORIZ_RULES | wxDV_VERT_RULES);
+        if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
+                dv.SetAlternateRowColour(colour);
+                dv.ToggleWindowStyle(wxDV_ROW_LINES); // wxDV_HORIZ_RULES | wxDV_VERT_RULES
+        }
 }
 
 void MainFrame::restore_state()
