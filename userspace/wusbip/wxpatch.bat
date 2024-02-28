@@ -1,9 +1,9 @@
+setlocal
 set WXDIR=..\..\packages\wxWidgets.3.2.2.1\include\wx
 set TOOLS=..\..\tools
-set PATCHES=wxpatch
-set FNAME=dataview.h
+set REJECT=usbip
 
-%TOOLS%\sed.exe -i -f %PATCHES%\log.h.sed  %WXDIR%\log.h
+rem cd %WXDIR%\.. && diff -urd wx wx_patched > wxpatch.diff
 
-%TOOLS%\pathc.exe --unified --forward --reject-file=%TEMP%\%FNAME%.rej --directory=%WXDIR%\persist --input=%CD%\%PATCHES%\%FNAME%.diff
-del /f /q %TEMP%\%FNAME%.rej > nul 2>&1
+%TOOLS%\pathc.exe -p1 --unified --forward --reject-file=%TEMP%\%REJECT%.rej --directory=%WXDIR% --input=%CD%\wxpatch.diff
+del /f /q %TEMP%\%REJECT%.rej > nul 2>&1
