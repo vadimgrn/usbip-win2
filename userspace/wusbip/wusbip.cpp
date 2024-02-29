@@ -409,6 +409,12 @@ void MainFrame::post_refresh()
         wxPostEvent(m_menu_devices, evt);
 }
 
+void MainFrame::post_exit()
+{
+        wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_EXIT);
+        wxPostEvent(m_menu_file, evt);
+}
+
 void MainFrame::on_close(wxCloseEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
@@ -1090,5 +1096,36 @@ void MainFrame::on_reload(wxCommandEvent &event)
         if (static bool once; !once) {
                 once = true;
                 on_load(event);
+        }
+}
+
+void MainFrame::on_item_context_menu(wxTreeListEvent&)
+{
+}
+
+/*
+ * @see wxConfig::Get()->DeleteAll()
+ */
+void MainFrame::on_view_reset(wxCommandEvent&)
+{
+        wxMessageDialog dlg(this, _("Reset all settings and restart the app?"), _("Reset settings"),
+                wxOK | wxCANCEL | wxCANCEL_DEFAULT | wxICON_WARNING | wxCENTRE);
+
+        if (dlg.ShowModal() == wxID_CANCEL) {
+                return;
+        }
+
+        wxPersistenceManager::Get().DisableSaving();	
+        wxConfig::Get()->DeleteGroup(L"Persistent_Options"); // FIXME: private key, defined in src\msw\regconf.cpp
+
+        wchar_t** argv = wxGetApp().argv;
+
+        switch (wxExecute(argv)) {
+        case 0: // the command could not be executed
+        case -1: // can happen when using DDE under Windows for command execution
+                wxLogError(_("Cannot relaunch itself, please restart the app"));
+                break;
+        default:
+                post_exit();
         }
 }

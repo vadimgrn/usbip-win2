@@ -370,6 +370,24 @@
             <event name="OnMenuSelection">on_view_labels</event>
             <event name="OnUpdateUI">on_view_labels_update_ui</event>
           </object>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator51</property>
+            <property name="permission">none</property>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_CLOSE; wxART_MENU</property>
+            <property name="checked">1</property>
+            <property name="enabled">1</property>
+            <property name="help">Reset all settings</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Reset</property>
+            <property name="name">m_view_reset</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_view_reset</event>
+          </object>
         </object>
         <object class="wxMenu" expanded="true">
           <property name="label">Devices</property>
@@ -476,7 +494,7 @@
             <event name="OnUpdateUI">on_log_show_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
+            <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Show debug messages in the log window</property>
@@ -1015,7 +1033,7 @@
           <event name="OnButtonClick">add_exported_devices</event>
         </object>
       </object>
-      <object class="wxTreeListCtrl" expanded="false">
+      <object class="wxTreeListCtrl" expanded="true">
         <property name="BottomDockable">0</property>
         <property name="LeftDockable">0</property>
         <property name="RightDockable">0</property>
@@ -1069,6 +1087,7 @@
         <property name="window_name"></property>
         <property name="window_style"></property>
         <event name="OnTreelistItemActivated">on_item_activated</event>
+        <event name="OnTreelistItemContextMenu">on_item_context_menu</event>
         <object class="wxTreeListCtrlColumn" expanded="false">
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>

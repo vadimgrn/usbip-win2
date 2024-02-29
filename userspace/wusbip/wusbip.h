@@ -48,6 +48,8 @@ private:
 	void on_has_devices_update_ui(wxUpdateUIEvent &event) override;
 	void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
 	void on_toogle_auto(wxCommandEvent &event) override;
+	void on_item_context_menu(wxTreeListEvent &event) override;
+	void on_view_reset(wxCommandEvent &event) override;
 
 	void on_save(wxCommandEvent &event) override;
 	void on_save_selected(wxCommandEvent &event) override;
@@ -87,7 +89,9 @@ private:
 	void remove_device(_In_ wxTreeListItem dev);
 
 	bool attach(_In_ const wxString &url, _In_ const wxString &busid);
+	
 	void post_refresh();
+	void post_exit();
 
 	bool is_persistent(_In_ wxTreeListItem device);
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);

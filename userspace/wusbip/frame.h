@@ -85,6 +85,7 @@ class Frame : public wxFrame
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_reset( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_reload( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
@@ -96,6 +97,7 @@ class Frame : public wxFrame
 		virtual void on_log_verbose_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_item_activated( wxTreeListEvent& event ) { event.Skip(); }
+		virtual void on_item_context_menu( wxTreeListEvent& event ) { event.Skip(); }
 
 
 	public:

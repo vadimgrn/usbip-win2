@@ -146,6 +146,17 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_view_labels );
 	m_view_labels->Check( true );
 
+	m_menu_view->AppendSeparator();
+
+	wxMenuItem* m_view_reset;
+	m_view_reset = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Reset") ) , _("Reset all settings"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_view_reset->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_CLOSE), wxASCII_STR(wxART_MENU) ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_view_reset->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_CLOSE), wxASCII_STR(wxART_MENU) ) );
+	#endif
+	m_menu_view->Append( m_view_reset );
+
 	m_menubar->Append( m_menu_view, _("View") );
 
 	m_menu_devices = new wxMenu();
@@ -212,6 +223,11 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	wxMenuItem* m_log_verbose;
 	m_log_verbose = new wxMenuItem( m_menu_log, wxID_ANY, wxString( _("Verbose") ) , _("Show debug messages in the log window"), wxITEM_CHECK );
+	#ifdef __WXMSW__
+	m_log_verbose->SetBitmaps( wxNullBitmap );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_log_verbose->SetBitmap( wxNullBitmap );
+	#endif
 	m_menu_log->Append( m_log_verbose );
 
 	m_menubar->Append( m_menu_log, _("Log") );
@@ -331,6 +347,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_view_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_labels ), this, m_view_labels->GetId());
 	this->Connect( m_view_labels->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_reset ), this, m_view_reset->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_reload ), this, m_cmd_reload->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
@@ -353,6 +370,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_tool_save->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_save ) );
 	m_button_add->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
 	m_treeListCtrl->Connect( wxEVT_TREELIST_ITEM_ACTIVATED, wxTreeListEventHandler( Frame::on_item_activated ), NULL, this );
+	m_treeListCtrl->Connect( wxEVT_TREELIST_ITEM_CONTEXT_MENU, wxTreeListEventHandler( Frame::on_item_context_menu ), NULL, this );
 }
 
 Frame::~Frame()
@@ -386,6 +404,7 @@ Frame::~Frame()
 	this->Disconnect( m_tool_save->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_save ) );
 	m_button_add->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( Frame::add_exported_devices ), NULL, this );
 	m_treeListCtrl->Disconnect( wxEVT_TREELIST_ITEM_ACTIVATED, wxTreeListEventHandler( Frame::on_item_activated ), NULL, this );
+	m_treeListCtrl->Disconnect( wxEVT_TREELIST_ITEM_CONTEXT_MENU, wxTreeListEventHandler( Frame::on_item_context_menu ), NULL, this );
 
 	m_mgr.UnInit();
 
