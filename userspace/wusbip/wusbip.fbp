@@ -110,20 +110,6 @@
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Save selected devices</property>
-            <property name="id">wxID_ANY</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Save</property>
-            <property name="name">m_file_save</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+S</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_save</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_PASTE; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -136,6 +122,35 @@
             <property name="shortcut">CTRL+L</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_load</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Save devices</property>
+            <property name="id">wxID_SAVE</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Save</property>
+            <property name="name">m_file_save</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+S</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_save</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE_AS; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Save selected devices</property>
+            <property name="id">wxID_SAVEAS</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Save selected</property>
+            <property name="name">m_file_save_selected</property>
+            <property name="permission">none</property>
+            <property name="shortcut">ALT+S</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_save_selected</event>
+            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="separator" expanded="false">
             <property name="name">m_separator5</property>
@@ -156,7 +171,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -165,7 +180,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Select all devices</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">wxID_SELECTALL</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Select all</property>
             <property name="name">m_select_all</property>
@@ -173,26 +188,26 @@
             <property name="shortcut">CTRL+A</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_select_all</event>
-            <event name="OnUpdateUI">on_has_items_update_ui</event>
+            <event name="OnUpdateUI">on_has_devices_update_ui</event>
           </object>
           <object class="separator" expanded="false">
             <property name="name">m_separator6</property>
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_MENU</property>
+            <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Toggle Persistent (Auto)</property>
+            <property name="help">Toggle Auto (aka Persistent)</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Persistent</property>
-            <property name="name">m_toggle_persistent</property>
+            <property name="label">Toggle Auto</property>
+            <property name="name">m_toggle_auto</property>
             <property name="permission">none</property>
             <property name="shortcut">CTRL+P</property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_toogle_persistent</event>
-            <event name="OnUpdateUI">on_has_selections_update_ui</event>
+            <event name="OnMenuSelection">on_toogle_auto</event>
+            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_EDIT; wxART_MENU</property>
@@ -208,126 +223,6 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_edit_notes</event>
             <event name="OnUpdateUI">on_edit_notes_update_ui</event>
-          </object>
-        </object>
-        <object class="wxMenu" expanded="false">
-          <property name="label">Devices</property>
-          <property name="name">m_menu_devices</property>
-          <property name="permission">protected</property>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Show attached devices</property>
-            <property name="id">wxID_REFRESH</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Reload</property>
-            <property name="name">m_cmd_reload</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+R</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_reload</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Add remote devices</property>
-            <property name="id">wxID_ANY</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">A&amp;dd</property>
-            <property name="name">m_cmd_add</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+I</property>
-            <property name="unchecked_bitmap">Load From File; </property>
-            <event name="OnMenuSelection">add_exported_devices</event>
-          </object>
-          <object class="separator" expanded="false">
-            <property name="name">m_separator12</property>
-            <property name="permission">none</property>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Attach selected devices</property>
-            <property name="id">wxID_ANY</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Attach</property>
-            <property name="name">m_cmd_attach</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+T</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_attach</event>
-            <event name="OnUpdateUI">on_has_selections_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Detach selected devices</property>
-            <property name="id">wxID_ANY</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Detach</property>
-            <property name="name">m_cmd_detach</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+D</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_detach</event>
-            <event name="OnUpdateUI">on_has_selections_update_ui</event>
-          </object>
-          <object class="separator" expanded="false">
-            <property name="name">m_separator21</property>
-            <property name="permission">none</property>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Detach all devices</property>
-            <property name="id">wxID_ANY</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Detach &amp;All</property>
-            <property name="name">m_cmd_detach_all</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+X</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_detach_all</event>
-          </object>
-        </object>
-        <object class="wxMenu" expanded="true">
-          <property name="label">Log</property>
-          <property name="name">m_menu_log</property>
-          <property name="permission">protected</property>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From File; </property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Show/hide the window with log records</property>
-            <property name="id">ID_LOG_TOGGLE</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Toggle window</property>
-            <property name="name">m_log_toggle</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+W</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_log_show</event>
-            <event name="OnUpdateUI">on_log_show_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap"></property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Show debug messages in the log window</property>
-            <property name="id">wxID_ANY</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Verbose</property>
-            <property name="name">m_log_verbose</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_log_verbose</event>
-            <event name="OnUpdateUI">on_log_verbose_update_ui</event>
           </object>
         </object>
         <object class="wxMenu" expanded="true">
@@ -477,6 +372,126 @@
           </object>
         </object>
         <object class="wxMenu" expanded="true">
+          <property name="label">Devices</property>
+          <property name="name">m_menu_devices</property>
+          <property name="permission">protected</property>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Show attached devices</property>
+            <property name="id">wxID_REFRESH</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Reload</property>
+            <property name="name">m_cmd_reload</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+R</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_reload</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Add remote devices</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">A&amp;dd</property>
+            <property name="name">m_cmd_add</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+I</property>
+            <property name="unchecked_bitmap">Load From File; </property>
+            <event name="OnMenuSelection">add_exported_devices</event>
+          </object>
+          <object class="separator" expanded="false">
+            <property name="name">m_separator12</property>
+            <property name="permission">none</property>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Attach selected devices</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Attach</property>
+            <property name="name">m_cmd_attach</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+T</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_attach</event>
+            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Detach selected devices</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Detach</property>
+            <property name="name">m_cmd_detach</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+D</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_detach</event>
+            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+          </object>
+          <object class="separator" expanded="false">
+            <property name="name">m_separator21</property>
+            <property name="permission">none</property>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Detach all devices</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Detach &amp;All</property>
+            <property name="name">m_cmd_detach_all</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+X</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_detach_all</event>
+          </object>
+        </object>
+        <object class="wxMenu" expanded="true">
+          <property name="label">Log</property>
+          <property name="name">m_menu_log</property>
+          <property name="permission">protected</property>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From File; </property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Show/hide the window with log records</property>
+            <property name="id">ID_LOG_TOGGLE</property>
+            <property name="kind">wxITEM_CHECK</property>
+            <property name="label">Toggle window</property>
+            <property name="name">m_log_toggle</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+W</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_show</event>
+            <event name="OnUpdateUI">on_log_show_update_ui</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap"></property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Show debug messages in the log window</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_CHECK</property>
+            <property name="label">Verbose</property>
+            <property name="name">m_log_verbose</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_log_verbose</event>
+            <event name="OnUpdateUI">on_log_verbose_update_ui</event>
+          </object>
+        </object>
+        <object class="wxMenu" expanded="true">
           <property name="label">Help</property>
           <property name="name">m_menu_log_help</property>
           <property name="permission">protected</property>
@@ -496,7 +511,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -559,7 +574,7 @@
         <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_TOOLBAR</property>
           <property name="context_menu">0</property>
-          <property name="id">wxID_ANY</property>
+          <property name="id">wxID_REFRESH</property>
           <property name="kind">wxITEM_NORMAL</property>
           <property name="label">Reload</property>
           <property name="name">m_tool_reload</property>
@@ -582,7 +597,7 @@
           <property name="statusbar"></property>
           <property name="tooltip">Attach selected devices</property>
           <event name="OnToolClicked">on_attach</event>
-          <event name="OnUpdateUI">on_has_selections_update_ui</event>
+          <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_TOOLBAR</property>
@@ -595,7 +610,7 @@
           <property name="statusbar"></property>
           <property name="tooltip">Detach selected devices</property>
           <event name="OnToolClicked">on_detach</event>
-          <event name="OnUpdateUI">on_has_selections_update_ui</event>
+          <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_TOOLBAR</property>
@@ -613,18 +628,6 @@
           <property name="permission">protected</property>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_TOOLBAR</property>
-          <property name="context_menu">0</property>
-          <property name="id">wxID_ANY</property>
-          <property name="kind">wxITEM_NORMAL</property>
-          <property name="label">Save</property>
-          <property name="name">m_tool_save</property>
-          <property name="permission">protected</property>
-          <property name="statusbar"></property>
-          <property name="tooltip">Save selected devices</property>
-          <event name="OnToolClicked">on_save</event>
-        </object>
-        <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_PASTE; wxART_TOOLBAR</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -635,6 +638,18 @@
           <property name="statusbar"></property>
           <property name="tooltip">Load saved devices</property>
           <event name="OnToolClicked">on_load</event>
+        </object>
+        <object class="tool" expanded="false">
+          <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_TOOLBAR</property>
+          <property name="context_menu">0</property>
+          <property name="id">wxID_SAVE</property>
+          <property name="kind">wxITEM_NORMAL</property>
+          <property name="label">Save</property>
+          <property name="name">m_tool_save</property>
+          <property name="permission">protected</property>
+          <property name="statusbar"></property>
+          <property name="tooltip">Save devices</property>
+          <event name="OnToolClicked">on_save</event>
         </object>
       </object>
       <object class="wxAuiToolBar" expanded="true">

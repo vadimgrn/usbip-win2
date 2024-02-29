@@ -41,26 +41,26 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_LOG_TOGGLE = 1000,
-			ID_VIEW_LABELS
+			ID_VIEW_LABELS = 1000,
+			ID_LOG_TOGGLE
 		};
 
 		wxStatusBar* m_statusBar;
 		wxMenuBar* m_menubar;
 		wxMenu* m_menu_file;
 		wxMenu* m_menu_edit;
-		wxMenu* m_menu_devices;
-		wxMenu* m_menu_log;
 		wxMenu* m_menu_view;
 		wxMenu* m_menu_columns;
+		wxMenu* m_menu_devices;
+		wxMenu* m_menu_log;
 		wxMenu* m_menu_log_help;
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_tool_reload;
 		wxAuiToolBarItem* m_tool_attach;
 		wxAuiToolBarItem* m_tool_detach;
 		wxAuiToolBarItem* m_tool_detach_all;
-		wxAuiToolBarItem* m_tool_save;
 		wxAuiToolBarItem* m_tool_load;
+		wxAuiToolBarItem* m_tool_save;
 		wxAuiToolBar* m_auiToolBarAdd;
 		wxStaticText* m_staticTextServer;
 		wxTextCtrl* m_textCtrlServer;
@@ -71,15 +71,20 @@ class Frame : public wxFrame
 
 		// Virtual event handlers, override them in your derived class
 		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
-		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_save_selected( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_has_selected_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_has_items_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_toogle_persistent( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_has_selections_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_has_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_toogle_auto( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_reload( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
@@ -89,10 +94,6 @@ class Frame : public wxFrame
 		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_log_verbose( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_verbose_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_item_activated( wxTreeListEvent& event ) { event.Skip(); }
 

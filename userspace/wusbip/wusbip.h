@@ -45,11 +45,12 @@ private:
 	void on_help_about(wxCommandEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
 	void on_select_all(wxCommandEvent &event) override;
-	void on_has_items_update_ui(wxUpdateUIEvent &event) override;
-	void on_has_selections_update_ui(wxUpdateUIEvent &event) override;
-	void on_toogle_persistent(wxCommandEvent &event) override;
+	void on_has_devices_update_ui(wxUpdateUIEvent &event) override;
+	void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
+	void on_toogle_auto(wxCommandEvent &event) override;
 
 	void on_save(wxCommandEvent &event) override;
+	void on_save_selected(wxCommandEvent &event) override;
 	void on_load(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
@@ -99,4 +100,6 @@ private:
 
 	int get_port(_In_ wxTreeListItem dev) const;
 	wxTreeListItem get_edit_notes_device();
+
+	void save(_In_ const wxTreeListItems &devices);
 };
