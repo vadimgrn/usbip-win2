@@ -27,6 +27,7 @@ public:
 
 private:
 	friend class wxPersistentMainFrame;
+
 	LogWindow *m_log{};
 
 	usbip::Handle m_read;
@@ -41,7 +42,6 @@ private:
 	void on_detach(wxCommandEvent &event) override;
 	void on_detach_all(wxCommandEvent &event) override;
 	void on_reload(wxCommandEvent &event) override;
-	void on_log_level(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
 	void on_select_all(wxCommandEvent &event) override;
@@ -54,6 +54,9 @@ private:
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
+
+	void on_log_verbose_update_ui(wxUpdateUIEvent &event) override;
+	void on_log_verbose(wxCommandEvent &event) override;
 
 	void on_view_column_update_ui(wxUpdateUIEvent &event) override;
 	void on_view_column(wxCommandEvent &event) override;
@@ -69,12 +72,8 @@ private:
 
 	void init();
 	void init_tree_list();
-	
 	void restore_state();
-	void post_restore_state();
 	
-	void adjust_log_level();
-
 	void read_loop();
 	void break_read_loop();
 

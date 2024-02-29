@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.0.0-eea61759)
+// C++ code generated with wxFormBuilder (version 4.1.0-0-g733bf3d)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -42,11 +42,6 @@ class Frame : public wxFrame
 		enum
 		{
 			ID_LOG_TOGGLE = 1000,
-			ID_LOGLEVEL_ERROR,
-			ID_LOGLEVEL_WARNING,
-			ID_LOGLEVEL_MESSAGE,
-			ID_LOGLEVEL_STATUS,
-			ID_LOGLEVEL_INFO,
 			ID_VIEW_LABELS
 		};
 
@@ -92,7 +87,8 @@ class Frame : public wxFrame
 		virtual void on_detach_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_log_level( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_log_verbose( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_log_verbose_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }

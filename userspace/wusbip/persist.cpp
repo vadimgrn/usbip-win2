@@ -50,9 +50,8 @@ void wxPersistentMainFrame::Save() const
         }
 
         if (auto log = frame.m_log) {
-                auto lvl = log->GetLogLevel();
-                static_assert(sizeof(lvl) == sizeof(long));
-                SaveValue(m_loglevel, static_cast<long>(lvl));
+                auto verbose = log->GetLogLevel() == VERBOSE_LOGLEVEL;
+                SaveValue(m_log_verbose, verbose);
         }
 
         if (auto item = frame.m_menu_view->FindItem(frame.ID_VIEW_LABELS)) {
@@ -86,9 +85,9 @@ void wxPersistentMainFrame::do_restore()
                 fr->Show(show);
         }
 
-        if (long lvl{}; RestoreValue(m_loglevel, &lvl)) {
-                static_assert(sizeof(lvl) == sizeof(wxLogLevel));
-                frame.m_log->SetLogLevel(static_cast<wxLogLevel>(lvl));
+        if (bool verbose{}; RestoreValue(m_log_verbose, &verbose)) {
+                auto lvl = verbose ? VERBOSE_LOGLEVEL : DEFAULT_LOGLEVEL;
+                frame.m_log->SetLogLevel(lvl);
         }
 
         if (auto item = frame.m_menu_view->FindItem(frame.ID_VIEW_LABELS); !item) {

@@ -329,10 +329,7 @@ MainFrame::MainFrame(_In_ Handle read) :
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 
         init();
-        
         restore_state();
-        post_restore_state();
-
         post_refresh();
 }
 
@@ -343,6 +340,9 @@ MainFrame::~MainFrame()
 
 void MainFrame::init()
 {
+        m_log->SetVerbose(true); // produce messages for wxLOG_Info
+        m_log->SetLogLevel(DEFAULT_LOGLEVEL);
+
         if (auto cfg = wxConfig::Get()) {
                 cfg->SetStyle(wxCONFIG_USE_LOCAL_FILE);
         }
@@ -384,11 +384,6 @@ void MainFrame::restore_state()
         wxPersistentRegisterAndRestore(m_treeListCtrl->GetDataView(), m_treeListCtrl->GetName());
 }
 
-void MainFrame::post_restore_state()
-{
-        adjust_log_level();
-}
-
 void MainFrame::post_refresh()
 {
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED, wxID_REFRESH);
@@ -409,30 +404,6 @@ void MainFrame::on_close(wxCloseEvent &event)
 void MainFrame::on_exit(wxCommandEvent&)
 {
         Close(true);
-}
-
-void MainFrame::adjust_log_level()
-{
-        auto verbose = m_log->GetVerbose(); // --verbose option has passed
-        if (!verbose) {
-                m_log->SetVerbose(true); // produce messages for wxLOG_Info
-        }
-
-        auto lvl = m_log->GetLogLevel();
-
-        if (!(lvl >= wxLOG_Error && lvl <= wxLOG_Info)) {
-                lvl = verbose ? wxLOG_Info : wxLOG_Status;
-                m_log->SetLogLevel(lvl);
-        }
-
-        auto id = ID_LOGLEVEL_ERROR + (lvl - wxLOG_Error);
-        wxASSERT(id <= ID_LOGLEVEL_INFO);
-
-        auto item = m_menu_log->FindItem(id);
-        wxASSERT(item);
-
-        wxASSERT(item->IsRadio());
-        item->Check(true);
 }
 
 void MainFrame::read_loop()
@@ -630,14 +601,16 @@ void MainFrame::on_log_show(wxCommandEvent &event)
         m_log->Show(checked);
 }
 
-void MainFrame::on_log_level(wxCommandEvent &event)
+void MainFrame::on_log_verbose_update_ui(wxUpdateUIEvent &event)
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
+        auto verbose = m_log->GetLogLevel() == VERBOSE_LOGLEVEL;
+        event.Check(verbose);
+}
 
-        auto lvl = static_cast<wxLogLevelValues>(wxLOG_Error + (event.GetId() - ID_LOGLEVEL_ERROR));
-        wxASSERT(lvl >= wxLOG_Error && lvl <= wxLOG_Info);
-
-        m_log->SetLogLevel(lvl);
+void MainFrame::on_log_verbose(wxCommandEvent &event)
+{
+        bool checked = event.GetInt();
+        m_log->SetLogLevel(checked ? VERBOSE_LOGLEVEL : DEFAULT_LOGLEVEL);
 }
 
 bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)

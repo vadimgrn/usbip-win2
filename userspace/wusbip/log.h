@@ -8,6 +8,8 @@
 
 class wxMenuItem;
 
+enum { DEFAULT_LOGLEVEL = wxLOG_Status, VERBOSE_LOGLEVEL };
+
 /*
  * Do not show dialog box for wxLOG_Info aka Verbose.
  */
