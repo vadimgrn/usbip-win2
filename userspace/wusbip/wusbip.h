@@ -77,6 +77,12 @@ private:
 	void on_edit_notes(wxCommandEvent &event) override;
 	void on_edit_notes_update_ui(wxUpdateUIEvent &event) override;
 
+	void on_frame_mouse_wheel(wxMouseEvent &event) override;
+	
+	void on_view_font_increase(wxCommandEvent & event) override;
+	void on_view_font_decrease(wxCommandEvent & event) override;
+	void on_view_font_default(wxCommandEvent &event) override;
+
 	void init();
 	void init_tree_list();
 	void restore_state();
@@ -110,4 +116,7 @@ private:
 	wxTreeListItem get_edit_notes_device();
 
 	void save(_In_ const wxTreeListItems &devices);
+
+	void on_tree_mouse_wheel(_In_ wxMouseEvent &event);
+	void on_log_mouse_wheel(_In_ wxMouseEvent &event);
 };

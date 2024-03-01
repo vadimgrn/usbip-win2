@@ -59,6 +59,7 @@
       <property name="window_style">wxTAB_TRAVERSAL</property>
       <property name="xrc_skip_sizer">1</property>
       <event name="OnClose">on_close</event>
+      <event name="OnMouseWheel">on_frame_mouse_wheel</event>
       <object class="wxStatusBar" expanded="true">
         <property name="bg"></property>
         <property name="context_help"></property>
@@ -362,7 +363,7 @@
             <property name="help">Alternate row colour for the tree</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Alt. row colour</property>
+            <property name="label">Alternate row colour</property>
             <property name="name">m_view_zebra</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
@@ -374,10 +375,10 @@
             <property name="bitmap"></property>
             <property name="checked">1</property>
             <property name="enabled">1</property>
-            <property name="help">Show toolbar labels</property>
+            <property name="help"></property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Labels</property>
+            <property name="label">Show toolbar labels</property>
             <property name="name">m_view_labels</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
@@ -390,13 +391,59 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_PLUS ; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Increase font size, Ctrl+Wheel</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Increase font</property>
+            <property name="name">m_view_font_increase</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL++</property>
+            <property name="unchecked_bitmap">Load From File; </property>
+            <event name="OnMenuSelection">on_view_font_increase</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_MINUS ; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Decrease font size, Ctrl+Wheel </property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Decrease font</property>
+            <property name="name">m_view_font_decrease</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+-</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_view_font_decrease</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_UNDO; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Set default font size</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Default font</property>
+            <property name="name">m_view_font_default</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+0</property>
+            <property name="unchecked_bitmap">Load From File; </property>
+            <event name="OnMenuSelection">on_view_font_default</event>
+          </object>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator511</property>
+            <property name="permission">none</property>
+          </object>
+          <object class="wxMenuItem" expanded="true">
             <property name="bitmap">Load From Art Provider; wxART_CLOSE; wxART_MENU</property>
-            <property name="checked">1</property>
+            <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Reset all settings</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Reset</property>
+            <property name="label">Reset settings</property>
             <property name="name">m_view_reset</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
@@ -618,6 +665,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
+        <event name="OnMouseWheel">on_frame_mouse_wheel</event>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_TOOLBAR</property>
           <property name="context_menu">0</property>
@@ -759,6 +807,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style">wxTAB_TRAVERSAL</property>
+        <event name="OnMouseWheel">on_frame_mouse_wheel</event>
         <object class="wxStaticText" expanded="false">
           <property name="BottomDockable">1</property>
           <property name="LeftDockable">1</property>

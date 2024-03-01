@@ -70,6 +70,7 @@ class Frame : public wxFrame
 
 		// Virtual event handlers, override them in your derived class
 		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
+		virtual void on_frame_mouse_wheel( wxMouseEvent& event ) { event.Skip(); }
 		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_save_selected( wxCommandEvent& event ) { event.Skip(); }
@@ -86,6 +87,9 @@ class Frame : public wxFrame
 		virtual void on_view_zabra_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_font_increase( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_view_font_decrease( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_view_font_default( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_reset( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_reload( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
