@@ -19,6 +19,7 @@ private:
         static inline auto &m_log_verbose = L"LogVerbose";
         static inline auto &m_toolbar_labels = L"ToolBarLabels";
         static inline auto &m_show_log_window = L"ShowLogWindow";
+        static inline auto &m_row_lines = L"RowLines";
 
         void Save() const override;
         bool Restore() override;

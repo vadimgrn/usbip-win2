@@ -355,12 +355,27 @@
               <event name="OnUpdateUI">on_view_column_update_ui</event>
             </object>
           </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap"></property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Alternate row colour for the tree</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_CHECK</property>
+            <property name="label">Alt. row colour</property>
+            <property name="name">m_view_zebra</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_view_zebra</event>
+            <event name="OnUpdateUI">on_view_zabra_update_ui</event>
+          </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">1</property>
             <property name="enabled">1</property>
             <property name="help">Show toolbar labels</property>
-            <property name="id">ID_VIEW_LABELS</property>
+            <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_CHECK</property>
             <property name="label">Labels</property>
             <property name="name">m_view_labels</property>
@@ -514,7 +529,7 @@
           <property name="name">m_menu_log_help</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_INFORMATION; wxART_MENU</property>
+            <property name="bitmap">Load From Art Provider; wxART_TIP; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help"></property>
@@ -526,6 +541,20 @@
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_help_about</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_INFORMATION; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Show information about the library</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">wxWidgets</property>
+            <property name="name">m_help_about_lib</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_help_about_lib</event>
           </object>
         </object>
       </object>

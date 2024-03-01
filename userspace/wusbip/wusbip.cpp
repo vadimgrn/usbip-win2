@@ -392,7 +392,6 @@ void MainFrame::init_tree_list()
 
         if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
                 dv.SetAlternateRowColour(colour);
-                dv.ToggleWindowStyle(wxDV_ROW_LINES); // wxDV_HORIZ_RULES | wxDV_VERT_RULES
         }
 }
 
@@ -622,6 +621,20 @@ void MainFrame::on_log_show(wxCommandEvent &event)
 {
         bool checked = event.GetInt();
         m_log->Show(checked);
+}
+
+void MainFrame::on_view_zabra_update_ui(wxUpdateUIEvent &event)
+{
+        auto &dv = *m_treeListCtrl->GetDataView();
+        auto check = dv.HasFlag(wxDV_ROW_LINES);
+        event.Check(check);
+}
+
+void MainFrame::on_view_zebra(wxCommandEvent&)
+{
+        auto &dv = *m_treeListCtrl->GetDataView();
+        dv.ToggleWindowStyle(wxDV_ROW_LINES);
+        dv.Refresh(false);
 }
 
 void MainFrame::on_log_verbose_update_ui(wxUpdateUIEvent &event)
@@ -952,7 +965,7 @@ void MainFrame::on_view_labels(wxCommandEvent &)
 {
         auto &tb = *m_auiToolBar;
         tb.ToggleWindowStyle(wxAUI_TB_TEXT);
-        tb.Refresh();
+        tb.Refresh(false);
 }
 
 int MainFrame::get_port(_In_ wxTreeListItem dev) const
@@ -1128,4 +1141,9 @@ void MainFrame::on_view_reset(wxCommandEvent&)
         default:
                 post_exit();
         }
+}
+
+void MainFrame::on_help_about_lib(wxCommandEvent&)
+{
+        wxInfoMessageBox(this);
 }

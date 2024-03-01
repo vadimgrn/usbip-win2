@@ -141,8 +141,12 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_view->Append( m_menu_columnsItem );
 
+	wxMenuItem* m_view_zebra;
+	m_view_zebra = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Alt. row colour") ) , _("Alternate row colour for the tree"), wxITEM_CHECK );
+	m_menu_view->Append( m_view_zebra );
+
 	wxMenuItem* m_view_labels;
-	m_view_labels = new wxMenuItem( m_menu_view, ID_VIEW_LABELS, wxString( _("Labels") ) , _("Show toolbar labels"), wxITEM_CHECK );
+	m_view_labels = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Labels") ) , _("Show toolbar labels"), wxITEM_CHECK );
 	m_menu_view->Append( m_view_labels );
 	m_view_labels->Check( true );
 
@@ -236,11 +240,20 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_help_about;
 	m_help_about = new wxMenuItem( m_menu_log_help, wxID_ABOUT, wxString( _("About") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_help_about->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_INFORMATION), wxASCII_STR(wxART_MENU) ) );
+	m_help_about->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_TIP), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_help_about->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_INFORMATION), wxASCII_STR(wxART_MENU) ) );
+	m_help_about->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_TIP), wxASCII_STR(wxART_MENU) ) );
 	#endif
 	m_menu_log_help->Append( m_help_about );
+
+	wxMenuItem* m_help_about_lib;
+	m_help_about_lib = new wxMenuItem( m_menu_log_help, wxID_ANY, wxString( _("wxWidgets") ) , _("Show information about the library"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_help_about_lib->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_INFORMATION), wxASCII_STR(wxART_MENU) ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_help_about_lib->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_INFORMATION), wxASCII_STR(wxART_MENU) ) );
+	#endif
+	m_menu_log_help->Append( m_help_about_lib );
 
 	m_menubar->Append( m_menu_log_help, _("Help") );
 
@@ -345,6 +358,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_view_persistent->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_notes->GetId());
 	this->Connect( m_view_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_zebra ), this, m_view_zebra->GetId());
+	this->Connect( m_view_zebra->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zabra_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_labels ), this, m_view_labels->GetId());
 	this->Connect( m_view_labels->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_reset ), this, m_view_reset->GetId());
@@ -360,6 +375,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_verbose ), this, m_log_verbose->GetId());
 	this->Connect( m_log_verbose->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
 	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
+	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about_lib ), this, m_help_about_lib->GetId());
 	this->Connect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
@@ -389,7 +405,8 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
-	this->Disconnect( ID_VIEW_LABELS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zabra_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );

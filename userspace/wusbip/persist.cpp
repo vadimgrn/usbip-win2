@@ -6,6 +6,8 @@
 #include "wusbip.h"
 #include "log.h"
 
+#include <wx/dataview.h>
+
 namespace
 {
 
@@ -54,11 +56,12 @@ void wxPersistentMainFrame::Save() const
                 SaveValue(m_log_verbose, verbose);
         }
 
-        if (auto item = frame.m_menu_view->FindItem(frame.ID_VIEW_LABELS)) {
-                wxASSERT(item->IsCheck());
-                SaveValue(m_toolbar_labels, item->IsChecked());
-        } else {
-                wxASSERT(!"ID_VIEW_LABELS not found");
+        if (auto tb = frame.m_auiToolBar) {
+                SaveValue(m_toolbar_labels, tb->HasFlag(wxAUI_TB_TEXT));
+        }
+
+        if (auto dv = frame.m_treeListCtrl->GetDataView()) {
+                SaveValue(m_row_lines, dv->HasFlag(wxDV_ROW_LINES));
         }
 }
 
@@ -90,11 +93,13 @@ void wxPersistentMainFrame::do_restore()
                 frame.m_log->SetLogLevel(lvl);
         }
 
-        if (auto item = frame.m_menu_view->FindItem(frame.ID_VIEW_LABELS); !item) {
-                wxASSERT(!"ID_VIEW_LABELS not found");
-        } else if (bool check{}; RestoreValue(m_toolbar_labels, &check) && check != item->IsChecked()) {
-                item->Toggle();
+        if (bool ok{}; RestoreValue(m_toolbar_labels, &ok) && ok != frame.m_auiToolBar->HasFlag(wxAUI_TB_TEXT)) {
                 wxCommandEvent evt;
                 frame.on_view_labels(evt);
+        }
+
+        if (bool ok{}; RestoreValue(m_row_lines, &ok) && ok) {
+                wxCommandEvent evt;
+                frame.on_view_zebra(evt);
         }
 }

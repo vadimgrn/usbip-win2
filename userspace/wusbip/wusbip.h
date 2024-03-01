@@ -50,10 +50,14 @@ private:
 	void on_toogle_auto(wxCommandEvent &event) override;
 	void on_item_context_menu(wxTreeListEvent &event) override;
 	void on_view_reset(wxCommandEvent &event) override;
+	void on_help_about_lib(wxCommandEvent&) override;
 
 	void on_save(wxCommandEvent &event) override;
 	void on_save_selected(wxCommandEvent &event) override;
 	void on_load(wxCommandEvent &event) override;
+
+	void on_view_zabra_update_ui(wxUpdateUIEvent &event) override;
+	void on_view_zebra(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
