@@ -395,7 +395,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Increase font size, Ctrl+Wheel</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_FONT_INCREASE</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Increase font</property>
             <property name="name">m_view_font_increase</property>
@@ -409,7 +409,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Decrease font size, Ctrl+Wheel </property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_FONT_DECREASE</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Decrease font</property>
             <property name="name">m_view_font_decrease</property>
@@ -423,7 +423,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Set default font size</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_FONT_DEFAULT</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Default font</property>
             <property name="name">m_view_font_default</property>

@@ -12,6 +12,7 @@
     <ClCompile Include="device_columns.cpp" />
     <ClCompile Include="persist.cpp" />
     <ClCompile Include="log.cpp" />
+    <ClCompile Include="wxutils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wusbip.h" />
@@ -21,6 +22,7 @@
     <ClInclude Include="device_columns.h" />
     <ClInclude Include="persist.h" />
     <ClInclude Include="log.h" />
+    <ClInclude Include="wxutils.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

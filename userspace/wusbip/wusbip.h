@@ -116,7 +116,5 @@ private:
 	wxTreeListItem get_edit_notes_device();
 
 	void save(_In_ const wxTreeListItems &devices);
-
 	void on_tree_mouse_wheel(_In_ wxMouseEvent &event);
-	void on_log_mouse_wheel(_In_ wxMouseEvent &event);
 };

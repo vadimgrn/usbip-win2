@@ -41,7 +41,10 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_LOG_TOGGLE = 1000
+			ID_FONT_INCREASE = 1000,
+			ID_FONT_DECREASE,
+			ID_FONT_DEFAULT,
+			ID_LOG_TOGGLE
 		};
 
 		wxStatusBar* m_statusBar;

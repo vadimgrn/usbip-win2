@@ -153,7 +153,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->AppendSeparator();
 
 	wxMenuItem* m_view_font_increase;
-	m_view_font_increase = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Increase font") ) + wxT('\t') + wxT("CTRL++"), _("Increase font size, Ctrl+Wheel"), wxITEM_NORMAL );
+	m_view_font_increase = new wxMenuItem( m_menu_view, ID_FONT_INCREASE, wxString( _("Increase font") ) + wxT('\t') + wxT("CTRL++"), _("Increase font size, Ctrl+Wheel"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_view_font_increase->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_PLUS), wxASCII_STR(wxART_MENU) ), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -162,7 +162,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_view_font_increase );
 
 	wxMenuItem* m_view_font_decrease;
-	m_view_font_decrease = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Decrease font") ) + wxT('\t') + wxT("CTRL+-"), _("Decrease font size, Ctrl+Wheel "), wxITEM_NORMAL );
+	m_view_font_decrease = new wxMenuItem( m_menu_view, ID_FONT_DECREASE, wxString( _("Decrease font") ) + wxT('\t') + wxT("CTRL+-"), _("Decrease font size, Ctrl+Wheel "), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_view_font_decrease->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_MINUS), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -171,7 +171,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_view_font_decrease );
 
 	wxMenuItem* m_view_font_default;
-	m_view_font_default = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Default font") ) + wxT('\t') + wxT("CTRL+0"), _("Set default font size"), wxITEM_NORMAL );
+	m_view_font_default = new wxMenuItem( m_menu_view, ID_FONT_DEFAULT, wxString( _("Default font") ) + wxT('\t') + wxT("CTRL+0"), _("Set default font size"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_view_font_default->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_UNDO), wxASCII_STR(wxART_MENU) ), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))

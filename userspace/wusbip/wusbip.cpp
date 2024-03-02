@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "persist.h"
 #include "log.h"
+#include "wxutils.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -74,47 +75,6 @@ void App::set_names()
 
         SetAppName(wx_string(v.GetProductName()));
         SetVendorName(wx_string(v.GetCompanyName()));
-}
-
-void for_each_child(_In_ wxWindow *wnd, _In_ const std::function<void (wxWindow*)> &f)
-{
-        auto &lst = wnd->GetChildren();
-
-        for (auto node = lst.GetFirst(); node; node = node->GetNext()) {
-                auto child = static_cast<wxWindow*>(node->GetData());
-                f(child);
-        }
-}
-
-/*
- * auto f = dir > 0 ? &wxFont::MakeLarger : &wxFont::MakeSmaller;
- * (font.*f)();
- */
-void change_font_size(_In_ wxWindow *wnd, _In_ int dir)
-{
-        enum { MIN_POINT = 6, MAX_POINT = 72 };
-
-        auto font = wnd->GetFont();
-        auto pt = font.GetPointSize();
-
-        if (!dir) {
-                if (auto def_pt = wxNORMAL_FONT->GetPointSize(); pt != def_pt) {
-                        pt = def_pt;
-                } else {
-                        return;
-                }
-        } else if (dir > 0 && pt < MAX_POINT) {
-                ++pt;
-        } else if (dir < 0 && pt > MIN_POINT) {
-                --pt;
-        } else {
-                return;
-        }
-
-        font.SetPointSize(pt);
-        wnd->SetFont(font);
-
-        wnd->Refresh(false);
 }
 
 consteval auto get_saved_keys()
@@ -382,15 +342,15 @@ wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 MainFrame::MainFrame(_In_ Handle read) : 
         Frame(nullptr),
         m_read(std::move(read)),
-        m_log(new LogWindow(this, m_menu_log->FindItem(ID_LOG_TOGGLE)))
+        m_log(new LogWindow(this, 
+                m_menu_log->FindItem(ID_LOG_TOGGLE),
+                m_menu_view->FindItem(ID_FONT_INCREASE),
+                m_menu_view->FindItem(ID_FONT_DECREASE),
+                m_menu_view->FindItem(ID_FONT_DEFAULT)))
 {
         wxASSERT(m_read);
         
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
-        
-        if (auto wnd = m_log->GetFrame()) {
-                wnd->Connect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_log_mouse_wheel));
-        }
 
         if (auto wnd = m_treeListCtrl->GetView()) {
                 wnd->Connect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel));
@@ -404,10 +364,6 @@ MainFrame::MainFrame(_In_ Handle read) :
 MainFrame::~MainFrame() 
 {
         Unbind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
-
-        if (auto wnd = m_log->GetFrame()) {
-                wnd->Disconnect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_log_mouse_wheel));
-        }
 
         if (auto wnd = m_treeListCtrl->GetView()) {
                 wnd->Disconnect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel));
@@ -1209,22 +1165,6 @@ void MainFrame::on_help_about_lib(wxCommandEvent&)
 void MainFrame::on_frame_mouse_wheel(wxMouseEvent &event)
 {
         on_tree_mouse_wheel(event);
-}
-
-/*
- * 'this' points to m_log->GetFrame() due to Connect().
- * @see m_log->GetFrame()->Connect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_log_mouse_wheel));
- */
-void MainFrame::on_log_mouse_wheel(_In_ wxMouseEvent &event)
-{
-        wxASSERT(this == static_cast<MainFrame*>(GetParent())->m_log->GetFrame());
-
-        if (event.GetModifiers() != wxMOD_CONTROL) { // only Ctrl is depressed
-                return;
-        }
-
-        auto f = [dir = event.GetWheelRotation()] (auto wnd) { change_font_size(wnd, dir); };
-        for_each_child(this, f);
 }
 
 /*
