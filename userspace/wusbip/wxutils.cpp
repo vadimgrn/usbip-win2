@@ -3,7 +3,9 @@
  */
 
 #include "wxutils.h"
+
 #include <wx/window.h>
+#include <wx/aui/auibar.h>
 
 void usbip::for_each_child(_In_ wxWindow *wnd, _In_ const std::function<void (wxWindow*)> &f)
 {
@@ -21,8 +23,6 @@ void usbip::for_each_child(_In_ wxWindow *wnd, _In_ const std::function<void (wx
  */
 void usbip::change_font_size(_In_ wxWindow *wnd, _In_ int dir)
 {
-        enum { MIN_POINT = 6, MAX_POINT = 72 };
-
         auto font = wnd->GetFont();
         auto pt = font.GetPointSize();
 
@@ -32,16 +32,51 @@ void usbip::change_font_size(_In_ wxWindow *wnd, _In_ int dir)
                 } else {
                         return;
                 }
-        } else if (dir > 0 && pt < MAX_POINT) {
+        } else if (dir > 0 && pt < FONT_MAX_POINT) {
                 ++pt;
-        } else if (dir < 0 && pt > MIN_POINT) {
+        } else if (dir < 0 && pt > FONT_MIN_POINT) {
                 --pt;
         } else {
                 return;
         }
 
         font.SetPointSize(pt);
-        wnd->SetFont(font);
 
-        wnd->Refresh(false);
+        if (wnd->SetFont(font)) {
+                wnd->Refresh(false);
+        } else {
+                wxFAIL_MSG("SetFont");
+        }
+}
+
+bool usbip::set_font_size(_In_ wxWindow *wnd, _In_ int pt)
+{
+        if (!valid_font_size(pt)) {
+                return false;
+        }
+
+        auto f = [pt] (auto wnd) 
+        {
+                if (auto f = wnd->GetFont(); f.GetPointSize() != pt) {
+                        f.SetPointSize(pt);
+                        if (wnd->SetFont(f)) {
+                                wnd->Refresh(false);
+                        }
+                }
+        };
+
+        for_each_child(wnd, f);
+        return true;
+}
+
+bool usbip::set_font_size(_Inout_ wxAuiToolBar &tb, _In_ int pt)
+{
+        if (!valid_font_size(pt)) {
+                return false;
+        }
+
+        auto font = tb.GetFont();
+        font.SetPointSize(pt);
+
+        return tb.SetFont(font);
 }

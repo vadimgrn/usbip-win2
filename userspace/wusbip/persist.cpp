@@ -5,6 +5,7 @@
 #include "persist.h"
 #include "wusbip.h"
 #include "log.h"
+#include "wxutils.h"
 
 #include <wx/dataview.h>
 
@@ -52,16 +53,26 @@ void wxPersistentMainFrame::Save() const
         }
 
         if (auto log = frame.m_log) {
-                auto verbose = log->GetLogLevel() == VERBOSE_LOGLEVEL;
-                SaveValue(m_log_verbose, verbose);
+                SaveValue(m_log_verbose, log->GetLogLevel() == VERBOSE_LOGLEVEL);
+                SaveValue(m_log_font_size, log->get_font_size());
         }
 
         if (auto tb = frame.m_auiToolBar) {
                 SaveValue(m_toolbar_labels, tb->HasFlag(wxAUI_TB_TEXT));
+                SaveValue(m_toolbar_font_size, tb->GetFont().GetPointSize());
+        }
+
+        if (auto tb = frame.m_auiToolBarAdd) {
+                SaveValue(m_toolbar_add_font_size, tb->GetFont().GetPointSize());
         }
 
         if (auto dv = frame.m_treeListCtrl->GetDataView()) {
-                SaveValue(m_row_lines, dv->HasFlag(wxDV_ROW_LINES));
+                SaveValue(m_tree_row_lines, dv->HasFlag(wxDV_ROW_LINES));
+        }
+
+        if (auto wnd = frame.m_treeListCtrl->GetView()) {
+                auto font = wnd->GetFont();
+                SaveValue(m_tree_font_size, font.GetPointSize());
         }
 }
 
@@ -93,13 +104,30 @@ void wxPersistentMainFrame::do_restore()
                 frame.m_log->SetLogLevel(lvl);
         }
 
+        if (int pt{}; RestoreValue(m_log_font_size, &pt)) {
+                frame.m_log->set_font_size(pt);
+        }
+
+        if (int pt{}; RestoreValue(m_toolbar_font_size, &pt)) {
+                usbip::set_font_size(*frame.m_auiToolBar, pt);
+        }
+
+        if (int pt{}; RestoreValue(m_toolbar_add_font_size, &pt)) {
+                usbip::set_font_size(*frame.m_auiToolBarAdd, pt);
+        }
+
         if (bool ok{}; RestoreValue(m_toolbar_labels, &ok) && ok != frame.m_auiToolBar->HasFlag(wxAUI_TB_TEXT)) {
                 wxCommandEvent evt;
                 frame.on_view_labels(evt);
         }
 
-        if (bool ok{}; RestoreValue(m_row_lines, &ok) && ok) {
+        if (bool ok{}; RestoreValue(m_tree_row_lines, &ok) && ok) {
                 wxCommandEvent evt;
                 frame.on_view_zebra(evt);
+        }
+
+        if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {
+                auto wnd = frame.m_treeListCtrl->GetDataView();
+                usbip::set_font_size(wnd, pt);
         }
 }

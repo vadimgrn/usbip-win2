@@ -401,7 +401,8 @@ void MainFrame::init_tree_list()
         if (auto hdr = dv.GenericGetHeader()) { // see dv.SetHeaderAttr()
                 auto font = hdr->GetFont();
                 font.MakeBold();
-                hdr->SetFont(font);
+                [[maybe_unused]] auto ok = hdr->SetFont(font);
+                wxASSERT(ok);
         }
 
         if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"

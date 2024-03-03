@@ -167,7 +167,7 @@
             <property name="label">E&amp;xit</property>
             <property name="name">m_file_exit</property>
             <property name="permission">none</property>
-            <property name="shortcut"></property>
+            <property name="shortcut">CTRL+Q</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_exit</event>
           </object>
@@ -394,10 +394,10 @@
             <property name="bitmap">Load From Art Provider; wxART_PLUS ; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Increase font size, Ctrl+Wheel</property>
+            <property name="help">Use Ctrl+Wheel as well</property>
             <property name="id">ID_FONT_INCREASE</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Increase font</property>
+            <property name="label">Increase font size</property>
             <property name="name">m_view_font_increase</property>
             <property name="permission">none</property>
             <property name="shortcut">CTRL++</property>
@@ -408,10 +408,10 @@
             <property name="bitmap">Load From Art Provider; wxART_MINUS ; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Decrease font size, Ctrl+Wheel </property>
+            <property name="help">Use Ctrl+Wheel as well</property>
             <property name="id">ID_FONT_DECREASE</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Decrease font</property>
+            <property name="label">Decrease font size</property>
             <property name="name">m_view_font_decrease</property>
             <property name="permission">none</property>
             <property name="shortcut">CTRL+-</property>
@@ -425,7 +425,7 @@
             <property name="help">Set default font size</property>
             <property name="id">ID_FONT_DEFAULT</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Default font</property>
+            <property name="label">Default font size</property>
             <property name="name">m_view_font_default</property>
             <property name="permission">none</property>
             <property name="shortcut">CTRL+0</property>

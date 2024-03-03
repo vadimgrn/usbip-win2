@@ -105,3 +105,20 @@ void LogWindow::on_mouse_wheel(_In_ wxMouseEvent &event)
         usbip::for_each_child(wnd, f);
 }
 
+bool LogWindow::set_font_size(_In_ int pt)
+{
+        return usbip::set_font_size(GetFrame(), pt);
+}
+
+int LogWindow::get_font_size() const
+{
+        auto &frame = *GetFrame();
+
+        if (auto &v = frame.GetChildren(); !v.empty()) {
+                auto wnd = v.front();
+                auto font = wnd->GetFont();
+                return font.GetPointSize();
+        }
+
+        return 0;
+}

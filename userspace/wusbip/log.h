@@ -24,6 +24,9 @@ public:
 		_In_ const wxMenuItem *font_decr,
 		_In_ const wxMenuItem *font_dflt);
 
+	int get_font_size() const;
+	bool set_font_size(_In_ int pt);
+
 private:
 	void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
 

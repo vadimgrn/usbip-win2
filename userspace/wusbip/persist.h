@@ -19,7 +19,11 @@ private:
         static inline auto &m_log_verbose = L"LogVerbose";
         static inline auto &m_toolbar_labels = L"ToolBarLabels";
         static inline auto &m_show_log_window = L"ShowLogWindow";
-        static inline auto &m_row_lines = L"RowLines";
+        static inline auto &m_log_font_size = L"LogFontSize";
+        static inline auto &m_tree_font_size = L"TreeFontSize";
+        static inline auto &m_tree_row_lines = L"TreeRowLines";
+        static inline auto &m_toolbar_font_size = L"ToolBarFontSize";
+        static inline auto &m_toolbar_add_font_size = L"ToolBarAddFontSize";
 
         void Save() const override;
         bool Restore() override;
