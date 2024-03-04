@@ -84,7 +84,7 @@
         <property name="window_name"></property>
         <property name="window_style"></property>
       </object>
-      <object class="wxMenuBar" expanded="false">
+      <object class="wxMenuBar" expanded="true">
         <property name="bg"></property>
         <property name="context_help"></property>
         <property name="context_menu">1</property>
@@ -172,7 +172,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -200,7 +200,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Toggle Auto (aka Persistent)</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_TOGGLE_AUTO</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Toggle Auto</property>
             <property name="name">m_toggle_auto</property>
@@ -215,7 +215,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Edit notes for a device</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_EDIT_NOTES</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Notes</property>
             <property name="name">m_edit_notes</property>
@@ -451,7 +451,7 @@
             <event name="OnMenuSelection">on_view_reset</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Devices</property>
           <property name="name">m_menu_devices</property>
           <property name="permission">protected</property>
@@ -492,7 +492,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Attach selected devices</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_ATTACH</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Attach</property>
             <property name="name">m_cmd_attach</property>
@@ -507,7 +507,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Detach selected devices</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">ID_DETACH</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Detach</property>
             <property name="name">m_cmd_detach</property>

@@ -82,7 +82,7 @@ consteval auto get_saved_keys()
         using key_val = std::pair<const wchar_t* const, column_pos_t>;
 
         return std::to_array<key_val>({
-                std::make_pair(L"busid", COL_BUSID),
+                { L"busid", COL_BUSID },
                 { L"speed", COL_SPEED },
                 { L"vendor", COL_VENDOR },
                 { L"product", COL_PRODUCT },
@@ -1127,8 +1127,44 @@ void MainFrame::on_reload(wxCommandEvent &event)
         }
 }
 
+std::unique_ptr<wxMenu> MainFrame::create_popup_menu()
+{
+        using elem = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
+
+        auto v = std::to_array<elem>({
+                { ID_ATTACH, m_menu_devices, &MainFrame::on_attach },
+                { ID_DETACH, m_menu_devices, &MainFrame::on_detach },
+                { wxID_SEPARATOR, nullptr, nullptr },
+                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
+                { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
+                { wxID_SEPARATOR, nullptr, nullptr },
+                { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
+                { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
+        });
+
+        auto popup = std::make_unique<wxMenu>();
+
+        for (auto [id, menu, handler]: v) {
+                if (id == wxID_SEPARATOR) {
+                        popup->AppendSeparator();
+                } else if (auto item = menu->FindItem(id)) {
+                        popup->Append(id, item->GetItemLabel(), item->GetHelp(), item->GetKind());
+                        popup->Bind(wxEVT_COMMAND_MENU_SELECTED, handler, this, id);
+                } else {
+                        wxFAIL_MSG("FindItem");
+                }
+        }
+
+        return popup;
+}
+
 void MainFrame::on_item_context_menu(wxTreeListEvent&)
 {
+        if (!m_popup_menu) {
+                m_popup_menu = create_popup_menu();
+        }
+
+        PopupMenu(m_popup_menu.get());
 }
 
 /*

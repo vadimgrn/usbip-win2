@@ -41,9 +41,13 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_FONT_INCREASE = 1000,
+			ID_TOGGLE_AUTO = 1000,
+			ID_EDIT_NOTES,
+			ID_FONT_INCREASE,
 			ID_FONT_DECREASE,
 			ID_FONT_DEFAULT,
+			ID_ATTACH,
+			ID_DETACH,
 			ID_LOG_TOGGLE
 		};
 
