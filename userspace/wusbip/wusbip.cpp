@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "persist.h"
 #include "log.h"
-#include "wxutils.h"
+#include "font.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -1181,18 +1181,15 @@ void MainFrame::on_tree_mouse_wheel(_In_ wxMouseEvent &event)
 
 void MainFrame::on_view_font_increase(wxCommandEvent&)
 {
-        auto f = [] (auto wnd) { change_font_size(wnd, 1); };
-        for_each_child(this, f);
+        change_font_size(this, 1);
 }
 
 void MainFrame::on_view_font_decrease(wxCommandEvent&)
 {
-        auto f = [] (auto wnd) { change_font_size(wnd, -1); };
-        for_each_child(this, f);
+        change_font_size(this, -1);
 }
 
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
-        auto f = [] (auto wnd) { change_font_size(wnd, 0); };
-        for_each_child(this, f);
+        change_font_size(this, 0);
 }

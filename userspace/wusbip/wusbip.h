@@ -78,7 +78,7 @@ private:
 	void on_edit_notes_update_ui(wxUpdateUIEvent &event) override;
 
 	void on_frame_mouse_wheel(wxMouseEvent &event) override;
-	
+
 	void on_view_font_increase(wxCommandEvent & event) override;
 	void on_view_font_decrease(wxCommandEvent & event) override;
 	void on_view_font_default(wxCommandEvent &event) override;

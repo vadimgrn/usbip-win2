@@ -3,7 +3,7 @@
  */
 
 #include "log.h"
-#include "wxutils.h"
+#include "font.h"
 
 #include <wx/frame.h>
 #include <wx/menuitem.h>
@@ -77,48 +77,23 @@ void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In
 
 void LogWindow::on_font_increase(_In_ wxCommandEvent&)
 {
-        auto f = [] (auto wnd) { usbip::change_font_size(wnd, 1); };
-        usbip::for_each_child(GetFrame(), f);
+        usbip::change_font_size(GetFrame(), 1);
 }
 
 void LogWindow::on_font_decrease(_In_ wxCommandEvent&)
 {
-        auto f = [] (auto wnd) { usbip::change_font_size(wnd, -1); };
-        usbip::for_each_child(GetFrame(), f);
+        usbip::change_font_size(GetFrame(), -1);
 }
 
 void LogWindow::on_font_default(_In_ wxCommandEvent&)
 {
-        auto f = [] (auto wnd) { usbip::change_font_size(wnd, 0); };
-        usbip::for_each_child(GetFrame(), f);
+        usbip::change_font_size(GetFrame(), 0);
 }
 
 void LogWindow::on_mouse_wheel(_In_ wxMouseEvent &event)
 {
-        if (event.GetModifiers() != wxMOD_CONTROL) { // only Ctrl is depressed
-                return;
+        if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
+                auto wnd = static_cast<wxWindow*>(event.GetEventObject());
+                usbip::change_font_size(wnd, event.GetWheelRotation());
         }
-
-        auto wnd = static_cast<wxWindow*>(event.GetEventObject());
-        auto f = [dir = event.GetWheelRotation()] (auto wnd) { usbip::change_font_size(wnd, dir); };
-
-        usbip::for_each_child(wnd, f);
-}
-
-bool LogWindow::set_font_size(_In_ int pt)
-{
-        return usbip::set_font_size(GetFrame(), pt);
-}
-
-int LogWindow::get_font_size() const
-{
-        auto &frame = *GetFrame();
-
-        if (auto &v = frame.GetChildren(); !v.empty()) {
-                auto wnd = v.front();
-                auto font = wnd->GetFont();
-                return font.GetPointSize();
-        }
-
-        return 0;
 }

@@ -110,7 +110,7 @@
     <ClCompile Include="persist.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="wusbip.cpp" />
-    <ClCompile Include="wxutils.cpp" />
+    <ClCompile Include="font.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="device_columns.h" />
@@ -120,7 +120,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="wusbip.h" />
-    <ClInclude Include="wxutils.h" />
+    <ClInclude Include="font.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

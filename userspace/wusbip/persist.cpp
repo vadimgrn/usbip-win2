@@ -5,12 +5,14 @@
 #include "persist.h"
 #include "wusbip.h"
 #include "log.h"
-#include "wxutils.h"
+#include "font.h"
 
 #include <wx/dataview.h>
 
 namespace
 {
+
+using namespace usbip;
 
 auto try_catch(_In_ const char *function, _In_ const std::function<void()> &func)
 {
@@ -54,26 +56,21 @@ void wxPersistentMainFrame::Save() const
 
         if (auto log = frame.m_log) {
                 SaveValue(m_log_verbose, log->GetLogLevel() == VERBOSE_LOGLEVEL);
-                SaveValue(m_log_font_size, log->get_font_size());
+                SaveValue(m_log_font_size, get_font_size(log));
         }
 
         if (auto tb = frame.m_auiToolBar) {
                 SaveValue(m_toolbar_labels, tb->HasFlag(wxAUI_TB_TEXT));
-                SaveValue(m_toolbar_font_size, tb->GetFont().GetPointSize());
+                SaveValue(m_toolbar_font_size, get_font_size(tb));
         }
 
-        if (auto tb = frame.m_auiToolBarAdd) {
-                SaveValue(m_toolbar_add_font_size, tb->GetFont().GetPointSize());
-        }
+        SaveValue(m_toolbar_add_font_size, get_font_size(frame.m_auiToolBarAdd));
 
         if (auto dv = frame.m_treeListCtrl->GetDataView()) {
                 SaveValue(m_tree_row_lines, dv->HasFlag(wxDV_ROW_LINES));
         }
 
-        if (auto wnd = frame.m_treeListCtrl->GetView()) {
-                auto font = wnd->GetFont();
-                SaveValue(m_tree_font_size, font.GetPointSize());
-        }
+        SaveValue(m_tree_font_size, get_font_size(frame.m_treeListCtrl));
 }
 
 bool wxPersistentMainFrame::Restore()
@@ -105,15 +102,15 @@ void wxPersistentMainFrame::do_restore()
         }
 
         if (int pt{}; RestoreValue(m_log_font_size, &pt)) {
-                frame.m_log->set_font_size(pt);
+                set_font_size(frame.m_log, pt);
         }
 
         if (int pt{}; RestoreValue(m_toolbar_font_size, &pt)) {
-                usbip::set_font_size(*frame.m_auiToolBar, pt);
+                set_font_size(frame.m_auiToolBar, pt);
         }
 
         if (int pt{}; RestoreValue(m_toolbar_add_font_size, &pt)) {
-                usbip::set_font_size(*frame.m_auiToolBarAdd, pt);
+                set_font_size(frame.m_auiToolBarAdd, pt);
         }
 
         if (bool ok{}; RestoreValue(m_toolbar_labels, &ok) && ok != frame.m_auiToolBar->HasFlag(wxAUI_TB_TEXT)) {
@@ -127,7 +124,6 @@ void wxPersistentMainFrame::do_restore()
         }
 
         if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {
-                auto wnd = frame.m_treeListCtrl->GetDataView();
-                usbip::set_font_size(wnd, pt);
+                set_font_size(frame.m_treeListCtrl, pt);
         }
 }
