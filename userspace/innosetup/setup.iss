@@ -74,7 +74,7 @@ WizardSmallImageFile=usbip-small.bmp
 WizardImageFile=usbip-logo.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
-; UninstallDisplayIcon={app}\usbip.exe
+; UninstallDisplayIcon={app}\wusbip.exe
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no 
