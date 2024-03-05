@@ -153,7 +153,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->AppendSeparator();
 
 	wxMenuItem* m_view_font_increase;
-	m_view_font_increase = new wxMenuItem( m_menu_view, ID_FONT_INCREASE, wxString( _("Increase font size") ) + wxT('\t') + wxT("CTRL++"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
+	m_view_font_increase = new wxMenuItem( m_menu_view, wxID_ZOOM_IN, wxString( _("Increase font size") ) + wxT('\t') + wxT("CTRL++"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_view_font_increase->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_PLUS), wxASCII_STR(wxART_MENU) ), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -162,7 +162,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_view_font_increase );
 
 	wxMenuItem* m_view_font_decrease;
-	m_view_font_decrease = new wxMenuItem( m_menu_view, ID_FONT_DECREASE, wxString( _("Decrease font size") ) + wxT('\t') + wxT("CTRL+-"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
+	m_view_font_decrease = new wxMenuItem( m_menu_view, wxID_ZOOM_OUT, wxString( _("Decrease font size") ) + wxT('\t') + wxT("CTRL+-"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_view_font_decrease->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_MINUS), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -171,7 +171,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_view_font_decrease );
 
 	wxMenuItem* m_view_font_default;
-	m_view_font_default = new wxMenuItem( m_menu_view, ID_FONT_DEFAULT, wxString( _("Default font size") ) + wxT('\t') + wxT("CTRL+0"), _("Set default font size"), wxITEM_NORMAL );
+	m_view_font_default = new wxMenuItem( m_menu_view, wxID_ZOOM_100, wxString( _("Default font size") ) + wxT('\t') + wxT("CTRL+0"), _("Set default font size"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_view_font_default->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_UNDO), wxASCII_STR(wxART_MENU) ), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -246,7 +246,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_log = new wxMenu();
 	wxMenuItem* m_log_toggle;
-	m_log_toggle = new wxMenuItem( m_menu_log, ID_LOG_TOGGLE, wxString( _("Toggle window") ) + wxT('\t') + wxT("CTRL+W"), _("Show/hide the window with log records"), wxITEM_CHECK );
+	m_log_toggle = new wxMenuItem( m_menu_log, ID_TOGGLE_LOG_WINDOW, wxString( _("Toggle window") ) + wxT('\t') + wxT("CTRL+W"), _("Show/hide the window with log records"), wxITEM_CHECK );
 	#ifdef __WXMSW__
 	m_log_toggle->SetBitmaps( wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -445,7 +445,7 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	this->Disconnect( ID_ATTACH, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_DETACH, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	this->Disconnect( ID_LOG_TOGGLE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
+	this->Disconnect( ID_TOGGLE_LOG_WINDOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
 	m_auiToolBar->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
 	this->Disconnect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );

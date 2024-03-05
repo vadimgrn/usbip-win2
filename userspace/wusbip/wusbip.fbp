@@ -226,7 +226,7 @@
             <event name="OnUpdateUI">on_edit_notes_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
@@ -395,7 +395,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Use Ctrl+Wheel as well</property>
-            <property name="id">ID_FONT_INCREASE</property>
+            <property name="id">wxID_ZOOM_IN</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Increase font size</property>
             <property name="name">m_view_font_increase</property>
@@ -409,7 +409,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Use Ctrl+Wheel as well</property>
-            <property name="id">ID_FONT_DECREASE</property>
+            <property name="id">wxID_ZOOM_OUT</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Decrease font size</property>
             <property name="name">m_view_font_decrease</property>
@@ -423,7 +423,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Set default font size</property>
-            <property name="id">ID_FONT_DEFAULT</property>
+            <property name="id">wxID_ZOOM_100</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Default font size</property>
             <property name="name">m_view_font_default</property>
@@ -536,7 +536,7 @@
             <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
@@ -545,7 +545,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Show/hide the window with log records</property>
-            <property name="id">ID_LOG_TOGGLE</property>
+            <property name="id">ID_TOGGLE_LOG_WINDOW</property>
             <property name="kind">wxITEM_CHECK</property>
             <property name="label">Toggle window</property>
             <property name="name">m_log_toggle</property>

@@ -43,12 +43,9 @@ class Frame : public wxFrame
 		{
 			ID_TOGGLE_AUTO = 1000,
 			ID_EDIT_NOTES,
-			ID_FONT_INCREASE,
-			ID_FONT_DECREASE,
-			ID_FONT_DEFAULT,
 			ID_ATTACH,
 			ID_DETACH,
-			ID_LOG_TOGGLE
+			ID_TOGGLE_LOG_WINDOW
 		};
 
 		wxStatusBar* m_statusBar;

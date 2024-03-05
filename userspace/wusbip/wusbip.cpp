@@ -343,10 +343,10 @@ MainFrame::MainFrame(_In_ Handle read) :
         Frame(nullptr),
         m_read(std::move(read)),
         m_log(new LogWindow(this, 
-                m_menu_log->FindItem(ID_LOG_TOGGLE),
-                m_menu_view->FindItem(ID_FONT_INCREASE),
-                m_menu_view->FindItem(ID_FONT_DECREASE),
-                m_menu_view->FindItem(ID_FONT_DEFAULT)))
+                m_menu_log->FindItem(ID_TOGGLE_LOG_WINDOW),
+                m_menu_view->FindItem(wxID_ZOOM_IN),
+                m_menu_view->FindItem(wxID_ZOOM_OUT),
+                m_menu_view->FindItem(wxID_ZOOM_100)))
 {
         wxASSERT(m_read);
         
