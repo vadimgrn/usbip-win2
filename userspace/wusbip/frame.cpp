@@ -21,9 +21,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_file_load;
 	m_file_load = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Load") ) + wxT('\t') + wxT("CTRL+L"), _("Load saved devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_file_load->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_PASTE), wxASCII_STR(wxART_MENU) ) );
+	m_file_load->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_GO_DOWN), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_file_load->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_PASTE), wxASCII_STR(wxART_MENU) ) );
+	m_file_load->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_GO_DOWN), wxASCII_STR(wxART_MENU) ) );
 	#endif
 	m_menu_file->Append( m_file_load );
 
@@ -302,7 +302,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_auiToolBar->AddSeparator();
 
-	m_tool_load = m_auiToolBar->AddTool( wxID_ANY, _("Load"), wxArtProvider::GetBitmap( wxASCII_STR(wxART_PASTE), wxASCII_STR(wxART_TOOLBAR) ), wxNullBitmap, wxITEM_NORMAL, _("Load saved devices"), wxEmptyString, NULL );
+	m_tool_load = m_auiToolBar->AddTool( wxID_ANY, _("Load"), wxArtProvider::GetBitmap( wxASCII_STR(wxART_GO_DOWN), wxASCII_STR(wxART_TOOLBAR) ), wxNullBitmap, wxITEM_NORMAL, _("Load saved devices"), wxEmptyString, NULL );
 
 	m_tool_save = m_auiToolBar->AddTool( wxID_SAVE, _("Save"), wxArtProvider::GetBitmap( wxASCII_STR(wxART_FILE_SAVE), wxASCII_STR(wxART_TOOLBAR) ), wxNullBitmap, wxITEM_NORMAL, _("Save devices"), wxEmptyString, NULL );
 

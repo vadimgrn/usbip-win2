@@ -111,7 +111,7 @@
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_PASTE; wxART_MENU</property>
+            <property name="bitmap">Load From Art Provider; wxART_GO_DOWN; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Load saved devices</property>
@@ -172,7 +172,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -226,7 +226,7 @@
             <event name="OnUpdateUI">on_edit_notes_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
@@ -451,7 +451,7 @@
             <event name="OnMenuSelection">on_view_reset</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Devices</property>
           <property name="name">m_menu_devices</property>
           <property name="permission">protected</property>
@@ -536,7 +536,7 @@
             <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
@@ -605,7 +605,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -723,7 +723,7 @@
           <property name="permission">protected</property>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_PASTE; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From Art Provider; wxART_GO_DOWN; wxART_TOOLBAR</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
           <property name="kind">wxITEM_NORMAL</property>

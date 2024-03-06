@@ -1148,7 +1148,10 @@ std::unique_ptr<wxMenu> MainFrame::create_popup_menu()
                 if (id == wxID_SEPARATOR) {
                         popup->AppendSeparator();
                 } else if (auto item = menu->FindItem(id)) {
-                        popup->Append(id, item->GetItemLabel(), item->GetHelp(), item->GetKind());
+                        auto clone = popup->Append(id, item->GetItemLabel(), item->GetHelp(), item->GetKind());
+                        for (auto checked: {false, true}) {
+                                clone->SetBitmap(item->GetBitmap(checked), checked);
+                        }
                         popup->Bind(wxEVT_COMMAND_MENU_SELECTED, handler, this, id);
                 } else {
                         wxFAIL_MSG("FindItem");
