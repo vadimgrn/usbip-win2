@@ -372,6 +372,8 @@ MainFrame::~MainFrame()
 
 void MainFrame::init()
 {
+        SetIcon(wxIcon(L"USBip")); // see wxwidgets.rc
+
         m_log->SetVerbose(true); // produce messages for wxLOG_Info
         m_log->SetLogLevel(DEFAULT_LOGLEVEL);
 
