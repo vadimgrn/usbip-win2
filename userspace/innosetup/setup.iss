@@ -70,11 +70,11 @@ OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
 SolidCompression=yes
 DisableWelcomePage=no
-WizardSmallImageFile=usbip-small.bmp
-WizardImageFile=usbip-logo.bmp
+WizardSmallImageFile=48.bmp,64.bmp,128.bmp
+WizardImageFile=164.bmp,192.bmp,256.bmp,384.bmp,512.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
-; UninstallDisplayIcon={app}\wusbip.exe
+UninstallDisplayIcon={app}\wusbip.exe
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no 
