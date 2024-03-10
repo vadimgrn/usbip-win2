@@ -71,7 +71,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_edit->AppendSeparator();
 
 	wxMenuItem* m_toggle_auto;
-	m_toggle_auto = new wxMenuItem( m_menu_edit, ID_TOGGLE_AUTO, wxString( _("Toggle Auto") ) + wxT('\t') + wxT("CTRL+P"), _("Toggle Auto (aka Persistent)"), wxITEM_NORMAL );
+	m_toggle_auto = new wxMenuItem( m_menu_edit, ID_TOGGLE_AUTO, wxString( _("Toggle Auto") ) + wxT('\t') + wxT("CTRL+P"), _("Toggle Auto (aka Persistent) for selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_toggle_auto->SetBitmaps( wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
