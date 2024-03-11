@@ -68,6 +68,15 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	#endif
 	m_menu_edit->Append( m_select_all );
 
+	wxMenuItem* m_copy_rows;
+	m_copy_rows = new wxMenuItem( m_menu_edit, wxID_COPY, wxString( _("Copy rows") ) + wxT('\t') + wxT("CTRL+C"), _("Copy selected rows to the clipboard"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_copy_rows->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_COPY), wxASCII_STR(wxART_MENU) ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_copy_rows->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_COPY), wxASCII_STR(wxART_MENU) ) );
+	#endif
+	m_menu_edit->Append( m_copy_rows );
+
 	m_menu_edit->AppendSeparator();
 
 	wxMenuItem* m_toggle_auto;
@@ -370,6 +379,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_select_all ), this, m_select_all->GetId());
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
+	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_copy_rows ), this, m_copy_rows->GetId());
+	this->Connect( m_copy_rows->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toogle_auto ), this, m_toggle_auto->GetId());
 	this->Connect( m_toggle_auto->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
@@ -433,6 +444,7 @@ Frame::~Frame()
 	this->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ) );
 	this->Disconnect( wxID_SAVEAS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( wxID_SELECTALL, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
+	this->Disconnect( wxID_COPY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_AUTO, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_EDIT_NOTES, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );

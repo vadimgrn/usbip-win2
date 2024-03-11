@@ -52,6 +52,7 @@ private:
 	void on_item_context_menu(wxTreeListEvent &event) override;
 	void on_view_reset(wxCommandEvent &event) override;
 	void on_help_about_lib(wxCommandEvent&) override;
+	void on_copy_rows(wxCommandEvent &event) override;
 
 	void on_save(wxCommandEvent &event) override;
 	void on_save_selected(wxCommandEvent &event) override;

@@ -21,6 +21,7 @@
 #include <wx/config.h>
 #include <wx/textdlg.h>
 #include <wx/headerctrl.h>
+#include <wx/clipbrd.h>
 #include <wx/persist/dataview.h>
 
 #include <format>
@@ -316,6 +317,22 @@ auto get_saved()
         return result;
 }
 
+auto to_string(_In_ _In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev)
+{
+        wxASSERT(tree.GetColumnCount() > COL_LAST_VISIBLE);
+
+        wxString s;
+        for (unsigned int n = COL_LAST_VISIBLE, i = 0; i <= n; ++i) {
+                if (!i) {
+                        auto server = tree.GetItemParent(dev);
+                        wxASSERT(server.IsOk());
+                        s += tree.GetItemText(server);
+                }
+                s += L',' + tree.GetItemText(dev, i);
+        }
+        return s;
+}
+
 } // namespace
 
 wxIMPLEMENT_APP(App);
@@ -548,6 +565,24 @@ void MainFrame::on_has_selected_devices_update_ui(wxUpdateUIEvent &event)
 {
         auto v = get_selected_devices(*m_treeListCtrl);
         event.Enable(!v.empty());
+}
+
+void MainFrame::on_copy_rows(wxCommandEvent&)
+{
+        wxString rows;
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+                rows += to_string(tree, dev) + L'\n';
+        }
+
+        wxLogVerbose(rows);
+
+        if (wxClipboardLocker lck; !lck) {
+                wxLogError(_("Cannot lock the clipboard"));
+        } else if (auto data = std::make_unique<wxTextDataObject>(rows); wxTheClipboard->SetData(data.get())) {
+                data.release();
+        } else {
+                wxLogError(_("Cannot pass data to the clipboard"));
+        }
 }
 
 void MainFrame::on_select_all(wxCommandEvent&)
@@ -1134,13 +1169,15 @@ std::unique_ptr<wxMenu> MainFrame::create_popup_menu()
         using elem = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
 
         auto v = std::to_array<elem>({
+                { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
+                { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
+                { wxID_SEPARATOR, nullptr, nullptr },
                 { ID_ATTACH, m_menu_devices, &MainFrame::on_attach },
                 { ID_DETACH, m_menu_devices, &MainFrame::on_detach },
                 { wxID_SEPARATOR, nullptr, nullptr },
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
                 { wxID_SEPARATOR, nullptr, nullptr },
-                { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
         });
 

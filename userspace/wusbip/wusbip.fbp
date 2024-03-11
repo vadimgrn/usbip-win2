@@ -172,7 +172,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -190,6 +190,21 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_select_all</event>
             <event name="OnUpdateUI">on_has_devices_update_ui</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_COPY; wxART_MENU</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Copy selected rows to the clipboard</property>
+            <property name="id">wxID_COPY</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Copy rows</property>
+            <property name="name">m_copy_rows</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+C</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_copy_rows</event>
+            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="separator" expanded="false">
             <property name="name">m_separator6</property>
