@@ -163,6 +163,11 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
 
 auto usbip::vhci::open(_In_ bool overlapped) -> Handle
 {
+        DWORD FlagsAndAttributes = FILE_ATTRIBUTE_NORMAL;
+        if (overlapped) {
+                FlagsAndAttributes |= FILE_FLAG_OVERLAPPED;
+        }
+
         Handle h;
 
         if (auto path = get_path(); !path.empty()) {
@@ -171,7 +176,7 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
                                 FILE_SHARE_READ | FILE_SHARE_WRITE, 
                                 nullptr, // lpSecurityAttributes
                                 OPEN_EXISTING, 
-                                overlapped ? FILE_FLAG_OVERLAPPED : FILE_ATTRIBUTE_NORMAL,
+                                FlagsAndAttributes,
                                 nullptr)); // hTemplateFile
         }
 

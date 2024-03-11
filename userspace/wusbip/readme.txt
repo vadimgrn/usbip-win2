@@ -1,0 +1,2 @@
+wusbip.fbp is a project file for wxFormBuilder that is used to create the GUI.
+See: https://github.com/wxFormBuilder/wxFormBuilder

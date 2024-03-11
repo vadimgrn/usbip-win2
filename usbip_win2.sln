@@ -17,6 +17,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "package", "drivers\package\
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "innosetup", "userspace\innosetup\innosetup.vcxproj", "{0B54108E-9FB0-45EA-B252-CEBC68A5CCF0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A} = {4AA823F8-7C8A-4A4B-A106-E9F630CD001A}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "devnode", "userspace\devnode\devnode.vcxproj", "{7A610672-F2EF-4048-883A-41195D0977DC}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -40,6 +43,11 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libusbip", "userspace\libusbip\libusbip.vcxproj", "{35196D26-E918-4002-B87E-1EEC2BF54444}"
 	ProjectSection(ProjectDependencies) = postProject
 		{EF113E88-152A-4EB5-811C-1D499C3248A0} = {EF113E88-152A-4EB5-811C-1D499C3248A0}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wusbip", "userspace\wusbip\wusbip.vcxproj", "{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{35196D26-E918-4002-B87E-1EEC2BF54444} = {35196D26-E918-4002-B87E-1EEC2BF54444}
 	EndProjectSection
 EndProject
 Global
@@ -96,6 +104,10 @@ Global
 		{35196D26-E918-4002-B87E-1EEC2BF54444}.Debug|x64.Build.0 = Debug|x64
 		{35196D26-E918-4002-B87E-1EEC2BF54444}.Release|x64.ActiveCfg = Release|x64
 		{35196D26-E918-4002-B87E-1EEC2BF54444}.Release|x64.Build.0 = Release|x64
+		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Debug|x64.ActiveCfg = Debug|x64
+		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Debug|x64.Build.0 = Debug|x64
+		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Release|x64.ActiveCfg = Release|x64
+		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

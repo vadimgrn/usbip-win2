@@ -1,4 +1,4 @@
-; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
 #if Ver < EncodeVer(6,2,0,0)
         #error This script requires Inno Setup 6.2 or later
@@ -28,6 +28,9 @@
 
 #define VCToolsRedistExe "vc_redist.x64.exe"
 
+#define AppExeName ExtractFileName(ExePath)
+; #define OutputDir  ExtractFilePath(AppExePath)
+
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
 #define AppVersion GetVersionNumbersString(ExePath)
@@ -44,6 +47,8 @@
 #define CertFile "usbip.pfx"
 #define CertName "USBip"
 #define CertPwd "usbip"
+
+#define wxWidgetsDLL "wxmsw32u*_vc"
 
 [Setup]
 AppName={#ProductName}
@@ -65,11 +70,11 @@ OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
 OutputDir={#BuildDir}
 SolidCompression=yes
 DisableWelcomePage=no
-WizardSmallImageFile=usbip-small.bmp
-WizardImageFile=usbip-logo.bmp
+WizardSmallImageFile=48.bmp,64.bmp,128.bmp
+WizardImageFile=164.bmp,192.bmp,256.bmp,384.bmp,512.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
-; UninstallDisplayIcon={app}\usbip.exe
+UninstallDisplayIcon={app}\wusbip.exe
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no 
@@ -82,8 +87,14 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 
 [Components]
 Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
+Name: "gui"; Description: "GUI App"; Types: full custom;
 Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
 Name: "pdb"; Description: "Program DataBase files"; Types: full custom
+
+[Icons]
+Name: "{group}\{#ProductName}"; Filename: "{app}\{#AppExeName}"; Components: gui
+Name: "{group}\{cm:UninstallProgram,{#ProductName}}"; Filename: "{uninstallexe}"; Components: main
+Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#AppExeName}"; Components: gui; Tasks: desktopicon
 
 [Files]
 
@@ -94,15 +105,20 @@ Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Fl
 Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Excludes: "{#wxWidgetsDLL}.dll"; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 Source: {#BuildDir + "libusbip.lib"}; DestDir: "{app}\lib"; Components: sdk
 Source: {#BuildDir + "libusbip.exp"}; DestDir: "{app}\lib"; Components: sdk
 
-Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip.pdb, libusbip_check.pdb"; Components: pdb
+; wxmsw32u?_vc.pdb is too large
+Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip*.pdb, wusbip.pdb, {#wxWidgetsDLL}.pdb"; Components: pdb
 Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
+Source: {#BuildDir + "wusbip.pdb"}; DestDir: "{app}"; Components: pdb and gui
+
+Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
+Source: {#BuildDir}{#wxWidgetsDLL + ".dll"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
@@ -111,6 +127,7 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
 Name: modifypath; Description: "Add to &PATH environment variable for all users"
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Run]
 
@@ -256,7 +273,7 @@ end;
 
 // UninsIS.dll
 // https://github.com/Bill-Stewart/UninsIS
-// Code is copied from [Code] section of UninsIS.iss, following modifications are made:
+// Code is copied from [Code] section of UninsIS-Sample.iss, following modifications are made:
 // 1) CompareISPackageVersion is removed because it MUST always be uninstalled
 // 2) PrepareToInstall does not call it
 

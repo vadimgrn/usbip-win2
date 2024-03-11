@@ -248,7 +248,8 @@ const char *device_control_name(ULONG ioctl_code)
 	case vhci::ioctl::PLUGIN_HARDWARE: return "vhci_plugin_hardware";
 	case vhci::ioctl::PLUGOUT_HARDWARE: return "vhci_plugout_hardware";
 	case vhci::ioctl::GET_IMPORTED_DEVICES: return "vhci_get_imported_devices";
-	case vhci::ioctl::DRIVER_REGISTRY_PATH: return "vhci_driver_registry_path";
+	case vhci::ioctl::GET_PERSISTENT: return "vhci_get_persistent";
+	case vhci::ioctl::SET_PERSISTENT: return "vhci_set_persistent";
 
 	case IOCTL_USB_DIAG_IGNORE_HUBS_ON: return "USB_DIAG_IGNORE_HUBS_ON";
 	case IOCTL_USB_DIAG_IGNORE_HUBS_OFF: return "USB_DIAG_IGNORE_HUBS_OFF";

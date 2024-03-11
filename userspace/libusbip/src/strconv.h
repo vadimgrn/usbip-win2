@@ -12,6 +12,11 @@
 namespace usbip
 {
 
+constexpr auto size_bytes(_In_ std::wstring_view s) noexcept
+{
+        return s.size()*sizeof(s[0]);
+}
+
 USBIP_API std::wstring utf8_to_wchar(_In_ std::string_view s);
 USBIP_API std::string wchar_to_utf8(_In_ std::wstring_view ws);
 

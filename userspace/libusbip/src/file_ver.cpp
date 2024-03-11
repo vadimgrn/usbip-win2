@@ -1,15 +1,36 @@
 /*
- * Copyright (C) 2001 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2001 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "file_ver.h"
 
 #include <cassert>
-#include <exception>
-#include <memory>
+#include <system_error>
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <format>
+
+ /*
+  * @see _get_pgmptr, _get_wpgmptr
+  */
+std::wstring win::get_module_filename()
+{
+        std::wstring path(MAX_PATH, L'\0');
+
+        for (auto ok = true; ok; ) {
+                auto cch = GetModuleFileName(nullptr, path.data(), static_cast<DWORD>(path.size()));
+
+                if (ok = cch == path.size(); ok) {
+                        assert(GetLastError() == ERROR_INSUFFICIENT_BUFFER);
+                        cch *= 2;
+                }
+
+                path.resize(cch);
+        }
+
+        return path;
+}
 
 class win::FileVersion::Impl
 {
@@ -49,28 +70,20 @@ private:
 
         std::wstring GetTranslation(bool original = false) const;
 
-        void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const;
-        std::wstring_view VerQueryValue(const wchar_t *val) const;
+        const void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const;
+        std::wstring_view VerQueryValue(const wchar_t *value) const;
 };
 
 win::FileVersion::Impl::Impl(std::wstring_view filename)
 {
-        if (filename.empty()) {
-                if (wchar_t *val{}; auto err = _get_wpgmptr(&val)) { // FIXME: for wmain only
-                        throw std::exception("win::FileVersion: _get_wpgmptr error");
-                } else {
-                        filename = val;
-                }
-        }
-
         if (auto err = SetFile(filename)) {
-                throw std::exception("win::FileVersion: SetFile error");
+                throw std::system_error(err, std::system_category(), "FileVersion::SetFile");
         }
 }
 
 DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
 {
-        auto sz = GetFileVersionInfoSize(path.data(), nullptr);
+        auto sz = GetFileVersionInfoSize(path.empty() ? nullptr : path.data(), nullptr);
         if (!sz) {
                 return GetLastError();
         }
@@ -91,32 +104,35 @@ void win::FileVersion::Impl::SetTranslation(WORD lang_id, UINT code_page)
         m_def_transl = MakeTransl(transl);
 }
 
-void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_sz) const
+const void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_sz) const
 {
         if (m_info.empty()) {
-                throw std::exception("win::FileVersion::VerQueryValue: not initialized");
+                throw std::logic_error("FileVersion::VerQueryValue: not initialized");
         }
 
         void *buf{};
         buf_sz = 0;
 
         if (!::VerQueryValue(m_info.data(), val.c_str(), &buf, &buf_sz)) {
-                throw std::exception("win::FileVersion::VerQueryValue error");
+                throw std::invalid_argument("FileVersion::VerQueryValue");
         }
         
         return buf;
 }
 
-std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *val) const
+std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *value) const
 {
         std::wstring_view res;
-        auto s = L"\\StringFileInfo\\" + GetTranslation() + L'\\' + val;
+        auto key = L"\\StringFileInfo\\" + GetTranslation() + L'\\' + value;
 
-        UINT buf_sz;
-        auto buf = VerQueryValue(s, buf_sz);
+        UINT cch{};
+        auto ws = static_cast<const wchar_t*>(VerQueryValue(key, cch));
 
-        if (buf && buf_sz) {
-                res = std::wstring_view(static_cast<const wchar_t*>(buf), buf_sz);
+        if (ws && cch) {
+                if (ws[cch - 1] == L'\0') {
+                        --cch;
+                }
+                res = std::wstring_view(ws, cch);
         }
 
         return res;
@@ -124,11 +140,11 @@ std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *val) cons
 
 std::wstring win::FileVersion::Impl::VerLanguageName() const
 {
-        WORD wLang = 0;
+        WORD wLang{};
 
         std::wistringstream is(std::wstring(m_def_transl, m_def_transl.size() >> 1));
         if (!(is >> std::hex >> wLang)) {
-                throw std::exception("win::FileVersion::VerLanguageName: stream in error state");
+                throw std::runtime_error("FileVersion::VerLanguageName: stream in error state");
         }
 
 	auto cnt = ::VerLanguageName(wLang, 0, 0);
@@ -151,20 +167,23 @@ std::wstring win::FileVersion::Impl::MakeTransl(DWORD transl)
 
 DWORD win::FileVersion::Impl::PackTransl(WORD lang_id, UINT code_page)
 {
-        auto locale_id = MAKELCID(lang_id, SORT_DEFAULT);
+        auto locale_id = MAKELCID(lang_id, SORT_DEFAULT); // FIXME: deprecated
 
         if (!IsValidLocale(locale_id, LCID_INSTALLED)) { // LCID_SUPPORTED
-                throw std::exception("win::FileVersion::PackTransl: locale is not installed");
+                auto s = std::format("FileVersion::PackTransl: locale {:#x} is not installed", locale_id);
+                throw std::runtime_error(s);
         }
 
         if (!IsValidCodePage(code_page)) {
-                throw std::exception("win::FileVersion::PackTransl: code page is not installed");
+                auto s = std::format("FileVersion::PackTransl: code page {} is not installed", code_page);
+                throw std::runtime_error(s);
         }
 
-        auto offs = static_cast<int>(sizeof(WORD))*CHAR_BIT; // number of bits in WORD
+        constexpr auto offs = static_cast<int>(sizeof(WORD))*CHAR_BIT; // number of bits in WORD
 
-        if (code_page >> offs ) {
-                throw std::exception("win::FileVersion::PackTransl: UINT trancating");
+        if (code_page >> offs) {
+                auto s = std::format("FileVersion::PackTransl: UINT({:#x}) trancating", code_page);
+                throw std::overflow_error(s);
         }
 
         DWORD res = code_page;
@@ -186,13 +205,12 @@ std::wstring win::FileVersion::Impl::GetTranslation(bool original) const
 
         std::wstring s;
 
-        UINT buf_sz;
-        auto buf = VerQueryValue(L"\\VarFileInfo\\Translation", buf_sz);
+        UINT buf_sz{};
+        auto ptr = reinterpret_cast<const DWORD*>(VerQueryValue(L"\\VarFileInfo\\Translation", buf_sz)); // first always must be present
 
-        if (buf && buf_sz) {
-                auto dw = *reinterpret_cast<DWORD*>(buf); // first always must present
-                assert(buf_sz == sizeof(dw));
-                s = MakeTransl(dw);
+        if (ptr && buf_sz) {
+                assert(buf_sz == sizeof(*ptr));
+                s = MakeTransl(*ptr);
         }
 
         return s;
@@ -204,7 +222,7 @@ void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) cons
         std::wistringstream is(m_def_transl);
 
         if (!(is >> std::hex >> dw)) {
-                throw std::exception("win::FileVersion::GetTranslation: istream in error state");
+                throw std::runtime_error("FileVersion::GetTranslation: istream in error state");
         }
         
         lang_id   = HIWORD(dw);

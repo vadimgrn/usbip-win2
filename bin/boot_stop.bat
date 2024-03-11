@@ -1,6 +1,8 @@
 @echo off
 
 set NAME=USBip
+set SED=..\tools\sed.exe
+
 set NAME_UDE=%NAME%-ude
 set NAME_FLT=%NAME%-flt
 
@@ -15,9 +17,8 @@ tracelog.exe -stop %NAME_FLT%
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME_UDE%.txt %LOG_DIR%\%NAME_UDE%.etl
 tracefmt.exe -nosummary -p %TEMP%\%NAME% -o %NAME_FLT%.txt %LOG_DIR%\%NAME_FLT%.etl
 
-sed -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-*.txt
-sed -i "s/`anonymous namespace':://" %NAME%-*.txt
-del /F sed*
+%SED% -i "s/TRACE_LEVEL_CRITICAL/CRT/;s/TRACE_LEVEL_ERROR/ERR/;s/TRACE_LEVEL_WARNING/WRN/;s/TRACE_LEVEL_INFORMATION/INF/;s/TRACE_LEVEL_VERBOSE/VRB/" %NAME%-*.txt
+%SED% -i "s/`anonymous namespace':://" %NAME%-*.txt
 
 reg delete %REG_DIR%\%NAME_UDE% /f
 reg delete %REG_DIR%\%NAME_FLT% /f
