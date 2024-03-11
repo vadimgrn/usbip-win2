@@ -160,6 +160,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_view_font_increase->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_PLUS), wxASCII_STR(wxART_MENU) ) );
 	#endif
 	m_menu_view->Append( m_view_font_increase );
+	m_view_font_increase->Enable( false );
 
 	wxMenuItem* m_view_font_decrease;
 	m_view_font_decrease = new wxMenuItem( m_menu_view, wxID_ZOOM_OUT, wxString( _("Decrease font size") ) + wxT('\t') + wxT("CTRL+-"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
@@ -169,6 +170,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_view_font_decrease->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_MINUS), wxASCII_STR(wxART_MENU) ) );
 	#endif
 	m_menu_view->Append( m_view_font_decrease );
+	m_view_font_decrease->Enable( false );
 
 	wxMenuItem* m_view_font_default;
 	m_view_font_default = new wxMenuItem( m_menu_view, wxID_ZOOM_100, wxString( _("Default font size") ) + wxT('\t') + wxT("CTRL+0"), _("Set default font size"), wxITEM_NORMAL );

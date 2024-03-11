@@ -172,7 +172,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -393,7 +393,7 @@
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_PLUS ; wxART_MENU</property>
             <property name="checked">0</property>
-            <property name="enabled">1</property>
+            <property name="enabled">0</property>
             <property name="help">Use Ctrl+Wheel as well</property>
             <property name="id">wxID_ZOOM_IN</property>
             <property name="kind">wxITEM_NORMAL</property>
@@ -407,7 +407,7 @@
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_MINUS ; wxART_MENU</property>
             <property name="checked">0</property>
-            <property name="enabled">1</property>
+            <property name="enabled">0</property>
             <property name="help">Use Ctrl+Wheel as well</property>
             <property name="id">wxID_ZOOM_OUT</property>
             <property name="kind">wxITEM_NORMAL</property>
