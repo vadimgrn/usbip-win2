@@ -323,14 +323,30 @@ auto to_string(_In_ _In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev)
 
         wxString s;
         for (unsigned int n = COL_LAST_VISIBLE, i = 0; i <= n; ++i) {
-                if (!i) {
-                        auto server = tree.GetItemParent(dev);
-                        wxASSERT(server.IsOk());
+                if (i) {
+                        s += L',';
+                } else if (auto server = tree.GetItemParent(dev); server.IsOk()) {
                         s += tree.GetItemText(server);
+                        s += L'/';
+                } else {
+                        wxFAIL_MSG("server.IsOk");
                 }
-                s += L',' + tree.GetItemText(dev, i);
+                s += tree.GetItemText(dev, i);
         }
         return s;
+}
+
+auto get_servers(_In_ const std::vector<device_columns> &devices)
+{
+        std::set<wxString> servers;
+
+        for (wxString hostname, service; auto &dc: devices) {
+                if (auto url = get_url(dc); split_server_url(url, hostname, service)) {
+                        servers.insert(std::move(hostname));
+                }
+        }
+
+        return servers;
 }
 
 } // namespace
@@ -402,7 +418,7 @@ void MainFrame::init()
         SetTitle(app_name);
 
         set_menu_columns_labels();
-        m_textCtrlServer->SetMaxLength(NI_MAXHOST);
+        m_comboBoxServer->SetMaxLength(NI_MAXHOST);
 
         auto port = get_tcp_port();
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
@@ -878,9 +894,11 @@ void MainFrame::on_help_about(wxCommandEvent&)
 
 void MainFrame::add_exported_devices(wxCommandEvent&)
 {
-        auto host = m_textCtrlServer->GetValue();
+        auto &cb = *m_comboBoxServer;
+
+        auto host = cb.GetValue();
         if (host.empty()) {
-                m_textCtrlServer->SetFocus();
+                cb.SetFocus();
                 return;
         }
 
@@ -930,6 +948,10 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
                 wxLogError(_("enum_exportable_devices error %#lx\n%s"), err, GetLastErrorMsg(err));
+        } else if (cb.FindString(host) != wxNOT_FOUND) {
+                // already exists
+        } else if (auto pos = cb.Append(host); cb.GetCount() > 32) {
+                cb.Delete(pos > 0 ? --pos : ++pos);
         }
 }
 
@@ -1099,15 +1121,22 @@ void MainFrame::on_save_selected(wxCommandEvent&)
 
 void MainFrame::on_load(wxCommandEvent&)
 {
-        auto &tree = *m_treeListCtrl;
         int cnt = 0;
+        auto saved = get_saved();
 
-        for (auto persistent = get_persistent(); auto &dc: get_saved()) {
+        if (static bool once{}; !once) {
+                once = true;
+                for (auto &i: get_servers(saved)) {
+                        m_comboBoxServer->Append(i);
+                }
+        }
+
+        for (auto persistent = get_persistent(); auto &dc: saved) {
 
                 auto flags = get_saved_flags();
                 auto [dev, added] = find_or_add_device(dc);
 
-                if (!(added || is_empty(tree, dev))) {
+                if (!(added || is_empty(*m_treeListCtrl, dev))) {
                         wxLogVerbose(_("Skip loading existing device %s/%s"), get_url(dc), dc[COL_BUSID]);
                         continue;
                 }

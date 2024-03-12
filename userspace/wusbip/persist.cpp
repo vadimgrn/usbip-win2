@@ -42,7 +42,7 @@ void wxPersistentMainFrame::Save() const
         wxPersistentTLW::Save();
         auto &frame = *Get();
                 
-        if (auto ctl = frame.m_textCtrlServer) {
+        if (auto ctl = frame.m_comboBoxServer) {
                 SaveValue(m_server, ctl->GetValue());
         }
 
@@ -84,7 +84,7 @@ void wxPersistentMainFrame::do_restore()
         auto &frame = *Get();
                 
         if (wxString val; RestoreValue(m_server, &val)) {
-                frame.m_textCtrlServer->SetValue(val);
+                frame.m_comboBoxServer->SetValue(val);
         }
 
         if (int val{}; RestoreValue(m_port, &val)) {

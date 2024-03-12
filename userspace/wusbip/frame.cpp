@@ -327,10 +327,10 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_staticTextServer->SetToolTip( _("USBIP server hostname or IP address") );
 
 	m_auiToolBarAdd->AddControl( m_staticTextServer );
-	m_textCtrlServer = new wxTextCtrl( m_auiToolBarAdd, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
-	m_textCtrlServer->SetToolTip( _("Hostname or IP address") );
+	m_comboBoxServer = new wxComboBox( m_auiToolBarAdd, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, NULL, wxCB_DROPDOWN|wxCB_SORT );
+	m_comboBoxServer->SetToolTip( _("Hostname or IP address") );
 
-	m_auiToolBarAdd->AddControl( m_textCtrlServer );
+	m_auiToolBarAdd->AddControl( m_comboBoxServer );
 	m_staticTextPort = new wxStaticText( m_auiToolBarAdd, wxID_ANY, _("Port"), wxDefaultPosition, wxDefaultSize, wxALIGN_CENTER_HORIZONTAL );
 	m_staticTextPort->Wrap( -1 );
 	m_staticTextPort->SetToolTip( _("TCP/IP port number") );

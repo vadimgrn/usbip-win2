@@ -23,7 +23,7 @@
 #include <wx/aui/aui.h>
 #include <wx/aui/auibar.h>
 #include <wx/stattext.h>
-#include <wx/textctrl.h>
+#include <wx/combobox.h>
 #include <wx/spinctrl.h>
 #include <wx/button.h>
 #include <wx/treelist.h>
@@ -66,7 +66,7 @@ class Frame : public wxFrame
 		wxAuiToolBarItem* m_tool_save;
 		wxAuiToolBar* m_auiToolBarAdd;
 		wxStaticText* m_staticTextServer;
-		wxTextCtrl* m_textCtrlServer;
+		wxComboBox* m_comboBoxServer;
 		wxStaticText* m_staticTextPort;
 		wxSpinCtrl* m_spinCtrlPort;
 		wxButton* m_button_add;
