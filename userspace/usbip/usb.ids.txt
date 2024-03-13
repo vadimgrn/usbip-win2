@@ -1,0 +1,2 @@
+usb.ids must be in Unix format, 0xA line endings.
+http://www.linux-usb.org/usb-ids.html

@@ -1,1 +1,4 @@
 * text=auto eol=crlf
+
+# Unix line endings
+userspace/usbip/usb.ids binary
