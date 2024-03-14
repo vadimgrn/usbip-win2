@@ -355,6 +355,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
+        WdfRequestSetInformation(request, 0);
 
         vhci::ioctl::plugin_hardware *r{};
 
@@ -376,7 +377,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST request)
 
         constexpr auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
-        
+
         return STATUS_SUCCESS;
 }
 
@@ -421,6 +422,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_imported_devices(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
+        WdfRequestSetInformation(request, 0);
 
         size_t outlen;
         vhci::ioctl::get_imported_devices *r;
@@ -493,6 +495,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
+        WdfRequestSetInformation(request, 0);
 
         void *buf{};
         size_t length{};

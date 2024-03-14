@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2021 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "..\vhci.h"
@@ -199,7 +199,7 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
                 r = reinterpret_cast<ioctl::get_imported_devices*>(buf.data());
                 r->size = sizeof(*r);
 
-                if (DWORD BytesReturned; // must be set if the last arg is NULL
+                if (DWORD BytesReturned{}; // must be set if the last arg is NULL
                     DeviceIoControl(dev, ioctl::GET_IMPORTED_DEVICES, r, sizeof(r->size), 
                                     buf.data(), DWORD(buf.size()), &BytesReturned, nullptr)) {
 
@@ -239,7 +239,7 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
 
         constexpr auto outlen = offsetof(ioctl::plugin_hardware, port) + sizeof(r.port);
 
-        if (DWORD BytesReturned; // must be set if the last arg is NULL
+        if (DWORD BytesReturned{}; // must be set if the last arg is NULL
             DeviceIoControl(dev, ioctl::PLUGIN_HARDWARE, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
 
                 if (BytesReturned != outlen) [[unlikely]] {
@@ -258,7 +258,7 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
         ioctl::plugout_hardware r { .port = port };
         r.size = sizeof(r);
 
-        DWORD BytesReturned; // must be set if the last arg is NULL
+        DWORD BytesReturned{}; // must be set if the last arg is NULL
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
 

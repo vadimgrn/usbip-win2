@@ -48,7 +48,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->AppendSeparator();
 
 	wxMenuItem* m_file_exit;
-	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("E&xit") ) + wxT('\t') + wxT("CTRL+Q"), wxEmptyString, wxITEM_NORMAL );
+	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("E&xit") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_file_exit->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_QUIT), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))

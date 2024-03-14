@@ -42,6 +42,7 @@
 - Userspace code is fully rewritten (libusbip and usbip utility)
 - SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
+- Full-featured GUI app
 - Windows 10 version 1809 or later is required
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
