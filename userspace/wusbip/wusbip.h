@@ -29,7 +29,7 @@ private:
 	friend class wxPersistentMainFrame;
 
 	LogWindow *m_log{};
-	std::unique_ptr<wxMenu> m_popup_menu;
+	std::unique_ptr<wxMenu> m_tree_popup_menu;
 
 	usbip::Handle m_read;
 	std::mutex m_read_close_mtx;
@@ -120,5 +120,8 @@ private:
 	void save(_In_ const wxTreeListItems &devices);
 	void on_tree_mouse_wheel(_In_ wxMouseEvent &event);
 
-	std::unique_ptr<wxMenu> create_popup_menu();
+	using menu_item_descr = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
+	std::unique_ptr<wxMenu> create_popup_menu(_In_ const menu_item_descr *items, _In_ int cnt);
+
+	std::unique_ptr<wxMenu> create_tree_popup_menu();
 };

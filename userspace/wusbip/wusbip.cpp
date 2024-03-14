@@ -1193,26 +1193,13 @@ void MainFrame::on_reload(wxCommandEvent &event)
         }
 }
 
-std::unique_ptr<wxMenu> MainFrame::create_popup_menu()
+std::unique_ptr<wxMenu> MainFrame::create_popup_menu(_In_ const menu_item_descr *items, _In_ int cnt)
 {
-        using elem = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
-
-        auto v = std::to_array<elem>({
-                { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
-                { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
-                { wxID_SEPARATOR, nullptr, nullptr },
-                { ID_ATTACH, m_menu_devices, &MainFrame::on_attach },
-                { ID_DETACH, m_menu_devices, &MainFrame::on_detach },
-                { wxID_SEPARATOR, nullptr, nullptr },
-                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
-                { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
-                { wxID_SEPARATOR, nullptr, nullptr },
-                { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
-        });
-
         auto popup = std::make_unique<wxMenu>();
 
-        for (auto [id, menu, handler]: v) {
+        for (int i = 0; i < cnt; ++i) {
+                auto [id, menu, handler] = items[i];
+
                 if (id == wxID_SEPARATOR) {
                         popup->AppendSeparator();
                 } else if (auto item = menu->FindItem(id)) {
@@ -1229,13 +1216,31 @@ std::unique_ptr<wxMenu> MainFrame::create_popup_menu()
         return popup;
 }
 
+std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
+{
+        const auto items = std::to_array<menu_item_descr>({
+                { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
+                { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
+                { wxID_SEPARATOR, nullptr, nullptr },
+                { ID_ATTACH, m_menu_devices, &MainFrame::on_attach },
+                { ID_DETACH, m_menu_devices, &MainFrame::on_detach },
+                { wxID_SEPARATOR, nullptr, nullptr },
+                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
+                { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
+                { wxID_SEPARATOR, nullptr, nullptr },
+                { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
+        });
+
+        return create_popup_menu(items.data(), items.size());
+}
+
 void MainFrame::on_item_context_menu(wxTreeListEvent&)
 {
-        if (!m_popup_menu) {
-                m_popup_menu = create_popup_menu();
+        if (!m_tree_popup_menu) {
+                m_tree_popup_menu = create_tree_popup_menu();
         }
 
-        PopupMenu(m_popup_menu.get());
+        PopupMenu(m_tree_popup_menu.get());
 }
 
 /*
@@ -1303,3 +1308,63 @@ void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(this, 0);
 }
+
+/*
+void MainFrame::on_save_dropdown(wxAuiToolBarEvent &event)
+{
+        wxLogVerbose(wxString::FromAscii(__func__));
+
+        auto &tb = *static_cast<wxAuiToolBar*>(event.GetEventObject());
+        auto tool_id = event.GetId();
+
+        auto &tool = *m_tool_save;
+        wxASSERT(tool.GetId() == tool_id);
+
+        auto &save = *m_menu_file->FindItem(wxID_SAVE); 
+        auto was_save = tool.GetLabel() == save.GetItemLabelText();
+
+        if (!event.IsDropDownClicked()) {
+                was_save ? on_save(event) : on_save_selected(event);
+                return;
+        }
+
+        if (was_save) {
+                tool.SetLabel(_("Selected"));
+                tool.SetBitmap(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FILE_SAVE_AS), wxASCII_STR(wxART_TOOLBAR)));
+        } else {
+                tool.SetLabel(save.GetItemLabelText());
+                tool.SetBitmap(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FILE_SAVE), wxASCII_STR(wxART_TOOLBAR)));
+        }
+
+        tb.Refresh(false);
+}
+
+void MainFrame::on_save_dropdown(wxAuiToolBarEvent &event)
+{
+        if (!event.IsDropDownClicked()) {
+                on_save(event);
+                return;
+        }
+
+        if (auto v = get_selected_devices(*m_treeListCtrl); v.empty()) {
+                return;
+        }
+
+        if (!m_save_popup_menu) {
+                m_save_popup_menu = create_save_popup_menu();
+        }
+
+        auto &tb = *static_cast<wxAuiToolBar*>(event.GetEventObject());
+        auto tool_id = event.GetId();
+
+        tb.SetToolSticky(tool_id, true);
+        {
+                auto rc = tb.GetToolRect(tool_id);
+                auto pt = tb.ClientToScreen(rc.GetBottomLeft());
+                pt = ScreenToClient(pt);
+
+                PopupMenu(m_save_popup_menu.get(), pt);
+        }
+        tb.SetToolSticky(tool_id, false);
+}
+*/

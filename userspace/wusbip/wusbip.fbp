@@ -106,7 +106,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">File</property>
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
@@ -172,7 +172,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -191,7 +191,7 @@
             <event name="OnMenuSelection">on_select_all</event>
             <event name="OnUpdateUI">on_has_devices_update_ui</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_COPY; wxART_MENU</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -1127,7 +1127,7 @@
           <event name="OnButtonClick">add_exported_devices</event>
         </object>
       </object>
-      <object class="wxTreeListCtrl" expanded="true">
+      <object class="wxTreeListCtrl" expanded="false">
         <property name="BottomDockable">0</property>
         <property name="LeftDockable">0</property>
         <property name="RightDockable">0</property>
