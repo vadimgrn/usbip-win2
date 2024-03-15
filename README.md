@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="userspace/wusbip/art/USBip.svg" width="256" alt="USBip logo"/>
+</p>
+
 [![latest release](https://img.shields.io/github/v/release/vadimgrn/usbip-win2?include_prereleases)](https://github.com/vadimgrn/usbip-win2/releases/latest) [![release date](https://img.shields.io/github/release-date-pre/vadimgrn/usbip-win2)](https://github.com/vadimgrn/usbip-win2/releases/latest) [![downloads](https://img.shields.io/github/downloads-pre/vadimgrn/usbip-win2/latest/total)](https://github.com/vadimgrn/usbip-win2/releases/latest) [![commits since](https://img.shields.io/github/commits-since/vadimgrn/usbip-win2/latest/develop?include_prereleases "commits since")](https://github.com/vadimgrn/usbip-win2/commits/develop) [![commit activity](https://img.shields.io/github/commit-activity/m/vadimgrn/usbip-win2/develop "commit activity")](https://github.com/vadimgrn/usbip-win2/commits/develop) [![license](https://img.shields.io/github/license/vadimgrn/usbip-win2)](https://github.com/vadimgrn/usbip-win2/blob/master/LICENSE)
 
 # USB/IP Client for Windows
@@ -39,10 +43,10 @@
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - Brand new UDE driver, not inherited from the parent repo
+- Full-featured GUI app
 - Userspace code is fully rewritten (libusbip and usbip utility)
 - SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
-- Full-featured GUI app
 - Windows 10 version 1809 or later is required
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
