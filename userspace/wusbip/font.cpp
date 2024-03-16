@@ -8,8 +8,6 @@
 #include <wx/frame.h>
 #include <wx/window.h>
 #include <wx/treelist.h>
-#include <wx/dataview.h>
-#include <wx/headerctrl.h>
 
 #include <functional>
 
@@ -123,19 +121,4 @@ int usbip::get_font_size(_In_ wxLogWindow *log)
 bool usbip::set_font_size(_In_ wxTreeListCtrl *tree, _In_ int pt)
 {
         return do_set_font_size(tree, pt);
-}
-
-void usbip::make_header_bold(_In_ wxTreeListCtrl *tree)
-{
-        auto dv = tree->GetDataView();
-        auto hdr = dv->GenericGetHeader();
-
-        auto font = hdr->GetFont();
-        wxASSERT(font.IsOk());
-
-        if (auto bold = wxFONTWEIGHT_BOLD; font.GetWeight() != bold) {
-                font.SetWeight(bold); // font.MakeBold();
-                [[maybe_unused]] auto ok = hdr->SetFont(font);
-                wxASSERT(ok);
-        }
 }

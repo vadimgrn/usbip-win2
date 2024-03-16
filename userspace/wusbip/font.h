@@ -29,6 +29,5 @@ bool set_font_size(_In_ wxLogWindow *wnd, _In_ int pt);
 int get_font_size(_In_ wxLogWindow *wnd);
 
 bool set_font_size(_In_ wxTreeListCtrl *tree, _In_ int pt);
-void make_header_bold(_In_ wxTreeListCtrl *tree);
 
 } // namespace usbip

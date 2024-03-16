@@ -430,8 +430,6 @@ void MainFrame::init_tree_list()
         if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
                 dv.SetAlternateRowColour(colour);
         }
-
-        make_header_bold(&tree);
 }
 
 void MainFrame::restore_state()
@@ -1269,7 +1267,6 @@ void MainFrame::on_frame_mouse_wheel(wxMouseEvent &event)
         if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
                 auto wnd = static_cast<wxWindow*>(event.GetEventObject());
                 change_font_size(wnd, event.GetWheelRotation());
-                make_header_bold(m_treeListCtrl);
         }
 }
 
@@ -1277,24 +1274,20 @@ void MainFrame::on_tree_mouse_wheel(_In_ wxMouseEvent &event)
 {
         if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
                 change_font_size(m_treeListCtrl, event.GetWheelRotation());
-                make_header_bold(m_treeListCtrl);
         }
 }
 
 void MainFrame::on_view_font_increase(wxCommandEvent&)
 {
         change_font_size(this, 1);
-        make_header_bold(m_treeListCtrl);
 }
 
 void MainFrame::on_view_font_decrease(wxCommandEvent&)
 {
         change_font_size(this, -1);
-        make_header_bold(m_treeListCtrl);
 }
 
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(this, 0);
-        make_header_bold(m_treeListCtrl);
 }

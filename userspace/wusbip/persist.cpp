@@ -125,6 +125,5 @@ void wxPersistentMainFrame::do_restore()
 
         if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {
                 set_font_size(frame.m_treeListCtrl, pt);
-                make_header_bold(frame.m_treeListCtrl);
         }
 }
