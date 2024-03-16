@@ -23,7 +23,6 @@ class MainFrame : public Frame
 {
 public:
 	MainFrame(_In_ usbip::Handle read);
-	~MainFrame();
 
 private:
 	friend class wxPersistentMainFrame;

@@ -106,7 +106,7 @@
         <property name="window_extra_style"></property>
         <property name="window_name"></property>
         <property name="window_style"></property>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">File</property>
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
@@ -241,7 +241,7 @@
             <event name="OnUpdateUI">on_edit_notes_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
@@ -408,7 +408,7 @@
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_PLUS ; wxART_MENU</property>
             <property name="checked">0</property>
-            <property name="enabled">0</property>
+            <property name="enabled">1</property>
             <property name="help">Use Ctrl+Wheel as well</property>
             <property name="id">wxID_ZOOM_IN</property>
             <property name="kind">wxITEM_NORMAL</property>
@@ -422,7 +422,7 @@
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_MINUS ; wxART_MENU</property>
             <property name="checked">0</property>
-            <property name="enabled">0</property>
+            <property name="enabled">1</property>
             <property name="help">Use Ctrl+Wheel as well</property>
             <property name="id">wxID_ZOOM_OUT</property>
             <property name="kind">wxITEM_NORMAL</property>
@@ -620,7 +620,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="true">
+      <object class="wxAuiToolBar" expanded="false">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -731,7 +731,7 @@
           <property name="name">m_tool_detach_all</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Detach all remote devices</property>
+          <property name="tooltip">Detach all devices</property>
           <event name="OnToolClicked">on_detach_all</event>
         </object>
         <object class="toolSeparator" expanded="false">
@@ -1127,7 +1127,7 @@
           <event name="OnButtonClick">add_exported_devices</event>
         </object>
       </object>
-      <object class="wxTreeListCtrl" expanded="false">
+      <object class="wxTreeListCtrl" expanded="true">
         <property name="BottomDockable">0</property>
         <property name="LeftDockable">0</property>
         <property name="RightDockable">0</property>

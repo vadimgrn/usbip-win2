@@ -382,25 +382,11 @@ MainFrame::MainFrame(_In_ Handle read) :
                 m_menu_view->FindItem(wxID_ZOOM_100)))
 {
         wxASSERT(m_read);
-        
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
-
-        if (auto wnd = m_treeListCtrl->GetView()) {
-                wnd->Connect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel));
-        }
 
         init();
         restore_state();
         post_refresh();
-}
-
-MainFrame::~MainFrame() 
-{
-        Unbind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
-
-        if (auto wnd = m_treeListCtrl->GetView()) {
-                wnd->Disconnect(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel));
-        }
 }
 
 void MainFrame::init()
@@ -427,22 +413,25 @@ void MainFrame::init()
 }
 
 /*
- * FIXME: set first column bold. 
+ * FIXME: set first column bold.
+ * FIXME: wxTreeListCtrl::OnMouseWheel event does not work if it is set in wxFormBuilder
  */
 void MainFrame::init_tree_list()
 {
-        auto &dv = *m_treeListCtrl->GetDataView();
+        auto &tree = *m_treeListCtrl;
+        auto &dv = *tree.GetDataView();
 
-        if (auto hdr = dv.GenericGetHeader()) { // see dv.SetHeaderAttr()
-                auto font = hdr->GetFont();
-                font.MakeBold();
-                [[maybe_unused]] auto ok = hdr->SetFont(font);
-                wxASSERT(ok);
+        tree.GetView()->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel), this);
+
+        if (auto hdr = dv.GenericGetHeader()) {
+                hdr->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel), this);
         }
 
         if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
                 dv.SetAlternateRowColour(colour);
         }
+
+        make_header_bold(&tree);
 }
 
 void MainFrame::restore_state()
@@ -1275,96 +1264,37 @@ void MainFrame::on_help_about_lib(wxCommandEvent&)
         wxInfoMessageBox(this);
 }
 
-void MainFrame::on_frame_mouse_wheel(wxMouseEvent&)
+void MainFrame::on_frame_mouse_wheel(wxMouseEvent &event)
 {
-        // on_tree_mouse_wheel(event);
-}
-
-void MainFrame::on_tree_mouse_wheel(_In_ wxMouseEvent&)
-{
-/*
         if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
                 auto wnd = static_cast<wxWindow*>(event.GetEventObject());
                 change_font_size(wnd, event.GetWheelRotation());
+                make_header_bold(m_treeListCtrl);
         }
-*/
+}
+
+void MainFrame::on_tree_mouse_wheel(_In_ wxMouseEvent &event)
+{
+        if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
+                change_font_size(m_treeListCtrl, event.GetWheelRotation());
+                make_header_bold(m_treeListCtrl);
+        }
 }
 
 void MainFrame::on_view_font_increase(wxCommandEvent&)
 {
-        if (this == m_log->GetFrame()) {
-                change_font_size(this, 1);
-        }
+        change_font_size(this, 1);
+        make_header_bold(m_treeListCtrl);
 }
 
 void MainFrame::on_view_font_decrease(wxCommandEvent&)
 {
-        if (this == m_log->GetFrame()) {
-                change_font_size(this, -1);
-        }
+        change_font_size(this, -1);
+        make_header_bold(m_treeListCtrl);
 }
 
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(this, 0);
+        make_header_bold(m_treeListCtrl);
 }
-
-/*
-void MainFrame::on_save_dropdown(wxAuiToolBarEvent &event)
-{
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        auto &tb = *static_cast<wxAuiToolBar*>(event.GetEventObject());
-        auto tool_id = event.GetId();
-
-        auto &tool = *m_tool_save;
-        wxASSERT(tool.GetId() == tool_id);
-
-        auto &save = *m_menu_file->FindItem(wxID_SAVE); 
-        auto was_save = tool.GetLabel() == save.GetItemLabelText();
-
-        if (!event.IsDropDownClicked()) {
-                was_save ? on_save(event) : on_save_selected(event);
-                return;
-        }
-
-        if (was_save) {
-                tool.SetLabel(_("Selected"));
-                tool.SetBitmap(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FILE_SAVE_AS), wxASCII_STR(wxART_TOOLBAR)));
-        } else {
-                tool.SetLabel(save.GetItemLabelText());
-                tool.SetBitmap(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FILE_SAVE), wxASCII_STR(wxART_TOOLBAR)));
-        }
-
-        tb.Refresh(false);
-}
-
-void MainFrame::on_save_dropdown(wxAuiToolBarEvent &event)
-{
-        if (!event.IsDropDownClicked()) {
-                on_save(event);
-                return;
-        }
-
-        if (auto v = get_selected_devices(*m_treeListCtrl); v.empty()) {
-                return;
-        }
-
-        if (!m_save_popup_menu) {
-                m_save_popup_menu = create_save_popup_menu();
-        }
-
-        auto &tb = *static_cast<wxAuiToolBar*>(event.GetEventObject());
-        auto tool_id = event.GetId();
-
-        tb.SetToolSticky(tool_id, true);
-        {
-                auto rc = tb.GetToolRect(tool_id);
-                auto pt = tb.ClientToScreen(rc.GetBottomLeft());
-                pt = ScreenToClient(pt);
-
-                PopupMenu(m_save_popup_menu.get(), pt);
-        }
-        tb.SetToolSticky(tool_id, false);
-}
-*/
