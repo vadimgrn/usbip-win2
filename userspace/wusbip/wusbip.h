@@ -13,6 +13,7 @@
 #include <mutex>
 
 class LogWindow;
+class TaskBarIcon;
 class wxDataViewColumn;
 
 class DeviceStateEvent;
@@ -28,6 +29,7 @@ private:
 	friend class wxPersistentMainFrame;
 
 	LogWindow *m_log{};
+	std::unique_ptr<TaskBarIcon> m_taskbar_icon;
 	std::unique_ptr<wxMenu> m_tree_popup_menu;
 
 	usbip::Handle m_read;
@@ -57,7 +59,7 @@ private:
 	void on_save_selected(wxCommandEvent &event) override;
 	void on_load(wxCommandEvent &event) override;
 
-	void on_view_zabra_update_ui(wxUpdateUIEvent &event) override;
+	void on_view_zebra_update_ui(wxUpdateUIEvent &event) override;
 	void on_view_zebra(wxCommandEvent &event) override;
 
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
@@ -87,7 +89,7 @@ private:
 	void init();
 	void init_tree_list();
 	void restore_state();
-	
+
 	void read_loop();
 	void break_read_loop();
 
@@ -98,9 +100,11 @@ private:
 	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_columns &dc);
 
 	void remove_device(_In_ wxTreeListItem dev);
-
 	bool attach(_In_ const wxString &url, _In_ const wxString &busid);
 	
+	bool close_to_tray() const;
+	void set_close_to_tray();
+
 	void post_refresh();
 	void post_exit();
 

@@ -42,6 +42,8 @@ void wxPersistentMainFrame::Save() const
         wxPersistentTLW::Save();
         auto &frame = *Get();
                 
+        SaveValue(m_close_to_tray, frame.close_to_tray());
+
         if (auto ctl = frame.m_comboBoxServer) {
                 SaveValue(m_server, ctl->GetValue());
         }
@@ -125,5 +127,9 @@ void wxPersistentMainFrame::do_restore()
 
         if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {
                 set_font_size(frame.m_treeListCtrl, pt);
+        }
+
+        if (bool close{}; RestoreValue(m_close_to_tray, &close) && close) {
+                frame.set_close_to_tray();
         }
 }

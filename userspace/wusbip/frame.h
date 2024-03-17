@@ -43,6 +43,7 @@ class Frame : public wxFrame
 		{
 			ID_TOGGLE_AUTO = 1000,
 			ID_EDIT_NOTES,
+			ID_CLOSE_TO_TRAY,
 			ID_ATTACH,
 			ID_DETACH,
 			ID_TOGGLE_LOG_WINDOW
@@ -89,7 +90,7 @@ class Frame : public wxFrame
 		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_zebra( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_zabra_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_zebra_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_font_increase( wxCommandEvent& event ) { event.Skip(); }
