@@ -47,6 +47,16 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_file->AppendSeparator();
 
+	wxMenuItem* m_file_start_minimized;
+	m_file_start_minimized = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Start minimized") ) , _("Launch the app in the tray"), wxITEM_CHECK );
+	m_menu_file->Append( m_file_start_minimized );
+
+	wxMenuItem* m_file_close_to_tray;
+	m_file_close_to_tray = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Close to tray") ) , _("Close to tray instead of exit"), wxITEM_CHECK );
+	m_menu_file->Append( m_file_close_to_tray );
+
+	m_menu_file->AppendSeparator();
+
 	wxMenuItem* m_file_exit;
 	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("E&xit") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
@@ -189,15 +199,6 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_view->Append( m_view_font_default );
 
 	m_menu_view->AppendSeparator();
-
-	wxMenuItem* m_view_close_to_tray;
-	m_view_close_to_tray = new wxMenuItem( m_menu_view, ID_CLOSE_TO_TRAY, wxString( _("Close to tray") ) , _("Close to tray instead of exit"), wxITEM_CHECK );
-	#ifdef __WXMSW__
-	m_view_close_to_tray->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_QUIT), wxASCII_STR(wxART_MENU) ) );
-	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_view_close_to_tray->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_QUIT), wxASCII_STR(wxART_MENU) ) );
-	#endif
-	m_menu_view->Append( m_view_close_to_tray );
 
 	wxMenuItem* m_view_reset;
 	m_view_reset = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Reset settings") ) , _("Reset all settings"), wxITEM_NORMAL );
@@ -383,6 +384,10 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_save ), this, m_file_save->GetId());
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_save_selected ), this, m_file_save_selected->GetId());
 	this->Connect( m_file_save_selected->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_start_minimized ), this, m_file_start_minimized->GetId());
+	this->Connect( m_file_start_minimized->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_minimized_update_ui ) );
+	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_close_to_tray ), this, m_file_close_to_tray->GetId());
+	this->Connect( m_file_close_to_tray->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_close_to_tray_update_ui ) );
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_select_all ), this, m_select_all->GetId());
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
@@ -450,6 +455,8 @@ Frame::~Frame()
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	this->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ) );
 	this->Disconnect( wxID_SAVEAS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_minimized_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_close_to_tray_update_ui ) );
 	this->Disconnect( wxID_SELECTALL, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
 	this->Disconnect( wxID_COPY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_AUTO, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );

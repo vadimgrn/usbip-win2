@@ -3,16 +3,17 @@
  */
 
 #include "wusbip.h"
-#include "utils.h"
+#include "taskbaricon.h"
 #include "persist.h"
-#include "log.h"
+#include "utils.h"
 #include "font.h"
+#include "app.h"
+#include "log.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
 #include <libusbip/src/file_ver.h>
 
-#include <wx/app.h>
 #include <wx/event.h>
 #include <wx/msgdlg.h>
 #include <wx/aboutdlg.h>
@@ -22,7 +23,6 @@
 #include <wx/textdlg.h>
 #include <wx/headerctrl.h>
 #include <wx/clipbrd.h>
-#include <wx/taskbar.h>
 #include <wx/persist/dataview.h>
 
 #include <format>
@@ -36,49 +36,6 @@ using namespace usbip;
 auto &g_key_devices = L"/devices";
 auto &g_key_url = L"url";
 auto &g_persistent_mark = L"\u2713"; // CHECK MARK, 2714 HEAVY CHECK MARK
-
-class App : public wxApp
-{
-public:
-        bool OnInit() override;
-
-private:
-        void set_names();
-};
-
-bool App::OnInit()
-{
-        if (wxApp::OnInit()) {
-                set_names();
-        } else {
-                return false;
-        }
-
-        wxASSERT(wxTaskBarIcon::IsAvailable());
-
-        wxString err;
-
-        if (auto read = init(err) ? vhci::open() : Handle()) {
-                auto frame = new MainFrame(std::move(read));
-                frame->Show(true);
-                return true;
-        }
-
-        if (err.empty()) {
-                err = GetLastErrorMsg();
-        }
-
-        wxSafeShowMessage(_("Fatal error"), err);
-        return false;
-}
-
-void App::set_names()
-{
-        auto &v = win::get_file_version();
-
-        SetAppName(wx_string(v.GetProductName()));
-        SetVendorName(wx_string(v.GetCompanyName()));
-}
 
 consteval auto get_saved_keys()
 {
@@ -353,8 +310,6 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
 
 } // namespace
 
-wxIMPLEMENT_APP(App);
-
 
 class DeviceStateEvent : public wxEvent
 {
@@ -372,77 +327,6 @@ private:
         device_state m_state;
 };
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
-
-
-class TaskBarIcon : public wxTaskBarIcon
-{
-public:
-        TaskBarIcon();
-
-private:
-        std::unique_ptr<wxMenu> m_popup;
-
-        wxMenu *GetPopupMenu() override;
-        std::unique_ptr<wxMenu> create_popup_menu();
-
-        auto& get_main_window() const { return *wxGetApp().GetMainTopWindow(); }
-        void on_exit(wxCommandEvent&) { get_main_window().Close(true); }
-        void on_left_dclick(wxTaskBarIconEvent&);
-
-        void on_show_update_ui(wxUpdateUIEvent &event);
-        void on_show(wxCommandEvent&);
-};
-
-TaskBarIcon::TaskBarIcon()
-{
-        Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_show), this, wxID_EXECUTE);
-        Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_exit), this, wxID_EXIT);
-        Bind(wxEVT_TASKBAR_LEFT_DCLICK, wxTaskBarIconEventHandler(TaskBarIcon::on_left_dclick), this);
-}
-
-wxMenu* TaskBarIcon::GetPopupMenu()
-{
-        if (!m_popup) {
-                m_popup = create_popup_menu();
-        }
-        return m_popup.get();
-}
-
-std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
-{
-        auto m = std::make_unique<wxMenu>();
-
-        m->AppendCheckItem(wxID_EXECUTE, _("Show"), _("Show window"));
-        Connect(wxID_EXECUTE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler(TaskBarIcon::on_show_update_ui));
-
-        m->Append(wxID_EXIT, _("Exit"), nullptr, _("Close app"));
-
-        return m;
-}
-
-void TaskBarIcon::on_show_update_ui(wxUpdateUIEvent &event)
-{
-        auto shown = get_main_window().IsShown();
-        event.Check(shown);
-}
-
-void TaskBarIcon::on_left_dclick(wxTaskBarIconEvent&)
-{
-        wxCommandEvent evt;
-        evt.SetInt(1);
-
-        on_show(evt);
-}
-
-void TaskBarIcon::on_show(wxCommandEvent &event)
-{
-        bool checked = event.GetInt();
-        get_main_window().Show(checked);
-        
-        if (IsIconInstalled()) {
-                RemoveIcon();
-        }
-}
 
 
 MainFrame::MainFrame(_In_ Handle read) : 
@@ -529,14 +413,14 @@ void MainFrame::on_close(wxCloseEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
-        if (event.CanVeto() && close_to_tray()) {
+        if (event.CanVeto() && m_close_to_tray) {
                 event.Veto();
                 if (!m_taskbar_icon->SetIcon(GetIcon(), GetTitle())) {
                         wxLogError(_("Could not set taskbar icon"));
                 } else {
                         Hide();
-                        return;
                 }
+                return;
         }
 
         break_read_loop();
@@ -547,30 +431,7 @@ void MainFrame::on_close(wxCloseEvent &event)
 
 void MainFrame::on_exit(wxCommandEvent&)
 {
-        auto force = !close_to_tray();
-        Close(force);
-}
-
-bool MainFrame::close_to_tray() const
-{
-        bool ok{};
-
-        if (auto item = m_menu_view->FindItem(ID_CLOSE_TO_TRAY)) {
-                ok = item->IsCheck();
-        } else {
-                wxFAIL_MSG("ID_CLOSE_TO_TRAY");
-        }
-
-        return ok;
-}
-
-void MainFrame::set_close_to_tray()
-{
-        if (auto item = m_menu_view->FindItem(ID_CLOSE_TO_TRAY)) {
-                item->Check(true);
-        } else {
-                wxFAIL_MSG("ID_CLOSE_TO_TRAY");
-        }
+        Close(true);
 }
 
 void MainFrame::read_loop()
@@ -809,6 +670,28 @@ void MainFrame::on_log_verbose(wxCommandEvent &event)
 {
         bool checked = event.GetInt();
         m_log->SetLogLevel(checked ? VERBOSE_LOGLEVEL : DEFAULT_LOGLEVEL);
+}
+
+void MainFrame::on_start_minimized_update_ui(wxUpdateUIEvent &event)
+{
+        event.Check(m_start_minimized);
+}
+
+void MainFrame::on_start_minimized(wxCommandEvent &event)
+{
+        bool checked = event.GetInt();
+        m_start_minimized = checked;
+}
+
+void MainFrame::on_close_to_tray_update_ui(wxUpdateUIEvent &event)
+{
+        event.Check(m_close_to_tray);
+}
+
+void MainFrame::on_close_to_tray(wxCommandEvent &event)
+{
+        bool checked = event.GetInt();
+        m_close_to_tray = checked;
 }
 
 bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)

@@ -24,6 +24,7 @@ private:
         static inline auto &m_tree_row_lines = L"TreeRowLines";
         static inline auto &m_toolbar_font_size = L"ToolBarFontSize";
         static inline auto &m_toolbar_add_font_size = L"ToolBarAddFontSize";
+        static inline auto &m_start_minimized = L"StartMinimized";
         static inline auto &m_close_to_tray = L"CloseToTray";
 
         void Save() const override;

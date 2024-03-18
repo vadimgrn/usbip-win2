@@ -28,6 +28,9 @@ public:
 private:
 	friend class wxPersistentMainFrame;
 
+	bool m_start_minimized{};
+	bool m_close_to_tray{};
+
 	LogWindow *m_log{};
 	std::unique_ptr<TaskBarIcon> m_taskbar_icon;
 	std::unique_ptr<wxMenu> m_tree_popup_menu;
@@ -71,6 +74,12 @@ private:
 	void on_view_column_update_ui(wxUpdateUIEvent &event) override;
 	void on_view_column(wxCommandEvent &event) override;
 
+	void on_start_minimized_update_ui(wxUpdateUIEvent &event) override;
+	void on_start_minimized(wxCommandEvent &event) override;
+	
+	void on_close_to_tray_update_ui(wxUpdateUIEvent &event) override;
+	void on_close_to_tray(wxCommandEvent &event) override;
+
 	void on_device_state(_In_ DeviceStateEvent &event);
 	void on_item_activated(wxTreeListEvent &event) override;
 
@@ -102,9 +111,6 @@ private:
 	void remove_device(_In_ wxTreeListItem dev);
 	bool attach(_In_ const wxString &url, _In_ const wxString &busid);
 	
-	bool close_to_tray() const;
-	void set_close_to_tray();
-
 	void post_refresh();
 	void post_exit();
 

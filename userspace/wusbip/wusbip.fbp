@@ -157,6 +157,40 @@
             <property name="name">m_separator5</property>
             <property name="permission">none</property>
           </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap"></property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Launch the app in the tray</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_CHECK</property>
+            <property name="label">Start minimized</property>
+            <property name="name">m_file_start_minimized</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_start_minimized</event>
+            <event name="OnUpdateUI">on_start_minimized_update_ui</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap"></property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Close to tray instead of exit</property>
+            <property name="id">wxID_ANY</property>
+            <property name="kind">wxITEM_CHECK</property>
+            <property name="label">Close to tray</property>
+            <property name="name">m_file_close_to_tray</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_close_to_tray</event>
+            <event name="OnUpdateUI">on_close_to_tray_update_ui</event>
+          </object>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator52</property>
+            <property name="permission">none</property>
+          </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_QUIT; wxART_MENU</property>
             <property name="checked">0</property>
@@ -450,19 +484,6 @@
           <object class="separator" expanded="false">
             <property name="name">m_separator511</property>
             <property name="permission">none</property>
-          </object>
-          <object class="wxMenuItem" expanded="true">
-            <property name="bitmap">Load From Art Provider; wxART_QUIT; wxART_MENU</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Close to tray instead of exit</property>
-            <property name="id">ID_CLOSE_TO_TRAY</property>
-            <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Close to tray</property>
-            <property name="name">m_view_close_to_tray</property>
-            <property name="permission">none</property>
-            <property name="shortcut"></property>
-            <property name="unchecked_bitmap"></property>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_CLOSE; wxART_MENU</property>

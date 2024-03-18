@@ -13,6 +13,8 @@
     <ClCompile Include="persist.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="font.cpp" />
+    <ClCompile Include="taskbaricon.cpp" />
+    <ClCompile Include="app.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wusbip.h" />
@@ -23,6 +25,8 @@
     <ClInclude Include="persist.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="font.h" />
+    <ClInclude Include="taskbaricon.h" />
+    <ClInclude Include="app.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

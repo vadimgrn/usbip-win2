@@ -42,7 +42,8 @@ void wxPersistentMainFrame::Save() const
         wxPersistentTLW::Save();
         auto &frame = *Get();
                 
-        SaveValue(m_close_to_tray, frame.close_to_tray());
+        SaveValue(m_start_minimized, frame.m_start_minimized);
+        SaveValue(m_close_to_tray, frame.m_close_to_tray);
 
         if (auto ctl = frame.m_comboBoxServer) {
                 SaveValue(m_server, ctl->GetValue());
@@ -84,7 +85,15 @@ bool wxPersistentMainFrame::Restore()
 void wxPersistentMainFrame::do_restore()
 {
         auto &frame = *Get();
-                
+
+        if (bool ok{}; RestoreValue(m_start_minimized, &ok)) {
+                frame.m_start_minimized = ok;
+        }
+
+        if (bool ok{}; RestoreValue(m_close_to_tray, &ok)) {
+                frame.m_close_to_tray = ok;
+        }
+
         if (wxString val; RestoreValue(m_server, &val)) {
                 frame.m_comboBoxServer->SetValue(val);
         }
@@ -127,9 +136,5 @@ void wxPersistentMainFrame::do_restore()
 
         if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {
                 set_font_size(frame.m_treeListCtrl, pt);
-        }
-
-        if (bool close{}; RestoreValue(m_close_to_tray, &close) && close) {
-                frame.set_close_to_tray();
         }
 }
