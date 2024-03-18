@@ -3,17 +3,14 @@
  */
 
 #include "taskbaricon.h"
-#include "wusbip.h"
 #include "app.h"
+
+#include <wx/menu.h>
+#include <wx/window.h>
 
 TaskBarIcon::TaskBarIcon()
 {
         Bind(wxEVT_TASKBAR_LEFT_DCLICK, wxTaskBarIconEventHandler(TaskBarIcon::on_left_dclick), this);
-}
-
-wxWindow& TaskBarIcon::main_window() const 
-{ 
-        return *wxGetApp().GetMainTopWindow(); 
 }
 
 wxMenu* TaskBarIcon::GetPopupMenu()
@@ -28,7 +25,7 @@ std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
 {
         auto m = std::make_unique<wxMenu>();
 
-        if (auto item = m->Append(wxID_ANY, _("Open"), _("Open the window"))) {
+        if (auto item = m->Append(wxID_ANY, _("Open window"), _("Open the main window"))) {
                 Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_open), this, item->GetId());
         }
 
@@ -41,17 +38,20 @@ std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
         return m;
 }
 
+wxWindow& TaskBarIcon::window() const
+{
+        return *wxGetApp().GetMainTopWindow();
+}
+
 void TaskBarIcon::on_exit(wxCommandEvent&)
 { 
-        main_window().Close(true);
+        window().Close(true);
 }
 
 void TaskBarIcon::on_open(wxCommandEvent&)
 {
-        auto &wnd = main_window();
-
-        wxASSERT(!wnd.IsShown());
-        wnd.Show();
+        wxASSERT(!window().IsShown());
+        window().Show();
 
         wxASSERT(IsIconInstalled());
 

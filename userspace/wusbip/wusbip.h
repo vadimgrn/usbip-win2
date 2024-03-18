@@ -27,7 +27,7 @@ public:
 
 	auto start_in_tray() const noexcept { return m_start_in_tray; }
 	void iconize_to_tray();
-
+	
 private:
 	friend class wxPersistentMainFrame;
 
@@ -136,5 +136,8 @@ private:
 	std::unique_ptr<wxMenu> create_popup_menu(_In_ const menu_item_descr *items, _In_ int cnt);
 
 	std::unique_ptr<wxMenu> create_tree_popup_menu();
-	TaskBarIcon& get_taskbar_icon();
+
+	bool can_show_balloon() const noexcept;
+	void show_balloon(_In_ const wxString &text, _In_ int flags = wxICON_INFORMATION);
+	void cancel_balloon() { show_balloon(wxEmptyString, 0); }
 };

@@ -48,7 +48,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->AppendSeparator();
 
 	wxMenuItem* m_file_start_in_tray;
-	m_file_start_in_tray = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Launch in tray") ) , _("Show the app in the system tray at startup"), wxITEM_CHECK );
+	m_file_start_in_tray = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Start in tray") ) , _("Show the app in the system tray at startup"), wxITEM_CHECK );
 	m_menu_file->Append( m_file_start_in_tray );
 
 	wxMenuItem* m_file_close_to_tray;

@@ -432,10 +432,13 @@ void MainFrame::on_exit(wxCommandEvent&)
 
 void MainFrame::iconize_to_tray()
 {
-        auto &icon = get_taskbar_icon();
-        wxASSERT(!icon.IsIconInstalled());
+        if (m_taskbar_icon) {
+                wxASSERT(!m_taskbar_icon->IsIconInstalled());
+        } else {
+                m_taskbar_icon = std::make_unique<TaskBarIcon>();
+        }
 
-        if (!icon.SetIcon(GetIcon(), GetTitle())) {
+        if (!m_taskbar_icon->SetIcon(GetIcon(), GetTitle())) {
                 wxLogError(_("Could not set taskbar icon"));
         } else if (IsShown()) {
                 [[maybe_unused]] auto ok = Hide();
@@ -487,6 +490,12 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto st_empty = is_empty(st.device);
 
         log(st);
+        
+        if (can_show_balloon()) {
+                cancel_balloon();
+                auto s = _(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
+                show_balloon(s);
+        }
 
         auto [dev, added] = find_or_add_device(st.device.location);
 
@@ -729,7 +738,7 @@ bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
 void MainFrame::on_attach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
-        
+
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
 
                 auto server = tree.GetItemParent(dev);
@@ -1294,11 +1303,15 @@ void MainFrame::on_view_font_default(wxCommandEvent&)
         change_font_size(m_treeListCtrl, 0);
 }
 
-TaskBarIcon& MainFrame::get_taskbar_icon()
-{
-        if (!m_taskbar_icon) {
-                m_taskbar_icon = std::make_unique<TaskBarIcon>();
-        }
+bool MainFrame::can_show_balloon() const noexcept
+{ 
+        return m_taskbar_icon && m_taskbar_icon->IsIconInstalled(); 
+}
 
-        return *m_taskbar_icon;
+void MainFrame::show_balloon(_In_ const wxString &text, _In_ int flags)
+{
+        wxASSERT(m_taskbar_icon);
+        if (!m_taskbar_icon->ShowBalloon(wxEmptyString, text, 0, flags)) {
+                wxLogError(_("Could not show balloon notification"));
+        }
 }

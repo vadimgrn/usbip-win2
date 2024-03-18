@@ -128,6 +128,12 @@ auto usbip::make_imported_device(
         };
 }
 
+wxString usbip::make_device_url(_In_ const device_location &loc)
+{
+        auto url = loc.hostname + ':' + loc.service + '/' + loc.busid;
+        return wxString::FromUTF8(url);
+}
+
 wxString usbip::make_server_url(_In_ const device_location &loc)
 {
         auto url = loc.hostname + ':' + loc.service;

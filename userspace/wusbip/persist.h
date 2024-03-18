@@ -26,6 +26,7 @@ private:
         static inline auto &m_toolbar_add_font_size = L"ToolBarAddFontSize";
         static inline auto &m_start_in_tray = L"StartInTray";
         static inline auto &m_close_to_tray = L"CloseToTray";
+        static inline auto &m_show_balloons = L"ShowBalloons";
 
         void Save() const override;
         bool Restore() override;

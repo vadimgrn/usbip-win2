@@ -42,6 +42,8 @@ struct usb_device;
 struct imported_device;
 imported_device make_imported_device(_In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev);
 
+wxString make_device_url(_In_ const device_location &loc);
+
 wxString make_server_url(_In_ const device_location &loc);
 wxString make_server_url(_In_ const wxString &hostname, _In_ const wxString &service);
 

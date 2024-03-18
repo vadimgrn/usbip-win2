@@ -67,7 +67,7 @@ BEGIN
         BLOCK "040004b0"
         BEGIN
             VALUE "CompanyName", "usbip-win2"
-            VALUE "FileDescription", "GUI for USBip"
+            VALUE "FileDescription", "USBip"
             VALUE "FileVersion", "0.9.6.1"
             VALUE "InternalName", "wusbip.exe"
             VALUE "LegalCopyright", "Copyright (C) 2023 - 2024 usbip-win2 project"
