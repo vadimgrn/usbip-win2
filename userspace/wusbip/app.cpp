@@ -21,8 +21,11 @@ bool App::OnInit()
         wxString err;
 
         if (auto read = init(err) ? vhci::open() : Handle()) {
-                auto frame = new MainFrame(std::move(read));
-                frame->Show(true);
+                if (auto &frame = *new MainFrame(std::move(read)); frame.start_in_tray()) {
+                        frame.iconize_to_tray();
+                } else {
+                        frame.Show();
+                }
                 return true;
         }
 

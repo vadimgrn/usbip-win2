@@ -161,22 +161,22 @@
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Launch the app in the tray</property>
+            <property name="help">Show the app in the system tray at startup</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Start minimized</property>
-            <property name="name">m_file_start_minimized</property>
+            <property name="label">Launch in tray</property>
+            <property name="name">m_file_start_in_tray</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_start_minimized</event>
-            <event name="OnUpdateUI">on_start_minimized_update_ui</event>
+            <event name="OnMenuSelection">on_start_in_tray</event>
+            <event name="OnUpdateUI">on_start_in_tray_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="true">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Close to tray instead of exit</property>
+            <property name="help">Move  the app to the system tray instead of closing</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_CHECK</property>
             <property name="label">Close to tray</property>

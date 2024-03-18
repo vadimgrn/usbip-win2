@@ -42,7 +42,7 @@ void wxPersistentMainFrame::Save() const
         wxPersistentTLW::Save();
         auto &frame = *Get();
                 
-        SaveValue(m_start_minimized, frame.m_start_minimized);
+        SaveValue(m_start_in_tray, frame.m_start_in_tray);
         SaveValue(m_close_to_tray, frame.m_close_to_tray);
 
         if (auto ctl = frame.m_comboBoxServer) {
@@ -86,8 +86,8 @@ void wxPersistentMainFrame::do_restore()
 {
         auto &frame = *Get();
 
-        if (bool ok{}; RestoreValue(m_start_minimized, &ok)) {
-                frame.m_start_minimized = ok;
+        if (bool ok{}; RestoreValue(m_start_in_tray, &ok)) {
+                frame.m_start_in_tray = ok;
         }
 
         if (bool ok{}; RestoreValue(m_close_to_tray, &ok)) {

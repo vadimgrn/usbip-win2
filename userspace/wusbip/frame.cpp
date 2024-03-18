@@ -47,12 +47,12 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_file->AppendSeparator();
 
-	wxMenuItem* m_file_start_minimized;
-	m_file_start_minimized = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Start minimized") ) , _("Launch the app in the tray"), wxITEM_CHECK );
-	m_menu_file->Append( m_file_start_minimized );
+	wxMenuItem* m_file_start_in_tray;
+	m_file_start_in_tray = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Launch in tray") ) , _("Show the app in the system tray at startup"), wxITEM_CHECK );
+	m_menu_file->Append( m_file_start_in_tray );
 
 	wxMenuItem* m_file_close_to_tray;
-	m_file_close_to_tray = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Close to tray") ) , _("Close to tray instead of exit"), wxITEM_CHECK );
+	m_file_close_to_tray = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Close to tray") ) , _("Move  the app to the system tray instead of closing"), wxITEM_CHECK );
 	m_menu_file->Append( m_file_close_to_tray );
 
 	m_menu_file->AppendSeparator();
@@ -384,8 +384,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_save ), this, m_file_save->GetId());
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_save_selected ), this, m_file_save_selected->GetId());
 	this->Connect( m_file_save_selected->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_start_minimized ), this, m_file_start_minimized->GetId());
-	this->Connect( m_file_start_minimized->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_minimized_update_ui ) );
+	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_start_in_tray ), this, m_file_start_in_tray->GetId());
+	this->Connect( m_file_start_in_tray->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_in_tray_update_ui ) );
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_close_to_tray ), this, m_file_close_to_tray->GetId());
 	this->Connect( m_file_close_to_tray->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_close_to_tray_update_ui ) );
 	m_menu_file->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_exit ), this, m_file_exit->GetId());
@@ -455,7 +455,7 @@ Frame::~Frame()
 	this->Disconnect( wxEVT_CLOSE_WINDOW, wxCloseEventHandler( Frame::on_close ) );
 	this->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ) );
 	this->Disconnect( wxID_SAVEAS, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_minimized_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_in_tray_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_close_to_tray_update_ui ) );
 	this->Disconnect( wxID_SELECTALL, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
 	this->Disconnect( wxID_COPY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );

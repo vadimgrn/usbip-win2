@@ -79,8 +79,8 @@ class Frame : public wxFrame
 		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_save_selected( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_selected_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_start_minimized( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_start_minimized_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_start_in_tray( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_start_in_tray_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_close_to_tray( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_close_to_tray_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }

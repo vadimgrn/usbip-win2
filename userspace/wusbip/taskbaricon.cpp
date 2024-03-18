@@ -8,19 +8,12 @@
 
 TaskBarIcon::TaskBarIcon()
 {
-        Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_show), this, wxID_EXECUTE);
-        Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_exit), this, wxID_EXIT);
         Bind(wxEVT_TASKBAR_LEFT_DCLICK, wxTaskBarIconEventHandler(TaskBarIcon::on_left_dclick), this);
 }
 
-wxWindow& TaskBarIcon::get_main_window() const 
+wxWindow& TaskBarIcon::main_window() const 
 { 
         return *wxGetApp().GetMainTopWindow(); 
-}
-
-void TaskBarIcon::on_exit(wxCommandEvent&) 
-{ 
-        get_main_window().Close(true); 
 }
 
 wxMenu* TaskBarIcon::GetPopupMenu()
@@ -35,34 +28,39 @@ std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
 {
         auto m = std::make_unique<wxMenu>();
 
-        m->AppendCheckItem(wxID_EXECUTE, _("Show"), _("Show window"));
-        Connect(wxID_EXECUTE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler(TaskBarIcon::on_show_update_ui));
+        if (auto item = m->Append(wxID_ANY, _("Open"), _("Open the window"))) {
+                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_open), this, item->GetId());
+        }
 
-        m->Append(wxID_EXIT, _("Exit"), nullptr, _("Close app"));
+        m->AppendSeparator();
+
+        if (auto item = m->Append(wxID_ANY, _("E&xit"), _("Exit the app"))) {
+                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_exit), this, item->GetId());
+        }
 
         return m;
 }
 
-void TaskBarIcon::on_show_update_ui(wxUpdateUIEvent &event)
+void TaskBarIcon::on_exit(wxCommandEvent&)
+{ 
+        main_window().Close(true);
+}
+
+void TaskBarIcon::on_open(wxCommandEvent&)
 {
-        auto shown = get_main_window().IsShown();
-        event.Check(shown);
+        auto &wnd = main_window();
+
+        wxASSERT(!wnd.IsShown());
+        wnd.Show();
+
+        wxASSERT(IsIconInstalled());
+
+        [[maybe_unused]] auto ok = RemoveIcon();
+        wxASSERT(ok);
 }
 
 void TaskBarIcon::on_left_dclick(wxTaskBarIconEvent&)
 {
         wxCommandEvent evt;
-        evt.SetInt(1);
-
-        on_show(evt);
-}
-
-void TaskBarIcon::on_show(wxCommandEvent &event)
-{
-        bool checked = event.GetInt();
-        get_main_window().Show(checked);
-        
-        if (IsIconInstalled()) {
-                RemoveIcon();
-        }
+        on_open(evt);
 }

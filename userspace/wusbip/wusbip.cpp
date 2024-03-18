@@ -331,7 +331,6 @@ wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 MainFrame::MainFrame(_In_ Handle read) : 
         Frame(nullptr),
-        m_taskbar_icon(std::make_unique<TaskBarIcon>()),
         m_read(std::move(read)),
         m_log(new LogWindow(this, 
                 m_menu_log->FindItem(ID_TOGGLE_LOG_WINDOW),
@@ -340,7 +339,6 @@ MainFrame::MainFrame(_In_ Handle read) :
                 m_menu_view->FindItem(wxID_ZOOM_100)))
 {
         wxASSERT(m_read);
-        Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 
         init();
         restore_state();
@@ -368,6 +366,8 @@ void MainFrame::init()
         m_spinCtrlPort->SetValue(wxString::FromAscii(port)); // NI_MAXSERV
 
         init_tree_list();
+
+        Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 }
 
 /*
@@ -413,13 +413,9 @@ void MainFrame::on_close(wxCloseEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
-        if (event.CanVeto() && m_close_to_tray) {
+        if (m_close_to_tray && event.CanVeto()) {
                 event.Veto();
-                if (!m_taskbar_icon->SetIcon(GetIcon(), GetTitle())) {
-                        wxLogError(_("Could not set taskbar icon"));
-                } else {
-                        Hide();
-                }
+                iconize_to_tray();
                 return;
         }
 
@@ -432,6 +428,19 @@ void MainFrame::on_close(wxCloseEvent &event)
 void MainFrame::on_exit(wxCommandEvent&)
 {
         Close(true);
+}
+
+void MainFrame::iconize_to_tray()
+{
+        auto &icon = get_taskbar_icon();
+        wxASSERT(!icon.IsIconInstalled());
+
+        if (!icon.SetIcon(GetIcon(), GetTitle())) {
+                wxLogError(_("Could not set taskbar icon"));
+        } else if (IsShown()) {
+                [[maybe_unused]] auto ok = Hide();
+                wxASSERT(ok);
+        }
 }
 
 void MainFrame::read_loop()
@@ -672,15 +681,15 @@ void MainFrame::on_log_verbose(wxCommandEvent &event)
         m_log->SetLogLevel(checked ? VERBOSE_LOGLEVEL : DEFAULT_LOGLEVEL);
 }
 
-void MainFrame::on_start_minimized_update_ui(wxUpdateUIEvent &event)
+void MainFrame::on_start_in_tray_update_ui(wxUpdateUIEvent &event)
 {
-        event.Check(m_start_minimized);
+        event.Check(m_start_in_tray);
 }
 
-void MainFrame::on_start_minimized(wxCommandEvent &event)
+void MainFrame::on_start_in_tray(wxCommandEvent &event)
 {
         bool checked = event.GetInt();
-        m_start_minimized = checked;
+        m_start_in_tray = checked;
 }
 
 void MainFrame::on_close_to_tray_update_ui(wxUpdateUIEvent &event)
@@ -1283,4 +1292,13 @@ void MainFrame::on_view_font_decrease(wxCommandEvent&)
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(m_treeListCtrl, 0);
+}
+
+TaskBarIcon& MainFrame::get_taskbar_icon()
+{
+        if (!m_taskbar_icon) {
+                m_taskbar_icon = std::make_unique<TaskBarIcon>();
+        }
+
+        return *m_taskbar_icon;
 }

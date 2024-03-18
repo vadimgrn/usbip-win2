@@ -25,10 +25,13 @@ class MainFrame : public Frame
 public:
 	MainFrame(_In_ usbip::Handle read);
 
+	auto start_in_tray() const noexcept { return m_start_in_tray; }
+	void iconize_to_tray();
+
 private:
 	friend class wxPersistentMainFrame;
 
-	bool m_start_minimized{};
+	bool m_start_in_tray{};
 	bool m_close_to_tray{};
 
 	LogWindow *m_log{};
@@ -74,8 +77,8 @@ private:
 	void on_view_column_update_ui(wxUpdateUIEvent &event) override;
 	void on_view_column(wxCommandEvent &event) override;
 
-	void on_start_minimized_update_ui(wxUpdateUIEvent &event) override;
-	void on_start_minimized(wxCommandEvent &event) override;
+	void on_start_in_tray_update_ui(wxUpdateUIEvent &event) override;
+	void on_start_in_tray(wxCommandEvent &event) override;
 	
 	void on_close_to_tray_update_ui(wxUpdateUIEvent &event) override;
 	void on_close_to_tray(wxCommandEvent &event) override;
@@ -133,4 +136,5 @@ private:
 	std::unique_ptr<wxMenu> create_popup_menu(_In_ const menu_item_descr *items, _In_ int cnt);
 
 	std::unique_ptr<wxMenu> create_tree_popup_menu();
+	TaskBarIcon& get_taskbar_icon();
 };
