@@ -8,6 +8,7 @@
 #include <memory>
 
 class wxMenu;
+class MainFrame;
 
 class TaskBarIcon : public wxTaskBarIcon
 {
@@ -19,9 +20,8 @@ private:
 
         wxMenu *GetPopupMenu() override;
         std::unique_ptr<wxMenu> create_popup_menu();
-        wxWindow& window() const;
+        MainFrame& frame() const;
 
         void on_left_dclick(wxTaskBarIconEvent&);
         void on_open(wxCommandEvent&);
-        void on_exit(wxCommandEvent&);
 };

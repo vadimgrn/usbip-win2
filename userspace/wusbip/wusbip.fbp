@@ -500,7 +500,7 @@
             <event name="OnMenuSelection">on_view_reset</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Devices</property>
           <property name="name">m_menu_devices</property>
           <property name="permission">protected</property>
@@ -541,7 +541,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Attach selected devices</property>
-            <property name="id">ID_ATTACH</property>
+            <property name="id">wxID_OPEN</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Attach</property>
             <property name="name">m_cmd_attach</property>
@@ -556,7 +556,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Detach selected devices</property>
-            <property name="id">ID_DETACH</property>
+            <property name="id">wxID_CLOSE</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Detach</property>
             <property name="name">m_cmd_detach</property>
@@ -575,7 +575,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Detach all devices</property>
-            <property name="id">wxID_ANY</property>
+            <property name="id">wxID_CLOSE_ALL</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Detach &amp;All</property>
             <property name="name">m_cmd_detach_all</property>

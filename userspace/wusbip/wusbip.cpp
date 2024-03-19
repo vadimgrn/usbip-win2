@@ -9,6 +9,7 @@
 #include "font.h"
 #include "app.h"
 #include "log.h"
+#include "wxutils.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -1188,27 +1189,17 @@ void MainFrame::on_reload(wxCommandEvent &event)
         }
 }
 
-std::unique_ptr<wxMenu> MainFrame::create_popup_menu(_In_ const menu_item_descr *items, _In_ int cnt)
+std::unique_ptr<wxMenu> MainFrame::create_menu(_In_ const menu_item_descr *items, _In_ int cnt)
 {
-        auto popup = std::make_unique<wxMenu>();
+        auto menu = std::make_unique<wxMenu>();
 
         for (int i = 0; i < cnt; ++i) {
-                auto [id, menu, handler] = items[i];
-
-                if (id == wxID_SEPARATOR) {
-                        popup->AppendSeparator();
-                } else if (auto item = menu->FindItem(id)) {
-                        auto clone = popup->Append(id, item->GetItemLabel(), item->GetHelp(), item->GetKind());
-                        for (auto checked: {false, true}) {
-                                clone->SetBitmap(item->GetBitmap(checked), checked);
-                        }
-                        popup->Bind(wxEVT_COMMAND_MENU_SELECTED, handler, this, id);
-                } else {
-                        wxFAIL_MSG("FindItem");
+                if (auto [id, src, handler] = items[i]; clone_menu_item(*menu, id, *src)) {
+                        menu->Bind(wxEVT_COMMAND_MENU_SELECTED, handler, this, id);
                 }
         }
 
-        return popup;
+        return menu;
 }
 
 std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
@@ -1217,8 +1208,8 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
                 { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
                 { wxID_SEPARATOR, nullptr, nullptr },
-                { ID_ATTACH, m_menu_devices, &MainFrame::on_attach },
-                { ID_DETACH, m_menu_devices, &MainFrame::on_detach },
+                { wxID_OPEN, m_menu_devices, &MainFrame::on_attach },
+                { wxID_CLOSE, m_menu_devices, &MainFrame::on_detach },
                 { wxID_SEPARATOR, nullptr, nullptr },
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
@@ -1226,7 +1217,7 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
         });
 
-        return create_popup_menu(items.data(), items.size());
+        return create_menu(items.data(), items.size());
 }
 
 void MainFrame::on_item_context_menu(wxTreeListEvent&)

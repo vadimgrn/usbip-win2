@@ -113,6 +113,7 @@
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="wusbip.cpp" />
     <ClCompile Include="font.cpp" />
+    <ClCompile Include="wxutils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.h" />
@@ -125,6 +126,7 @@
     <ClInclude Include="utils.h" />
     <ClInclude Include="wusbip.h" />
     <ClInclude Include="font.h" />
+    <ClInclude Include="wxutils.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

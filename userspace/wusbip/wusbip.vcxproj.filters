@@ -15,6 +15,7 @@
     <ClCompile Include="font.cpp" />
     <ClCompile Include="taskbaricon.cpp" />
     <ClCompile Include="app.cpp" />
+    <ClCompile Include="wxutils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wusbip.h" />
@@ -27,6 +28,7 @@
     <ClInclude Include="font.h" />
     <ClInclude Include="taskbaricon.h" />
     <ClInclude Include="app.h" />
+    <ClInclude Include="wxutils.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />

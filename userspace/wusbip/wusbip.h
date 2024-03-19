@@ -27,7 +27,13 @@ public:
 
 	auto start_in_tray() const noexcept { return m_start_in_tray; }
 	void iconize_to_tray();
-	
+
+	void on_exit(wxCommandEvent &event) override;
+	void on_detach_all(wxCommandEvent &event) override;
+
+	auto& get_menu_devices() const noexcept { return *m_menu_devices; }
+	auto& get_menu_file() const noexcept { return *m_menu_file; }
+
 private:
 	friend class wxPersistentMainFrame;
 
@@ -44,11 +50,8 @@ private:
 	std::thread m_read_thread{ &MainFrame::read_loop, this };
 
 	void on_close(wxCloseEvent &event) override; 
-	void on_exit(wxCommandEvent &event) override;
-
 	void on_attach(wxCommandEvent &event) override;
 	void on_detach(wxCommandEvent &event) override;
-	void on_detach_all(wxCommandEvent &event) override;
 	void on_reload(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
@@ -133,7 +136,7 @@ private:
 	void on_tree_mouse_wheel(_In_ wxMouseEvent &event);
 
 	using menu_item_descr = std::tuple<int, wxMenu*, decltype(&MainFrame::on_attach)>;
-	std::unique_ptr<wxMenu> create_popup_menu(_In_ const menu_item_descr *items, _In_ int cnt);
+	std::unique_ptr<wxMenu> create_menu(_In_ const menu_item_descr *items, _In_ int cnt);
 
 	std::unique_ptr<wxMenu> create_tree_popup_menu();
 

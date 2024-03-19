@@ -43,8 +43,6 @@ class Frame : public wxFrame
 		{
 			ID_TOGGLE_AUTO = 1000,
 			ID_EDIT_NOTES,
-			ID_ATTACH,
-			ID_DETACH,
 			ID_TOGGLE_LOG_WINDOW
 		};
 

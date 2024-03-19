@@ -3,7 +3,9 @@
  */
 
 #include "taskbaricon.h"
+#include "wusbip.h"
 #include "app.h"
+#include "wxutils.h"
 
 #include <wx/menu.h>
 #include <wx/window.h>
@@ -23,35 +25,36 @@ wxMenu* TaskBarIcon::GetPopupMenu()
 
 std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
 {
-        auto m = std::make_unique<wxMenu>();
+        auto &fr = frame();
+        auto menu = std::make_unique<wxMenu>();
 
-        if (auto item = m->Append(wxID_ANY, _("Open window"), _("Open the main window"))) {
+        if (auto item = menu->Append(wxID_ANY, _("Open window"), _("Open the main window"))) {
                 Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_open), this, item->GetId());
+                item->SetBitmaps(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FULL_SCREEN), wxASCII_STR(wxART_MENU)));
         }
 
-        m->AppendSeparator();
+        menu->AppendSeparator();
 
-        if (auto item = m->Append(wxID_ANY, _("E&xit"), _("Exit the app"))) {
-                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_exit), this, item->GetId());
+        if (auto id = wxID_CLOSE_ALL; clone_menu_item(*menu, id, fr.get_menu_devices())) {
+                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainFrame::on_detach_all), &fr, id);
         }
 
-        return m;
+        if (auto id = wxID_EXIT; clone_menu_item(*menu, id, fr.get_menu_file())) {
+                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainFrame::on_exit), &fr, id);
+        }
+
+        return menu;
 }
 
-wxWindow& TaskBarIcon::window() const
+MainFrame& TaskBarIcon::frame() const
 {
-        return *wxGetApp().GetMainTopWindow();
-}
-
-void TaskBarIcon::on_exit(wxCommandEvent&)
-{ 
-        window().Close(true);
+        return *static_cast<MainFrame*>(wxGetApp().GetMainTopWindow());
 }
 
 void TaskBarIcon::on_open(wxCommandEvent&)
 {
-        wxASSERT(!window().IsShown());
-        window().Show();
+        wxASSERT(!frame().IsShown());
+        frame().Show();
 
         wxASSERT(IsIconInstalled());
 

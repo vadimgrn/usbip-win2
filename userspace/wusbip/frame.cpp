@@ -233,7 +233,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_attach;
-	m_cmd_attach = new wxMenuItem( m_menu_devices, ID_ATTACH, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+T"), _("Attach selected devices"), wxITEM_NORMAL );
+	m_cmd_attach = new wxMenuItem( m_menu_devices, wxID_OPEN, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+T"), _("Attach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_attach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_TICK_MARK), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -242,7 +242,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_detach;
-	m_cmd_detach = new wxMenuItem( m_menu_devices, ID_DETACH, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach selected devices"), wxITEM_NORMAL );
+	m_cmd_detach = new wxMenuItem( m_menu_devices, wxID_CLOSE, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_detach->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_CROSS_MARK), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -253,7 +253,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_detach_all;
-	m_cmd_detach_all = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("Detach &All") ) + wxT('\t') + wxT("CTRL+X"), _("Detach all devices"), wxITEM_NORMAL );
+	m_cmd_detach_all = new wxMenuItem( m_menu_devices, wxID_CLOSE_ALL, wxString( _("Detach &All") ) + wxT('\t') + wxT("CTRL+X"), _("Detach all devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_detach_all->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_DELETE), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -471,8 +471,8 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zebra_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
-	this->Disconnect( ID_ATTACH, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	this->Disconnect( ID_DETACH, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( wxID_OPEN, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( wxID_CLOSE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_LOG_WINDOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
 	m_auiToolBar->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
