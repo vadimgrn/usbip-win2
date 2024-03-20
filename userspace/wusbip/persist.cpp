@@ -64,10 +64,7 @@ void wxPersistentMainFrame::Save() const
 
         if (auto tb = frame.m_auiToolBar) {
                 SaveValue(m_toolbar_labels, tb->HasFlag(wxAUI_TB_TEXT));
-                SaveValue(m_toolbar_font_size, get_font_size(tb));
         }
-
-        SaveValue(m_toolbar_add_font_size, get_font_size(frame.m_auiToolBarAdd));
 
         if (auto dv = frame.m_treeListCtrl->GetDataView()) {
                 SaveValue(m_tree_row_lines, dv->HasFlag(wxDV_ROW_LINES));
@@ -114,14 +111,6 @@ void wxPersistentMainFrame::do_restore()
 
         if (int pt{}; RestoreValue(m_log_font_size, &pt)) {
                 set_font_size(frame.m_log, pt);
-        }
-
-        if (int pt{}; RestoreValue(m_toolbar_font_size, &pt)) {
-                set_font_size(frame.m_auiToolBar, pt);
-        }
-
-        if (int pt{}; RestoreValue(m_toolbar_add_font_size, &pt)) {
-                set_font_size(frame.m_auiToolBarAdd, pt);
         }
 
         if (bool ok{}; RestoreValue(m_toolbar_labels, &ok) && ok != frame.m_auiToolBar->HasFlag(wxAUI_TB_TEXT)) {
