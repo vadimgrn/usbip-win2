@@ -54,7 +54,7 @@ class Frame : public wxFrame
 		wxMenu* m_menu_columns;
 		wxMenu* m_menu_devices;
 		wxMenu* m_menu_log;
-		wxMenu* m_menu_log_help;
+		wxMenu* m_menu_help;
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_tool_reload;
 		wxAuiToolBarItem* m_tool_attach;

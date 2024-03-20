@@ -5,11 +5,12 @@
 #include "wusbip.h"
 #include "taskbaricon.h"
 #include "persist.h"
+#include "wxutils.h"
 #include "utils.h"
 #include "font.h"
 #include "app.h"
 #include "log.h"
-#include "wxutils.h"
+
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -355,7 +356,7 @@ void MainFrame::init()
         SetTitle(app_name);
 
         SetIcon(wxIcon(L"USBip")); // see wxwidgets.rc
-
+        
         if (auto cfg = wxConfig::Get()) {
                 cfg->SetStyle(wxCONFIG_USE_LOCAL_FILE);
         }

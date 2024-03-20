@@ -284,26 +284,26 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menubar->Append( m_menu_log, _("Log") );
 
-	m_menu_log_help = new wxMenu();
+	m_menu_help = new wxMenu();
 	wxMenuItem* m_help_about;
-	m_help_about = new wxMenuItem( m_menu_log_help, wxID_ABOUT, wxString( _("About") ) , wxEmptyString, wxITEM_NORMAL );
+	m_help_about = new wxMenuItem( m_menu_help, wxID_ABOUT, wxString( _("About") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_help_about->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_TIP), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_help_about->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_TIP), wxASCII_STR(wxART_MENU) ) );
 	#endif
-	m_menu_log_help->Append( m_help_about );
+	m_menu_help->Append( m_help_about );
 
 	wxMenuItem* m_help_about_lib;
-	m_help_about_lib = new wxMenuItem( m_menu_log_help, wxID_ANY, wxString( _("wxWidgets") ) , _("Show information about the library"), wxITEM_NORMAL );
+	m_help_about_lib = new wxMenuItem( m_menu_help, wxID_ANY, wxString( _("wxWidgets") ) , _("Show information about the library"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_help_about_lib->SetBitmaps( wxArtProvider::GetBitmap( wxASCII_STR(wxART_INFORMATION), wxASCII_STR(wxART_MENU) ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
 	m_help_about_lib->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_INFORMATION), wxASCII_STR(wxART_MENU) ) );
 	#endif
-	m_menu_log_help->Append( m_help_about_lib );
+	m_menu_help->Append( m_help_about_lib );
 
-	m_menubar->Append( m_menu_log_help, _("Help") );
+	m_menubar->Append( m_menu_help, _("Help") );
 
 	this->SetMenuBar( m_menubar );
 
@@ -432,8 +432,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_log_toggle->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_verbose ), this, m_log_verbose->GetId());
 	this->Connect( m_log_verbose->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
-	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
-	m_menu_log_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about_lib ), this, m_help_about_lib->GetId());
+	m_menu_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
+	m_menu_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about_lib ), this, m_help_about_lib->GetId());
 	m_auiToolBar->Connect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
 	this->Connect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );

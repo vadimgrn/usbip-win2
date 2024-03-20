@@ -622,7 +622,7 @@
         </object>
         <object class="wxMenu" expanded="false">
           <property name="label">Help</property>
-          <property name="name">m_menu_log_help</property>
+          <property name="name">m_menu_help</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_TIP; wxART_MENU</property>
