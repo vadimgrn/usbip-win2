@@ -6,6 +6,7 @@
 
 #include <sal.h>
 #include <compare>
+
 #include <wx/string.h>
 
 class wxMenu;

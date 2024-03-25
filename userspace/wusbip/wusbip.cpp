@@ -414,10 +414,11 @@ void MainFrame::post_exit()
 void MainFrame::on_close(wxCloseEvent &event)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
+        wxASSERT(event.GetEventType() == wxEVT_CLOSE_WINDOW);
 
         if (m_close_to_tray && event.CanVeto()) {
-                event.Veto();
                 iconize_to_tray();
+                event.Veto();
                 return;
         }
 
@@ -434,15 +435,18 @@ void MainFrame::on_exit(wxCommandEvent&)
 
 void MainFrame::iconize_to_tray()
 {
-        if (m_taskbar_icon) {
-                wxASSERT(!m_taskbar_icon->IsIconInstalled());
-        } else {
-                m_taskbar_icon = std::make_unique<TaskBarIcon>();
-        }
+        auto shown = IsShown();
 
+        if (!m_taskbar_icon) {
+                m_taskbar_icon = std::make_unique<TaskBarIcon>();
+        } else if (m_taskbar_icon->IsIconInstalled()) {
+                wxASSERT(!shown);
+                return;
+        }
+        
         if (!m_taskbar_icon->SetIcon(GetIcon(), GetTitle())) {
                 wxLogError(_("Could not set taskbar icon"));
-        } else if (IsShown()) {
+        } else if (shown) {
                 [[maybe_unused]] auto ok = Hide();
                 wxASSERT(ok);
         }

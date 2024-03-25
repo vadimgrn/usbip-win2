@@ -10,6 +10,11 @@
 
 using namespace usbip;
 
+App::App()
+{
+        Bind(wxEVT_END_SESSION, &App::on_end_session, this);
+}
+
 bool App::OnInit()
 {
         if (wxApp::OnInit()) {
@@ -43,6 +48,17 @@ void App::set_names()
 
         SetAppName(wx_string(v.GetProductName()));
         SetVendorName(wx_string(v.GetCompanyName()));
+}
+
+/*
+ * wxEVT_CLOSE_WINDOW will not be sent to MainFrame, but m_read_thread must be joined.
+ * @see MainFrame::on_close
+ */
+void App::on_end_session(_In_ wxCloseEvent&)
+{
+        if (auto wnd = GetMainTopWindow()) {
+                wnd->Close(true);
+        }
 }
 
 wxIMPLEMENT_APP(App);
