@@ -12,7 +12,7 @@
 #include <thread>
 #include <mutex>
 
-class LogWindow;
+class wxLogWindow;
 class TaskBarIcon;
 class wxDataViewColumn;
 
@@ -40,7 +40,7 @@ private:
 	bool m_start_in_tray{};
 	bool m_close_to_tray{};
 
-	LogWindow *m_log{};
+	wxLogWindow *m_log{};
 	std::unique_ptr<TaskBarIcon> m_taskbar_icon;
 	std::unique_ptr<wxMenu> m_tree_popup_menu;
 
@@ -139,8 +139,4 @@ private:
 	std::unique_ptr<wxMenu> create_menu(_In_ const menu_item_descr *items, _In_ int cnt);
 
 	std::unique_ptr<wxMenu> create_tree_popup_menu();
-
-	bool can_show_balloon() const noexcept;
-	void show_balloon(_In_ const wxString &text, _In_ int flags = wxICON_INFORMATION);
-	void cancel_balloon() { show_balloon(wxEmptyString, 0); }
 };

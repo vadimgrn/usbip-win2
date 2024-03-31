@@ -13,6 +13,7 @@
 TaskBarIcon::TaskBarIcon()
 {
         Bind(wxEVT_TASKBAR_LEFT_DCLICK, wxTaskBarIconEventHandler(TaskBarIcon::on_left_dclick), this);
+        Bind(wxEVT_TASKBAR_BALLOON_TIMEOUT, wxTaskBarIconEventHandler(TaskBarIcon::on_balloon_timeout), this);
 }
 
 wxMenu* TaskBarIcon::GetPopupMenu()
@@ -66,4 +67,17 @@ void TaskBarIcon::on_left_dclick(wxTaskBarIconEvent&)
 {
         wxCommandEvent evt;
         on_open(evt);
+}
+
+void TaskBarIcon::show_balloon(_In_ const wxString &text, _In_ int flags)
+{
+        wxLogVerbose(L"Balloon '%s', cancel %d", text, m_cancel);
+
+        if (m_cancel) {
+                auto ok = ShowBalloon(wxEmptyString, wxEmptyString, 0, 0); 
+                wxASSERT(ok);
+        }
+
+        m_cancel = ShowBalloon(wxEmptyString, text, 0, flags);
+        wxASSERT(m_cancel);
 }

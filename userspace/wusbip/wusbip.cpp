@@ -497,10 +497,9 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 
         log(st);
         
-        if (can_show_balloon()) {
-                cancel_balloon();
+        if (m_taskbar_icon && m_taskbar_icon->IsIconInstalled()) {
                 auto s = _(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
-                show_balloon(s);
+                m_taskbar_icon->show_balloon(s);
         }
 
         auto [dev, added] = find_or_add_device(st.device.location);
@@ -1297,17 +1296,4 @@ void MainFrame::on_view_font_decrease(wxCommandEvent&)
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(m_treeListCtrl, 0);
-}
-
-bool MainFrame::can_show_balloon() const noexcept
-{ 
-        return m_taskbar_icon && m_taskbar_icon->IsIconInstalled(); 
-}
-
-void MainFrame::show_balloon(_In_ const wxString &text, _In_ int flags)
-{
-        wxASSERT(m_taskbar_icon);
-        if (!m_taskbar_icon->ShowBalloon(wxEmptyString, text, 0, flags)) {
-                wxLogError(_("Could not show balloon notification"));
-        }
 }
