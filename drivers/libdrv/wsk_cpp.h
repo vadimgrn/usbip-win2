@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -58,8 +58,8 @@ PAGED NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool w
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
 
-_IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress);
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress, _In_ IRP *irp);
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress);
@@ -78,9 +78,6 @@ NTSTATUS send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IR
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication);
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
@@ -109,19 +106,13 @@ PAGED NTSTATUS getaddrinfo(
         _Out_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
-        _In_opt_ ADDRINFOEXW *Hints);
+        _In_opt_ ADDRINFOEXW *Hints,
+        _Inout_ IRP *irp);
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED void free(_In_opt_ ADDRINFOEXW *AddrInfo);
 
 //
-
-using addrinfo_f = NTSTATUS (_In_ SOCKET *sock, _In_ const ADDRINFOEXW &ai, _Inout_opt_ void *ctx);
-
-_IRQL_requires_max_(APC_LEVEL)
-PAGED SOCKET *for_each(
-        _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch, // for FN_WSK_SOCKET
-        _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _Inout_opt_ void *ctx);
 
 enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
 

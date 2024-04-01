@@ -146,7 +146,7 @@ constexpr auto can_retry(_In_ NTSTATUS status)
 {
         switch (as_usbip_status(status)) {
         case USBIP_ERROR_ADDRINFO:
-        case USBIP_ERROR_CONNECT:
+//      case USBIP_ERROR_CONNECT:
         case USBIP_ERROR_NETWORK:
                 return true;
         }

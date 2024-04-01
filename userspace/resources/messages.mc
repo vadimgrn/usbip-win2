@@ -1,4 +1,4 @@
-;// Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+;// Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;//
 ;#pragma once
 ;
@@ -53,14 +53,6 @@ Facility=Driver
 SymbolicName=USBIP_ERROR_ADDRINFO
 Language=English
 Cannot get address information for hostname
-.
-
-MessageId=
-Severity=Error
-Facility=Driver
-SymbolicName=USBIP_ERROR_CONNECT
-Language=English
-Unable to establish TCP/IP connection to remote host.
 .
 
 MessageId=

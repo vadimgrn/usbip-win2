@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -16,6 +16,7 @@
 #include <initguid.h>
 #include <usbip\vhci.h>
 
+struct addrinfoexW; // ADDRINFOEXW
 
 /*
  * Macro WDF_TYPE_NAME_TO_TYPE_INFO (see WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE)
@@ -84,6 +85,8 @@ struct device_ctx;
 struct device_ctx_ext
 {
         device_ctx *ctx;
+
+        addrinfoexW *addrinfo; // is used during the attach and will be released after that
         wsk::SOCKET *sock;
 
         // from ioctl::plugin_hardware
@@ -172,7 +175,6 @@ inline auto& get_endpoint(_In_ WDFQUEUE queue) // use get_device() for device_ct
 {
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
-
 
 /*
  * Context space for WDFREQUEST.

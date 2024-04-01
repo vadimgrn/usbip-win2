@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <ntddk.h>
@@ -422,7 +422,8 @@ PAGED NTSTATUS wsk::getaddrinfo(
         _Out_ ADDRINFOEXW* &Result,
         _In_opt_ UNICODE_STRING *NodeName,
         _In_opt_ UNICODE_STRING *ServiceName,
-        _In_opt_ ADDRINFOEXW *Hints)
+        _In_opt_ ADDRINFOEXW *Hints,
+        _Inout_ IRP *irp)
 {
         PAGED_CODE();
         Result = nullptr;
@@ -432,21 +433,14 @@ PAGED NTSTATUS wsk::getaddrinfo(
                 return STATUS_UNSUCCESSFUL;
         }
 
-        irp_cls irp;
-        if (!irp) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        auto st = prov->Dispatch->WskGetAddressInfo(prov->Client, NodeName, ServiceName,
-                                                        0, // NameSpace
-                                                        nullptr, // Provider
-                                                        Hints,
-                                                        &Result,
-                                                        nullptr, // OwningProcess
-                                                        nullptr, // OwningThread
-                                                        irp.get());
-
-        return irp.wait_for_completion(st);
+        return prov->Dispatch->WskGetAddressInfo(prov->Client, NodeName, ServiceName,
+                                                0, // NameSpace
+                                                nullptr, // Provider
+                                                Hints,
+                                                &Result,
+                                                nullptr, // OwningProcess
+                                                nullptr, // OwningThread
+                                                irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -664,16 +658,10 @@ PAGED NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
         return irp.wait_for_completion(st);
 }
 
-_IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress, _In_ IRP *irp)
 {
-        PAGED_CODE();
-
-        auto &irp = sock->misc_irp;
-        irp.reset();
-
-        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, irp.get());
-        return irp.wait_for_completion(st);
+        return sock->invoke(nullptr, sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -686,12 +674,6 @@ PAGED NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_
 
         auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskDisconnect, sock->Self, buffer, flags, irp.get());
         return irp.wait_for_completion(st);
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS wsk::release(_In_ SOCKET *sock, _In_ WSK_DATA_INDICATION *DataIndication)
-{
-        return sock->invoke(&sock->misc_cnt, sock->Connection->WskRelease, sock->Self, DataIndication);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -716,32 +698,6 @@ PAGED NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddre
 
         auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskGetRemoteAddress, sock->Self, RemoteAddress, irp.get());
         return irp.wait_for_completion(st);
-}
-
-_IRQL_requires_max_(APC_LEVEL)
-PAGED auto wsk::for_each(
-        _In_ ULONG Flags, _In_opt_ void *SocketContext, _In_opt_ const void *Dispatch,
-        _In_ const ADDRINFOEXW *head, _In_ addrinfo_f f, _Inout_opt_ void *ctx) -> SOCKET*
-{
-        PAGED_CODE();
-
-        for (auto ai = head; ai; ai = ai->ai_next) {
-
-                SOCKET *sock{};
-
-                if (socket(sock, static_cast<ADDRESS_FAMILY>(ai->ai_family), 
-                           static_cast<USHORT>(ai->ai_socktype), ai->ai_protocol, Flags, SocketContext, Dispatch)) {
-                        NT_ASSERT(!sock);
-                } else if (auto err = f(sock, *ai, ctx)) {
-                        err = close(sock);
-                        NT_ASSERT(!err);
-                        free(sock);
-                } else {
-                        return sock;
-                }
-        }
-
-        return nullptr;
 }
 
 /*

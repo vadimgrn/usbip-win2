@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "context.h"
@@ -72,9 +72,10 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::free(_In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
-
         NT_ASSERT(ext);
+
         free(ext->sock);
+        wsk::free(ext->addrinfo);
 
         libdrv::FreeUnicodeString(ext->node_name, pooltag); // @see RtlFreeUnicodeString
         libdrv::FreeUnicodeString(ext->service_name, pooltag);
