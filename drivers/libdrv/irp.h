@@ -63,7 +63,7 @@ inline auto get_irp(_In_ LIST_ENTRY *entry)
 }
 
 template<auto N, typename T = void>
-inline auto& argv(_In_ IRP *irp)
+inline decltype(auto) argv(_In_ IRP *irp)
 {
 	NT_ASSERT(irp);
         auto &ptr = irp->Tail.Overlay.DriverContext[N];

@@ -72,10 +72,9 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::free(_In_ device_ctx_ext *ext)
 {
         PAGED_CODE();
-        NT_ASSERT(ext);
 
+        NT_ASSERT(ext);
         free(ext->sock);
-        wsk::free(ext->addrinfo);
 
         libdrv::FreeUnicodeString(ext->node_name, pooltag); // @see RtlFreeUnicodeString
         libdrv::FreeUnicodeString(ext->service_name, pooltag);

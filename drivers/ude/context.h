@@ -16,8 +16,6 @@
 #include <initguid.h>
 #include <usbip\vhci.h>
 
-struct addrinfoexW; // ADDRINFOEXW
-
 /*
  * Macro WDF_TYPE_NAME_TO_TYPE_INFO (see WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE)
  * makes impossible to declare context type with the same name in different namespaces.
@@ -85,8 +83,6 @@ struct device_ctx;
 struct device_ctx_ext
 {
         device_ctx *ctx;
-
-        addrinfoexW *addrinfo; // is used during the attach and will be released after that
         wsk::SOCKET *sock;
 
         // from ioctl::plugin_hardware

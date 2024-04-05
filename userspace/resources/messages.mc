@@ -52,7 +52,23 @@ Severity=Error
 Facility=Driver
 SymbolicName=USBIP_ERROR_ADDRINFO
 Language=English
-Cannot get address information for hostname
+The host name cannot be resolved
+.
+
+MessageId=
+Severity=Error
+Facility=Driver
+SymbolicName=USBIP_ERROR_ADDRINFO_NOT_FOUND
+Language=English
+The host name cannot be resolved, not found
+.
+
+MessageId=
+Severity=Error
+Facility=Driver
+SymbolicName=USBIP_ERROR_ADDRINFO_END
+Language=English
+Unable to establish connection with specified host/service, USBIP server is not running?
 .
 
 MessageId=
