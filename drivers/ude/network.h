@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -32,7 +32,7 @@ PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code);
+PAGED USBIP_STATUS recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code);
 
 enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 

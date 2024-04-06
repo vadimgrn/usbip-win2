@@ -290,7 +290,7 @@ PAGED NTSTATUS connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS complete(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS irp_complete(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         if (irp->PendingReturned) {
                 IoMarkIrpPending(irp);
@@ -302,42 +302,52 @@ NTSTATUS complete(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressi
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto try_connect(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _In_ wsk::SOCKET *sock, _In_ const ADDRINFOEXW &ai)
+PAGED auto make_sockaddr_inet(_In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
+        SOCKADDR_INET sa{};
+
+        NT_ASSERT(ai.ai_addrlen <= sizeof(sa));
+        auto len = min(ai.ai_addrlen, sizeof(sa));
+
+        RtlCopyMemory(&sa, ai.ai_addr, len);
+        return sa;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
+{
+        PAGED_CODE();
+        NT_ASSERT(!sock);
+
+        if (auto err = socket(sock, static_cast<ADDRESS_FAMILY>(ai.ai_family), 
+                                static_cast<USHORT>(ai.ai_socktype), ai.ai_protocol, 
+                                WSK_FLAG_CONNECTION_SOCKET, nullptr, nullptr)) {
+                NT_ASSERT(!sock);
+                Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", err);
+                return err;
+        }
 
         if (auto err = set_options(sock)) {
                 return err;
         }
 
-        SOCKADDR_INET addr { // see INADDR_ANY, IN6ADDR_ANY_INIT
+        SOCKADDR_INET any { // see INADDR_ANY, IN6ADDR_ANY_INIT
                 .si_family = static_cast<ADDRESS_FAMILY>(ai.ai_family)
         };
 
-        if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&addr))) {
+        if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&any))) {
                 Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", err);
                 return err;
         }
 
-        auto addrlen = min(ai.ai_addrlen, sizeof(addr));
-        RtlCopyMemory(&addr, ai.ai_addr, addrlen);
-
-        auto irp = set_args(request, __func__, &ai);
-        IoSetCompletionRoutine(irp, complete, wi, true, true, true);
-
-        if (auto st = connect(sock, ai.ai_addr, irp); // comletion handler will be called anyway
-            addr.si_family == AF_INET) { // can't access ai.* after connect
-                TraceDbg("%!IPADDR!, %!STATUS!", addr.Ipv4.sin_addr.s_addr, st);
-        } else {
-                TraceDbg("%!BIN!, %!STATUS!", WppBinary(&addr, USHORT(addrlen)), st);
-        }
-
-        return STATUS_PENDING;
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS try_address(
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS connect(
         _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wsk::SOCKET* &sock, _In_opt_ const ADDRINFOEXW *ai)
 {
         PAGED_CODE();
@@ -348,33 +358,45 @@ PAGED NTSTATUS try_address(
                 return USBIP_ERROR_ADDRINFO_END;
         }
 
-        if (auto err = socket(sock, static_cast<ADDRESS_FAMILY>(ai->ai_family), 
-                                static_cast<USHORT>(ai->ai_socktype), ai->ai_protocol, 
-                                WSK_FLAG_CONNECTION_SOCKET, nullptr, nullptr)) {
-                NT_ASSERT(!sock);
-                Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", err);
+        if (auto err = create_socket(sock, *ai)) {
                 return err;
         }
 
-        return try_connect(request, wi, sock, *ai);
+        auto sa = make_sockaddr_inet(*ai);
+
+        auto irp = set_args(request, __func__, ai);
+        IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
+
+        auto st = connect(sock, ai->ai_addr, irp); // comletion handler will be called anyway
+
+        if (sa.si_family == AF_INET) { // can't access ai.* after connect
+                auto &v4 = sa.Ipv4;
+                TraceDbg("%!IPADDR!, %!STATUS!", v4.sin_addr.s_addr, st);
+        } else {
+                auto &v6 = sa.Ipv6;
+                TraceDbg("%!BIN!, %!STATUS!", WppBinary(&v6.sin6_addr, sizeof(v6.sin6_addr)), st);
+        }
+
+        return STATUS_PENDING;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto on_connect(
-        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ device_ctx_ext* &ext, _In_ const ADDRINFOEXW &current)
+        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ device_ctx_ext* &ext, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
         auto st = WdfRequestGetStatus(request);
 
         if (NT_SUCCESS(st)) {
                 st = connected(request, ext);
+                NT_ASSERT(st != STATUS_PENDING);
         } else {
                 auto err = close(ext->sock);
                 NT_ASSERT(!err);
 
                 free(ext->sock);
-                st = try_address(request, wi, ext->sock, current.ai_next);
+                st = connect(request, wi, ext->sock, ai.ai_next);
         }
 
         return st;
@@ -403,7 +425,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         if (auto ai = libdrv::argv<ADDRINFOEXW, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx.ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
-                st = try_address(request, wi, ext.sock, ctx.addrinfo);
+                st = connect(request, wi, ext.sock, ctx.addrinfo);
         } else if (st == STATUS_NOT_FOUND) { // "Element not found" is not clear enough
                 st = USBIP_ERROR_ADDRINFO_NOT_FOUND;
         }
@@ -475,7 +497,7 @@ PAGED auto getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wor
         };
 
         auto irp = set_args(request, __func__);
-        IoSetCompletionRoutine(irp, complete, wi, true, true, true);
+        IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
                          
         NT_ASSERT(!ctx.addrinfo);
         return wsk::getaddrinfo(ctx.addrinfo, &ext.node_name, &ext.service_name, &hints, irp);
@@ -507,7 +529,7 @@ PAGED NTSTATUS plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl:
         TraceDbg("getaddrinfo %!STATUS!", st);
 
         switch (st) {
-        case STATUS_NO_MATCH:
+        case STATUS_NO_MATCH: // FIXME: sure?
         case STATUS_INVALID_PARAMETER:
                 return USBIP_ERROR_ADDRINFO;
         default: // completion routine will be called

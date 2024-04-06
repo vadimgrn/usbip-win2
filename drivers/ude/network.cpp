@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "network.h"
@@ -58,7 +58,7 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
+PAGED USBIP_STATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
 {
         PAGED_CODE();
 

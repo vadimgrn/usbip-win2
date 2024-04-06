@@ -60,7 +60,7 @@ Severity=Error
 Facility=Driver
 SymbolicName=USBIP_ERROR_ADDRINFO_NOT_FOUND
 Language=English
-The host name cannot be resolved, not found
+The host name cannot be resolved, no such host is known
 .
 
 MessageId=
@@ -68,15 +68,7 @@ Severity=Error
 Facility=Driver
 SymbolicName=USBIP_ERROR_ADDRINFO_END
 Language=English
-Unable to establish connection with specified host/service, USBIP server is not running?
-.
-
-MessageId=
-Severity=Error
-Facility=Driver
-SymbolicName=USBIP_ERROR_NETWORK
-Language=English
-Network error while communicating with remote host.
+Could not establish connection with specified host/service
 .
 
 MessageId=

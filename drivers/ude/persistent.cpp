@@ -145,13 +145,19 @@ PAGED auto sleep(_Inout_ vhci_ctx &ctx, _In_ ULONG seconds)
 constexpr auto can_retry(_In_ NTSTATUS status)
 {
         switch (as_usbip_status(status)) {
-        case USBIP_ERROR_ADDRINFO:
-//      case USBIP_ERROR_CONNECT:
-        case USBIP_ERROR_NETWORK:
+        case USBIP_ERROR_VERSION:
+        case USBIP_ERROR_PROTOCOL:
+        case USBIP_ERROR_ABI:
+        // @see op_status_t
+        case USBIP_ERROR_ST_NA: 
+        case USBIP_ERROR_ST_DEV_BUSY:
+        case USBIP_ERROR_ST_DEV_ERR:
+        case USBIP_ERROR_ST_NODEV:
+        case USBIP_ERROR_ST_ERROR:
+                return false;
+        default:
                 return true;
         }
-
-        return false;
 }
 
 /*
