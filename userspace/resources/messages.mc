@@ -47,14 +47,7 @@ Language=English
 Driver command completed unsuccessfully.
 .
 
-MessageId=
-Severity=Error
-Facility=Driver
-SymbolicName=USBIP_ERROR_ADDRINFO
-Language=English
-The host name cannot be resolved
-.
-
+;// STATUS_NOT_FOUND -> WSAHOST_NOT_FOUND
 MessageId=
 Severity=Error
 Facility=Driver
@@ -63,12 +56,22 @@ Language=English
 The host name cannot be resolved, no such host is known
 .
 
+;// STATUS_NO_MATCH
 MessageId=
 Severity=Error
 Facility=Driver
-SymbolicName=USBIP_ERROR_ADDRINFO_END
+SymbolicName=USBIP_ERROR_ADDRINFO_NO_MATCH
 Language=English
-Could not establish connection with specified host/service
+The host name cannot be resolved, there was no match
+.
+
+;// STATUS_IO_TIMEOUT -> WSAETIMEDOUT
+MessageId=
+Severity=Error
+Facility=Driver
+SymbolicName=USBIP_ERROR_CONNECT_IO_TIMEOUT
+Language=English
+A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond 
 .
 
 MessageId=
