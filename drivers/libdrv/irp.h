@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -62,12 +62,17 @@ inline auto get_irp(_In_ LIST_ENTRY *entry)
 	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
 }
 
-template<auto N, typename T = void>
+template<auto N>
 inline decltype(auto) argv(_In_ IRP *irp)
 {
 	NT_ASSERT(irp);
-        auto &ptr = irp->Tail.Overlay.DriverContext[N];
-        return reinterpret_cast<T*&>(ptr);
+        return irp->Tail.Overlay.DriverContext[N];
+}
+
+template<typename R, auto N>
+inline auto argv(_In_ IRP *irp)
+{
+	return static_cast<R*>(argv<N>(irp));
 }
 
 _IRQL_requires_same_

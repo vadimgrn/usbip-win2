@@ -102,7 +102,7 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
+PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_import_reply &reply)
 {
         PAGED_CODE();
         RtlZeroMemory(&reply, sizeof(reply));
@@ -123,7 +123,7 @@ PAGED auto recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_ op_
                 return err;
         } else if (strncmp(reply.udev.busid, busid, sizeof(busid))) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
-                return as_ntstatus(USBIP_ERROR_PROTOCOL);
+                return USBIP_ERROR_PROTOCOL;
         }
 
         return STATUS_SUCCESS;
@@ -160,7 +160,7 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
+PAGED NTSTATUS plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
@@ -168,7 +168,7 @@ PAGED auto plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
                 TraceDbg("port %d claimed", port);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "All roothub ports are occupied");
-                return as_ntstatus(USBIP_ERROR_PORTFULL);
+                return USBIP_ERROR_PORTFULL;
         }
 
         auto &dev = *get_device_ctx(device);
@@ -252,7 +252,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
+PAGED NTSTATUS connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
 {
         PAGED_CODE();
         Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
@@ -261,13 +261,13 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
         auto vhci = get_vhci(request);
-        device_state_changed(vhci, *ext, r->port, vhci::state::connected);
+        device_state_changed(vhci, *ext, 0, vhci::state::connected);
 
         if (auto err = import_remote_device(*ext)) {
-                return as_ntstatus(err);
+                return err;
         }
 
-        UDECXUSBDEVICE dev;
+        UDECXUSBDEVICE dev{};
         if (auto err = device::create(dev, vhci, ext)) {
                 return err;
         }
@@ -395,12 +395,12 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto &ctx = *get_workitem_ctx(wi);
         auto &ext = *ctx.ext;
 
-        const auto what = libdrv::argv<ARG_WHAT, char>(irp);
+        auto what = libdrv::argv<const char, ARG_WHAT>(irp);
         auto st = WdfRequestGetStatus(request);
 
         TraceDbg("%s %!USTR!:%!USTR!/%!USTR!, %!STATUS!", what, &ext.node_name, &ext.service_name, &ext.busid, st);
 
-        if (const auto ai = libdrv::argv<ARG_AI, ADDRINFOEXW>(irp)) {
+        if (auto ai = libdrv::argv<ADDRINFOEXW, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx.ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 st = try_address(request, wi, ext.sock, ctx.addrinfo);
@@ -517,7 +517,7 @@ PAGED NTSTATUS plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl:
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugin_hardware(_In_ WDFREQUEST request)
+PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
         WdfRequestSetInformation(request, 0);
@@ -533,7 +533,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "plugin_hardware.size %lu != sizeof(plugin_hardware) %Iu", 
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(USBIP_ERROR_ABI);
+                return USBIP_ERROR_ABI;
         }
 
         r->port = 0;
@@ -546,7 +546,7 @@ PAGED auto plugin_hardware(_In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugout_hardware(_In_ WDFREQUEST request)
+PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
 
@@ -561,7 +561,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "plugout_hardware.size %lu != sizeof(plugout_hardware) %Iu",
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(USBIP_ERROR_ABI);
+                return USBIP_ERROR_ABI;
         }
 
         TraceDbg("port %d", r->port);
@@ -582,7 +582,7 @@ PAGED auto plugout_hardware(_In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_imported_devices(_In_ WDFREQUEST request)
+PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
         WdfRequestSetInformation(request, 0);
@@ -596,7 +596,7 @@ PAGED auto get_imported_devices(_In_ WDFREQUEST request)
                 Trace(TRACE_LEVEL_ERROR, "get_imported_devices.size %lu != sizeof(get_imported_devices) %Iu", 
                                           r->size, sizeof(*r));
 
-                return as_ntstatus(USBIP_ERROR_ABI);
+                return USBIP_ERROR_ABI;
         }
 
         auto devices_size = outlen - offsetof(vhci::ioctl::get_imported_devices, devices); // size of array

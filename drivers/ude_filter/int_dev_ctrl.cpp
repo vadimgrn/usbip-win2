@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "int_dev_ctrl.h"
@@ -30,7 +30,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
-	auto urb = libdrv::argv<0, URB>(irp);
+	auto urb = libdrv::argv<URB, 0>(irp);
 	NT_ASSERT(urb);
 
 	auto tag = libdrv::argv<1>(irp);
