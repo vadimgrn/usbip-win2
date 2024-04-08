@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -17,6 +17,17 @@ using Handle = generic_handle<HANDLE, HandleTag, INVALID_HANDLE_VALUE>;
 
 template<>
 inline void close_handle(Handle::type h, Handle::tag_type) noexcept
+{
+        [[maybe_unused]] auto ok = CloseHandle(h);
+        assert(ok);
+}
+
+
+struct NullableHandleTag {};
+using NullableHandle = generic_handle<HANDLE, NullableHandleTag, nullptr>;
+
+template<>
+inline void close_handle(NullableHandle::type h, NullableHandle::tag_type) noexcept
 {
         [[maybe_unused]] auto ok = CloseHandle(h);
         assert(ok);
