@@ -51,29 +51,4 @@ inline auto verify(_In_ const WSK_BUF &buf, _In_ bool exact)
 	return exact ? buf.Length == sz : buf.Length <= sz;
 }
 
-constexpr auto map_getaddrinfo_error(_In_ NTSTATUS st)
-{
-        switch (st) {
-        case STATUS_NOT_FOUND:
-                st = USBIP_ERROR_ADDRINFO_NOT_FOUND;
-                break;
-        case STATUS_NO_MATCH:
-                st = USBIP_ERROR_ADDRINFO_NO_MATCH;
-                break;
-        }
-
-        return st;
-}
-
-constexpr auto map_connect_error(_In_ NTSTATUS st)
-{
-        switch (st) {
-        case STATUS_IO_TIMEOUT:
-                st = USBIP_ERROR_CONNECT_IO_TIMEOUT;
-                break;
-        }
-
-        return st;
-}
-
 } // namespace usbip

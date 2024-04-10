@@ -18,6 +18,26 @@ namespace
 
 using namespace usbip;
 
+constexpr auto map_attach_error(_In_ DWORD err)
+{
+        switch (err) {
+        case ERROR_NOT_FOUND: // STATUS_NOT_FOUND, WskGetAddressInfo
+        case ERROR_NO_MATCH:  // STATUS_NO_MATCH,  WskGetAddressInfo
+                err = WSAHOST_NOT_FOUND;
+                break;
+        case ERROR_SEM_TIMEOUT: // STATUS_IO_TIMEOUT, WskConnect
+                err = WSAETIMEDOUT;
+                break;
+/*
+        case ERROR_CONNECTION_REFUSED: // STATUS_CONNECTION_REFUSED, WskConnect
+                err = WSAECONNREFUSED;
+                break;
+*/
+        }
+
+        return err;
+}
+
 auto assign(_Out_ vhci::imported_device_location &dst, _In_ const device_location &src)
 {
         struct {
@@ -248,6 +268,11 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
                         assert(r.port > 0);
                         return r.port;
                 }
+        }
+
+        auto err = GetLastError();
+        if (auto code = map_attach_error(err); code != err) {
+                SetLastError(code);
         }
 
         return 0;

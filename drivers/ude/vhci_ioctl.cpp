@@ -389,8 +389,9 @@ PAGED auto on_connect(
                 NT_VERIFY(NT_SUCCESS(close(ext->sock)));
                 free(ext->sock);
 
-                st = ai.ai_next ? connect(request, wi, ext->sock, *ai.ai_next) : 
-                                  map_connect_error(st); // preserve last error
+                if (st != STATUS_CANCELLED && ai.ai_next) {
+                        st = connect(request, wi, ext->sock, *ai.ai_next);
+                }
         }
 
         return st;
@@ -421,8 +422,6 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
                 st = connect(request, wi, ext.sock, *ctx.addrinfo);
-        } else {
-                st = map_getaddrinfo_error(st);
         }
 
         if (st != STATUS_PENDING) {
