@@ -440,7 +440,7 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
         }
 
         init_func_t* const functions[] { init_context, configure, create_interfaces, 
-                                         add_usbdevice_emulation, vhci::create_default_queue };
+                                         add_usbdevice_emulation, vhci::create_queues };
 
         for (auto f: functions) {
                 if (auto err = f(vhci)) {

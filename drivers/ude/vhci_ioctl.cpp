@@ -739,15 +739,6 @@ PAGED void device_control(
         case vhci::ioctl::PLUGOUT_HARDWARE:
                 st = plugout_hardware(Request);
                 break;
-        case vhci::ioctl::GET_IMPORTED_DEVICES:
-                st = get_imported_devices(Request);
-                break;
-        case vhci::ioctl::SET_PERSISTENT:
-                st = set_persistent(Request);
-                break;
-        case vhci::ioctl::GET_PERSISTENT:
-                st = get_persistent(Request);
-                break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
                 if (USBUSER_REQUEST_HEADER *hdr; 
@@ -758,8 +749,74 @@ PAGED void device_control(
                 }
                 [[fallthrough]];
         default:
-                st = UdecxWdfDeviceTryHandleUserIoctl(WdfIoQueueGetDevice(Queue), Request) ? // PASSIVE_LEVEL
+                auto vhci = WdfIoQueueGetDevice(Queue);
+
+                st = UdecxWdfDeviceTryHandleUserIoctl(vhci, Request) ? // PASSIVE_LEVEL
                         STATUS_PENDING : STATUS_INVALID_DEVICE_REQUEST;
+        }
+
+        if (st != STATUS_PENDING) {
+                TraceDbg("%!STATUS!, Information %Ix", st, WdfRequestGetInformation(Request));
+                WdfRequestComplete(Request, st);
+        }
+}
+
+/*
+ * There is an internal lock on the registry, but that’s just to ensure that registry operations are atomic; 
+ * that is, that if one thread writes a value to the registry and another thread reads that same value 
+ * from the registry, then the value that comes back is either the value before the write took place 
+ * or the value after the write took place, but not some sort of mixture of the two.
+ *
+ * @see Raymond Chen, The inability to lock someone out of the registry is a feature, not a bug
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED decltype(get_persistent) *get_parallel_handler(_In_ ULONG IoControlCode)
+{
+        PAGED_CODE();
+
+        switch (IoControlCode) {
+        case vhci::ioctl::GET_IMPORTED_DEVICES:
+                return get_imported_devices;
+        case vhci::ioctl::SET_PERSISTENT:
+                return set_persistent;
+        case vhci::ioctl::GET_PERSISTENT:
+                return get_persistent;
+        default:
+                return nullptr;
+        }
+}
+
+_Function_class_(EVT_WDF_IO_QUEUE_IO_DEVICE_CONTROL)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+PAGED void device_control_parallel(
+        _In_ WDFQUEUE Queue,
+        _In_ WDFREQUEST Request,
+        _In_ size_t OutputBufferLength,
+        _In_ size_t InputBufferLength,
+        _In_ ULONG IoControlCode)
+{
+        PAGED_CODE();
+
+        NTSTATUS st;
+
+        if (auto handler = get_parallel_handler(IoControlCode)) {
+                TraceDbg("%s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
+                          device_control_name(IoControlCode), IoControlCode, OutputBufferLength, InputBufferLength);
+
+                st = handler(Request);
+        } else {
+                auto vhci = WdfIoQueueGetDevice(Queue);
+                auto ctx = get_vhci_ctx(vhci);
+
+                st = WdfRequestForwardToIoQueue(Request, ctx->sequential_queue); // -> device_control
+
+                if (NT_SUCCESS(st)) [[likely]] {
+                        st = STATUS_PENDING;
+                } else {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", st);
+                }
         }
 
         if (st != STATUS_PENDING) {
@@ -812,28 +869,36 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::vhci::create_default_queue(_In_ WDFDEVICE vhci)
+PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-
-        WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential);
-        cfg.PowerManaged = WdfFalse;
-        cfg.EvtIoDeviceControl = device_control;
-        cfg.EvtIoRead = device_read;
+        const auto PowerManaged = WdfFalse;
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.EvtCleanupCallback = [] (auto) { TraceDbg("Default queue cleanup"); };
         attr.ExecutionLevel = WdfExecutionLevelPassive;
         attr.ParentObject = vhci;
 
-        WDFQUEUE queue;
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
+        WDF_IO_QUEUE_CONFIG cfg;
+        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchParallel); // see WdfDeviceGetDefaultQueue
+        cfg.PowerManaged = PowerManaged;
+        cfg.EvtIoDeviceControl = device_control_parallel;
+        cfg.EvtIoRead = device_read;
+
+        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate(parallel) %!STATUS!", err);
                 return err;
         }
 
-        TraceDbg("%04x", ptr04x(queue));
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchSequential);
+        cfg.PowerManaged = PowerManaged;
+        cfg.EvtIoDeviceControl = device_control;
+
+        if (auto ctx = get_vhci_ctx(vhci);
+            auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &ctx->sequential_queue)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate(sequential) %!STATUS!", err);
+                return err;
+        }
+
         return STATUS_SUCCESS;
 }

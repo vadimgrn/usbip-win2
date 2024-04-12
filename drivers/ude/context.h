@@ -42,10 +42,12 @@ constexpr auto is_valid_port(int port)
 
 /*
  * Context space for WDFDEVICE, Virtual Host Controller Interface.
- * Parent is WDFDRIVER.
+ * The parent is WDFDRIVER.
  */
 struct vhci_ctx
 {
+        WDFQUEUE sequential_queue; // see also WdfDeviceGetDefaultQueue
+
         UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 
