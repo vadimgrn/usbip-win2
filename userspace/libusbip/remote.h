@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 - 2023 Vadym Hrynchyshyn
+ * Copyright (C) 2021 - 2024 Vadym Hrynchyshyn
  */
 
 #pragma once
@@ -50,11 +50,26 @@ struct usb_interface
 USBIP_API const char *get_tcp_port() noexcept;
 
 /**
+ * This call is blocking and cannot be cancelled.
  * @param hostname name or IP address of a host to connect to
  * @param service TCP/IP port number of symbolic name
  * @return call GetLastError() if returned handle is invalid
  */
 USBIP_API Socket connect(_In_ const char *hostname, _In_ const char *service);
+
+/**
+ * This call is blocking, but it will be cancelled by any asynchronous procedure call (APC).
+ * It does not matter what APC is doing. If APC is queued to a thread, it will be executed, 
+ * after which the call will be canceled. This is possible due to using alertable wait functions. 
+ * In such case, GetLastError() will return WSA_E_CANCELLED if GetAddrInfoEx is canceled
+ * or ERROR_CANCELLED if connect is canceled.
+ * @see Asynchronous Procedure Calls, QueueUserAPC
+ * 
+ * @param hostname name or IP address of a host to connect to
+ * @param service TCP/IP port number of symbolic name
+ * @return call GetLastError() if returned handle is invalid
+ */
+USBIP_API Socket connect_cancellable(_In_ const char *hostname, _In_ const char *service);
 
 /**
  * @param idx zero-based index of usb device

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -27,6 +27,18 @@ inline void close_handle(_In_ Socket::type s, _In_ Socket::tag_type) noexcept
         [[maybe_unused]] auto err = closesocket(s);
         assert(!err);
 }
+
+
+struct WSAEventTag {};
+using WSAEvent = generic_handle<WSAEVENT, WSAEventTag, WSA_INVALID_EVENT>;
+
+template<>
+inline void close_handle(_In_ WSAEvent::type evt, _In_ WSAEvent::tag_type) noexcept
+{
+        [[maybe_unused]] auto ok = WSACloseEvent(evt);
+        assert(ok);
+}
+
 
 class USBIP_API InitWinSock2
 {
