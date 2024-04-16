@@ -72,6 +72,12 @@ auto usbip::get_ids() -> const UsbIds&
         return ids;
 }
 
+auto usbip::get_event() -> NullableHandle& 
+{
+        static NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
+        return evt;
+}
+
 bool usbip::init(_Out_ wxString &err)
 {
         wxASSERT(err.empty());
@@ -86,6 +92,12 @@ bool usbip::init(_Out_ wxString &err)
         if (!ws2) {
                 auto ec = GetLastError();
                 err = wxString::Format(_("WSAStartup error %lu\n%s"), ec, wxSysErrorMsg(ec));
+                return false;
+        }
+
+        if (!get_event()) {
+                auto ec = GetLastError();
+                err = wxString::Format(_("Cannot create event\nError %lu\n%s"), ec, wxSysErrorMsg(ec));
                 return false;
         }
 

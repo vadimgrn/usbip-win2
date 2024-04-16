@@ -308,67 +308,6 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
 
         return servers;
 }
-
-void cancel_synchronous_io(_In_ HANDLE thread)
-{
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        if (!CancelSynchronousIo(thread)) {
-                auto err = GetLastError();
-                wxLogVerbose(_("CancelSynchronousIo error %lu\n%s"), err, wxSysErrorMsg(err));
-        }
-}
-
-void cancel_connect(_In_ HANDLE thread)
-{
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        if (!QueueUserAPC( [] (auto) { wxLogVerbose(L"APC"); }, thread, 0)) {
-                auto err = GetLastError();
-                wxLogVerbose(_("QueueUserAPC error %lu\n%s"), err, wxSysErrorMsg(err));
-        }
-}
-
-/*
- * @return true if was cancelled 
- */
-bool run_cancellable(
-        _In_ wxWindow *parent,
-        _In_ const wxString &msg,
-        _In_ const wxString &caption,
-        _In_ std::function<void()> func,
-        _In_ const std::function<void(_In_ HANDLE thread)> &do_cancel = cancel_synchronous_io)
-{
-        constexpr auto style = wxOK | wxICON_WARNING | wxCENTER | wxSTAY_ON_TOP | wxBORDER_NONE | wxPOPUP_WINDOW;
-
-        wxGenericMessageDialog dlg(parent, msg, caption, style);
-        dlg.SetOKLabel(_("&Cancel"));
-
-        auto f = [&dlg, func = std::move(func)]
-        {
-                while (!dlg.IsModal()) {
-                        SleepEx(50, true);
-                }
-
-                func();
-
-                if (dlg.IsModal()) { // is not cancelled yet
-                        dlg.CallAfter(&wxGenericMessageDialog::EndModal, 0);
-                }
-        };
-
-        std::jthread thread(std::move(f));
-
-        wxWindowDisabler dis;
-        auto ret = dlg.ShowModal();
-
-        if (ret == wxID_OK) { // cancelled by user
-                do_cancel(thread.native_handle());
-        }
-
-        return ret;
-}
-
 } // namespace
 
 
@@ -803,14 +742,13 @@ void MainFrame::on_close_to_tray(wxCommandEvent &event)
         m_close_to_tray = checked;
 }
 
-bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
+DWORD MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
 {
         wxString hostname;
         wxString service;
 
         if (!split_server_url(url, hostname, service)) {
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return false;
+                return ERROR_INVALID_PARAMETER;
         }
 
         device_location loc {
@@ -820,15 +758,17 @@ bool MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
         };
 
         int port{};
+        DWORD error{};
 
-        auto f = [loc = std::move(loc), &port] 
+        auto f = [loc = std::move(loc), &port, &error]
         { 
                 port = vhci::attach(get_vhci().get(), loc); 
+                error = GetLastError();
         };
 
         auto msg = wxString::Format(L"%s/%s", url, busid);
 
-        return run_cancellable(this, msg, _("Attaching"), std::move(f)) || port;
+        return run_cancellable(this, msg, _("Attaching"), std::move(f)) || port ? 0 : error;
 }
 
 void MainFrame::on_attach(wxCommandEvent&)
@@ -841,9 +781,9 @@ void MainFrame::on_attach(wxCommandEvent&)
                 auto url = tree.GetItemText(server);
                 auto busid = tree.GetItemText(dev);
 
-                if (!attach(url,  busid)) {
-                        auto err = GetLastError();
+                if (auto err = attach(url,  busid)) {
                         wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), url, busid, err, GetLastErrorMsg(err));
+                        break;
                 }
         }
 }

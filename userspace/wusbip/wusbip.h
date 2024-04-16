@@ -118,7 +118,7 @@ private:
 	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_columns &dc);
 
 	void remove_device(_In_ wxTreeListItem dev);
-	bool attach(_In_ const wxString &url, _In_ const wxString &busid);
+	DWORD attach(_In_ const wxString &url, _In_ const wxString &busid);
 	
 	void post_refresh();
 	void post_exit();
