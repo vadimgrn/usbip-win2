@@ -5,6 +5,8 @@
 #include "log.h"
 #include "font.h"
 
+#include <libusbip/output.h>
+
 #include <wx/frame.h>
 #include <wx/menuitem.h>
 #include <wx/persist/toplevel.h>
@@ -96,4 +98,21 @@ void LogWindow::on_mouse_wheel(_In_ wxMouseEvent &event)
                 auto wnd = static_cast<wxWindow*>(event.GetEventObject());
                 usbip::change_font_size(wnd, event.GetWheelRotation());
         }
+}
+
+void usbip::enable_library_log(_In_ bool enable)
+{
+        libusbip::output_func_type f;
+
+        if (enable) {
+                f = [] (auto s) { wxLogVerbose(L"libusbip: " + wxString::FromUTF8(s)); };
+        }
+
+        libusbip::set_debug_output(f);
+}
+
+bool usbip::is_library_log_enabled()
+{
+        auto &f = libusbip::get_debug_output();
+        return static_cast<bool>(f);
 }

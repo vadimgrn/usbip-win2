@@ -71,6 +71,7 @@ void wxPersistentMainFrame::Save() const
         }
 
         SaveValue(m_tree_font_size, get_font_size(frame.m_treeListCtrl));
+        SaveValue(m_log_library, is_library_log_enabled());
 }
 
 bool wxPersistentMainFrame::Restore()
@@ -125,5 +126,9 @@ void wxPersistentMainFrame::do_restore()
 
         if (int pt{}; RestoreValue(m_tree_font_size, &pt)) {
                 set_font_size(frame.m_treeListCtrl, pt);
+        }
+
+        if (bool ok{}; RestoreValue(m_log_library, &ok) && ok) {
+                enable_library_log(true);
         }
 }

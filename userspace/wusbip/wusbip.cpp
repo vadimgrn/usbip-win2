@@ -11,7 +11,6 @@
 #include "app.h"
 #include "log.h"
 
-
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
 #include <libusbip/src/file_ver.h>
@@ -228,7 +227,7 @@ auto get_persistent(_In_ const Handle &vhci = get_vhci())
 
         if (auto lst = vhci::get_persistent(vhci.get(), success); !success) {
                 auto err = GetLastError();
-                wxLogVerbose(_("Could not get persistent info\nError %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, GetLastErrorMsg(err));
         } else for (auto &loc: lst) {
                 if (auto [i, inserted] = result.insert(std::move(loc)); !inserted) {
                         wxLogVerbose(_("%s: failed to insert %s:%s/%s"), 
@@ -310,13 +309,23 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
         return servers;
 }
 
-void cancel_apc_call(_In_ HANDLE thread)
+void cancel_synchronous_io(_In_ HANDLE thread)
+{
+        wxLogVerbose(wxString::FromAscii(__func__));
+
+        if (!CancelSynchronousIo(thread)) {
+                auto err = GetLastError();
+                wxLogVerbose(_("CancelSynchronousIo error %lu\n%s"), err, wxSysErrorMsg(err));
+        }
+}
+
+void cancel_connect(_In_ HANDLE thread)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
         if (!QueueUserAPC( [] (auto) { wxLogVerbose(L"APC"); }, thread, 0)) {
                 auto err = GetLastError();
-                wxLogVerbose(_("QueueUserAPC error %#lx\n%s"), err, wxSysErrorMsg(err));
+                wxLogVerbose(_("QueueUserAPC error %lu\n%s"), err, wxSysErrorMsg(err));
         }
 }
 
@@ -328,7 +337,7 @@ bool run_cancellable(
         _In_ const wxString &msg,
         _In_ const wxString &caption,
         _In_ std::function<void()> func,
-        _In_ const std::function<void(_In_ HANDLE thread)> &do_cancel = CancelSynchronousIo)
+        _In_ const std::function<void(_In_ HANDLE thread)> &do_cancel = cancel_synchronous_io)
 {
         constexpr auto style = wxOK | wxICON_WARNING | wxCENTER | wxSTAY_ON_TOP | wxBORDER_NONE | wxPOPUP_WINDOW;
 
@@ -518,7 +527,7 @@ void MainFrame::read_loop()
         }
 
         if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED) { // see CancelSynchronousIo
-                wxLogError(_("vhci::read_device_state error %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("vhci::read_device_state error %lu\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
@@ -754,6 +763,24 @@ void MainFrame::on_log_verbose(wxCommandEvent &event)
         m_log->SetLogLevel(checked ? VERBOSE_LOGLEVEL : DEFAULT_LOGLEVEL);
 }
 
+void MainFrame::on_log_library_update_ui(wxUpdateUIEvent &event)
+{
+        auto verbose = m_log->GetLogLevel() == VERBOSE_LOGLEVEL;
+
+        if (!verbose && is_library_log_enabled()) {
+                enable_library_log(false);
+        }
+
+        event.Check(is_library_log_enabled());
+        event.Enable(verbose);
+}
+
+void MainFrame::on_log_library(wxCommandEvent &event)
+{
+        bool checked = event.GetInt();
+        enable_library_log(checked);
+}
+
 void MainFrame::on_start_in_tray_update_ui(wxUpdateUIEvent &event)
 {
         event.Check(m_start_in_tray);
@@ -816,7 +843,7 @@ void MainFrame::on_attach(wxCommandEvent&)
 
                 if (!attach(url,  busid)) {
                         auto err = GetLastError();
-                        wxLogError(_("Could not attach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
+                        wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), url, busid, err, GetLastErrorMsg(err));
                 }
         }
 }
@@ -839,7 +866,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                         auto url = tree.GetItemText(server);
                         auto busid = tree.GetItemText(dev);
 
-                        wxLogError(_("Could not detach %s/%s\nError %#lx\n%s"), url, busid, err, GetLastErrorMsg(err));
+                        wxLogError(_("Could not detach %s/%s\nError %lu\n%s"), url, busid, err, GetLastErrorMsg(err));
                 }
         }
 }
@@ -859,7 +886,7 @@ void MainFrame::on_detach_all(wxCommandEvent&)
 
         auto cancelled = run_cancellable(this, _("Detaching all"), wxEmptyString, std::move(f));
         if (!cancelled && err) {
-                wxLogError(_("Could not detach all devices\nError %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Could not detach all devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
@@ -982,17 +1009,19 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto u8_port = port.ToStdString(wxConvUTF8);
 
         Socket sock;
-        auto connect = [&sock, host = u8_host.c_str(), port = u8_port.c_str()]
+        DWORD error{};
+
+        auto connect = [&sock, &error, host = u8_host.c_str(), port = u8_port.c_str()]
         {
-                sock = usbip::connect(host, port);
+                sock = usbip::connect_cancellable(host, port);
+                error = GetLastError();
         };
 
         if (auto msg = wxString::Format(L"%s:%s", host, port);
-            run_cancellable(this, msg, _("Connecting"), std::move(connect), cancel_apc_call)) {
+            run_cancellable(this, msg, _("Connecting"), std::move(connect), cancel_connect)) {
                 return;
         } else if (!sock) {
-                auto err = GetLastError();
-                wxLogError(_("Could not connect to %s:%s\nError %#lx\n%s"), host, port, err, GetLastErrorMsg(err));
+                wxLogError(_("Could not connect to %s:%s\nError %lu\n%s"), host, port, error, GetLastErrorMsg(error));
                 return;
         }
 
@@ -1021,7 +1050,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
-                wxLogError(_("enum_exportable_devices error %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("enum_exportable_devices error %lu\n%s"), err, GetLastErrorMsg(err));
         } else if (cb.FindString(host) != wxNOT_FOUND) {
                 // already exists
         } else if (auto pos = cb.Append(host); cb.GetCount() > 32) {
@@ -1174,7 +1203,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
 
         if (auto &vhci = get_vhci(); !vhci::set_persistent(vhci.get(), persistent)) {
                 auto err = GetLastError();
-                wxLogError(_("Could not save persistent info\nError %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Could not save persistent info\nError %lu\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
@@ -1241,7 +1270,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
         auto devices = vhci::get_imported_devices(vhci.get(), ok);
         if (!ok) {
                 auto err = GetLastError();
-                wxLogError(_("Could not get imported devices\nError %#lx\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Could not get imported devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
                 return;
         }
 

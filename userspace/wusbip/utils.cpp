@@ -10,7 +10,6 @@
 #include <libusbip/format_message.h>
 #include <libusbip/src/usb_ids.h>
 #include <libusbip/src/file_ver.h>
-#include <libusbip/output.h>
 
 #include <wx/log.h>
 #include <wx/translation.h>
@@ -89,12 +88,6 @@ bool usbip::init(_Out_ wxString &err)
                 err = wxString::Format(_("WSAStartup error %lu\n%s"), ec, wxSysErrorMsg(ec));
                 return false;
         }
-
-        auto logger = [] (auto s) 
-        { 
-                wxLogVerbose(wxString::FromUTF8(s)); 
-        };
-        libusbip::set_debug_output(logger);
 
         return static_cast<bool>(get_vhci());
 }

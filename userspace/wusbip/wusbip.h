@@ -74,6 +74,9 @@ private:
 	void on_log_show_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_show(wxCommandEvent &event) override;
 
+	void on_log_library_update_ui(wxUpdateUIEvent &event) override;
+	void on_log_library(wxCommandEvent &event) override;
+
 	void on_log_verbose_update_ui(wxUpdateUIEvent &event) override;
 	void on_log_verbose(wxCommandEvent &event) override;
 

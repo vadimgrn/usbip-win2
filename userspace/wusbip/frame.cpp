@@ -282,6 +282,15 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	#endif
 	m_menu_log->Append( m_log_verbose );
 
+	wxMenuItem* m_log_library;
+	m_log_library = new wxMenuItem( m_menu_log, wxID_ANY, wxString( _("Library") ) , _("Show debug messages from libusbip"), wxITEM_CHECK );
+	#ifdef __WXMSW__
+	m_log_library->SetBitmaps( wxNullBitmap );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_log_library->SetBitmap( wxNullBitmap );
+	#endif
+	m_menu_log->Append( m_log_library );
+
 	m_menubar->Append( m_menu_log, _("Log") );
 
 	m_menu_help = new wxMenu();
@@ -432,6 +441,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_log_toggle->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_verbose ), this, m_log_verbose->GetId());
 	this->Connect( m_log_verbose->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
+	m_menu_log->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_log_library ), this, m_log_library->GetId());
+	this->Connect( m_log_library->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_library_update_ui ) );
 	m_menu_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about ), this, m_help_about->GetId());
 	m_menu_help->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_help_about_lib ), this, m_help_about_lib->GetId());
 	m_auiToolBar->Connect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
@@ -475,6 +486,7 @@ Frame::~Frame()
 	this->Disconnect( wxID_CLOSE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_LOG_WINDOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
+	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_library_update_ui ) );
 	m_auiToolBar->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
 	this->Disconnect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );

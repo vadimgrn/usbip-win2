@@ -17,6 +17,7 @@ private:
         static inline auto &m_server = L"Server";
         static inline auto &m_port = L"Port";
         static inline auto &m_log_verbose = L"LogVerbose";
+        static inline auto &m_log_library = L"LogLibrary";
         static inline auto &m_toolbar_labels = L"ToolBarLabels";
         static inline auto &m_show_log_window = L"ShowLogWindow";
         static inline auto &m_log_font_size = L"LogFontSize";

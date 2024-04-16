@@ -38,3 +38,11 @@ private:
 		_In_ const wxMenuItem *font_decr, 
 		_In_ const wxMenuItem *font_dflt);
 };
+
+namespace usbip
+{
+
+void enable_library_log(_In_ bool enable);
+bool is_library_log_enabled();
+
+} // namespace usbip
