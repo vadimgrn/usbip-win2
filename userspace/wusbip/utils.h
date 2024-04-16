@@ -5,7 +5,6 @@
 #pragma once
 
 #include <libusbip/vhci.h>
-#include <usbspec.h>
 
 #include <string_view>
 #include <tuple>
@@ -36,7 +35,6 @@ const wchar_t* get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept;
 bool get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept;
 
 struct usb_device;
-struct imported_device;
 imported_device make_imported_device(_In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev);
 
 wxString make_device_url(_In_ const device_location &loc);
