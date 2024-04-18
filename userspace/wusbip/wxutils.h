@@ -20,18 +20,19 @@ std::strong_ordering operator <=> (_In_ const wxString &a, _In_ const wxString &
 namespace usbip
 {
 
-void cancel_connect(_In_ HANDLE thread);
-void cancel_synchronous_io(_In_ HANDLE thread);
+inline auto what(_In_ const std::exception &e)
+{
+        return wxString(e.what(), wxConvLibc);
+}
 
-/*
- * @return true if was cancelled 
- */
-bool run_cancellable(
+BOOL cancel_connect(_In_ HANDLE thread);
+
+void run_cancellable(
         _In_ wxWindow *parent,
         _In_ const wxString &msg,
         _In_ const wxString &caption,
         _In_ std::function<void()> func,
-        _In_ const std::function<void(_In_ HANDLE thread)> &cancel = cancel_synchronous_io);
+        _In_ const std::function<BOOL(_In_ HANDLE thread)> &cancel = CancelSynchronousIo);
 
 } // namespace usbip
 

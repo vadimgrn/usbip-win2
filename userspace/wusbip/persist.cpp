@@ -3,6 +3,7 @@
  */
 
 #include "persist.h"
+#include "wxutils.h"
 #include "wusbip.h"
 #include "log.h"
 #include "font.h"
@@ -19,7 +20,7 @@ auto try_catch(_In_ const char *function, _In_ const std::function<void()> &func
         try {
                 func();
         } catch (std::exception &e) {
-                wxLogError(_("%s exception: %s"), wxString::FromAscii(function), wxString(e.what(), wxConvLibc));
+                wxLogError(_("%s exception: %s"), wxString::FromAscii(function), what(e));
                 return false;
         }
 

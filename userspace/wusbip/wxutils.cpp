@@ -68,43 +68,26 @@ wxMenuItem* clone_menu_item(_In_ wxMenu &dest, _In_ int item_id, _In_ const wxMe
         return clone;
 }
 
-void usbip::cancel_synchronous_io(_In_ HANDLE thread)
+BOOL usbip::cancel_connect(_In_ HANDLE thread)
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        if (!CancelSynchronousIo(thread)) {
-                auto err = GetLastError();
-                wxLogVerbose(_("CancelSynchronousIo error %lu\n%s"), err, wxSysErrorMsg(err));
-        }
-}
-
-void usbip::cancel_connect(_In_ HANDLE thread)
-{
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        if (!QueueUserAPC( [] (auto) { wxLogVerbose(L"APC"); }, thread, 0)) {
-                auto err = GetLastError();
-                wxLogVerbose(_("QueueUserAPC error %lu\n%s"), err, wxSysErrorMsg(err));
-        }
+        return QueueUserAPC( [] (auto) { wxLogVerbose(L"APC"); }, thread, 0);
 }
 
 /*
- * FIXME: 
- * cannot close dialog from the thread for wxMessageDialog, EndModal() fails on assertion that it must be IsModal().
- * Native Windows implementation uses MessageBox to show dialog, can't close it from the thread.
+ * Native Windows implementation uses MessageBox to show dialog.
  * @see src/msw/msgdlg.cpp, wxGenericMessageDialog
  * @see src/msw/dialog.cpp, wxMessageDialog
  */
-bool usbip::run_cancellable(
+void usbip::run_cancellable(
         _In_ wxWindow *parent,
         _In_ const wxString &msg,
         _In_ const wxString &caption,
         _In_ std::function<void()> func,
-        _In_ const std::function<void(_In_ HANDLE thread)> &cancel)
+        _In_ const std::function<BOOL(_In_ HANDLE thread)> &cancel)
 {
         constexpr auto style = wxOK | wxICON_WARNING | wxCENTER | wxSTAY_ON_TOP | wxBORDER_NONE | wxPOPUP_WINDOW;
 
-        wxGenericMessageDialog dlg(parent, msg, caption, style);
+        wxMessageDialog dlg(parent, msg, caption, style);
         dlg.SetOKLabel(_("&Cancel"));
 
         auto &evt = get_event();
@@ -113,25 +96,36 @@ bool usbip::run_cancellable(
         [[maybe_unused]] auto ok = ResetEvent(evt.get());
         wxASSERT(ok);
 
-        auto f = [&dlg, evt = evt.get(), func = std::move(func)]
+        auto f = [&dlg, title = caption.wc_str(), evt = evt.get(), func = std::move(func)]
         {
-                func();
+                try {
+                        func();
+                } catch (std::exception &e) {
+                        wxLogVerbose(_("exception: %s"), what(e));
+                }
 
                 [[maybe_unused]] auto ok = SetEvent(evt);
                 wxASSERT(ok);
 
-                dlg.CallAfter(&wxGenericMessageDialog::EndModal, 0); // QueueEvent to GUI thread, see ShowModal()
+                wxASSERT(!dlg.IsModal()); // dlg.EndModal(0) fails on assert(IsModal())
+
+                if (auto msgbox = FindWindowEx(dlg.GetHWND(), nullptr, L"#32770", title)) { // find MessageBox window
+                        PostMessage(msgbox, WM_CLOSE, 0, 0); // the same as cancel
+                }
         };
 
         std::jthread thread(std::move(f));
         wxWindowDisabler dis;
 
-        auto ret = 0;
-        if (!wait(evt.get(), 1'000)) { // don't block GUI thread for a long time or use MsgWaitForMultipleObjects
-                ret = dlg.ShowModal(); // executes event loop, processes CallAfter events
-                if (ret == wxID_OK) { // cancelled by user
-                        cancel(thread.native_handle());
-                }
+        if (wait(evt.get(), 1'000)) { // use MsgWaitForMultipleObjects if GUI thread is blocked for a long time
+                return;
         }
-        return ret;
+
+        auto ret = dlg.ShowModal();
+        wxASSERT(ret == wxID_OK); // cancelled by user or closed from the thread
+
+        if (!(wait(evt.get(), 0) || cancel(thread.native_handle()))) { // cancelled by user
+                auto err = GetLastError();
+                wxLogVerbose(_("Could not cancel '%s', error %lu\n%s"), caption, err, wxSysErrorMsg(err));
+        }
 }

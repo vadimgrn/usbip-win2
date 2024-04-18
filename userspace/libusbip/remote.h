@@ -57,19 +57,25 @@ USBIP_API const char *get_tcp_port() noexcept;
  */
 USBIP_API Socket connect(_In_ const char *hostname, _In_ const char *service);
 
+enum connect_flags_t : unsigned long {
+        CANCEL_BY_APC = 1
+};
+
 /**
- * This call is blocking, but it will be cancelled by any asynchronous procedure call (APC).
- * It does not matter what APC is doing. If APC is queued to a thread, it will be executed, 
- * after which the call will be canceled. This is possible due to using alertable wait functions. 
- * In such case, GetLastError() will return WSA_E_CANCELLED if GetAddrInfoEx is canceled
- * or ERROR_CANCELLED if connect is canceled.
- * @see Asynchronous Procedure Calls, QueueUserAPC
- * 
+ * The call is blocking.
  * @param hostname name or IP address of a host to connect to
  * @param service TCP/IP port number of symbolic name
+ * @param options
+ *      CANCEL_BY_APC 
+ *      The call will be canceled by any asynchronous procedure call (APC).
+ *      It does not matter what APC is doing. If APC is queued to a thread, it will be executed, 
+ *      after which the call will be canceled. This is possible due to using alertable wait functions. 
+ *      In such case, GetLastError() will return WSA_E_CANCELLED if GetAddrInfoEx is canceled
+ *      or ERROR_CANCELLED if connect is canceled.
  * @return call GetLastError() if returned handle is invalid
+ * @see Asynchronous Procedure Calls, QueueUserAPC
  */
-USBIP_API Socket connect_cancellable(_In_ const char *hostname, _In_ const char *service);
+USBIP_API Socket connect(_In_ const char *hostname, _In_ const char *service, _In_ unsigned long options);
 
 /**
  * @param idx zero-based index of usb device

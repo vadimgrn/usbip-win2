@@ -757,18 +757,17 @@ DWORD MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
                 .busid = busid.ToStdString(wxConvUTF8),
         };
 
-        int port{};
-        DWORD error{};
-
-        auto f = [loc = std::move(loc), &port, &error]
+        DWORD err{};
+        auto f = [&err, loc = std::move(loc), vhci = get_vhci().get()]
         { 
-                port = vhci::attach(get_vhci().get(), loc); 
-                error = GetLastError();
+                auto port = vhci::attach(vhci, loc); 
+                err = port > 0 ? ERROR_SUCCESS : GetLastError();
         };
 
         auto msg = wxString::Format(L"%s/%s", url, busid);
+        run_cancellable(this, msg, _("Attaching"), std::move(f));
 
-        return run_cancellable(this, msg, _("Attaching"), std::move(f)) || port ? 0 : error;
+        return err;
 }
 
 void MainFrame::on_attach(wxCommandEvent&)
@@ -782,7 +781,10 @@ void MainFrame::on_attach(wxCommandEvent&)
                 auto busid = tree.GetItemText(dev);
 
                 if (auto err = attach(url,  busid)) {
-                        wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), url, busid, err, GetLastErrorMsg(err));
+                        if (err != ERROR_OPERATION_ABORTED) {
+                                wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
+                                              url, busid, err, GetLastErrorMsg(err));
+                        }
                         break;
                 }
         }
@@ -794,12 +796,9 @@ void MainFrame::on_detach(wxCommandEvent&)
 
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
 
-                auto port = get_port(dev);
-                if (!port) {
-                        continue;
-                }
-
-                if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
+                if (auto port = get_port(dev); !port) {
+                        // 
+                } else if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
                         auto err = GetLastError();
 
                         auto server = tree.GetItemParent(dev);
@@ -807,6 +806,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                         auto busid = tree.GetItemText(dev);
 
                         wxLogError(_("Could not detach %s/%s\nError %lu\n%s"), url, busid, err, GetLastErrorMsg(err));
+                        break;
                 }
         }
 }
@@ -815,18 +815,9 @@ void MainFrame::on_detach_all(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
-        DWORD err{};
-
-        auto f = [&err]
-        {
-                if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), -1)) {
-                        err = GetLastError();
-                }
-        };
-
-        auto cancelled = run_cancellable(this, _("Detaching all"), wxEmptyString, std::move(f));
-        if (!cancelled && err) {
-                wxLogError(_("Could not detach all devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
+        if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), -1)) {
+                auto err = GetLastError();
+                wxLogError(_("Could detach all devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
         }
 }
 
@@ -932,6 +923,34 @@ void MainFrame::on_help_about(wxCommandEvent&)
         wxAboutBox(d, this);
 }
 
+auto MainFrame::connect(
+        _In_ const wxString &hostname, _In_ const wxString &service, 
+        _In_ const std::string &hostname_u8, _In_ const std::string &service_u8)
+{
+        Socket sock;
+        DWORD err{};
+
+        auto f = [&sock, &err, host = hostname_u8.c_str(), svc = service_u8.c_str()]
+        {
+                sock = usbip::connect(host, svc, CANCEL_BY_APC);
+                err = sock ? ERROR_SUCCESS : GetLastError();
+        };
+
+        auto msg = wxString::Format(L"%s:%s", hostname, service);
+        run_cancellable(this, msg, _("Connecting"), std::move(f), cancel_connect);
+
+        switch (err) {
+        case ERROR_SUCCESS:
+        case WSA_E_CANCELLED:
+        case ERROR_CANCELLED:
+                break;
+        default:
+                wxLogError(_("Could not connect to %s:%s\nError %lu\n%s"), hostname, service, err, GetLastErrorMsg(err));
+        }
+
+        return sock;
+}
+
 void MainFrame::add_exported_devices(wxCommandEvent&)
 {
         auto &cb = *m_comboBoxServer;
@@ -948,20 +967,8 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto u8_host = host.ToStdString(wxConvUTF8);
         auto u8_port = port.ToStdString(wxConvUTF8);
 
-        Socket sock;
-        DWORD error{};
-
-        auto connect = [&sock, &error, host = u8_host.c_str(), port = u8_port.c_str()]
-        {
-                sock = usbip::connect_cancellable(host, port);
-                error = GetLastError();
-        };
-
-        if (auto msg = wxString::Format(L"%s:%s", host, port);
-            run_cancellable(this, msg, _("Connecting"), std::move(connect), cancel_connect)) {
-                return;
-        } else if (!sock) {
-                wxLogError(_("Could not connect to %s:%s\nError %lu\n%s"), host, port, error, GetLastErrorMsg(error));
+        auto sock = connect(host, port, u8_host, u8_port);
+        if (!sock) {
                 return;
         }
 

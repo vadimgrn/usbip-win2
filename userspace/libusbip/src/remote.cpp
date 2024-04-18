@@ -258,7 +258,7 @@ auto try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_ const sockaddr &addr, _I
 		}
 		break;
 	case WSA_WAIT_IO_COMPLETION: // see QueueUserAPC
-		libusbip::output("cancelled");
+		libusbip::output("connect cancelled");
 		err = ERROR_CANCELLED;
 		break;
 	default:
@@ -284,7 +284,7 @@ INT wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_ HANDLE cancel, _In_ bool ale
 		}
 		break;
 	case WAIT_IO_COMPLETION: // see QueueUserAPC
-		libusbip::output("cancelled");
+		libusbip::output("GetAddrInfoEx cancelled by APC");
 		if (err = GetAddrInfoExCancel(&cancel); err) {
 			libusbip::output("GetAddrInfoExOverlappedResult error {}", err);
 		} else {
@@ -399,10 +399,14 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Sock
 	return sock;
 }
 
-auto usbip::connect_cancellable(_In_ const char *hostname, _In_ const char *service) -> Socket
+auto usbip::connect(_In_ const char *hostname, _In_ const char *service, _In_ unsigned long options) -> Socket
 {
-	set_last_error last(NO_ERROR); // restore after sock.close()
+	set_last_error last(ERROR_INVALID_PARAMETER); // restore after sock.close()
 	Socket sock;
+
+	if (options != CANCEL_BY_APC) {
+		return sock;
+	}
 
 	auto ai = resolve(last, hostname, service);
 	if (!ai) {

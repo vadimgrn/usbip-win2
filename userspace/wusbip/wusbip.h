@@ -127,6 +127,9 @@ private:
 	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
 
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_columns &dc, _In_ unsigned int flags);
+	
+	auto connect(_In_ const wxString &hostname, _In_ const wxString &service, 
+		              _In_ const std::string &hostname_u8, _In_ const std::string &service_u8);
 
 	wxDataViewColumn* find_column(_In_ const wxString &title) const noexcept;
 	wxDataViewColumn* find_column(_In_ int item_id) const noexcept;
