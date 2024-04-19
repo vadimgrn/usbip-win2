@@ -24,6 +24,26 @@ namespace
 
 using namespace usbip;
 
+/*
+ * @see inet_ntop 
+ */
+auto address_to_string(_In_ const SOCKADDR &addr, _In_ DWORD len, _In_opt_ WSAPROTOCOL_INFO *info = nullptr)
+{
+	DWORD cch = 64; // for an IPv6 address, this buffer should be large enough to hold at least 46 characters
+	std::wstring s(cch, L'\0');
+	
+	if (WSAAddressToString(const_cast<SOCKADDR*>(&addr), len, info, s.data(), &cch)) {
+		auto err = WSAGetLastError();
+		libusbip::output("WSAAddressToString error {}", err);
+		cch = 0;
+	} else {
+		--cch; // exclude NULL terminator
+	}
+
+	s.resize(cch);
+	return s;
+}
+
 auto do_setsockopt(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ int level, _In_ int optname, _In_ int optval)
 {
 	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
@@ -234,11 +254,11 @@ auto prepare_event(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ WSAEVENT ev
 	return true;
 }
 
-auto try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_ const sockaddr &addr, _In_ size_t len)
+auto try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_ const sockaddr &addr, _In_ DWORD len)
 {
-	libusbip::output("connecting");
+	libusbip::output(L"connecting to {}", address_to_string(addr, len));
 
-	if (auto err = connect(s, &addr, static_cast<int>(len)) ? WSAGetLastError() : 0; !err) {
+	if (auto err = connect(s, &addr, len) ? WSAGetLastError() : 0; !err) {
 		return 0;
 	} else if (err != WSAEWOULDBLOCK) {
 		libusbip::output("connect error {}", err);
@@ -429,7 +449,7 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service, _In_ un
 			libusbip::output("socket(family={}) error {}", r->ai_family, last.error);
 		} else if (auto ok = set_options(last, sock.get()) && prepare_event(last, sock.get(), evt.get()); !ok) {
 			//
-		} else if (auto err = try_connect(sock.get(), evt.get(), *r->ai_addr, r->ai_addrlen)) {
+		} else if (auto err = try_connect(sock.get(), evt.get(), *r->ai_addr, static_cast<DWORD>(r->ai_addrlen))) {
 			if (last.error = err; err == ERROR_CANCELLED) {
 				break;
 			}

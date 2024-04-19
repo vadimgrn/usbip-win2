@@ -25,14 +25,15 @@ inline auto what(_In_ const std::exception &e)
         return wxString(e.what(), wxConvLibc);
 }
 
-BOOL cancel_connect(_In_ HANDLE thread);
+using cancel_function = decltype(CancelSynchronousIo);
+cancel_function cancel_connect;
 
 void run_cancellable(
         _In_ wxWindow *parent,
         _In_ const wxString &msg,
         _In_ const wxString &caption,
         _In_ std::function<void()> func,
-        _In_ const std::function<BOOL(_In_ HANDLE thread)> &cancel = CancelSynchronousIo);
+        _In_ const std::function<cancel_function> &cancel = CancelSynchronousIo);
 
 } // namespace usbip
 

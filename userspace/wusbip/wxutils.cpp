@@ -74,7 +74,8 @@ BOOL usbip::cancel_connect(_In_ HANDLE thread)
 }
 
 /*
- * Native Windows implementation uses MessageBox to show dialog.
+ * Native Windows implementation uses MessageBox to show dialog. Because of this, 
+ * idle events will not be handled and wxLogXXX output will be flushed when the dialog is closed.
  * @see src/msw/msgdlg.cpp, wxGenericMessageDialog
  * @see src/msw/dialog.cpp, wxMessageDialog
  */
@@ -83,7 +84,7 @@ void usbip::run_cancellable(
         _In_ const wxString &msg,
         _In_ const wxString &caption,
         _In_ std::function<void()> func,
-        _In_ const std::function<BOOL(_In_ HANDLE thread)> &cancel)
+        _In_ const std::function<cancel_function> &cancel)
 {
         constexpr auto style = wxOK | wxICON_WARNING | wxCENTER | wxSTAY_ON_TOP | wxBORDER_NONE | wxPOPUP_WINDOW;
 
