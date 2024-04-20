@@ -164,7 +164,7 @@
             <property name="help">Show the app in the system tray at startup</property>
             <property name="id">wxID_ANY</property>
             <property name="kind">wxITEM_CHECK</property>
-            <property name="label">Start in tray</property>
+            <property name="label">Appear in tray</property>
             <property name="name">m_file_start_in_tray</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
