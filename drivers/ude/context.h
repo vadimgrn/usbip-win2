@@ -115,9 +115,6 @@ struct device_ctx
 
         WDFSPINLOCK send_lock; // for WskSend on sock()
 
-        LIST_ENTRY egress_requests; // that are waiting for WskSend completion handler, head for request_ctx::entry
-        WDFSPINLOCK egress_requests_lock;
-
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
 
@@ -125,7 +122,9 @@ struct device_ctx
         KEVENT detach_completed;
 
         WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
-        WDFQUEUE queue; // requests that are waiting for USBIP_RET_SUBMIT from a server
+
+        LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
+        WDFSPINLOCK requests_lock;
 
         // for WSK receive
         WDFWORKITEM recv_hdr;
@@ -140,13 +139,6 @@ inline auto get_handle(_In_ device_ctx *ctx)
         NT_ASSERT(ctx);
         return static_cast<UDECXUSBDEVICE>(WdfObjectContextGetObject(ctx));
 }
-
-WDF_DECLARE_CONTEXT_TYPE(UDECXUSBDEVICE); // WdfObjectGet_UDECXUSBDEVICE
-inline auto& get_device(_In_ WDFQUEUE queue) // for device_ctx.queue
-{
-        return *WdfObjectGet_UDECXUSBDEVICE(queue);
-}
-
 
 /*
  * Context space for UDECXUSBENDPOINT.
@@ -169,19 +161,21 @@ struct endpoint_ctx
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 WDF_DECLARE_CONTEXT_TYPE(UDECXUSBENDPOINT); // WdfObjectGet_UDECXUSBENDPOINT
-inline auto& get_endpoint(_In_ WDFQUEUE queue) // use get_device() for device_ctx.queue
+inline auto& get_endpoint(_In_ WDFQUEUE queue)
 {
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
 }
+
 
 /*
  * Context space for WDFREQUEST.
  */
 struct request_ctx
 {
-        LIST_ENTRY entry; // head is device_ctx::egress_requests
+        LIST_ENTRY entry; // head is device_ctx::requests
         UDECXUSBENDPOINT endpoint;
         seqnum_t seqnum;
+        bool cancelable;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
@@ -190,6 +184,10 @@ inline auto get_handle(_In_ request_ctx *ctx)
         NT_ASSERT(ctx);
         return static_cast<WDFREQUEST>(WdfObjectContextGetObject(ctx));
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+UDECXUSBDEVICE get_device(_In_ WDFREQUEST Request);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

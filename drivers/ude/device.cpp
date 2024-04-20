@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device.h"
@@ -7,7 +7,7 @@
 #include "device.tmh"
 
 #include "driver.h"
-#include "device_queue.h"
+#include "request_list.h"
 #include "endpoint_list.h"
 #include "network.h"
 #include "device_ioctl.h"
@@ -73,7 +73,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
 
         if (auto dev = get_device_ctx(device)) { // all resources must be freed except for device_ctx_ext*
-                NT_ASSERT(IsListEmpty(&dev->egress_requests));
+                NT_ASSERT(IsListEmpty(&dev->requests));
                 NT_ASSERT(dev->unplugged);
                 NT_ASSERT(!dev->port);
         }
@@ -149,11 +149,7 @@ void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
 
         TraceDbg("dev %04x, endp %04x, queue %04x", ptr04x(endp.device), ptr04x(endpoint), ptr04x(endp.queue));
 
-        while (auto request = device::dequeue_request(dev, endpoint)) { // older
-                device::send_cmd_unlink_and_cancel(endp.device, request);
-        }
-
-        while (auto request = device::remove_egress_request(dev, endpoint)) { // newer
+        while (auto request = device::remove_request(dev, endpoint)) {
                 device::send_cmd_unlink_and_cancel(endp.device, request);
         }
 
@@ -539,7 +535,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         WDFSPINLOCK *v[] = {
                 &dev.send_lock,
                 &dev.endpoint_list_lock,
-                &dev.egress_requests_lock,
+                &dev.requests_lock,
         };
 
         for (auto i: v) {
@@ -556,11 +552,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 return err;
         }
 
-        if (auto err = device::create_queue(device)) {
-                return err;
-        }
-
-        InitializeListHead(&dev.egress_requests);
+        InitializeListHead(&dev.requests);
         KeInitializeEvent(&dev.detach_completed, NotificationEvent, false);
 
         return STATUS_SUCCESS;
@@ -611,15 +603,13 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
         auto &dev = *get_device_ctx(device);
 	NT_ASSERT(dev.unplugged);
 
-        WdfIoQueuePurgeSynchronously(dev.queue);
+        while (auto request = remove_request(dev, device::request_search())) {
+                device::send_cmd_unlink_and_cancel(device, request);
+        }
 
         if (close_socket(dev.sock())) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
                 device_state_changed(dev, vhci::state::disconnected);
-        }
-
-        while (auto request = remove_egress_request(dev, device::request_search())) {
-                complete(request, STATUS_CANCELLED);
         }
 
         auto port = vhci::reclaim_roothub_port(device);

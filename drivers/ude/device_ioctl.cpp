@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device_ioctl.h"
@@ -9,11 +9,11 @@
 #include "context.h"
 #include "wsk_context.h"
 #include "device.h"
-#include "device_queue.h"
+#include "request_list.h"
+#include "wsk_receive.h"
 #include "proto.h"
 #include "network.h"
 #include "ioctl.h"
-#include "wsk_receive.h"
 
 #include "filter_request.h"
 #include <ude_filter\request.h>
@@ -33,40 +33,18 @@ namespace
 
 using namespace usbip;
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void move_request_to_queue(_Inout_ device_ctx &dev, _In_ WDFREQUEST request)
-{
-        auto st = device::move_egress_request_to_queue(dev, request);
-
-        switch (st) {
-        case STATUS_NOT_FOUND: // WskReceive completion handler has already removed it
-        case STATUS_SUCCESS:
-                return;
-        case STATUS_WDF_BUSY: // destination queue is not accepting new requests
-                TraceDbg("req %04x, queue is purged", ptr04x(request));
-                st = STATUS_CANCELLED;
-                break;
-        default:
-                Trace(TRACE_LEVEL_ERROR, "req %04x, WdfRequestForwardToIoQueue %!STATUS!", ptr04x(request), st);
-        }
-
-        complete(request, st);
-}
-
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
  *
  * The completion handler for WskReceive is executed by a high priority thread
  * and is usually called before this handler.
- * @see wsk_receive.cpp, find_request
+ * @see wsk_receive.cpp, ret_command 
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS send_complete(
-        _In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *Context)
+NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
-        wsk_context_ptr ctx(static_cast<wsk_context*>(Context), true);
+        wsk_context_ptr ctx(static_cast<wsk_context*>(context), true);
 
         auto request = ctx->request; // can be WDF_NO_HANDLE or already completed
         auto &dev = *ctx->dev;
@@ -78,18 +56,15 @@ NTSTATUS send_complete(
         if (!request) {
                 // nothing to do
         } else if (NT_SUCCESS(wsk.Status)) { // request has sent
-                move_request_to_queue(dev, request);
-        } else if (auto victim = device::remove_egress_request(dev, request)) {
-                NT_ASSERT(victim == request);
-                complete(victim, wsk.Status);
-        } else {
-                Trace(TRACE_LEVEL_ERROR, "req %04x not found among egress", ptr04x(request));
+                device::mark_request_cancelable(dev, request);
+        } else if (device::remove_request(dev, request, false)) {
+                complete(request, wsk.Status);
         }
 
         if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !dev.unplugged) {
-                auto hdev = get_handle(&dev);
-                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(hdev), wsk.Status);
-                device::async_plugout_and_delete(hdev);
+                auto device = get_handle(&dev);
+                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(device), wsk.Status);
+                device::async_plugout_and_delete(device);
         }
 
         return StopCompletion;
@@ -126,27 +101,6 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
 }
 
 /*
- * WskSend reads data directly from URB transfer buffer. A request must not be added to Cancel-Safe IRP Queue
- * until the completion handler is called, otherwise it could be cancelled while the buffer is being copied.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void add_egress_request(
-        _Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endpoint, _In_ seqnum_t seqnum)
-{
-        auto &req = *get_request_ctx(request);
-        InitializeListHead(&req.entry);
-
-        NT_ASSERT(endpoint);
-        req.endpoint = endpoint;
-
-        req.seqnum = seqnum;
-        NT_ASSERT(is_valid_seqnum(req.seqnum));
-
-        device::add_egress_request(dev, req);
-}
-
-/*
  * switch (wdf::Lock lck(...); auto st = send(...))
  * is not used due to unspecified evaluation order of init-statement and condition.
  * switch (init-statement; condition) {} can be treated as:
@@ -173,7 +127,7 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
         }
 
         if (request) {
-                add_egress_request(dev, request, endpoint, ctx->hdr.base.seqnum);
+                device::append_request(dev, *ctx, endpoint);
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -194,8 +148,9 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "req %04x -> wsk irp %04x, %!STATUS!", ptr04x(request), ptr04x(wsk_irp), st);
-                if (st == STATUS_NOT_SUPPORTED) { // WskSend does not complete IRP for this status only
-                        libdrv::CompleteRequest(wsk_irp, dev.unplugged ? STATUS_CANCELLED : st);
+                // WskSend does not complete IRP for this status only
+                if (st == STATUS_NOT_SUPPORTED && device::remove_request(dev, request, false)) {
+                        complete(request, st);
                 }
         }
 
@@ -402,7 +357,7 @@ auto allocate_request_ctx(_In_ WDFREQUEST request)
                 return err;
         }
 
-        TraceDbg("req %04x", ptr04x(request));
+        TraceDbg("%04x", ptr04x(request));
         return STATUS_SUCCESS;
 }
 
@@ -412,7 +367,7 @@ auto usb_submit_urb(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp, _In_ WDFREQUEST request)
 {
         if (get_request_ctx(request)) [[likely]] {
-                // NULL for xbox gamepad
+                // NULL for some devices
         } else if (auto err = allocate_request_ctx(request)) {
                 return err;
         }

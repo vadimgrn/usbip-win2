@@ -407,17 +407,17 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto request = get_request(wi);
         auto irp = WdfRequestWdmGetIrp(request);
 
-        WdfRequestSetInformation(request, reinterpret_cast<ULONG_PTR>(libdrv::argv<ARG_INFO>(irp))); // restore
+        WdfRequestSetInformation(request, libdrv::argvi<ULONG_PTR, ARG_INFO>(irp)); // restore
 
         auto &ctx = *get_workitem_ctx(wi);
         auto &ext = *ctx.ext;
 
-        auto what = libdrv::argv<const char, ARG_WHAT>(irp);
+        auto what = libdrv::argv<const char*, ARG_WHAT>(irp);
         auto st = WdfRequestGetStatus(request);
 
         TraceDbg("%s %!USTR!:%!USTR!/%!USTR!, %!STATUS!", what, &ext.node_name, &ext.service_name, &ext.busid, st);
 
-        if (auto ai = libdrv::argv<ADDRINFOEXW, ARG_AI>(irp)) {
+        if (auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx.ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);

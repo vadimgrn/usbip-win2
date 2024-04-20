@@ -30,7 +30,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
-	auto urb = libdrv::argv<URB, 0>(irp);
+	auto urb = libdrv::argv<URB*, 0>(irp);
 	NT_ASSERT(urb);
 
 	auto tag = libdrv::argv<1>(irp);

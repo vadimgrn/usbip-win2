@@ -9,7 +9,7 @@
 #include "context.h"
 #include "wsk_context.h"
 #include "device.h"
-#include "device_queue.h"
+#include "request_list.h"
 #include "network.h"
 #include "driver.h"
 #include "ioctl.h"
@@ -549,17 +549,6 @@ NTSTATUS recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 	return receive(buf, ret_submit, ctx);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto find_request(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum)
-{
-	auto req = device::remove_egress_request(dev, seqnum); // most of the time it's still there
-	if (!req) {
-		req = device::dequeue_request(dev, seqnum); // could be cancelled on queue
-	}
-	return req;
-}
-
 /*
  * For RET_UNLINK irp was completed right after CMD_UNLINK was issued.
  * @see send_cmd_unlink
@@ -577,7 +566,7 @@ NTSTATUS ret_command(_Inout_ wsk_context &ctx)
 	auto &hdr = ctx.hdr;
 
 	ctx.request = hdr.base.command == USBIP_RET_SUBMIT ? // request must be completed
-		      find_request(*ctx.dev, hdr.base.seqnum) : WDF_NO_HANDLE;
+		      device::remove_request(*ctx.dev, hdr.base.seqnum) : WDF_NO_HANDLE;
 
 	{
 		char buf[DBG_USBIP_HDR_BUFSZ];

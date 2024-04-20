@@ -62,6 +62,9 @@ inline auto get_irp(_In_ LIST_ENTRY *entry)
 	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
 }
 
+/*
+ * The fourth parameter is used by WSK. 
+ */
 template<auto N>
 inline decltype(auto) argv(_In_ IRP *irp)
 {
@@ -70,9 +73,15 @@ inline decltype(auto) argv(_In_ IRP *irp)
 }
 
 template<typename R, auto N>
-inline auto argv(_In_ IRP *irp)
+inline auto argv(_In_ IRP *irp) // -> pointer
 {
-	return static_cast<R*>(argv<N>(irp));
+	return static_cast<R>(argv<N>(irp));
+}
+
+template<typename R, auto N>
+inline auto argvi(_In_ IRP *irp) // -> integral
+{
+	return static_cast<R>(reinterpret_cast<uintptr_t>(argv<N>(irp)));
 }
 
 _IRQL_requires_same_

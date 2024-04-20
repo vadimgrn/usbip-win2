@@ -14,7 +14,7 @@
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
     <ClCompile Include="context.cpp" />
     <ClCompile Include="device_ioctl.cpp" />
-    <ClCompile Include="device_queue.cpp" />
+    <ClCompile Include="request_list.cpp" />
     <ClCompile Include="filter_request.cpp" />
     <ClCompile Include="endpoint_list.cpp" />
     <ClCompile Include="network.cpp" />
@@ -36,7 +36,7 @@
     <ClInclude Include="..\..\include\usbip\vhci.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="device_ioctl.h" />
-    <ClInclude Include="device_queue.h" />
+    <ClInclude Include="request_list.h" />
     <ClInclude Include="filter_request.h" />
     <ClInclude Include="endpoint_list.h" />
     <ClInclude Include="ioctl.h" />

@@ -82,3 +82,12 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
 
         ExFreePoolWithTag(ext, pooltag);
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+UDECXUSBDEVICE usbip::get_device(_In_ WDFREQUEST Request)
+{
+        auto req = get_request_ctx(Request);
+        auto endp = get_endpoint_ctx(req->endpoint);
+        return endp->device;
+}

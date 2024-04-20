@@ -29,7 +29,7 @@
     <ClInclude Include="wsk_receive.h" />
     <ClInclude Include="device_ioctl.h" />
     <ClInclude Include="wsk_context.h" />
-    <ClInclude Include="device_queue.h" />
+    <ClInclude Include="request_list.h" />
     <ClInclude Include="proto.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="..\..\include\usbip\ch9.h">
@@ -50,7 +50,7 @@
     <ClCompile Include="wsk_receive.cpp" />
     <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="wsk_context.cpp" />
-    <ClCompile Include="device_queue.cpp" />
+    <ClCompile Include="request_list.cpp" />
     <ClCompile Include="proto.cpp" />
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
     <ClCompile Include="persistent.cpp" />
