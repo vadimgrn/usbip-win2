@@ -75,7 +75,13 @@ BOOL usbip::cancel_connect(_In_ HANDLE thread)
 
 /*
  * Native Windows implementation uses MessageBox to show dialog. Because of this, 
- * idle events will not be handled and wxLogXXX output will be flushed when the dialog is closed.
+ * idle events will not be handled and wxLogXXX output will be flushed 
+ * when the dialog is closed. Moreover, the app will not show device state changes.
+ * 
+ * if (auto msgbox = FindWindowEx(dlg.GetHWND(), nullptr, L"#32770", caption.wc_str())) { // find MessageBox window
+ *         PostMessage(msgbox, WM_CLOSE, 0, 0); // the same as cancel
+ * }
+ * 
  * @see src/msw/msgdlg.cpp, wxGenericMessageDialog
  * @see src/msw/dialog.cpp, wxMessageDialog
  */
@@ -88,7 +94,7 @@ void usbip::run_cancellable(
 {
         constexpr auto style = wxOK | wxICON_WARNING | wxCENTER | wxSTAY_ON_TOP | wxBORDER_NONE | wxPOPUP_WINDOW;
 
-        wxMessageDialog dlg(parent, msg, caption, style);
+        wxGenericMessageDialog dlg(parent, msg, caption, style);
         dlg.SetOKLabel(_("&Cancel"));
 
         auto &evt = get_event();
@@ -108,24 +114,20 @@ void usbip::run_cancellable(
                 [[maybe_unused]] auto ok = SetEvent(evt);
                 wxASSERT(ok);
 
-                wxASSERT(!dlg.IsModal()); // dlg.EndModal(0) fails on assert(IsModal())
-
-                if (auto msgbox = FindWindowEx(dlg.GetHWND(), nullptr, L"#32770", title)) { // find MessageBox window
-                        PostMessage(msgbox, WM_CLOSE, 0, 0); // the same as cancel
-                }
+                dlg.CallAfter(&wxGenericMessageDialog::EndModal, 0); // QueueEvent to GUI thread, see ShowModal()
         };
 
         std::jthread thread(std::move(f));
-        wxWindowDisabler dis;
 
-        if (wait(evt.get(), 1'000)) { // use MsgWaitForMultipleObjects if GUI thread is blocked for a long time
-                return;
+        {
+                wxWindowDisabler wd; // ShowModal calls it too
+                if (wait(evt.get(), 1'000)) { // use MsgWaitForMultipleObjects if GUI thread is blocked for a long time
+                        return;
+                }
         }
 
-        auto ret = dlg.ShowModal();
-        wxASSERT(ret == wxID_OK); // cancelled by user or closed from the thread
-
-        if (!(wait(evt.get(), 0) || cancel(thread.native_handle()))) { // cancelled by user
+        if (auto done = !dlg.ShowModal() || wait(evt.get(), 0); // wxID_OK if cancelled by user
+            !(done || cancel(thread.native_handle()))) { // cancelled by user
                 auto err = GetLastError();
                 wxLogVerbose(_("Could not cancel '%s', error %lu\n%s"), caption, err, wxSysErrorMsg(err));
         }

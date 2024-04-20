@@ -668,7 +668,7 @@ void MainFrame::set_persistent(_In_ wxTreeListItem device, _In_ bool persistent)
 void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
 {
         auto f = m_log->GetFrame();
-        event.Check(f->IsVisible());
+        event.Check(f->IsShown());
 }
 
 void MainFrame::on_log_show(wxCommandEvent &event)
