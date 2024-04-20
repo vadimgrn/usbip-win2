@@ -103,7 +103,7 @@ void usbip::run_cancellable(
         [[maybe_unused]] auto ok = ResetEvent(evt.get());
         wxASSERT(ok);
 
-        auto f = [&dlg, title = caption.wc_str(), evt = evt.get(), func = std::move(func)]
+        auto f = [&dlg, evt = evt.get(), func = std::move(func)]
         {
                 try {
                         func();
@@ -120,7 +120,7 @@ void usbip::run_cancellable(
         std::jthread thread(std::move(f));
 
         {
-                wxWindowDisabler wd; // ShowModal calls it too
+                wxWindowDisabler wd; // ShowModal uses it too that creates issues
                 if (wait(evt.get(), 1'000)) { // use MsgWaitForMultipleObjects if GUI thread is blocked for a long time
                         return;
                 }

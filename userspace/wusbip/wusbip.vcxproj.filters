@@ -2,8 +2,40 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <None Include="packages.config" />
-    <None Include="..\usbip\usb.ids" />
     <None Include="wxpatch.bat" />
+    <None Include="wx\msw\blank.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\bullseye.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\cross.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\hand.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\magnif1.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\pbrush.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\pencil.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\pntright.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\pntleft.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="wx\msw\roller.cur">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="..\usbip\usb.ids">
+      <Filter>Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />
@@ -35,5 +67,48 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wusbip.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="wx\msw\cdrom.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\colours.bmp">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\computer.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\csquery.bmp">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\drive.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\file1.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\floppy.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\folder1.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\folder2.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\std.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="wx\msw\removble.ico">
+      <Filter>Resources</Filter>
+    </Image>
+    <Image Include="USBip.ico">
+      <Filter>Resources</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{fda1638c-d93b-499b-a41d-073547b4041d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
