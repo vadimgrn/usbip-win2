@@ -100,12 +100,17 @@ void LogWindow::on_mouse_wheel(_In_ wxMouseEvent &event)
         }
 }
 
+/*
+ * wxLogXXX throws exception 'Incorrect format specifier' if use something like wxLogXXX(get_str()) 
+ * and get_str() result contains '%'. 
+ * wxLogVerbose(L"lib: " + wxString::FromUTF8(s)) can throw exception for this reason too.
+ */
 void usbip::enable_library_log(_In_ bool enable)
 {
         libusbip::output_func_type f;
 
         if (enable) {
-                f = [] (auto s) { wxLogVerbose(L"libusbip: " + wxString::FromUTF8(s)); };
+                f = [] (auto s) { wxLogVerbose(L"lib: %s", wxString::FromUTF8(s)); }; // see comments
         }
 
         libusbip::set_debug_output(f);
