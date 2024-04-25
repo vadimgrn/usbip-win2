@@ -20,14 +20,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto matches(_In_ WDFREQUEST request, _In_ const request_ctx &req, _In_ const device::request_search &crit)
 {
         switch (crit.what) {
-        case crit.REQUEST:
-                return crit.request == request;
         case crit.SEQNUM:
                 return crit.seqnum == req.seqnum;
+        case crit.REQUEST:
+                return crit.request == request;
         case crit.ENDPOINT:
                 return crit.endpoint == req.endpoint;
-        case crit.ANY:
-                return true;
         }
 
         Trace(TRACE_LEVEL_ERROR, "Invalid union member selector %d", crit.what);

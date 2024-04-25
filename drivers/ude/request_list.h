@@ -24,7 +24,6 @@ namespace usbip::device
 
 struct request_search
 {
-        request_search() = default;
         request_search(_In_ WDFREQUEST req) : request(req), what(REQUEST) {}
         request_search(_In_ UDECXUSBENDPOINT endp) : endpoint(endp), what(ENDPOINT) {}
 
@@ -35,7 +34,7 @@ struct request_search
         explicit operator bool() const { return request; }; // largest in union
         auto operator !() const { return !request; }
 
-        auto multimatch() const { return what == ENDPOINT || what == ANY; }
+        auto multimatch() const { return what == ENDPOINT; }
 
         union {
                 WDFREQUEST request{};
@@ -43,8 +42,8 @@ struct request_search
                 seqnum_t seqnum;
         };
 
-        enum what_t { ANY, REQUEST, ENDPOINT, SEQNUM };
-        what_t what = ANY; // union's member selector
+        enum what_t { SEQNUM, REQUEST, ENDPOINT };
+        what_t what; // union's member selector
 };
 
 

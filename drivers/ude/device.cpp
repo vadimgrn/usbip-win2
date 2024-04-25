@@ -605,10 +605,6 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
         auto &dev = *get_device_ctx(device);
 	NT_ASSERT(dev.unplugged);
 
-        while (auto request = remove_request(dev, device::request_search())) {
-                device::send_cmd_unlink_and_cancel(device, request);
-        }
-
         if (close_socket(dev.sock())) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
                 device_state_changed(dev, vhci::state::disconnected);
