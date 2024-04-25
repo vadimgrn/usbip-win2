@@ -126,6 +126,10 @@ struct device_ctx
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
 
+        // statistics
+        UINT64 sent_requests; // were sent successfully
+        UINT64 cancelable_requests; // marked as
+
         // for WSK receive
         WDFWORKITEM recv_hdr;
         using received_fn = NTSTATUS (wsk_context&);

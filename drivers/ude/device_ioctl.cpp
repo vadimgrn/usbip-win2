@@ -56,9 +56,22 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (!request) {
                 // nothing to do
         } else if (NT_SUCCESS(wsk.Status)) { // request has sent
-                device::mark_request_cancelable(dev, request);
+                ++dev.sent_requests;
+
+                auto ret = device::mark_request_cancelable(dev, request);
+                TraceWSK("%04x, mark cancelable %!STATUS!", ptr04x(request), ret);
+
+                if (NT_SUCCESS(ret)) {
+                        ++dev.cancelable_requests;
+                } else if (ret == STATUS_CANCELLED) {
+                        auto device = get_handle(&dev);
+                        device::send_cmd_unlink_and_cancel(device, request);
+                }
+
         } else if (device::remove_request(dev, request, false)) {
                 complete(request, wsk.Status);
+        } else{
+                TraceWSK("req %04x not found, could not complete", ptr04x(request));
         }
 
         if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !dev.unplugged) {

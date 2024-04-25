@@ -54,7 +54,7 @@ void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk, _In_ U
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void mark_request_cancelable(_Inout_ device_ctx &dev, _In_ const request_search &crit);
+NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ const request_search &crit);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

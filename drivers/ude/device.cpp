@@ -70,13 +70,15 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         PAGED_CODE();
 
         auto device = static_cast<UDECXUSBDEVICE>(Object);
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
+        auto &dev = *get_device_ctx(device);
 
-        if (auto dev = get_device_ctx(device)) { // all resources must be freed except for device_ctx_ext*
-                NT_ASSERT(IsListEmpty(&dev->requests));
-                NT_ASSERT(dev->unplugged);
-                NT_ASSERT(!dev->port);
-        }
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
+                ptr04x(device), dev.cancelable_requests, dev.sent_requests);
+
+        // all resources must be freed except for device_ctx_ext*
+        NT_ASSERT(IsListEmpty(&dev.requests));
+        NT_ASSERT(dev.unplugged);
+        NT_ASSERT(!dev.port);
 }
 
 /*
