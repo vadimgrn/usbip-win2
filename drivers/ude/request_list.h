@@ -4,10 +4,8 @@
 
 #pragma once
 
-#include <usbip\proto.h>
-
-#include <libdrv\codeseg.h>
-#include <libdrv\wdf_cpp.h>
+#include <usbip/proto.h>
+#include <libdrv/wdf_cpp.h>
 
 #include <usb.h>
 #include <wdfusb.h>
@@ -53,7 +51,7 @@ void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk, _In_ U
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ const request_search &crit);
+NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ WDFREQUEST request);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

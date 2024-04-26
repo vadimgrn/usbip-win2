@@ -41,7 +41,7 @@ void cancel_request(_In_ WDFREQUEST request)
         auto dev = get_device_ctx(device);
 
         bool removed = device::remove_request(*dev, request, false); // can clash with concurrent remove_request(, true)
-        TraceDbg("%04x, removed %!bool!", ptr04x(request), removed);
+        TraceDbg("%04x, removed %d", ptr04x(request), removed);
 
         device::send_cmd_unlink_and_cancel(device, request);
 }
@@ -68,30 +68,26 @@ void usbip::device::append_request(_Inout_ device_ctx &dev, _In_ const wsk_conte
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::mark_request_cancelable(_Inout_ device_ctx &dev, _In_ const request_search &crit)
+NTSTATUS usbip::device::mark_request_cancelable(_Inout_ device_ctx &dev, _In_ WDFREQUEST request)
 {
-        NT_ASSERT(crit);
         wdf::Lock lck(dev.requests_lock);
 
         for (auto head = &dev.requests, entry = head->Flink; entry != head; entry = entry->Flink) {
 
-                auto req = CONTAINING_RECORD(entry, request_ctx, entry);
-                
-                if (auto request = get_handle(req); matches(request, *req, crit)) {
-
-                        auto ret = WdfRequestMarkCancelableEx(request, cancel_request);
-
-                        if (NT_SUCCESS(ret)) {
-                                req->cancelable = true;
-                        } else if (ret == STATUS_CANCELLED) { // EvtRequestCancel will not be called
-                                RemoveEntryList(entry); // must do the same as cancel_request after that
-                        }
-
-                        return ret;
+                if (auto req = CONTAINING_RECORD(entry, request_ctx, entry); get_handle(req) != request) {
+                        // continue;
+                } else if (auto err = WdfRequestMarkCancelableEx(request, cancel_request)) {
+                        TraceDbg("%04x, %!STATUS!", ptr04x(request), err);
+                        RemoveEntryList(entry);
+                        return err; // must do the same as cancel_request after that
+                } else {
+                        req->cancelable = true;
+                        ++dev.cancelable_requests;
+                        break;
                 }
         }
 
-        return STATUS_NOT_FOUND;
+        return STATUS_SUCCESS;
 }
 
 /*
@@ -115,11 +111,10 @@ WDFREQUEST usbip::device::remove_request(
 
                 RemoveEntryList(entry);
 
-                if (unmark_cancelable && req->cancelable) {
-
-                        auto ret = WdfRequestUnmarkCancelable(request);
-                        TraceWSK("%04x, unmark cancelable %!STATUS!", ptr04x(request), ret);
-
+                if (!(unmark_cancelable && req->cancelable)) {
+                        // not required
+                } else if (auto ret = WdfRequestUnmarkCancelable(request)) {
+                        TraceDbg("%04x, unmark cancelable %!STATUS!", ptr04x(request), ret);
                         if (ret != STATUS_CANCELLED) {
                                 // EvtRequestCancel will not be called
                         } else if (crit.multimatch()) {

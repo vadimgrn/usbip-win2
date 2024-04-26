@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -15,7 +15,14 @@ namespace usbip::device
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request);
+void send_cmd_unlink_and_complete(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ NTSTATUS status);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
+{
+        send_cmd_unlink_and_complete(device, request, STATUS_CANCELLED);
+}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

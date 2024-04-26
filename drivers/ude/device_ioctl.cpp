@@ -55,23 +55,16 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
         if (!request) {
                 // nothing to do
-        } else if (NT_SUCCESS(wsk.Status)) { // request has sent
+        } else if (NT_SUCCESS(wsk.Status)) {
                 ++dev.sent_requests;
-
-                auto ret = device::mark_request_cancelable(dev, request);
-                TraceWSK("%04x, mark cancelable %!STATUS!", ptr04x(request), ret);
-
-                if (NT_SUCCESS(ret)) {
-                        ++dev.cancelable_requests;
-                } else if (ret == STATUS_CANCELLED) {
+                if (auto err = device::mark_request_cancelable(dev, request)) {
                         auto device = get_handle(&dev);
-                        device::send_cmd_unlink_and_cancel(device, request);
+                        device::send_cmd_unlink_and_complete(device, request, err);
                 }
-
         } else if (device::remove_request(dev, request, false)) {
                 complete(request, wsk.Status);
-        } else{
-                TraceWSK("req %04x not found, could not complete", ptr04x(request));
+        } else {
+                Trace(TRACE_LEVEL_ERROR, "req %04x not found, could not complete", ptr04x(request));
         }
 
         if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !dev.unplugged) {
@@ -464,7 +457,7 @@ auto send_ep0_out(
   */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::device::send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request)
+void usbip::device::send_cmd_unlink_and_complete(_In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
         auto &dev = *get_device_ctx(device);
         auto &req = *get_request_ctx(request);
@@ -480,7 +473,7 @@ void usbip::device::send_cmd_unlink_and_cancel(_In_ UDECXUSBDEVICE device, _In_ 
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, seqnum %u, wsk_context_ptr error", ptr04x(device), req.seqnum);
         }
 
-        complete(request, STATUS_CANCELLED);
+        complete(request, status);
 }
 
 _IRQL_requires_same_

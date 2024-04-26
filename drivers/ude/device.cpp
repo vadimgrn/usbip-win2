@@ -15,8 +15,8 @@
 #include "ioctl.h"
 #include "vhci.h"
 
-#include <libdrv\dbgcommon.h>
-#include <libdrv\wait_timeout.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/wait_timeout.h>
 
 namespace
 {
@@ -494,13 +494,13 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &handle, _In_ UDECXUSBDEVICE device)
+PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &handle, _In_ WDFOBJECT parent)
 {
         PAGED_CODE();
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = device;
+        attr.ParentObject = parent;
 
         if (auto err = WdfWaitLockCreate(&attr, &handle)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
@@ -512,13 +512,13 @@ PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &handle, _In_ UDECXUSBDEVICE dev
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_spin_lock(_Out_ WDFSPINLOCK *handle, _In_ UDECXUSBDEVICE device)
+PAGED auto create_spin_lock(_Out_ WDFSPINLOCK *handle, _In_ WDFOBJECT parent)
 {
         PAGED_CODE();
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = device;
+        attr.ParentObject = parent;
 
         if (auto err = WdfSpinLockCreate(&attr, handle)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
