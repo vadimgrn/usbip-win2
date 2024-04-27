@@ -19,6 +19,7 @@
 #include <libdrv\usbdsc.h>
 #include <libdrv\irp.h>
 #include <libdrv\pdu.h>
+#include <libdrv\ch9.h>
 
 namespace
 {
@@ -93,6 +94,36 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	auto &hdr = ctx.hdr;
 	NT_ASSERT(hdr.base.command == USBIP_RET_SUBMIT);
 	return hdr.u.ret_submit;
+}
+
+/*
+ * Full Speed audio device, ISOCH OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1, such devices do not work. 
+ * ucx01000!UrbHandler_USBPORTStyle_Legacy_IsochTransfer completes IRP with USBD_STATUS_INVALID_PARAMETER,
+ * this error can be observed in the filter driver, this driver will not get ISOCH transfers at all.
+ *
+ * UDE (perhaps due to its dependency on USBHUB3) does not support 1ms polling, 
+ * it always treats bInterval as 0.125ms intervals, and it doesn't care 
+ * if everything else in the device descriptor or speed is correct.
+ * 
+ * To fix that, bInterval of each ISOCH OUT endpoint must not be smaller than 4, 
+ * even if the physical device reports bInterval=1.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void patch_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
+{
+	for (USB_COMMON_DESCRIPTOR *cur{}; bool(cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
+
+		auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
+
+		if (e.bInterval == 1 && usb_endpoint_dir_out(e) && usb_endpoint_type(e) == UsbdPipeTypeIsochronous) {
+			e.bInterval = 4;
+			TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, bmAttributes %#x, "
+				 "wMaxPacketSize %d, bInterval %d (patched, was 1)", 
+				  e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
+				  e.wMaxPacketSize, e.bInterval);
+		}
+	}
 }
 
 /*
@@ -249,14 +280,15 @@ void post_control_transfer(_In_ const _URB_CONTROL_TRANSFER &r, _In_ void *Trans
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
-			NT_ASSERT(usbdlib::is_valid(d));
+			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
+			patch_endpoint_interval(&d);
 		}
 		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
 		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
-			NT_ASSERT(usbdlib::is_valid(d));
+			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
 		}
 		break;

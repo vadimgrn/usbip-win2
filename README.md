@@ -10,20 +10,7 @@
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - You can **donate to purchase an EV certificate** which is required for signing the driver, please read [this](https://github.com/vadimgrn/usbip-win2/issues/48#issuecomment-1888655412) thread
-
-## Two implementations
-- [UDE driver](https://github.com/vadimgrn/usbip-win2/tree/master) (version 0.9.5 and later)
-  - Is stable, but **has known issues** for some kind of devices (at least audio devices)
-  - Should be used if your devices work with it
-  - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (list is incomplete)
-- [WDM driver](https://github.com/vadimgrn/usbip-win2/tree/wdm) (versions up to 0.9.5)
-  - **Is fully implemented**
-  - The latest release is [0.9.3.4](https://github.com/vadimgrn/usbip-win2/releases/tag/wdm-0.9.3.4)
-  - Development stopped in favor of UDE driver
-  - Use it only if UDE driver has issues with your devices
-  - Will be supported until UDE driver is fully functional
-  - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#wdm-driver-list-of-devices-known-to-work) that work (list is incomplete)
-- UDE and WDM drivers can be installed and used together on the same PC, just make sure you use the appropriate usbip.exe for each one
+- [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (list is incomplete)
 
 ## Requirements
 - Windows 10 x64 Version [1809](https://en.wikipedia.org/wiki/Windows_10,_version_1809) (OS build 17763) and later

@@ -137,7 +137,7 @@ auto select_configuration(
                 cfg = cd->bConfigurationValue;
 
                 auto intf = &r.Interface;
-                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = usbdlib::next(intf)) {
+                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = libdrv::next(intf)) {
                         update_pipe_properties(dev, *intf);
                 }
         }

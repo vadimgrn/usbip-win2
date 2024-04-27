@@ -39,9 +39,10 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
         case USB_SPEED_FULL:
                 return UdecxUsbFullSpeed;
         case USB_SPEED_LOW:
+                return UdecxUsbLowSpeed;
         case USB_SPEED_UNKNOWN:
         default:
-                return UdecxUsbLowSpeed;
+                return UdecxUsbHighSpeed; // FIXME
         }
 }
 
