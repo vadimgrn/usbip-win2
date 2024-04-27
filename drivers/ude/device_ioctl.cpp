@@ -57,14 +57,14 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                 // nothing to do
         } else if (NT_SUCCESS(wsk.Status)) {
                 ++dev.sent_requests;
-                if (auto err = device::mark_request_cancelable(dev, request)) {
+                if (auto seqnum = ctx.seqnum(true); auto err = device::mark_request_cancelable(dev, seqnum)) {
                         auto device = get_handle(&dev);
                         device::send_cmd_unlink_and_complete(device, request, err);
                 }
         } else if (device::remove_request(dev, request, false)) {
                 complete(request, wsk.Status);
         } else {
-                Trace(TRACE_LEVEL_ERROR, "req %04x not found, could not complete", ptr04x(request));
+                TraceDbg("req %04x not found, could not complete", ptr04x(request));
         }
 
         if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !dev.unplugged) {

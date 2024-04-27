@@ -225,3 +225,13 @@ wsk_context* usbip::wsk_context_ptr::release()
         m_ctx = nullptr; 
         return tmp;
 }
+
+seqnum_t usbip::wsk_context_ptr::seqnum(bool byte_swap) const
+{
+        NT_ASSERT(m_ctx);
+        
+        auto seqnum = m_ctx->hdr.base.seqnum;
+        static_assert(sizeof(seqnum) == sizeof(unsigned long));
+
+        return byte_swap ? RtlUlongByteSwap(seqnum) : seqnum;
+}

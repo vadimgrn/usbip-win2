@@ -87,6 +87,8 @@ public:
         auto operator ->() const { return m_ctx; }
         auto& operator *() const { return *m_ctx; }
 
+        seqnum_t seqnum(bool byte_swap) const;
+
         wsk_context *release();
         void reset(wsk_context *ctx, bool reuse);
 

@@ -66,17 +66,25 @@ void usbip::device::append_request(_Inout_ device_ctx &dev, _In_ const wsk_conte
         InsertTailList(&dev.requests, &req.entry);
 }
 
+/*
+ * seqnum is used instead of WDFREQUEST because
+ * - request can be already completed and must be used for value comparison only
+ * - if request is completed, the same request instance can be allocated from a cache
+ *   for next transfer and put in the list
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::mark_request_cancelable(_Inout_ device_ctx &dev, _In_ WDFREQUEST request)
+NTSTATUS usbip::device::mark_request_cancelable(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum)
 {
+        NT_ASSERT(is_valid_seqnum(seqnum));
+
         wdf::Lock lck(dev.requests_lock);
 
         for (auto head = &dev.requests, entry = head->Flink; entry != head; entry = entry->Flink) {
 
-                if (auto req = CONTAINING_RECORD(entry, request_ctx, entry); get_handle(req) != request) {
+                if (auto req = CONTAINING_RECORD(entry, request_ctx, entry); req->seqnum != seqnum) {
                         // continue;
-                } else if (auto err = WdfRequestMarkCancelableEx(request, cancel_request)) {
+                } else if (auto request = get_handle(req); auto err = WdfRequestMarkCancelableEx(request, cancel_request)) {
                         TraceDbg("%04x, %!STATUS!", ptr04x(request), err);
                         RemoveEntryList(entry);
                         return err; // must do the same as cancel_request after that

@@ -51,7 +51,7 @@ void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk, _In_ U
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ WDFREQUEST request);
+NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
