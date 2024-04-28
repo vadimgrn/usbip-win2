@@ -11,7 +11,6 @@
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="select.cpp" />
-    <ClCompile Include="handle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -32,7 +31,6 @@
     </ClInclude>
     <ClInclude Include="wdf_cpp.h" />
     <ClInclude Include="ch9.h" />
-    <ClInclude Include="lock.h" />
     <ClInclude Include="pair.h" />
     <ClInclude Include="unique_ptr.h" />
     <ClInclude Include="remove_lock.h" />
@@ -42,7 +40,6 @@
     <ClInclude Include="..\..\include\usbip\ch9.h">
       <Filter>usbip</Filter>
     </ClInclude>
-    <ClInclude Include="handle.h" />
     <ClInclude Include="urb_ptr.h" />
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
     <ClInclude Include="wait_timeout.h" />

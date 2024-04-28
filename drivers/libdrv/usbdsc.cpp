@@ -14,6 +14,7 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *prev)
 {
 	NT_ASSERT(cfg);
+	NT_ASSERT(is_valid(*cfg));
 	void *end = reinterpret_cast<char*>(cfg) + cfg->wTotalLength;
 
 	auto start = prev ? next(prev) : static_cast<void*>(cfg);

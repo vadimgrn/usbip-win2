@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dbgcommon.cpp" />
-    <ClCompile Include="handle.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="mdl_cpp.cpp" />
     <ClCompile Include="select.cpp" />
@@ -144,12 +143,10 @@
     <ClInclude Include="ch11.h" />
     <ClInclude Include="ch9.h" />
     <ClInclude Include="dbgcommon.h" />
-    <ClInclude Include="handle.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="irp.h" />
     <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="codeseg.h" />
-    <ClInclude Include="lock.h" />
     <ClInclude Include="pair.h" />
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="select.h" />
