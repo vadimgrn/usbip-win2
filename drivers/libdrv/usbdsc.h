@@ -20,6 +20,11 @@ struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 };
 static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
+constexpr auto is_valid(_In_ const USB_COMMON_DESCRIPTOR &d)
+{
+	return d.bLength >= sizeof(d);
+}
+
 constexpr auto is_valid(_In_ const USB_DEVICE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) && 
@@ -54,8 +59,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto next(_In_ USB_COMMON_DESCRIPTOR *d)
 {
 	NT_ASSERT(d);
-	auto next = reinterpret_cast<char*>(d) + d->bLength;
-	return reinterpret_cast<USB_COMMON_DESCRIPTOR*>(next);
+	void *next = reinterpret_cast<char*>(d) + d->bLength;
+	return static_cast<USB_COMMON_DESCRIPTOR*>(next);
 }
 
 _IRQL_requires_same_
@@ -63,13 +68,18 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto next(_In_ const USBD_INTERFACE_INFORMATION *d)
 {
 	NT_ASSERT(d);
-	auto next = reinterpret_cast<const char*>(d) + d->Length;
-	return reinterpret_cast<const USBD_INTERFACE_INFORMATION*>(next);
+	const void *next = reinterpret_cast<const char*>(d) + d->Length;
+	return static_cast<const USBD_INTERFACE_INFORMATION*>(next);
 }
 
+/*
+ * @param type of the usb descriptor - interface, endpoint, string
+ * @param cur nullptr for the first iteration or result from the previous iteration
+ * @return next found descriptor or nullptr
+ */
 _IRQL_requires_same_
 _IRQL_requires_(DISPATCH_LEVEL)
 USB_COMMON_DESCRIPTOR *find_next(
-	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *prev = nullptr);
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur);
 
 } // namespace libdrv

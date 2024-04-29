@@ -11,21 +11,21 @@
 _IRQL_requires_same_
 _IRQL_requires_(DISPATCH_LEVEL)
 USB_COMMON_DESCRIPTOR* libdrv::find_next(
-	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *prev)
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur)
 {
 	NT_ASSERT(cfg);
-	NT_ASSERT(is_valid(*cfg));
-	void *end = reinterpret_cast<char*>(cfg) + cfg->wTotalLength;
+	const void *end = reinterpret_cast<char*>(cfg) + cfg->wTotalLength;
 
-	auto start = prev ? next(prev) : static_cast<void*>(cfg);
-	NT_ASSERT(start >= cfg);
-	NT_ASSERT(start <= end);
+	cur = cur ? next(cur) : reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
 
-	for (auto d = static_cast<USB_COMMON_DESCRIPTOR*>(start); next(d) <= end; d = next(d)) {
-		if (d->bDescriptorType == type) {
-			return d;
-		} else if (d->bLength < sizeof(*d)) { // invalid USB descriptor
-			return nullptr;
+	NT_ASSERT(cur >= static_cast<void*>(cfg));
+	NT_ASSERT(cur <= end);
+
+	for (USB_COMMON_DESCRIPTOR *cur_end; cur < end && (cur_end = next(cur)) <= end; cur = cur_end) {
+		if (cur->bDescriptorType == type) {
+			return cur;
+		} else if (!is_valid(*cur)) {
+			break;
 		}
 	}
 
