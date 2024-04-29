@@ -97,7 +97,7 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 }
 
 /*
- * Full Speed audio device, ISOCH OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1, such devices do not work. 
+ * USB_SPEED_FULL audio devices do not work if ISOCH IN/OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1. 
  * ucx01000!UrbHandler_USBPORTStyle_Legacy_IsochTransfer completes IRP with USBD_STATUS_INVALID_PARAMETER,
  * this error can be observed in the filter driver, this driver will not get ISOCH transfers at all.
  *
@@ -107,6 +107,12 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
  * 
  * To fix that, bInterval of each ISOCH OUT endpoint must not be smaller than 4, 
  * even if the physical device reports bInterval=1.
+ * 
+ * 5.6.4 Isochronous Transfer Bus Access Constraints
+ * Isochronous transfers can only be used by full-speed and high-speed devices.
+ * An isochronous endpoint must specify its required bus access period. Full-/high-speed endpoints 
+ * must specify a desired period as 2^(bInterval-1) x F, where bInterval is in the range 
+ * one to (and including) 16 and F is 125 microseconds for high-speed and 1ms for full-speed.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -116,7 +122,7 @@ void patch_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
 
 		auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
-		if (e.bInterval == 1 && usb_endpoint_dir_out(e) && usb_endpoint_type(e) == UsbdPipeTypeIsochronous) {
+		if (e.bInterval == 1 && usb_endpoint_type(e) == UsbdPipeTypeIsochronous) { // IN/OUT
 			e.bInterval = 4;
 			TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, bmAttributes %#x, "
 				 "wMaxPacketSize %d, bInterval %d (patched, was 1)", 
@@ -235,15 +241,15 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 		return STATUS_INVALID_PARAMETER;
 	}
 
+	NT_ASSERT(r.TransferBufferLength == static_cast<ULONG>(ret.actual_length));
 	UCHAR *buffer{};
 
 	if (is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
-		ULONG length; // ctx.mdl_buf describes actual_length instead of TransferBufferLength
+		ULONG length; // full, not actual
 		if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
 			Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
 			return err;
 		}
-		NT_ASSERT(length == r.TransferBufferLength);
 	}
 
 	return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
@@ -259,7 +265,7 @@ void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_control_transfer(_In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
+void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
 {
 	auto dsc = static_cast<USB_COMMON_DESCRIPTOR*>(TransferBuffer);
 	auto dsc_len = static_cast<UINT16>(r.TransferBufferLength);
@@ -282,7 +288,9 @@ void post_control_transfer(_In_ const _URB_CONTROL_TRANSFER &r, _In_ void *Trans
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
 			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
-			patch_endpoint_interval(&d);
+			if (dev.speed() == USB_SPEED_FULL) {
+				patch_endpoint_interval(&d);
+			}
 		}
 		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:
@@ -297,13 +305,13 @@ void post_control_transfer(_In_ const _URB_CONTROL_TRANSFER &r, _In_ void *Trans
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_transfer_buffer(_In_ const URB &urb, _In_ void *TransferBuffer)
+void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
 {
 	switch (urb.UrbHeader.Function) {
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
 		static_assert(sizeof(urb.UrbControlTransfer) == sizeof(urb.UrbControlTransferEx));
-		post_control_transfer(urb.UrbControlTransfer, TransferBuffer);
+		post_control_transfer(dev, urb.UrbControlTransfer, TransferBuffer);
 	}
 }
 
@@ -332,7 +340,7 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit
 	}
 
 	if (NT_SUCCESS(st) && TransferBufferLength) {
-		post_process_transfer_buffer(urb, TransferBuffer);
+		post_process_transfer_buffer(*ctx.dev, urb, TransferBuffer);
 	}
 
 	return st;
