@@ -36,6 +36,8 @@ NullableHandle& get_event();
 const wchar_t* get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept;
 bool get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept;
 
+wxString to_string(_In_ state state);
+
 struct usb_device;
 imported_device make_imported_device(_In_ std::string hostname, _In_ std::string service, _In_ const usb_device &dev);
 

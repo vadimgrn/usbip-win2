@@ -34,9 +34,9 @@ namespace
 
 using namespace usbip;
 
+const auto g_persistent_mark = L'\u2713'; // CHECK MARK, 2714 HEAVY CHECK MARK
 auto &g_key_devices = L"/devices";
 auto &g_key_url = L"url";
-auto &g_persistent_mark = L"\u2713"; // CHECK MARK, 2714 HEAVY CHECK MARK
 
 consteval auto get_saved_keys()
 {
@@ -1078,10 +1078,9 @@ void MainFrame::on_item_activated(wxTreeListEvent &event)
         
         if (auto item = event.GetItem(); tree.GetItemParent(item) == tree.GetRootItem()) {
                 // item is a server
-        } else if (auto state = tree.GetItemText(item, COL_STATE);
-                   state == _(vhci::get_state_str(state::unplugged))) {
-                on_attach(event);
-        } else if (state == _(vhci::get_state_str(state::plugged))) {
+        } else if (auto state = tree.GetItemText(item, COL_STATE); state == to_string(state::unplugged)) {
+                on_attach(event); 
+        } else if (state == to_string(state::plugged)) {
                 on_detach(event);
         }
 }
@@ -1201,7 +1200,7 @@ void MainFrame::on_load(wxCommandEvent&)
                 constexpr auto state_flag = mkflag(COL_STATE);
                 static_assert(!(get_saved_flags() & state_flag));
 
-                dc[COL_STATE] = _(vhci::get_state_str(state::unplugged));
+                dc[COL_STATE] = to_string(state::unplugged);
                 flags = update_from_saved(dc, flags | state_flag, persistent);
 
                 update_device(dev, dc, flags);

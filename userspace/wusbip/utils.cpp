@@ -168,3 +168,25 @@ bool usbip::split_server_url(_In_ const wxString &url, _Out_ wxString &hostname,
 
         return found;
 }
+
+/*
+ * 25FC black medium square
+ * 26AA medium white circle, 26AB medium black circle
+ */
+wxString usbip::to_string(_In_ state state)
+{
+        wxString s;
+
+        switch (state) {
+        case state::unplugged:
+                s = L'\u25FB'; // white medium square
+                break;
+        case state::plugged:
+                s = L'\u25A3'; // white square containing small black square
+                break;
+        default:
+                s = _(vhci::get_state_str(state));
+        }
+
+        return s;
+}

@@ -15,20 +15,18 @@ using namespace usbip;
 /*
  * @param busid hub-port[.port]... 
  */
-auto parse_busid(_Inout_ wxString &busid)
+auto parse_busid(_In_ wxString busid)
 {
         std::vector<int> v;
-        wxString rest;
-        int val;
 
-        if (auto hub = busid.BeforeFirst(L'-', &rest); hub.ToInt(&val)) {
-                v.push_back(val);
-                busid = std::move(rest);
+        if (auto i = busid.Find(L'-'); i != wxNOT_FOUND) {
+                busid[i] = L'.';
         } else {
                 return v;
         }
 
-        for ( ; busid.BeforeFirst(L'.', &rest).ToInt(&val); busid = std::move(rest)) {
+        int val;
+        for (wxString rest; busid.BeforeFirst(L'.', &rest).ToInt(&val); busid = std::move(rest)) {
                 v.push_back(val);
         }
 

@@ -118,7 +118,7 @@ auto usbip::make_device_columns(_In_ const device_state &st) -> std::pair<device
         auto ret = make_device_columns(st.device);
         auto &[dc, flags] = ret;
 
-        dc[COL_STATE] = _(vhci::get_state_str(st.state));
+        dc[COL_STATE] = to_string(st.state);
         flags |= mkflag(COL_STATE);
 
         return ret;
