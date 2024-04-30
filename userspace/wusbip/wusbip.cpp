@@ -345,6 +345,11 @@ MainFrame::MainFrame(_In_ Handle read) :
         post_refresh();
 }
 
+MainFrame::~MainFrame()
+{
+        m_treeListCtrl->SetItemComparator(nullptr);
+}
+
 void MainFrame::init()
 {
         m_log->SetVerbose(true); // produce messages for wxLOG_Info
@@ -379,6 +384,7 @@ void MainFrame::init_tree_list()
         auto &tree = *m_treeListCtrl;
         auto &dv = *tree.GetDataView();
 
+        tree.SetItemComparator(&m_tree_cmp);
         tree.GetView()->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel), this);
 
         if (auto hdr = dv.GenericGetHeader()) {

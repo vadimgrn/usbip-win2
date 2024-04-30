@@ -120,6 +120,7 @@
     <ClCompile Include="log.cpp" />
     <ClCompile Include="persist.cpp" />
     <ClCompile Include="taskbaricon.cpp" />
+    <ClCompile Include="tree_comparator.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="wusbip.cpp" />
     <ClCompile Include="font.cpp" />
@@ -133,6 +134,7 @@
     <ClInclude Include="persist.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="taskbaricon.h" />
+    <ClInclude Include="tree_comparator.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="wusbip.h" />
     <ClInclude Include="font.h" />
