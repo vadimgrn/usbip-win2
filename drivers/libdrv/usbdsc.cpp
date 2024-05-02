@@ -21,7 +21,8 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
 	NT_ASSERT(cur >= static_cast<void*>(cfg));
 	NT_ASSERT(cur <= end);
 
-	for (USB_COMMON_DESCRIPTOR *nxt; cur < end && is_valid(*cur) && (nxt = next(cur)) <= end; cur = nxt) {
+	for (USB_COMMON_DESCRIPTOR *nxt; 
+	     cur + sizeof(*cur) <= end && is_valid(*cur) && (nxt = next(cur)) <= end; cur = nxt) {
 		if (cur->bDescriptorType == type) {
 			return cur;
 		}

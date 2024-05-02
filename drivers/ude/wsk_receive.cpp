@@ -97,6 +97,41 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 }
 
 /*
+ * Isochronous transfers can only be used by full-speed and high-speed devices.
+ * For devices and host controllers that can operate at full speed, the period is measured in units of 1 millisecond frames.
+ * 
+ * For devices and host controllers that can operate at high speed, the period is measured in units of microframes.
+ * There are eight microframes in each 1 millisecond frame.
+ * The period is related to the value in bInterval by the formula 2**(bInterval - 1), the result is number of microframes.
+ * 
+ * @param bInterval value for full-speed device, milliseconds
+ * @return equivalent interval value for high-speed device
+ * 
+ * @see USB_ENDPOINT_DESCRIPTOR structure (usbspec.h)
+ * @see 5.6.4 Isochronous Transfer Bus Access Constraints
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
+{
+	NT_ASSERT(bInterval);
+
+	if (bInterval == 1) {
+		return 4; // 2**(4-1) = 8 microframes or 1ms
+	} else if (bInterval < 4) {
+		return 5; // 16mf or 2ms
+	} else if (bInterval < 8) {
+		return 6; // 32mf or 4ms
+	} else if (bInterval < 16) {
+		return 7; // 64mf or 8ms
+	} else if (bInterval < 32) {
+		return 8; // 128mf or 16ms
+	} else { // up to 255
+		return 9; // 256mf or 32ms
+	}
+}
+
+/*
  * USB_SPEED_FULL audio devices do not work if ISOCH IN/OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1. 
  * ucx01000!UrbHandler_USBPORTStyle_Legacy_IsochTransfer completes IRP with USBD_STATUS_INVALID_PARAMETER,
  * this error can be observed in the filter driver, this driver will not get ISOCH transfers at all.
@@ -104,30 +139,24 @@ inline auto& get_ret_submit(_In_ const wsk_context &ctx)
  * UDE (perhaps due to its dependency on USBHUB3) does not support 1ms polling, 
  * it always treats bInterval as 0.125ms intervals, and it doesn't care 
  * if everything else in the device descriptor or speed is correct.
- * 
- * To fix that, bInterval of each ISOCH OUT endpoint must not be smaller than 4, 
- * even if the physical device reports bInterval=1.
- * 
- * 5.6.4 Isochronous Transfer Bus Access Constraints
- * Isochronous transfers can only be used by full-speed and high-speed devices.
- * An isochronous endpoint must specify its required bus access period. Full-/high-speed endpoints 
- * must specify a desired period as 2^(bInterval-1) x F, where bInterval is in the range 
- * one to (and including) 16 and F is 125 microseconds for high-speed and 1ms for full-speed.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void patch_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
+void fix_full_speed_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
 	for (USB_COMMON_DESCRIPTOR *cur{}; bool(cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
 
 		auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
-		if (e.bInterval == 1 && usb_endpoint_type(e) == UsbdPipeTypeIsochronous) { // IN/OUT
-			e.bInterval = 4;
+		if (auto t = usb_endpoint_type(e); t == UsbdPipeTypeIsochronous || t == UsbdPipeTypeInterrupt) { // IN/OUT
+
+			auto val = e.bInterval; // always treated as high-speed device despite it is full-speed
+			e.bInterval = to_high_speed_interval(val);
+
 			TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, bmAttributes %#x, "
-				 "wMaxPacketSize %d, bInterval %d (patched, was 1)", 
+				 "wMaxPacketSize %d, bInterval %d (patched value is %d)", 
 				  e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
-				  e.wMaxPacketSize, e.bInterval);
+				  e.wMaxPacketSize, val, e.bInterval);
 		}
 	}
 }
@@ -241,7 +270,6 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &r
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	NT_ASSERT(r.TransferBufferLength == static_cast<ULONG>(ret.actual_length));
 	UCHAR *buffer{};
 
 	if (is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
@@ -289,7 +317,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
 			if (dev.speed() == USB_SPEED_FULL) {
-				patch_endpoint_interval(&d);
+				fix_full_speed_endpoint_interval(&d);
 			}
 		}
 		break;
@@ -325,14 +353,14 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit
 		return isoch_transfer(ctx, ret, urb);
 	}
 
-	auto st = STATUS_SUCCESS;
-	
 	UCHAR *TransferBuffer{};
 	ULONG TransferBufferLength{};
 
-	if (NT_ERROR(UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength))) {
-		return st; // URB has no transfer buffer
+	if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) {
+		return err == STATUS_INVALID_PARAMETER ? STATUS_SUCCESS : err; // OK if URB has no transfer buffer
 	}
+
+	auto st = STATUS_SUCCESS;
 
 	if (TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
 		st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
