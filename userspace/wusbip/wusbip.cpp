@@ -389,6 +389,9 @@ void MainFrame::init_tree_list()
 
         if (auto hdr = dv.GenericGetHeader()) {
                 hdr->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel), this);
+                if (auto colour = wxTheColourDatabase->Find(L"DIM GREY"); colour.IsOk()) { // MIDNIGHT BLUE"
+                        hdr->SetForegroundColour(colour);
+                }
         }
 
         if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
