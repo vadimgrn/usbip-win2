@@ -384,7 +384,9 @@ void MainFrame::init_tree_list()
         auto &tree = *m_treeListCtrl;
         auto &dv = *tree.GetDataView();
 
+        tree.SetImages(get_tree_images());
         tree.SetItemComparator(&m_tree_cmp);
+
         tree.GetView()->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel), this);
 
         if (auto hdr = dv.GenericGetHeader()) {
@@ -397,6 +399,19 @@ void MainFrame::init_tree_list()
         if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
                 dv.SetAlternateRowColour(colour);
         }
+}
+
+wxWithImages::Images MainFrame::get_tree_images()
+{
+        wxWithImages::Images v(IMG_CNT);
+
+        for (auto client = wxASCII_STR(wxART_LIST);
+             auto [idx, id]: { std::make_pair(IMG_SERVER, wxART_GO_HOME), {IMG_DEVICE, wxART_REMOVABLE} }) {
+
+                v[idx] = wxArtProvider::GetBitmap(wxASCII_STR(id), client);
+        }
+
+        return v;
 }
 
 void MainFrame::restore_state()
@@ -842,7 +857,7 @@ wxTreeListItem MainFrame::find_or_add_server(_In_ const wxString &url)
                 }
         }
 
-        return server = tree.AppendItem(tree.GetRootItem(), url);
+        return server = tree.AppendItem(tree.GetRootItem(), url, IMG_SERVER, IMG_SERVER);
 }
 
 std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const wxString &url, _In_ const wxString &busid)
@@ -858,7 +873,7 @@ std::pair<wxTreeListItem, bool> MainFrame::find_or_add_device(_In_ const wxStrin
                 }
         }
 
-        auto device = tree.AppendItem(server, busid);
+        auto device = tree.AppendItem(server, busid, IMG_DEVICE, IMG_DEVICE);
 
         if (!tree.IsExpanded(server)) {
                 tree.Expand(server);

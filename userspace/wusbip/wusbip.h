@@ -38,6 +38,7 @@ public:
 
 private:
 	friend class wxPersistentMainFrame;
+	enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
 
 	bool m_start_in_tray{};
 	bool m_close_to_tray{};
@@ -51,6 +52,8 @@ private:
 	std::mutex m_read_close_mtx;
 
 	std::thread m_read_thread{ &MainFrame::read_loop, this };
+
+	static wxWithImages::Images get_tree_images();
 
 	void on_close(wxCloseEvent &event) override; 
 	void on_attach(wxCommandEvent &event) override;
