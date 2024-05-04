@@ -24,18 +24,18 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 // TEXTINCLUDE
 //
 
-1 TEXTINCLUDE
+1 TEXTINCLUDE 
 BEGIN
     "resource.h\0"
 END
 
-2 TEXTINCLUDE
+2 TEXTINCLUDE 
 BEGIN
     "#include ""winres.h""\r\n"
     "\0"
 END
 
-3 TEXTINCLUDE
+3 TEXTINCLUDE 
 BEGIN
     "\r\n"
     "\0"
@@ -92,44 +92,20 @@ IDR_USB_IDS             RCDATA                  "../usbip/usb.ids"
 
 
 /////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
 
-// wxWidgets
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
 
 // note that the icon used by the Explorer (i.e. the programs icon) is the
 // first icon in the executable and the icons are sorted both by their order
 // and alphabetically (!), so put this icon first and give it a name
 // starting with "a"
-aaaaaaaa ICON 	"USBip.ico"
+aaaaaaaa		ICON                    "resources/USBip.ico"
 
-// this icon is used with wxFrame::SetIcon()
-USBip	 ICON 	"USBip.ico"
-
-// Note that wxUSE_RC_MANIFEST needs to be defined to 1 to embed the wx-defined
-// manifest, this is not done by default to avoid conflicts with the manifest
-// embedded by MSVS projects.
-//
-// An application manifest is needed for the application UI to look properly
-// and for DPI awareness, so make sure that you define wxUSE_RC_MANIFEST=1 to
-// include it from here or add the manifest at the build system level.
-//
-// See "Using a Manifest" section of docs/msw/install.md for more information.
-
-// Set this to 1 if you don't want to use manifest resource provided by
-// wxWidgets but wxUSE_RC_MANIFEST is somehow defined elsewhere.
-#define wxUSE_NO_MANIFEST 0
-
-// When embedding manifest here, predefine this symbol to enable full High DPI
-// support, see MSW subsection of "Platform-Specific Build Issues" section in
-// the "High DPI Support" guide in wxWidgets manual for more details.
-//
-// As mentioned above, this has no effect unless wxUSE_RC_MANIFEST=1.
-#ifndef wxUSE_DPI_AWARE_MANIFEST
-#define wxUSE_DPI_AWARE_MANIFEST 2
-#endif
-
-// this file contains the standard icons, cursors etc. and also includes the application
-// manifest mentioned above
-#include "wx/msw/wx.rc"
+USBIP                   ICON                    "resources/USBip.ico"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////

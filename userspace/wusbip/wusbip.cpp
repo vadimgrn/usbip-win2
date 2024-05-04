@@ -405,9 +405,8 @@ wxWithImages::Images MainFrame::get_tree_images()
 {
         wxWithImages::Images v(IMG_CNT);
 
-        for (auto client = wxASCII_STR(wxART_LIST);
+        for (auto client = wxASCII_STR(wxART_LIST); 
              auto [idx, id]: { std::make_pair(IMG_SERVER, wxART_GO_HOME), {IMG_DEVICE, wxART_REMOVABLE} }) {
-
                 v[idx] = wxArtProvider::GetBitmap(wxASCII_STR(id), client);
         }
 

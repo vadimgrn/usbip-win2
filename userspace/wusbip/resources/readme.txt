@@ -1,4 +1,4 @@
-These svg files were created in Inkscape open source vector graphics editor, https://inkscape.org/
+USBip*.svg files were created in Inkscape open source vector graphics editor, https://inkscape.org/
 
 Steps to create USBip.ico
 
