@@ -9,6 +9,20 @@
 namespace libdrv
 {
 
+class RaiseIrql
+{
+public:
+	explicit RaiseIrql(_In_ KIRQL new_irql) { KeRaiseIrql(new_irql, &old_irql); }
+	~RaiseIrql() { KeLowerIrql(old_irql); }
+
+	RaiseIrql(_In_ const RaiseIrql&) = delete;
+	RaiseIrql& operator =(_In_ const RaiseIrql&) = delete;
+
+private:
+	KIRQL old_irql{};
+};
+
+
 class irp_ptr
 {
 public:

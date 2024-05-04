@@ -212,11 +212,7 @@ PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
                 return err;
         }
 
-        if (auto dev = get_device_ctx(device)) {
-                sched_receive_usbip_header(*dev);
-        }
-
-        return STATUS_SUCCESS;
+        return device::recv_thread_start(device);
 }
 
 /*

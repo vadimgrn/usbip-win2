@@ -80,6 +80,25 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         NT_ASSERT(IsListEmpty(&dev.requests));
         NT_ASSERT(dev.unplugged);
         NT_ASSERT(!dev.port);
+        NT_ASSERT(!dev.recv_thread);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void recv_thread_join(_In_ UDECXUSBDEVICE device)
+{
+        PAGED_CODE();
+
+        TraceDbg("dev %04x", ptr04x(device));
+        auto &dev = *get_device_ctx(device);
+
+        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev.recv_thread), nullptr);
+        NT_ASSERT(thread);
+
+        NT_VERIFY(!KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr));
+        TraceDbg("dev %04x, joined", ptr04x(device));
+
+        ObDereferenceObject(thread);
 }
 
 /*
@@ -551,10 +570,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 return err;
         }
 
-        if (auto err = init_receive_usbip_header(dev)) {
-                return err;
-        }
-
         InitializeListHead(&dev.requests);
         KeInitializeEvent(&dev.detach_completed, NotificationEvent, false);
 
@@ -610,6 +625,8 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
                 device_state_changed(dev, vhci::state::disconnected);
         }
+
+        recv_thread_join(device);
 
         auto port = vhci::reclaim_roothub_port(device);
         if (port) {
@@ -730,6 +747,30 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
+{
+        PAGED_CODE();
+        const auto access = THREAD_ALL_ACCESS;
+
+        HANDLE handle{};
+        if (auto err = PsCreateSystemThread(&handle, access, nullptr, nullptr, nullptr, recv_thread_function, device)) {
+                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
+                return err;
+        }
+
+        auto dev = get_device_ctx(device);
+
+        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
+                                                       reinterpret_cast<PVOID*>(&dev->recv_thread), nullptr)));
+
+        NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+
+        TraceDbg("dev %04x", ptr04x(device));
+        return STATUS_SUCCESS;
+}
+
 /*
  * WdfIoQueuePurge(,PurgeComplete,) could be used instead of WdfWorkItem if set queue's ExecutionLevel
  * to WdfExecutionLevelPassive. But in this case WDF constantly use worker thread on DPC level:
@@ -790,7 +831,6 @@ PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
 }
 
 /*
- * It must be OK to call WdfIoQueuePurgeSynchronously from this thread.
  * @see plugout_and_delete
  */
 _IRQL_requires_same_
@@ -803,7 +843,7 @@ PAGED NTSTATUS usbip::device::detach(_In_ UDECXUSBDEVICE device)
         if (auto was_unplugged = set_unplugged(dev)) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
         } else {
-                ::detach(device); // calls WdfIoQueuePurgeSynchronously
+                ::detach(device);
         }
 
         auto timeout = wait_detach_timeout();
