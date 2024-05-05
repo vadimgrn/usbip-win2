@@ -22,6 +22,8 @@ namespace
 
 using namespace usbip;
 
+enum { ARG_URB, ARG_TAG };
+
 /*
  * @param result of make_irp() 
  * IO_REMOVE_LOCK must be used because IRP_MN_REMOVE_DEVICE can remove FiDO prior this callback.
@@ -30,10 +32,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 {
-	auto urb = libdrv::argv<URB*, 0>(irp);
+	auto urb = libdrv::argv<URB*, ARG_URB>(irp);
 	NT_ASSERT(urb);
 
-	auto tag = libdrv::argv<1>(irp);
+	auto tag = libdrv::argv<ARG_TAG>(irp);
 	NT_ASSERT(tag);
 
 	TraceDbg("dev %04x, urb %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
@@ -95,9 +97,9 @@ auto send_request(
 	filter::pack_request(urb.get()->UrbControlTransferEx, TransferBuffer.release(), function);
 	TraceDbg("dev %04x, urb %04x -> target %04x", ptr04x(fltr.self), ptr04x(urb.get()), ptr04x(target));
 
-	libdrv::argv<0>(irp.get()) = urb.release();
+	libdrv::argv<ARG_URB>(irp.get()) = urb.release();
 
-	libdrv::argv<1>(irp.get()) = lck.tag();
+	libdrv::argv<ARG_TAG>(irp.get()) = lck.tag();
 	lck.clear();
 
 	return IoCallDriver(target, irp.release()); // completion routine will be called anyway
@@ -128,7 +130,7 @@ void select_configuration(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
 
-	if (ULONG len{}; unique_ptr buf = clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)) {
+	if (ULONG len{}; unique_ptr buf = clone(len, r, NonPagedPoolNx, buf.pooltag)) {
 		send_request(fltr, lck, buf, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);

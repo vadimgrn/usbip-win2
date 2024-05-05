@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -15,18 +15,18 @@ namespace impl
 
 /*
  * 9.4 Standard Device Requests
- * 9.4.14 Set Firmware Status
- * bRequest: SET_FW_STATUS
- * wValue: 0 : Disallow FW update, 1 : Allow FW update, 2 – 0xFF : Reserved
+ * 9.4.1? Get Firmware Status
+ * bRequest: GET_FW_STATUS
+ * wValue: USB_GET_FIRMWARE_ALLOWED_OR_DISALLOWED_STATE, USB_GET_FIRMWARE_HASH
  * wIndex: Zero
  * wLength: Zero
  */
 inline const USB_DEFAULT_PIPE_SETUP_PACKET setup_packet =
 {
-        .bmRequestType = USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
-        .bRequest = USB_REQUEST_SET_FIRMWARE_STATUS,
-        .wValue{.W = MAXUSHORT}, // must be zero for genuine request
-        .wIndex{.W = MAXUSHORT}
+        .bmRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
+        .bRequest = USB_REQUEST_GET_FIRMWARE_STATUS,
+        .wValue{.W = USB_GET_FIRMWARE_ALLOWED_OR_DISALLOWED_STATE},
+        .wIndex{.W = MAXUSHORT}, // real request should have zero
 };
 
 constexpr ULONG const_part = 0xFFFF'0000;
@@ -54,7 +54,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto is_request(_In_ const _URB_CONTROL_TRANSFER_EX &r)
 {
         return (r.Timeout & impl::const_part) == impl::const_part && 
-                r.TransferFlags == ULONG(USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT) &&
+                r.TransferFlags == ULONG(USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_IN) &&
                 get_setup_packet(r) == impl::setup_packet;
 }
 
