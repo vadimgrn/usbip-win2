@@ -57,11 +57,20 @@
 
 ## Setup USB/IP server on Ubuntu Linux
 - Install required packages
+
 ```
 sudo apt install linux-tools-generic linux-cloud-tools-generic
 sudo modprobe -a usbip-core usbip-host
 sudo usbipd -D
 ```
+
+Or for Raspberry (Raspberry Pi OS):
+```
+sudo apt install usbip hwdata usbutils
+sudo modprobe -a usbip-core usbip-host
+sudo usbipd -D
+```
+
 - List available USB devices
   - `usbip list -l`
 ```
