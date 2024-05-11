@@ -9,8 +9,8 @@
 - Works with Linux USB/IP server at least for kernels 4.19 - 6.5
 - **Is not ready for production use**, can cause BSOD
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
-- **Do not set `testsigning off` while USBip is installed**, please read [this](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#disable-windows-test-signing-mode-without-removing-usbip)
-- You can **donate to purchase an EV certificate** which is required for signing the driver, please read [this](https://github.com/vadimgrn/usbip-win2/issues/48#issuecomment-1888655412) thread
+- **Do not set `testsigning off` when USBip is installed**, [see](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#disable-windows-test-signing-mode-without-removing-usbip)
+- You can donate to purchase an EV certificate which is required for signing the driver, please [read](https://github.com/vadimgrn/usbip-win2/issues/48#issuecomment-1888655412)
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (list is incomplete)
 
 ## Requirements
@@ -58,14 +58,8 @@
 
 ## Setup USB/IP server on Ubuntu Linux
 - Install required packages
- - Linux
-```
-sudo apt install linux-tools-generic linux-cloud-tools-generic
-```
- - Raspberry Pi
-```
-sudo apt install usbip hwdata usbutils
-```
+  - Linux `sudo apt install linux-tools-generic linux-cloud-tools-generic`
+  - Raspberry Pi `sudo apt install usbip hwdata usbutils`
 - Load modules and run the daemon
 ```
 sudo modprobe -a usbip-core usbip-host
@@ -141,7 +135,7 @@ FOR /f %P IN ('findstr /M /L %HWID% C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /de
 rd /S /Q "%APPDIR%"
 ```
 ### Disable Windows Test Signing Mode without removing USB/IP
-- Can be useful if you want to temporary disable test signing without removing USBip
+- Can be useful if you want to temporary disable test signing
 - After that, USBip will not work until the test signing will be reenabled
 - **usbip2_filter driver must be disabled, otherwise all USB controllers/devices will not work**
 ```

@@ -626,11 +626,7 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 {
 	PAGED_CODE();
 
-	for (NTSTATUS status{}; !(status || dev.unplugged); ) {
-
-		if (auto err = recv_usbip_header(ctx)) {
-			break;
-		}
+	for (NTSTATUS status{}; !(status || dev.unplugged || recv_usbip_header(ctx)); ) {
 
 		NT_ASSERT(!ctx.request); // must be completed and zeroed on every loop
 		ctx.request = ret_command(ctx);
