@@ -1,8 +1,9 @@
 USBip*.svg files were created in Inkscape open source vector graphics editor, https://inkscape.org/
+check.svg, close.svg, dismiss.svg are from wxMaterialDesignArtProvider, see https://github.com/perazz/wxMaterialDesignArtProvider
 
-Steps to create USBip.ico
+Steps to create .ico from .svg
 
-- Open USBip.svg in Inkscape
+- Open .svg in Inkscape
 - For each resolution 512, 256, 128, 64, 48, 32, 16
   - Ctrl+A to select all objects
   - Open Object/Transform, Scale Tab, check "Scale proportionally", set Width=resolution in pixels
@@ -14,4 +15,4 @@ Steps to create USBip.ico
 - After that you will have 16.png, 32.png, 48.png, 64.png, 128.png, 256.png, 512.png
 - Open 512.png in Gimp (https://www.gimp.org/)
   - File/Open As Layers, select all others .png
-  - File/Export As, Name=USBip.ico, check all icons
+  - File/Export As, Name=XXX.ico, check all icons

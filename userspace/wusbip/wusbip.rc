@@ -88,8 +88,25 @@ END
 // RCDATA
 //
 
-IDR_USB_IDS             RCDATA                  "../usbip/usb.ids"
+IDR_USB_IDS		RCDATA			"../usbip/usb.ids"
 
+ADD_SVG			RCDATA			"resources/Add.svg"
+COPY_SVG		RCDATA			"resources/copy.svg"
+CHECK_SVG		RCDATA			"resources/check.svg"
+CLOSE_SVG		RCDATA			"resources/close.svg"
+DISMISS_SVG		RCDATA			"resources/dismiss.svg"
+REFRESH_SVG		RCDATA			"resources/refresh.svg"
+COMMENT_EDIT_SVG	RCDATA			"resources/Comment_Edit.svg"
+SAVE_SVG		RCDATA			"resources/Save.svg"
+SAVE_ALT_SVG		RCDATA			"resources/save_alt.svg"
+SAVE_MULTIPLE_SVG	RCDATA			"resources/Save_Multiple.svg"
+SELECT_ALL_SVG		RCDATA			"resources/Select_All_On.svg"
+POWER_SVG		RCDATA			"resources/power_settings_new.svg"
+REPLAY_SVG		RCDATA			"resources/replay.svg"
+INFO_SVG		RCDATA			"resources/Info.svg"
+USB_SVG			RCDATA			"resources/usb.svg"
+TEXT_INCREASE_SVG	RCDATA			"resources/text_increase.svg"
+TEXT_DECREASE_SVG	RCDATA			"resources/text_decrease.svg"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -103,9 +120,8 @@ IDR_USB_IDS             RCDATA                  "../usbip/usb.ids"
 // first icon in the executable and the icons are sorted both by their order
 // and alphabetically (!), so put this icon first and give it a name
 // starting with "a"
-aaaaaaaa		ICON                    "resources/USBip.ico"
-
-USBIP                   ICON                    "resources/USBip.ico"
+aaaaaaaa	ICON	"resources/USBip.ico"
+USBIP		ICON	"resources/USBip.ico"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////

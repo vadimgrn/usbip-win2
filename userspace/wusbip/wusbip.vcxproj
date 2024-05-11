@@ -65,6 +65,9 @@
       <Command>wxpatch.bat</Command>
       <Message>Patching wxWidgets</Message>
     </PreBuildEvent>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -92,6 +95,9 @@
       <Command>wxpatch.bat</Command>
       <Message>Patching wxWidgets</Message>
     </PreBuildEvent>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ProjectReference Include="..\libusbip\libusbip.vcxproj">

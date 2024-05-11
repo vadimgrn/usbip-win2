@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="24"
+   height="24"
+   viewBox="0 0 24 24"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="dismiss.svg"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)">
+  <metadata
+     id="metadata10">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs8" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     id="namedview6"
+     showgrid="false"
+     inkscape:zoom="32"
+     inkscape:cx="5.16616"
+     inkscape:cy="12.94535"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg4" />
+  <path
+     d="m 23.359543,0.73930953 a 1.7963036,1.7703394 0.06653817 0 0 -2.542958,-0.002966 L 11.987277,9.4000102 3.1782157,0.69800972 A 1.7981443,1.7721536 0.06653824 1 0 0.63233589,3.2012472 L 9.4413979,11.903248 0.61207006,20.584689 a 1.7981444,1.7721537 0.06653822 1 0 2.54003634,2.509165 l 8.8293266,-8.681439 8.809062,8.702001 a 1.7981447,1.7721538 0.06653823 1 0 2.545881,-2.503237 l -8.809062,-8.702004 8.829327,-8.6814385 c 0.686123,-0.6746311 0.68745,-1.812198 0.0029,-2.48842697 z"
+     id="path2"
+     inkscape:connector-curvature="0"
+     style="fill:#ff2a2a;stroke-width:1.79043579" />
+</svg>

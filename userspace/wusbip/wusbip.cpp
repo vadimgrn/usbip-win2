@@ -403,14 +403,15 @@ void MainFrame::init_tree_list()
 
 wxWithImages::Images MainFrame::get_tree_images()
 {
-        wxWithImages::Images v(IMG_CNT);
+        static_assert(IMG_SERVER == 0);
+        static_assert(IMG_DEVICE == 1);
 
-        for (auto client = wxASCII_STR(wxART_LIST); 
-             auto [idx, id]: { std::make_pair(IMG_SERVER, wxART_GO_HOME), {IMG_DEVICE, wxART_REMOVABLE} }) {
-                v[idx] = wxArtProvider::GetBitmap(wxASCII_STR(id), client);
-        }
+        auto server = wxArtProvider::GetBitmap(wxASCII_STR(wxART_GO_HOME), wxASCII_STR(wxART_LIST));
 
-        return v;
+        return wxWithImages::Images{
+                server,
+                wxBitmapBundle::FromSVGResource(wxASCII_STR("usb_svg"), server.GetSize()),
+        };
 }
 
 void MainFrame::restore_state()

@@ -48,7 +48,7 @@
       <property name="minimum_size"></property>
       <property name="name">Frame</property>
       <property name="pos"></property>
-      <property name="size">752,462</property>
+      <property name="size">1000,600</property>
       <property name="style">wxDEFAULT_FRAME_STYLE</property>
       <property name="subclass">; ; forward_declare</property>
       <property name="title"></property>
@@ -111,7 +111,7 @@
           <property name="name">m_menu_file</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_GO_DOWN; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; save_alt_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Load saved devices</property>
@@ -125,7 +125,7 @@
             <event name="OnMenuSelection">on_load</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; save_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Save devices</property>
@@ -139,7 +139,7 @@
             <event name="OnMenuSelection">on_save</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE_AS; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; SAVE_MULTIPLE_SVG; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Save selected devices</property>
@@ -157,7 +157,7 @@
             <property name="name">m_separator5</property>
             <property name="permission">none</property>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -172,7 +172,7 @@
             <event name="OnMenuSelection">on_start_in_tray</event>
             <event name="OnUpdateUI">on_start_in_tray_update_ui</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -187,12 +187,12 @@
             <event name="OnMenuSelection">on_close_to_tray</event>
             <event name="OnUpdateUI">on_close_to_tray_update_ui</event>
           </object>
-          <object class="separator" expanded="true">
+          <object class="separator" expanded="false">
             <property name="name">m_separator52</property>
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_QUIT; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; power_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help"></property>
@@ -211,7 +211,7 @@
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_FULL_SCREEN; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; select_all_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Select all devices</property>
@@ -226,7 +226,7 @@
             <event name="OnUpdateUI">on_has_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_COPY; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; COPY_SVG; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Copy selected rows to the clipboard</property>
@@ -260,7 +260,7 @@
             <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_EDIT; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; COMMENT_EDIT_SVG; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Edit notes for a device</property>
@@ -440,7 +440,7 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_PLUS ; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; TEXT_INCREASE_SVG; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Use Ctrl+Wheel as well</property>
@@ -454,7 +454,7 @@
             <event name="OnMenuSelection">on_view_font_increase</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_MINUS ; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; TEXT_DECREASE_SVG; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Use Ctrl+Wheel as well</property>
@@ -468,7 +468,7 @@
             <event name="OnMenuSelection">on_view_font_decrease</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_UNDO; wxART_MENU</property>
+            <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Set default font size</property>
@@ -486,7 +486,7 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_CLOSE; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; replay_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Reset all settings</property>
@@ -505,7 +505,7 @@
           <property name="name">m_menu_devices</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; refresh_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Show attached devices</property>
@@ -519,7 +519,7 @@
             <event name="OnMenuSelection">on_reload</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; add_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Add remote devices</property>
@@ -537,7 +537,7 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; check_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Attach selected devices</property>
@@ -552,7 +552,7 @@
             <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; close_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Detach selected devices</property>
@@ -571,7 +571,7 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; dismiss_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Detach all devices</property>
@@ -585,7 +585,7 @@
             <event name="OnMenuSelection">on_detach_all</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="true">
+        <object class="wxMenu" expanded="false">
           <property name="label">Log</property>
           <property name="name">m_menu_log</property>
           <property name="permission">protected</property>
@@ -619,7 +619,7 @@
             <event name="OnMenuSelection">on_log_verbose</event>
             <event name="OnUpdateUI">on_log_verbose_update_ui</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -635,12 +635,12 @@
             <event name="OnUpdateUI">on_log_library_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Help</property>
           <property name="name">m_menu_help</property>
           <property name="permission">protected</property>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_TIP; wxART_MENU</property>
+            <property name="bitmap">Load From SVG Resource; info_svg; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help"></property>
@@ -654,7 +654,7 @@
             <event name="OnMenuSelection">on_help_about</event>
           </object>
           <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From Art Provider; wxART_INFORMATION; wxART_MENU</property>
+            <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Show information about the library</property>
@@ -669,7 +669,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -731,7 +731,7 @@
         <property name="window_style"></property>
         <event name="OnMouseWheel">on_frame_mouse_wheel</event>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_REDO; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From SVG Resource; refresh_svg; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_REFRESH</property>
           <property name="kind">wxITEM_NORMAL</property>
@@ -746,7 +746,7 @@
           <property name="permission">protected</property>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_TICK_MARK; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From SVG Resource; check_svg; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
           <property name="kind">wxITEM_NORMAL</property>
@@ -759,7 +759,7 @@
           <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_CROSS_MARK; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From SVG Resource; close_svg; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
           <property name="kind">wxITEM_NORMAL</property>
@@ -772,7 +772,7 @@
           <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_DELETE; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From SVG Resource; dismiss_svg; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
           <property name="kind">wxITEM_NORMAL</property>
@@ -787,7 +787,7 @@
           <property name="permission">protected</property>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_GO_DOWN; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From SVG Resource; save_alt_svg; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
           <property name="kind">wxITEM_NORMAL</property>
@@ -799,7 +799,7 @@
           <event name="OnToolClicked">on_load</event>
         </object>
         <object class="tool" expanded="false">
-          <property name="bitmap">Load From Art Provider; wxART_FILE_SAVE; wxART_TOOLBAR</property>
+          <property name="bitmap">Load From SVG Resource; save_svg; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_SAVE</property>
           <property name="kind">wxITEM_NORMAL</property>
@@ -811,7 +811,7 @@
           <event name="OnToolClicked">on_save</event>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -929,7 +929,7 @@
           <property name="window_style"></property>
           <property name="wrap">-1</property>
         </object>
-        <object class="wxComboBox" expanded="true">
+        <object class="wxComboBox" expanded="false">
           <property name="BottomDockable">1</property>
           <property name="LeftDockable">1</property>
           <property name="RightDockable">1</property>
@@ -1117,7 +1117,7 @@
           <property name="auth_needed">0</property>
           <property name="best_size"></property>
           <property name="bg"></property>
-          <property name="bitmap">Load From Art Provider; wxART_PLUS; wxART_BUTTON</property>
+          <property name="bitmap">Load From SVG Resource; add_svg; [24; 24]</property>
           <property name="caption"></property>
           <property name="caption_visible">0</property>
           <property name="center_pane">0</property>
@@ -1176,7 +1176,7 @@
           <event name="OnButtonClick">add_exported_devices</event>
         </object>
       </object>
-      <object class="wxTreeListCtrl" expanded="true">
+      <object class="wxTreeListCtrl" expanded="false">
         <property name="BottomDockable">0</property>
         <property name="LeftDockable">0</property>
         <property name="RightDockable">0</property>
