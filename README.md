@@ -66,13 +66,11 @@ sudo apt install linux-tools-generic linux-cloud-tools-generic
 ```
 sudo apt install usbip hwdata usbutils
 ```
-
 - Load modules and run the daemon
 ```
 sudo modprobe -a usbip-core usbip-host
 sudo usbipd -D
 ```
-
 - List available USB devices
   - `usbip list -l`
 ```
