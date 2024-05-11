@@ -21,6 +21,10 @@
 #include <libdrv\pdu.h>
 #include <libdrv\ch9.h>
 
+extern "C" {
+#include <usbdlib.h>
+}
+
 namespace
 {
 
@@ -121,6 +125,8 @@ PAGED constexpr UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
  * UDE (perhaps due to its dependency on USBHUB3) does not support 1ms polling, 
  * it always treats bInterval as 0.125ms intervals, and it doesn't care 
  * if everything else in the device descriptor or speed is correct.
+ * 
+ * @see libdrv::find_next
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -128,7 +134,9 @@ PAGED void fix_full_speed_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *c
 {
 	PAGED_CODE();
 
-	for (USB_COMMON_DESCRIPTOR *cur{}; bool(cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
+	for (auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cd); 
+	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE)); 
+	     cur = libdrv::next(cur)) {
 
 		auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
