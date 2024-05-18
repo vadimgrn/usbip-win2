@@ -107,6 +107,23 @@
   <ItemGroup>
     <None Include="..\usbip\usb.ids" />
     <None Include="packages.config" />
+    <None Include="resources\Add.svg" />
+    <None Include="resources\check.svg" />
+    <None Include="resources\close.svg" />
+    <None Include="resources\Comment_Edit.svg" />
+    <None Include="resources\copy.svg" />
+    <None Include="resources\dismiss.svg" />
+    <None Include="resources\Info.svg" />
+    <None Include="resources\power_settings_new.svg" />
+    <None Include="resources\refresh.svg" />
+    <None Include="resources\replay.svg" />
+    <None Include="resources\Save.svg" />
+    <None Include="resources\save_alt.svg" />
+    <None Include="resources\Save_Multiple.svg" />
+    <None Include="resources\Select_All_On.svg" />
+    <None Include="resources\text_decrease.svg" />
+    <None Include="resources\text_increase.svg" />
+    <None Include="resources\usb.svg" />
     <None Include="wxpatch.bat" />
   </ItemGroup>
   <ItemGroup>

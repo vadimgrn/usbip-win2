@@ -3,7 +3,60 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="wxpatch.bat" />
-    <None Include="..\usbip\usb.ids" />
+    <None Include="resources\Add.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\check.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\close.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Comment_Edit.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\copy.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Info.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\usb.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\save_alt.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Save.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\replay.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\refresh.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\dismiss.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Select_All_On.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Save_Multiple.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\text_increase.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\text_decrease.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="..\usbip\usb.ids">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\power_settings_new.svg">
+      <Filter>Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />
@@ -39,6 +92,13 @@
     <ResourceCompile Include="wusbip.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="resources\USBip.ico" />
+    <Filter Include="Resources">
+      <UniqueIdentifier>{2d369b4c-292f-49a3-a640-7b5b69b4845d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\USBip.ico">
+      <Filter>Resources</Filter>
+    </Image>
   </ItemGroup>
 </Project>

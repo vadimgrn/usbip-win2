@@ -17,6 +17,7 @@
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -50,8 +51,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,9,6,3
- PRODUCTVERSION 0,9,6,3
+ FILEVERSION 0,9,6,4
+ PRODUCTVERSION 0,9,6,4
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -68,12 +69,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "usbip-win2"
             VALUE "FileDescription", "USBip"
-            VALUE "FileVersion", "0.9.6.3"
+            VALUE "FileVersion", "0.9.6.4"
             VALUE "InternalName", "wusbip.exe"
             VALUE "LegalCopyright", "Copyright (C) 2023 - 2024 usbip-win2 project"
             VALUE "OriginalFilename", "wusbip.exe"
             VALUE "ProductName", "USBip"
-            VALUE "ProductVersion", "0.9.6.3"
+            VALUE "ProductVersion", "0.9.6.4"
         END
     END
     BLOCK "VarFileInfo"
@@ -88,25 +89,42 @@ END
 // RCDATA
 //
 
-IDR_USB_IDS		RCDATA			"../usbip/usb.ids"
+IDR_USB_IDS             RCDATA                  "../usbip/usb.ids"
 
-ADD_SVG			RCDATA			"resources/Add.svg"
-COPY_SVG		RCDATA			"resources/copy.svg"
-CHECK_SVG		RCDATA			"resources/check.svg"
-CLOSE_SVG		RCDATA			"resources/close.svg"
-DISMISS_SVG		RCDATA			"resources/dismiss.svg"
-REFRESH_SVG		RCDATA			"resources/refresh.svg"
-COMMENT_EDIT_SVG	RCDATA			"resources/Comment_Edit.svg"
-SAVE_SVG		RCDATA			"resources/Save.svg"
-SAVE_ALT_SVG		RCDATA			"resources/save_alt.svg"
-SAVE_MULTIPLE_SVG	RCDATA			"resources/Save_Multiple.svg"
-SELECT_ALL_SVG		RCDATA			"resources/Select_All_On.svg"
-POWER_SVG		RCDATA			"resources/power_settings_new.svg"
-REPLAY_SVG		RCDATA			"resources/replay.svg"
-INFO_SVG		RCDATA			"resources/Info.svg"
-USB_SVG			RCDATA			"resources/usb.svg"
-TEXT_INCREASE_SVG	RCDATA			"resources/text_increase.svg"
-TEXT_DECREASE_SVG	RCDATA			"resources/text_decrease.svg"
+ADD_SVG                 RCDATA                  "resources/Add.svg"
+
+COPY_SVG                RCDATA                  "resources/copy.svg"
+
+CHECK_SVG               RCDATA                  "resources/check.svg"
+
+CLOSE_SVG               RCDATA                  "resources/close.svg"
+
+DISMISS_SVG             RCDATA                  "resources/dismiss.svg"
+
+REFRESH_SVG             RCDATA                  "resources/refresh.svg"
+
+COMMENT_EDIT_SVG        RCDATA                  "resources/Comment_Edit.svg"
+
+SAVE_SVG                RCDATA                  "resources/Save.svg"
+
+SAVE_ALT_SVG            RCDATA                  "resources/save_alt.svg"
+
+SAVE_MULTIPLE_SVG       RCDATA                  "resources/Save_Multiple.svg"
+
+SELECT_ALL_SVG          RCDATA                  "resources/Select_All_On.svg"
+
+POWER_SVG               RCDATA                  "resources/power_settings_new.svg"
+
+REPLAY_SVG              RCDATA                  "resources/replay.svg"
+
+INFO_SVG                RCDATA                  "resources/Info.svg"
+
+USB_SVG                 RCDATA                  "resources/usb.svg"
+
+TEXT_INCREASE_SVG       RCDATA                  "resources/text_increase.svg"
+
+TEXT_DECREASE_SVG       RCDATA                  "resources/text_decrease.svg"
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -115,16 +133,13 @@ TEXT_DECREASE_SVG	RCDATA			"resources/text_decrease.svg"
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
+AAAAAAAA                ICON                    "resources/USBip.ico"
 
-// note that the icon used by the Explorer (i.e. the programs icon) is the
-// first icon in the executable and the icons are sorted both by their order
-// and alphabetically (!), so put this icon first and give it a name
-// starting with "a"
-aaaaaaaa	ICON	"resources/USBip.ico"
-USBIP		ICON	"resources/USBip.ico"
+USBIP                   ICON                    "resources/USBip.ico"
 
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
+
 
 
 #ifndef APSTUDIO_INVOKED
