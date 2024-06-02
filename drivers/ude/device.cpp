@@ -85,20 +85,23 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void recv_thread_join(_In_ UDECXUSBDEVICE device)
+PAGED _KTHREAD *recv_thread_join(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
-
-        TraceDbg("dev %04x", ptr04x(device));
-        auto &dev = *get_device_ctx(device);
 
         auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev.recv_thread), nullptr);
         NT_ASSERT(thread);
 
+        if (thread == KeGetCurrentThread()) {
+                return thread;
+        }
+
+        TraceDbg("dev %04x", ptr04x(device));
         NT_VERIFY(!KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr));
         TraceDbg("dev %04x, joined", ptr04x(device));
 
         ObDereferenceObject(thread);
+        return nullptr;
 }
 
 /*
@@ -614,7 +617,7 @@ PAGED auto plugout_and_delete(_In_ UDECXUSBDEVICE dev, _In_ WDFWAITLOCK delete_l
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach(_In_ UDECXUSBDEVICE device)
+PAGED auto detach(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
@@ -626,7 +629,7 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
                 device_state_changed(dev, vhci::state::disconnected);
         }
 
-        recv_thread_join(device);
+        auto thread = recv_thread_join(device, dev);
 
         auto port = vhci::reclaim_roothub_port(device);
         if (port) {
@@ -641,6 +644,7 @@ PAGED void detach(_In_ UDECXUSBDEVICE device)
         }
 
         NT_VERIFY(!KeSetEvent(&dev.detach_completed, IO_NO_INCREMENT, false)); // once
+        return thread;
 }
 
 _IRQL_requires_same_
@@ -650,7 +654,7 @@ auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ UDECXUSBDEVICE device)
         auto func = [] (auto WorkItem)
         {
                 if (auto dev = (UDECXUSBDEVICE)WdfWorkItemGetParentObject(WorkItem)) {
-                        detach(dev);
+                        NT_VERIFY(!detach(dev));
                 }
                 WdfObjectDelete(WorkItem);
         };
@@ -842,8 +846,10 @@ PAGED NTSTATUS usbip::device::detach(_In_ UDECXUSBDEVICE device)
 
         if (auto was_unplugged = set_unplugged(dev)) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
-        } else {
-                ::detach(device);
+        } else if (auto thread = ::detach(device)) {
+                NT_ASSERT(thread == KeGetCurrentThread());
+                ObDereferenceObjectDeferDelete(thread);
+                return STATUS_SUCCESS;
         }
 
         auto timeout = wait_detach_timeout();
