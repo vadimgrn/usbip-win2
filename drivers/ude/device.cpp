@@ -786,7 +786,7 @@ PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::device::async_plugout_and_delete(_In_ UDECXUSBDEVICE device)
+NTSTATUS usbip::device::async_detach_nowait(_In_ UDECXUSBDEVICE device)
 {
         static_assert(NT_SUCCESS(STATUS_PENDING));
 
@@ -822,11 +822,11 @@ NTSTATUS usbip::device::async_plugout_and_delete(_In_ UDECXUSBDEVICE device)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::plugout_and_delete(_In_ UDECXUSBDEVICE device)
+PAGED NTSTATUS usbip::device::async_detach_and_wait(_In_ UDECXUSBDEVICE device)
 {
         PAGED_CODE();
 
-        auto st = async_plugout_and_delete(device);
+        auto st = async_detach_nowait(device);
         if (NT_SUCCESS(st)) {
                 auto timeout = wait_detach_timeout();
                 st = wait_detach(device, &timeout);

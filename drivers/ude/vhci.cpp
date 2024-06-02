@@ -565,10 +565,10 @@ PAGED auto get_detach_function(_In_ vhci::detach_call how)
         switch (how) {
                 using enum vhci::detach_call;
         case async_wait:
-                f = device::plugout_and_delete;
+                f = device::async_detach_and_wait;
                 break;
         case async_nowait:
-                f = device::async_plugout_and_delete;
+                f = device::async_detach_nowait;
                 break;
         case direct:
                 f = device::detach;

@@ -30,11 +30,11 @@ PAGED NTSTATUS recv_thread_start(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS async_plugout_and_delete(_In_ UDECXUSBDEVICE device);
+NTSTATUS async_detach_nowait(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS plugout_and_delete(_In_ UDECXUSBDEVICE device);
+PAGED NTSTATUS async_detach_and_wait(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

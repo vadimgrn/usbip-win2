@@ -582,7 +582,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
         } else if (!is_valid_port(r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                st = device::plugout_and_delete(dev.get<UDECXUSBDEVICE>());
+                st = device::async_detach_and_wait(dev.get<UDECXUSBDEVICE>());
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }
