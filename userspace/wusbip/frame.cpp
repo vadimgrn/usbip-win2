@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.1.0-95312493)
+// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -335,7 +335,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_tool_save = m_auiToolBar->AddTool( wxID_SAVE, _("Save"), wxBitmapBundle::FromSVGResource( wxT("save_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Save devices"), wxEmptyString, NULL );
 
 	m_auiToolBar->Realize();
-	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Floatable( false ).Row( 0 ).Layer( 10 ).ToolbarPane() );
+	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Floatable( false ).Layer( 10 ).ToolbarPane() );
 
 	m_auiToolBarAdd = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER|wxTAB_TRAVERSAL );
 	m_auiToolBarAdd->SetToolSeparation( 1 );
@@ -364,7 +364,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_button_add->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("add_svg"), {24, 24} ) );
 	m_auiToolBarAdd->AddControl( m_button_add );
 	m_auiToolBarAdd->Realize();
-	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).Floatable( false ).Row( 0 ).Layer( 10 ).ToolbarPane() );
+	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).Floatable( false ).Layer( 10 ).ToolbarPane() );
 
 	m_treeListCtrl = new wxTreeListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTL_MULTIPLE );
 	m_treeListCtrl->SetFont( wxFont( wxNORMAL_FONT->GetPointSize(), wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, wxEmptyString ) );

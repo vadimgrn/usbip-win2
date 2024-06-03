@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.1.0-95312493)
+// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -41,9 +41,9 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_TOGGLE_AUTO = 1000,
+			ID_TOGGLE_AUTO = 6000,
 			ID_EDIT_NOTES,
-			ID_TOGGLE_LOG_WINDOW
+			ID_TOGGLE_LOG_WINDOW,
 		};
 
 		wxStatusBar* m_statusBar;
