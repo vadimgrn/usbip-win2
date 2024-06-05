@@ -44,9 +44,9 @@
 ## Build
 
 ### Build Tools
-- The latest Microsoft [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) 2022
-- SDK for Windows 11, version 22H2 (10.0.22621.0)
-- [WDK for Windows 11](https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk), version 22H2 (10.0.22621.0)
+- [Visual Studio 2022](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-visual-studio-step-1-install-visual-studio-2022)
+- SDK for Windows 11, version 24H2 ([10.0.26100.1](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-sdk-step-2-install-sdk))
+- WDK for Windows 11, version 24H2 ([10.0.26100.1](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-wdk-step-3-install-wdk))
 
 ### Build Visual Studio solution
 - Open `usbip_win2.sln`
@@ -161,7 +161,7 @@ bcdedit.exe /set testsigning on
 - Start log sessions for drivers (run commands as Administrator)
 ```
 rem change to your WDK version
-set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64
+set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64
 
 set NAME=usbip
 
@@ -179,7 +179,7 @@ tracelog.exe -start %NAME%-ude -guid #ed18c9c5-8322-48ae-bf78-d01d898a1562 -f %N
 - **If you copy commands to a .bat file, double '%' in TRACE_FORMAT_PREFIX**
 ```
 rem change to your WDK version
-set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64
+set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64
 
 set NAME=usbip
 set TRACE_FORMAT_PREFIX=[%9]%3!04x! %!LEVEL! %!FUNC!:
