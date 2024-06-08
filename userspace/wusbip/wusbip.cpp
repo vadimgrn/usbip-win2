@@ -207,7 +207,7 @@ auto get_selected_devices(_In_ const wxTreeListCtrl &tree)
         tree.GetSelections(v);
 
         auto pred = [&tree] (auto &item) { return is_server_or_empty(tree, item); };
-        std::erase_if(v, pred);
+        std::erase_if(v, pred); // v.erase(std::remove_if(v.begin(), v.end(), pred), v.end());
 
         return v;
 }
@@ -407,10 +407,11 @@ wxWithImages::Images MainFrame::get_tree_images()
         static_assert(IMG_DEVICE == 1);
 
         auto server = wxArtProvider::GetBitmap(wxASCII_STR(wxART_GO_HOME), wxASCII_STR(wxART_LIST));
+        auto device = wxBitmapBundle::FromSVGResource(wxASCII_STR("usb_svg"), server.GetSize());
 
-        return wxWithImages::Images{
-                server,
-                wxBitmapBundle::FromSVGResource(wxASCII_STR("usb_svg"), server.GetSize()),
+        return wxWithImages::Images { 
+                std::move(server),
+                std::move(device) 
         };
 }
 

@@ -1,5 +1,6 @@
 setlocal
-set WXDIR=..\..\packages\wxWidgets.3.2.2.1\include\wx
+set TRIPLET=%1
+set WXDIR=vcpkg_installed\%TRIPLET%\%TRIPLET%\include\wx
 set TOOLS=..\..\tools
 set REJECT=usbip
 

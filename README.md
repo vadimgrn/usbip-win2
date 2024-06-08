@@ -49,6 +49,7 @@
 - WDK for Windows 11, version 24H2 ([10.0.26100.1](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-wdk-step-3-install-wdk))
 
 ### Build Visual Studio solution
+- Run `bootstrap.bat`
 - Open `usbip_win2.sln`
 - Set certificate driver signing for `package` project
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
