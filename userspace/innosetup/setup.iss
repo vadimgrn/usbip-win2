@@ -53,8 +53,10 @@
 
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
+#define ServerDriver "usbip2_server"
 
 #define CLIENT_HWID "ROOT\USBIP_WIN2\UDE"
+#define SERVER_HWID "ROOT\USBIP_WIN2\SERVER"
 
 #define CertFile "usbip.pfx"
 #define CertName "USBip"
@@ -97,7 +99,8 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 
 [Components]
 Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
-Name: "client"; Description: "Client"; Types: full compact custom; Flags: fixed
+Name: "client"; Description: "Client"; Types: full compact
+Name: "server"; Description: "Server"; Types: full compact
 Name: "gui"; Description: "GUI"; Types: full
 Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full
 Name: "pdb"; Description: "Program DataBase files"; Types: full
@@ -148,13 +151,15 @@ Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir
 Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden; Components: client
 
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#ServerDriver}.inf {#SERVER_HWID}"; Flags: runhidden; Components: server
 
 [UninstallRun]
 
 Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove {#SERVER_HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""{#CLIENT_HWID}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""{#CLIENT_HWID} {#SERVER_HWID}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
 Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
