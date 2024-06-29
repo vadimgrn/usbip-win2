@@ -26,6 +26,10 @@
         #error Use option /DExePath=path-to-exe
 #endif
 
+#ifndef GuiExePath
+        #error Use option /DGuiExePath=path-to-exe
+#endif
+
 #ifndef VCToolsRedistInstallDir
         #error Use option /DVCToolsRedistInstallDir
 #endif
@@ -33,7 +37,7 @@
 #define VCToolsRedistExe "vc_redist." + Platform + ".exe"
 
 #define AppExeName ExtractFileName(ExePath)
-; #define OutputDir  ExtractFilePath(AppExePath)
+#define GuiExeName ExtractFileName(GuiExePath)
 
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
@@ -46,7 +50,7 @@
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
 
-#define HWID "ROOT\USBIP_WIN2\UDE"
+#define CLIENT_HWID "ROOT\USBIP_WIN2\UDE"
 
 #define CertFile "usbip.pfx"
 #define CertName "USBip"
@@ -76,10 +80,10 @@ WizardSmallImageFile=48.bmp,64.bmp,128.bmp
 WizardImageFile=164.bmp,192.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
-UninstallDisplayIcon={app}\wusbip.exe
+UninstallDisplayIcon="{app}\{#AppExeName}"
 
 ; this app can't be installed more than once
-MissingRunOnceIdsWarning=no 
+MissingRunOnceIdsWarning=no
 
 ; Windows 10, version 1809
 MinVersion=10.0.17763
@@ -89,22 +93,22 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Sig
 
 [Components]
 Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
-Name: "gui"; Description: "GUI App"; Types: full custom;
-Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full custom
-Name: "pdb"; Description: "Program DataBase files"; Types: full custom
+Name: "client"; Description: "Client"; Types: full compact custom; Flags: fixed
+Name: "gui"; Description: "GUI"; Types: full
+Name: "sdk"; Description: "USBIP Software Development Kit"; Types: full
+Name: "pdb"; Description: "Program DataBase files"; Types: full
 
 [Icons]
-Name: "{group}\{#ProductName}"; Filename: "{app}\{#AppExeName}"; Components: gui
+Name: "{group}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Components: gui
 Name: "{group}\{cm:UninstallProgram,{#ProductName}}"; Filename: "{uninstallexe}"; Components: main
-Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#AppExeName}"; Components: gui; Tasks: desktopicon
+Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Tasks: desktopicon
 
 [Files]
 
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
-
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
+Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
 Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
-Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: main
+
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
@@ -120,6 +124,7 @@ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 ; wusbip.pdb is too large
 
 Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
+Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: client
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
@@ -128,24 +133,24 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
 Name: modifypath; Description: "Add to &PATH environment variable for all users"
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Components: gui
 
 [Run]
 
-Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist 
+Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
-Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
-Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#Platform}"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden; Components: client
+Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#Platform}"; Flags: runhidden; Components: client
 
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#HWID}"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
 
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "remove {#HWID} root"; Flags: runhidden
+Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""{#CLIENT_HWID}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
 Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#Platform}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden

@@ -91,6 +91,17 @@ END
 
 IDR_USB_IDS             RCDATA                  "usb.ids"
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+AAAAAAAA                ICON                    "../wusbip/resources/USBip.ico"
+
+USBIP                   ICON                    "../wusbip/resources/USBip.ico"
+
 #endif    // English (United States) resources
 /////////////////////////////////////////////////////////////////////////////
 
