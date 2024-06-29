@@ -1,0 +1,57 @@
+;
+; usbip2_server.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=USB
+ClassGuid={36FC9E60-C465-11CF-8056-444553540000} ; Devguid.h, GUID_DEVCLASS_USB, USB host controllers and USB hubs
+Provider=%Manufacturer%
+CatalogFile=usbip2_server.cat ; do not modify, used by setup.iss for searching drivers for uninstallation
+PnpLockDown=1
+
+[DestinationDirs]
+DefaultDestDir = 13 ; Driver package isolation
+
+[SourceDisksNames]
+1 = "USBip Server Installation Disk"
+
+[SourceDisksFiles]
+usbip2_server.sys  = 1
+
+[Manufacturer]
+; Windows 10, version 1809 and later
+; For Windows 10+ you do not need to redistribute WDF or provide a Coinstaller
+%Manufacturer%=Standard,NT$ARCH$.10.0...17763 ; %13% support introduced in build 16299
+
+[Standard.NT$ARCH$.10.0...17763]
+%DisplayName%=server_Device, ROOT\USBIP_WIN2\SERVER
+
+[server_Device.NT]
+CopyFiles=@usbip2_server.sys
+
+;-------------- Service installation
+[server_Device.NT.Services]
+; Flags: 0x00000002 (SPSVCINST_ASSOCSERVICE)
+AddService = usbip2_server,2,server_Service_Inst
+
+; -------------- server driver install sections
+[server_Service_Inst]
+DisplayName    = %DisplayName%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\usbip2_server.sys ; Driver package isolation
+Dependencies   = tcpip
+AddReg         = server_Device_Service_AddReg
+
+[server_Device_Service_AddReg]
+; Inflight Trace Recorder (IFR) parameter "VerboseOn".
+; The default setting of zero causes the IFR to log errors, warnings, and informational events
+HKR,Parameters,VerboseOn,0x00010001,1 ; show TRACE_LEVEL_VERBOSE
+HKR,Parameters\Wdf,VerifierOn,0x00010001,1
+HKR,Parameters\Wdf,VerboseOn,0x00010001,1
+
+[Strings]
+Manufacturer="USBIP-WIN2"
+DisplayName="USBip Server" ; for device and service

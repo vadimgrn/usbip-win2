@@ -13,6 +13,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libdrv", "drivers\libdrv\li
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "package", "drivers\package\package.vcxproj", "{B7B9AC6F-45CC-4C98-9136-3D6E8F50AD1C}"
 	ProjectSection(ProjectDependencies) = postProject
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F} = {2519C810-AE71-4EF2-9961-D7BD7FBCED0F}
 		{3A3812CE-3370-4B5F-829D-43433267B154} = {3A3812CE-3370-4B5F-829D-43433267B154}
 	EndProjectSection
 EndProject
@@ -48,6 +49,12 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wusbip", "userspace\wusbip\wusbip.vcxproj", "{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}"
 	ProjectSection(ProjectDependencies) = postProject
 		{35196D26-E918-4002-B87E-1EEC2BF54444} = {35196D26-E918-4002-B87E-1EEC2BF54444}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "usbip2_server", "drivers\server\usbip2_server.vcxproj", "{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{27AB4325-4980-4634-9818-AE6BD61DE532} = {27AB4325-4980-4634-9818-AE6BD61DE532}
+		{EF113E88-152A-4EB5-811C-1D499C3248A0} = {EF113E88-152A-4EB5-811C-1D499C3248A0}
 	EndProjectSection
 EndProject
 Global
@@ -162,6 +169,12 @@ Global
 		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Release|ARM64.Build.0 = Release|ARM64
 		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Release|x64.ActiveCfg = Release|x64
 		{4AA823F8-7C8A-4A4B-A106-E9F630CD001A}.Release|x64.Build.0 = Release|x64
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}.Debug|x64.ActiveCfg = Debug|x64
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}.Debug|x64.Build.0 = Debug|x64
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}.Debug|x64.Deploy.0 = Debug|x64
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}.Release|x64.ActiveCfg = Release|x64
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}.Release|x64.Build.0 = Release|x64
+		{2519C810-AE71-4EF2-9961-D7BD7FBCED0F}.Release|x64.Deploy.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

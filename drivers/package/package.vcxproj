@@ -19,6 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\server\usbip2_server.vcxproj">
+      <Project>{2519c810-ae71-4ef2-9961-d7bd7fbced0f}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\ude\usbip2_ude.vcxproj">
       <Project>{3a3812ce-3370-4b5f-829d-43433267b154}</Project>
     </ProjectReference>
