@@ -1,21 +1,5 @@
-/*++
+#include <libdrv/wdf_cpp.h>
 
-Module Name:
-
-    driver.h
-
-Abstract:
-
-    This file contains the driver definitions.
-
-Environment:
-
-    Kernel-mode Driver Framework
-
---*/
-
-#include <ntddk.h>
-#include <wdf.h>
 #include <usb.h>
 #include <usbdlib.h>
 #include <wdfusb.h>

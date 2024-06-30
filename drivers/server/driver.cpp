@@ -1,19 +1,3 @@
-/*++
-
-Module Name:
-
-    driver.c
-
-Abstract:
-
-    This file contains the driver entry points and callbacks.
-
-Environment:
-
-    Kernel-mode Driver Framework
-
---*/
-
 #include "driver.h"
 #include "driver.tmh"
 

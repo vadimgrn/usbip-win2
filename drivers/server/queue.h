@@ -1,19 +1,3 @@
-/*++
-
-Module Name:
-
-    queue.h
-
-Abstract:
-
-    This file contains the queue definitions.
-
-Environment:
-
-    Kernel-mode Driver Framework
-
---*/
-
 EXTERN_C_START
 
 //

@@ -1,19 +1,3 @@
-/*++
-
-Module Name:
-
-    device.h
-
-Abstract:
-
-    This file contains the device definitions.
-
-Environment:
-
-    Kernel-mode Driver Framework
-
---*/
-
 #include "public.h"
 
 EXTERN_C_START
