@@ -1,19 +1,3 @@
-/*++
-
-Module Name:
-
-    device.c - Device handling events for example driver.
-
-Abstract:
-
-   This file contains the device entry points and callbacks.
-    
-Environment:
-
-    Kernel-mode Driver Framework
-
---*/
-
 #include "driver.h"
 #include "device.tmh"
 

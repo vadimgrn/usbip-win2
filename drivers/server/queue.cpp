@@ -1,19 +1,3 @@
-/*++
-
-Module Name:
-
-    queue.c
-
-Abstract:
-
-    This file contains the queue entry points and callbacks.
-
-Environment:
-
-    Kernel-mode Driver Framework
-
---*/
-
 #include "driver.h"
 #include "queue.tmh"
 
