@@ -196,6 +196,9 @@
       <Project>{35196d26-e918-4002-b87e-1eec2bf54444}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\wusbip\resources\USBip.ico" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets" Condition="Exists('..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets')" />
