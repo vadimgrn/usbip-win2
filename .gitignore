@@ -3,6 +3,7 @@
 *.vcxproj.user
 /.vs
 x64
+ARM64
 /packages
 /bin/usbip-*.*
 /userspace/resources/messages.h

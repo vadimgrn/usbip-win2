@@ -8,12 +8,12 @@
         #error Use option /DSolutionDir=<path>
 #endif
 
-#ifndef Configuration
-        #error Use option /DConfiguration=<cfg>
+#ifndef Platform
+        #error Use option /DPlatform=<ARCH>
 #endif
 
-#ifndef CpuArch
-        #error Use option /DCpuArch=<ARCH>
+#ifndef Configuration
+        #error Use option /DConfiguration=<cfg>
 #endif
 
 #ifdef ExePath
@@ -26,7 +26,7 @@
         #error Use option /DVCToolsRedistInstallDir
 #endif
 
-#define VCToolsRedistExe "vc_redist.x64.exe"
+#define VCToolsRedistExe "vc_redist." + Platform + ".exe"
 
 #define AppExeName ExtractFileName(ExePath)
 ; #define OutputDir  ExtractFilePath(AppExePath)
@@ -64,7 +64,7 @@ ShowLanguageDialog=no
 AllowNoIcons=yes
 LicenseFile={#SolutionDir + "LICENSE"}
 AppId={{#AppGUID}
-OutputBaseFilename={#ProductName}-{#AppVersion}-{#Configuration}
+OutputBaseFilename={#ProductName}-{#AppVersion}-{#Platform}-{#Configuration}
 OutputDir={#BuildDir}
 SolidCompression=yes
 DisableWelcomePage=no
@@ -132,7 +132,7 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden
-Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#Platform}"; Flags: runhidden
 
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#HWID}"; Flags: runhidden
 
@@ -143,7 +143,7 @@ Filename: {app}\devnode.exe; Parameters: "remove {#HWID} root"; Flags: runhidden
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
 Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L {#HWID} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
-Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#Platform}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
