@@ -1,18 +1,22 @@
 ; Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
-#if Ver < EncodeVer(6,2,0,0)
-        #error This script requires Inno Setup 6.2 or later
+#if Ver < EncodeVer(6,3,1,0)
+        #error This script requires Inno Setup 6.3.1 or later
 #endif
 
 #ifndef SolutionDir
         #error Use option /DSolutionDir=<path>
 #endif
 
-#ifndef Platform
-        #error Use option /DPlatform=<ARCH>
+#ifdef Platform
+        #define Platform Lowercase(Platform)
+#else
+        #error Use option /DPlatform=<platform>
 #endif
 
-#ifndef Configuration
+#ifdef Configuration
+        #define Configuration Lowercase(Configuration)
+#else
         #error Use option /DConfiguration=<cfg>
 #endif
 
@@ -158,13 +162,13 @@ end;
 
 // Inno Setup Third-Party Files, PathMgr.dll
 // https://github.com/Bill-Stewart/PathMgr
-// Code is copied as is from [Code] section of EditPath.iss
+// The code is copied as is from [Code] section of PathMan.iss
 
 const
   MODIFY_PATH_TASK_NAME = 'modifypath';  // Specify name of task
 
 var
-  PathIsModified: Boolean;  // Cache task selection from previous installs
+  PathIsModified: Boolean;          // Cache task selection from previous installs
   ApplicationUninstalled: Boolean;  // Has application been uninstalled?
 
 // Import AddDirToPath() at setup time ('files:' prefix)
@@ -267,10 +271,9 @@ end;
 // end of PathMgr.dll
 
 
-
 // UninsIS.dll
 // https://github.com/Bill-Stewart/UninsIS
-// Code is copied from [Code] section of UninsIS-Sample.iss, following modifications are made:
+// The code is copied from [Code] section of UninsIS-Sample.iss, following modifications are made:
 // 1) CompareISPackageVersion is removed because it MUST always be uninstalled
 // 2) PrepareToInstall does not call it
 
