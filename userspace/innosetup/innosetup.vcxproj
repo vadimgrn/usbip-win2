@@ -65,35 +65,35 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
     <NMakeOutput />
-    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
     <NMakeOutput>
     </NMakeOutput>
-    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
     <NMakeOutput />
-    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DCpuArch=$(PROCESSOR_ARCHITECTURE) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
     <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>

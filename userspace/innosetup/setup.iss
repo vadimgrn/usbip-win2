@@ -20,6 +20,10 @@
         #error Use option /DConfiguration=<cfg>
 #endif
 
+#ifndef CpuArch
+        #error Use option /DCpuArch=<ARCH>
+#endif
+
 #ifdef ExePath
         #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 #else
@@ -141,7 +145,7 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
 Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden; Components: client
-Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#Platform}"; Flags: runhidden; Components: client
+Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden; Components: client
 
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
 
@@ -152,7 +156,7 @@ Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: ru
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
 Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""{#CLIENT_HWID}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
-Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#Platform}"; Flags: runhidden
+Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
 Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
