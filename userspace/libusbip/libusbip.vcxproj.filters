@@ -68,11 +68,11 @@
     <ClInclude Include="src\usb_ids.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="persistent.h" />
-    <ClInclude Include="generic_handle_ex.h" />
-    <ClInclude Include="setupapi.h">
+    <ClInclude Include="src\setupapi.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="persistent.h" />
+    <ClInclude Include="generic_handle_ex.h" />
     <ClInclude Include="hkey.h">
       <Filter>src</Filter>
     </ClInclude>

@@ -181,7 +181,6 @@
     <ClInclude Include="format_message.h" />
     <ClInclude Include="generic_handle.h" />
     <ClInclude Include="generic_handle_ex.h" />
-    <ClInclude Include="setupapi.h" />
     <ClInclude Include="hkey.h" />
     <ClInclude Include="output.h" />
     <ClInclude Include="persistent.h" />
@@ -194,6 +193,7 @@
     <ClInclude Include="src\output.h" />
     <ClInclude Include="src\strconv.h" />
     <ClInclude Include="src\usb_ids.h" />
+    <ClInclude Include="src\setupapi.h" />
     <ClInclude Include="vhci.h" />
     <ClInclude Include="win_handle.h" />
     <ClInclude Include="win_socket.h" />
