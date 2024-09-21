@@ -40,7 +40,7 @@
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
 - Server (stub driver) is removed
-- x64 build only
+- x64/arm64 builds only
 
 ## Build
 
@@ -56,7 +56,7 @@
   - Right-click on the `Project > Properties > Driver Signing > Test Certificate`
   - Enter `usbip.pfx` (password: usbip)
 - Build the solution
-- All output files are created under x64/{Debug,Release} folders.
+- All output files are created under {x64,ARM64}/{Debug,Release} folders.
 
 ## Setup USB/IP server on Ubuntu Linux
 - Install required packages
