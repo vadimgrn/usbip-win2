@@ -297,15 +297,15 @@ PAGED NTSTATUS connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
         return STATUS_SUCCESS;
 }
 
+/*
+ * irp->PendingReturned is always true
+ * @see IoMarkIrpPending
+ */
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_complete(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS irp_complete(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
-        if (irp->PendingReturned) {
-                IoMarkIrpPending(irp);
-        }
-
         WdfWorkItemEnqueue(static_cast<WDFWORKITEM>(context));
         return StopCompletion;
 }
@@ -474,7 +474,7 @@ PAGED auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ WDFOBJECT parent)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ workitem_ctx &ctx)
+PAGED void getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ workitem_ctx &ctx)
 {
         PAGED_CODE();
         auto &ext = *ctx.ext;
@@ -490,7 +490,8 @@ PAGED auto getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wor
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
                          
         NT_ASSERT(!ctx.addrinfo);
-        return wsk::getaddrinfo(ctx.addrinfo, &ext.node_name, &ext.service_name, &hints, irp);
+        auto st = wsk::getaddrinfo(ctx.addrinfo, &ext.node_name, &ext.service_name, &hints, irp);
+        TraceDbg("%!STATUS!", st);
 }
 
 _IRQL_requires_same_
@@ -515,14 +516,8 @@ PAGED NTSTATUS plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl:
 
         device_state_changed(ctx.vhci, *ctx.ext, 0, vhci::state::connecting);
 
-        auto st = getaddrinfo(request, wi, ctx);
-        TraceDbg("getaddrinfo %!STATUS!", st);
-
-        if (st != STATUS_INVALID_PARAMETER) [[likely]] { // completion handler will be called
-                st = STATUS_PENDING;
-        }
-
-        return st;
+        getaddrinfo(request, wi, ctx); // completion handler will be called anyway
+        return STATUS_PENDING;
 }
 
 _IRQL_requires_same_
