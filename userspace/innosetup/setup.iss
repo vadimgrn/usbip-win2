@@ -154,7 +154,8 @@ Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIEN
 Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden
 
 ; FIXME: usbip2_ude service is not deleted on Win10 version 1809
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L ""{#CLIENT_HWID}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u ""{#CLIENT_HWID}"" {win}\INF\oem*.inf 2>nul') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
 Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
