@@ -30,7 +30,7 @@ using namespace usbip;
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
 
-enum { ARG_INFO, ARG_WHAT, ARG_AI }; // the fourth parameter is used by WSK subsystem
+enum { ARG_INFO, ARG_FUNCTION, ARG_AI }; // the fourth parameter is used by WSK subsystem
 
 struct workitem_ctx
 {
@@ -40,6 +40,8 @@ struct workitem_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_request(_In_ WDFWORKITEM wi)
 {
         return static_cast<WDFREQUEST>(WdfWorkItemGetParentObject(wi));
@@ -53,24 +55,10 @@ PAGED auto set_args(_In_ WDFREQUEST request, _In_ const char *function, _In_ con
         auto irp = WdfRequestWdmGetIrp(request);
 
         libdrv::argv<ARG_INFO>(irp) = reinterpret_cast<void*>(WdfRequestGetInformation(request)); // backup
-        libdrv::argv<ARG_WHAT>(irp) = const_cast<char*>(function);
+        libdrv::argv<ARG_FUNCTION>(irp) = const_cast<char*>(function);
         libdrv::argv<ARG_AI>(irp) = const_cast<ADDRINFOEXW*>(ai);
 
         return irp;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_sockaddr_inet(_In_ const ADDRINFOEXW &ai)
-{
-        PAGED_CODE();
-        SOCKADDR_INET sa{};
-
-        NT_ASSERT(ai.ai_addrlen <= sizeof(sa));
-        auto len = min(ai.ai_addrlen, sizeof(sa));
-
-        RtlCopyMemory(&sa, ai.ai_addr, len);
-        return sa;
 }
 
 _IRQL_requires_same_
@@ -262,10 +250,10 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
+PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
 {
         PAGED_CODE();
-        Trace(TRACE_LEVEL_INFORMATION, "Connected to %!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
+        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
 
         vhci::ioctl::plugin_hardware *r{};
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
@@ -298,21 +286,25 @@ PAGED NTSTATUS connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
 }
 
 /*
- * irp->PendingReturned is always true
- * @see IoMarkIrpPending
+ * @see Using IRPs with Winsock Kernel Functions
  */
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_complete(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS irp_complete(
+        _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
+        if (irp->PendingReturned) {
+                IoMarkIrpPending(irp); // must be called
+        }
+
         WdfWorkItemEnqueue(static_cast<WDFWORKITEM>(context));
         return StopCompletion;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
+PAGED auto create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
         NT_ASSERT(!sock);
@@ -343,28 +335,27 @@ PAGED NTSTATUS create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS connect(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
+PAGED auto connect(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
+
+        if (auto &sa = *reinterpret_cast<SOCKADDR_INET*>(ai.ai_addr); sa.si_family == AF_INET) {
+                auto &v4 = sa.Ipv4;
+                TraceDbg("%!IPADDR!", v4.sin_addr.s_addr);
+        } else {
+                auto &v6 = sa.Ipv6;
+                TraceDbg("%!BIN!", WppBinary(&v6.sin6_addr, sizeof(v6.sin6_addr)));
+        }
 
         if (auto err = create_socket(sock, ai)) {
                 return err;
         }
 
-        auto sa = make_sockaddr_inet(ai);
-
         auto irp = set_args(request, __func__, &ai);
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
 
         auto st = connect(sock, ai.ai_addr, irp); // completion handler will be called anyway
-
-        if (sa.si_family == AF_INET) { // can't access ai.* after connect
-                auto &v4 = sa.Ipv4;
-                TraceDbg("%!IPADDR!, %!STATUS!", v4.sin_addr.s_addr, st);
-        } else {
-                auto &v6 = sa.Ipv6;
-                TraceDbg("%!BIN!, %!STATUS!", WppBinary(&v6.sin6_addr, sizeof(v6.sin6_addr)), st);
-        }
+        TraceDbg("%!STATUS!", st);
 
         return STATUS_PENDING;
 }
@@ -395,7 +386,7 @@ PAGED auto on_connect(
 
 _Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 {
         PAGED_CODE();
@@ -404,23 +395,20 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto irp = WdfRequestWdmGetIrp(request);
 
         WdfRequestSetInformation(request, libdrv::argvi<ULONG_PTR, ARG_INFO>(irp)); // restore
+        auto function = libdrv::argv<const char*, ARG_FUNCTION>(irp);
 
-        auto &ctx = *get_workitem_ctx(wi);
-        auto &ext = *ctx.ext;
-
-        auto what = libdrv::argv<const char*, ARG_WHAT>(irp);
         auto st = WdfRequestGetStatus(request);
+        TraceDbg("%s %!STATUS!", function, st);
 
-        TraceDbg("%s %!USTR!:%!USTR!/%!USTR!, %!STATUS!", what, &ext.node_name, &ext.service_name, &ext.busid, st);
-
-        if (auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
+        if (auto &ctx = *get_workitem_ctx(wi); auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx.ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
-                st = connect(request, wi, ext.sock, *ctx.addrinfo);
+                st = connect(request, wi, ctx.ext->sock, *ctx.addrinfo);
         }
 
         if (st != STATUS_PENDING) {
+                TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
                 WdfRequestComplete(request, st);
         }
 }
@@ -466,10 +454,7 @@ PAGED auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ WDFOBJECT parent)
         attr.EvtCleanupCallback = workitem_cleanup;
         attr.ParentObject = parent;
 
-        auto st = WdfWorkItemCreate(&cfg, &attr, &wi);
-
-        TraceDbg("%04x, %!STATUS!", ptr04x(wi), st);
-        return st;
+        return WdfWorkItemCreate(&cfg, &attr, &wi);
 }
 
 _IRQL_requires_same_
@@ -496,7 +481,7 @@ PAGED void getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wor
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r)
+PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r)
 {
         PAGED_CODE();
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s", r.host, r.service, r.busid);
