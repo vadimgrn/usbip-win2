@@ -144,21 +144,10 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
         NTSTATUS st;
         {
                 wdf::Lock lck(dev.send_lock); // EvtUsbEndpointPurge, EvtIoInternalDeviceControl on other queues
-                st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp);
+                st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp); // completion handler will be called anyway
         }
-
-        switch (st) {
-        case STATUS_PENDING:
-        case STATUS_SUCCESS:
-                TraceWSK("req %04x -> wsk irp %04x, %Iu bytes, %!STATUS!", ptr04x(request), ptr04x(wsk_irp), buf.Length, st);
-                break;
-        default:
-                Trace(TRACE_LEVEL_ERROR, "req %04x -> wsk irp %04x, %!STATUS!", ptr04x(request), ptr04x(wsk_irp), st);
-                // WskSend does not complete IRP for this status only
-                if (st == STATUS_NOT_SUPPORTED && device::remove_request(dev, request, false)) {
-                        complete(request, st);
-                }
-        }
+        TraceWSK("req %04x -> wsk irp %04x, %Iu bytes, %!STATUS!", 
+                  ptr04x(request), ptr04x(wsk_irp), buf.Length, st);
 
         return STATUS_PENDING;
 }
