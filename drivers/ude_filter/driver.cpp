@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  * 
  * @see https://github.com/desowin/usbpcap/tree/master/USBPcapDriver
  */
@@ -61,11 +61,8 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_S
 	drvobj->DriverUnload = driver_unload;
 	drvobj->DriverExtension->AddDevice = add_device;
 
-	for (int i = 0; i < ARRAYSIZE(drvobj->MajorFunction); ++i) {
-#pragma warning(push)
-#pragma warning(disable:28168)
-		drvobj->MajorFunction[i] = dispatch_lower; // C28168 must be ignored
-#pragma warning(pop)
+	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i) {
+		drvobj->MajorFunction[i] = dispatch_lower;
 	}
 
 	drvobj->MajorFunction[IRP_MJ_PNP] = pnp;
