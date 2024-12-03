@@ -167,7 +167,8 @@ PAGED NTSTATUS usbip::do_add_device(
 	filter_ext *fltr{};
 	DEVICE_OBJECT *fido{}; // Filter Device Object
 
-	if (auto err = IoCreateDevice(drvobj, sizeof(*fltr), nullptr, FILE_DEVICE_UNKNOWN, 0, false, &fido)) {
+	if (auto err = IoCreateDevice(drvobj, sizeof(*fltr), nullptr,
+				      FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, false, &fido)) {
 		Trace(TRACE_LEVEL_ERROR, "IoCreateDevice %!STATUS!", err);
 		return err;
 	}
@@ -213,6 +214,11 @@ PAGED NTSTATUS usbip::do_add_device(
 	return STATUS_SUCCESS;
 }
 
+/*
+ * If USB upper class filter driver fails to load, all USB devices will not work.
+ * To avoid this, the function always returns success.
+ * If do_add_device returns an error, USBip software will not work, but other USB devices will be fine.
+ */
 _Function_class_(DRIVER_ADD_DEVICE)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -226,5 +232,9 @@ PAGED NTSTATUS usbip::add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT 
 		return STATUS_SUCCESS;
 	}
 
-	return do_add_device(drvobj, hub_or_hci_pdo, nullptr);
+	if (auto err = do_add_device(drvobj, hub_or_hci_pdo, nullptr)) {
+		Trace(TRACE_LEVEL_CRITICAL, "Failed to add a device");
+	}
+
+	return STATUS_SUCCESS;
 }

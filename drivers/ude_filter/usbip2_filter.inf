@@ -1,4 +1,4 @@
-; Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;
 ; usbip2_filter.inf
 ; Upper-level class filter primitive driver (since Windows 10 version 1903).
@@ -6,6 +6,7 @@
 ; @google Creating a new primitive driver
 ; @see https://github.com/desowin/usbpcap/blob/master/USBPcapDriver/USBPcap.inx
 ; @see https://github.com/desowin/usbpcap/blob/master/nsis/USBPcap.nsi
+; @see HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GroupOrderList
 
 [Version]
 Signature="$WINDOWS NT$"
@@ -58,7 +59,7 @@ DelService = usbip2_filter,0x00000200 ; SPSVCINST_STOPSERVICE -> stop the servic
 DisplayName    = %DisplayName%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
-ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ErrorControl   = 2               ; SERVICE_ERROR_SEVERE
 ServiceBinary  = %12%\usbip2_filter.sys
 AddReg         = usbip2_filter_Service_AddReg
 
