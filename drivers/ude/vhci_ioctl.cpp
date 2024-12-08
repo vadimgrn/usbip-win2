@@ -35,17 +35,12 @@ enum { ARG_INFO, ARG_FUNCTION, ARG_AI }; // the fourth parameter is used by WSK 
 struct workitem_ctx
 {
         WDFDEVICE vhci;
+        WDFREQUEST request;
+
         device_ctx_ext *ext;
         ADDRINFOEXW *addrinfo; // list head
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto get_request(_In_ WDFWORKITEM wi)
-{
-        return static_cast<WDFREQUEST>(WdfWorkItemGetParentObject(wi));
-}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -335,7 +330,8 @@ PAGED auto create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto connect(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
+PAGED auto connect(
+        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
 
@@ -390,8 +386,9 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 {
         PAGED_CODE();
+        auto &ctx = *get_workitem_ctx(wi);
 
-        auto request = get_request(wi);
+        auto request = ctx.request;
         auto irp = WdfRequestWdmGetIrp(request);
 
         WdfRequestSetInformation(request, libdrv::argvi<ULONG_PTR, ARG_INFO>(irp)); // restore
@@ -400,7 +397,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto st = WdfRequestGetStatus(request);
         TraceDbg("%s %!STATUS!", function, st);
 
-        if (auto &ctx = *get_workitem_ctx(wi); auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
+        if (auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx.ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
@@ -410,11 +407,12 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         if (st != STATUS_PENDING) {
                 TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
                 WdfRequestComplete(request, st);
+                WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup
         }
 }
 
 /*
- * get_vhci(request) must not be used because the request has being completed.
+ * ctx.request could be already completed.
  */
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
@@ -422,9 +420,12 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void workitem_cleanup(_In_ WDFOBJECT obj)
 {
         PAGED_CODE();
+        
+        auto wi = static_cast<WDFWORKITEM>(obj); // WdfWorkItemGetParentObject(wi) returns NULL
+        auto &ctx = *get_workitem_ctx(wi); 
 
-        auto &ctx = *get_workitem_ctx(static_cast<WDFWORKITEM>(obj)); 
-        TraceDbg("%04x, addrinfo %04x, device_ctx_ext %04x", ptr04x(obj), ptr04x(ctx.addrinfo), ptr04x(ctx.ext));
+        TraceDbg("request %04x, addrinfo %04x, device_ctx_ext %04x", 
+                  ptr04x(ctx.request), ptr04x(ctx.addrinfo), ptr04x(ctx.ext));
 
         wsk::free(ctx.addrinfo);
         ctx.addrinfo = nullptr;
@@ -484,22 +485,26 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r)
 {
         PAGED_CODE();
+
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s", r.host, r.service, r.busid);
+        auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
-        if (auto err = create_workitem(wi, request)) {
+        if (auto err = create_workitem(wi, vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
                 return err;
-        } 
-
+        }
         auto &ctx = *get_workitem_ctx(wi);
-        ctx.vhci = get_vhci(request);
+
+        ctx.vhci = vhci;
+        ctx.request = request;
 
         if (auto err = create_device_ctx_ext(ctx.ext, r)) {
+                WdfObjectDelete(wi);
                 return err;
         }
 
-        device_state_changed(ctx.vhci, *ctx.ext, 0, vhci::state::connecting);
+        device_state_changed(vhci, *ctx.ext, 0, vhci::state::connecting);
 
         getaddrinfo(request, wi, ctx); // completion handler will be called anyway
         return STATUS_PENDING;
