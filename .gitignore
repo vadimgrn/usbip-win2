@@ -1,6 +1,9 @@
 *~
 *.aps
 *.vcxproj.user
+*.idb
+*.pdb
+*.sarif
 /.vs
 x64
 ARM64

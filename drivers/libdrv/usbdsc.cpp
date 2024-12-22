@@ -14,7 +14,7 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur)
 {
 	NT_ASSERT(cfg);
-	const void *end = reinterpret_cast<char*>(cfg) + cfg->wTotalLength;
+	auto end = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(reinterpret_cast<char*>(cfg) + cfg->wTotalLength);
 
 	cur = cur ? next(cur) : reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
 
@@ -22,7 +22,7 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
 	NT_ASSERT(cur <= end);
 
 	for (USB_COMMON_DESCRIPTOR *nxt; 
-	     cur + sizeof(*cur) <= end && is_valid(*cur) && (nxt = next(cur)) <= end; cur = nxt) {
+	     cur + 1 <= end && is_valid(*cur) && (nxt = next(cur)) <= end; cur = nxt) {
 		if (cur->bDescriptorType == type) {
 			return cur;
 		}
