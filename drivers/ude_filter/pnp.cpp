@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2023 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (C) 2022 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "pnp.h"
@@ -231,8 +231,8 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_START_DEVICE: // must be started after lower device objects
-		if constexpr (true) {
-			auto st = ForwardIrpSynchronously(fltr, irp); 
+		{
+			auto st = ForwardIrpSynchronously(fltr, irp);
 			CompleteRequest(irp);
 			return st;
 		}

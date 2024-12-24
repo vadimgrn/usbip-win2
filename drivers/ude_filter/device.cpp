@@ -23,12 +23,11 @@ _IRQL_requires_same_
 PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
 {
 	PAGED_CODE();
-	NT_ASSERT(f.is_hub == !parent);
 
 	IoInitializeRemoveLock(&f.remove_lock, pooltag, 0, 0);
 
-	if (f.is_hub) {
-		//
+	if (!parent) {
+		NT_ASSERT(f.is_hub);
 	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, 0)) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return err;

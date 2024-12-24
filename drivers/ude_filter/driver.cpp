@@ -48,6 +48,10 @@ auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 } // namespace
 
 
+/*
+ * warning C28168: The function 'dispatch_lower' does not have a _Dispatch_type_ annotation 
+ * matching dispatch table position 'IRP_MJ_CREATE'...
+ */
 _Function_class_(DRIVER_INITIALIZE)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -61,9 +65,12 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *drvobj, _In_ UNICODE_S
 	drvobj->DriverUnload = driver_unload;
 	drvobj->DriverExtension->AddDevice = add_device;
 
+#pragma warning(push)
+#pragma warning(disable:28168)
 	for (int i = 0; i <= IRP_MJ_MAXIMUM_FUNCTION; ++i) {
 		drvobj->MajorFunction[i] = dispatch_lower;
 	}
+#pragma warning(pop)
 
 	drvobj->MajorFunction[IRP_MJ_PNP] = pnp;
 	drvobj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = int_dev_ctrl;

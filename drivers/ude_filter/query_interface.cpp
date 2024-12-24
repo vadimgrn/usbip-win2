@@ -19,7 +19,7 @@ _Function_class_(PUSB_BUSIFFN_QUERY_BUS_TIME)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
-	_In_ void *, 
+	_In_opt_ void *, 
 	_Out_opt_ ULONG *CurrentUsbFrame)
 {
 	if (CurrentUsbFrame) {
@@ -46,7 +46,7 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
 	_Out_opt_ PULONG HighSpeedFrameCounter)
 {
 	auto st = QueryBusTime(BusContext, HighSpeedFrameCounter);
-	if (NT_SUCCESS(st)) {
+	if (NT_SUCCESS(st) && HighSpeedFrameCounter) {
 		*HighSpeedFrameCounter <<= 3;
 		// TraceDbg("%lu", **HighSpeedFrameCounter); // too often
 	}

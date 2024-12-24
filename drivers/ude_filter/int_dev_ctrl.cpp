@@ -41,12 +41,12 @@ auto free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 	TraceDbg("dev %04x, urb %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
 		  ptr04x(urb), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
 
-	auto &r = urb->UrbControlTransferEx;
-	unique_ptr(r.TransferBuffer);
+	{
+		libdrv::urb_ptr a(fltr.device.usbd_handle, urb);
+		unique_ptr b(urb->UrbControlTransferEx.TransferBuffer);
+	}
 
-	libdrv::urb_ptr(fltr.device.usbd_handle, urb);
 	IoFreeIrp(irp);
-
 	return tag;
 }
 
@@ -59,7 +59,7 @@ NTSTATUS on_send_request(
 	auto &fltr = *static_cast<filter_ext*>(context);
 
 	auto tag = free(fltr, irp);
-	libdrv::RemoveLockGuard(fltr.remove_lock, libdrv::adopt_lock, tag);
+	libdrv::RemoveLockGuard guard(fltr.remove_lock, libdrv::adopt_lock, tag);
 
 	return StopCompletion;
 }
