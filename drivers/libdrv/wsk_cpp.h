@@ -82,6 +82,7 @@ NTSTATUS receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer = nullptr, _In_ ULONG flags = 0);
 
+_IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS close(_In_ SOCKET *sock);
 

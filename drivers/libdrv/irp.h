@@ -12,7 +12,13 @@ namespace libdrv
 class RaiseIrql
 {
 public:
+	_IRQL_requires_max_(HIGH_LEVEL)
+	_IRQL_raises_(new_irql)
+	_IRQL_saves_global_(old_irql, this)
 	explicit RaiseIrql(_In_ KIRQL new_irql) { KeRaiseIrql(new_irql, &old_irql); }
+
+	_IRQL_requires_max_(HIGH_LEVEL)
+	_IRQL_restores_global_(old_irql, this)
 	~RaiseIrql() { KeLowerIrql(old_irql); }
 
 	RaiseIrql(_In_ const RaiseIrql&) = delete;

@@ -9,7 +9,7 @@
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ UTF8_STRING &dst, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS libdrv::unicode_to_utf8(_Inout_ UTF8_STRING &dst, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
 
@@ -22,7 +22,7 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ UTF8_STRING &dst, _In_ const UNICOD
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_opt_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
 
@@ -46,7 +46,7 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_ char *utf8, _In_ USHORT maxlen, _In
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS libdrv::utf8_to_unicode(
-        _Out_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag)
+        _Inout_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag)
 {
         PAGED_CODE();
 

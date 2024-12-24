@@ -13,9 +13,9 @@
   enum _WDF_REQUEST_TYPE : int;
 #endif
 
+#include "codeseg.h"
 #include <libusbip/generic_handle_ex.h>
 
-#include <wdm.h>
 #include <wdf.h>
 
 namespace wdf
@@ -64,7 +64,7 @@ public:
         WaitLock() = default;
                 
         _IRQL_requires_max_(PASSIVE_LEVEL)
-        explicit WaitLock(_In_ WDFWAITLOCK lock) : m_lock(lock) 
+        PAGED explicit WaitLock(_In_ WDFWAITLOCK lock) : m_lock(lock) 
         { 
                 PAGED_CODE();
                 WdfWaitLockAcquire(m_lock, nullptr); 
@@ -112,16 +112,25 @@ class Lock
 public:
         using type = T;
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_raises_(DISPATCH_LEVEL)
+        _IRQL_saves_global_(m_lock, this)
         explicit Lock(_In_ type obj) : m_lock(obj)
         { 
                 acquire_lock(m_lock);
         }
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_requires_min_(DISPATCH_LEVEL)
+        _IRQL_restores_global_(m_lock, this)
         ~Lock() { release(); }
 
         Lock(_In_ const Lock&) = delete;
         Lock& operator =(_In_ const Lock&) = delete;
 
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        _IRQL_requires_min_(DISPATCH_LEVEL)
+        _IRQL_restores_global_(m_lock, this)
         void release()
         {
                 if (auto handle = (type)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_lock), WDF_NO_HANDLE)) {
@@ -135,13 +144,27 @@ private:
 
 
 template<>
-inline void acquire_lock(_In_ WDFSPINLOCK handle)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_raises_(DISPATCH_LEVEL)
+inline void acquire_lock(
+        _In_ 
+        _Requires_lock_not_held_(_Curr_)
+        _Acquires_lock_(_Curr_)
+        _IRQL_saves_
+        WDFSPINLOCK handle)
 {
         WdfSpinLockAcquire(handle);
 }
 
 template<>
-inline void release_lock(_In_ WDFSPINLOCK handle)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_min_(DISPATCH_LEVEL)
+inline void release_lock(
+        _In_ 
+        _Requires_lock_held_(_Curr_)
+        _Releases_lock_(_Curr_)
+        _IRQL_restores_
+        WDFSPINLOCK handle)
 {
         WdfSpinLockRelease(handle);
 }
