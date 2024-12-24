@@ -40,7 +40,7 @@ struct devnode_remove_args
 {
         std::wstring hwid;
         std::wstring enumerator;
-        bool dry_run;
+        bool dry_run{};
 };
 
 struct classfilter_args
@@ -85,7 +85,7 @@ auto make_hwid(_In_ std::wstring hwid)
         return hwid;
 }
 
-auto get_class_guid(_Out_ std::wstring &class_name, _In_ PCWSTR infname)
+auto get_class_guid(_Inout_ std::wstring &class_name, _In_ PCWSTR infname)
 {
         auto guid = GUID_NULL;
 
@@ -334,7 +334,7 @@ auto install_files(_In_ HINF hinf, _In_ const std::wstring &section_name, _In_ b
  * in the Service Install sections listed in the Service section of an INF file.
  */
 auto install_services(
-        _Out_ bool &reboot_required, _In_ HINF hinf, _In_ std::wstring section_name, _In_ bool install)
+        _Inout_ bool &reboot_required, _In_ HINF hinf, _In_ std::wstring section_name, _In_ bool install)
 {
         section_name += L".Services";
 

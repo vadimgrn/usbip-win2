@@ -23,7 +23,7 @@ const FileVersion& get_file_version();
 namespace usbip
 {
 
-bool init(_Out_ wxString &err);
+bool init(_Inout_ wxString &err);
 
 wxString GetLastErrorMsg(_In_ DWORD msg_id = GetLastError());
 Handle& get_vhci();
@@ -46,7 +46,7 @@ wxString make_device_url(_In_ const device_location &loc);
 wxString make_server_url(_In_ const device_location &loc);
 wxString make_server_url(_In_ const wxString &hostname, _In_ const wxString &service);
 
-bool split_server_url(_In_ const wxString &url, _Out_ wxString &hostname, _Out_ wxString &service);
+bool split_server_url(_In_ const wxString &url, _Inout_ wxString &hostname, _Inout_ wxString &service);
 
 constexpr UINT32 make_devid(_In_ int busnum, _In_ int devnum) noexcept
 {

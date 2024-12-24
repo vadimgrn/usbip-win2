@@ -33,13 +33,13 @@ struct attach_args
         bool terse{};
 
         // --stash
-        bool stashed;
+        bool stashed{};
 };
 command_t cmd_attach;
 
 struct detach_args
 {
-        int port;
+        int port{};
 };
 command_t cmd_detach;
 
@@ -49,14 +49,14 @@ struct list_args
         std::string remote;
 
         // --stashed
-        bool stashed;
+        bool stashed{};
 };
 command_t cmd_list;
 
 struct port_args
 {
         std::set<int> ports;
-        bool stash;
+        bool stash{};
 };
 command_t cmd_port;
 
