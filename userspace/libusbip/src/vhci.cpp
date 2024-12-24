@@ -293,7 +293,7 @@ USBIP_API DWORD usbip::vhci::get_device_state_size() noexcept
 }
 
 USBIP_API bool usbip::vhci::get_device_state(
-        _Out_ usbip::device_state &result, _In_ const void *data, _In_ DWORD length)
+        _Inout_ usbip::device_state &result, _In_ const void *data, _In_ DWORD length)
 {
         auto r = reinterpret_cast<const vhci::device_state*>(data);
         assert(get_device_state_size() == sizeof(*r));
@@ -314,7 +314,7 @@ USBIP_API bool usbip::vhci::get_device_state(
  * ReadFile returns TRUE for STATUS_END_OF_FILE.
  * @see UDE driver, EVT_WDF_IO_QUEUE_IO_READ
  */
-bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Out_ usbip::device_state &result)
+bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state &result)
 {
         vhci::device_state r;
 

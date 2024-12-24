@@ -293,7 +293,7 @@ auto try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_ const sockaddr &addr, _I
 	return err;
 }
 
-INT wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_ HANDLE cancel, _In_ bool alertable)
+INT wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_opt_ HANDLE cancel, _In_ bool alertable)
 {
 	INT err;
 

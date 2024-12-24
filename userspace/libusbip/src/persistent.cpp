@@ -19,7 +19,7 @@ auto is_malformed(_In_ const device_location &d)
         return d.hostname.empty() || d.service.empty() || d.busid.empty();
 }
 
-auto make_multi_sz(_Out_ std::wstring &result, _In_ const std::vector<device_location> &v)
+auto make_multi_sz(_Inout_ std::wstring &result, _In_ const std::vector<device_location> &v)
 {
         assert(result.empty());
 

@@ -83,7 +83,11 @@ win::FileVersion::Impl::Impl(std::wstring_view filename)
 
 DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
 {
-        auto sz = GetFileVersionInfoSize(path.empty() ? nullptr : path.data(), nullptr);
+        if (path.empty()) {
+                return ERROR_INVALID_PARAMETER;
+        }
+
+        auto sz = GetFileVersionInfoSize(path.data(), nullptr);
         if (!sz) {
                 return GetLastError();
         }
@@ -229,7 +233,7 @@ void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) cons
         code_page = LOWORD(dw);
 }
 
-win::FileVersion::FileVersion(std::wstring_view filename) : m_impl(new Impl(filename)) {}
+win::FileVersion::FileVersion(const std::wstring &filename) : m_impl(new Impl(filename)) {}
 win::FileVersion::~FileVersion() { delete m_impl; }
 
 auto win::FileVersion::operator =(FileVersion&& obj) noexcept -> FileVersion&

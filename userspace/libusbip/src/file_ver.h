@@ -21,7 +21,7 @@ USBIP_API std::wstring get_module_filename();
 class USBIP_API FileVersion 
 {
 public:
-        FileVersion(std::wstring_view filename = get_module_filename());
+        FileVersion(const std::wstring &filename = get_module_filename());
         ~FileVersion();
 
         FileVersion(const FileVersion&) = delete;

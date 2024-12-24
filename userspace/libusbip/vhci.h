@@ -28,13 +28,13 @@ struct device_location
 struct imported_device
 {
         device_location location;
-        int port; // hub port number, >= 1
+        int port{}; // hub port number, >= 1
 
-        UINT32 devid;
-        USB_DEVICE_SPEED speed;
+        UINT32 devid{};
+        USB_DEVICE_SPEED speed = UsbLowSpeed;
 
-        UINT16 vendor;
-        UINT16 product;
+        UINT16 vendor{};
+        UINT16 product{};
 };
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
@@ -42,7 +42,7 @@ enum class state { unplugged, connecting, connected, plugged, disconnected, unpl
 struct device_state
 {
         imported_device device;
-        state state;
+        state state = state::unplugged;
 };
 
 } // namespace usbip
@@ -96,13 +96,13 @@ USBIP_API DWORD get_device_state_size() noexcept;
  * @param length data length, must be equal to get_device_state_size()
  * @return call GetLastError() if false is returned
  */
-USBIP_API bool get_device_state(_Out_ device_state &result, _In_ const void *data, _In_ DWORD length);
+USBIP_API bool get_device_state(_Inout_ device_state &result, _In_ const void *data, _In_ DWORD length);
 
 /**
  * @param dev handle of the driver device that must be opened for serialized I/O
  * @param result data that was obtained by read operation on the given handle
  * @return call GetLastError() if false is returned
  */
-USBIP_API bool read_device_state(_In_ HANDLE dev, _Out_ device_state &result);
+USBIP_API bool read_device_state(_In_ HANDLE dev, _Inout_ device_state &result);
 
 } // namespace usbip::vhci

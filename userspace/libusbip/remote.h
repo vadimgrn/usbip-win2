@@ -18,30 +18,30 @@ struct usb_device
         std::string path;
         std::string busid;
 
-        UINT32 busnum;
-        UINT32 devnum;
-        USB_DEVICE_SPEED speed;
+        UINT32 busnum{};
+        UINT32 devnum{};
+        USB_DEVICE_SPEED speed = UsbLowSpeed;
 
-        UINT16 idVendor;
-        UINT16 idProduct;
-        UINT16 bcdDevice; // Device Release Number
+        UINT16 idVendor{};
+        UINT16 idProduct{};
+        UINT16 bcdDevice{}; // Device Release Number
 
-        UINT8 bDeviceClass;
-        UINT8 bDeviceSubClass;
-        UINT8 bDeviceProtocol;
+        UINT8 bDeviceClass{};
+        UINT8 bDeviceSubClass{};
+        UINT8 bDeviceProtocol{};
 
-        UINT8 bConfigurationValue;
+        UINT8 bConfigurationValue{};
 
-        UINT8 bNumConfigurations;
-        UINT8 bNumInterfaces;
+        UINT8 bNumConfigurations{};
+        UINT8 bNumInterfaces{};
 };
 
 struct usb_interface 
 {
-        UINT8 bInterfaceClass;
-        UINT8 bInterfaceSubClass;
-        UINT8 bInterfaceProtocol;
-        UINT8 padding;	/* alignment */
+        UINT8 bInterfaceClass{};
+        UINT8 bInterfaceSubClass{};
+        UINT8 bInterfaceProtocol{};
+        UINT8 padding{}; /* alignment */
 };
 
 /**
