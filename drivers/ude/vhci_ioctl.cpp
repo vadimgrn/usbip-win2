@@ -44,7 +44,7 @@ WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto set_args(_In_ WDFREQUEST request, _In_ const char *function, _In_ const ADDRINFOEXW *ai = nullptr)
+PAGED auto set_args(_In_ WDFREQUEST request, _In_ const char *function, _In_opt_ const ADDRINFOEXW *ai = nullptr)
 {
         PAGED_CODE();
         auto irp = WdfRequestWdmGetIrp(request);
@@ -287,7 +287,7 @@ _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS irp_complete(
-        _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+        _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_(_Inexpressible_("varies")) void *context)
 {
         if (irp->PendingReturned) {
                 IoMarkIrpPending(irp); // must be called

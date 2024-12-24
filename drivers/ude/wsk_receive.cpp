@@ -97,7 +97,7 @@ PAGED inline auto& get_ret_submit(_In_ const wsk_context &ctx)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED constexpr UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
+PAGED UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
 {
 	PAGED_CODE();
 	NT_ASSERT(bInterval);
@@ -713,8 +713,9 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	}
 
 	auto endp = get_endpoint_ctx(req.endpoint);
-	
-	if (libdrv::RaiseIrql lvl(DISPATCH_LEVEL); auto boost = endp->priority_boost) {
+	libdrv::RaiseIrql lvl(DISPATCH_LEVEL);
+
+	if (auto boost = endp->priority_boost) {
 		WdfRequestCompleteWithPriorityBoost(request, status, boost); // UdecxUrbComplete has no PriorityBoost
 	} else {
 		UdecxUrbCompleteWithNtStatus(request, status);

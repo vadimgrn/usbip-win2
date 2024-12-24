@@ -20,11 +20,17 @@ namespace
 
 using namespace usbip;
 
+/*
+ * A pageable thread or pageable driver routine that runs at IRQL = PASSIVE_LEVEL 
+ * should never call KeSetEvent with the Wait parameter set to TRUE. 
+ * Such a call causes a fatal page fault if the caller happens to be paged out 
+ * between the calls to KeSetEvent and KeWaitXxx.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 /*PAGED*/ void attach_thread_join(_In_ WDFDEVICE vhci) // not PAGED, see KeSetEvent
 {
-        PAGED_CODE();
+        NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
         auto &ctx = *get_vhci_ctx(vhci);
 
         auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.attach_thread), nullptr);

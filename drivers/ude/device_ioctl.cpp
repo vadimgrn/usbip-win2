@@ -132,7 +132,7 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
                         ptr04x(request), buf.Length, dbg_usbip_hdr(str, sizeof(str), &ctx->hdr, log_setup));
         }
 
-        if (request) {
+        if (request && endpoint) {
                 device::append_request(dev, *ctx, endpoint);
         }
 
