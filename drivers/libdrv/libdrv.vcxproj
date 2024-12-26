@@ -175,6 +175,9 @@
     <Lib>
       <AdditionalDependencies>$(SDK_LIB_PATH)uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
+    <DriverSign>
+      <FileDigestAlgorithm />
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -229,6 +232,9 @@
     <Lib>
       <AdditionalDependencies>$(SDK_LIB_PATH)uuid.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
+    <DriverSign>
+      <FileDigestAlgorithm />
+    </DriverSign>
   </ItemDefinitionGroup>
   <ItemGroup>
     <FilesToPackage Include="$(TargetPath)" />

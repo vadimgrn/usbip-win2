@@ -4,6 +4,7 @@
 *.idb
 *.pdb
 *.sarif
+*.DVL.XML
 /.vs
 x64
 ARM64
