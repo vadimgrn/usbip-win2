@@ -46,8 +46,6 @@ constexpr auto is_valid_port(int port)
  */
 struct vhci_ctx
 {
-        WDFQUEUE sequential_queue; // see also WdfDeviceGetDefaultQueue
-
         UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 

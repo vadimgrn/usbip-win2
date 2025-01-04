@@ -789,9 +789,9 @@ PAGED void device_control_parallel(
                 st = handler(Request);
         } else {
                 auto vhci = WdfIoQueueGetDevice(Queue);
-                auto ctx = get_vhci_ctx(vhci);
+                auto def_queue = WdfDeviceGetDefaultQueue(vhci);
 
-                st = WdfRequestForwardToIoQueue(Request, ctx->sequential_queue); // -> device_control
+                st = WdfRequestForwardToIoQueue(Request, def_queue); // -> device_control
 
                 if (NT_SUCCESS(st)) [[likely]] {
                         st = STATUS_PENDING;
@@ -861,23 +861,25 @@ PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
         attr.ParentObject = vhci;
 
         WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchParallel); // see WdfDeviceGetDefaultQueue
+        WDF_IO_QUEUE_CONFIG_INIT_DEFAULT_QUEUE(&cfg, WdfIoQueueDispatchSequential); // WdfDeviceGetDefaultQueue
         cfg.PowerManaged = PowerManaged;
-        cfg.EvtIoDeviceControl = device_control_parallel;
+        cfg.EvtIoDeviceControl = device_control;
         cfg.EvtIoRead = device_read;
 
         if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate(parallel) %!STATUS!", err);
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
                 return err;
         }
 
-        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchSequential);
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel);
         cfg.PowerManaged = PowerManaged;
-        cfg.EvtIoDeviceControl = device_control;
+        cfg.EvtIoDeviceControl = device_control_parallel;
 
-        if (auto ctx = get_vhci_ctx(vhci);
-            auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &ctx->sequential_queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate(sequential) %!STATUS!", err);
+        if (WDFQUEUE queue{}; auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &queue)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
+                return err;
+        } else if (err = WdfDeviceConfigureRequestDispatching(vhci, queue, WdfRequestTypeDeviceControl); err) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDeviceConfigureRequestDispatching %!STATUS!", err);
                 return err;
         }
 

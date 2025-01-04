@@ -13,7 +13,7 @@ codeql pack download microsoft/windows-drivers@1.1.0
 rmdir /S /Q D:\codeql-home\databases
 D:\codeql-home\codeql\codeql database create D:\codeql-home\databases --language=cpp --source-root=D:\usbip-win2\drivers --command="msbuild /t:rebuild D:\usbip-win2\usbip_win2.sln"
 
-D:\codeql-home\codeql\codeql database analyze --download D:\codeql-home\databases D:\codeql-home\windows_driver_recommended.qls --format=sarifv2.1.0 --output=D:\usbip-win2\drivers\ude\result.sarif
+codeql database analyze --download ..\databases ..\windows_driver_recommended.qls --format=sarifv2.1.0 --output=D:\usbip-win2\drivers\ude\result.sarif
 
 # Install Visual Studio extention
 # Main menu, Extentions/Manage Extentions, Microsoft SARIF Viewer
