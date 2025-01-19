@@ -201,10 +201,13 @@ PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE Ta
         return STATUS_SUCCESS;
 }
 
+/*
+ * You should not make this callback function pageable.
+ */
 _Function_class_(EVT_WDF_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE PreviousState)
+/*PAGED*/ NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE PreviousState)
 {
         PAGED_CODE();
         TraceDbg("PreviousState %!WDF_POWER_DEVICE_STATE!", PreviousState);
