@@ -50,6 +50,13 @@
 - WDK for Windows 11, version 24H2 ([10.0.26100.2161](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-wdk-step-3-install-wdk))
 
 ### Build Visual Studio solution
+- Install git
+  - Run Visual Studio Installer
+  - Select "Individual components" tab
+  - Type "git" in search box
+  - Check "Git for Windows"
+  - Install selected items
+- Clone project using git or download an archive from github and extract source code
 - Run `bootstrap.bat`
 - Open `usbip_win2.sln`
 - Set certificate driver signing for `package` project
