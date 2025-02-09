@@ -77,8 +77,8 @@ PAGED inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	PAGED_CODE();
 
 	auto &hdr = ctx.hdr;
-	NT_ASSERT(hdr.base.command == USBIP_RET_SUBMIT);
-	return hdr.u.ret_submit;
+	NT_ASSERT(hdr.command == USBIP_RET_SUBMIT);
+	return hdr.ret_submit;
 }
 
 /*
@@ -456,7 +456,7 @@ PAGED auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ UR
 
 	if (fail || !TransferBufferLength) {
 		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
-			                  TransferBufferLength, ret.actual_length, ctx.hdr.base.direction);
+			                  TransferBufferLength, ret.actual_length, ctx.hdr.direction);
 		return STATUS_INVALID_BUFFER_SIZE;
 	}
 
@@ -554,8 +554,8 @@ PAGED auto ret_command(_Inout_ wsk_context &ctx)
 	PAGED_CODE();
 	auto &hdr = ctx.hdr;
 
-	auto request = hdr.base.command == USBIP_RET_SUBMIT ? // request must be completed
-		       device::remove_request(*ctx.dev, hdr.base.seqnum) : WDF_NO_HANDLE;
+	auto request = hdr.command == USBIP_RET_SUBMIT ? // request must be completed
+		       device::remove_request(*ctx.dev, hdr.seqnum) : WDF_NO_HANDLE;
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
 	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
@@ -571,12 +571,11 @@ PAGED auto validate_header(_Inout_ usbip_header &hdr)
 	PAGED_CODE();
 	byteswap_header(hdr, swap_dir::net2host);
 
-	auto &base = hdr.base;
-	auto cmd = static_cast<usbip_request_type>(base.command);
+	auto cmd = static_cast<usbip_request_type>(hdr.command);
 
 	switch (cmd) {
 	case USBIP_RET_SUBMIT: {
-		auto &ret = hdr.u.ret_submit;
+		auto &ret = hdr.ret_submit;
 		if (ret.number_of_packets == number_of_packets_non_isoch) {
 			ret.number_of_packets = 0;
 		} else if (!is_valid_number_of_packets(ret.number_of_packets)) {
@@ -591,12 +590,12 @@ PAGED auto validate_header(_Inout_ usbip_header &hdr)
 		return false;
 	}
 
-	auto ok = is_valid_seqnum(base.seqnum);
+	auto ok = is_valid_seqnum(hdr.seqnum);
 
 	if (ok) {
-		base.direction = extract_dir(base.seqnum); // always zero in server response
+		hdr.direction = extract_dir(hdr.seqnum); // always zero in server response
 	} else {
-		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum %u", base.seqnum);
+		Trace(TRACE_LEVEL_ERROR, "Invalid seqnum %u", hdr.seqnum);
 	}
 
 	return ok;

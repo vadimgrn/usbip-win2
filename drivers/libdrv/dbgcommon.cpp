@@ -444,33 +444,32 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const usbip_header *hdr, bool s
 	}
 
 	auto result = buf;
-	auto base = &hdr->base;
 
 	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
-					base->seqnum, 
-					base->devid,			
-					base->direction == USBIP_DIR_OUT ? "out" : "in",
-					base->ep);
+					hdr->seqnum, 
+					hdr->devid,			
+					hdr->direction == USBIP_DIR_OUT ? "out" : "in",
+					hdr->ep);
 
 	if (st != STATUS_SUCCESS) {
 		return "dbg_usbip_hdr error";
 	}
 
-	switch (base->command) {
+	switch (hdr->command) {
 	case USBIP_CMD_SUBMIT:
-		print_cmd_submit(buf, len, &hdr->u.cmd_submit, setup_packet);
+		print_cmd_submit(buf, len, &hdr->cmd_submit, setup_packet);
 		break;
 	case USBIP_RET_SUBMIT:
-		print_ret_submit(buf, len, &hdr->u.ret_submit);
+		print_ret_submit(buf, len, &hdr->ret_submit);
 		break;
 	case USBIP_CMD_UNLINK:
-		RtlStringCbPrintfA(buf, len, "cmd_unlink: seqnum %u", hdr->u.cmd_unlink.seqnum);
+		RtlStringCbPrintfA(buf, len, "cmd_unlink: seqnum %u", hdr->cmd_unlink.seqnum);
 		break;
 	case USBIP_RET_UNLINK:
-		RtlStringCbPrintfA(buf, len, "ret_unlink: status %d", hdr->u.ret_unlink.status);
+		RtlStringCbPrintfA(buf, len, "ret_unlink: status %d", hdr->ret_unlink.status);
 		break;
 	default:
-		RtlStringCbPrintfA(buf, len, "command %u", base->command);
+		RtlStringCbPrintfA(buf, len, "command %u", hdr->command);
 	}
 
 	return result;

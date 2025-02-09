@@ -62,26 +62,26 @@ inline void byteswap(usbip_header_ret_unlink &r)
 void byteswap_header(usbip_header &hdr, swap_dir dir) 
 {
 	if (dir == swap_dir::net2host) {
-		byteswap(hdr.base);
+		byteswap(hdr);
 	}
 
-	switch (hdr.base.command) {
+	switch (hdr.command) {
 	case USBIP_CMD_SUBMIT:
-		byteswap(hdr.u.cmd_submit);
+		byteswap(hdr.cmd_submit);
 		break;
 	case USBIP_RET_SUBMIT:
-		byteswap(hdr.u.ret_submit);
+		byteswap(hdr.ret_submit);
 		break;
 	case USBIP_CMD_UNLINK:
-		byteswap(hdr.u.cmd_unlink);
+		byteswap(hdr.cmd_unlink);
 		break;
 	case USBIP_RET_UNLINK:
-		byteswap(hdr.u.ret_unlink);
+		byteswap(hdr.ret_unlink);
 		break;
 	}
 
 	if (dir == swap_dir::host2net) {
-		byteswap(hdr.base);
+		byteswap(hdr);
 	}
 }
 
@@ -113,19 +113,19 @@ void byteswap_payload(usbip_header &hdr)
  */
 size_t get_isoc_descr(usbip_iso_packet_descriptor* &isoc, usbip_header &hdr) 
 {
-	auto dir_out = hdr.base.direction == USBIP_DIR_OUT;
+	auto dir_out = hdr.direction == USBIP_DIR_OUT;
 
 	auto buf_end = reinterpret_cast<char*>(&hdr + 1);
 	size_t cnt = 0;
 
-	switch (hdr.base.command) {
+	switch (hdr.command) {
 	case USBIP_CMD_SUBMIT:
-		buf_end += dir_out ? hdr.u.cmd_submit.transfer_buffer_length : 0;
-		cnt = hdr.u.cmd_submit.number_of_packets;
+		buf_end += dir_out ? hdr.cmd_submit.transfer_buffer_length : 0;
+		cnt = hdr.cmd_submit.number_of_packets;
 		break;
 	case USBIP_RET_SUBMIT:
-		buf_end += dir_out ? 0 : hdr.u.ret_submit.actual_length; // harmless if direction was not corrected
-		cnt = hdr.u.ret_submit.number_of_packets;
+		buf_end += dir_out ? 0 : hdr.ret_submit.actual_length; // harmless if direction was not corrected
+		cnt = hdr.ret_submit.number_of_packets;
 		break;
 	case USBIP_CMD_UNLINK:
 	case USBIP_RET_UNLINK:

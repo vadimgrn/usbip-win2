@@ -59,7 +59,7 @@ void usbip::device::append_request(_Inout_ device_ctx &dev, _In_ const wsk_conte
         NT_ASSERT(endpoint);
         req.endpoint = endpoint;
 
-        req.seqnum = wsk.hdr.base.seqnum;
+        req.seqnum = wsk.hdr.seqnum;
         NT_ASSERT(is_valid_seqnum(req.seqnum));
 
         wdf::Lock lck(dev.requests_lock);

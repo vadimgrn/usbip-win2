@@ -82,16 +82,14 @@ struct usbip_header_ret_unlink
 	INT32 status;
 };
 
-struct usbip_header 
+struct usbip_header : usbip_header_basic
 {
-	usbip_header_basic base;
-
 	union {
 		usbip_header_cmd_submit	cmd_submit;
 		usbip_header_ret_submit	ret_submit;
 		usbip_header_cmd_unlink	cmd_unlink;
 		usbip_header_ret_unlink	ret_unlink;
-	} u;
+	};
 };
 
 static_assert(sizeof(usbip_header) == 48);

@@ -62,15 +62,13 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 
 	TransferFlags = fix_transfer_flags(TransferFlags, dir_out);
 
-	if (auto r = &hdr.base) {
-		r->command = USBIP_CMD_SUBMIT;
-		r->seqnum = next_seqnum(dev, !dir_out);
-		r->devid = dev.devid();
-		r->direction = dir_out ? USBIP_DIR_OUT : USBIP_DIR_IN;
-		r->ep = usb_endpoint_num(epd);
-	}
+	hdr.command = USBIP_CMD_SUBMIT;
+	hdr.seqnum = next_seqnum(dev, !dir_out);
+	hdr.devid = dev.devid();
+	hdr.direction = dir_out ? USBIP_DIR_OUT : USBIP_DIR_IN;
+	hdr.ep = usb_endpoint_num(epd);
 
-	if (auto r = &hdr.u.cmd_submit) {
+	if (auto r = &hdr.cmd_submit) {
 		r->transfer_flags = to_linux_flags(TransferFlags, !dir_out);
 		r->transfer_buffer_length = TransferBufferLength;
 		r->start_frame = 0;
@@ -86,14 +84,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::set_cmd_unlink_usbip_header(
 	_Out_ usbip_header &hdr, _Inout_ device_ctx &dev, _In_ seqnum_t seqnum_unlink)
 {
-	auto &r = hdr.base;
-
-	r.command = USBIP_CMD_UNLINK;
-	r.devid = dev.devid();
-	r.direction = USBIP_DIR_OUT;
-	r.seqnum = next_seqnum(dev, r.direction);
-	r.ep = 0;
+	hdr.command = USBIP_CMD_UNLINK;
+	hdr.devid = dev.devid();
+	hdr.direction = USBIP_DIR_OUT;
+	hdr.seqnum = next_seqnum(dev, hdr.direction);
+	hdr.ep = 0;
 
 	NT_ASSERT(is_valid_seqnum(seqnum_unlink));
-	hdr.u.cmd_unlink.seqnum = seqnum_unlink;
+	hdr.cmd_unlink.seqnum = seqnum_unlink;
 }

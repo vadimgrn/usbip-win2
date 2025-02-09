@@ -15,5 +15,5 @@ inline auto& get_setup(usbip_header_cmd_submit &hdr)
 
 inline auto& get_submit_setup(usbip_header &hdr)
 {
-	return get_setup(hdr.u.cmd_submit);
+	return get_setup(hdr.cmd_submit);
 }

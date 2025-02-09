@@ -208,8 +208,8 @@ auto control_transfer(
                 return err;
         }
 
-        static_assert(sizeof(ctx->hdr.u.cmd_submit.setup) == sizeof(pkt));
-        RtlCopyMemory(ctx->hdr.u.cmd_submit.setup, &pkt, sizeof(pkt));
+        static_assert(sizeof(ctx->hdr.cmd_submit.setup) == sizeof(pkt));
+        RtlCopyMemory(ctx->hdr.cmd_submit.setup, &pkt, sizeof(pkt));
 
         return send(endpoint, ctx, dev, true, &urb);
 }
@@ -329,7 +329,7 @@ auto isoch_transfer(
                 return err;
         }
 
-        if (auto cmd = &ctx->hdr.u.cmd_submit) {
+        if (auto cmd = &ctx->hdr.cmd_submit) {
                 cmd->start_frame = r.StartFrame;
                 cmd->number_of_packets = r.NumberOfPackets;
         }

@@ -230,7 +230,7 @@ seqnum_t usbip::wsk_context_ptr::seqnum(bool byte_swap) const
 {
         NT_ASSERT(m_ctx);
         
-        auto seqnum = m_ctx->hdr.base.seqnum;
+        auto seqnum = m_ctx->hdr.seqnum;
         static_assert(sizeof(seqnum) == sizeof(unsigned long));
 
         return byte_swap ? RtlUlongByteSwap(seqnum) : seqnum;
