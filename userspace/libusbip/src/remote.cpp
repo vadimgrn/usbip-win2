@@ -2,7 +2,6 @@
  * Copyright (C) 2021 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-
 #include "..\remote.h"
 #include "..\win_handle.h"
 
@@ -183,7 +182,7 @@ auto send_op_common(_In_ SOCKET s, _In_ uint16_t code)
 		.status = ST_OK
 	};
 
-	PACK_OP_COMMON(true, &r);
+	byteswap(r);
 	return send(s, &r, sizeof(r));
 }
 
@@ -193,7 +192,7 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 
 	op_common r{};
 	if (recv(s, &r, sizeof(r))) {
-		PACK_OP_COMMON(false, &r);
+		byteswap(r);
 	} else {
 		return GetLastError();
 	}
@@ -486,7 +485,7 @@ bool usbip::enum_exportable_devices(
 	op_devlist_reply reply{};
 	
 	if (recv(s, &reply, sizeof(reply))) {
-		PACK_OP_DEVLIST_REPLY(false, &reply);
+		byteswap(reply);
 	} else {
 		return false;
 	}
@@ -502,22 +501,22 @@ bool usbip::enum_exportable_devices(
 
 	for (UINT32 i = 0; i < reply.ndev; ++i) {
 
-		usbip_usb_device dev{};
+		op_devlist_reply_extra extra{};
 
-		if (recv(s, &dev, sizeof(dev))) {
-			usbip_net_pack_usb_device(false, &dev);
-			lib_dev = as_usb_device(dev);
+		if (recv(s, &extra, sizeof(extra))) {
+			byteswap(extra);
+			lib_dev = as_usb_device(extra.udev);
 			on_dev(i, lib_dev);
 		} else {
 			return false;
 		}
 
-		for (int j = 0; j < dev.bNumInterfaces; ++j) {
+		for (int j = 0; j < lib_dev.bNumInterfaces; ++j) {
 
 			usbip_usb_interface intf{};
 
 			if (recv(s, &intf, sizeof(intf))) {
-				usbip_net_pack_usb_interface(false, &intf);
+				byteswap(intf);
 				static_assert(sizeof(intf) == sizeof(usb_interface));
 				on_intf(i, lib_dev, j, reinterpret_cast<usb_interface&>(intf));
 			} else {

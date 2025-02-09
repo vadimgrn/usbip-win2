@@ -91,8 +91,8 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
                 return err;
         }
 
-        PACK_OP_COMMON(false, &req.hdr);
-        PACK_OP_IMPORT_REQUEST(false, &req.body);
+        byteswap(req.hdr);
+        byteswap(req.body);
 
         return send(ext.sock, memory::stack, &req, sizeof(req));
 }
@@ -112,7 +112,7 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
                 Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
                 return err;
         }
-        PACK_OP_IMPORT_REPLY(false, &reply);
+        byteswap(reply);
 
         if (char busid[sizeof(reply.udev.busid)];
             auto err = libdrv::unicode_to_utf8(busid, sizeof(busid), ext.busid)) {

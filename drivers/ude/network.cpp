@@ -67,7 +67,7 @@ PAGED USBIP_STATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expec
                 Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
                 return err;
         }
-	PACK_OP_COMMON(false, &r);
+        byteswap(r);
 
 	if (r.version != USBIP_VERSION) {
 		Trace(TRACE_LEVEL_ERROR, "version(%#x) != expected(%#x)", r.version, USBIP_VERSION);
