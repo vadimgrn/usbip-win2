@@ -44,21 +44,21 @@ void print_ret_submit(char *buf, size_t len, const header_ret_submit *cmd)
 } // namespace
 
 
-const char *request_type(UCHAR type)
+const char* usbip::request_type(UCHAR type)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
 	NT_ASSERT(type < ARRAYSIZE(v));
 	return v[type];
 }
 
-const char *request_recipient(UCHAR recipient)
+const char* usbip::request_recipient(UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
 	NT_ASSERT(recipient < ARRAYSIZE(v));
 	return v[recipient];
 }
 
-const char *brequest_str(UCHAR bRequest)
+const char* usbip::brequest_str(UCHAR bRequest)
 {
 	switch (bRequest) {
 	case USB_REQUEST_GET_STATUS: return "GET_STATUS";
@@ -81,7 +81,7 @@ const char *brequest_str(UCHAR bRequest)
 	return "?";
 }
 
-const char *get_usbd_status(USBD_STATUS status)
+const char* usbip::get_usbd_status(USBD_STATUS status)
 {
 	switch (status) {
 	case USBD_STATUS_SUCCESS: 
@@ -212,7 +212,7 @@ const char *get_usbd_status(USBD_STATUS status)
 /*
  * For IRP_MJ_DEVICE_CONTROL, IOCTL_USB_USER_REQUEST.
  */
-const char *usbuser_request_name(_In_ ULONG UsbUserRequest)
+const char* usbip::usbuser_request_name(_In_ ULONG UsbUserRequest)
 {
 	switch (UsbUserRequest) {
 	case USBUSER_GET_CONTROLLER_INFO_0: return "GET_CONTROLLER_INFO_0";
@@ -247,7 +247,7 @@ const char *usbuser_request_name(_In_ ULONG UsbUserRequest)
 /*
  * For IRP_MJ_DEVICE_CONTROL.
  */
-const char *device_control_name(ULONG ioctl_code)
+const char* usbip::device_control_name(ULONG ioctl_code)
 {
 	using namespace usbip;
 	static_assert(sizeof(ioctl_code) == sizeof(vhci::ioctl::PLUGIN_HARDWARE));
@@ -297,7 +297,7 @@ const char *device_control_name(ULONG ioctl_code)
 /*
  * For IRP_MJ_INTERNAL_DEVICE_CONTROL.
  */
-const char *internal_device_control_name(ULONG ioctl_code)
+const char* usbip::internal_device_control_name(ULONG ioctl_code)
 {
 	static_assert(sizeof(ioctl_code) == sizeof(IOCTL_INTERNAL_USB_CYCLE_PORT));
 
@@ -333,7 +333,7 @@ const char *internal_device_control_name(ULONG ioctl_code)
 	return "?";
 }
 
-const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
+const char* usbip::usbd_pipe_type_str(USBD_PIPE_TYPE t)
 {
 	static const char* v[] = { "Ctrl", "Isoch", "Bulk", "Intr" };
 	NT_ASSERT(t < ARRAYSIZE(v));
@@ -343,7 +343,7 @@ const char *usbd_pipe_type_str(USBD_PIPE_TYPE t)
 /*
  * Can't use CUSTOM_TYPE(urb_function, ItemListShort(...)), it's too big for WPP.
  */
-const char *urb_function_str(int function)
+const char* usbip::urb_function_str(int function)
 {
 	static const char* v[] = 
 	{
@@ -439,7 +439,7 @@ const char *urb_function_str(int function)
 	return function >= 0 && function < ARRAYSIZE(v) ? v[function] : "URB_FUNCTION_?";
 }
 
-const char *dbg_usbip_hdr(char *buf, size_t len, const header *hdr, bool setup_packet)
+const char* usbip::dbg_usbip_hdr(char *buf, size_t len, const header *hdr, bool setup_packet)
 {
 	if (!hdr) {
 		return "usbip_header{null}";
@@ -477,7 +477,7 @@ const char *dbg_usbip_hdr(char *buf, size_t len, const header *hdr, bool setup_p
 	return result;
 }
 
-const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
+const char* usbip::usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 {
 	auto r  = static_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(packet);
 
@@ -496,7 +496,7 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 	return st != STATUS_INVALID_PARAMETER ? buf : "usb_setup_pkt_str invalid parameter";
 }
 
-const char* usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
+const char* usbip::usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
 {
 	auto dir = IsTransferDirectionOut(TransferFlags) ? "OUT" : "IN";
 

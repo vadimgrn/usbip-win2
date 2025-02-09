@@ -9,8 +9,8 @@
 
 namespace usbip
 {
-        struct header;
-}
+
+struct header;
 
 const char *request_type(UCHAR type);
 inline auto bmrequest_type(BM_REQUEST_TYPE r) { return request_type(r.s.Type); }
@@ -37,3 +37,6 @@ const char *usb_setup_pkt_str(char *buf, size_t len, const void *packet);
 
 enum { USBD_TRANSFER_FLAGS_BUFBZ = 36 };
 const char *usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags);
+
+} // namespace usbip
+

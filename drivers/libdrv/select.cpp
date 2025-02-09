@@ -11,6 +11,8 @@
 namespace
 {
 
+using namespace usbip;
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto next_interface(_In_ const USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)

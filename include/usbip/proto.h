@@ -13,7 +13,7 @@
 namespace usbip
 {
 
-enum request_type 
+enum request_type
 {
 	CMD_SUBMIT = 1,
 	CMD_UNLINK,
@@ -37,10 +37,10 @@ using seqnum_t = UINT32;
 
 struct header_basic 
 {
-	UINT32 command; // enum usbip_request_type
+	UINT32 command; // enum request_type
 	seqnum_t seqnum;
 	UINT32 devid;
-	UINT32 direction; // enum usbip_dir
+	UINT32 direction; // enum direction
 	UINT32 ep; // endpoint number
 };
 
