@@ -28,10 +28,10 @@ struct wsk_context
         IRP *wsk_irp;
 
         Mdl mdl_hdr;
-        usbip_header hdr;
+        usbip::header hdr;
 
         Mdl mdl_isoc;
-        usbip_iso_packet_descriptor *isoc;
+        iso_packet_descriptor *isoc;
         ULONG isoc_alloc_cnt;
         bool is_isoc;
 };

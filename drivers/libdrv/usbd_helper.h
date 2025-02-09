@@ -80,14 +80,14 @@ inline auto is_transfer_dir_out(const Transfer &r)
 	return is_transfer_dir_out(pkt);
 }
 
-constexpr auto is_transfer_dir_in(const usbip_header &h)
+constexpr auto is_transfer_dir_in(const usbip::header &h)
 {
-	return h.direction == USBIP_DIR_IN;
+	return h.direction == usbip::direction::in;
 }
 
-constexpr auto is_transfer_dir_out(const usbip_header &h)
+constexpr auto is_transfer_dir_out(const usbip::header &h)
 {
-	return h.direction == USBIP_DIR_OUT;
+	return h.direction == usbip::direction::out;
 }
 
 constexpr auto is_isoch(_In_ const URB &urb)

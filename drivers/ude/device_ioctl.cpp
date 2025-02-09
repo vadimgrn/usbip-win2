@@ -254,7 +254,7 @@ auto bulk_or_interrupt_transfer(
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
  */
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto repack(_In_ usbip_iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
+auto repack(_In_ iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 {
         ULONG length = 0;
 
@@ -309,9 +309,9 @@ auto isoch_transfer(
                         func);
         }
 
-        if (r.NumberOfPackets > USBIP_MAX_ISO_PACKETS) {
+        if (r.NumberOfPackets > max_iso_packets) {
                 Trace(TRACE_LEVEL_ERROR, "NumberOfPackets(%lu) > USBIP_MAX_ISO_PACKETS(%d)", 
-                                          r.NumberOfPackets, USBIP_MAX_ISO_PACKETS);
+                                          r.NumberOfPackets, max_iso_packets);
                 return STATUS_INVALID_PARAMETER;
         }
 

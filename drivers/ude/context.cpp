@@ -17,10 +17,10 @@
   */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-seqnum_t usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in)
+auto usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in) -> seqnum_t
 {
-	static_assert(!USBIP_DIR_OUT);
-	static_assert(USBIP_DIR_IN);
+	static_assert(!direction::out);
+	static_assert(direction::in);
 
 	auto &seqnum = dev.seqnum;
 	static_assert(sizeof(seqnum) == sizeof(LONG));

@@ -223,7 +223,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 seqnum_t next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in);
 
 constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
-constexpr auto extract_dir(seqnum_t seqnum) { return usbip_dir(seqnum & 1); }
+constexpr auto extract_dir(seqnum_t seqnum) { return usbip::direction(seqnum & 1); }
 constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 
 constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)

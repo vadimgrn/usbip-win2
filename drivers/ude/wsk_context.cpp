@@ -177,7 +177,7 @@ NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         ULONG isoc_len = NumberOfPackets*sizeof(*ctx.isoc);
 
         if (ctx.isoc_alloc_cnt < NumberOfPackets) {
-                auto isoc = (usbip_iso_packet_descriptor*)ExAllocatePoolZero(NonPagedPoolNx, isoc_len, g_tag);
+                auto isoc = (iso_packet_descriptor*)ExAllocatePoolZero(NonPagedPoolNx, isoc_len, g_tag);
                 if (!isoc) {
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }

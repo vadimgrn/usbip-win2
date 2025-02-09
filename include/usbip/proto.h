@@ -10,21 +10,24 @@
  * Declarations from <drivers/usb/usbip/usbip_common.h>
  */
 
-enum usbip_request_type 
+namespace usbip
 {
-	USBIP_CMD_SUBMIT = 1,
-	USBIP_CMD_UNLINK,
-	USBIP_RET_SUBMIT,
-	USBIP_RET_UNLINK
+
+enum request_type 
+{
+	CMD_SUBMIT = 1,
+	CMD_UNLINK,
+	RET_SUBMIT,
+	RET_UNLINK
 };
 
-enum usbip_dir { USBIP_DIR_OUT, USBIP_DIR_IN }; // transfer direction like USB_DIR_IN, USB_DIR_OUT
-enum { USBIP_MAX_ISO_PACKETS = 1024 };
+enum direction { out, in }; // transfer direction like USB_DIR_IN, USB_DIR_OUT
+enum { max_iso_packets = 1024 };
 enum { number_of_packets_non_isoch = -1 }; // see protocol for USBIP_CMD_SUBMIT/USBIP_RET_SUBMIT
 
 constexpr auto is_valid_number_of_packets(int number_of_packets)
 {
-	return number_of_packets >= 0 && number_of_packets <= USBIP_MAX_ISO_PACKETS;
+	return number_of_packets >= 0 && number_of_packets <= max_iso_packets;
 }
 
 using seqnum_t = UINT32;
@@ -32,7 +35,7 @@ using seqnum_t = UINT32;
 
 #include <PSHPACK1.H>
 
-struct usbip_header_basic 
+struct header_basic 
 {
 	UINT32 command; // enum usbip_request_type
 	seqnum_t seqnum;
@@ -44,7 +47,7 @@ struct usbip_header_basic
 /*
  * CMD_SUBMIT
  */
-struct usbip_header_cmd_submit 
+struct header_cmd_submit 
 {
 	UINT32 transfer_flags;
 	INT32 transfer_buffer_length;
@@ -57,7 +60,7 @@ struct usbip_header_cmd_submit
 /*
  * RET_SUBMIT
  */
-struct usbip_header_ret_submit 
+struct header_ret_submit 
 {
 	INT32 status;
 	INT32 actual_length;
@@ -69,7 +72,7 @@ struct usbip_header_ret_submit
 /*
  * CMD_UNLINK
  */
-struct usbip_header_cmd_unlink 
+struct header_cmd_unlink 
 {
 	seqnum_t seqnum;
 };
@@ -77,24 +80,25 @@ struct usbip_header_cmd_unlink
 /*
  * RET_UNLINK
  */
-struct usbip_header_ret_unlink 
+struct header_ret_unlink 
 {
 	INT32 status;
 };
 
-struct usbip_header : usbip_header_basic
+struct header : header_basic
 {
-	union {
-		usbip_header_cmd_submit	cmd_submit;
-		usbip_header_ret_submit	ret_submit;
-		usbip_header_cmd_unlink	cmd_unlink;
-		usbip_header_ret_unlink	ret_unlink;
+	union 
+	{
+		header_cmd_submit cmd_submit;
+		header_ret_submit ret_submit;
+		header_cmd_unlink cmd_unlink;
+		header_ret_unlink ret_unlink;
 	};
 };
 
-static_assert(sizeof(usbip_header) == 48);
+static_assert(sizeof(header) == 48);
 
-struct usbip_iso_packet_descriptor 
+struct iso_packet_descriptor 
 {
 	UINT32 offset;
 	UINT32 length;
@@ -103,3 +107,5 @@ struct usbip_iso_packet_descriptor
 };
 
 #include <POPPACK.H>
+
+} // namespace usbip

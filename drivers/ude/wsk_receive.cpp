@@ -77,7 +77,7 @@ PAGED inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 	PAGED_CODE();
 
 	auto &hdr = ctx.hdr;
-	NT_ASSERT(hdr.command == USBIP_RET_SUBMIT);
+	NT_ASSERT(hdr.command == RET_SUBMIT);
 	return hdr.ret_submit;
 }
 
@@ -170,7 +170,7 @@ PAGED void fix_full_speed_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *c
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ ULONG length, 
-	_In_ const usbip_iso_packet_descriptor *src)
+	_In_ const iso_packet_descriptor *src)
 {
 	PAGED_CODE();
 
@@ -241,7 +241,7 @@ PAGED auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto isoch_transfer(_In_ wsk_context &ctx, _In_ const usbip_header_ret_submit &ret, _Inout_ URB &urb)
+PAGED auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
 	PAGED_CODE();
 	auto cnt = ret.number_of_packets;
@@ -345,7 +345,7 @@ PAGED void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const U
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const usbip_header_ret_submit &ret, _Inout_ URB &urb)
+PAGED auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
 	PAGED_CODE();
 	urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
@@ -554,7 +554,7 @@ PAGED auto ret_command(_Inout_ wsk_context &ctx)
 	PAGED_CODE();
 	auto &hdr = ctx.hdr;
 
-	auto request = hdr.command == USBIP_RET_SUBMIT ? // request must be completed
+	auto request = hdr.command == RET_SUBMIT ? // request must be completed
 		       device::remove_request(*ctx.dev, hdr.seqnum) : WDF_NO_HANDLE;
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
@@ -566,15 +566,15 @@ PAGED auto ret_command(_Inout_ wsk_context &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto validate_header(_Inout_ usbip_header &hdr)
+PAGED auto validate_header(_Inout_ header &hdr)
 {
 	PAGED_CODE();
 	byteswap_header(hdr, swap_dir::net2host);
 
-	auto cmd = static_cast<usbip_request_type>(hdr.command);
+	auto cmd = static_cast<usbip::request_type>(hdr.command);
 
 	switch (cmd) {
-	case USBIP_RET_SUBMIT: {
+	case RET_SUBMIT: {
 		auto &ret = hdr.ret_submit;
 		if (ret.number_of_packets == number_of_packets_non_isoch) {
 			ret.number_of_packets = 0;
@@ -583,7 +583,7 @@ PAGED auto validate_header(_Inout_ usbip_header &hdr)
 			return false;
 		}
 	}	break;
-	case USBIP_RET_UNLINK:
+	case RET_UNLINK:
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "USBIP_RET_* expected, got %!usbip_request_type!", cmd);
