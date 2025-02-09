@@ -1,4 +1,8 @@
-﻿#include <usbip\proto_op.h>
+﻿/*
+ * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
+#include <usbip\proto_op.h>
 #include <intrin.h>
 
 void usbip_net_pack_uint32_t(int, UINT32 *num)

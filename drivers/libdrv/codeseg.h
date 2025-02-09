@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
 
 #include <wdm.h> // defines ALLOC_PRAGMA, ALLOC_DATA_PRAGMA

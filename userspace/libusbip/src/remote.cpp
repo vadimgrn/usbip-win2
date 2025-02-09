@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2021 - 2024 Vadym Hrynchyshyn
+ * Copyright (C) 2021 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
+
 
 #include "..\remote.h"
 #include "..\win_handle.h"

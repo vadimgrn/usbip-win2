@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2023 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #pragma once
 
 #include "consts.h"

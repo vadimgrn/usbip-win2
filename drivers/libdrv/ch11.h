@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /*
  * This file holds Hub protocol constants and data structures that are

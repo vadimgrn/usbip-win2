@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
+
 #include "usbd_helper.h"
 
 /*
