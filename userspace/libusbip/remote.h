@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2021 - 2025 Vadym Hrynchyshyn
+ * Copyright (c) 2021-2025 Vadym Hrynchyshyn
  */
 
 #pragma once

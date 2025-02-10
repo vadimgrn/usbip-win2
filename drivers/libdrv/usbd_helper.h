@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -24,12 +24,12 @@ UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in);
 
 constexpr auto IsTransferDirectionIn(ULONG TransferFlags)
 {
-	return USBD_TRANSFER_DIRECTION_FLAG(TransferFlags) == USBD_TRANSFER_DIRECTION_IN;
+	return USBD_TRANSFER_DIRECTION_IN == USBD_TRANSFER_DIRECTION_FLAG(TransferFlags);
 }
 
 constexpr auto IsTransferDirectionOut(ULONG TransferFlags)
 {
-	return USBD_TRANSFER_DIRECTION_FLAG(TransferFlags) == USBD_TRANSFER_DIRECTION_OUT;
+	return USBD_TRANSFER_DIRECTION_OUT == USBD_TRANSFER_DIRECTION_FLAG(TransferFlags);
 }
 
 constexpr auto is_transfer_dir_in(const USB_DEFAULT_PIPE_SETUP_PACKET &r)

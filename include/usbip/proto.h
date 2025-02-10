@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -12,6 +12,8 @@
 
 namespace usbip
 {
+
+using seqnum_t = UINT32;
 
 enum request_type
 {
@@ -29,9 +31,6 @@ constexpr auto is_valid_number_of_packets(int number_of_packets)
 {
 	return number_of_packets >= 0 && number_of_packets <= max_iso_packets;
 }
-
-using seqnum_t = UINT32;
-
 
 #include <PSHPACK1.H>
 

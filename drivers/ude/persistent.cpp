@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "persistent.h"

@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <usbip\proto_op.h>

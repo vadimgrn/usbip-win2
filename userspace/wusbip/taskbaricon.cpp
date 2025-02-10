@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (C) 2024 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "taskbaricon.h"

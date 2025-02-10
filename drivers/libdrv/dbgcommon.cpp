@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "dbgcommon.h"
@@ -44,14 +44,14 @@ void print_ret_submit(char *buf, size_t len, const header_ret_submit *cmd)
 } // namespace
 
 
-const char* usbip::request_type(UCHAR type)
+const char* usbip::request_type_str(UCHAR type)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
 	NT_ASSERT(type < ARRAYSIZE(v));
 	return v[type];
 }
 
-const char* usbip::request_recipient(UCHAR recipient)
+const char* usbip::request_recipient_str(UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
 	NT_ASSERT(recipient < ARRAYSIZE(v));
@@ -484,8 +484,8 @@ const char* usbip::usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 	auto st = RtlStringCbPrintfA(buf, len, 
 					"{%s|%s|%s, %s(%#02hhx), wValue %#04hx, wIndex %#04hx, wLength %#04hx(%d)}",
 					bmrequest_dir(r->bmRequestType),
-					bmrequest_type(r->bmRequestType),
-					bmrequest_recipient(r->bmRequestType),
+					bmrequest_type_str(r->bmRequestType),
+					bmrequest_recipient_str(r->bmRequestType),
 					brequest_str(r->bRequest),
 					r->bRequest,
 					r->wValue.W,

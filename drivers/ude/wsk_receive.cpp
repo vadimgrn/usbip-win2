@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (C) 2022 - 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wsk_receive.h"
@@ -571,7 +571,7 @@ PAGED auto validate_header(_Inout_ header &hdr)
 	PAGED_CODE();
 	byteswap_header(hdr, swap_dir::net2host);
 
-	auto cmd = static_cast<enum request_type>(hdr.command);
+	auto cmd = static_cast<request_type>(hdr.command);
 
 	switch (cmd) {
 	case RET_SUBMIT: {
