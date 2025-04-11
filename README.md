@@ -6,7 +6,7 @@
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USB/IP server at least for kernels 4.19 - 6.8
+- Works with Linux USB/IP server at least for kernels 4.19 - 6.11
 - **Is not ready for production use**, can cause BSOD. **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/develop?tab=readme-ov-file#install-usbip)** before installing USBip.
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - **Do not set `testsigning off` when USBip is installed**, [see](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#disable-windows-test-signing-mode-without-removing-usbip)

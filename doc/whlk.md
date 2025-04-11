@@ -1,3 +1,0 @@
-- DF - Fuzz zero length buffer IOCTL test (Reliability)
-  - The test has been running for more than four hours. There are no errors, but it fails due to unexpectedly long execution time. The test timeout is 180 minutes.
-  - To fix that, set MinFunctionCode=2048 and MaxFunctionCode=2053 parameters to specify the range of IOCTL function codes used in the calls. See include\usbip\vhci.h, usbip::vhci::ioctl::function.
