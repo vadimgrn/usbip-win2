@@ -306,6 +306,7 @@
     <ClInclude Include="wxutils.h" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="..\..\LICENSE.txt" />
     <Text Include="readme.txt" />
   </ItemGroup>
   <ItemGroup>

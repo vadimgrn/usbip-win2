@@ -86,6 +86,7 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="readme.txt" />
+    <Text Include="..\..\LICENSE.txt" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="wusbip.rc" />
