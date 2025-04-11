@@ -201,12 +201,12 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets" Condition="Exists('..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets')" />
+    <Import Project="..\..\packages\Ponta.spdlog.1.14.1\build\native\Ponta.spdlog.targets" Condition="Exists('..\..\packages\Ponta.spdlog.1.14.1\build\native\Ponta.spdlog.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Gray_spdlog.1.10.0\build\native\Gray_spdlog.targets'))" />
+    <Error Condition="!Exists('..\..\packages\Ponta.spdlog.1.14.1\build\native\Ponta.spdlog.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Ponta.spdlog.1.14.1\build\native\Ponta.spdlog.targets'))" />
   </Target>
 </Project>
