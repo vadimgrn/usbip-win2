@@ -93,7 +93,7 @@ MissingRunOnceIdsWarning=no
 MinVersion=10.0.17763
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nWindows Test Signing Mode must be enabled. To enable it execute as Administrator%n%nbcdedit.exe /set testsigning on%n%nand reboot Windows.
+WelcomeLabel2=This will install [name/ver] on your computer.
 
 [Components]
 Name: "main"; Description: "Main Files"; Types: full compact custom; Flags: fixed
@@ -164,6 +164,27 @@ Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; F
 
 [Code]
 
+function make_bcd_subkey_path(const object, element: String): String;
+begin
+  result := 'BCD00000000\Objects\' + object +  '\Elements\' + element;
+end;
+
+function IsTestSigningModeEnabled(): Boolean;
+var
+  subkey, name, value : String;
+  binval : AnsiString;
+begin
+  subkey := make_bcd_subkey_path('{9DEA862C-5CDD-4E70-ACC1-F32B344D4795}', '23000003'); // default loader
+  name := 'Element'
+  
+  result := RegQueryStringValue(HKEY_LOCAL_MACHINE, subkey, name, value);
+  if not result then
+    exit;
+   
+  subkey := make_bcd_subkey_path(value, '16000049'); // AllowPrereleaseSignatures
+  result := RegQueryBinaryValue(HKEY_LOCAL_MACHINE, subkey, name, binval) and (binval = #1)
+end;
+
 procedure InitializeWizard();
 begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
@@ -172,7 +193,8 @@ end;
 
 // Inno Setup Third-Party Files, PathMgr.dll
 // https://github.com/Bill-Stewart/PathMgr
-// The code is copied as is from [Code] section of PathMan.iss
+// The code is copied as is from [Code] section of PathMan.iss,
+// except for InitializeSetup function, which was modified.
 
 const
   MODIFY_PATH_TASK_NAME = 'modifypath';  // Specify name of task
@@ -229,9 +251,17 @@ end;
 
 function InitializeSetup(): Boolean;
 begin
-  result := true;
-  // Was task selected during a previous install?
-  PathIsModified := GetPreviousData(MODIFY_PATH_TASK_NAME, '') = 'true';
+  result := IsTestSigningModeEnabled();
+
+  if result then
+  begin
+    // Was task selected during a previous install?
+    PathIsModified := GetPreviousData(MODIFY_PATH_TASK_NAME, '') = 'true';
+  end
+  else
+    MsgBox('To use USBip, enable test-signed drivers to load.' #13#13
+           'Run "Bcdedit.exe -set TESTSIGNING ON" as Administrator and reboot the PC.',
+            mbCriticalError, MB_OK);
 end;
 
 function InitializeUninstall(): Boolean;
