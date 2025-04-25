@@ -56,9 +56,21 @@
 
 #define CLIENT_HWID "ROOT\USBIP_WIN2\UDE"
 
-#define CertFile "usbip.pfx"
+#define TimestampServer "http://timestamp.digicert.com"
+
+; project's test certificate
+#define CertFileName "usbip.pfx"
+#define CertFilePath SolutionDir + "drivers\package\" + CertFileName
 #define CertName "USBip"
 #define CertPwd "usbip"
+
+; whether SignTool directive uses the project's test certificate
+#define TEST_SIGNED_SETUP
+
+; whether drivers are signed by the project's test certificate
+#define TEST_SIGNED_DRIVERS
+
+#define INSTALL_TEST_CERTIFICATE (Defined(TEST_SIGNED_SETUP) || Defined(TEST_SIGNED_DRIVERS))
 
 [Setup]
 AppName={#ProductName}
@@ -85,6 +97,7 @@ WizardImageFile=164.bmp,192.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
 UninstallDisplayIcon="{app}\{#AppExeName}"
+SignTool=sign_util sign /f $q{#CertFilePath}$q /p {#CertPwd} /tr {#TimestampServer} /td sha256 /fd sha256 $f
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no
@@ -110,12 +123,12 @@ Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Tasks: 
 [Files]
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
-Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
+Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy signonce; Components: main
+Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall signonce; Components: main
 
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Flags: signonce; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Flags: signonce; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Flags: signonce; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
@@ -127,12 +140,15 @@ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 ; Source: {#BuildDir + "wusbip.pdb"}; DestDir: "{app}"; Components: pdb and gui
 ; wusbip.pdb is too large
 
-Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
+Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Flags: signonce; Components: gui
 Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: client
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
-Source: {#SolutionDir + "drivers\package\"}{#CertFile}; DestDir: "{tmp}"; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
+
+#if INSTALL_TEST_CERTIFICATE
+  Source: {#CertFilePath}; DestDir: "{tmp}"; Components: main
+#endif
 
 [Tasks]
 Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
@@ -142,7 +158,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Run]
 
 Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist
-Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFile}"" FriendlyName=""{#CertName}"""; Flags: runhidden
+
+#if INSTALL_TEST_CERTIFICATE
+  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden
+#endif
 
 Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden; Components: client
 Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden; Components: client
@@ -160,7 +179,9 @@ Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u ""{#CLIENT_HW
 Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
 Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
 
-Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
+#if INSTALL_TEST_CERTIFICATE
+  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
+#endif
 
 [Code]
 
@@ -183,6 +204,19 @@ begin
    
   subkey := make_bcd_subkey_path(value, '16000049'); // AllowPrereleaseSignatures
   result := RegQueryBinaryValue(HKEY_LOCAL_MACHINE, subkey, name, binval) and (binval = #1)
+end;
+
+function check_test_sign_mode(): Boolean;
+begin
+#ifdef TEST_SIGNED_DRIVERS
+  result := IsTestSigningModeEnabled();
+  if not result then
+    MsgBox('To use USBip, enable test-signed drivers to load.' #13#13
+           'Run "Bcdedit.exe -set TESTSIGNING ON" as Administrator and reboot the PC.',
+            mbCriticalError, MB_OK);
+#else
+  result := true;
+#endif
 end;
 
 procedure InitializeWizard();
@@ -251,17 +285,12 @@ end;
 
 function InitializeSetup(): Boolean;
 begin
-  result := IsTestSigningModeEnabled();
-
+  result := check_test_sign_mode();
   if result then
   begin
     // Was task selected during a previous install?
     PathIsModified := GetPreviousData(MODIFY_PATH_TASK_NAME, '') = 'true';
-  end
-  else
-    MsgBox('To use USBip, enable test-signed drivers to load.' #13#13
-           'Run "Bcdedit.exe -set TESTSIGNING ON" as Administrator and reboot the PC.',
-            mbCriticalError, MB_OK);
+  end;
 end;
 
 function InitializeUninstall(): Boolean;
