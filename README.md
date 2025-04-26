@@ -1,3 +1,21 @@
+![OSSign Banner](https://github.com/OSSign/.github/raw/main/svg/badge-white-wide-links.svg)
+# OSSign Information
+## What's this?
+This is a fork of the original repository, with the purpose of building binaries for regular code signing. 
+
+## How are updates pushed?
+Open a pull request to this repository with the changes you want to be built. Once the pipeline has succeeded, the code signing will happen manually in the background, and the changes will be published to the releases section of this repository.
+
+## Where are the signed binaries published?
+The signed drivers are baked into the releases on [vadimgrn/usbip-win2], and the releases themselves are signed with the project certificate.
+
+You can find fully signed binaries, including installer and uninstaller, in the [releases section in this repository](https://github.com/ossign/vadimgrn--usbip-win2/releases) section of this repository. 
+
+
+## Original Repository
+This repository is a mirror of [vadimgrn/usbip-win2](https://github.com/vadimgrn/usbip-win2) and is regularly synced with the upstream repository.
+Please refer to the original repository for the most up-to-date-information.
+
 <p align="center">
   <img src="userspace/wusbip/resources/USBip.svg" width="256" alt="USBip logo"/>
 </p>
