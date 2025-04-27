@@ -52,8 +52,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0,9,7,2
- PRODUCTVERSION 0,9,7,2
+ FILEVERSION 0,9,7,3
+ PRODUCTVERSION 0,9,7,3
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -70,12 +70,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "usbip-win2"
             VALUE "FileDescription", "devnode for USBip"
-            VALUE "FileVersion", "0.9.7.2"
+            VALUE "FileVersion", "0.9.7.3"
             VALUE "InternalName", "devnode.exe"
             VALUE "LegalCopyright", "Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>"
             VALUE "OriginalFilename", "devnode.exe"
             VALUE "ProductName", "USBip"
-            VALUE "ProductVersion", "0.9.7.2"
+            VALUE "ProductVersion", "0.9.7.3"
         END
     END
     BLOCK "VarFileInfo"

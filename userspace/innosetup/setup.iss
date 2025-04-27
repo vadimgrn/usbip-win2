@@ -102,8 +102,8 @@ SignTool=sign_util sign /f $q{#CertFilePath}$q /p {#CertPwd} /tr {#TimestampServ
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no
 
-; Windows 10, version 1809
-MinVersion=10.0.17763
+; Windows 10, version 1903
+MinVersion=10.0.18362
 
 [Messages]
 WelcomeLabel2=This will install [name/ver] on your computer.

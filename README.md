@@ -28,13 +28,12 @@ Please refer to the original repository for the most up-to-date-information.
 - **Is not ready for production use**, can cause BSOD. **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/develop?tab=readme-ov-file#install-usbip)** before installing USBip.
 - The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
 - **Do not set `testsigning off` when USBip is installed**, [see](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#disable-windows-test-signing-mode-without-removing-usbip)
-- You can donate to purchase an EV certificate which is required for signing the driver, please [read](https://github.com/vadimgrn/usbip-win2/issues/48#issuecomment-1888655412)
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (the list is incomplete)
 
 ## Requirements
-- Windows 10 x64 Version [1809](https://en.wikipedia.org/wiki/Windows_10,_version_1809) (OS build 17763) and later
+- Windows 10 x64 Version [1903](https://en.wikipedia.org/wiki/Windows_10,_version_1903) (OS build 18362) and later
 - Windows 11 ARM64
-- Server must support USB/IP protocol v.1.1.1
+- USB/IP server must support protocol v.1.1.1
 
 ## Key features
 - [UDE](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/developing-windows-drivers-for-emulated-usb-host-controllers-and-devices) driver is an USB/IP client
@@ -56,7 +55,7 @@ Please refer to the original repository for the most up-to-date-information.
 - Userspace code is fully rewritten (libusbip and usbip utility)
 - SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
-- Windows 10 version 1809 or later is required
+- Windows 10 version 1903 or later is required
 - C++ 20 is used for all projects
 - Visual Studio 2022 is used
 - Server (stub driver) is removed
