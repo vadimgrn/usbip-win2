@@ -17,8 +17,7 @@ CatalogFile=usbip2_filter.cat
 PnpLockDown=1
 
 [DestinationDirs]
- ; 13 -> SetupInstallServicesFromInfSection error 0xE0000217 "A service installation section in this INF is invalid"
-DefaultDestDir = 12
+DefaultDestDir = 13
 
 [SourceDisksNames]
 1 = "USBip Filter Installation Disk"
@@ -27,19 +26,12 @@ DefaultDestDir = 12
 usbip2_filter.sys = 1
 
 [DefaultInstall.NT$ARCH$]
-CopyFiles = usbip2_filter_CopyFiles
+CopyFiles = @usbip2_filter.sys
 AddReg = usbip2_filter_AddReg
 
 [DefaultUninstall.NT$ARCH$]
 LegacyUninstall = 1
-DelFiles = usbip2_filter_DelFiles
 DelReg = usbip2_filter_DelReg
-
-[usbip2_filter_CopyFiles]
-usbip2_filter.sys,,,0x00004000 ; COPYFLG_IN_USE_RENAME
-
-[usbip2_filter_DelFiles]
-usbip2_filter.sys,,,0x00000001 ; DELFLG_IN_USE
 
 [usbip2_filter_AddReg]
 ; append this service to existing REG_MULTI_SZ list, if any
@@ -52,15 +44,12 @@ HKR,,UpperFilters,0x00018002,usbip2_filter
 [DefaultInstall.NT$ARCH$.Services]
 AddService = usbip2_filter,,usbip2_filter_Service_Inst
 
-[DefaultUninstall.NT$ARCH$.Services]
-DelService = usbip2_filter,0x00000200 ; SPSVCINST_STOPSERVICE -> stop the service before deleting it
-
 [usbip2_filter_Service_Inst]
 DisplayName    = %DisplayName%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 2               ; SERVICE_ERROR_SEVERE
-ServiceBinary  = %12%\usbip2_filter.sys
+ServiceBinary  = %13%\usbip2_filter.sys
 AddReg         = usbip2_filter_Service_AddReg
 
 [usbip2_filter_Service_AddReg]

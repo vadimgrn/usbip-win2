@@ -297,59 +297,8 @@ auto remove_devnode(_In_ devnode_remove_args &r)
 }
 
 /*
- * Performs CopyFiles, DelFiles, RenFiles sections that are listed by an Install section.
- */
-auto install_files(_In_ HINF hinf, _In_ const std::wstring &section_name, _In_ bool install)
-{
-        HspFileQ fileq(SetupOpenFileQueue());
-        if (!fileq) {
-                errmsg("SetupOpenFileQueue");
-                return false;
-        }
-
-        if (UINT flags = install ? SP_COPY_IN_USE_NEEDS_REBOOT | SP_COPY_NOSKIP : 0;
-            !SetupInstallFilesFromInfSection(hinf, nullptr, fileq.get(), section_name.c_str(), nullptr, flags)) {
-                errmsg("SetupInstallFilesFromInfSection", section_name.c_str());
-                return false;
-        }
-
-        using ctx_t = std::unique_ptr<void, decltype(SetupTermDefaultQueueCallback)&>;
-
-        ctx_t ctx(SetupInitDefaultQueueCallback(nullptr), SetupTermDefaultQueueCallback);
-        if (!ctx) {
-                errmsg("SetupInitDefaultQueueCallback");
-                return false;
-        }
-
-        if (!SetupCommitFileQueue(nullptr, fileq.get(), SetupDefaultQueueCallback, ctx.get())) {
-                errmsg("SetupCommitFileQueue");
-                return false;
-        }
-
-        return true;
-}
-
-/*
- * Performs service installation and deletion operations that are specified 
- * in the Service Install sections listed in the Service section of an INF file.
- */
-auto install_services(
-        _Inout_ bool &reboot_required, _In_ HINF hinf, _In_ std::wstring section_name, _In_ bool install)
-{
-        section_name += L".Services";
-
-        if (SetLastError(ERROR_SUCCESS);
-            !SetupInstallServicesFromInfSection(hinf, section_name.c_str(), install ? 0 : SPSVCINST_STOPSERVICE)) {
-                errmsg("SetupInstallServicesFromInfSection", section_name.c_str());
-                return false;
-        }
-
-        reboot_required = GetLastError() == ERROR_SUCCESS_REBOOT_REQUIRED;
-        return true;
-}
-
-/*
  * Perform registry operations AddReg, DelReg in the Install section being processed.
+ * DiInstallDriver does not run AddReg, DiUninstallDriver does not run DelReg.
  */
 auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
 {
@@ -380,8 +329,17 @@ auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
 }
 
 /*
+ * Creating a new primitive driver.
+ * @see https://learn.microsoft.com/en-us/windows-hardware/drivers/develop/creating-a-primitive-driver
+ * 
  * Install a class filter driver.
  * @see https://learn.microsoft.com/en-us/windows-hardware/drivers/install/installing-a-filter-driver
+ * 
+ * FIXME: if DefaultDestDir = 13 (12 is OK), SetupInstallServicesFromInfSection fails and
+ * C:\Windows\INF\setupapi.app.log contains following messages:
+ * Driver Path not in system root
+ * Error while installing services.
+ * Error 0xe0000217: A service installation section in this INF is invalid.
  */
 auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
 {
@@ -391,23 +349,16 @@ auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
                 return false;
         }
 
-        bool reboot_required{};
         auto ok = true;
 
         if (install) {
-                ok = install_files(inf.get(), r.section_name, install) &&
-                     install_services(reboot_required, inf.get(), r.section_name, install) &&
+                ok = DiInstallDriver(nullptr, r.infpath.c_str(), DIIRFLAG_FORCE_INF, nullptr) &&
                      install_registry(inf.get(), r);
         } else { // ignore errors
                 ok &= install_registry(inf.get(), r);
-                ok &= install_services(reboot_required, inf.get(), r.section_name, install);
-                ok &= install_files(inf.get(), r.section_name, install);
+                ok &= !!DiUninstallDriver(nullptr, r.infpath.c_str(), 0, nullptr);
         }
 
-        if (reboot_required) {
-                prompt_reboot();
-        }
-        
         return ok;
 }
 
