@@ -329,17 +329,22 @@ auto install_registry(_In_ HINF hinf, _In_ const classfilter_args &r)
 }
 
 /*
+ * Primitive drivers targeted only for Windows 10 version 1903 and later 
+ * should use DiInstallDriver and DiUninstallDriver to properly 
+ * install and uninstall their software in/from the driver store.
+ * 
+ * If DefaultDestDir = 13 (12 is OK), SetupInstallServicesFromInfSection fails and
+ * C:\Windows\INF\setupapi.app.log contains following messages:
+ * Driver Path not in system root.
+ * Error while installing services.
+ * Error 0xe0000217: A service installation section in this INF is invalid.
+ * @see SetupInstallFilesFromInfSection
+ *
  * Creating a new primitive driver.
  * @see https://learn.microsoft.com/en-us/windows-hardware/drivers/develop/creating-a-primitive-driver
  * 
  * Install a class filter driver.
  * @see https://learn.microsoft.com/en-us/windows-hardware/drivers/install/installing-a-filter-driver
- * 
- * FIXME: if DefaultDestDir = 13 (12 is OK), SetupInstallServicesFromInfSection fails and
- * C:\Windows\INF\setupapi.app.log contains following messages:
- * Driver Path not in system root
- * Error while installing services.
- * Error 0xe0000217: A service installation section in this INF is invalid.
  */
 auto classfilter_install(_In_ const classfilter_args &r, _In_ bool install)
 {

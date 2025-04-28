@@ -1,7 +1,8 @@
 ; Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;
 ; usbip2_filter.inf
-; Upper-level class filter primitive driver (since Windows 10 version 1903).
+; Upper-level class filter primitive driver.
+; Primitive drivers targeting only Windows 10 version 1903 and later.
 ;
 ; @google Creating a new primitive driver
 ; @see https://github.com/desowin/usbpcap/blob/master/USBPcapDriver/USBPcap.inx
@@ -17,7 +18,7 @@ CatalogFile=usbip2_filter.cat
 PnpLockDown=1
 
 [DestinationDirs]
-DefaultDestDir = 13
+DefaultDestDir = 13 ; Driver package isolation
 
 [SourceDisksNames]
 1 = "USBip Filter Installation Disk"
@@ -49,7 +50,7 @@ DisplayName    = %DisplayName%
 ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
 StartType      = 3               ; SERVICE_DEMAND_START
 ErrorControl   = 2               ; SERVICE_ERROR_SEVERE
-ServiceBinary  = %13%\usbip2_filter.sys
+ServiceBinary  = %13%\usbip2_filter.sys ; Driver package isolation
 AddReg         = usbip2_filter_Service_AddReg
 
 [usbip2_filter_Service_AddReg]
