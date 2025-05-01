@@ -47,8 +47,7 @@
 
 ### Build Tools
 - [Visual Studio 2022](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-visual-studio-step-1-install-visual-studio-2022)
-- SDK for Windows 11, version 24H2 ([10.0.26100.1742](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-sdk-step-2-install-sdk))
-- WDK for Windows 11, version 24H2 ([10.0.26100.2161](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-wdk-step-3-install-wdk))
+- SDK/WDK installation is not required, [NuGet](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget#how-to-install-wdk-nuget) will install them automatically
 
 ### Build Visual Studio solution
 - Install git

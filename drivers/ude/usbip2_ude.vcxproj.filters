@@ -62,5 +62,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="custom_wpp.ini" />
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
