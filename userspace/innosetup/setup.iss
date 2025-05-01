@@ -20,10 +20,6 @@
         #error Use option /DConfiguration=<cfg>
 #endif
 
-#ifndef CpuArch
-        #error Use option /DCpuArch=<ARCH>
-#endif
-
 #ifdef ExePath
         #define BuildDir AddBackslash(ExtractFilePath(ExePath))
 #else
@@ -141,7 +137,6 @@ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 ; wusbip.pdb is too large
 
 Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Flags: signonce; Components: gui
-Source: {#BuildDir + "package\"}{#FilterDriver + ".inf"}; DestDir: "{app}"; Components: client
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
@@ -163,21 +158,15 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
   Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 #endif
 
-Filename: {cmd}; Parameters: "/c mklink classfilter.exe devnode.exe"; WorkingDir: "{app}"; Flags: runhidden; Components: client
-Filename: {app}\classfilter.exe; Parameters: "install {tmp}\{#FilterDriver}.inf DefaultInstall.NT{#CpuArch}"; Flags: runhidden; Components: client
-
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; Flags: runhidden; Components: client
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
 
 [UninstallRun]
 
 Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden
 
-; FIXME: usbip2_ude service is not deleted on Win10 version 1809
 ; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u ""{#CLIENT_HWID}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
-
-Filename: {app}\classfilter.exe; Parameters: "uninstall .\{#FilterDriver}.inf DefaultUninstall.NT{#CpuArch}"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c del /F ""{app}\classfilter.exe"""; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u ""{#UdeDriver} {#FilterDriver}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
 #if INSTALL_TEST_CERTIFICATE
   Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
