@@ -89,7 +89,7 @@ PAGED bool driver_name_equal(
 }
 
 /*
- * Do not check that HardwareID is "USB\ROOT_HUB30" because above usbip2_vhci can be nothing else.
+ * Do not check that HardwareID is "USB\ROOT_HUB30" because above usbip2_ude can be nothing else.
  * 
  * for (auto cur = IoGetAttachedDeviceReference(pdo); cur; ) { // @see IoGetDeviceAttachmentBaseRef
  * 	auto lower = IoGetLowerDeviceObject(cur);
@@ -214,7 +214,7 @@ PAGED NTSTATUS usbip::do_add_device(
 }
 
 /*
- * If USB upper class filter driver fails to load, all USB devices will not work.
+ * If upper filter driver fails to load, all USB devices will not work.
  * To avoid this, the function always returns success.
  * If do_add_device returns an error, USBip software will not work, but other USB devices will be fine.
  */

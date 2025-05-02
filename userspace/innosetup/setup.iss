@@ -166,7 +166,8 @@ Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIEN
 Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden
 
 ; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u ""{#UdeDriver} {#FilterDriver}"" {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#UdeDriver}    {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#FilterDriver} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
 
 #if INSTALL_TEST_CERTIFICATE
   Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
