@@ -198,6 +198,39 @@ PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
         return device::recv_thread_start(device);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inout_ int &intvl)
+{
+        PAGED_CODE();
+
+        Registry key;
+        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
+                return;
+        }
+
+        struct {
+                const wchar_t *name;
+                int &value;
+        } const params[] = {
+                { L"TCP_KEEPIDLE", idle },
+                { L"TCP_KEEPCNT", cnt },
+                { L"TCP_KEEPINTVL", intvl },
+        };
+
+        for (auto& [name, value]: params) {
+
+                UNICODE_STRING value_name;
+                NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
+
+                if (ULONG val{}; auto err = WdfRegistryQueryULong(key.get(), &value_name, &val)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, err);
+                } else {
+                        value = val;
+                }
+        }
+}
+
 /*
  * TCP_NODELAY is not supported, see WSK_FLAG_NODELAY.
  */
@@ -209,38 +242,29 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 
         auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
 
-        int idle = 0;
-        int cnt = 0;
-        int intvl = 0;
+        int idle{};
+        int cnt{};
+        int intvl{};
 
         if (auto err = get_keepalive_opts(sock, &idle, &cnt, &intvl)) {
                 Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", err);
                 return err;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
+        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
 
-        enum { IDLE = 30, CNT = 9, INTVL = 10 };
+        query_keepalive_parameters(idle, cnt, intvl);
 
-        if (auto err = set_keepalive(sock, IDLE, CNT, INTVL)) {
+        if (auto err = set_keepalive(sock, idle, cnt, intvl)) {
                 Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
                 return err;
         }
 
-        bool optval{};
-        if (auto err = get_keepalive(sock, optval)) {
-                Trace(TRACE_LEVEL_ERROR, "get_keepalive %!STATUS!", err);
-                return err;
-        }
-
-        NT_VERIFY(!get_keepalive_opts(sock, &idle, &cnt, &intvl));
-
-        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d sec) + cnt(%d)*intvl(%d sec) => %d sec", 
+        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
-
-        bool ok = optval && keepalive(idle, cnt, intvl) == keepalive(IDLE, CNT, INTVL);
-        return ok ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+        
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_
