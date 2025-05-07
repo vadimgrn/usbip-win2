@@ -93,6 +93,7 @@ WizardImageFile=164.bmp,192.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
 UninstallDisplayIcon="{app}\{#AppExeName}"
+AlwaysRestart=yes
 SignTool=sign_util sign /f $q{#CertFilePath}$q /p {#CertPwd} /tr {#TimestampServer} /td sha256 /fd sha256 $f
 
 ; this app can't be installed more than once
@@ -212,6 +213,11 @@ end;
 procedure InitializeWizard();
 begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
+end;
+
+function UninstallNeedRestart(): Boolean;
+begin
+  result := true;
 end;
 
 

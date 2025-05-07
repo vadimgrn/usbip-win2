@@ -93,19 +93,9 @@ auto get_class_guid(_Inout_ std::wstring &class_name, _In_ PCWSTR infname)
         return guid;
 }
 
-void prompt_reboot()
+void remind_reboot() noexcept
 {
-        switch (auto ret = SetupPromptReboot(nullptr, nullptr, false)) {
-        case SPFILEQ_REBOOT_IN_PROGRESS:
-                wprintf(L"Rebooting...\n");
-                break;
-        case SPFILEQ_REBOOT_RECOMMENDED:
-                wprintf(L"Reboot is recommended\n");
-                break;
-        default:
-                assert(ret == -1);
-                errmsg("SetupPromptReboot");
-        }
+        wprintf(L"Reboot is requied to finish setup.\n");
 }
 
 using device_visitor_f = std::function<bool(HDEVINFO di, SP_DEVINFO_DATA &dd)>;
@@ -218,7 +208,7 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
         }
 
         if (reboot || RebootRequired) {
-                prompt_reboot();
+                remind_reboot();
         }
 
         return ok;
@@ -284,7 +274,7 @@ auto remove_devnode(_In_ devnode_remove_args &r)
         }
                 
         if (reboot) {
-                prompt_reboot();
+                remind_reboot();
         }
 
         return true;
