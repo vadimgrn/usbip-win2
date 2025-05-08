@@ -9,7 +9,7 @@ Signature = "$WINDOWS NT$"
 Class = Extension
 ClassGuid = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
 Provider = %Manufacturer%
-ExtensionId = {68D0D86A-9B7B-4A09-B732-E7B3238399ED}
+ExtensionId = {c1e0d1fe-d564-596e-4526-71da1249702a}
 CatalogFile = usbip2_filter.cat
 PnpLockDown = 1
 

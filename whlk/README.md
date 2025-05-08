@@ -1,4 +1,4 @@
-The goal is to certify drivers for Windows 10 Build 1809 and later.
+The goal is to certify drivers for Windows 10 Build 1903 and later.
 The following steps should be done for each of these platforms, Windows 11 23H2 is used as an example.
 
 - **Setup VHLK test server**
@@ -43,15 +43,20 @@ The following steps should be done for each of these platforms, Windows 11 23H2 
   - Function Discovery Resource Publication
   - SSDP Discovery
   - UPnP Device Host
-- Run “Group Policy Editor” **gpedit.msc**
-  - Open **“Computer Configuration\Administrative Templates\Network\Lanman Workstation”**
-  - On the right, open the **"Enable insecure guest logons"** policy
-  - Set the policy to **Enabled** and click Apply > OK
-- Open **“Computer Configuration\Windows Settings\Security Settings\Local Policies\Security Options”**
-  - At the right pane, make sure that the following two policies are **Disabled**
-  - **Microsoft Network Client: Digitally sign communications (always)**
-  - **Microsoft Network Client: Digitally sign communications (if server agrees)**
-  - Reboot Windows
+- Method 1. Allow Insecure Guest Logins in Registry.
+  - reg add HKLM\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters\ /f /v RequireSecuritySignature /t REG_DWORD /d 0
+  - reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation /f /v AllowInsecureGuestAuth /t REG_DWORD /d 1
+  - reg add HKLM\SOFTWARE\WOW6432Node\Policies\Microsoft\Windows\LanmanWorkstation /f /v AllowInsecureGuestAuth /t REG_DWORD /d 1
+- Method 2. Allow Insecure Logins via Group Policy (Windows 10/11 PRO)*.
+  - Run “Group Policy Editor” **gpedit.msc**
+    - Open **“Computer Configuration\Administrative Templates\Network\Lanman Workstation”**
+    - On the right, open the **"Enable insecure guest logons"** policy
+    - Set the policy to **Enabled** and click Apply > OK
+  - Open **“Computer Configuration\Windows Settings\Security Settings\Local Policies\Security Options”**
+    - At the right pane, make sure that the following two policies are **Disabled**
+    - **Microsoft Network Client: Digitally sign communications (always)**
+    - **Microsoft Network Client: Digitally sign communications (if server agrees)**
+    - Reboot Windows
 - See [FIX: Windows 11 24H2 Cannot Access Network Shares (0x80070035)](https://www.wintips.org/fix-windows-11-24h2-cannot-access-network-shares-0x80070035/)
 
 

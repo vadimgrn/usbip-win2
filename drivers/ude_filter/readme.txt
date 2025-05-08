@@ -39,8 +39,12 @@ The issue of this implementation is that the driver install/delete restarts all 
      dvi:                          Start: USB\ROOT_HUB30\4&62F4A8E&0&0
      dvi:                     {Restarting Devices exit} 11:10:05.453
 
-If set HWID of particular USB Hub (f.e. USB\ROOT_HUB30&VID8086&PID15EC&REV0006), it will not help and 
+If set HWID of particular USB Hub (f.e. USB\ROOT_HUB30&VID8086&PID15EC&REV0006),
 all hubs will be restarted anyway. See message "Restart required for any devices using this driver").
+
+Set upper filter for Emulated HC only is a good idea, but it is not possible to preprocess PNP request
+to modify its HWID. WdfDeviceInitAssignWdmIrpPreprocessCallback will return STATUS_INVALID_DEVICE_REQUEST
+if pass IRP_MJ_PNP/IRP_MN_QUERY_ID. If pass IRP_MJ_PNP only, the callback will never be called.
 
 ### Alternative implementation
 

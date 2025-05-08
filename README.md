@@ -96,7 +96,7 @@ usbip: info: bind device on busid 3-2: complete
 - Reboot the system to apply
 
 ### Install USB/IP
-- Create a [restore point](https://support.microsoft.com/en-us/windows/create-a-system-restore-point-77e02e2a-3298-c869-9974-ef5658ea3be9) to undo possible system crashes
+- **Create a [restore point](https://support.microsoft.com/en-us/windows/create-a-system-restore-point-77e02e2a-3298-c869-9974-ef5658ea3be9)** to undo possible system crashes
   - In the search box on the taskbar, type 'Create a restore point', and select it from the list of results
   - On the System Protection tab in System Properties
     - Make sure system drive protection is enabled
@@ -104,6 +104,9 @@ usbip: info: bind device on busid 3-2: complete
     - Type a description for the restore point, and then select Create
 - Download and run an installer from [releases](https://github.com/vadimgrn/usbip-win2/releases)
 - Some antivirus programs issue false positives for InnoSetup installer
+- **All USB Hub 3.0 devices will be restarted during an installation**
+  - This means that all USB devices will stop working for a short time and then start working again.
+  - Make sure you don't interrupt your important workflow, such as a video call using a USB webcam, an audio call using a USB headset, etc.
 
 ### Use usbip.exe to attach remote device(s)
 - Query available USB devices on the server
