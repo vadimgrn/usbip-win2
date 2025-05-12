@@ -1,9 +1,13 @@
 The goal is to certify drivers for Windows 10 Build 1903 and later.
-The following steps should be done for each of these platforms, Windows 11 23H2 is used as an example.
+The following steps should be done for each of these platforms, Windows 11 24H2 is used as an example
+  - Windows 10, Build 1903, 2004
+  - Windows 11, Version 21H2, 22H2, 24H2
+    - Certifying 23H2 is [optional](https://techcommunity.microsoft.com/blog/windowshardwarecertification/windows-hardware-compatibility-program-guidance-for-windows-11-version-23h2/3938433)
+    - HLK for 23H2 detects a test system as 22H2 despite it is 23H2, just skip this system
 
 - **Setup VHLK test server**
   - See [VHLK Getting Started Guide](https://learn.microsoft.com/en-us/windows-hardware/test/hlk/getstarted/getstarted-vhlk)
-  - Install [Virtual HLK (VHLK) for Windows 11, version 23H2](https://go.microsoft.com/fwlink/p/?linkid=2196270&clcid=0x409&culture=en-us&country=us)
+  - Install [Virtual HLK (VHLK) for Windows 11, version 24H2](https://go.microsoft.com/fwlink/p/?linkid=2196270&clcid=0x409&culture=en-us&country=us)
   - Update [Windows Hardware Lab Kit Filters](https://learn.microsoft.com/en-us/windows-hardware/test/hlk/user/windows-hardware-lab-kit-filters)
   - If network copying is slow between controller and client, use these settings
     - ![hyperv-network-adapter](jpg/hyperv-network-adapter.jpg)
@@ -15,7 +19,7 @@ The following steps should be done for each of these platforms, Windows 11 23H2 
 
 - **Setup a dedicated Windows PC as a test system**
   - [Windows HLK Prerequisites](https://learn.microsoft.com/en-us/windows-hardware/test/hlk/getstarted/windows-hlk-prerequisites)
-  - Install [Windows 11 (business editions), version 23H2](https://my.visualstudio.com/downloads) on dedicated physical machine (test client)
+  - Install [Windows 11, version 24H2](https://my.visualstudio.com/downloads) on dedicated physical machine (test system)
   - Enable **test signing mode**
     - Run as Administrator: **bcdedit /set testsigning on**
     - Reboot the PC
@@ -28,12 +32,11 @@ The following steps should be done for each of these platforms, Windows 11 23H2 
 - Load Windows Hardware Compatibility playlist
   - Download the [playlist](https://learn.microsoft.com/en-us/windows-hardware/test/hlk/#download-windows-hardware-compatibility-playlist), extract it on the test controller
   - HLK Studio, select “Tests“ tab and click “Load playlist“
-  - Select “HLK Version 23H2 CompatPlaylist x64 ARM64.xml“
+  - Select “HLK Version 24H2 CompatPlaylist x64 ARM64.xml“
 - Prepare data for **“Static Tools Logo Test“**
   - Read instructions from [codeql.txt](codeql.txt)
   - See also [CodeQL and the Static Tools Logo Test](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/static-tools-and-codeql)
   - See also [How to Create a Driver Verification Log](https://learn.microsoft.com/en-us/windows-hardware/drivers/develop/creating-a-driver-verification-log)
-- If **“DF - Fuzz zero length buffer IOCTL test (Reliability)”** is on the list, it has been running for about 4-5 hours instead of 15 minutes. To fix that, set test’s parameters **MinFunctionCode** and **MaxFunctionCode**, see "enum class function" in [vhci.h](../include/usbip/vhci.h).
 - Run all tests and [create a submission package](https://learn.microsoft.com/en-us/windows-hardware/test/hlk/getstarted/step-8-create-a-submission-package) for the tested platform
 
 
@@ -43,11 +46,13 @@ The following steps should be done for each of these platforms, Windows 11 23H2 
   - Function Discovery Resource Publication
   - SSDP Discovery
   - UPnP Device Host
-- Method 1. Allow Insecure Guest Logins in Registry.
-  - reg add HKLM\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters\ /f /v RequireSecuritySignature /t REG_DWORD /d 0
-  - reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation /f /v AllowInsecureGuestAuth /t REG_DWORD /d 1
-  - reg add HKLM\SOFTWARE\WOW6432Node\Policies\Microsoft\Windows\LanmanWorkstation /f /v AllowInsecureGuestAuth /t REG_DWORD /d 1
-- Method 2. Allow Insecure Logins via Group Policy (Windows 10/11 PRO)*.
+- **Method 1. Allow Insecure Guest Logins in Registry.**
+```
+reg add HKLM\SYSTEM\CurrentControlSet\Services\LanmanWorkstation\Parameters\ /f /v RequireSecuritySignature /t REG_DWORD /d 0
+reg add HKLM\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation /f /v AllowInsecureGuestAuth /t REG_DWORD /d 1
+reg add HKLM\SOFTWARE\WOW6432Node\Policies\Microsoft\Windows\LanmanWorkstation /f /v AllowInsecureGuestAuth /t REG_DWORD /d 1
+```
+- **Method 2. Allow Insecure Logins via Group Policy (Windows 10/11 PRO).**
   - Run “Group Policy Editor” **gpedit.msc**
     - Open **“Computer Configuration\Administrative Templates\Network\Lanman Workstation”**
     - On the right, open the **"Enable insecure guest logons"** policy

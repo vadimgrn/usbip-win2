@@ -1,4 +1,4 @@
-This is an device-specific upper filter driver which is required for Emulated Host Controller driver usbip2_ude.
+This is a device-specific upper filter driver which is required for Emulated Host Controller driver usbip2_ude.
 UDE doesn't propagate correctly SELECT_CONFIGURATION/SELECT_INTERFACE and this is a major issue.
 This driver fixes that. 
 
