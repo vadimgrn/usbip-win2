@@ -21,4 +21,7 @@
   <ItemGroup>
     <Inf Include="usbip2_filter.inf" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>

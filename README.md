@@ -25,9 +25,9 @@ Please refer to the original repository for the most up-to-date-information.
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
 - Works with Linux USB/IP server at least for kernels 4.19 - 6.11
-- **Is not ready for production use**, can cause BSOD. **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/develop?tab=readme-ov-file#install-usbip)** before installing USBip.
-- The driver is not signed, [Windows Test Signing Mode](https://docs.microsoft.com/en-us/windows-hardware/drivers/install/the-testsigning-boot-configuration-option) must be enabled
-- **Do not set `testsigning off` when USBip is installed**, [see](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#disable-windows-test-signing-mode-without-removing-usbip)
+- **[WHLK](https://en.wikipedia.org/wiki/Windows_Hardware_Lab_Kit) certified drivers**
+  - Download [Microsoft Hardware Certification Report](https://partner.microsoft.com/en-us/dashboard/hardware/Driver/DownloadCertificationReport/82862560/14228871579043985/1152921505699289069)
+- **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#install-usbip)** before installing USBip
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (the list is incomplete)
 
 ## Requirements
@@ -37,7 +37,7 @@ Please refer to the original repository for the most up-to-date-information.
 
 ## Key features
 - [UDE](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/developing-windows-drivers-for-emulated-usb-host-controllers-and-devices) driver is an USB/IP client
-- USB class upper filter driver usbip2_filter is used as companion for UDE driver
+- A device-specific upper filter driver usbip2_filter is used as companion for UDE driver
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and does data exchange
   - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls
@@ -49,7 +49,7 @@ Please refer to the original repository for the most up-to-date-information.
 
 ## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
 - The 2-Clause BSD License since release 0.9.7.0
-  - If you decide to WHQL the drivers, make sure to base them on this release or newer, since the GPL 3.0 license used prior to this release is not compatible with WHQL.
+- WHLK certified drivers
 - Brand new UDE driver, not inherited from the parent repo
 - Full-featured GUI app
 - Userspace code is fully rewritten (libusbip and usbip utility)
@@ -65,8 +65,7 @@ Please refer to the original repository for the most up-to-date-information.
 
 ### Build Tools
 - [Visual Studio 2022](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-visual-studio-step-1-install-visual-studio-2022)
-- SDK for Windows 11, version 24H2 ([10.0.26100.1742](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-sdk-step-2-install-sdk))
-- WDK for Windows 11, version 24H2 ([10.0.26100.2161](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-wdk-step-3-install-wdk))
+- SDK/WDK installation is not required, [NuGet](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget#how-to-install-wdk-nuget) will install them automatically
 
 ### Build Visual Studio solution
 - Install git
@@ -110,12 +109,13 @@ usbip: info: bind device on busid 3-2: complete
 
 ## Setup USB/IP on Windows
 
-### Enable Windows Test Signing Mode
+### Enable Windows Test Signing Mode if drivers are not signed by Microsoft
 - `bcdedit.exe /set testsigning on`
 - Reboot the system to apply
+- **Do not disable testsigning if USBip has test-signed drivers**, otherwise all USB devices will not work
 
 ### Install USB/IP
-- Create a [restore point](https://support.microsoft.com/en-us/windows/create-a-system-restore-point-77e02e2a-3298-c869-9974-ef5658ea3be9) to undo possible system crashes
+- **Create a [restore point](https://support.microsoft.com/en-us/windows/create-a-system-restore-point-77e02e2a-3298-c869-9974-ef5658ea3be9)** to undo possible system crashes
   - In the search box on the taskbar, type 'Create a restore point', and select it from the list of results
   - On the System Protection tab in System Properties
     - Make sure system drive protection is enabled
@@ -123,6 +123,9 @@ usbip: info: bind device on busid 3-2: complete
     - Type a description for the restore point, and then select Create
 - Download and run an installer from [releases](https://github.com/vadimgrn/usbip-win2/releases)
 - Some antivirus programs issue false positives for InnoSetup installer
+- **All USB Hub 3.0 devices will be restarted during an installation**
+  - This means that all USB devices will stop working for a short time and then start working again.
+  - Make sure you don't interrupt your important workflow, such as a video call using a USB webcam, an audio call using a USB headset, etc.
 
 ### Use usbip.exe to attach remote device(s)
 - Query available USB devices on the server
@@ -148,45 +151,24 @@ port 1 is successfully detached
 ```
 ### Uninstallation of USB/IP
 - Uninstall USB/IP app
-- Disable test signing
+- Disable test signing if it was enabled during the installation
     - `bcdedit.exe /set testsigning off`
   - Reboot the system to apply
-- If an uninstaller is corrupted, run these commands as Administrator
+- If the uninstaller is corrupted, run these commands as Administrator
 - **If you copy commands to a .bat file, use %%P and %%~nxP in FOR statement**
 ```
+SET HWID=ROOT\USBIP_WIN2\UDE
 set APPDIR=C:\Program Files\USBip
-set HWID=ROOT\USBIP_WIN2\UDE
-
-"%APPDIR%\usbip.exe" detach --all
 
 "%APPDIR%\devnode.exe" remove %HWID% root
+rem alternative command since Windows 11, version 21H2
 rem pnputil.exe /remove-device /deviceid %HWID% /subtree
 
 rem WARNING: use %%P and %%~nxP if you run this command in a .bat file
-FOR /f %P IN ('findstr /M /L %HWID% C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
+FOR /f %P IN ('findstr /M /L /Q:u "usbip2_filter usbip2_ude" C:\WINDOWS\INF\oem*.inf') DO pnputil.exe /delete-driver %~nxP /uninstall
 
-"%APPDIR%\classfilter.exe" uninstall "%APPDIR%\usbip2_filter.inf" DefaultUninstall.NTamd64
 rd /S /Q "%APPDIR%"
 ```
-### Disable Windows Test Signing Mode without removing USB/IP
-- Can be useful if you want to temporary disable test signing
-- After that, USBip will not work until the test signing will be reenabled
-- **usbip2_filter driver must be disabled, otherwise all USB controllers/devices will not work**
-```
-devcon.exe classfilter usb upper !usbip2_filter
-bcdedit.exe /set testsigning off
-```
-- To enable it again
-```
-devcon.exe classfilter usb upper +usbip2_filter
-bcdedit.exe /set testsigning on
-```
-- If devcon.exe is not installed
-  - Run regedit.exe
-  - Open key HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\\{36fc9e60-c465-11cf-8056-444553540000}
-  - Remove ```usbip2_filter``` line from ```UpperFilters``` multi-string value to disable the driver
-  - Add this line to enable the driver
-
 ## Obtaining USB/IP logs on Windows
 - WPP Software Tracing is used
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
