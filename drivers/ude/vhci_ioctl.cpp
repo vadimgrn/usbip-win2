@@ -588,7 +588,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 detach_all_devices(vhci, vhci::detach_call::async_wait); // detach_call::direct can't be used here
-        } else if (!is_valid_port(r->port)) {
+        } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
                 st = device::async_detach_and_wait(dev.get<UDECXUSBDEVICE>());
@@ -624,14 +624,16 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         NT_ASSERT(max_cnt);
 
         auto vhci = get_vhci(request);
+        auto &ctx = *get_vhci_ctx(vhci);
+        
         ULONG cnt = 0;
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
+        for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
-                } else if (auto ctx = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *ctx)) {
+                } else if (auto dc = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *dc)) {
                         return err;
                 }
         }

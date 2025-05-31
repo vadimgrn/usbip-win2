@@ -91,3 +91,10 @@ UDECXUSBDEVICE usbip::get_device(_In_ WDFREQUEST Request)
         auto endp = get_endpoint_ctx(req->endpoint);
         return endp->device;
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port)
+{
+        return port > 0 && port <= ctx.devices_cnt;
+}

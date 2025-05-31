@@ -44,9 +44,10 @@ public:
         template<typename T>
         auto get() const { return static_cast<T*>(m_ptr); }
 
+        template<typename T = void>
         auto release()
         {
-                auto ptr = m_ptr;
+                auto ptr = get<T>();
                 m_ptr = nullptr;
                 return ptr;
         }

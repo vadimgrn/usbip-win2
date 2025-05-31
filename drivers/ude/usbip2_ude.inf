@@ -54,6 +54,12 @@ AddReg         = ude_Device_Service_AddReg
 ; The default setting of zero causes the IFR to log errors, warnings, and informational events
 HKR, Parameters, VerboseOn, %REG_DWORD%, 1 ; show TRACE_LEVEL_VERBOSE
 
+; The number of USB 2.0 ports on the root hub of the emulated host controller
+HKR, Parameters, NumberOfUsb20Ports, %REG_DWORD%, 30
+
+; The number of USB 3.0 ports on the root hub of the emulated host controller
+HKR, Parameters, NumberOfUsb30Ports, %REG_DWORD%, 30
+
 ; The time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probes
 HKR, Parameters, TCP_KEEPIDLE, %REG_DWORD%, 30
 

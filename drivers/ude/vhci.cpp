@@ -6,6 +6,7 @@
 #include "trace.h"
 #include "vhci.tmh"
 
+#include "driver.h"
 #include "device.h"
 #include "vhci_ioctl.h"
 #include "persistent.h"
@@ -60,11 +61,18 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 {
         PAGED_CODE();
+        TraceDbg("vhci %04x", ptr04x(object));
 
         auto vhci = static_cast<WDFDEVICE>(object);
-        TraceDbg("vhci %04x", ptr04x(vhci));
+        auto &ctx = *get_vhci_ctx(vhci);
 
         attach_thread_join(vhci);
+        
+        unique_ptr(ctx.devices); // destroy
+        ctx.devices = nullptr;
+
+        ctx.devices_cnt = 0;
+        ctx.usb2_ports = 0;
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
@@ -96,6 +104,104 @@ PAGED auto create_read_queue(_Out_ WDFQUEUE &queue, _In_ WDF_OBJECT_ATTRIBUTES &
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
+{
+        PAGED_CODE();
+
+        struct {
+                enum { usb3, usb2 };
+                int cnt[2];
+        } v {def_cnt, def_cnt};
+
+        Registry key;
+        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
+                return v;
+        }
+
+        struct {
+                const wchar_t *name;
+                int &value;
+        } const params[] = {
+                { L"NumberOfUsb20Ports", v.cnt[v.usb2] },
+                { L"NumberOfUsb30Ports", v.cnt[v.usb3] },
+        };
+
+        for (auto& [name, value]: params) {
+
+                UNICODE_STRING value_name;
+                NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
+
+                if (ULONG val{}; auto err = WdfRegistryQueryULong(key.get(), &value_name, &val)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, err);
+                } else {
+                        value = val;
+                }
+        }
+
+        return v;
+}
+
+/*
+ * Ports number cannot be zero and total ports number cannot exceed 255.
+ * @see userspace/usbip/usbip.cpp, MAX_HUB_PORTS
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void set_usb_ports_cnt(_Inout_ int &usb2_ports, _Inout_ int &usb3_ports)
+{
+        PAGED_CODE();
+
+        enum { MIN_PORTS = 1, DEF_PORTS = 30, MAX_PORTS = 254, MAX_TOTAL_PORTS };
+        auto v = query_usb_ports_cnt(DEF_PORTS);
+
+        for (int total = 0; auto &n: v.cnt) {
+
+                n = min(MAX_PORTS, max(MIN_PORTS, n));
+
+                if (total + n > MAX_TOTAL_PORTS) {
+                        n = MAX_TOTAL_PORTS - total;
+                }
+
+                NT_ASSERT(n >= MIN_PORTS);
+                NT_ASSERT(n <= MAX_PORTS);
+
+                total += n;
+                NT_ASSERT(total <= MAX_TOTAL_PORTS);
+        }
+
+        usb2_ports = v.cnt[v.usb2];
+        usb3_ports = v.cnt[v.usb3];
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto alloc_devices(_Inout_ vhci_ctx &vhci)
+{
+        PAGED_CODE();
+
+        int usb2_ports{};
+        int usb3_ports{};
+        set_usb_ports_cnt(usb2_ports, usb3_ports);
+
+        auto n = usb2_ports + usb3_ports;
+        NT_ASSERT(n > 0);
+
+        unique_ptr ptr(NonPagedPoolNx, n*sizeof(*vhci.devices));
+        if (!ptr) {
+                Trace(TRACE_LEVEL_ERROR, "Cannot allocate array UDECXUSBDEVICE[%d]", n);
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        vhci.usb2_ports = usb2_ports;
+        vhci.devices_cnt = n;
+        vhci.devices = ptr.release<UDECXUSBDEVICE>();
+
+        Trace(TRACE_LEVEL_INFORMATION, "usb2 ports %d, UDECXUSBDEVICE[%d]", vhci.usb2_ports, vhci.devices_cnt);
+        return STATUS_SUCCESS;
+}
+
 using init_func_t = NTSTATUS(WDFDEVICE);
 
 _Function_class_(init_func_t)
@@ -105,6 +211,10 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
+
+        if (auto err = alloc_devices(ctx)) {
+                return err;
+        }
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
@@ -374,17 +484,23 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
+        auto &ctx = *get_vhci_ctx(vhci);
 
         UDECX_WDF_DEVICE_CONFIG cfg;
         UDECX_WDF_DEVICE_CONFIG_INIT(&cfg, query_usb_capability);
 
-        cfg.NumberOfUsb20Ports = USB2_PORTS;
-        cfg.NumberOfUsb30Ports = USB3_PORTS;
+        cfg.NumberOfUsb20Ports = static_cast<USHORT>(ctx.usb2_ports);
+        cfg.NumberOfUsb30Ports = static_cast<USHORT>(ctx.devices_cnt - ctx.usb2_ports);
+
+        NT_ASSERT(cfg.NumberOfUsb20Ports + cfg.NumberOfUsb30Ports == ctx.devices_cnt);
 
         if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
                 return err;
         }
+
+        Trace(TRACE_LEVEL_INFORMATION, "NumberOfUsb20Ports %d, NumberOfUsb30Ports %d", 
+                                        cfg.NumberOfUsb20Ports, cfg.NumberOfUsb30Ports);
 
         return STATUS_SUCCESS;
 }
@@ -462,16 +578,16 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_port_range(_In_ usb_device_speed speed)
+auto get_port_range(_In_ const vhci_ctx &vhci, _In_ usb_device_speed speed)
 {
         struct{ int begin;  int end; } r;
 
         if (speed < USB_SPEED_SUPER) {
                 r.begin = 0;
-                r.end = USB2_PORTS;
+                r.end = vhci.usb2_ports;
         } else {
-                r.begin = USB2_PORTS;
-                r.end = TOTAL_PORTS;
+                r.begin = vhci.usb2_ports;
+                r.end = vhci.devices_cnt;
         }
 
         return r;
@@ -514,7 +630,8 @@ PAGED auto make_device_state(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void process_event(_In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY evt)
+PAGED void process_event(
+        _In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_ WDFMEMORY evt, _In_ ULONG max_events)
 {
         PAGED_CODE();
 
@@ -529,7 +646,7 @@ PAGED void process_event(_In_ WDFQUEUE queue, _Inout_ fileobject_ctx &fobj, _In_
         case STATUS_NO_MORE_ENTRIES:
                 if (auto err = WdfCollectionAdd(fobj.events, evt)) { // append and increment reference count
                         Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", err);
-                } else if (auto cnt = WdfCollectionGetCount(fobj.events); cnt > fobj.MAX_EVENTS) {
+                } else if (auto cnt = WdfCollectionGetCount(fobj.events); cnt > max_events) {
                         auto head = WdfCollectionGetFirstItem(fobj.events);
                         WdfCollectionRemove(fobj.events, head); // decrements reference count
 
@@ -556,7 +673,7 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
         for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
                 if (fobj.process_events) {
-                        process_event(vhci.reads, fobj, evt);
+                        process_event(vhci.reads, fobj, evt, 2*vhci.devices_cnt);
                         ++cnt;
                 }
         }
@@ -604,18 +721,18 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
         NT_ASSERT(!dev.port);
         int port = 0;
 
-        auto [begin, end] = get_port_range(dev.speed());
+        auto [begin, end] = get_port_range(vhci, dev.speed());
 
         wdf::Lock lck(vhci.devices_lock); // function must be resident, do not use PAGED
 
         for (auto i = begin; i < end; ++i) {
-                NT_ASSERT(i < ARRAYSIZE(vhci.devices));
+                NT_ASSERT(i < vhci.devices_cnt);
 
                 if (auto &handle = vhci.devices[i]; !handle) {
                         WdfObjectReference(handle = device);
                         
                         port = i + 1;
-                        NT_ASSERT(is_valid_port(port));
+                        NT_ASSERT(is_valid_port(vhci, port));
 
                         dev.port = port;
                         break;
@@ -633,12 +750,11 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
         auto &dev = *get_device_ctx(device);
         auto &vhci = *get_vhci_ctx(dev.vhci); 
 
-        static_assert(!is_valid_port(0));
         int portnum = 0;
 
         wdf::Lock lck(vhci.devices_lock); 
         if (auto &port = dev.port) {
-                NT_ASSERT(is_valid_port(port));
+                NT_ASSERT(is_valid_port(vhci, port));
                 portnum = port;
 
                 auto &handle = vhci.devices[port - 1];
@@ -660,12 +776,12 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 {
+        auto &ctx = *get_vhci_ctx(vhci);
+
         wdf::ObjectRef ptr;
-        if (!is_valid_port(port)) {
+        if (!is_valid_port(ctx, port)) {
                 return ptr;
         }
-
-        auto &ctx = *get_vhci_ctx(vhci);
 
         wdf::Lock lck(ctx.devices_lock); 
         if (auto handle = ctx.devices[port - 1]) {
@@ -682,11 +798,12 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how)
 {
         PAGED_CODE();
-
         TraceDbg("%04x", ptr04x(vhci));
+
+        auto &ctx = *get_vhci_ctx(vhci);
         auto detach = get_detach_function(how);
 
-        for (int port = 1; port <= ARRAYSIZE(vhci_ctx::devices); ++port) {
+        for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
                         detach(hdev);
                 }

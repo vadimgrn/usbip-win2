@@ -244,7 +244,7 @@ PAGED void intersection(_In_ WDFCOLLECTION a, _In_ WDFCOLLECTION b)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED ULONG get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh)
+PAGED auto get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh)
 {
         PAGED_CODE();
 
@@ -253,10 +253,10 @@ PAGED ULONG get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh
         } else if (auto newcol = get_persistent_devices(key)) {
                 intersection(col, newcol.get<WDFCOLLECTION>());
         } else {
-                return 0;
+                return 0UL;
         }
 
-        return min(WdfCollectionGetCount(col), ARRAYSIZE(vhci_ctx::devices));
+        return WdfCollectionGetCount(col);
 }
 
 _IRQL_requires_same_
@@ -294,7 +294,9 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 
         for (ULONG attempt = 0; true; ++attempt) {
 
-                auto cnt = get_count(devices.get<WDFCOLLECTION>(), key.get(), attempt);
+                auto cnt = min(get_count(devices.get<WDFCOLLECTION>(), key.get(), attempt),
+                               static_cast<ULONG>(ctx.devices_cnt));
+
                 if (!cnt) {
                         break;
                 }

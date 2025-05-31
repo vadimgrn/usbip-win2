@@ -29,24 +29,16 @@ namespace wsk
 namespace usbip
 {
 
-enum { 
-        USB2_PORTS = 30,
-        USB3_PORTS = USB2_PORTS,
-        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
-};
-
-constexpr auto is_valid_port(int port)
-{
-        return port > 0 && port <= TOTAL_PORTS;
-}
-
 /*
  * Context space for WDFDEVICE, Virtual Host Controller Interface.
  * The parent is WDFDRIVER.
  */
 struct vhci_ctx
 {
-        UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
+        int usb2_ports; // constant
+
+        int devices_cnt; // constant, usb2_ports + usb3 ports
+        UDECXUSBDEVICE *devices; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 
         LIST_ENTRY fileobjects; // @see fileobject_ctx::entry
@@ -64,6 +56,10 @@ inline auto get_handle(_In_ vhci_ctx *ctx)
         NT_ASSERT(ctx);
         return static_cast<WDFDEVICE>(WdfObjectContextGetObject(ctx));
 }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
 
 struct wsk_context;
 struct device_ctx;
@@ -203,10 +199,7 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
 struct fileobject_ctx
 {
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
-
         WDFCOLLECTION events; // WDFMEMORY(device_state) that are waiting for IRP_MJ_READ
-        enum { MAX_EVENTS = 2*TOTAL_PORTS }; // arbitrary
-
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
