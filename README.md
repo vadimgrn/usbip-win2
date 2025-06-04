@@ -251,4 +251,6 @@ verifier /reset
 - To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv, usbip2_filter, usbip2_ude projects
 
 ### If you like this project
-<a href="https://www.buymeacoffee.com/usbip" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+[![paypal](whlk/jpg/paypal_donate_qrcode.png)](https://www.paypal.com/donate/?hosted_button_id=YNZ9GUFWFYHFW)
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=YNZ9GUFWFYHFW)
