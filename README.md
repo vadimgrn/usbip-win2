@@ -113,7 +113,7 @@ usbip: info: bind device on busid 3-2: complete
 - Some antivirus programs issue false positives for InnoSetup installer
 - **All USB Hub 3.0 devices will be restarted during an installation**
   - This means that all USB devices will stop working for a short time and then start working again.
-  - Make sure you don't interrupt your important workflow, such as a video call using a USB webcam, an audio call using a USB headset, etc.
+  - Make sure you don't interrupt your important workflow, such as a video call using a USB webcam, an audio call using a USB headset, copying from/to USB drive, etc.
 
 ### Use usbip.exe to attach remote device(s)
 - Query available USB devices on the server
@@ -216,7 +216,7 @@ rem del /F sed*
 .sympath+ C:\Program Files\USBip
 !wmitrace.searchpath +%TEMP%\usbip
 !analyze -v
-!wdfkd.wdfsearchpath %TEMP%\USBip
+!wdfkd.wdfsearchpath %TEMP%\usbip
 !wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wdfkd.wdflogdump usbip2_ude -d
 !wdfkd.wdflogdump usbip2_ude -f

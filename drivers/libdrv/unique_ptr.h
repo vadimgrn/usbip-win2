@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "pair.h"
 #include <wdm.h>
 
 namespace libdrv
