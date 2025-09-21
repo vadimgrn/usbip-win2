@@ -85,9 +85,10 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
         } req;
 
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
+        auto busid = ext.busid();
 
-        if (auto &busid = req.body.busid; auto err = libdrv::unicode_to_utf8(busid, sizeof(busid), ext.busid)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ext.busid, err);
+        if (auto &dst = req.body.busid; auto err = libdrv::unicode_to_utf8(dst, sizeof(dst), *busid)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", busid, err);
                 return err;
         }
 
@@ -115,8 +116,8 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
         byteswap(reply);
 
         if (char busid[sizeof(reply.udev.busid)];
-            auto err = libdrv::unicode_to_utf8(busid, sizeof(busid), ext.busid)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &ext.busid, err);
+            auto err = libdrv::unicode_to_utf8(busid, sizeof(busid), *ext.busid())) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), err);
                 return err;
         } else if (strncmp(reply.udev.busid, busid, sizeof(busid))) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
@@ -145,11 +146,13 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
         auto &udev = reply.udev; 
         log(udev);
 
-        if (auto d = &ext.dev) {
-                d->devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
-                d->speed = static_cast<usb_device_speed>(udev.speed);
-                d->vendor = udev.idVendor;
-                d->product = udev.idProduct;
+        {
+                auto &p = ext.properties();
+
+                p.devid = make_devid(static_cast<UINT16>(udev.busnum), static_cast<UINT16>(udev.devnum));
+                p.speed = static_cast<usb_device_speed>(udev.speed);
+                p.vendor = udev.idVendor;
+                p.product = udev.idProduct;
         }
 
         return STATUS_SUCCESS;
@@ -272,13 +275,13 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
 {
         PAGED_CODE();
-        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", &ext->node_name, &ext->service_name);
+        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", ext->node_name(), ext->service_name());
 
         vhci::ioctl::plugin_hardware *r{};
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
         auto vhci = get_vhci(request);
-        device_state_changed(vhci, *ext, 0, vhci::state::connected);
+        device_state_changed(vhci, ext->attr, 0, vhci::state::connected);
 
         if (auto err = import_remote_device(*ext)) {
                 return err;
@@ -456,7 +459,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT obj)
 
         if (auto &ext = ctx.ext) {
                 close_socket(ext->sock);
-                device_state_changed(ctx.vhci, *ext, 0, vhci::state::disconnected);
+                device_state_changed(ctx.vhci, ext->attr, 0, vhci::state::disconnected);
 
                 free(ext);
                 ext = nullptr;
@@ -500,7 +503,7 @@ PAGED void getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wor
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
                          
         NT_ASSERT(!ctx.addrinfo);
-        auto st = wsk::getaddrinfo(ctx.addrinfo, &ext.node_name, &ext.service_name, &hints, irp);
+        auto st = wsk::getaddrinfo(ctx.addrinfo, ext.node_name(), ext.service_name(), &hints, irp);
         TraceDbg("%!STATUS!", st);
 }
 
@@ -528,7 +531,7 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
                 return err;
         }
 
-        device_state_changed(vhci, *ctx.ext, 0, vhci::state::connecting);
+        device_state_changed(vhci, ctx.ext->attr, 0, vhci::state::connecting);
 
         getaddrinfo(request, wi, ctx); // completion handler will be called anyway
         return STATUS_PENDING;

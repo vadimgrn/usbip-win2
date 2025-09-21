@@ -57,7 +57,7 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT object)
         auto &ext = get_device_ctx(device)->ext;
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, %!USTR!:%!USTR!/%!USTR!", 
-                ptr04x(device), &ext->node_name, &ext->service_name, &ext->busid);
+                ptr04x(device), ext->node_name(), ext->service_name(), ext->busid());
 
         free(ext);
         ext = nullptr;
@@ -494,7 +494,9 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
         cb.EvtUsbDeviceLinkPowerEntry = d0_entry; // required if the device supports USB remote wake
         cb.EvtUsbDeviceLinkPowerExit = d0_exit;
         
-        if (ext.dev.speed >= USB_SPEED_SUPER) { // required
+        auto speed = ext.properties().speed;
+
+        if (speed >= USB_SPEED_SUPER) { // required
                 cb.EvtUsbDeviceSetFunctionSuspendAndWake = function_suspend_and_wake;
         }
 
@@ -506,10 +508,10 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
 
         UdecxUsbDeviceInitSetStateChangeCallbacks(init, &cb);
 
-        auto speed = to_udex_speed(ext.dev.speed);
-        TraceDbg("%!usb_device_speed! -> %!UDECX_USB_DEVICE_SPEED!", ext.dev.speed, speed);
+        auto udex_speed = to_udex_speed(speed);
+        TraceDbg("%!usb_device_speed! -> %!UDECX_USB_DEVICE_SPEED!", speed, udex_speed);
 
-        UdecxUsbDeviceInitSetSpeed(init, speed);
+        UdecxUsbDeviceInitSetSpeed(init, udex_speed);
         UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
 
         return STATUS_SUCCESS;
@@ -636,11 +638,12 @@ PAGED auto detach(_In_ UDECXUSBDEVICE device)
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        device_state_changed(dev.vhci, *dev.ext, port, vhci::state::unplugging);
+        auto &attr = dev.attributes();
+        device_state_changed(dev.vhci, attr, port, vhci::state::unplugging);
 
         if (plugout_and_delete(device, dev.delete_lock)) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
-                device_state_changed(dev.vhci, *dev.ext, port, vhci::state::unplugged);
+                device_state_changed(dev.vhci, attr, port, vhci::state::unplugged);
         }
 
         NT_VERIFY(!KeSetEvent(&dev.detach_completed, IO_NO_INCREMENT, false)); // once

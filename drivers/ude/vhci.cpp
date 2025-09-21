@@ -596,7 +596,7 @@ auto get_port_range(_In_ const vhci_ctx &vhci, _In_ usb_device_speed speed)
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED auto make_device_state(
-        _In_ WDFOBJECT parent, _In_ const device_ctx_ext &ext, _In_ int port, _In_ vhci::state state)
+        _In_ WDFOBJECT parent, _In_ const device_attributes &dev, _In_ int port, _In_ vhci::state state)
 {
         PAGED_CODE();
 
@@ -616,7 +616,7 @@ PAGED auto make_device_state(
         r->size = sizeof(*r);
         r->state = state;
 
-        if (auto err = fill(*r, ext, port)) {
+        if (auto err = fill(*r, dev, port)) {
                 WdfObjectDelete(mem);
                 mem = WDF_NO_HANDLE;
         }
@@ -812,19 +812,19 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::vhci::fill(_Out_ imported_device &dev, _In_ const device_ctx_ext &ext, _In_ int port)
+PAGED NTSTATUS usbip::vhci::fill(_Out_ imported_device &dev, _In_ const device_attributes &r, _In_ int port)
 {
         PAGED_CODE();
 
 //      imported_device_location
         dev.port = port;
-        if (auto err = copy(dev.host, sizeof(dev.host), ext.node_name, 
-                            dev.service, sizeof(dev.service), ext.service_name,  
-                            dev.busid, sizeof(dev.busid), ext.busid)) {
+        if (auto err = copy(dev.host, sizeof(dev.host), r.node_name, 
+                            dev.service, sizeof(dev.service), r.service_name,  
+                            dev.busid, sizeof(dev.busid), r.busid)) {
                 return err;
         }
 //
-        static_cast<imported_device_properties&>(dev) = ext.dev;
+        static_cast<imported_device_properties&>(dev) = r.properties;
         return STATUS_SUCCESS;
 }
 
@@ -860,7 +860,7 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::vhci::device_state_changed(
-        _In_ WDFDEVICE vhci, _In_ const device_ctx_ext& ext, _In_ int port, _In_ state state)
+        _In_ WDFDEVICE vhci, _In_ const device_attributes &attr, _In_ int port, _In_ state state)
 {
         PAGED_CODE();
 
@@ -868,7 +868,7 @@ PAGED void usbip::vhci::device_state_changed(
         auto subscribers = ctx.events_subscribers;
 
         TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d", 
-                  &ext.node_name, &ext.service_name, &ext.busid, port, int(state), subscribers);
+                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
 
         if (!subscribers) {
                 wdf::WaitLock lck(ctx.events_lock);
@@ -877,7 +877,7 @@ PAGED void usbip::vhci::device_state_changed(
                 }
         }
 
-        if (auto evt = make_device_state(vhci, ext, port, state)) {
+        if (auto evt = make_device_state(vhci, attr, port, state)) {
                 process_event(ctx, evt);
                 WdfObjectDelete(evt); // will be deleted after its reference count becomes zero
         } else {

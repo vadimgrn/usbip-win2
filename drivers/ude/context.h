@@ -64,6 +64,16 @@ bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
 struct wsk_context;
 struct device_ctx;
 
+struct device_attributes
+{
+        // from ioctl::plugin_hardware, .Buffer-s are allocated in PagedPool
+        UNICODE_STRING node_name;
+        UNICODE_STRING service_name;
+        UNICODE_STRING busid;
+        //
+        vhci::imported_device_properties properties; // for ioctl::get_imported_devices
+};
+
 /*
  * Context extention for device_ctx. 
  *
@@ -81,14 +91,13 @@ struct device_ctx_ext
         device_ctx *ctx;
         wsk::SOCKET *sock;
 
-        // from ioctl::plugin_hardware
-        // .Buffer-s are allocated in PagedPool, see create_device_ctx_ext
-        UNICODE_STRING node_name;
-        UNICODE_STRING service_name;
-        UNICODE_STRING busid;
-        //
-        
-        vhci::imported_device_properties dev; // for ioctl::get_imported_devices
+        device_attributes attr;
+
+        auto node_name() { return &attr.node_name; }
+        auto service_name() { return &attr.service_name; }
+        auto busid() { return &attr.busid; }
+
+        auto& properties() { return attr.properties; }
 };
 
 /*
@@ -99,8 +108,10 @@ struct device_ctx
         device_ctx_ext *ext; // must be free-d
 
         auto sock() const { return ext->sock; }
-        auto speed() const { return ext->dev.speed; }
-        auto devid() const { return ext->dev.devid; }
+        auto& attributes() const { return ext->attr; }
+
+        auto speed() const { return ext->properties().speed; }
+        auto devid() const { return ext->properties().devid; }
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 

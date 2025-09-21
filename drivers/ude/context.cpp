@@ -46,19 +46,19 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         }
 
         struct {
-                UNICODE_STRING &dst;
+                UNICODE_STRING *dst;
                 const char *src;
                 USHORT maxlen;
         } const v[] = {
-                { ext->node_name, r.host, sizeof(r.host) },
-                { ext->service_name, r.service, sizeof(r.service) },
-                { ext->busid, r.busid, sizeof(r.busid) },
+                { ext->node_name(), r.host, sizeof(r.host) },
+                { ext->service_name(), r.service, sizeof(r.service) },
+                { ext->busid(), r.busid, sizeof(r.busid) },
         };
 
         for (auto &[dst, src, maxlen]: v) {
                 if (!*src) {
                         // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
-                } else if (auto err = libdrv::utf8_to_unicode(dst, src, maxlen, PagedPool, pooltag)) {
+                } else if (auto err = libdrv::utf8_to_unicode(*dst, src, maxlen, PagedPool, pooltag)) {
                         Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, err);
                         return err;
                 }
@@ -76,9 +76,9 @@ PAGED void usbip::free(_In_ device_ctx_ext *ext)
         NT_ASSERT(ext);
         free(ext->sock);
 
-        libdrv::FreeUnicodeString(ext->node_name, pooltag); // @see RtlFreeUnicodeString
-        libdrv::FreeUnicodeString(ext->service_name, pooltag);
-        libdrv::FreeUnicodeString(ext->busid, pooltag);
+        libdrv::FreeUnicodeString(*ext->node_name(), pooltag); // @see RtlFreeUnicodeString
+        libdrv::FreeUnicodeString(*ext->service_name(), pooltag);
+        libdrv::FreeUnicodeString(*ext->busid(), pooltag);
 
         ExFreePoolWithTag(ext, pooltag);
 }
