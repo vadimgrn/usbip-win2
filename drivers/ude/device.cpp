@@ -54,13 +54,12 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT object)
         PAGED_CODE();
 
         auto device = static_cast<UDECXUSBDEVICE>(object);
-        auto &ext = get_device_ctx(device)->ext;
+        Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(device));
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, %!USTR!:%!USTR!/%!USTR!", 
-                ptr04x(device), ext->node_name(), ext->service_name(), ext->busid());
-
-        free(ext);
-        ext = nullptr;
+        if (auto dev = get_device_ctx(device); auto &mem = dev->ctx_ext) { // the parent is vhci controller, not UDECXUSBDEVICE
+                WdfObjectDelete(mem);
+                mem = WDF_NO_HANDLE;
+        }
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -337,7 +336,8 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 return STATUS_DEVICE_NOT_CONNECTED;
         }
 
-        wdf::WaitLock lck(dev.delete_lock);
+        auto &ext = dev.ext();
+        wdf::WaitLock lck(ext.delete_lock);
 
         auto &epd = data->EndpointDescriptor ? *data->EndpointDescriptor : EP0;
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, epd.bEndpointAddress);
@@ -483,7 +483,7 @@ struct device_init_ptr
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ext)
+PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ usb_device_speed speed)
 {
         PAGED_CODE();
         NT_ASSERT(init);
@@ -494,8 +494,6 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
         cb.EvtUsbDeviceLinkPowerEntry = d0_entry; // required if the device supports USB remote wake
         cb.EvtUsbDeviceLinkPowerExit = d0_exit;
         
-        auto speed = ext.properties().speed;
-
         if (speed >= USB_SPEED_SUPER) { // required
                 cb.EvtUsbDeviceSetFunctionSuspendAndWake = function_suspend_and_wake;
         }
@@ -513,24 +511,6 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ device_ctx_ext &ex
 
         UdecxUsbDeviceInitSetSpeed(init, udex_speed);
         UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &handle, _In_ WDFOBJECT parent)
-{
-        PAGED_CODE();
-
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = parent;
-
-        if (auto err = WdfWaitLockCreate(&attr, &handle)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
-                return err;
-        }
 
         return STATUS_SUCCESS;
 }
@@ -571,13 +551,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 }
         }
 
-        if (auto err = create_delete_lock(dev.delete_lock, device)) {
-                return err;
-        }
-
         InitializeListHead(&dev.requests);
-        KeInitializeEvent(&dev.detach_completed, NotificationEvent, false);
-
         return STATUS_SUCCESS;
 }
 
@@ -624,6 +598,8 @@ PAGED auto detach(_In_ UDECXUSBDEVICE device)
         PAGED_CODE();
 
         auto &dev = *get_device_ctx(device);
+        auto &ext = dev.ext();
+
 	NT_ASSERT(dev.unplugged);
 
         if (close_socket(dev.sock())) {
@@ -641,12 +617,12 @@ PAGED auto detach(_In_ UDECXUSBDEVICE device)
         auto &attr = dev.attributes();
         device_state_changed(dev.vhci, attr, port, vhci::state::unplugging);
 
-        if (plugout_and_delete(device, dev.delete_lock)) {
+        if (plugout_and_delete(device, ext.delete_lock)) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
                 device_state_changed(dev.vhci, attr, port, vhci::state::unplugged);
         }
 
-        NT_VERIFY(!KeSetEvent(&dev.detach_completed, IO_NO_INCREMENT, false)); // once
+        NT_VERIFY(!KeSetEvent(&ext.detach_completed, IO_NO_INCREMENT, false)); // once
         return thread;
 }
 
@@ -687,9 +663,11 @@ PAGED auto wait_detach(_In_ UDECXUSBDEVICE device, _In_opt_ LARGE_INTEGER *timeo
         TraceDbg("dev %04x", ptr04x(device));
 
         auto &dev = *get_device_ctx(device);
+        auto &ext = dev.ext();
+
         NT_ASSERT(dev.unplugged);
 
-        auto st = KeWaitForSingleObject(&dev.detach_completed, Executive, KernelMode, false, timeout);
+        auto st = KeWaitForSingleObject(&ext.detach_completed, Executive, KernelMode, false, timeout);
 
         switch (st) {
         case STATUS_SUCCESS:
@@ -717,13 +695,17 @@ constexpr auto wait_detach_timeout()
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext)
+PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext)
 {
         PAGED_CODE();
+
         device = WDF_NO_HANDLE;
+        auto &ext = get_device_ctx_ext(ctx_ext);
 
         device_init_ptr init(vhci);
-        if (auto err = init ? prepare_init(init.ptr, *ext) : STATUS_INSUFFICIENT_RESOURCES) {
+
+        if (auto &prop = ext.properties(); 
+            auto err = init ? prepare_init(init.ptr, prop.speed) : STATUS_INSUFFICIENT_RESOURCES) {
                 Trace(TRACE_LEVEL_ERROR, "UDECXUSBDEVICE_INIT %!STATUS!", err);
                 return err;
         }
@@ -732,7 +714,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, device_ctx);
         attr.EvtCleanupCallback = device_cleanup;
         attr.EvtDestroyCallback = device_destroy;
-        attr.ParentObject = vhci; // FIXME: by default?
+        attr.ParentObject = vhci;
 
         if (auto err = UdecxUsbDeviceCreate(&init.ptr, &attr, &device)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
@@ -743,8 +725,8 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         auto &ctx = *get_device_ctx(device);
 
         ctx.vhci = vhci;
-        ctx.ext = ext;
-        ext->ctx = &ctx;
+        ctx.ctx_ext = ctx_ext;
+        ext.ctx = &ctx;
 
         if (auto err = init_device(device, ctx)) {
                 return err;

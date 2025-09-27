@@ -37,7 +37,9 @@ struct workitem_ctx
         WDFDEVICE vhci;
         WDFREQUEST request;
 
-        device_ctx_ext *ext;
+        WDFMEMORY ctx_ext;
+        auto& ext() const { return get_device_ctx_ext(ctx_ext); }
+
         ADDRINFOEXW *addrinfo; // list head
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
@@ -272,26 +274,28 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto connected(_In_ WDFREQUEST request, _Inout_ device_ctx_ext* &ext)
+PAGED auto connected(_In_ WDFREQUEST request, _Inout_ WDFMEMORY &ctx_ext)
 {
         PAGED_CODE();
-        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", ext->node_name(), ext->service_name());
+
+        auto &ext = get_device_ctx_ext(ctx_ext);
+        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!", ext.node_name(), ext.service_name());
 
         vhci::ioctl::plugin_hardware *r{};
         NT_VERIFY(NT_SUCCESS(WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), nullptr)));
 
         auto vhci = get_vhci(request);
-        device_state_changed(vhci, ext->attr, 0, vhci::state::connected);
+        device_state_changed(vhci, ext.attr, 0, vhci::state::connected);
 
-        if (auto err = import_remote_device(*ext)) {
+        if (auto err = import_remote_device(ext)) {
                 return err;
         }
 
         UDECXUSBDEVICE dev{};
-        if (auto err = device::create(dev, vhci, ext)) {
+        if (auto err = device::create(dev, vhci, ctx_ext)) {
                 return err;
         }
-        ext = nullptr; // now dev owns it
+        ctx_ext = WDF_NO_HANDLE; // now dev owns it
 
         if (auto err = start_device(r->port, dev)) {
                 WdfObjectDelete(dev); // UdecxUsbDevicePlugIn failed or was not called
@@ -386,21 +390,23 @@ PAGED auto connect(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto on_connect(
-        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ device_ctx_ext* &ext, _In_ const ADDRINFOEXW &ai)
+        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ workitem_ctx &ctx, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
 
         auto st = WdfRequestGetStatus(request);
 
         if (NT_SUCCESS(st)) {
-                st = connected(request, ext);
+                st = connected(request, ctx.ctx_ext);
                 NT_ASSERT(st != STATUS_PENDING);
         } else {
-                NT_VERIFY(NT_SUCCESS(close(ext->sock)));
-                free(ext->sock);
+                auto &ext = ctx.ext();
+
+                NT_VERIFY(NT_SUCCESS(close(ext.sock)));
+                free(ext.sock);
 
                 if (st != STATUS_CANCELLED && ai.ai_next) {
-                        st = connect(request, wi, ext->sock, *ai.ai_next);
+                        st = connect(request, wi, ext.sock, *ai.ai_next);
                 }
         }
 
@@ -425,10 +431,12 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         TraceDbg("%s %!STATUS!", function, st);
 
         if (auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
-                st = on_connect(request, wi, ctx.ext, *ai);
+                st = on_connect(request, wi, ctx, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
+                auto &ext = ctx.ext();
+
                 NT_ASSERT(ctx.addrinfo);
-                st = connect(request, wi, ctx.ext->sock, *ctx.addrinfo);
+                st = connect(request, wi, ext.sock, *ctx.addrinfo);
         }
 
         if (st != STATUS_PENDING) {
@@ -444,25 +452,27 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void workitem_cleanup(_In_ WDFOBJECT obj)
+PAGED void workitem_cleanup(_In_ WDFOBJECT object)
 {
         PAGED_CODE();
         
-        auto wi = static_cast<WDFWORKITEM>(obj); // WdfWorkItemGetParentObject(wi) returns NULL
-        auto &ctx = *get_workitem_ctx(wi); 
+        auto wi = static_cast<WDFWORKITEM>(object); // WdfWorkItemGetParentObject(wi) returns NULL
+        auto &ctx = *get_workitem_ctx(wi);
 
         TraceDbg("request %04x, addrinfo %04x, device_ctx_ext %04x", 
-                  ptr04x(ctx.request), ptr04x(ctx.addrinfo), ptr04x(ctx.ext));
+                  ptr04x(ctx.request), ptr04x(ctx.addrinfo), ptr04x(ctx.ctx_ext));
 
         wsk::free(ctx.addrinfo);
         ctx.addrinfo = nullptr;
 
-        if (auto &ext = ctx.ext) {
-                close_socket(ext->sock);
-                device_state_changed(ctx.vhci, ext->attr, 0, vhci::state::disconnected);
+        if (auto &mem = ctx.ctx_ext) {
+                auto &ext = get_device_ctx_ext(mem); // or ctx.ext()
 
-                free(ext);
-                ext = nullptr;
+                close_socket(ext.sock);
+                device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::disconnected);
+
+                WdfObjectDelete(mem);
+                mem = WDF_NO_HANDLE;
         }
 }
 
@@ -490,7 +500,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void getaddrinfo(_In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ workitem_ctx &ctx)
 {
         PAGED_CODE();
-        auto &ext = *ctx.ext;
+        auto &ext = ctx.ext();
 
         ADDRINFOEXW hints {
                 .ai_flags = AI_NUMERICSERV,
@@ -526,12 +536,13 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
         ctx.vhci = vhci;
         ctx.request = request;
 
-        if (auto err = create_device_ctx_ext(ctx.ext, r)) {
+        if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);
                 return err;
         }
 
-        device_state_changed(vhci, ctx.ext->attr, 0, vhci::state::connecting);
+        auto &ext = ctx.ext();
+        device_state_changed(vhci, ext.attr, 0, vhci::state::connecting);
 
         getaddrinfo(request, wi, ctx); // completion handler will be called anyway
         return STATUS_PENDING;

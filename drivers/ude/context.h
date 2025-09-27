@@ -93,6 +93,9 @@ struct device_ctx_ext
 
         device_attributes attr;
 
+        KEVENT detach_completed;
+        WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
+
         auto node_name() { return &attr.node_name; }
         auto service_name() { return &attr.service_name; }
         auto busid() { return &attr.busid; }
@@ -101,17 +104,28 @@ struct device_ctx_ext
 };
 
 /*
+ * @param mem must contain device_ctx_ext
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto& get_device_ctx_ext(_In_ WDFMEMORY mem)
+{
+        return *static_cast<device_ctx_ext*>(WdfMemoryGetBuffer(mem, nullptr));
+}
+
+/*
  * Context space for UDECXUSBDEVICE - emulated USB device.
  */
 struct device_ctx
 {
-        device_ctx_ext *ext; // must be free-d
+        WDFMEMORY ctx_ext;
+        auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
-        auto sock() const { return ext->sock; }
-        auto& attributes() const { return ext->attr; }
+        auto sock() const { return ext().sock; }
+        auto& attributes() const { return ext().attr; }
 
-        auto speed() const { return ext->properties().speed; }
-        auto devid() const { return ext->properties().devid; }
+        auto speed() const { return ext().properties().speed; }
+        auto devid() const { return ext().properties().devid; }
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
@@ -124,9 +138,6 @@ struct device_ctx
         seqnum_t seqnum; // @see next_seqnum
 
         volatile bool unplugged; // initiated detach that may still be ongoing
-        KEVENT detach_completed;
-
-        WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
 
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
@@ -237,10 +248,6 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ const vhci::ioctl::plugin_hardware &r);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void free(_In_ device_ctx_ext *ext);
+PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r);
 
 } // namespace usbip
