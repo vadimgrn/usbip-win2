@@ -30,14 +30,10 @@ PAGED NTSTATUS recv_thread_start(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS async_detach_nowait(_In_ UDECXUSBDEVICE device);
+void async_detach(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS async_detach_and_wait(_In_ UDECXUSBDEVICE device);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS detach(_In_ UDECXUSBDEVICE device);
+PAGED void detach(_In_ UDECXUSBDEVICE device);
 
 } // namespace usbip::device

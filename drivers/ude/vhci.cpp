@@ -68,6 +68,10 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 
         attach_thread_join(vhci);
         
+        if (auto t = ctx.target_self) {
+                WdfIoTargetClose(t);
+        }
+
         unique_ptr(ctx.devices); // destroy
         ctx.devices = nullptr;
 
@@ -202,6 +206,30 @@ PAGED auto alloc_devices(_Inout_ vhci_ctx &vhci)
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ WDFDEVICE vhci)
+{
+        PAGED_CODE();
+
+        if (auto err = WdfIoTargetCreate(vhci, &attr, &target)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetCreate %!STATUS!", err);
+                return err;
+        }
+
+        auto fdo = WdfDeviceWdmGetDeviceObject(vhci);
+
+        WDF_IO_TARGET_OPEN_PARAMS params;
+        WDF_IO_TARGET_OPEN_PARAMS_INIT_EXISTING_DEVICE(&params, fdo);
+
+        if (auto err = WdfIoTargetOpen(target, &params)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetOpen %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
 using init_func_t = NTSTATUS(WDFDEVICE);
 
 _Function_class_(init_func_t)
@@ -227,6 +255,10 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
 
         if (auto err = WdfWaitLockCreate(&attr, &ctx.events_lock)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
+                return err;
+        }
+
+        if (auto err = create_target_self(ctx.target_self, attr, vhci)) {
                 return err;
         }
 
@@ -324,6 +356,11 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
         return STATUS_SUCCESS;
 }
 
+/*
+ * Do not call WdfIoQueuePurgeSynchronously from the following queue object event callback functions,
+ * regardless of the queue with which the event callback function is associated:
+ * EvtIoDefault, EvtIoDeviceControl, EvtIoInternalDeviceControl, EvtIoRead, EvtIoWrite.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
@@ -356,8 +393,8 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(vhci));
 
-        detach_all_devices(vhci, vhci::detach_call::async_nowait); // must not block this callback for long time
-        purge_read_queue(vhci); // detach notifications will not be received due to detach_call::async_nowait
+        vhci::detach_all_devices(vhci, true);
+        purge_read_queue(vhci); // detach notifications will not be received
 
         return STATUS_SUCCESS;
 }
@@ -681,30 +718,6 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
         NT_ASSERT(cnt == vhci.events_subscribers);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto get_detach_function(_In_ vhci::detach_call how)
-{
-        PAGED_CODE();
-        decltype(device::detach) *f{};
-
-        switch (how) {
-                using enum vhci::detach_call;
-        case async_wait:
-                f = device::async_detach_and_wait;
-                break;
-        case async_nowait:
-                f = device::async_detach_nowait;
-                break;
-        case direct:
-                f = device::detach;
-                break;
-        }
-
-        NT_ASSERT(f);
-        return f;
-}
-
 } // namespace
 
 
@@ -795,13 +808,13 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async)
 {
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(vhci));
 
         auto &ctx = *get_vhci_ctx(vhci);
-        auto detach = get_detach_function(how);
+        auto detach = async ? device::async_detach : device::detach;
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {

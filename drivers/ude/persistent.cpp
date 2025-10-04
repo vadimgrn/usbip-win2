@@ -81,36 +81,6 @@ PAGED auto parse_string(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const UNICOD
                     r.busid, sizeof(r.busid), busid);
 }
 
-/*
- * Target is self. 
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_target(_In_ WDFDEVICE vhci)
-{
-        PAGED_CODE();
-        ObjectDelete target;
-
-        if (WDFIOTARGET t; auto err = WdfIoTargetCreate(vhci, WDF_NO_OBJECT_ATTRIBUTES, &t)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetCreate %!STATUS!", err);
-                return target;
-        } else {
-                target.reset(t);
-        }
-
-        auto fdo = WdfDeviceWdmGetDeviceObject(vhci);
-
-        WDF_IO_TARGET_OPEN_PARAMS params;
-        WDF_IO_TARGET_OPEN_PARAMS_INIT_EXISTING_DEVICE(&params, fdo);
-
-        if (auto err = WdfIoTargetOpen(target.get<WDFIOTARGET>(), &params)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetOpen %!STATUS!", err);
-                target.reset();
-        }
-
-        return target;
-}
-
 constexpr auto get_delay(_In_ ULONG attempt, _In_ ULONG cnt)
 {
         NT_ASSERT(cnt);
@@ -275,13 +245,6 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
                 return;
         }
 
-        auto vhci = get_handle(&ctx);
-
-        auto target = make_target(vhci);
-        if (!target) {
-                return;
-        }
-
         vhci::ioctl::plugin_hardware req{{ .size = sizeof(req) }};
 
         WDF_MEMORY_DESCRIPTOR input;
@@ -314,7 +277,7 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
                                 WdfStringGetUnicodeString(s, &str);
                         }
 
-                        if (plugin_hardware(str, target.get<WDFIOTARGET>(), req, input, output, outlen)) {
+                        if (plugin_hardware(str, ctx.target_self, req, input, output, outlen)) {
                                 TraceDbg("exclude %!USTR!", &str);
                                 WdfCollectionRemoveItem(devices.get<WDFCOLLECTION>(), i);
                                 --cnt;

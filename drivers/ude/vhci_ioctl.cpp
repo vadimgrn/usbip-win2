@@ -601,11 +601,11 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
         auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
-                detach_all_devices(vhci, vhci::detach_call::async_wait); // detach_call::direct can't be used here
+                vhci::detach_all_devices(vhci);
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                st = device::async_detach_and_wait(dev.get<UDECXUSBDEVICE>());
+                device::detach(dev.get<UDECXUSBDEVICE>());
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }

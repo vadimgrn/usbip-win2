@@ -32,11 +32,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 
-enum class detach_call { async_wait, async_nowait, direct };
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ detach_call how);
+PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async = false);
 
 struct imported_device;
 enum class state;

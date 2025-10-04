@@ -139,7 +139,6 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDF
         }
 
         auto &ext = get_device_ctx_ext(ctx_ext);
-        KeInitializeEvent(&ext.detach_completed, NotificationEvent, false);
 
         if (auto err = save_device_location(ext, r)) {
                 return err;

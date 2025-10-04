@@ -48,6 +48,8 @@ struct vhci_ctx
 
         _KTHREAD *attach_thread;
         KEVENT attach_thread_stop;
+
+        WDFIOTARGET target_self;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
@@ -92,8 +94,6 @@ struct device_ctx_ext
         wsk::SOCKET *sock;
 
         device_attributes attr;
-
-        KEVENT detach_completed;
         WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
 
         auto node_name() { return &attr.node_name; }
