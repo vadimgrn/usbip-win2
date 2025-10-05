@@ -55,11 +55,6 @@ PAGED void NTAPI device_destroy(_In_ WDFOBJECT object)
 
         auto device = static_cast<UDECXUSBDEVICE>(object);
         Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(device));
-
-        if (auto dev = get_device_ctx(device); auto &mem = dev->ctx_ext) { // the parent is vhci controller, not UDECXUSBDEVICE
-                WdfObjectDelete(mem);
-                mem = WDF_NO_HANDLE;
-        }
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -75,7 +70,12 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
                 ptr04x(device), dev.cancelable_requests, dev.sent_requests);
 
-        // all resources must be freed except for device_ctx_ext*
+        if (auto &h = dev.ctx_ext) { // the parent is vhci controller
+                WdfObjectDelete(h);
+                h = WDF_NO_HANDLE;
+        }
+
+        // all resources must be freed
         NT_ASSERT(IsListEmpty(&dev.requests));
         NT_ASSERT(dev.unplugged);
         NT_ASSERT(!dev.port);
@@ -313,16 +313,6 @@ PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT 
         return STATUS_SUCCESS;
 }
 
-/*
- * UDE can call UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS despite UdecxUsbDevicePlugOutAndDelete was called.
- * This can cause BSOD:
- * WDF_VIOLATION
- * A NULL parameter was passed to a function that required a non-NULL value
- * udecx!Endpoint_UcxEndpointCleanup
- * 
- * To fix it, callbacks and UdecxUsbDevicePlugOutAndDelete must be called serially.
- * WdfObjectAcquireLock for UDECXUSBDEVICE can't be used, it will use spinlock that raises IRQL.
- */
 _Function_class_(EVT_UDECX_USB_DEVICE_ENDPOINT_ADD)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -335,9 +325,6 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 TraceDbg("dev %04x, unplugged", ptr04x(device));
                 return STATUS_DEVICE_NOT_CONNECTED;
         }
-
-        auto &ext = dev.ext();
-        wdf::WaitLock lck(ext.delete_lock);
 
         auto &epd = data->EndpointDescriptor ? *data->EndpointDescriptor : EP0;
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, epd.bEndpointAddress);
@@ -425,8 +412,6 @@ void endpoints_configure(
         _In_ UDECXUSBDEVICE device, _In_ WDFREQUEST request, _In_ UDECX_ENDPOINTS_CONFIGURE_PARAMS *params)
 {
         NT_ASSERT(!has_urb(request)); // but MajorFunction == IRP_MJ_INTERNAL_DEVICE_CONTROL
-
-//      wdf::WaitLock lck(dev.delete_lock); // not required, only logging there
 
         if (auto n = params->EndpointsToConfigureCount) {
                 TraceDbg("dev %04x, EndpointsToConfigure[%lu]%!BIN!", ptr04x(device), n, 

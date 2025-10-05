@@ -94,7 +94,6 @@ struct device_ctx_ext
         wsk::SOCKET *sock;
 
         device_attributes attr;
-        WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
 
         auto node_name() { return &attr.node_name; }
         auto service_name() { return &attr.service_name; }

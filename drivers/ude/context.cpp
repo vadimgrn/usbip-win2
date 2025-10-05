@@ -44,24 +44,6 @@ PAGED auto save_device_location(_In_ device_ctx_ext &ext, _In_ const vhci::ioctl
         return STATUS_SUCCESS;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_delete_lock(_Out_ WDFWAITLOCK &result, _In_ WDFOBJECT parent)
-{
-        PAGED_CODE();
-
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = parent;
-
-        if (auto err = WdfWaitLockCreate(&attr, &result)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -139,12 +121,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDF
         }
 
         auto &ext = get_device_ctx_ext(ctx_ext);
-
-        if (auto err = save_device_location(ext, r)) {
-                return err;
-        }
-
-        return create_delete_lock(ext.delete_lock, ctx_ext);
+        return save_device_location(ext, r);
 }
 
 _IRQL_requires_same_
