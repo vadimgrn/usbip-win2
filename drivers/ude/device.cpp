@@ -46,17 +46,6 @@ PAGED auto to_udex_speed(_In_ usb_device_speed speed)
         }
 }
 
-_Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void NTAPI device_destroy(_In_ WDFOBJECT object)
-{
-        PAGED_CODE();
-
-        auto device = static_cast<UDECXUSBDEVICE>(object);
-        Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(device));
-}
-
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -70,6 +59,8 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
                 ptr04x(device), dev.cancelable_requests, dev.sent_requests);
 
+        NT_VERIFY(!device::detach(device, false)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
+
         if (auto &h = dev.ctx_ext) { // the parent is vhci controller
                 WdfObjectDelete(h);
                 h = WDF_NO_HANDLE;
@@ -82,25 +73,36 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         NT_ASSERT(!dev.recv_thread);
 }
 
+/*
+ * @return object_reference defer dereference of receive thread if it executes this function
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED _KTHREAD *recv_thread_join(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
+PAGED auto recv_thread_join(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
+        wdm::object_reference thread(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev.recv_thread), nullptr), false);
 
-        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev.recv_thread), nullptr);
-        NT_ASSERT(thread);
-
-        if (thread == KeGetCurrentThread()) {
+        if (!thread) {
+                TraceDbg("dev %04x, was not created", ptr04x(device));
+                return thread;
+        } else if (thread.get() == KeGetCurrentThread()) { // called by receive thread
+                thread.set_defer_delete();
                 return thread;
         }
 
+        NT_ASSERT(dev.unplugged); // thread checks it
         TraceDbg("dev %04x", ptr04x(device));
-        NT_VERIFY(!KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr));
-        TraceDbg("dev %04x, joined", ptr04x(device));
 
-        ObDereferenceObject(thread);
-        return nullptr;
+        if (auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
+            auto err = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout)) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), err);
+        } else {
+                TraceDbg("dev %04x, joined", ptr04x(device));
+        }
+
+        thread.reset(); // it's safe to dereference(delete) now
+        return thread;
 }
 
 /*
@@ -540,65 +542,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         return STATUS_SUCCESS;
 }
 
-inline auto set_unplugged(_Inout_ device_ctx &dev)
-{
-        static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
-        return InterlockedExchange8(PCHAR(&dev.unplugged), true);
-}
-
-/*
- * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
- * After UdecxUsbDevicePlugOutAndDelete the client driver can no longer use UDECXUSBDEVICE.
- * 
- * FIXME:
- * If call UdecxUsbDevicePlugOutAndDelete shortly after UdecxUsbDevicePlugIn,
- * it is highly likely it will not delete UDECXUSBDEVICE immediately.
- * In such case UDECXUSBDEVICE.EvtCleanupCallback will be called during the deletion of VHCI device only.
- * The reason is unknown, there are no any clarifications in API documentation about that.
- * 
- * Therefore we have to close a socket and free a port here instead of device_cleanup, 
- * otherwise next plugin_hardware will fail with ST_DEV_BUSY because the socket is still connected.
- *
- * FIXME: inability to delete UDECXUSBDEVICE causes leak of resources, drivers' memory consumption 
- * raises over the time. Driver Verifier cannot detect it because all will be freed on driver unload.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto detach(_In_ UDECXUSBDEVICE device)
-{
-        PAGED_CODE();
-
-        auto &dev = *get_device_ctx(device);
-        NT_ASSERT(dev.unplugged);
-
-        if (close_socket(dev.sock())) {
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
-                device_state_changed(dev, vhci::state::disconnected);
-        }
-
-        auto thread = recv_thread_join(device, dev);
-
-        auto port = vhci::reclaim_roothub_port(device);
-        if (port) {
-                Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
-        }
-
-        wdf::ObjectRef ref(dev.ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
-        auto &ext = get_device_ctx_ext(dev.ctx_ext);
-
-        auto vhci = dev.vhci;
-        device_state_changed(vhci, ext.attr, port, vhci::state::unplugging);
-
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
-        } else { // device and dev may already be destroyed, do not use
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, PlugOutAndDelete-d", ptr04x(device));
-                device_state_changed(vhci, ext.attr, port, vhci::state::unplugged);
-        }
-
-        return thread;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto create_detach_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr)
@@ -632,6 +575,26 @@ auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port
         return mem;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void plugout_and_delete(
+        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device, _In_ WDFMEMORY ctx_ext, _In_ int port)
+{
+        PAGED_CODE();
+
+        wdf::ObjectRef ref(ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
+        auto &ext = get_device_ctx_ext(ctx_ext);
+
+        device_state_changed(vhci, ext.attr, port, vhci::state::unplugging);
+
+        if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
+        } else { // device and device_ctx may already be destroyed, do not use
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, done", ptr04x(device));
+                device_state_changed(vhci, ext.attr, port, vhci::state::unplugged);
+        }
+}
+
 } // namespace
 
 
@@ -655,7 +618,6 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, device_ctx);
         attr.EvtCleanupCallback = device_cleanup;
-        attr.EvtDestroyCallback = device_destroy;
         attr.ParentObject = vhci;
 
         if (auto err = UdecxUsbDeviceCreate(&init.ptr, &attr, &device)) {
@@ -678,6 +640,9 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         return STATUS_SUCCESS;
 }
 
+/*
+ * ObDereferenceObject must be called as soon as it is done with this thread
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
@@ -693,9 +658,10 @@ PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
 
         auto dev = get_device_ctx(device);
 
-        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
-                                                       reinterpret_cast<PVOID*>(&dev->recv_thread), nullptr)));
+        PVOID thread{};
+        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, &thread, nullptr)));
 
+        NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev->recv_thread), thread));
         NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
 
         TraceDbg("dev %04x", ptr04x(device));
@@ -754,25 +720,57 @@ void usbip::device::async_detach(_In_ UDECXUSBDEVICE device)
 }
 
 /*
- * Must wait for the completion because plugin_hardware can be called prior ::detach().
- * In such case plugin_hardware will fail with USBIP_ERROR_ST_DEV_BUSY because the socket is still connected.
- *
  * Must be called from EvtIoDeviceControl of default queue only.
  * The default queue has WdfIoQueueDispatchSequential and WdfExecutionLevelPassive.
  * If you need to call it from somewhere else, call async_detach.
  *
  * @see vhci_ioctl.cpp, device_control.
+ *
+ * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
+ * After UdecxUsbDevicePlugOutAndDelete the client driver can no longer use UDECXUSBDEVICE.
+ * 
+ * FIXME:
+ * If call UdecxUsbDevicePlugOutAndDelete shortly after UdecxUsbDevicePlugIn,
+ * it is highly likely it will not delete UDECXUSBDEVICE immediately.
+ * In such case UDECXUSBDEVICE.EvtCleanupCallback will be called during the deletion of VHCI device only.
+ * The reason is unknown, there are no any clarifications in API documentation about that.
+ * 
+ * Therefore we have to close a socket and free a port here instead of device_cleanup, 
+ * otherwise next plugin_hardware will fail with ST_DEV_BUSY because the socket is still connected.
+ *
+ * FIXME: inability to delete UDECXUSBDEVICE causes leak of resources, drivers' memory consumption 
+ * raises over the time. Driver Verifier cannot detect it because all will be freed on driver unload.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::device::detach(_In_ UDECXUSBDEVICE device)
+PAGED wdm::object_reference usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
 {
         PAGED_CODE();
 
-        if (auto dev = get_device_ctx(device); auto was_unplugged = set_unplugged(*dev)) {
+        wdm::object_reference thread;
+        auto &dev = *get_device_ctx(device);
+
+        if (InterlockedExchange8(PCHAR(&dev.unplugged), true)) {
+                static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
-        } else if (auto thread = ::detach(device)) {
-                NT_ASSERT(thread == KeGetCurrentThread());
-                ObDereferenceObjectDeferDelete(thread);
+                return thread;
         }
+
+        if (close_socket(dev.sock())) {
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
+                device_state_changed(dev, vhci::state::disconnected);
+        }
+
+        thread = recv_thread_join(device, dev);
+
+        auto port = vhci::reclaim_roothub_port(device);
+        if (port) {
+                Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
+        }
+
+        if (plugout_and_delete) {
+                ::plugout_and_delete(dev.vhci, device, dev.ctx_ext, port);
+        }
+
+        return thread;
 }

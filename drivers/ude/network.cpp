@@ -156,6 +156,8 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
  * wsk::close() does not free SOCKET and wsk:free() is not called here.
  * Retaining SOCKET alive solves the issue with possible send/receive calls after closing.
  * Now such calls return an error and are thread-safe (send/receive/.../close can be executed concurrently).
+ * 
+ * Can be called several times.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

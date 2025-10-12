@@ -303,9 +303,9 @@ PAGED void persistent_devices_thread(_In_ void *ctx)
         auto &vhci = *static_cast<vhci_ctx*>(ctx);
         plugin_persistent_devices(vhci);
 
-        if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.attach_thread), nullptr)) {
-                ObDereferenceObject(thread);
+        if (auto thread = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.attach_thread), nullptr)) {
                 TraceDbg("dereference");
+                ObDereferenceObjectDeferDelete(thread);
         } else {
                 TraceDbg("exit");
         }
@@ -314,6 +314,9 @@ PAGED void persistent_devices_thread(_In_ void *ctx)
 } // namespace 
 
 
+/*
+ * ObDereferenceObject must be called as soon as it is done with this thread
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
@@ -323,17 +326,18 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
         const auto access = THREAD_ALL_ACCESS;
         auto fdo = WdfDeviceWdmGetDeviceObject(get_handle(vhci));
 
-        if (HANDLE handle; 
+        if (HANDLE handle{}; 
             auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, 
                                             nullptr, persistent_devices_thread, vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "IoCreateSystemThread %!STATUS!", err);
         } else {
-                PVOID thread;
-                NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
+                PVOID thread{};
+                NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode,
                                                                &thread, nullptr)));
 
-                NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
                 NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->attach_thread), thread));
+                NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+
                 TraceDbg("thread launched");
         }
 }

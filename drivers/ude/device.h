@@ -6,6 +6,7 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\wdf_cpp.h>
+#include <libdrv/wdm_cpp.h>
 
 #include <usb.h>
 #include <wdfusb.h>
@@ -34,6 +35,6 @@ void async_detach(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach(_In_ UDECXUSBDEVICE device);
+PAGED wdm::object_reference detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete = true);
 
 } // namespace usbip::device

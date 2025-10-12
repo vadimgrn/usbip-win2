@@ -11,6 +11,9 @@
 #include "vhci_ioctl.h"
 #include "persistent.h"
 
+#include <libdrv/wdm_cpp.h>
+#include <libdrv/wait_timeout.h>
+
 #include <ntstrsafe.h>
 
 #include <usbdlib.h>
@@ -31,25 +34,24 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 /*PAGED*/ void attach_thread_join(_In_ WDFDEVICE vhci) // not PAGED, see KeSetEvent
 {
-        NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
+        NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL); // PAGED_CODE()
         auto &ctx = *get_vhci_ctx(vhci);
 
-        auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.attach_thread), nullptr);
+        wdm::object_reference thread(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.attach_thread), nullptr), false);
         if (!thread) {
-                TraceDbg("already exited");
+                TraceDbg("already exited or was not created");
                 return;
         }
 
         TraceDbg("signal stop and wait"); 
-
+        auto timeout = make_timeout(10*wdm::minute, wdm::period::relative);
+        
         if (KeSetEvent(&ctx.attach_thread_stop, IO_NO_INCREMENT, true); // raises IRQL
-            auto err = KeWaitForSingleObject(thread, Executive, KernelMode, false, nullptr)) {
+            auto err = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout)) {
                 Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", err);
         } else {
                 TraceDbg("joined");
         }
-
-        ObDereferenceObject(thread);
 }
 
 /*
@@ -394,7 +396,7 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
         TraceDbg("%04x", ptr04x(vhci));
 
         vhci::detach_all_devices(vhci, true);
-        purge_read_queue(vhci); // detach notifications will not be received
+        purge_read_queue(vhci); // detach notifications may not be received
 
         return STATUS_SUCCESS;
 }
@@ -814,7 +816,7 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async)
         TraceDbg("%04x", ptr04x(vhci));
 
         auto &ctx = *get_vhci_ctx(vhci);
-        auto detach = async ? device::async_detach : device::detach;
+        auto detach = async ? device::async_detach : [] (auto dev) { device::detach(dev); };
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {

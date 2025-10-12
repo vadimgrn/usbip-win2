@@ -27,6 +27,7 @@
     <ClCompile Include="dbgcommon.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="mdl_cpp.cpp" />
+    <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="select.cpp" />
     <ClCompile Include="usbdsc.cpp" />
     <ClCompile Include="pdu.cpp" />
@@ -256,6 +257,7 @@
     <ClInclude Include="irp.h" />
     <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="codeseg.h" />
+    <ClInclude Include="wdm_cpp.h" />
     <ClInclude Include="pair.h" />
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="select.h" />
