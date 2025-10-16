@@ -162,9 +162,10 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
+PAGED NTSTATUS plugin(_In_ UDECXUSBDEVICE device, _Inout_ int &port, _Inout_ bool &plugged)
 {
         PAGED_CODE();
+        NT_ASSERT(!plugged);
 
         if (port = vhci::claim_roothub_port(device); port) {
                 TraceDbg("port %d claimed", port);
@@ -185,19 +186,8 @@ PAGED NTSTATUS plugin(_Out_ int &port, _In_ UDECXUSBDEVICE device)
         if (auto err = UdecxUsbDevicePlugIn(device, &options)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
                 return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto start_device(_Out_ int &port, _In_ UDECXUSBDEVICE device)
-{
-        PAGED_CODE();
-
-        if (auto err = plugin(port, device)) {
-                return err;
+        } else { // UdecxUsbDevicePlugOutAndDelete must be called instead of WdfObjectDelete
+                plugged = true;
         }
 
         return device::recv_thread_start(device);
@@ -297,8 +287,12 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ WDFMEMORY &ctx_ext)
         }
         ctx_ext = WDF_NO_HANDLE; // now dev owns it
 
-        if (auto err = start_device(r->port, dev)) {
-                WdfObjectDelete(dev); // UdecxUsbDevicePlugIn failed or was not called
+        if (bool plugged{}; auto err = plugin(dev, r->port, plugged)) {
+                if (plugged) {
+                        device::detach(dev); // calls UdecxUsbDevicePlugOutAndDelete
+                } else {
+                        WdfObjectDelete(dev);
+                }
                 return err;
         }
 
