@@ -29,12 +29,21 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS recv_thread_start(_In_ UDECXUSBDEVICE device);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void async_detach(_In_ UDECXUSBDEVICE device);
+enum : bool { DONT_DELETE, PLUGOUT_AND_DELETE };
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED wdm::object_reference detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete = true);
+PAGED wdm::object_reference detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+inline auto detach_and_delete(_In_ UDECXUSBDEVICE device)
+{
+        return detach(device, PLUGOUT_AND_DELETE);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void async_detach_and_delete(_In_ UDECXUSBDEVICE device);
 
 } // namespace usbip::device

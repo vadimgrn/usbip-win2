@@ -289,7 +289,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ WDFMEMORY &ctx_ext)
 
         if (bool plugged{}; auto err = plugin(dev, r->port, plugged)) {
                 if (plugged) {
-                        device::detach(dev); // calls UdecxUsbDevicePlugOutAndDelete
+                        device::detach_and_delete(dev);
                 } else {
                         WdfObjectDelete(dev);
                 }
@@ -599,7 +599,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach(dev.get<UDECXUSBDEVICE>());
+                device::detach_and_delete(dev.get<UDECXUSBDEVICE>());
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }

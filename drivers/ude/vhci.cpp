@@ -816,7 +816,9 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async)
         TraceDbg("%04x", ptr04x(vhci));
 
         auto &ctx = *get_vhci_ctx(vhci);
-        auto detach = async ? device::async_detach : [] (auto dev) { device::detach(dev); };
+
+        auto detach = async ? device::async_detach_and_delete : 
+                              [] (auto dev) { device::detach_and_delete(dev); };
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {

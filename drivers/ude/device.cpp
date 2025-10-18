@@ -59,7 +59,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
                 ptr04x(device), dev.cancelable_requests, dev.sent_requests);
 
-        NT_VERIFY(!device::detach(device, false)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
+        NT_VERIFY(!detach(device, device::DONT_DELETE)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
 
         if (auto &h = dev.ctx_ext) { // the parent is vhci controller
                 WdfObjectDelete(h);
@@ -670,7 +670,7 @@ PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::device::async_detach(_In_ UDECXUSBDEVICE device)
+void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
 {
         auto &dev = *get_device_ctx(device);
         auto &ctx = *get_vhci_ctx(dev.vhci);
