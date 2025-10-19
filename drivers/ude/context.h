@@ -249,4 +249,10 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r);
 
+inline auto InterlockedExchangeBool(_Inout_ _Interlocked_operand_ volatile bool *target, _In_ bool value)
+{
+        static_assert(sizeof(*target) == sizeof(CHAR));
+        return InterlockedExchange8(reinterpret_cast<volatile CHAR*>(target), value);
+}
+
 } // namespace usbip

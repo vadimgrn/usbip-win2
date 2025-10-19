@@ -750,8 +750,7 @@ PAGED wdm::object_reference usbip::device::detach(_In_ UDECXUSBDEVICE device, _I
         wdm::object_reference thread;
         auto &dev = *get_device_ctx(device);
 
-        if (InterlockedExchange8(PCHAR(&dev.unplugged), true)) {
-                static_assert(sizeof(dev.unplugged) == sizeof(CHAR));
+        if (InterlockedExchangeBool(&dev.unplugged, true)) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
                 return thread;
         }
