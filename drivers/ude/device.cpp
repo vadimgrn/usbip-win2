@@ -59,7 +59,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
                 ptr04x(device), dev.cancelable_requests, dev.sent_requests);
 
-        NT_VERIFY(!detach(device, device::DONT_DELETE)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
+        NT_VERIFY(!device::detach(device, false)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
 
         if (auto &h = dev.ctx_ext) { // the parent is vhci controller
                 WdfObjectDelete(h);
@@ -359,9 +359,10 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 NT_ASSERT(sizeof(endp.descriptor) >= len);
                 RtlCopyMemory(&endp.descriptor, &epd, len);
                 insert_endpoint_list(endp);
-        } else {
+        } else { // default control pipe always added first
                 NT_ASSERT(epd == EP0);
                 static_cast<USB_ENDPOINT_DESCRIPTOR&>(endp.descriptor) = epd;
+                dev.ext().ep0_added = true;
                 dev.ep0 = endpoint;
         }
 
@@ -575,6 +576,21 @@ auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port
         return mem;
 }
 
+/*
+ * Call UdecxUsbDevicePlugOutAndDelete if UdecxUsbDevicePlugIn was successful.
+ * After UdecxUsbDevicePlugOutAndDelete the client driver can no longer use UDECXUSBDEVICE.
+ * 
+ * If call UdecxUsbDevicePlugOutAndDelete shortly after UdecxUsbDevicePlugIn,
+ * it is highly likely it will not delete UDECXUSBDEVICE immediately. In such case 
+ * UDECXUSBDEVICE.EvtCleanupCallback will be called during the deletion of VHCI device.
+ * 
+ * This only happens if UdecxUsbDevicePlugOutAndDelete was called when endpoints 
+ * were not created and EVT_UDECX_USB_DEVICE_ENDPOINTS_CONFIGURE was not called.
+ * In such case WdfObjectDelete will destroy the device immediately and without a BSOD.
+ * 
+ * We have to close a socket and free a port in detach() instead of device_cleanup, 
+ * otherwise next plugin_hardware will fail with ST_DEV_BUSY because the socket is still connected.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugout_and_delete(
@@ -589,9 +605,17 @@ PAGED void plugout_and_delete(
 
         if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
-        } else { // device and device_ctx may already be destroyed, do not use
-                Trace(TRACE_LEVEL_INFORMATION, "dev %04x, done", ptr04x(device));
-                device_state_changed(vhci, ext.attr, port, vhci::state::unplugged);
+                return;
+        }
+        // device and device_ctx may already be destroyed, do not use
+
+        auto force_delete = !ext.ep0_added;
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, done, force delete %d", ptr04x(device), force_delete);
+
+        device_state_changed(vhci, ext.attr, port, vhci::state::unplugged);
+
+        if (force_delete) { // FIXME: may cause BSOD if something changes in future UDE releases
+                WdfObjectDelete(device);
         }
 }
 

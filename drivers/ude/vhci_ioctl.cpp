@@ -287,10 +287,9 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ WDFMEMORY &ctx_ext)
         }
         ctx_ext = WDF_NO_HANDLE; // now dev owns it
 
-        if (bool plugged{}; auto err = plugin(dev, r->port, plugged)) {
-                if (plugged) {
-                        device::detach_and_delete(dev);
-                } else {
+        if (bool plugout_and_delete{}; auto err = plugin(dev, r->port, plugout_and_delete)) {
+                device::detach(dev, plugout_and_delete);
+                if (!plugout_and_delete) {
                         WdfObjectDelete(dev);
                 }
                 return err;

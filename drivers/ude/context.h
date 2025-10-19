@@ -94,6 +94,7 @@ struct device_ctx_ext
         wsk::SOCKET *sock;
 
         device_attributes attr;
+        bool ep0_added;
 
         auto node_name() { return &attr.node_name; }
         auto service_name() { return &attr.service_name; }
