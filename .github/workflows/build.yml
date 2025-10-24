@@ -22,7 +22,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: packages
-        key: ${{ runner.os }}-packages
+        key: ${{ runner.os }}-packages-x64
 
     - name: Set up Visual Studio
       uses: microsoft/setup-msbuild@v2
@@ -32,13 +32,14 @@ jobs:
 
     - name: Build solution
       run: |
+        $env:PATH="$env:PATH:C:\a\vadimgrn--usbip-win2\vadimgrn--usbip-win2\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\c\bin\10.0.26100.0\x64"
         msbuild usbip_win2.sln /p:Configuration=Release /p:Platform=x64 /m
         ls .
-        ls ./bin/
+        ls ./x64/
 
     - name: Archive build artifacts
       if: success()
       uses: actions/upload-artifact@v4
       with:
        name: build-artifacts
-       path: bin/*
+       path: x64/*
