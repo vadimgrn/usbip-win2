@@ -27,7 +27,7 @@ namespace
 
 using namespace usbip;
 
-const auto MAX_HUB_PORTS = 127;
+const auto MAX_HUB_PORTS = 255; // @see drivers/usbip_ude/vhci.cpp, set_usb_ports_cnt
 
 auto get_ids_data()
 {

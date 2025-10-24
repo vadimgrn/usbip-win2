@@ -29,24 +29,16 @@ namespace wsk
 namespace usbip
 {
 
-enum { 
-        USB2_PORTS = 30,
-        USB3_PORTS = USB2_PORTS,
-        TOTAL_PORTS = USB2_PORTS + USB3_PORTS
-};
-
-constexpr auto is_valid_port(int port)
-{
-        return port > 0 && port <= TOTAL_PORTS;
-}
-
 /*
  * Context space for WDFDEVICE, Virtual Host Controller Interface.
  * The parent is WDFDRIVER.
  */
 struct vhci_ctx
 {
-        UDECXUSBDEVICE devices[TOTAL_PORTS]; // do not access directly, functions must be used
+        int usb2_ports; // constant
+
+        int devices_cnt; // constant, usb2_ports + usb3 ports
+        UDECXUSBDEVICE *devices; // do not access directly, functions must be used
         WDFSPINLOCK devices_lock;
 
         LIST_ENTRY fileobjects; // @see fileobject_ctx::entry
@@ -56,6 +48,8 @@ struct vhci_ctx
 
         _KTHREAD *attach_thread;
         KEVENT attach_thread_stop;
+
+        WDFIOTARGET target_self;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
@@ -65,8 +59,22 @@ inline auto get_handle(_In_ vhci_ctx *ctx)
         return static_cast<WDFDEVICE>(WdfObjectContextGetObject(ctx));
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
+
 struct wsk_context;
 struct device_ctx;
+
+struct device_attributes
+{
+        // from ioctl::plugin_hardware, .Buffer-s are allocated in PagedPool
+        UNICODE_STRING node_name;
+        UNICODE_STRING service_name;
+        UNICODE_STRING busid;
+        //
+        vhci::imported_device_properties properties; // for ioctl::get_imported_devices
+};
 
 /*
  * Context extention for device_ctx. 
@@ -85,26 +93,39 @@ struct device_ctx_ext
         device_ctx *ctx;
         wsk::SOCKET *sock;
 
-        // from ioctl::plugin_hardware
-        // .Buffer-s are allocated in PagedPool, see create_device_ctx_ext
-        UNICODE_STRING node_name;
-        UNICODE_STRING service_name;
-        UNICODE_STRING busid;
-        //
-        
-        vhci::imported_device_properties dev; // for ioctl::get_imported_devices
+        device_attributes attr;
+        bool ep0_added;
+
+        auto node_name() { return &attr.node_name; }
+        auto service_name() { return &attr.service_name; }
+        auto busid() { return &attr.busid; }
+
+        auto& properties() { return attr.properties; }
 };
+
+/*
+ * @param mem must contain device_ctx_ext
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto& get_device_ctx_ext(_In_ WDFMEMORY mem)
+{
+        return *static_cast<device_ctx_ext*>(WdfMemoryGetBuffer(mem, nullptr));
+}
 
 /*
  * Context space for UDECXUSBDEVICE - emulated USB device.
  */
 struct device_ctx
 {
-        device_ctx_ext *ext; // must be free-d
+        WDFMEMORY ctx_ext;
+        auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
-        auto sock() const { return ext->sock; }
-        auto speed() const { return ext->dev.speed; }
-        auto devid() const { return ext->dev.devid; }
+        auto sock() const { return ext().sock; }
+        auto& attributes() const { return ext().attr; }
+
+        auto speed() const { return ext().properties().speed; }
+        auto devid() const { return ext().properties().devid; }
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
@@ -117,9 +138,6 @@ struct device_ctx
         seqnum_t seqnum; // @see next_seqnum
 
         volatile bool unplugged; // initiated detach that may still be ongoing
-        KEVENT detach_completed;
-
-        WDFWAITLOCK delete_lock; // serialize UdecxUsbDevicePlugOutAndDelete and UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS
 
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
@@ -203,10 +221,7 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
 struct fileobject_ctx
 {
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
-
         WDFCOLLECTION events; // WDFMEMORY(device_state) that are waiting for IRP_MJ_READ
-        enum { MAX_EVENTS = 2*TOTAL_PORTS }; // arbitrary
-
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
@@ -233,10 +248,12 @@ constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create_device_ctx_ext(_Out_ device_ctx_ext* &ext, _In_ const vhci::ioctl::plugin_hardware &r);
+PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r);
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void free(_In_ device_ctx_ext *ext);
+inline auto InterlockedExchangeBool(_Inout_ _Interlocked_operand_ volatile bool *target, _In_ bool value)
+{
+        static_assert(sizeof(*target) == sizeof(CHAR));
+        return InterlockedExchange8(reinterpret_cast<volatile CHAR*>(target), value);
+}
 
 } // namespace usbip

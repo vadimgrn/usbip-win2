@@ -11,6 +11,7 @@
     <ClCompile Include="wdf_cpp.cpp" />
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="select.cpp" />
+    <ClCompile Include="wdm_cpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -43,6 +44,7 @@
     <ClInclude Include="urb_ptr.h" />
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
     <ClInclude Include="wait_timeout.h" />
+    <ClInclude Include="wdm_cpp.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

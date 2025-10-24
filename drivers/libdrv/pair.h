@@ -4,11 +4,11 @@
 
 #pragma once
 
-template<typename T1, typename T2>
-inline void swap(T1 &a, T2 &b)
+template<typename T>
+inline void swap(T &a, T &b)
 {
-        T1 tmp(a);
-        a = b; // std::move is not available
+        T tmp(a); // std::move is not available
+        a = b;
         b = tmp;
 }
 

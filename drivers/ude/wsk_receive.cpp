@@ -658,18 +658,17 @@ PAGED void usbip::recv_thread_function(_In_ void *context)
 	auto device = static_cast<UDECXUSBDEVICE>(context);
 	TraceDbg("dev %04x", ptr04x(device));
 
-	//KeSetPriorityThread(KeGetCurrentThread(), LOW_REALTIME_PRIORITY);
-	auto dev = get_device_ctx(device);
+	auto &dev = *get_device_ctx(device);
 
-	if (auto ctx = alloc_wsk_context(dev, WDF_NO_HANDLE)) {
-		recv_loop(*dev, *ctx);
+	if (auto ctx = alloc_wsk_context(&dev, WDF_NO_HANDLE)) {
+		recv_loop(dev, *ctx);
 		NT_ASSERT(!ctx->request);
 		free(ctx, true);
 	}
 
-	if (!dev->unplugged) {
+	if (!dev.unplugged) {
 		TraceDbg("dev %04x, detaching", ptr04x(device));
-		device::detach(device);
+		device::async_detach_and_delete(device); // detach will be called by this thread
 	}
 
 	TraceDbg("dev %04x, exited", ptr04x(device));

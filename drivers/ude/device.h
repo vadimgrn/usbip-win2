@@ -6,6 +6,7 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\wdf_cpp.h>
+#include <libdrv/wdm_cpp.h>
 
 #include <usb.h>
 #include <wdfusb.h>
@@ -22,22 +23,25 @@ namespace usbip::device
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ device_ctx_ext *ext);
+PAGED NTSTATUS create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS recv_thread_start(_In_ UDECXUSBDEVICE device);
 
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED wdm::object_reference detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+inline auto detach_and_delete(_In_ UDECXUSBDEVICE device)
+{
+        return detach(device, true);
+}
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS async_detach_nowait(_In_ UDECXUSBDEVICE device);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS async_detach_and_wait(_In_ UDECXUSBDEVICE device);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS detach(_In_ UDECXUSBDEVICE device);
+void async_detach_and_delete(_In_ UDECXUSBDEVICE device);
 
 } // namespace usbip::device

@@ -24,9 +24,10 @@ Please refer to the original repository for the most up-to-date-information.
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USB/IP server at least for kernels 4.19 - 6.11
+- Works with Linux USB/IP server at least for kernels 4.19 - 6.14
 - **[WHLK](https://en.wikipedia.org/wiki/Windows_Hardware_Lab_Kit) certified drivers**
   - Download [Microsoft Hardware Certification Report](https://partner.microsoft.com/en-us/dashboard/hardware/Driver/DownloadCertificationReport/82862560/14228871579043985/1152921505699289069)
+  - Certification was made possible thanks to [Open Source Codesigning Initiative](https://github.com/OSSign)
 - **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#install-usbip)** before installing USBip
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (the list is incomplete)
 
@@ -121,11 +122,16 @@ usbip: info: bind device on busid 3-2: complete
     - Make sure system drive protection is enabled
     - Select Create
     - Type a description for the restore point, and then select Create
-- Download and run an installer from [releases](https://github.com/vadimgrn/usbip-win2/releases)
+- Download and run an installer from
+  - [Releases](https://github.com/vadimgrn/usbip-win2/releases)
+    - Drivers are signed by Microsoft, other binaries (*.exe, *.dll) are test-signed by project's certificate
+  - [OSSign](https://github.com/OSSign/vadimgrn--usbip-win2/releases)
+    - Drivers and all binaries, including the installer, are signed by Microsoft
+    - Use it if officially signed binaries are a mandatory requirement
 - Some antivirus programs issue false positives for InnoSetup installer
 - **All USB Hub 3.0 devices will be restarted during an installation**
   - This means that all USB devices will stop working for a short time and then start working again.
-  - Make sure you don't interrupt your important workflow, such as a video call using a USB webcam, an audio call using a USB headset, etc.
+  - Make sure you don't interrupt your important workflow, such as a video call using a USB webcam, an audio call using a USB headset, copying from/to USB drive, etc.
 
 ### Use usbip.exe to attach remote device(s)
 - Query available USB devices on the server
@@ -228,7 +234,7 @@ rem del /F sed*
 .sympath+ C:\Program Files\USBip
 !wmitrace.searchpath +%TEMP%\usbip
 !analyze -v
-!wdfkd.wdfsearchpath %TEMP%\USBip
+!wdfkd.wdfsearchpath %TEMP%\usbip
 !wdfkd.wdfsettraceprefix [%9]%3!04x! %!LEVEL! %!FUNC!:
 !wdfkd.wdflogdump usbip2_ude -d
 !wdfkd.wdflogdump usbip2_ude -f
@@ -263,4 +269,6 @@ verifier /reset
 - To run Static Driver Verifier, set "Treat Warnings As Errors" to "No" for libdrv, usbip2_filter, usbip2_ude projects
 
 ### If you like this project
-<a href="https://www.buymeacoffee.com/usbip" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
+[![paypal](whlk/jpg/paypal_donate_qrcode.png)](https://www.paypal.com/donate/?hosted_button_id=YNZ9GUFWFYHFW)
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=YNZ9GUFWFYHFW)

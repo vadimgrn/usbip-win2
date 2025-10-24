@@ -81,36 +81,6 @@ PAGED auto parse_string(_Out_ vhci::ioctl::plugin_hardware &r, _In_ const UNICOD
                     r.busid, sizeof(r.busid), busid);
 }
 
-/*
- * Target is self. 
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_target(_In_ WDFDEVICE vhci)
-{
-        PAGED_CODE();
-        ObjectDelete target;
-
-        if (WDFIOTARGET t; auto err = WdfIoTargetCreate(vhci, WDF_NO_OBJECT_ATTRIBUTES, &t)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetCreate %!STATUS!", err);
-                return target;
-        } else {
-                target.reset(t);
-        }
-
-        auto fdo = WdfDeviceWdmGetDeviceObject(vhci);
-
-        WDF_IO_TARGET_OPEN_PARAMS params;
-        WDF_IO_TARGET_OPEN_PARAMS_INIT_EXISTING_DEVICE(&params, fdo);
-
-        if (auto err = WdfIoTargetOpen(target.get<WDFIOTARGET>(), &params)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetOpen %!STATUS!", err);
-                target.reset();
-        }
-
-        return target;
-}
-
 constexpr auto get_delay(_In_ ULONG attempt, _In_ ULONG cnt)
 {
         NT_ASSERT(cnt);
@@ -244,7 +214,7 @@ PAGED void intersection(_In_ WDFCOLLECTION a, _In_ WDFCOLLECTION b)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED ULONG get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh)
+PAGED auto get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh)
 {
         PAGED_CODE();
 
@@ -253,10 +223,10 @@ PAGED ULONG get_count(_In_ WDFCOLLECTION col, _In_ WDFKEY key, _In_ bool refresh
         } else if (auto newcol = get_persistent_devices(key)) {
                 intersection(col, newcol.get<WDFCOLLECTION>());
         } else {
-                return 0;
+                return 0UL;
         }
 
-        return min(WdfCollectionGetCount(col), ARRAYSIZE(vhci_ctx::devices));
+        return WdfCollectionGetCount(col);
 }
 
 _IRQL_requires_same_
@@ -275,13 +245,6 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
                 return;
         }
 
-        auto vhci = get_handle(&ctx);
-
-        auto target = make_target(vhci);
-        if (!target) {
-                return;
-        }
-
         vhci::ioctl::plugin_hardware req{{ .size = sizeof(req) }};
 
         WDF_MEMORY_DESCRIPTOR input;
@@ -294,7 +257,9 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
 
         for (ULONG attempt = 0; true; ++attempt) {
 
-                auto cnt = get_count(devices.get<WDFCOLLECTION>(), key.get(), attempt);
+                auto cnt = min(get_count(devices.get<WDFCOLLECTION>(), key.get(), attempt),
+                               static_cast<ULONG>(ctx.devices_cnt));
+
                 if (!cnt) {
                         break;
                 }
@@ -312,7 +277,7 @@ PAGED void plugin_persistent_devices(_In_ vhci_ctx &ctx)
                                 WdfStringGetUnicodeString(s, &str);
                         }
 
-                        if (plugin_hardware(str, target.get<WDFIOTARGET>(), req, input, output, outlen)) {
+                        if (plugin_hardware(str, ctx.target_self, req, input, output, outlen)) {
                                 TraceDbg("exclude %!USTR!", &str);
                                 WdfCollectionRemoveItem(devices.get<WDFCOLLECTION>(), i);
                                 --cnt;
@@ -338,9 +303,9 @@ PAGED void persistent_devices_thread(_In_ void *ctx)
         auto &vhci = *static_cast<vhci_ctx*>(ctx);
         plugin_persistent_devices(vhci);
 
-        if (auto thread = (_KTHREAD*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.attach_thread), nullptr)) {
-                ObDereferenceObject(thread);
+        if (auto thread = InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci.attach_thread), nullptr)) {
                 TraceDbg("dereference");
+                ObDereferenceObjectDeferDelete(thread);
         } else {
                 TraceDbg("exit");
         }
@@ -349,6 +314,9 @@ PAGED void persistent_devices_thread(_In_ void *ctx)
 } // namespace 
 
 
+/*
+ * ObDereferenceObject must be called as soon as it is done with this thread
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
@@ -358,17 +326,18 @@ PAGED void usbip::plugin_persistent_devices(_In_ vhci_ctx *vhci)
         const auto access = THREAD_ALL_ACCESS;
         auto fdo = WdfDeviceWdmGetDeviceObject(get_handle(vhci));
 
-        if (HANDLE handle; 
+        if (HANDLE handle{}; 
             auto err = IoCreateSystemThread(fdo, &handle, access, nullptr, nullptr, 
                                             nullptr, persistent_devices_thread, vhci)) {
                 Trace(TRACE_LEVEL_ERROR, "IoCreateSystemThread %!STATUS!", err);
         } else {
-                PVOID thread;
-                NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, 
+                PVOID thread{};
+                NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode,
                                                                &thread, nullptr)));
 
-                NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
                 NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&vhci->attach_thread), thread));
+                NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+
                 TraceDbg("thread launched");
         }
 }
