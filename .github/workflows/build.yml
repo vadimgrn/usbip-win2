@@ -29,12 +29,10 @@ jobs:
 
     - name: Install NuGet dependencies
       run: nuget restore usbip_win2.sln
-    
-    
 
     - name: Build solution
       run: |
-        msbuild usbip_win2.sln /p:Configuration=Release /m
+        msbuild usbip_win2.sln /p:Configuration=Release /p:Platform=x64 /m
         ls .
         ls ./bin/
 
