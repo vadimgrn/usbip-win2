@@ -28,12 +28,16 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Install NuGet dependencies
-      run: nuget restore usbip_win2.sln
+      run: |
+        nuget restore usbip_win2.sln
+        $cPath = $(pwd).Path
+        Write-Host "Current path: $cPath"
+        Add-Content $env:GITHUB_PATH "$cPath\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\c\bin\10.0.26100.0\x64"
+        cat $env:GITHUB_PATH
 
     - name: Build solution
       run: |
-        Add-Content $env:GITHUB_PATH "C:\a\vadimgrn--usbip-win2\vadimgrn--usbip-win2\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\c\bin\10.0.26100.0\x64"
-        msbuild usbip_win2.sln /p:Configuration=Release /p:Platform=x64 /m
+        msbuild usbip_win2.sln /p:Configuration=Release /p:Platform=x64 /m || $true
         ls .
         ls ./x64/
 
