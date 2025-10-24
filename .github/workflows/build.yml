@@ -1,0 +1,37 @@
+name: Build Drivers and Executables
+
+on:
+  push:
+    branches:
+      - test-action
+
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Visual Studio
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Install NuGet dependencies
+      run: nuget restore usbip_win2.sln
+
+    - name: Build solution
+      run: |
+        msbuild usbip_win2.sln /p:Configuration=Release /m
+        ls .
+        ls ./bin/
+
+    - name: Archive build artifacts
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          bin/**/*.exe
+          bin/**/*.dll
+          bin/**/*.sys
