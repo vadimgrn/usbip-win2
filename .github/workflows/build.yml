@@ -32,18 +32,15 @@ jobs:
     
     
 
-    #- name: Build solution
-    #  run: |
-    #    msbuild usbip_win2.sln /p:Configuration=Release /m
-    #    ls .
-    #    ls ./bin/
-#
-#    - name: Archive build artifacts
-#      if: success()
-#      uses: actions/upload-artifact@v4
- #     with:
- #       name: build-artifacts
- #       path: |
- #         bin/**/*.exe
- #         bin/**/*.dll
- #         bin/**/*.sys#
+    - name: Build solution
+      run: |
+        msbuild usbip_win2.sln /p:Configuration=Release /m
+        ls .
+        ls ./bin/
+
+    - name: Archive build artifacts
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+       name: build-artifacts
+       path: bin/*
