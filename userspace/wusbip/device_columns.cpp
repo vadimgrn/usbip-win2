@@ -32,16 +32,19 @@ auto make_cmp_key(_In_ const device_location &loc)
 auto set_vendor_product(
         _Inout_ device_columns &dc, _In_ unsigned int flags, _In_ UINT16 vendor_id, _In_ UINT16 product_id) 
 {
-        wxASSERT(vendor_id);
-        wxASSERT(product_id);
-
+        wxASSERT(vendor_id || product_id);
         auto [vendor, product] = get_ids().find_product(vendor_id, product_id);
 
         for (auto [col, id, str]: {
                 std::make_tuple(COL_VENDOR, vendor_id, vendor),
                 std::make_tuple(COL_PRODUCT, product_id, product) }) {
 
-                dc[col] = str.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(str.data(), str.size());
+                if (id) {
+                        dc[col] = str.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(str.data(), str.size());
+                } else {
+                        dc[col].clear();
+                }
+
                 flags |= mkflag(col);
         }
 
@@ -53,24 +56,26 @@ auto set_vendor_product(
 
 /*
  * port can be zero, speed can be UsbLowSpeed aka zero.
+ * Some devices has zero VID or PID.
  */
 bool usbip::is_empty(_In_ const imported_device &d) noexcept
 {
-        return !(d.vendor && d.product);
+        return !(d.vendor || d.product);
 }
 
 /*
+ * Some devices has zero VID or PID.
  * @see is_empty(_In_ wxTreeListCtrl &tree, _In_ wxTreeListItem dev) 
  */
 bool usbip::is_empty(_In_ const device_columns &dc) noexcept
 {
         for (auto col: {COL_VENDOR, COL_PRODUCT}) {
-                if (dc[col].empty()) {
-                        return true;
+                if (!dc[col].empty()) {
+                        return false;
                 }
         }
 
-        return false;
+        return true;
 }
 
 auto usbip::make_device_location(_In_ const wxString &url, _In_ const wxString &busid) -> device_location

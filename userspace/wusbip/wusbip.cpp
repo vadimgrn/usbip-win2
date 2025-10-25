@@ -71,18 +71,19 @@ void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &sa
 }
 
 /*
+ * Some devices has zero VID or PID.
  * @see is_empty(_In_ const device_columns &dc)
  * @see is_empty(_In_ const imported_device &d)
  */
 auto is_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev) noexcept
 {
         for (auto col: {COL_VENDOR, COL_PRODUCT}) {
-                if (auto &s = tree.GetItemText(dev, col); s.empty()) {
-                        return true;
+                if (auto &s = tree.GetItemText(dev, col); !s.empty()) {
+                        return false;
                 }
         }
 
-        return false;
+        return true;
 }
 
 /*
