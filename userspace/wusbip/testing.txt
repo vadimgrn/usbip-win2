@@ -1,0 +1,60 @@
+			### Testing scenarios ###
+
+### Add devices
+		
+- Add device with Auto and Notes, Ctrl+S
+- Press Reload to remove devices
+- Add the same device, Auto and Notes must be restored
+
+- Add device with Auto and Notes, Ctrl+S
+- Insert the other device in the same port
+- Add device should update columns except for Auto and Notes
+
+### Load
+
+- Add devices with Auto and Notes, Ctrl+S
+- Press Reload to remove devices
+- Press Load, all saved devices must be restored
+
+- Add two devices, Ctrl+S
+- Press Reload to remove devices
+- Add one of the devices again
+- Press Load, it must add missing devices and do not touch existing
+
+### Reload
+
+- Must list attached devices only
+- Auto and Notes must be restored, State must be checked
+
+### State
+
+- Detach all devices, Reload, Ctrl+S
+- usbip attach -r localhost -b 1-10
+- The device must be added, State is Checked
+
+- Add device with Auto and Notes, Ctrl+S
+- Attach this device from CLI
+  - usbip attach -r localhost -b 1-10
+  - State must be checked
+- Detach this device from CLI
+  - usbip detach --all
+  - State must be unchecked
+
+- Add device with Auto and Notes, Ctrl+S
+- Reload to remove all devices
+- Attach this device from CLI
+  - usbip attach -r localhost -b 1-10
+  - State must be checked, Auto and Notes must be restored
+- Detach this device from CLI
+  - usbip detach --all
+  - State must be unchecked
+
+- usbip attach -r microsoft.com -b 1-10
+- A new device must be added with empty columns and 'Connecting' state
+- When the connection is failed, it must be removed
+
+- Add device with Auto and Notes, Ctrl+S
+- Attach this device, State must be checked
+- Attach the same device from CLI
+  - usbip attach -r localhost -b 1-10
+- Columns must not change, State must remain checked

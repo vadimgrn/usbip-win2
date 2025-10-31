@@ -86,7 +86,7 @@
         <property name="window_name"></property>
         <property name="window_style"></property>
       </object>
-      <object class="wxMenuBar" expanded="false">
+      <object class="wxMenuBar" expanded="true">
         <property name="bg"></property>
         <property name="context_help"></property>
         <property name="context_menu">1</property>
@@ -277,11 +277,11 @@
             <event name="OnUpdateUI">on_edit_notes_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
-          <object class="submenu" expanded="false">
+          <object class="submenu" expanded="true">
             <property name="bitmap">Load From Art Provider; wxART_REPORT_VIEW; wxART_MENU</property>
             <property name="label">Columns</property>
             <property name="name">m_menu_columns</property>
@@ -400,6 +400,21 @@
               <property name="kind">wxITEM_CHECK</property>
               <property name="label">?</property>
               <property name="name">m_view_notes</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">0</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">wxID_ANY</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">?</property>
+              <property name="name">m_view_devid</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -1174,7 +1189,7 @@
           <event name="OnButtonClick">add_exported_devices</event>
         </object>
       </object>
-      <object class="wxTreeListCtrl" expanded="false">
+      <object class="wxTreeListCtrl" expanded="true">
         <property name="BottomDockable">0</property>
         <property name="LeftDockable">0</property>
         <property name="RightDockable">0</property>
@@ -1275,6 +1290,12 @@
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Notes</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_CENTER</property>
+          <property name="flag">wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">DeviceId</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
