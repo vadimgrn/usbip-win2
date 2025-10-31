@@ -37,7 +37,7 @@ struct imported_device
         UINT16 product{};
 };
 
-enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
+enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging, resolving };
 
 struct device_state
 {

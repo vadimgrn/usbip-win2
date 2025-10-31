@@ -167,6 +167,7 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         static_assert(int(state::plugged) == int(vhci::state::plugged));
         static_assert(int(state::disconnected) == int(vhci::state::disconnected));
         static_assert(int(state::unplugging) == int(vhci::state::unplugging));
+        static_assert(int(state::resolving) == int(vhci::state::resolving));
 
         static_assert(int(state::unplugged) == 0);
         static_assert(int(state::connecting) == 1);
@@ -174,8 +175,9 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         static_assert(int(state::plugged) == 3);
         static_assert(int(state::disconnected) == 4);
         static_assert(int(state::unplugging) == 5);
+        static_assert(int(state::resolving) == 6);
 
-        const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
+        const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging", "resolving" };
 
         auto idx = static_cast<int>(state);
         return idx >= 0 && idx < ARRAYSIZE(v) ? v[idx] : "";
