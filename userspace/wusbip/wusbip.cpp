@@ -556,7 +556,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         log(st);
 
         if (m_taskbar_icon && m_taskbar_icon->IsIconInstalled()) {
-                auto s = _(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
+                auto s = wxString::FromAscii(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
                 m_taskbar_icon->show_balloon(s);
         }
 

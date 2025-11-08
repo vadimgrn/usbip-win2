@@ -185,7 +185,7 @@ wxString usbip::to_string(_In_ state state)
                 s = L'\u25A3'; // white square containing small black square
                 break;
         default:
-                s = _(vhci::get_state_str(state));
+                s = wxString::FromAscii(vhci::get_state_str(state));
         }
 
         return s;
