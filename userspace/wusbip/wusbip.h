@@ -7,6 +7,7 @@
 #include "frame.h"
 #include "device_columns.h"
 #include "tree_comparator.h"
+#include "app.h"
 
 #include <libusbip/win_handle.h>
 
@@ -24,7 +25,7 @@ wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 class MainFrame : public Frame
 {
 public:
-	MainFrame(_In_ usbip::Handle read);
+	MainFrame(_In_ usbip::Handle read, _In_ wxApp::Appearance appearance);
 	~MainFrame();
 
 	auto start_in_tray() const noexcept { return m_start_in_tray; }
@@ -64,7 +65,7 @@ private:
 	void on_select_all(wxCommandEvent &event) override;
 	void on_has_devices_update_ui(wxUpdateUIEvent &event) override;
 	void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
-	void on_toogle_auto(wxCommandEvent &event) override;
+	void on_toggle_auto(wxCommandEvent &event) override;
 	void on_item_context_menu(wxTreeListEvent &event) override;
 	void on_view_reset(wxCommandEvent &event) override;
 	void on_help_about_lib(wxCommandEvent&) override;
@@ -110,7 +111,10 @@ private:
 	void on_view_font_decrease(wxCommandEvent & event) override;
 	void on_view_font_default(wxCommandEvent &event) override;
 
+	void on_view_appearance(wxCommandEvent &event) override;
+
 	void init();
+	void set_appearance(_In_ wxApp::Appearance appearance);
 	void init_tree_list();
 	void restore_state();
 

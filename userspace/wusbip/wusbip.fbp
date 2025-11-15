@@ -258,7 +258,7 @@
             <property name="permission">none</property>
             <property name="shortcut">CTRL+P</property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_toogle_auto</event>
+            <event name="OnMenuSelection">on_toggle_auto</event>
             <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
@@ -281,7 +281,7 @@
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
-          <object class="submenu" expanded="true">
+          <object class="submenu" expanded="false">
             <property name="bitmap">Load From Art Provider; wxART_REPORT_VIEW; wxART_MENU</property>
             <property name="label">Columns</property>
             <property name="name">m_menu_columns</property>
@@ -422,6 +422,54 @@
               <event name="OnUpdateUI">on_view_column_update_ui</event>
             </object>
           </object>
+          <object class="submenu" expanded="true">
+            <property name="bitmap">Load From Art Provider; wxART_TIP; wxART_MENU</property>
+            <property name="label">Appearance</property>
+            <property name="name">m_view_appearance</property>
+            <property name="permission">protected</property>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">0</property>
+              <property name="enabled">1</property>
+              <property name="help">Windows default app colors</property>
+              <property name="id">wxID_FILE1</property>
+              <property name="kind">wxITEM_RADIO</property>
+              <property name="label">System</property>
+              <property name="name">m_appearance_system</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_appearance</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">0</property>
+              <property name="enabled">1</property>
+              <property name="help">Light mode</property>
+              <property name="id">wxID_FILE2</property>
+              <property name="kind">wxITEM_RADIO</property>
+              <property name="label">Light</property>
+              <property name="name">m_appearance_light</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_appearance</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">0</property>
+              <property name="enabled">1</property>
+              <property name="help">Dark mode</property>
+              <property name="id">wxID_FILE3</property>
+              <property name="kind">wxITEM_RADIO</property>
+              <property name="label">Dark</property>
+              <property name="name">m_appearance_dark</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_appearance</event>
+            </object>
+          </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap"></property>
             <property name="checked">0</property>
@@ -498,8 +546,8 @@
             <property name="unchecked_bitmap">Load From File; </property>
             <event name="OnMenuSelection">on_view_font_default</event>
           </object>
-          <object class="separator" expanded="false">
-            <property name="name">m_separator511</property>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator5111</property>
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">

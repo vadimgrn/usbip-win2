@@ -164,6 +164,26 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_view->Append( m_menu_columnsItem );
 
+	m_view_appearance = new wxMenu();
+	wxMenuItem* m_view_appearanceItem = new wxMenuItem( m_menu_view, wxID_ANY, _("Appearance"), wxEmptyString, wxITEM_NORMAL, m_view_appearance );
+	#if (defined( __WXMSW__ ) || defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_view_appearanceItem->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_TIP), wxASCII_STR(wxART_MENU) ) );
+	#endif
+
+	wxMenuItem* m_appearance_system;
+	m_appearance_system = new wxMenuItem( m_view_appearance, wxID_FILE1, wxString( _("System") ) , _("Windows default app colors"), wxITEM_RADIO );
+	m_view_appearance->Append( m_appearance_system );
+
+	wxMenuItem* m_appearance_light;
+	m_appearance_light = new wxMenuItem( m_view_appearance, wxID_FILE2, wxString( _("Light") ) , _("Light mode"), wxITEM_RADIO );
+	m_view_appearance->Append( m_appearance_light );
+
+	wxMenuItem* m_appearance_dark;
+	m_appearance_dark = new wxMenuItem( m_view_appearance, wxID_FILE3, wxString( _("Dark") ) , _("Dark mode"), wxITEM_RADIO );
+	m_view_appearance->Append( m_appearance_dark );
+
+	m_menu_view->Append( m_view_appearanceItem );
+
 	wxMenuItem* m_view_zebra;
 	m_view_zebra = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Alternate row colour") ) , _("Alternate row colour for the tree"), wxITEM_CHECK );
 	m_menu_view->Append( m_view_zebra );
@@ -407,7 +427,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_copy_rows ), this, m_copy_rows->GetId());
 	this->Connect( m_copy_rows->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toogle_auto ), this, m_toggle_auto->GetId());
+	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toggle_auto ), this, m_toggle_auto->GetId());
 	this->Connect( m_toggle_auto->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
 	this->Connect( m_edit_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
@@ -429,6 +449,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_view_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_devid->GetId());
 	this->Connect( m_view_devid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_view_appearance->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_appearance ), this, m_appearance_system->GetId());
+	m_view_appearance->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_appearance ), this, m_appearance_light->GetId());
+	m_view_appearance->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_appearance ), this, m_appearance_dark->GetId());
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_zebra ), this, m_view_zebra->GetId());
 	this->Connect( m_view_zebra->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zebra_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_labels ), this, m_view_labels->GetId());

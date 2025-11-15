@@ -9,7 +9,6 @@
 #include "wxutils.h"
 #include "utils.h"
 #include "font.h"
-#include "app.h"
 #include "log.h"
 
 #include <libusbip/remote.h>
@@ -69,6 +68,16 @@ void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &sa
         for (auto [key, col]: get_saved_keys()) {
                 dc[col] = saved[col];
         }
+}
+
+constexpr auto get_menu_item_id(_In_ wxApp::Appearance appearance)
+{
+        return wxID_FILE1 + static_cast<int>(appearance);
+}
+
+constexpr auto get_appearance(_In_ long menu_item_id)
+{
+        return menu_item_id - wxID_FILE1; // wxApp::Appearance
 }
 
 /*
@@ -354,7 +363,7 @@ private:
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 
-MainFrame::MainFrame(_In_ Handle read) : 
+MainFrame::MainFrame(_In_ Handle read, wxApp::Appearance appearance) : 
         Frame(nullptr),
         m_read(std::move(read)),
         m_log(new LogWindow(this, 
@@ -365,7 +374,9 @@ MainFrame::MainFrame(_In_ Handle read) :
 {
         wxASSERT(m_read);
 
+        set_appearance(appearance);
         init();
+
         restore_state();
         post_refresh();
 }
@@ -373,6 +384,17 @@ MainFrame::MainFrame(_In_ Handle read) :
 MainFrame::~MainFrame()
 {
         m_treeListCtrl->SetItemComparator(nullptr);
+}
+
+void MainFrame::set_appearance(_In_ wxApp::Appearance appearance)
+{
+        auto id = get_menu_item_id(appearance);
+
+        if (auto itm = m_view_appearance->FindItem(id)) {
+                itm->Check();
+        } else {
+                wxLogError(_("View/Appearance: cannot find item id %d(wxID_FILE?)"), id);
+        }
 }
 
 void MainFrame::init()
@@ -1155,7 +1177,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         return str.ToInt(&port) ? port : 0;
 }
 
-void MainFrame::on_toogle_auto(wxCommandEvent&)
+void MainFrame::on_toggle_auto(wxCommandEvent&)
 {
         for (auto &dev: get_selected_devices(*m_treeListCtrl)) {
                 auto ok = is_persistent(dev);
@@ -1319,7 +1341,7 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_OPEN, m_menu_devices, &MainFrame::on_attach },
                 { wxID_CLOSE, m_menu_devices, &MainFrame::on_detach },
                 { wxID_SEPARATOR, nullptr, nullptr },
-                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
+                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
                 { wxID_SEPARATOR, nullptr, nullptr },
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
@@ -1400,4 +1422,15 @@ void MainFrame::on_view_font_decrease(wxCommandEvent&)
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(m_treeListCtrl, 0);
+}
+
+void MainFrame::on_view_appearance(wxCommandEvent &event)
+{
+        auto appearance = get_appearance(event.GetId());
+
+        if (auto &cfg = *wxConfig::Get(); cfg.Write(App::KeyAppearance, appearance)) {
+                cfg.Flush();
+        } else {
+                wxLogError(_("Cannot write %s=%d"), App::KeyAppearance, appearance);
+        }
 }

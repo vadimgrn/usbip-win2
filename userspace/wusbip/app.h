@@ -12,8 +12,11 @@ public:
         App();
         bool OnInit() override;
 
+        static inline auto &KeyAppearance = L"Appearance";
+
 private:
         void set_names();
+        Appearance restore_appearance();
         void on_end_session(_In_ wxCloseEvent &event);
 };
 

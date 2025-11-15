@@ -7,26 +7,39 @@
 #include "wusbip.h"
 
 #include <libusbip/src/file_ver.h>
+#include <wx/config.h>
+
+namespace
+{
 
 using namespace usbip;
-
-App::App()
+        
+auto read_appearance()
 {
-        Bind(wxEVT_END_SESSION, &App::on_end_session, this);
-}
+        enum { System = static_cast<long>(wxApp::Appearance::System) };
 
-bool App::OnInit()
-{
-        if (wxApp::OnInit()) {
-                set_names();
-        } else {
-                return false;
+        auto &cfg = *wxConfig::Get();
+        auto val = cfg.ReadLong(App::KeyAppearance, System);
+
+        switch (val) {
+        case System:
+        case static_cast<long>(wxApp::Appearance::Light):
+        case static_cast<long>(wxApp::Appearance::Dark):
+                break;
+        default:
+                wxLogError(_("Unexpected value %s=%d"), App::KeyAppearance, val);
+                val = System;
         }
 
+        return static_cast<wxApp::Appearance>(val);
+}
+
+auto init_mainframe(_In_ wxApp::Appearance appearance)
+{
         wxString err;
 
-        if (auto read = init(err) ? vhci::open() : Handle()) {
-                if (auto &frame = *new MainFrame(std::move(read)); frame.start_in_tray()) {
+        if (auto read = usbip::init(err) ? vhci::open() : Handle()) {
+                if (auto &frame = *new MainFrame(std::move(read), appearance); frame.start_in_tray()) {
                         frame.iconize_to_tray();
                 } else {
                         frame.Show();
@@ -42,12 +55,43 @@ bool App::OnInit()
         return false;
 }
 
+} // namespace
+
+
+App::App()
+{
+        Bind(wxEVT_END_SESSION, &App::on_end_session, this);
+}
+
+bool App::OnInit()
+{
+        if (!wxApp::OnInit()) {
+                return false;
+        }
+
+        set_names();
+
+        auto appearance = restore_appearance();
+        return init_mainframe(appearance);
+}
+
 void App::set_names()
 {
         auto &v = win::get_file_version();
 
         SetAppName(wx_string(v.GetProductName()));
         SetVendorName(wx_string(v.GetCompanyName()));
+}
+
+auto App::restore_appearance() -> Appearance
+{
+        auto appearance = read_appearance();
+
+        if (auto res = SetAppearance(appearance); res != AppearanceResult::Ok) {
+                wxLogError(_("SetAppearance(%d) error %d"), appearance, res);
+        }
+
+        return appearance;
 }
 
 /*
