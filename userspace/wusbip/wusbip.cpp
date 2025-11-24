@@ -9,8 +9,8 @@
 #include "wxutils.h"
 #include "utils.h"
 #include "font.h"
-#include "app.h"
 #include "log.h"
+#include "app.h"
 
 #include <libusbip/remote.h>
 #include <libusbip/persistent.h>
@@ -38,6 +38,20 @@ using namespace usbip;
 const auto g_persistent_mark = L'\u2713'; // CHECK MARK, 2714 HEAVY CHECK MARK
 auto &g_key_devices = L"/devices";
 auto &g_key_url = L"url";
+
+/*
+ * Menu/View/Appearance, radio items
+ */
+inline auto get_appearance_itemid(_In_ int appearance) noexcept
+{
+        return wxID_FILE1 + appearance;
+}
+
+inline auto get_appearance_value(_In_ int itemid) noexcept
+{
+        wxASSERT(itemid >= wxID_FILE1);
+        return itemid - wxID_FILE1;
+}
 
 consteval auto get_saved_keys()
 {
@@ -354,7 +368,7 @@ private:
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 
-MainFrame::MainFrame(_In_ Handle read) : 
+MainFrame::MainFrame(_In_ Handle read, _In_ int appearance) : 
         Frame(nullptr),
         m_read(std::move(read)),
         m_log(new LogWindow(this, 
@@ -364,7 +378,8 @@ MainFrame::MainFrame(_In_ Handle read) :
                 m_menu_view->FindItem(wxID_ZOOM_100)))
 {
         wxASSERT(m_read);
-
+        check_view_appearance(appearance);
+        
         init();
         restore_state();
         post_refresh();
@@ -373,6 +388,17 @@ MainFrame::MainFrame(_In_ Handle read) :
 MainFrame::~MainFrame()
 {
         m_treeListCtrl->SetItemComparator(nullptr);
+}
+
+void MainFrame::check_view_appearance(_In_ int appearance)
+{
+        auto id = get_appearance_itemid(appearance);
+
+        if (auto itm = m_view_appearance->FindItem(id); itm && itm->GetKind() == wxITEM_RADIO) {
+                itm->Check();
+        } else {
+                wxLogError(_("View/Appearance: invalid appearance %d"), appearance);
+        }
 }
 
 void MainFrame::init()
@@ -403,6 +429,12 @@ void MainFrame::init()
 /*
  * FIXME: set first column bold.
  * FIXME: wxTreeListCtrl::OnMouseWheel event does not work if it is set in wxFormBuilder
+ * 
+ * MEDIUM FOREST GREEN
+ * FOREST GREEN
+ * CADET BLUE
+ * LIGHT STEEL BLUE
+ * MEDIUM ORCHID
  */
 void MainFrame::init_tree_list()
 {
@@ -416,28 +448,26 @@ void MainFrame::init_tree_list()
 
         if (auto hdr = dv.GenericGetHeader()) {
                 hdr->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(MainFrame::on_tree_mouse_wheel), this);
-                if (auto colour = wxTheColourDatabase->Find(L"DIM GREY"); colour.IsOk()) { // MIDNIGHT BLUE"
+                if (auto colour = wxTheColourDatabase->Find(L"MEDIUM FOREST GREEN"); colour.IsOk()) { // for Light and Dark
                         hdr->SetForegroundColour(colour);
                 }
-        }
-
-        if (auto colour = wxTheColourDatabase->Find(L"MEDIUM GOLDENROD"); colour.IsOk()) { // "WHEAT"
-                dv.SetAlternateRowColour(colour);
         }
 }
 
 wxWithImages::Images MainFrame::get_tree_images()
 {
-        static_assert(IMG_SERVER == 0);
-        static_assert(IMG_DEVICE == 1);
+        auto dark = wxSystemSettings::GetAppearance().IsDark();
 
-        auto server = wxArtProvider::GetBitmap(wxASCII_STR(wxART_GO_HOME), wxASCII_STR(wxART_LIST));
-        auto device = wxBitmapBundle::FromSVGResource(wxASCII_STR("usb_svg"), server.GetSize());
+        auto stock_bmp = wxArtProvider::GetBitmap(wxASCII_STR(wxART_GO_HOME), wxASCII_STR(wxART_LIST));
+        auto size = stock_bmp.GetSize();
 
         return wxWithImages::Images { 
-                std::move(server),
-                std::move(device) 
+                wxBitmapBundle::FromSVGResource(wxASCII_STR(dark ? "computer_svg_dark" : "computer_svg"), size),
+                wxBitmapBundle::FromSVGResource(wxASCII_STR(dark ? "usb_svg_dark" : "usb_svg"), size)
         };
+
+        static_assert(IMG_SERVER == 0);
+        static_assert(IMG_DEVICE == 1);
 }
 
 void MainFrame::restore_state()
@@ -1155,7 +1185,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         return str.ToInt(&port) ? port : 0;
 }
 
-void MainFrame::on_toogle_auto(wxCommandEvent&)
+void MainFrame::on_toggle_auto(wxCommandEvent&)
 {
         for (auto &dev: get_selected_devices(*m_treeListCtrl)) {
                 auto ok = is_persistent(dev);
@@ -1319,7 +1349,7 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_OPEN, m_menu_devices, &MainFrame::on_attach },
                 { wxID_CLOSE, m_menu_devices, &MainFrame::on_detach },
                 { wxID_SEPARATOR, nullptr, nullptr },
-                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toogle_auto },
+                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
                 { wxID_SEPARATOR, nullptr, nullptr },
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
@@ -1400,4 +1430,12 @@ void MainFrame::on_view_font_decrease(wxCommandEvent&)
 void MainFrame::on_view_font_default(wxCommandEvent&)
 {
         change_font_size(m_treeListCtrl, 0);
+}
+
+void MainFrame::on_view_appearance(wxCommandEvent &event)
+{
+        auto val = get_appearance_value(event.GetId());
+        wxGetApp().write_appearance(val);
+
+        wxLogStatus(_("Restart the app to change its appearance"));
 }

@@ -1,2 +1,3 @@
 * text=auto eol=crlf
+*.svg text eol=lf
 userspace/usbip/usb.ids text eol=lf

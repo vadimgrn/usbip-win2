@@ -95,39 +95,69 @@ IDR_USB_IDS             RCDATA                  "../usbip/usb.ids"
 IDR_LICENSE             RCDATA                  "../../LICENSE.txt"
 
 ADD_SVG                 RCDATA                  "resources/Add.svg"
+ADD_SVG_DARK            RCDATA                  "resources/Add_dark.svg"
+
+APPEARANCE_SVG          RCDATA                  "resources/appearance.svg"
+APPEARANCE_SVG_DARK     RCDATA                  "resources/appearance_dark.svg"
 
 COPY_SVG                RCDATA                  "resources/copy.svg"
+COPY_SVG_DARK           RCDATA                  "resources/copy_dark.svg"
 
 CHECK_SVG               RCDATA                  "resources/check.svg"
+CHECK_SVG_DARK          RCDATA                  "resources/check_dark.svg"
 
 CLOSE_SVG               RCDATA                  "resources/close.svg"
+CLOSE_SVG_DARK          RCDATA                  "resources/close_dark.svg"
 
 DISMISS_SVG             RCDATA                  "resources/dismiss.svg"
 
 REFRESH_SVG             RCDATA                  "resources/refresh.svg"
+REFRESH_SVG_DARK        RCDATA                  "resources/refresh_dark.svg"
 
 COMMENT_EDIT_SVG        RCDATA                  "resources/Comment_Edit.svg"
+COMMENT_EDIT_SVG_DARK   RCDATA                  "resources/Comment_Edit_dark.svg"
 
 SAVE_SVG                RCDATA                  "resources/Save.svg"
+SAVE_SVG_DARK           RCDATA                  "resources/Save_dark.svg"
 
 SAVE_ALT_SVG            RCDATA                  "resources/save_alt.svg"
+SAVE_ALT_SVG_DARK       RCDATA                  "resources/save_alt_dark.svg"
 
 SAVE_MULTIPLE_SVG       RCDATA                  "resources/Save_Multiple.svg"
+SAVE_MULTIPLE_SVG_DARK  RCDATA                  "resources/Save_Multiple_dark.svg"
 
 SELECT_ALL_SVG          RCDATA                  "resources/Select_All_On.svg"
+SELECT_ALL_SVG_DARK     RCDATA                  "resources/Select_All_On_dark.svg"
 
 POWER_SVG               RCDATA                  "resources/power_settings_new.svg"
+POWER_SVG_DARK          RCDATA                  "resources/power_settings_new_dark.svg"
 
 REPLAY_SVG              RCDATA                  "resources/replay.svg"
+REPLAY_SVG_DARK         RCDATA                  "resources/replay_dark.svg"
 
 INFO_SVG                RCDATA                  "resources/Info.svg"
+INFO_SVG_DARK           RCDATA                  "resources/Info_dark.svg"
 
 USB_SVG                 RCDATA                  "resources/usb.svg"
+USB_SVG_DARK            RCDATA                  "resources/usb_dark.svg"
 
 TEXT_INCREASE_SVG       RCDATA                  "resources/text_increase.svg"
+TEXT_INCREASE_SVG_DARK  RCDATA                  "resources/text_increase_dark.svg"
 
 TEXT_DECREASE_SVG       RCDATA                  "resources/text_decrease.svg"
+TEXT_DECREASE_SVG_DARK  RCDATA                  "resources/text_decrease_dark.svg"
 
+VIEW_COLUMNS_SVG  	RCDATA                  "resources/view_columns.svg"
+VIEW_COLUMNS_SVG_DARK 	RCDATA              	"resources/view_columns_dark.svg"
+
+COMPUTER_SVG  		RCDATA                  "resources/computer.svg"
+COMPUTER_SVG_DARK	RCDATA              	"resources/computer_dark.svg"
+
+APP_LIGHT_SVG  		RCDATA                  "resources/app_light.svg"
+APP_LIGHT_SVG_DARK	RCDATA              	"resources/app_light_dark.svg"
+
+APP_DARK_SVG  		RCDATA                  "resources/app_dark.svg"
+APP_DARK_SVG_DARK	RCDATA              	"resources/app_dark_dark.svg"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -154,4 +184,3 @@ USBIP                   ICON                    "resources/USBip.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-
