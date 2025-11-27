@@ -429,7 +429,7 @@
             <property name="permission">protected</property>
             <object class="wxMenuItem" expanded="false">
               <property name="bitmap"></property>
-              <property name="checked">0</property>
+              <property name="checked">1</property>
               <property name="enabled">1</property>
               <property name="help">Windows default app appearance</property>
               <property name="id">wxID_FILE1</property>
@@ -442,7 +442,7 @@
               <event name="OnMenuSelection">on_view_appearance</event>
             </object>
             <object class="wxMenuItem" expanded="false">
-              <property name="bitmap">Load From SVG Resource; APP_LIGHT_SVG; APP_LIGHT_SVG_DARK; [16; 16]</property>
+              <property name="bitmap">Load From SVG Resource; APP_LIGHT_CHECKED_SVG; APP_LIGHT_CHECKED_SVG_DARK; [16; 16]</property>
               <property name="checked">0</property>
               <property name="enabled">1</property>
               <property name="help"></property>
@@ -452,11 +452,11 @@
               <property name="name">m_appearance_light</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
-              <property name="unchecked_bitmap"></property>
+              <property name="unchecked_bitmap">Load From SVG Resource; APP_LIGHT_UNCHECKED_SVG; APP_LIGHT_UNCHECKED_SVG_DARK; [16; 16]</property>
               <event name="OnMenuSelection">on_view_appearance</event>
             </object>
             <object class="wxMenuItem" expanded="false">
-              <property name="bitmap">Load From SVG Resource; APP_DARK_SVG; APP_DARK_SVG_DARK; [16; 16]</property>
+              <property name="bitmap">Load From SVG Resource; APP_DARK_CHECKED_SVG; APP_DARK_CHECKED_SVG_DARK; [16; 16]</property>
               <property name="checked">0</property>
               <property name="enabled">1</property>
               <property name="help"></property>
@@ -466,7 +466,7 @@
               <property name="name">m_appearance_dark</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
-              <property name="unchecked_bitmap"></property>
+              <property name="unchecked_bitmap">Load From SVG Resource; APP_DARK_UNCHECKED_SVG; APP_DARK_UNCHECKED_SVG_DARK; [16; 16]</property>
               <event name="OnMenuSelection">on_view_appearance</event>
             </object>
           </object>

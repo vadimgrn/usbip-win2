@@ -153,11 +153,17 @@ VIEW_COLUMNS_SVG_DARK 	RCDATA              	"resources/view_columns_dark.svg"
 COMPUTER_SVG  		RCDATA                  "resources/computer.svg"
 COMPUTER_SVG_DARK	RCDATA              	"resources/computer_dark.svg"
 
-APP_LIGHT_SVG  		RCDATA                  "resources/app_light.svg"
-APP_LIGHT_SVG_DARK	RCDATA              	"resources/app_light_dark.svg"
+APP_LIGHT_CHECKED_SVG  		RCDATA          "resources/app_light_checked.svg"
+APP_LIGHT_CHECKED_SVG_DARK	RCDATA          "resources/app_light_checked_dark.svg"
 
-APP_DARK_SVG  		RCDATA                  "resources/app_dark.svg"
-APP_DARK_SVG_DARK	RCDATA              	"resources/app_dark_dark.svg"
+APP_LIGHT_UNCHECKED_SVG  	RCDATA          "resources/app_light_unchecked.svg"
+APP_LIGHT_UNCHECKED_SVG_DARK	RCDATA          "resources/app_light_unchecked_dark.svg"
+
+APP_DARK_CHECKED_SVG  		RCDATA          "resources/app_dark_checked.svg"
+APP_DARK_CHECKED_SVG_DARK	RCDATA          "resources/app_dark_checked_dark.svg"
+
+APP_DARK_UNCHECKED_SVG  	RCDATA          "resources/app_dark_unchecked.svg"
+APP_DARK_UNCHECKED_SVG_DARK	RCDATA          "resources/app_dark_unchecked_dark.svg"
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -184,3 +190,4 @@ USBIP                   ICON                    "resources/USBip.ico"
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
+
