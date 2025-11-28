@@ -60,11 +60,9 @@
 #define CertName "USBip"
 #define CertPwd "usbip"
 
-; whether SignTool directive uses the project's test certificate
-#define TEST_SIGNED_SETUP
-
-; whether drivers are signed by the project's test certificate
-#define TEST_SIGNED_DRIVERS
+; To install the test certificate, pass /DTEST_SIGNED_SETUP and/or /DTEST_SIGNED_DRIVERS to iscc:
+;   /DTEST_SIGNED_SETUP   - the setup EXE itself is signed with the test certificate
+;   /DTEST_SIGNED_DRIVERS - the drivers are signed with the test certificate
 
 #define INSTALL_TEST_CERTIFICATE (Defined(TEST_SIGNED_SETUP) || Defined(TEST_SIGNED_DRIVERS))
 
