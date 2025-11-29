@@ -1,0 +1,29 @@
+name: Dependency Updates
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+jobs:
+  check-dependencies:
+    name: Check for Updates
+    runs-on: windows-2022
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Check vcpkg updates
+        shell: pwsh
+        run: |
+          cd vcpkg
+          git fetch origin
+          $behind = git rev-list HEAD..origin/master --count
+          if ($behind -gt 0) {
+            echo "::warning::vcpkg is $behind commits behind"
+          }
+      
+      - name: Check NuGet updates
+        run: |
+          nuget list -Source nuget.org -PreRelease | Select-String "Microsoft.Windows"
