@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.2.1-9490aaee)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -52,6 +52,7 @@ class Frame : public wxFrame
 		wxMenu* m_menu_edit;
 		wxMenu* m_menu_view;
 		wxMenu* m_menu_columns;
+		wxMenu* m_view_appearance;
 		wxMenu* m_menu_devices;
 		wxMenu* m_menu_log;
 		wxMenu* m_menu_help;
@@ -85,11 +86,12 @@ class Frame : public wxFrame
 		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_has_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_copy_rows( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_toogle_auto( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_toggle_auto( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_edit_notes_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
+		virtual void on_view_appearance( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_zebra( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_view_zebra_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }

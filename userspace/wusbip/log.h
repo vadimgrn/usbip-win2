@@ -26,6 +26,7 @@ public:
 
 private:
 	void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
+	void tune_dark_appearance();
 
 	void on_font_increase(_In_ wxCommandEvent &event);
 	void on_font_decrease(_In_ wxCommandEvent &event);

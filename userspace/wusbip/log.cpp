@@ -9,6 +9,7 @@
 
 #include <wx/frame.h>
 #include <wx/menuitem.h>
+#include <wx/textctrl.h>
 #include <wx/persist/toplevel.h>
 
 #include <memory>
@@ -36,6 +37,20 @@ LogWindow::LogWindow(
         wnd->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(LogWindow::on_mouse_wheel), this);
 
         wxPersistentRegisterAndRestore(wnd, wxString::FromAscii(__func__));
+
+        if (wxSystemSettings::GetAppearance().IsDark()) {
+                tune_dark_appearance();
+        }
+}
+
+void LogWindow::tune_dark_appearance()
+{
+        for (auto fr = GetFrame(); auto child: fr->GetChildren()) {
+
+                if (auto ctl = dynamic_cast<wxTextCtrl*>(child)) {
+                        ctl->SetDefaultStyle(*wxWHITE);
+                }
+        }
 }
 
 void LogWindow::set_accelerators(

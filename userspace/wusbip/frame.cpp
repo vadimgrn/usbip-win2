@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.2.1-9490aaee)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -11,6 +11,15 @@
 
 Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style ) : wxFrame( parent, id, title, pos, size, style )
 {
+	#if wxCHECK_VERSION(3, 1, 3)
+	[[maybe_unused]] auto pick_resname = [dark = wxSystemSettings::GetAppearance().IsDark()] (const auto& name, const auto& name_dark) noexcept -> decltype(auto)
+	{
+		return dark ? name_dark : name;
+	};
+	#else
+	[[maybe_unused]] auto pick_resname = [] (const auto& name, const auto&) noexcept -> decltype(auto) { return name; };
+	#endif
+
 	this->SetSizeHints( wxDefaultSize, wxDefaultSize );
 	m_mgr.SetManagedWindow(this);
 	m_mgr.SetFlags(wxAUI_MGR_DEFAULT);
@@ -21,27 +30,27 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_file_load;
 	m_file_load = new wxMenuItem( m_menu_file, wxID_ANY, wxString( _("Load") ) + wxT('\t') + wxT("CTRL+L"), _("Load saved devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_file_load->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("save_alt_svg"), {16, 16} ) );
+	m_file_load->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("save_alt_svg"), wxT("save_alt_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_file_load->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("save_alt_svg"), {16, 16} ) );
+	m_file_load->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("save_alt_svg"), wxT("save_alt_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_file->Append( m_file_load );
 
 	wxMenuItem* m_file_save;
 	m_file_save = new wxMenuItem( m_menu_file, wxID_SAVE, wxString( _("Save") ) + wxT('\t') + wxT("CTRL+S"), _("Save devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_file_save->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("save_svg"), {16, 16} ) );
+	m_file_save->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("save_svg"), wxT("save_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_file_save->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("save_svg"), {16, 16} ) );
+	m_file_save->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("save_svg"), wxT("save_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_file->Append( m_file_save );
 
 	wxMenuItem* m_file_save_selected;
 	m_file_save_selected = new wxMenuItem( m_menu_file, wxID_SAVEAS, wxString( _("Save selected") ) + wxT('\t') + wxT("ALT+S"), _("Save selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_file_save_selected->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("SAVE_MULTIPLE_SVG"), {16, 16} ) );
+	m_file_save_selected->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("SAVE_MULTIPLE_SVG"), wxT("SAVE_MULTIPLE_SVG_DARK")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_file_save_selected->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("SAVE_MULTIPLE_SVG"), {16, 16} ) );
+	m_file_save_selected->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("SAVE_MULTIPLE_SVG"), wxT("SAVE_MULTIPLE_SVG_DARK")), {16, 16} ) );
 	#endif
 	m_menu_file->Append( m_file_save_selected );
 
@@ -60,9 +69,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_file_exit;
 	m_file_exit = new wxMenuItem( m_menu_file, wxID_EXIT, wxString( _("E&xit") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_file_exit->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("power_svg"), {16, 16} ) );
+	m_file_exit->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("power_svg"), wxT("power_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_file_exit->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("power_svg"), {16, 16} ) );
+	m_file_exit->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("power_svg"), wxT("power_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_file->Append( m_file_exit );
 
@@ -72,18 +81,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_select_all;
 	m_select_all = new wxMenuItem( m_menu_edit, wxID_SELECTALL, wxString( _("Select all") ) + wxT('\t') + wxT("CTRL+A"), _("Select all devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_select_all->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("select_all_svg"), {16, 16} ) );
+	m_select_all->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("select_all_svg"), wxT("select_all_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_select_all->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("select_all_svg"), {16, 16} ) );
+	m_select_all->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("select_all_svg"), wxT("select_all_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_edit->Append( m_select_all );
 
 	wxMenuItem* m_copy_rows;
 	m_copy_rows = new wxMenuItem( m_menu_edit, wxID_COPY, wxString( _("Copy rows") ) + wxT('\t') + wxT("CTRL+C"), _("Copy selected rows to the clipboard"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_copy_rows->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("COPY_SVG"), {16, 16} ) );
+	m_copy_rows->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("COPY_SVG"), wxT("COPY_SVG_DARK")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_copy_rows->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("COPY_SVG"), {16, 16} ) );
+	m_copy_rows->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("COPY_SVG"), wxT("COPY_SVG_DARK")), {16, 16} ) );
 	#endif
 	m_menu_edit->Append( m_copy_rows );
 
@@ -101,9 +110,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_edit_notes;
 	m_edit_notes = new wxMenuItem( m_menu_edit, ID_EDIT_NOTES, wxString( _("Notes") ) + wxT('\t') + wxT("CTRL+N"), _("Edit notes for a device"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_edit_notes->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("COMMENT_EDIT_SVG"), {16, 16} ) );
+	m_edit_notes->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("COMMENT_EDIT_SVG"), wxT("COMMENT_EDIT_SVG_DARK")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_edit_notes->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("COMMENT_EDIT_SVG"), {16, 16} ) );
+	m_edit_notes->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("COMMENT_EDIT_SVG"), wxT("COMMENT_EDIT_SVG_DARK")), {16, 16} ) );
 	#endif
 	m_menu_edit->Append( m_edit_notes );
 
@@ -113,7 +122,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_columns = new wxMenu();
 	wxMenuItem* m_menu_columnsItem = new wxMenuItem( m_menu_view, wxID_ANY, _("Columns"), wxEmptyString, wxITEM_NORMAL, m_menu_columns );
 	#if (defined( __WXMSW__ ) || defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_menu_columnsItem->SetBitmap( wxArtProvider::GetBitmap( wxASCII_STR(wxART_REPORT_VIEW), wxASCII_STR(wxART_MENU) ) );
+	m_menu_columnsItem->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("VIEW_COLUMNS_SVG"), wxT("VIEW_COLUMNS_SVG_DARK")), {16, 16} ) );
 	#endif
 
 	wxMenuItem* m_view_busid;
@@ -164,6 +173,26 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_menu_view->Append( m_menu_columnsItem );
 
+	m_view_appearance = new wxMenu();
+	wxMenuItem* m_view_appearanceItem = new wxMenuItem( m_menu_view, wxID_ANY, _("Appearance"), wxEmptyString, wxITEM_NORMAL, m_view_appearance );
+	#if (defined( __WXMSW__ ) || defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_view_appearanceItem->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("APPEARANCE_SVG"), wxT("APPEARANCE_SVG_DARK")), {16, 16} ) );
+	#endif
+
+	wxMenuItem* m_appearance_system;
+	m_appearance_system = new wxMenuItem( m_view_appearance, wxID_FILE1, wxString( _("&System") ) , _("Windows default app appearance"), wxITEM_RADIO );
+	m_view_appearance->Append( m_appearance_system );
+
+	wxMenuItem* m_appearance_light;
+	m_appearance_light = new wxMenuItem( m_view_appearance, wxID_FILE2, wxString( _("&Light") ) , wxEmptyString, wxITEM_RADIO );
+	m_view_appearance->Append( m_appearance_light );
+
+	wxMenuItem* m_appearance_dark;
+	m_appearance_dark = new wxMenuItem( m_view_appearance, wxID_FILE3, wxString( _("&Dark") ) , wxEmptyString, wxITEM_RADIO );
+	m_view_appearance->Append( m_appearance_dark );
+
+	m_menu_view->Append( m_view_appearanceItem );
+
 	wxMenuItem* m_view_zebra;
 	m_view_zebra = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Alternate row colour") ) , _("Alternate row colour for the tree"), wxITEM_CHECK );
 	m_menu_view->Append( m_view_zebra );
@@ -178,18 +207,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_view_font_increase;
 	m_view_font_increase = new wxMenuItem( m_menu_view, wxID_ZOOM_IN, wxString( _("Increase font size") ) + wxT('\t') + wxT("CTRL++"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_view_font_increase->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("TEXT_INCREASE_SVG"), {16, 16} ), wxNullBitmap );
+	m_view_font_increase->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("TEXT_INCREASE_SVG"), wxT("TEXT_INCREASE_SVG_DARK")), {16, 16} ), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_view_font_increase->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("TEXT_INCREASE_SVG"), {16, 16} ) );
+	m_view_font_increase->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("TEXT_INCREASE_SVG"), wxT("TEXT_INCREASE_SVG_DARK")), {16, 16} ) );
 	#endif
 	m_menu_view->Append( m_view_font_increase );
 
 	wxMenuItem* m_view_font_decrease;
 	m_view_font_decrease = new wxMenuItem( m_menu_view, wxID_ZOOM_OUT, wxString( _("Decrease font size") ) + wxT('\t') + wxT("CTRL+-"), _("Use Ctrl+Wheel as well"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_view_font_decrease->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("TEXT_DECREASE_SVG"), {16, 16} ) );
+	m_view_font_decrease->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("TEXT_DECREASE_SVG"), wxT("TEXT_DECREASE_SVG_DARK")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_view_font_decrease->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("TEXT_DECREASE_SVG"), {16, 16} ) );
+	m_view_font_decrease->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("TEXT_DECREASE_SVG"), wxT("TEXT_DECREASE_SVG_DARK")), {16, 16} ) );
 	#endif
 	m_menu_view->Append( m_view_font_decrease );
 
@@ -207,9 +236,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_view_reset;
 	m_view_reset = new wxMenuItem( m_menu_view, wxID_ANY, wxString( _("Reset settings") ) , _("Reset all settings"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_view_reset->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("replay_svg"), {16, 16} ) );
+	m_view_reset->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("replay_svg"), wxT("replay_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_view_reset->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("replay_svg"), {16, 16} ) );
+	m_view_reset->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("replay_svg"), wxT("replay_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_view->Append( m_view_reset );
 
@@ -219,18 +248,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_cmd_reload;
 	m_cmd_reload = new wxMenuItem( m_menu_devices, wxID_REFRESH, wxString( _("Reload") ) + wxT('\t') + wxT("CTRL+R"), _("Show attached devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_cmd_reload->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("refresh_svg"), {16, 16} ) );
+	m_cmd_reload->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("refresh_svg"), wxT("refresh_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_cmd_reload->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("refresh_svg"), {16, 16} ) );
+	m_cmd_reload->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("refresh_svg"), wxT("refresh_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_devices->Append( m_cmd_reload );
 
 	wxMenuItem* m_cmd_add;
 	m_cmd_add = new wxMenuItem( m_menu_devices, wxID_ANY, wxString( _("A&dd") ) + wxT('\t') + wxT("CTRL+I"), _("Add remote devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_cmd_add->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("add_svg"), {16, 16} ), wxNullBitmap );
+	m_cmd_add->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("add_svg"), wxT("add_svg_dark")), {16, 16} ), wxNullBitmap );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_cmd_add->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("add_svg"), {16, 16} ) );
+	m_cmd_add->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("add_svg"), wxT("add_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_devices->Append( m_cmd_add );
 
@@ -239,18 +268,18 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_cmd_attach;
 	m_cmd_attach = new wxMenuItem( m_menu_devices, wxID_OPEN, wxString( _("Attach") ) + wxT('\t') + wxT("CTRL+T"), _("Attach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_cmd_attach->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("check_svg"), {16, 16} ) );
+	m_cmd_attach->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("check_svg"), wxT("check_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_cmd_attach->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("check_svg"), {16, 16} ) );
+	m_cmd_attach->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("check_svg"), wxT("check_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_devices->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_detach;
 	m_cmd_detach = new wxMenuItem( m_menu_devices, wxID_CLOSE, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_cmd_detach->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("close_svg"), {16, 16} ) );
+	m_cmd_detach->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("close_svg"), wxT("close_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_cmd_detach->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("close_svg"), {16, 16} ) );
+	m_cmd_detach->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("close_svg"), wxT("close_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_devices->Append( m_cmd_detach );
 
@@ -301,9 +330,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_help_about;
 	m_help_about = new wxMenuItem( m_menu_help, wxID_ABOUT, wxString( _("About") ) , wxEmptyString, wxITEM_NORMAL );
 	#ifdef __WXMSW__
-	m_help_about->SetBitmaps( wxBitmapBundle::FromSVGResource( wxT("info_svg"), {16, 16} ) );
+	m_help_about->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("info_svg"), wxT("info_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
-	m_help_about->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("info_svg"), {16, 16} ) );
+	m_help_about->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("info_svg"), wxT("info_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_help->Append( m_help_about );
 
@@ -322,21 +351,21 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_auiToolBar = new wxAuiToolBar( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_GRIPPER|wxAUI_TB_TEXT );
 	m_auiToolBar->SetToolSeparation( 1 );
-	m_tool_reload = m_auiToolBar->AddTool( wxID_REFRESH, _("Reload"), wxBitmapBundle::FromSVGResource( wxT("refresh_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Show attached devices"), wxEmptyString, NULL );
+	m_tool_reload = m_auiToolBar->AddTool( wxID_REFRESH, _("Reload"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("refresh_svg"), wxT("refresh_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Show attached devices"), wxEmptyString, NULL );
 
 	m_auiToolBar->AddSeparator();
 
-	m_tool_attach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxBitmapBundle::FromSVGResource( wxT("check_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Attach selected devices"), wxEmptyString, NULL );
+	m_tool_attach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("check_svg"), wxT("check_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Attach selected devices"), wxEmptyString, NULL );
 
-	m_tool_detach = m_auiToolBar->AddTool( wxID_ANY, _("Detach"), wxBitmapBundle::FromSVGResource( wxT("close_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Detach selected devices"), wxEmptyString, NULL );
+	m_tool_detach = m_auiToolBar->AddTool( wxID_ANY, _("Detach"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("close_svg"), wxT("close_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Detach selected devices"), wxEmptyString, NULL );
 
 	m_tool_detach_all = m_auiToolBar->AddTool( wxID_ANY, _("Detach All"), wxBitmapBundle::FromSVGResource( wxT("dismiss_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Detach all devices"), wxEmptyString, NULL );
 
 	m_auiToolBar->AddSeparator();
 
-	m_tool_load = m_auiToolBar->AddTool( wxID_ANY, _("Load"), wxBitmapBundle::FromSVGResource( wxT("save_alt_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Load saved devices"), wxEmptyString, NULL );
+	m_tool_load = m_auiToolBar->AddTool( wxID_ANY, _("Load"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("save_alt_svg"), wxT("save_alt_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Load saved devices"), wxEmptyString, NULL );
 
-	m_tool_save = m_auiToolBar->AddTool( wxID_SAVE, _("Save"), wxBitmapBundle::FromSVGResource( wxT("save_svg"), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Save devices"), wxEmptyString, NULL );
+	m_tool_save = m_auiToolBar->AddTool( wxID_SAVE, _("Save"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("save_svg"), wxT("save_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Save devices"), wxEmptyString, NULL );
 
 	m_auiToolBar->Realize();
 	m_mgr.AddPane( m_auiToolBar, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( -1,-1 ) ).Floatable( false ).Layer( 10 ).ToolbarPane() );
@@ -365,7 +394,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_button_add->SetDefault();
 
-	m_button_add->SetBitmap( wxBitmapBundle::FromSVGResource( wxT("add_svg"), {24, 24} ) );
+	m_button_add->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("add_svg"), wxT("add_svg_dark")), {24, 24} ) );
 	m_auiToolBarAdd->AddControl( m_button_add );
 	m_auiToolBarAdd->Realize();
 	m_mgr.AddPane( m_auiToolBarAdd, wxAuiPaneInfo() .Top() .CaptionVisible( false ).CloseButton( false ).Gripper().Dock().Resizable().FloatingSize( wxSize( 137,137 ) ).Floatable( false ).Layer( 10 ).ToolbarPane() );
@@ -407,7 +436,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_copy_rows ), this, m_copy_rows->GetId());
 	this->Connect( m_copy_rows->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toogle_auto ), this, m_toggle_auto->GetId());
+	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toggle_auto ), this, m_toggle_auto->GetId());
 	this->Connect( m_toggle_auto->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
 	this->Connect( m_edit_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
@@ -429,6 +458,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_view_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_devid->GetId());
 	this->Connect( m_view_devid->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
+	m_view_appearance->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_appearance ), this, m_appearance_system->GetId());
+	m_view_appearance->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_appearance ), this, m_appearance_light->GetId());
+	m_view_appearance->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_appearance ), this, m_appearance_dark->GetId());
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_zebra ), this, m_view_zebra->GetId());
 	this->Connect( m_view_zebra->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zebra_update_ui ) );
 	m_menu_view->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_labels ), this, m_view_labels->GetId());
