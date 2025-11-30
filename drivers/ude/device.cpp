@@ -723,13 +723,13 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
                 return;
         }
 
-        auto completion = [] (WDFREQUEST req, WDFIOTARGET, WDF_REQUEST_COMPLETION_PARAMS*, WDFCONTEXT ctx)
+        auto completion = [] (auto request, auto, auto, auto ctx)
         {
-                auto st = WdfRequestGetStatus(req);
+                auto st = WdfRequestGetStatus(request);
                 auto port = static_cast<int>(reinterpret_cast<intptr_t>(ctx));
-                TraceDbg("req %04x, port %d, %!STATUS!", ptr04x(req), port, st);
+                TraceDbg("req %04x, port %d, %!STATUS!", ptr04x(request), port, st);
 
-                WdfObjectDelete(req);
+                WdfObjectDelete(request);
         };
 
         auto context = reinterpret_cast<void*>(static_cast<intptr_t>(dev.port));
