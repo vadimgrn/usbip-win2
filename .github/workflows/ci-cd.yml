@@ -1,0 +1,329 @@
+name: CI/CD Build and Release
+
+on:
+  push:
+    branches: 
+      - develop
+      - master
+  pull_request:
+    branches:
+      - develop
+      - master
+  release:
+    types: [created]
+  workflow_dispatch:
+
+env:
+  SOLUTION_NAME: usbip_win2.sln
+  VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+  WDK_VERSION: 10.0.26100.0
+  CERT_NAME: usbip
+  CERT_PASSWORD: usbip
+  HWID: ROOT\USBIP_WIN2\UDE
+
+jobs:
+  # ==============================================================================
+  # BUILD MATRIX: Compile drivers and userspace components
+  # ==============================================================================
+  build:
+    name: Build ${{ matrix.platform }}-${{ matrix.configuration }}
+    runs-on: windows-2022
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+        configuration: [Debug, Release]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0  # Full history for versioning
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: '17.0'  # Visual Studio 2022
+      
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+      
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        id: cache-vcpkg
+        with:
+          path: |
+            ${{ env.VCPKG_ROOT }}
+            !${{ env.VCPKG_ROOT }}/buildtrees
+            !${{ env.VCPKG_ROOT }}/packages
+            !${{ env.VCPKG_ROOT }}/downloads
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('**/vcpkg.json', '**/vcpkg-configuration.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+      
+      - name: Bootstrap vcpkg
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        run: .\bootstrap.bat
+        shell: cmd
+      
+      - name: Restore NuGet packages
+        run: nuget restore ${{ env.SOLUTION_NAME }}
+      
+      - name: Extract version from executable
+        id: version
+        shell: pwsh
+        run: |
+          $projectPath = "userspace\usbip\usbip.vcxproj"
+          [xml]$proj = Get-Content $projectPath
+          $version = $proj.Project.PropertyGroup.FileVersion
+          if ([string]::IsNullOrEmpty($version)) {
+            $version = "0.0.0.0"
+          }
+          echo "VERSION=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          echo "Version: $version"
+      
+      - name: Build solution
+        run: |
+          msbuild ${{ env.SOLUTION_NAME }} `
+            /p:Configuration=${{ matrix.configuration }} `
+            /p:Platform=${{ matrix.platform }} `
+            /p:OutDir="${{ github.workspace }}\${{ matrix.platform }}\${{ matrix.configuration }}\" `
+            /maxcpucount `
+            /verbosity:minimal `
+            /property:WarningLevel=3
+        shell: pwsh
+      
+      - name: Test-sign drivers (Debug builds only)
+        if: matrix.configuration == 'Debug'
+        shell: pwsh
+        run: |
+          $certPath = "drivers\package\${{ env.CERT_NAME }}.pfx"
+          $driverDir = "${{ github.workspace }}\${{ matrix.platform }}\${{ matrix.configuration }}\package"
+          
+          Get-ChildItem -Path $driverDir -Filter "*.sys" -Recurse | ForEach-Object {
+            Write-Host "Test-signing: $($_.FullName)"
+            & signtool sign /f $certPath /p ${{ env.CERT_PASSWORD }} /fd sha256 /t http://timestamp.digicert.com $_.FullName
+          }
+      
+      - name: Verify driver signatures
+        shell: pwsh
+        run: |
+          $driverDir = "${{ github.workspace }}\${{ matrix.platform }}\${{ matrix.configuration }}"
+          
+          Get-ChildItem -Path $driverDir -Filter "*.sys" -Recurse | ForEach-Object {
+            Write-Host "Verifying: $($_.FullName)"
+            & signtool verify /pa $_.FullName
+          }
+      
+      - name: Run unit tests (if exist)
+        if: matrix.configuration == 'Debug'
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          # Add test execution logic here if tests are available
+          Write-Host "No tests configured yet"
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: usbip-${{ matrix.platform }}-${{ matrix.configuration }}
+          path: |
+            ${{ matrix.platform }}/${{ matrix.configuration }}/*.exe
+            ${{ matrix.platform }}/${{ matrix.configuration }}/*.dll
+            ${{ matrix.platform }}/${{ matrix.configuration }}/*.sys
+            ${{ matrix.platform }}/${{ matrix.configuration }}/*.cat
+            ${{ matrix.platform }}/${{ matrix.configuration }}/*.inf
+            ${{ matrix.platform }}/${{ matrix.configuration }}/package/*
+          retention-days: 30
+      
+      - name: Upload PDB files
+        if: matrix.configuration == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: usbip-pdb-${{ matrix.platform }}-${{ matrix.configuration }}
+          path: |
+            ${{ matrix.platform }}/${{ matrix.configuration }}/*.pdb
+          retention-days: 90
+
+  # ==============================================================================
+  # CODE ANALYSIS: Static analysis and security scanning
+  # ==============================================================================
+  code-analysis:
+    name: Code Analysis
+    runs-on: windows-2022
+    needs: build
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: cpp
+          queries: security-and-quality
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Build for analysis
+        run: |
+          msbuild ${{ env.SOLUTION_NAME }} `
+            /p:Configuration=Debug `
+            /p:Platform=x64 `
+            /maxcpucount
+        shell: pwsh
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # ==============================================================================
+  # PACKAGING: Create InnoSetup installers
+  # ==============================================================================
+  package:
+    name: Create Installer
+    runs-on: windows-2022
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'release'
+    
+    strategy:
+      matrix:
+        platform: [x64, ARM64]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: usbip-${{ matrix.platform }}-Release
+          path: ${{ matrix.platform }}/Release
+      
+      - name: Install InnoSetup
+        shell: pwsh
+        run: |
+          $url = "https://jrsoftware.org/download.php/is.exe"
+          $installer = "$env:TEMP\innosetup.exe"
+          Invoke-WebRequest -Uri $url -OutFile $installer
+          Start-Process -FilePath $installer -Args "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART" -Wait
+      
+      - name: Get Visual C++ Redistributable path
+        id: vcredist
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -property installationPath
+          $vcToolsPath = Join-Path $vsPath "VC\Redist\MSVC"
+          $latestVersion = Get-ChildItem $vcToolsPath | Sort-Object -Descending | Select-Object -First 1
+          $vcRedistDir = Join-Path $latestVersion.FullName "${{ matrix.platform }}"
+          echo "VCREDIST_DIR=$vcRedistDir" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+      
+      - name: Extract version
+        id: version
+        shell: pwsh
+        run: |
+          $exePath = "${{ matrix.platform }}\Release\usbip.exe"
+          if (Test-Path $exePath) {
+            $fileVersion = (Get-Item $exePath).VersionInfo.FileVersion
+            echo "VERSION=$fileVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          } else {
+            echo "VERSION=0.0.0.0" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          }
+      
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $innoSetup = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $scriptPath = "userspace\innosetup\setup.iss"
+          
+          & $innoSetup $scriptPath `
+            /DPlatform=${{ matrix.platform }} `
+            /DConfiguration=Release `
+            /DExePath="${{ github.workspace }}\${{ matrix.platform }}\Release\usbip.exe" `
+            /DGuiExePath="${{ github.workspace }}\${{ matrix.platform }}\Release\wusbip.exe" `
+            /DSolutionDir="${{ github.workspace }}\" `
+            /DVCToolsRedistInstallDir="${{ steps.vcredist.outputs.VCREDIST_DIR }}\"
+      
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.platform }}
+          path: ${{ matrix.platform }}/Release/USBip-*.exe
+          retention-days: 90
+
+  # ==============================================================================
+  # RELEASE: Publish installers to GitHub Releases
+  # ==============================================================================
+  release:
+    name: Publish Release
+    runs-on: windows-2022
+    needs: [build, package]
+    if: github.event_name == 'release' && github.event.action == 'created'
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download x64 installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-x64
+          path: ./installers
+      
+      - name: Download ARM64 installer
+        uses: actions/download-artifact@v4
+        with:
+          name: installer-ARM64
+          path: ./installers
+      
+      - name: Download PDB files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: usbip-pdb-*
+          path: ./pdbs
+          merge-multiple: true
+      
+      - name: Create release assets
+        shell: pwsh
+        run: |
+          # Compress PDB files
+          Compress-Archive -Path ./pdbs/* -DestinationPath ./installers/USBip-PDBs.zip
+          
+          # List all files
+          Get-ChildItem ./installers -Recurse
+      
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./installers/*.exe
+            ./installers/*.zip
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==============================================================================
+  # NOTIFICATIONS: Send build status notifications
+  # ==============================================================================
+  notify:
+    name: Notify Build Status
+    runs-on: ubuntu-latest
+    needs: [build, code-analysis, package]
+    if: always()
+    
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build.result }}" == "failure" ]; then
+            echo "::error::Build failed"
+            exit 1
+          fi
+          echo "Build succeeded"
+      
+      # Add notification integrations here (Slack, Discord, Email, etc.)
