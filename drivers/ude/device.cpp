@@ -287,12 +287,13 @@ NTSTATUS function_suspend_and_wake(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_endpoint_queue(_Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT endpoint)
+PAGED auto create_endpoint_queue(
+        _Inout_ WDFQUEUE &queue, _In_ UDECXUSBENDPOINT endpoint, _In_ WDF_IO_QUEUE_DISPATCH_TYPE dispatch_type)
 {
         PAGED_CODE();
-        
+
         WDF_IO_QUEUE_CONFIG cfg;
-        WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel); // FIXME: Sequential for EP0?
+        WDF_IO_QUEUE_CONFIG_INIT(&cfg, dispatch_type);
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoInternalDeviceControl = device::internal_control;
 
@@ -366,7 +367,9 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 dev.ep0 = endpoint;
         }
 
-        if (auto err = create_endpoint_queue(endp.queue, endpoint)) {
+        if (auto dispatch = usb_endpoint_type(epd) == UsbdPipeTypeControl ?
+                            WdfIoQueueDispatchSequential : WdfIoQueueDispatchParallel;
+            auto err = create_endpoint_queue(endp.queue, endpoint, dispatch)) {
                 return err;
         }
 
