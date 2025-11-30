@@ -45,6 +45,7 @@ consteval auto get_saved_keys()
 
         return std::to_array<key_val>({
                 { L"busid", COL_BUSID },
+                { L"devid", COL_DEVID },
                 { L"speed", COL_SPEED },
                 { L"vendor", COL_VENDOR },
                 { L"product", COL_PRODUCT },
@@ -76,13 +77,8 @@ void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &sa
  */
 auto is_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev) noexcept
 {
-        for (auto col: {COL_VENDOR, COL_PRODUCT}) {
-                if (auto &s = tree.GetItemText(dev, col); s.empty()) {
-                        return true;
-                }
-        }
-
-        return false;
+        auto &s = tree.GetItemText(dev, COL_DEVID); 
+        return s.empty();
 }
 
 /*
@@ -92,13 +88,13 @@ constexpr auto is_port_residual(_In_ state st)
 {
         switch (st) {
         using enum state;
-        case unplugged: // port > 0 if previous state was unplugging
+        case unplugged:  // port > 0 if previous state was unplugging
         case connecting: // port is zero
-        case connected: // port is zero
+        case connected:  // ...
                 return true;
-        case plugged: // port > 0
         case disconnected: // port > 0 if previous state was plugged
-        case unplugging: // port > 0
+        case plugged:      // port > 0
+        case unplugging:   // ...
         default:
                 return false;
         }
@@ -116,7 +112,7 @@ void log(_In_ const device_state &st)
         auto &d = st.device;
         auto &loc = d.location;
 
-        auto s = std::format("{}:{}/{} {}, port {}, devid {:04x}, speed {}, vid {:02x}, pid {:02x}", 
+        auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}", 
                                 loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), 
                                 d.port, d.devid, static_cast<int>(d.speed), d.vendor, d.product);
 
@@ -129,11 +125,12 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
         auto &url = tree.GetItemText(server);
 
         auto s = wxString::Format(
-                        L"%s: %s/%s, port '%s', speed '%s', vendor '%s', product '%s', "
+                        L"%s: %s/%s, port '%s', devid '%s', speed '%s', vendor '%s', product '%s', "
                         L"state '%s', saved state '%s', auto '%s', notes '%s'", 
                         prefix, url,
                         tree.GetItemText(dev, COL_BUSID),
                         tree.GetItemText(dev, COL_PORT),
+                        tree.GetItemText(dev, COL_DEVID),
                         tree.GetItemText(dev, COL_SPEED),
                         tree.GetItemText(dev, COL_VENDOR), 
                         tree.GetItemText(dev, COL_PRODUCT), 
@@ -170,7 +167,8 @@ auto load_license()
 auto update_from_saved(
         _Inout_ device_columns &dc, _In_ unsigned int flags,
         _In_ const std::set<device_location> &persistent, 
-        _In_opt_ const std::set<device_columns> *saved = nullptr)
+        _In_opt_ const std::set<device_columns> *saved = nullptr,
+        _In_ bool notes_only = true)
 {
         constexpr auto saved_flags = get_saved_flags();
 
@@ -181,15 +179,15 @@ auto update_from_saved(
                 //
         } else if (auto i = saved->find(dc); i != saved->end()) {
 
-                if (usbip::is_empty(dc)) {
-                        set_saved_columns(dc, *i);
-                        flags |= saved_flags;
-                } else {
+                if (notes_only) {
                         dc[COL_NOTES] = (*i)[COL_NOTES];
 
                         constexpr auto notes_flag = mkflag(COL_NOTES);
                         wxASSERT(!(flags & notes_flag));
                         flags |= notes_flag;
+                } else {
+                        set_saved_columns(dc, *i);
+                        flags |= saved_flags;
                 }
         }
 
@@ -291,6 +289,10 @@ auto get_saved()
 
                 if (dev[COL_BUSID].empty()) {
                         continue;
+                }
+
+                if (auto &devid = dev[COL_DEVID]; devid.empty()) { // FIXME: remove after 0.9.7.6 release, temporary
+                        devid = L'0';
                 }
 
                 result.push_back(std::move(dev));
@@ -552,7 +554,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto st_empty = is_empty(st.device);
 
         log(st);
-        
+
         if (m_taskbar_icon && m_taskbar_icon->IsIconInstalled()) {
                 auto s = _(vhci::get_state_str(st.state)) + L' ' + make_device_url(st.device.location);
                 m_taskbar_icon->show_balloon(s);
@@ -584,6 +586,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         } else {
                 tree.SetItemText(dev, COL_STATE, saved_state);
                 wxLogVerbose(_("Saved state '%s' restored"), saved_state);
+                log(tree, dev, _("After"));
                 return;
         }
 
@@ -598,7 +601,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         if (added || st_empty) {
                 auto persistent = get_persistent(vhci::open()); // see comments above
                 auto saved = as_set(get_saved());
-                flags = update_from_saved(dc, flags, persistent, &saved);
+                flags = update_from_saved(dc, flags, persistent, &saved, false);
         }
 
         update_device(dev, dc, flags);
@@ -945,9 +948,10 @@ void MainFrame::update_device(_In_ wxTreeListItem device, _In_ const device_colu
                 return;
         }
         
-        for (auto col: { COL_PORT, COL_SPEED, COL_VENDOR, COL_PRODUCT, COL_STATE, COL_PERSISTENT, COL_NOTES }) {
-                if (auto &new_val = dc[col]; 
-                    (flags & mkflag(col)) && new_val != tree.GetItemText(device, col)) {
+        for (int i = UPD_COL_FIRST; i <= UPD_COL_LAST; ++i) {
+                auto col = static_cast<column_pos_t>(i);
+
+                if (auto &new_val = dc[col]; (flags & mkflag(col)) && new_val != tree.GetItemText(device, col)) {
                         tree.SetItemText(device, col, new_val);
                 }
         }
