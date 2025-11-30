@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-9490aaee)
+// C++ code generated with wxFormBuilder (version 4.2.1-cd035212)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -182,13 +182,24 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	wxMenuItem* m_appearance_system;
 	m_appearance_system = new wxMenuItem( m_view_appearance, wxID_FILE1, wxString( _("&System") ) , _("Windows default app appearance"), wxITEM_RADIO );
 	m_view_appearance->Append( m_appearance_system );
+	m_appearance_system->Check( true );
 
 	wxMenuItem* m_appearance_light;
 	m_appearance_light = new wxMenuItem( m_view_appearance, wxID_FILE2, wxString( _("&Light") ) , wxEmptyString, wxITEM_RADIO );
+	#ifdef __WXMSW__
+	m_appearance_light->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("APP_LIGHT_CHECKED_SVG"), wxT("APP_LIGHT_CHECKED_SVG_DARK")), {16, 16} ), wxBitmapBundle::FromSVGResource( pick_resname(wxT("APP_LIGHT_UNCHECKED_SVG"), wxT("APP_LIGHT_UNCHECKED_SVG_DARK")), {16, 16} ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_appearance_light->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("APP_LIGHT_CHECKED_SVG"), wxT("APP_LIGHT_CHECKED_SVG_DARK")), {16, 16} ) );
+	#endif
 	m_view_appearance->Append( m_appearance_light );
 
 	wxMenuItem* m_appearance_dark;
 	m_appearance_dark = new wxMenuItem( m_view_appearance, wxID_FILE3, wxString( _("&Dark") ) , wxEmptyString, wxITEM_RADIO );
+	#ifdef __WXMSW__
+	m_appearance_dark->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("APP_DARK_CHECKED_SVG"), wxT("APP_DARK_CHECKED_SVG_DARK")), {16, 16} ), wxBitmapBundle::FromSVGResource( pick_resname(wxT("APP_DARK_UNCHECKED_SVG"), wxT("APP_DARK_UNCHECKED_SVG_DARK")), {16, 16} ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_appearance_dark->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("APP_DARK_CHECKED_SVG"), wxT("APP_DARK_CHECKED_SVG_DARK")), {16, 16} ) );
+	#endif
 	m_view_appearance->Append( m_appearance_dark );
 
 	m_menu_view->Append( m_view_appearanceItem );
