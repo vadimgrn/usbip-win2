@@ -52,21 +52,17 @@
 
 #define CLIENT_HWID "ROOT\USBIP_WIN2\UDE"
 
-#define TimestampServer "http://timestamp.digicert.com"
-
-; project's test certificate
+; Project's test certificate is no longer installed for github releases since 0.9.7.5.
+; But it is required during the development.
 #define CertFileName "usbip.pfx"
 #define CertFilePath SolutionDir + "drivers\package\" + CertFileName
 #define CertName "USBip"
 #define CertPwd "usbip"
 
-; whether SignTool directive uses the project's test certificate
-#define TEST_SIGNED_SETUP
-
 ; whether drivers are signed by the project's test certificate
 #define TEST_SIGNED_DRIVERS
 
-#define INSTALL_TEST_CERTIFICATE (Defined(TEST_SIGNED_SETUP) || Defined(TEST_SIGNED_DRIVERS))
+#define INSTALL_TEST_CERTIFICATE Defined(TEST_SIGNED_DRIVERS)
 
 [Setup]
 AppName={#ProductName}
@@ -94,7 +90,6 @@ WizardImageAlphaFormat=defined
 WizardImageStretch=no
 UninstallDisplayIcon="{app}\{#AppExeName}"
 AlwaysRestart=yes
-SignTool=sign_util sign /f $q{#CertFilePath}$q /p {#CertPwd} /tr {#TimestampServer} /td sha256 /fd sha256 $f
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no
@@ -120,12 +115,12 @@ Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Tasks: 
 [Files]
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy signonce; Components: main
-Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall signonce; Components: main
+Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
+Source: {#SolutionDir + "userspace\innosetup\PathMgr.dll"}; DestDir: "{app}"; Flags: uninsneveruninstall; Components: main
 
-Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Flags: signonce; Components: main
-Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Flags: signonce; Components: main
-Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Flags: signonce; Components: main
+Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
+Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
 
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
@@ -137,7 +132,7 @@ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 ; Source: {#BuildDir + "wusbip.pdb"}; DestDir: "{app}"; Components: pdb and gui
 ; wusbip.pdb is too large
 
-Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Flags: signonce; Components: gui
+Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
