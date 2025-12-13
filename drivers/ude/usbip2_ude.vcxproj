@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props') and '$(Platform)' == 'x64'" />
-  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props') and '$(Platform)' == 'ARM64'" />
-  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props')" />
+  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.x64.props') and '$(Platform)' == 'x64'" />
+  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.arm64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.arm64.props') and '$(Platform)' == 'ARM64'" />
+  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.props')" />
   <Import Project="..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props" Condition="Exists('..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props') and '$(Platform)' == 'x64'" />
   <Import Project="..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props" Condition="Exists('..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props') and '$(Platform)' == 'ARM64'" />
   <ItemGroup Label="ProjectConfigurations">
@@ -285,7 +285,7 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.targets" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.targets')" />
+    <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.targets" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -293,9 +293,9 @@
     </PropertyGroup>
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props'))" />
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props'))" />
-    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props'))" />
-    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.targets'))" />
-    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props'))" />
-    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.targets'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.arm64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.arm64.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.x64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.7175\build\native\Microsoft.Windows.SDK.cpp.x64.props'))" />
   </Target>
 </Project>
