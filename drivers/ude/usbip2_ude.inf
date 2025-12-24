@@ -69,7 +69,9 @@ HKR, Parameters, TCP_KEEPCNT, %REG_DWORD%, 9
 ; The time (in seconds) between individual keepalive probes
 HKR, Parameters, TCP_KEEPINTVL, %REG_DWORD%, 10
 
-; HKR, Parameters, ImportedDevices, 0x00010000, "192.168.1.15,3240,3-1","192.168.1.15,3240,1-1.3"
+; HKR, Parameters, PersistentDevices, 0x00010000, "pc,3240,3-2","pc,3240,3-3"
+HKR, Parameters, MaxAttachRetries, %REG_DWORD%, 0 ; infinite if zero
+HKR, Parameters, MaxAttachPeriod,  %REG_DWORD%, 3600 ; seconds
 
 HKR, Parameters\Wdf, VerboseOn, %REG_DWORD%, 1
 HKR, Parameters\Wdf, VerifierOn, %REG_DWORD%, 1

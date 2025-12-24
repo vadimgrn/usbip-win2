@@ -46,10 +46,16 @@ struct vhci_ctx
         int events_subscribers; // SUM(fileobject_ctx::process_events)
         WDFWAITLOCK events_lock;
 
-        _KTHREAD *attach_thread;
-        KEVENT attach_thread_stop;
-
         WDFIOTARGET target_self;
+        WDFTIMER attach_timer;
+
+        unsigned int max_attach_retries; // constants
+        unsigned int max_attach_period;
+
+        LIST_ENTRY attach_requests; // list head
+        KSPIN_LOCK attach_requests_lock;
+
+        volatile bool removing;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 

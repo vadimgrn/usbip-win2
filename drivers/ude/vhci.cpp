@@ -25,32 +25,16 @@ namespace
 using namespace usbip;
 
 /*
- * A pageable thread or pageable driver routine that runs at IRQL = PASSIVE_LEVEL 
- * should never call KeSetEvent with the Wait parameter set to TRUE. 
- * Such a call causes a fatal page fault if the caller happens to be paged out 
- * between the calls to KeSetEvent and KeWaitXxx.
+ * Requests' parent is vhci, they will be deleted automatically.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-/*PAGED*/ void attach_thread_join(_In_ WDFDEVICE vhci) // not PAGED, see KeSetEvent
+PAGED void clear_attach_requests(_Inout_ vhci_ctx &ctx)
 {
-        NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL); // PAGED_CODE()
-        auto &ctx = *get_vhci_ctx(vhci);
+        PAGED_CODE();
 
-        wdm::object_reference thread(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&ctx.attach_thread), nullptr), false);
-        if (!thread) {
-                TraceDbg("already exited or was not created");
-                return;
-        }
-
-        TraceDbg("signal stop and wait"); 
-        auto timeout = make_timeout(10*wdm::minute, wdm::period::relative);
-        
-        if (KeSetEvent(&ctx.attach_thread_stop, IO_NO_INCREMENT, true); // raises IRQL
-            auto err = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout)) {
-                Trace(TRACE_LEVEL_ERROR, "KeWaitForSingleObject %!STATUS!", err);
-        } else {
-                TraceDbg("joined");
+        while (auto entry = ExInterlockedRemoveHeadList(&ctx.attach_requests, &ctx.attach_requests_lock)) {
+                InitializeListHead(entry);
         }
 }
 
@@ -63,13 +47,19 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 {
         PAGED_CODE();
-        TraceDbg("vhci %04x", ptr04x(object));
+        TraceDbg("%04x", ptr04x(object));
 
         auto vhci = static_cast<WDFDEVICE>(object);
         auto &ctx = *get_vhci_ctx(vhci);
 
-        attach_thread_join(vhci);
-        
+        ctx.removing = true; // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
+
+        if (auto t = ctx.attach_timer) {
+                auto was_removed = WdfTimerStop(t, true);
+                TraceDbg("timer was in queue %!BOOLEAN!", was_removed);
+                clear_attach_requests(ctx);
+        }
+
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
         }
@@ -232,6 +222,76 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto create_attach_timer(_Inout_ WDFTIMER &timer, _In_ WDFOBJECT parent)
+{
+        PAGED_CODE();
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ExecutionLevel = WdfExecutionLevelPassive;
+        attr.ParentObject = parent;
+
+        WDF_TIMER_CONFIG cfg;
+        WDF_TIMER_CONFIG_INIT(&cfg, on_attach_timer);
+        cfg.TolerableDelay = TolerableDelayUnlimited;
+
+        if (auto err = WdfTimerCreate(&cfg, &attr, &timer)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void set_constants(_Inout_ unsigned int &max_retries, _Inout_ unsigned int &max_period)
+{
+        PAGED_CODE();
+        NT_ASSERT(!max_retries);
+
+        enum {
+                HOUR = 60*60, DAY = 24*HOUR, // seconds
+                DEF_PERIOD = HOUR, MAX_PERIOD = DAY 
+        };
+
+        Registry key; 
+        if (NT_ERROR(open_parameters_key(key, KEY_QUERY_VALUE))) {
+                max_period = DEF_PERIOD;
+                return;
+        }
+
+        struct {
+                const wchar_t *name;
+                unsigned int &val;
+        } const v[] {
+                { L"MaxAttachRetries", max_retries },
+                { L"MaxAttachPeriod", max_period },
+        };
+
+        for (auto& [name, value]: v) {
+
+                UNICODE_STRING value_name;
+                RtlUnicodeStringInit(&value_name, name);
+
+                if (ULONG val = 0; auto err = WdfRegistryQueryULong(key.get<WDFKEY>(), &value_name, &val)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &value_name, err);
+                } else {
+                        value = static_cast<unsigned int>(val);
+                }
+        }
+
+        if (!max_period) {
+                max_period = DEF_PERIOD;
+        } else if (max_period > MAX_PERIOD) {
+                max_period = MAX_PERIOD;
+        }
+
+        TraceDbg("%S=%u, %S=%u", v[0].name, max_retries, v[1].name, max_period);
+}
+
 using init_func_t = NTSTATUS(WDFDEVICE);
 
 _Function_class_(init_func_t)
@@ -260,6 +320,10 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
+        if (auto err = create_attach_timer(ctx.attach_timer, vhci)) {
+                return err;
+        }
+
         if (auto err = create_target_self(ctx.target_self, attr, vhci)) {
                 return err;
         }
@@ -268,8 +332,11 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        KeInitializeEvent(&ctx.attach_thread_stop, NotificationEvent, false);
+        set_constants(ctx.max_attach_retries, ctx.max_attach_period);
+
         InitializeListHead(&ctx.fileobjects);
+        InitializeListHead(&ctx.attach_requests);
+        KeInitializeSpinLock(&ctx.attach_requests_lock);
 
         return STATUS_SUCCESS;
 }
@@ -393,7 +460,9 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
+
         TraceDbg("%04x", ptr04x(vhci));
+        get_vhci_ctx(vhci)->removing = true;
 
         vhci::detach_all_devices(vhci, true);
         purge_read_queue(vhci); // detach notifications may not be received
@@ -926,7 +995,7 @@ PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
         
         if (auto ctx = get_vhci_ctx(vhci)) {
-                plugin_persistent_devices(ctx);
+                plugin_persistent_devices(*ctx);
         }
 
         return STATUS_SUCCESS;

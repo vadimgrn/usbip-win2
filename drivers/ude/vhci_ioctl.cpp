@@ -422,7 +422,10 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto st = WdfRequestGetStatus(request);
         TraceDbg("%s %!STATUS!", function, st);
 
-        if (auto &ext = ctx.ext(); auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
+        if (auto vc = get_vhci_ctx(ctx.vhci); vc->removing) {
+                st = STATUS_CANCELLED;
+                TraceDbg("req %04x, assign %!STATUS!, vhci is being removing", ptr04x(request), st);
+        } else if (auto &ext = ctx.ext(); auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx, ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
@@ -449,7 +452,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT object)
         auto wi = static_cast<WDFWORKITEM>(object); // WdfWorkItemGetParentObject(wi) returns NULL
         auto &ctx = *get_workitem_ctx(wi);
 
-        TraceDbg("request %04x, addrinfo %04x, device_ctx_ext %04x", 
+        TraceDbg("req %04x, addrinfo %04x, device_ctx_ext %04x", 
                   ptr04x(ctx.request), ptr04x(ctx.addrinfo), ptr04x(ctx.ctx_ext));
 
         wsk::free(ctx.addrinfo);
@@ -738,7 +741,7 @@ PAGED void device_control(
 {
         PAGED_CODE();
 
-        TraceDbg("request %04x, %s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
+        TraceDbg("req %04x, %s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
                   ptr04x(Request), device_control_name(IoControlCode), IoControlCode, 
                   OutputBufferLength, InputBufferLength);
 
@@ -814,7 +817,7 @@ PAGED void device_control_parallel(
         NTSTATUS st;
 
         if (auto handler = get_parallel_handler(IoControlCode)) {
-                TraceDbg("request %04x, %s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
+                TraceDbg("req %04x, %s(%#08lX), OutputBufferLength %Iu, InputBufferLength %Iu", 
                           ptr04x(Request), device_control_name(IoControlCode), IoControlCode, 
                           OutputBufferLength, InputBufferLength);
 

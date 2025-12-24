@@ -7,13 +7,14 @@
 #include "device.tmh"
 
 #include "driver.h"
-#include "request_list.h"
-#include "endpoint_list.h"
-#include "network.h"
-#include "device_ioctl.h"
-#include "wsk_receive.h"
 #include "ioctl.h"
 #include "vhci.h"
+#include "network.h"
+#include "persistent.h"
+#include "wsk_receive.h"
+#include "device_ioctl.h"
+#include "request_list.h"
+#include "endpoint_list.h"
 
 #include <libdrv/dbgcommon.h>
 #include <libdrv/wait_timeout.h>
@@ -548,21 +549,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto create_detach_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr)
-{
-        ObjectDelete ptr;
-        
-        if (WDFREQUEST req; auto err = WdfRequestCreate(&attr, target, &req)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestCreate %!STATUS!", err);
-        } else {
-                ptr.reset(req);
-        }
-
-        return ptr;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port)
 {
         WDFMEMORY mem{}; 
@@ -706,7 +692,7 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = dev.vhci;
 
-        auto req_ptr = create_detach_request(ctx.target_self, attr);
+        auto req_ptr = create_request(ctx.target_self, attr);
         if (!req_ptr) {
                 return;
         }
