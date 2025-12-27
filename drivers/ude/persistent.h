@@ -27,11 +27,6 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_persistent_devices(_Inout_ vhci_ctx &ctx);
 
-_Function_class_(EVT_WDF_TIMER)
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void on_attach_timer(_In_ WDFTIMER timer);
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 ObjectDelete create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr);

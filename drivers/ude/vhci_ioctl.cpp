@@ -424,7 +424,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 
         if (auto vc = get_vhci_ctx(ctx.vhci); vc->removing) {
                 st = STATUS_CANCELLED;
-                TraceDbg("req %04x, assign %!STATUS!, vhci is being removing", ptr04x(request), st);
+                TraceDbg("req %04x, set %!STATUS!, vhci is being removing", ptr04x(request), st);
         } else if (auto &ext = ctx.ext(); auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx, ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo

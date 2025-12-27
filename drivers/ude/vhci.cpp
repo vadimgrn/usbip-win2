@@ -12,10 +12,8 @@
 #include "persistent.h"
 
 #include <libdrv/wdm_cpp.h>
-#include <libdrv/wait_timeout.h>
 
 #include <ntstrsafe.h>
-
 #include <usbdlib.h>
 #include <usbiodef.h>
 
@@ -23,20 +21,6 @@ namespace
 {
 
 using namespace usbip;
-
-/*
- * Requests' parent is vhci, they will be deleted automatically.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void clear_attach_requests(_Inout_ vhci_ctx &ctx)
-{
-        PAGED_CODE();
-
-        while (auto entry = ExInterlockedRemoveHeadList(&ctx.attach_requests, &ctx.attach_requests_lock)) {
-                InitializeListHead(entry);
-        }
-}
 
 /*
  * WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE.
@@ -53,12 +37,6 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto &ctx = *get_vhci_ctx(vhci);
 
         ctx.removing = true; // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
-
-        if (auto t = ctx.attach_timer) {
-                auto was_removed = WdfTimerStop(t, true);
-                TraceDbg("timer was in queue %!BOOLEAN!", was_removed);
-                clear_attach_requests(ctx);
-        }
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
@@ -224,29 +202,6 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_timer(_Inout_ WDFTIMER &timer, _In_ WDFOBJECT parent)
-{
-        PAGED_CODE();
-
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ExecutionLevel = WdfExecutionLevelPassive;
-        attr.ParentObject = parent;
-
-        WDF_TIMER_CONFIG cfg;
-        WDF_TIMER_CONFIG_INIT(&cfg, on_attach_timer);
-        cfg.TolerableDelay = TolerableDelayUnlimited;
-
-        if (auto err = WdfTimerCreate(&cfg, &attr, &timer)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", err);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void set_constants(_Inout_ unsigned int &max_retries, _Inout_ unsigned int &max_period)
 {
         PAGED_CODE();
@@ -300,7 +255,9 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto init_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
+
         auto &ctx = *get_vhci_ctx(vhci);
+        InitializeListHead(&ctx.fileobjects);
 
         if (auto err = alloc_devices(ctx)) {
                 return err;
@@ -320,10 +277,6 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        if (auto err = create_attach_timer(ctx.attach_timer, vhci)) {
-                return err;
-        }
-
         if (auto err = create_target_self(ctx.target_self, attr, vhci)) {
                 return err;
         }
@@ -333,11 +286,6 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
         }
 
         set_constants(ctx.max_attach_retries, ctx.max_attach_period);
-
-        InitializeListHead(&ctx.fileobjects);
-        InitializeListHead(&ctx.attach_requests);
-        KeInitializeSpinLock(&ctx.attach_requests_lock);
-
         return STATUS_SUCCESS;
 }
 

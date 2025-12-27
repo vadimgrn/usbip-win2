@@ -47,13 +47,9 @@ struct vhci_ctx
         WDFWAITLOCK events_lock;
 
         WDFIOTARGET target_self;
-        WDFTIMER attach_timer;
 
         unsigned int max_attach_retries; // constants
         unsigned int max_attach_period;
-
-        LIST_ENTRY attach_requests; // list head
-        KSPIN_LOCK attach_requests_lock;
 
         volatile bool removing;
 };

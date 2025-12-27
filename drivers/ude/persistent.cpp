@@ -23,27 +23,16 @@ using namespace usbip;
  */
 struct attach_ctx
 {
-        LIST_ENTRY entry; // list head is vhci_ctx::attach_requests
-        
+        WDFDEVICE vhci;
+        WDFSTRING url; // host,port,busid
+
+        WDFTIMER timer;
         WDFMEMORY inbuf;
         WDFMEMORY outbuf;
 
-        WDFSTRING url; // host,port,busid
         unsigned int retry_cnt;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(attach_ctx, get_attach_ctx);
-
-inline auto get_handle(_In_ attach_ctx *ctx)
-{
-        NT_ASSERT(ctx);
-        return static_cast<WDFREQUEST>(WdfObjectContextGetObject(ctx));
-}
-
-inline auto get_attach_ctx(_In_ LIST_ENTRY *entry)
-{
-        NT_ASSERT(entry);
-        return CONTAINING_RECORD(entry, attach_ctx, entry);
-}
 
 constexpr auto empty(_In_ const UNICODE_STRING &s)
 {
@@ -242,32 +231,30 @@ PAGED auto create_outbuf(_In_ vhci::ioctl::plugin_hardware *req, _Inout_ WDF_OBJ
 _Function_class_(EVT_WDF_REQUEST_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 void on_plugin_hardware(
-        _In_ WDFREQUEST request, _In_ WDFIOTARGET, _In_ WDF_REQUEST_COMPLETION_PARAMS*, _In_ WDFCONTEXT context)
+        _In_ WDFREQUEST request, _In_ WDFIOTARGET, _In_ WDF_REQUEST_COMPLETION_PARAMS*, _In_ WDFCONTEXT)
 {
-        auto vhci = static_cast<WDFDEVICE>(context);
-        auto &ctx = *get_vhci_ctx(vhci);
-
-        auto &req_ctx = *get_attach_ctx(request);
-        auto retry_cnt = req_ctx.retry_cnt++; // from zero
-
         auto st = WdfRequestGetStatus(request);
-        TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
 
-        if (auto retry = NT_ERROR(st) && can_retry(st) && can_retry(retry_cnt, ctx.max_attach_retries);
-            !retry || ctx.removing) {
-                TraceDbg("req %04x, cannot retry or vhci is being removing", ptr04x(request));
-                WdfObjectDelete(request);
-                return;
-        }
+        auto &ctx = *get_attach_ctx(request);
+        auto &vhci = *get_vhci_ctx(ctx.vhci);
 
-        NT_ASSERT(IsListEmpty(&req_ctx.entry));
+        auto retry_cnt = ctx.retry_cnt++; // from zero
 
-        if (ExInterlockedInsertTailList(&ctx.attach_requests, &req_ctx.entry, &ctx.attach_requests_lock)) {
-                TraceDbg("req %04x appended, retry #%u pending", ptr04x(request), retry_cnt);
+        auto failed = NT_ERROR(st); 
+        auto retry = failed && can_retry(st) && can_retry(retry_cnt, vhci.max_attach_retries);
+
+        if (retry && !vhci.removing) {
+                auto secs = get_period(retry_cnt, vhci.max_attach_period);
+                NT_VERIFY(!WdfTimerStart(ctx.timer, WDF_REL_TIMEOUT_IN_SEC(secs))); // @see on_attach_timer
+
+                TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, secs);
         } else {
-                auto secs = get_period(retry_cnt, ctx.max_attach_period);
-                NT_VERIFY(!WdfTimerStart(ctx.attach_timer, WDF_REL_TIMEOUT_IN_SEC(secs))); // @see on_attach_timer
-                TraceDbg("req %04x, retry #%u in %u secs.", ptr04x(request), retry_cnt, secs);
+                auto s = !failed ? "" : 
+                         !retry ? ", cannot retry" : 
+                         ", vhci is being removing";
+
+                TraceDbg("req %04x, %!STATUS!%s", ptr04x(request), st, s);
+                WdfObjectDelete(request);
         }
 }
 
@@ -279,18 +266,18 @@ void on_plugin_hardware(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_plugin_hardware(
-        _In_ WDFDEVICE vhci, _In_ WDFIOTARGET target, _In_ const attach_ctx &ctx, _Inout_ ObjectDelete &req)
+        _In_ WDFIOTARGET target, _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf,  _Inout_ ObjectDelete &req)
 {
         auto request = req.get<WDFREQUEST>();
         TraceDbg("req %04x", ptr04x(request));
 
         if (auto err = WdfIoTargetFormatRequestForIoctl(target, request,
-                                vhci::ioctl::PLUGIN_HARDWARE, ctx.inbuf, nullptr, ctx.outbuf, nullptr)) {
+                                vhci::ioctl::PLUGIN_HARDWARE, inbuf, nullptr, outbuf, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
                 return;
         }
 
-        WdfRequestSetCompletionRoutine(request, on_plugin_hardware, vhci);
+        WdfRequestSetCompletionRoutine(request, on_plugin_hardware, WDF_NO_CONTEXT);
 
         if (!WdfRequestSend(request, target, WDF_NO_SEND_OPTIONS)) {
                 auto err = WdfRequestGetStatus(request);
@@ -300,43 +287,115 @@ void send_plugin_hardware(
         }
 }
 
+/*
+ * Removing a device from persistents allows you to stop attach attempts.
+ */ 
+_Function_class_(EVT_WDF_TIMER)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(_In_ WDFOBJECT parent, WDFIOTARGET target, _In_ WDFSTRING url)
+PAGED void on_attach_timer(_In_ WDFTIMER timer)
+{
+        PAGED_CODE();
+        ObjectDelete req(WdfTimerGetParentObject(timer));
+
+        auto &ctx = *get_attach_ctx(req.get());
+        auto &vhci = *get_vhci_ctx(ctx.vhci);
+
+        ULONG cnt{};
+        auto persistent = get_persistent_devices(cnt, vhci.devices_cnt);
+
+        if (auto rm = vhci.removing; rm || !contains(persistent.get<WDFCOLLECTION>(), cnt, ctx.url)) {
+                auto s = rm ? "vhci is being removing" : "is no longer persistent";
+                TraceDbg("req %04x %s", ptr04x(req.get()), s);
+                return;
+        }
+
+        TraceDbg("req %04x, retrying", ptr04x(req.get()));
+
+        WDF_REQUEST_REUSE_PARAMS params;
+        WDF_REQUEST_REUSE_PARAMS_INIT(&params, WDF_REQUEST_REUSE_NO_FLAGS, STATUS_SUCCESS);
+
+        if (auto err = WdfRequestReuse(req.get<WDFREQUEST>(), &params)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestReuse %!STATUS!", err);
+        } else {
+                send_plugin_hardware(vhci.target_self, ctx.inbuf, ctx.outbuf, req);
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto create_attach_timer(_Inout_ WDFTIMER &timer, _In_ WDFOBJECT parent)
+{
+        PAGED_CODE();
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ExecutionLevel = WdfExecutionLevelPassive;
+        attr.ParentObject = parent;
+
+        WDF_TIMER_CONFIG cfg;
+        WDF_TIMER_CONFIG_INIT(&cfg, on_attach_timer);
+        cfg.TolerableDelay = TolerableDelayUnlimited;
+
+        if (auto err = WdfTimerCreate(&cfg, &attr, &timer)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
+/*
+* There is no need to call WdfTimerStop here or in EVT_WDF_OBJECT_CONTEXT_CLEANUP.
+* The framework stops and deletes the timer object before calling the parent's EvtCleanupCallback.
+ */
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void destroy_attach_request(_In_ WDFOBJECT obj)
+{
+        PAGED_CODE();
+        TraceDbg("%04x", ptr04x(obj)); 
+
+        if (auto &ctx = *get_attach_ctx(obj); ctx.url) {
+                WdfObjectDereference(ctx.url);
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto create_attach_request(_In_ WDFDEVICE vhci, WDFIOTARGET target, _In_ WDFSTRING url)
 {
         PAGED_CODE();
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, attach_ctx);
-        attr.ParentObject = parent;
+        attr.EvtDestroyCallback = destroy_attach_request;
+        attr.ParentObject = vhci;
 
-        attr.EvtCleanupCallback = [] (auto obj)
-        {
-                TraceDbg("~%04x", ptr04x(obj)); 
-                auto &ctx = *get_attach_ctx(static_cast<WDFREQUEST>(obj));
+        auto req = create_request(target, attr);
+        if (!req) {
+                return req;
+        }
 
-                WdfObjectDereference(ctx.url);
-                ctx.url = WDF_NO_HANDLE;
-        };
+        TraceDbg("%04x", ptr04x(req.get()));
 
-        auto ptr = create_request(target, attr);
+        auto &ctx = *get_attach_ctx(req.get()); 
+        ctx.vhci = vhci;
 
-        if (auto req = ptr.get<WDFREQUEST>()) {
-                TraceDbg("%04x", ptr04x(req));
-
-                auto &ctx = *get_attach_ctx(req);
-                InitializeListHead(&ctx.entry);
-                
+        if (auto err = create_attach_timer(ctx.timer, req.get())) {
+                req.reset();
+        } else {
                 WdfObjectReference(url);
                 ctx.url = url;
         }
 
-        return ptr;
+        return req;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugin_persistent_device(_In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ WDFSTRING url)
+PAGED void plugin_persistent_device(_In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ WDFSTRING url)
 {
         PAGED_CODE();
 
@@ -345,25 +404,25 @@ PAGED void plugin_persistent_device(_In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, 
 
         Trace(TRACE_LEVEL_INFORMATION, "%!USTR!", &str);
 
-        auto req = create_attach_request(vhci, ctx.target_self, url);
+        auto req = create_attach_request(vhci, vctx.target_self, url);
         if (!req) {
                 return;
         }
-        auto &req_ctx = *get_attach_ctx(req.get<WDFREQUEST>());
+        auto &ctx = *get_attach_ctx(req.get());
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = req.get<WDFREQUEST>();
+        attr.ParentObject = req.get();
 
         vhci::ioctl::plugin_hardware *r{};
-        if (req_ctx.inbuf = create_inbuf(r, attr); !req_ctx.inbuf) {
+        if (ctx.inbuf = create_inbuf(r, attr); !ctx.inbuf) {
                 return;
         }
 
         if (auto err = parse_string(*r, str)) {
                 Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
-        } else if (req_ctx.outbuf = create_outbuf(r, attr); req_ctx.outbuf) {
-                send_plugin_hardware(vhci, ctx.target_self, req_ctx, req);
+        } else if (ctx.outbuf = create_outbuf(r, attr); ctx.outbuf) {
+                send_plugin_hardware(vctx.target_self, ctx.inbuf, ctx.outbuf, req);
         }
 }
 
@@ -445,45 +504,4 @@ auto usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &
         }
 
         return ptr;
-}
-
-/*
- * Removing a device from persistents allows you to stop attach attempts.
- */ 
-_Function_class_(EVT_WDF_TIMER)
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::on_attach_timer(_In_ WDFTIMER timer)
-{
-        PAGED_CODE();
-
-        auto vhci = static_cast<WDFDEVICE>(WdfTimerGetParentObject(timer));
-        auto &ctx = *get_vhci_ctx(vhci);
-
-        ULONG cnt{};
-        auto persistent = get_persistent_devices(cnt, ctx.devices_cnt);
-
-        while (auto entry = ExInterlockedRemoveHeadList(&ctx.attach_requests, &ctx.attach_requests_lock)) {
-
-                InitializeListHead(entry);
-
-                auto &req_ctx = *get_attach_ctx(entry);
-                ObjectDelete req(::get_handle(&req_ctx));
-
-                if (ctx.removing || !contains(persistent.get<WDFCOLLECTION>(), cnt, req_ctx.url)) {
-                        TraceDbg("req %04x is no longer persistent or vhci is being removing", ptr04x(req.get()));
-                        continue;
-                }
-
-                TraceDbg("req %04x, retrying", ptr04x(req.get()));
-
-                WDF_REQUEST_REUSE_PARAMS params;
-                WDF_REQUEST_REUSE_PARAMS_INIT(&params, WDF_REQUEST_REUSE_NO_FLAGS, STATUS_SUCCESS);
-
-                if (auto err = WdfRequestReuse(req.get<WDFREQUEST>(), &params)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRequestReuse %!STATUS!", err);
-                } else {
-                        send_plugin_hardware(vhci, ctx.target_self, req_ctx, req);
-                }
-        }
 }
