@@ -67,7 +67,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                 TraceDbg("req %04x not found, could not complete", ptr04x(request));
         }
 
-        if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !dev.unplugged) {
+        if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !get_flag(dev.unplugged)) {
                 auto device = get_handle(&dev);
                 TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(device), wsk.Status);
                 device::async_detach_and_delete(device);
@@ -453,7 +453,7 @@ void usbip::device::send_cmd_unlink_and_complete(_In_ UDECXUSBDEVICE device, _In
 
         TraceDbg("dev %04x, seqnum %u", ptr04x(device), req.seqnum);
 
-        if (dev.unplugged) {
+        if (get_flag(dev.unplugged)) {
                 TraceDbg("Unplugged, do not send unlink");
         } else if (auto ctx = wsk_context_ptr(&dev, WDFREQUEST(WDF_NO_HANDLE))) {
                 set_cmd_unlink_usbip_header(ctx->hdr, dev, req.seqnum);
@@ -598,7 +598,7 @@ void NTAPI usbip::device::internal_control(
         auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
         
-        if (auto dev = get_device_ctx(endp.device); dev->unplugged) {
+        if (auto dev = get_device_ctx(endp.device); get_flag(dev->unplugged)) {
                 UdecxUrbComplete(request, USBD_STATUS_DEVICE_GONE);
         } else if (auto st = usb_submit_urb(*dev, endpoint, endp, request); st != STATUS_PENDING) {
                 if (st) {

@@ -625,14 +625,14 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 {
 	PAGED_CODE();
 
-	for (NTSTATUS status{}; !(status || dev.unplugged || recv_usbip_header(ctx)); ) {
+	for (NTSTATUS status{}; !(status || get_flag(dev.unplugged) || recv_usbip_header(ctx)); ) {
 
 		NT_ASSERT(!ctx.request); // must be completed and zeroed on every loop
 		ctx.request = ret_command(ctx);
 
 		if (auto sz = get_payload_size(ctx.hdr); !sz) {
 			//
-		} else if (dev.unplugged) {
+		} else if (get_flag(dev.unplugged)) {
 			status = STATUS_CANCELLED; // do not receive payload
 		} else {
 			auto f = ctx.request ? recv_payload : drain_payload;
@@ -666,7 +666,7 @@ PAGED void usbip::recv_thread_function(_In_ void *context)
 		free(ctx, true);
 	}
 
-	if (!dev.unplugged) {
+	if (!get_flag(dev.unplugged)) {
 		TraceDbg("dev %04x, detaching", ptr04x(device));
 		device::async_detach_and_delete(device); // detach will be called by this thread
 	}

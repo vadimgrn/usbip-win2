@@ -243,7 +243,7 @@ void on_plugin_hardware(
         auto failed = NT_ERROR(st); 
         auto retry = failed && can_retry(st) && can_retry(retry_cnt, vhci.max_attach_retries);
 
-        if (retry && !vhci.removing) {
+        if (retry && !get_flag(vhci.removing)) {
                 auto secs = get_period(retry_cnt, vhci.max_attach_period);
                 NT_VERIFY(!WdfTimerStart(ctx.timer, WDF_REL_TIMEOUT_IN_SEC(secs))); // @see on_attach_timer
 
@@ -304,7 +304,7 @@ PAGED void on_attach_timer(_In_ WDFTIMER timer)
         ULONG cnt{};
         auto persistent = get_persistent_devices(cnt, vhci.devices_cnt);
 
-        if (auto rm = vhci.removing; rm || !contains(persistent.get<WDFCOLLECTION>(), cnt, ctx.url)) {
+        if (auto rm = get_flag(vhci.removing); rm || !contains(persistent.get<WDFCOLLECTION>(), cnt, ctx.url)) {
                 auto s = rm ? "vhci is being removing" : "is no longer persistent";
                 TraceDbg("req %04x %s", ptr04x(req.get()), s);
                 return;

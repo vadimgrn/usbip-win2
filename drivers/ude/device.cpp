@@ -69,7 +69,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
 
         // all resources must be freed
         NT_ASSERT(IsListEmpty(&dev.requests));
-        NT_ASSERT(dev.unplugged);
+        NT_ASSERT(get_flag(dev.unplugged));
         NT_ASSERT(!dev.port);
         NT_ASSERT(!dev.recv_thread);
 }
@@ -92,7 +92,7 @@ PAGED auto recv_thread_join(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 return thread;
         }
 
-        NT_ASSERT(dev.unplugged); // thread checks it
+        NT_ASSERT(get_flag(dev.unplugged)); // thread checks it
         TraceDbg("dev %04x", ptr04x(device));
 
         if (auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
@@ -325,7 +325,7 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         PAGED_CODE();
         
         auto &dev = *get_device_ctx(device);
-        if (dev.unplugged) {
+        if (get_flag(dev.unplugged)) {
                 TraceDbg("dev %04x, unplugged", ptr04x(device));
                 return STATUS_DEVICE_NOT_CONNECTED;
         }
@@ -763,7 +763,7 @@ PAGED wdm::object_reference usbip::device::detach(_In_ UDECXUSBDEVICE device, _I
         wdm::object_reference thread;
         auto &dev = *get_device_ctx(device);
 
-        if (InterlockedExchangeBool(&dev.unplugged, true)) {
+        if (set_flag(dev.unplugged)) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
                 return thread;
         }

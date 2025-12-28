@@ -36,7 +36,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto vhci = static_cast<WDFDEVICE>(object);
         auto &ctx = *get_vhci_ctx(vhci);
 
-        ctx.removing = true; // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
+        set_flag(ctx.removing); // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
@@ -408,9 +408,11 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-
         TraceDbg("%04x", ptr04x(vhci));
-        get_vhci_ctx(vhci)->removing = true;
+        
+        if (auto ctx = get_vhci_ctx(vhci); true) {
+                set_flag(ctx->removing);
+        }
 
         vhci::detach_all_devices(vhci, true);
         purge_read_queue(vhci); // detach notifications may not be received

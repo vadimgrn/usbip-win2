@@ -51,7 +51,7 @@ struct vhci_ctx
         unsigned int max_attach_retries; // constants
         unsigned int max_attach_period;
 
-        volatile bool removing;
+        LONG removing; // use set_flag/get_flag
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
@@ -139,7 +139,7 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
 
-        volatile bool unplugged; // initiated detach that may still be ongoing
+        LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
 
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
@@ -252,10 +252,14 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r);
 
-inline auto InterlockedExchangeBool(_Inout_ _Interlocked_operand_ volatile bool *target, _In_ bool value)
+inline bool set_flag(_Inout_ LONG &target)
 {
-        static_assert(sizeof(*target) == sizeof(CHAR));
-        return InterlockedExchange8(reinterpret_cast<volatile CHAR*>(target), value);
+        return InterlockedExchange(&target, true);
+}
+
+inline bool get_flag(_Inout_ LONG &target)
+{
+        return InterlockedCompareExchange(&target, false, false);
 }
 
 } // namespace usbip
