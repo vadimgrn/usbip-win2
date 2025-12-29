@@ -590,7 +590,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
                 return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("port %d", r->port);
+        TraceDbg("port %d, reattach %!bool!", r->port, r->reattach);
         auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
@@ -598,7 +598,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach_and_delete(dev.get<UDECXUSBDEVICE>());
+                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), r->reattach);
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }

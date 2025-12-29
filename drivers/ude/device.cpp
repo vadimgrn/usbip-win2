@@ -549,7 +549,7 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port)
+auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port, _In_ bool reattach)
 {
         WDFMEMORY mem{}; 
         
@@ -560,6 +560,7 @@ auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port
                 RtlZeroMemory(req, sizeof(*req));
                 req->size = sizeof(*req);
                 req->port = port;
+                req->reattach = reattach;
         }
 
         return mem;
@@ -683,7 +684,7 @@ PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
+void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device, _In_ bool reattach)
 {
         auto &dev = *get_device_ctx(device);
         auto &ctx = *get_vhci_ctx(dev.vhci);
@@ -698,10 +699,10 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
         }
         auto request = req_ptr.get<WDFREQUEST>();
 
-        TraceDbg("req %04x, port %d", ptr04x(request), dev.port);
+        TraceDbg("req %04x, port %d, reattach %!bool!", ptr04x(request), dev.port, reattach);
 
         attr.ParentObject = request;
-        auto inbuf = create_detach_request_inbuf(attr, dev.port);
+        auto inbuf = create_detach_request_inbuf(attr, dev.port, reattach);
         if (!inbuf) {
                 return;
         }
@@ -724,11 +725,11 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
         auto context = reinterpret_cast<void*>(static_cast<intptr_t>(dev.port));
         WdfRequestSetCompletionRoutine(request, completion, context);
 
-        if (WdfRequestSend(request, ctx.target_self, WDF_NO_SEND_OPTIONS)) {
-                req_ptr.release(); // will be deleted in the completion routine
-        } else {
+        if (!WdfRequestSend(request, ctx.target_self, WDF_NO_SEND_OPTIONS)) {
                 auto err = WdfRequestGetStatus(request);
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestSend %!STATUS!", err);
+        } else {
+                req_ptr.release(); // will be deleted in the completion routine
         }
 }
 
@@ -756,12 +757,14 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED wdm::object_reference usbip::device::detach(_In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete)
+PAGED wdm::object_reference usbip::device::detach(
+        _In_ UDECXUSBDEVICE device, _In_ bool plugout_and_delete, _In_ bool reattach)
 {
         PAGED_CODE();
-
         wdm::object_reference thread;
+
         auto &dev = *get_device_ctx(device);
+        auto vhci = dev.vhci;
 
         if (set_flag(dev.unplugged)) {
                 TraceDbg("dev %04x, already unplugged", ptr04x(device));
@@ -780,8 +783,17 @@ PAGED wdm::object_reference usbip::device::detach(_In_ UDECXUSBDEVICE device, _I
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
+        ObjectDelete url;
+        if (reattach) {
+                url = make_device_url(vhci, dev.attributes());
+        }
+
         if (plugout_and_delete) {
-                ::plugout_and_delete(dev.vhci, device, dev.ctx_ext, port);
+                ::plugout_and_delete(vhci, device, dev.ctx_ext, port);
+        }
+
+        if (auto &ctx = *get_vhci_ctx(vhci); url && is_persistent(ctx, url.get<WDFSTRING>())) {
+                plugin_persistent_device(vhci, ctx, url.get<WDFSTRING>(), true);
         }
 
         return thread;

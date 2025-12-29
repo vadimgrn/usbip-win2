@@ -96,6 +96,7 @@ struct plugin_hardware : base, imported_device_location {};
 struct plugout_hardware : base
 {
         int port; // all ports if <= 0
+        bool reattach; // if persistent
 };
 
 struct get_imported_devices : base

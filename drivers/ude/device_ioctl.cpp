@@ -70,7 +70,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !get_flag(dev.unplugged)) {
                 auto device = get_handle(&dev);
                 TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(device), wsk.Status);
-                device::async_detach_and_delete(device);
+                device::async_detach_and_delete(device, true);
         }
 
         return StopCompletion;

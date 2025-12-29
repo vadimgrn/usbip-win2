@@ -12,6 +12,7 @@
 #include "persistent.h"
 
 #include <libdrv/wdm_cpp.h>
+#include <libdrv/pair.h>
 
 #include <ntstrsafe.h>
 #include <usbdlib.h>
@@ -202,19 +203,21 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void set_constants(_Inout_ unsigned int &max_retries, _Inout_ unsigned int &max_period)
+PAGED void init_constants(
+        _Inout_ unsigned int &max_tries, _Inout_ unsigned int &init_delay, _Inout_ unsigned int &max_delay)
 {
         PAGED_CODE();
-        NT_ASSERT(!max_retries);
 
         enum {
                 HOUR = 60*60, DAY = 24*HOUR, // seconds
-                DEF_PERIOD = HOUR, MAX_PERIOD = DAY 
+                DEF_INIT_DELAY = 15, DEF_MAX_DELAY = HOUR,
+                MIN_DELAY = 1, MAX_DELAY = DAY 
         };
 
         Registry key; 
         if (NT_ERROR(open_parameters_key(key, KEY_QUERY_VALUE))) {
-                max_period = DEF_PERIOD;
+                init_delay = DEF_INIT_DELAY;
+                max_delay = DEF_MAX_DELAY;
                 return;
         }
 
@@ -222,8 +225,9 @@ PAGED void set_constants(_Inout_ unsigned int &max_retries, _Inout_ unsigned int
                 const wchar_t *name;
                 unsigned int &val;
         } const v[] {
-                { L"MaxAttachRetries", max_retries },
-                { L"MaxAttachPeriod", max_period },
+                { L"ReattachMaxTries", max_tries },
+                { L"ReattachInitDelay", init_delay },
+                { L"ReattachMaxDelay", max_delay },
         };
 
         for (auto& [name, value]: v) {
@@ -237,14 +241,32 @@ PAGED void set_constants(_Inout_ unsigned int &max_retries, _Inout_ unsigned int
                         value = static_cast<unsigned int>(val);
                 }
         }
-
-        if (!max_period) {
-                max_period = DEF_PERIOD;
-        } else if (max_period > MAX_PERIOD) {
-                max_period = MAX_PERIOD;
+        
+        if (!init_delay) {
+                init_delay = DEF_INIT_DELAY;
         }
 
-        TraceDbg("%S=%u, %S=%u", v[0].name, max_retries, v[1].name, max_period);
+        if (!max_delay) {
+                max_delay = DEF_MAX_DELAY;
+        }
+
+        if (init_delay > max_delay) {
+                swap(init_delay, max_delay);
+        }
+
+        if (init_delay < MIN_DELAY) {
+                init_delay = MIN_DELAY;
+        }
+
+        if (max_delay > MAX_DELAY) {
+                max_delay = MAX_DELAY;
+        }
+
+        TraceDbg("%S=%u, %S=%u, %S=%u", v[0].name, max_tries, v[1].name, init_delay, v[2].name, max_delay);
+
+        NT_ASSERT(init_delay >= MIN_DELAY);
+        NT_ASSERT(max_delay <= MAX_DELAY);
+        NT_ASSERT(init_delay <= max_delay);
 }
 
 using init_func_t = NTSTATUS(WDFDEVICE);
@@ -285,7 +307,7 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        set_constants(ctx.max_attach_retries, ctx.max_attach_period);
+        init_constants(ctx.reattach_max_tries, ctx.reattach_init_delay, ctx.reattach_max_delay);
         return STATUS_SUCCESS;
 }
 
@@ -832,16 +854,18 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async)
 {
         PAGED_CODE();
-        TraceDbg("%04x", ptr04x(vhci));
 
+        TraceDbg("%04x", ptr04x(vhci));
         auto &ctx = *get_vhci_ctx(vhci);
 
-        auto detach = async ? device::async_detach_and_delete : 
-                              [] (auto dev) { device::detach_and_delete(dev); };
-
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
+ 
                 if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
-                        detach(hdev);
+                        if (async) {
+                                device::async_detach_and_delete(hdev);
+                        } else {
+                                device::detach_and_delete(hdev);
+                        }
                 }
         }
 }
@@ -938,15 +962,11 @@ PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 
         WDFDEVICE vhci{};
         if (auto err = create_vhci(vhci, init)) { 
-                // the framework handles deletion of WDFDEVICE
-                return err;
+                return err; // the framework handles deletion of WDFDEVICE
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
-        
-        if (auto ctx = get_vhci_ctx(vhci)) {
-                plugin_persistent_devices(*ctx);
-        }
+        plugin_persistent_devices(vhci);
 
         return STATUS_SUCCESS;
 }

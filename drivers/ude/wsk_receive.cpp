@@ -668,7 +668,7 @@ PAGED void usbip::recv_thread_function(_In_ void *context)
 
 	if (!get_flag(dev.unplugged)) {
 		TraceDbg("dev %04x, detaching", ptr04x(device));
-		device::async_detach_and_delete(device); // detach will be called by this thread
+		device::async_detach_and_delete(device, true); // detach will be called by this thread
 	}
 
 	TraceDbg("dev %04x, exited", ptr04x(device));
