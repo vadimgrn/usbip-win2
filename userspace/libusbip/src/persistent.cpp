@@ -35,7 +35,10 @@ auto make_multi_sz(_Inout_ std::wstring &result, _In_ const std::vector<device_l
                 result += utf8_to_wchar(s);
         }
 
-        result += L'\0';
+        for (int i = 0; i < v.empty() + 1; ++i) { // double null terminator if empty
+                result += L'\0';
+        }
+
         return ERROR_SUCCESS;
 }
 
