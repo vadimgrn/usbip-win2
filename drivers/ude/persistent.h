@@ -15,7 +15,7 @@ struct device_attributes;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK DesiredAccess);
+PAGED NTSTATUS open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK access);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

@@ -681,6 +681,10 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
         return st;
 }
 
+/*
+ * KEY_SET_VALUE is added to access the same key that is used by set_persistent.
+ * @see open_parameters_key
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent(_In_ WDFREQUEST request)
@@ -695,7 +699,7 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
         }
 
         Registry key;
-        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
+        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE | KEY_SET_VALUE)) {
                 return err;
         }
 

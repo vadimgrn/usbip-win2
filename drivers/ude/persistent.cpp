@@ -453,20 +453,30 @@ PAGED NTSTATUS usbip::copy(
         return STATUS_SUCCESS;
 }
 
+/*
+ * WdfDriverOpenParametersRegistryKey should not be used for write,
+ * use WdfDriverOpenPersistentStateRegistryKey instead.
+ *
+ * HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters stores immutable data.
+ * HLKM\SYSTEM\CurrentControlSet\Services\usbip2_ude\State is used to read/write persistent data.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK DesiredAccess)
+PAGED NTSTATUS usbip::open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK access)
 {
         PAGED_CODE();
 
-        WDFKEY k{}; 
-        auto st = WdfDriverOpenParametersRegistryKey(WdfGetDriver(), DesiredAccess, WDF_NO_OBJECT_ATTRIBUTES, &k);
+        const ACCESS_MASK write_flags = KEY_SET_VALUE | KEY_CREATE_SUB_KEY | KEY_WRITE | KEY_ALL_ACCESS;
+        auto f = access & write_flags ?WdfDriverOpenPersistentStateRegistryKey : WdfDriverOpenParametersRegistryKey;
+
+        WDFKEY h{};
+        auto st = f(WdfGetDriver(), access, WDF_NO_OBJECT_ATTRIBUTES, &h);
 
         if (NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDriverOpenParametersRegistryKey(DesiredAccess=%lu) %!STATUS!", DesiredAccess, st);
+                Trace(TRACE_LEVEL_ERROR, "%s(access=%#lx) %!STATUS!", __func__, access, st);
         }
 
-        key.reset(k);
+        key.reset(h);
         return st;
 }
 
