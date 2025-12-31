@@ -200,7 +200,7 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
         PAGED_CODE();
 
         Registry key;
-        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
+        if (auto err = open(key, DriverRegKeyParameters)) {
                 return;
         }
 
@@ -667,7 +667,7 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
         }
 
         Registry key;
-        if (auto err = open_parameters_key(key, KEY_SET_VALUE)) {
+        if (auto err = open(key, DriverRegKeyPersistentState, KEY_SET_VALUE)) {
                 return err;
         }
 
@@ -699,7 +699,7 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
         }
 
         Registry key;
-        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE | KEY_SET_VALUE)) {
+        if (auto err = open(key, DriverRegKeyPersistentState)) {
                 return err;
         }
 

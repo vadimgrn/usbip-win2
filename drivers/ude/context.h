@@ -48,8 +48,8 @@ struct vhci_ctx
 
         WDFIOTARGET target_self;
 
-        unsigned int reattach_max_tries; // constants
-        unsigned int reattach_init_delay;
+        unsigned int reattach_max_attempts; // constants
+        unsigned int reattach_first_delay;
         unsigned int reattach_max_delay;
 
         LONG removing; // use set_flag/get_flag

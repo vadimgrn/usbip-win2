@@ -96,7 +96,7 @@ struct plugin_hardware : base, imported_device_location {};
 struct plugout_hardware : base
 {
         int port; // all ports if <= 0
-        bool reattach; // if persistent
+        bool reattach; // if persistent, must always be set to false by libusbip
 };
 
 struct get_imported_devices : base

@@ -91,7 +91,7 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
         } v {def_cnt, def_cnt};
 
         Registry key;
-        if (auto err = open_parameters_key(key, KEY_QUERY_VALUE)) {
+        if (auto err = open(key, DriverRegKeyParameters)) {
                 return v;
         }
 
@@ -204,19 +204,19 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void init_constants(
-        _Inout_ unsigned int &max_tries, _Inout_ unsigned int &init_delay, _Inout_ unsigned int &max_delay)
+        _Inout_ unsigned int &max_attempts, _Inout_ unsigned int &first_delay, _Inout_ unsigned int &max_delay)
 {
         PAGED_CODE();
 
         enum {
                 HOUR = 60*60, DAY = 24*HOUR, // seconds
-                DEF_INIT_DELAY = 15, DEF_MAX_DELAY = HOUR,
+                DEF_FIRST_DELAY = 15, DEF_MAX_DELAY = HOUR,
                 MIN_DELAY = 1, MAX_DELAY = DAY 
         };
 
         Registry key; 
-        if (NT_ERROR(open_parameters_key(key, KEY_QUERY_VALUE))) {
-                init_delay = DEF_INIT_DELAY;
+        if (NT_ERROR(open(key, DriverRegKeyParameters))) {
+                first_delay = DEF_FIRST_DELAY;
                 max_delay = DEF_MAX_DELAY;
                 return;
         }
@@ -225,8 +225,8 @@ PAGED void init_constants(
                 const wchar_t *name;
                 unsigned int &val;
         } const v[] {
-                { L"ReattachMaxTries", max_tries },
-                { L"ReattachInitDelay", init_delay },
+                { L"ReattachMaxAttempts", max_attempts },
+                { L"ReattachFirstDelay", first_delay },
                 { L"ReattachMaxDelay", max_delay },
         };
 
@@ -242,31 +242,28 @@ PAGED void init_constants(
                 }
         }
         
-        if (!init_delay) {
-                init_delay = DEF_INIT_DELAY;
+        if (!first_delay) {
+                first_delay = DEF_FIRST_DELAY;
         }
 
         if (!max_delay) {
                 max_delay = DEF_MAX_DELAY;
         }
 
-        if (init_delay > max_delay) {
-                swap(init_delay, max_delay);
+        auto in_range = [] (auto val) { return max(MIN_DELAY, min(val, MAX_DELAY)); };
+
+        first_delay = in_range(first_delay);
+        max_delay = in_range(max_delay);
+
+        if (first_delay > max_delay) {
+                swap(first_delay, max_delay);
         }
 
-        if (init_delay < MIN_DELAY) {
-                init_delay = MIN_DELAY;
-        }
+        TraceDbg("%S=%u, %S=%u, %S=%u", v[0].name, max_attempts, v[1].name, first_delay, v[2].name, max_delay);
 
-        if (max_delay > MAX_DELAY) {
-                max_delay = MAX_DELAY;
-        }
-
-        TraceDbg("%S=%u, %S=%u, %S=%u", v[0].name, max_tries, v[1].name, init_delay, v[2].name, max_delay);
-
-        NT_ASSERT(init_delay >= MIN_DELAY);
+        NT_ASSERT(first_delay >= MIN_DELAY);
+        NT_ASSERT(first_delay <= max_delay);
         NT_ASSERT(max_delay <= MAX_DELAY);
-        NT_ASSERT(init_delay <= max_delay);
 }
 
 using init_func_t = NTSTATUS(WDFDEVICE);
@@ -307,7 +304,7 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        init_constants(ctx.reattach_max_tries, ctx.reattach_init_delay, ctx.reattach_max_delay);
+        init_constants(ctx.reattach_max_attempts, ctx.reattach_first_delay, ctx.reattach_max_delay);
         return STATUS_SUCCESS;
 }
 

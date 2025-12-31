@@ -15,7 +15,7 @@ struct device_attributes;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK access);
+PAGED NTSTATUS open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access = KEY_QUERY_VALUE);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -30,16 +30,16 @@ ObjectDelete create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED ObjectDelete make_device_url(_In_ WDFOBJECT parent, _In_ const device_attributes &dev);
+PAGED ObjectDelete make_device_str(_In_ WDFOBJECT parent, _In_ const device_attributes &dev);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED bool is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING url);
+PAGED bool is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING device_str);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_persistent_device(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ WDFSTRING url, _In_ bool after_delay = false);
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ WDFSTRING device_str, _In_ bool delayed = false);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

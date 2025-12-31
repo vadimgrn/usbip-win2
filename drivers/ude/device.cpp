@@ -783,17 +783,18 @@ PAGED wdm::object_reference usbip::device::detach(
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        ObjectDelete url;
+        ObjectDelete dev_str;
         if (reattach) {
-                url = make_device_url(vhci, dev.attributes());
+                dev_str = make_device_str(vhci, dev.attributes());
         }
 
         if (plugout_and_delete) {
                 ::plugout_and_delete(vhci, device, dev.ctx_ext, port);
         }
 
-        if (auto &ctx = *get_vhci_ctx(vhci); url && is_persistent(ctx, url.get<WDFSTRING>())) {
-                plugin_persistent_device(vhci, ctx, url.get<WDFSTRING>(), true);
+        if (auto &ctx = *get_vhci_ctx(vhci); dev_str && is_persistent(ctx, dev_str.get<WDFSTRING>())) {
+                auto delayed = plugout_and_delete;
+                plugin_persistent_device(vhci, ctx, dev_str.get<WDFSTRING>(), delayed);
         }
 
         return thread;

@@ -24,10 +24,10 @@ using namespace usbip;
  */
 struct attach_ctx
 {
-        WDFDEVICE vhci;
-        WDFSTRING url; // host,port,busid
-
+        WDFSTRING device_str; // host,port,busid
         WDFTIMER timer;
+        WDFWORKITEM wi;
+
         WDFMEMORY inbuf;
         WDFMEMORY outbuf;
 
@@ -35,6 +35,12 @@ struct attach_ctx
         unsigned int delay;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(attach_ctx, get_attach_ctx);
+
+WDF_DECLARE_CONTEXT_TYPE(WDFREQUEST); // WdfObjectGet_WDFREQUEST
+inline auto& get_request(_In_ WDFWORKITEM wi)
+{
+        return *WdfObjectGet_WDFREQUEST(wi);
+}
 
 constexpr auto empty(_In_ const UNICODE_STRING &s)
 {
@@ -60,9 +66,9 @@ constexpr auto can_retry(_In_ NTSTATUS status)
 /*
  * @param retry_cnt from zero
  */
-constexpr auto can_retry(_In_ unsigned int retry_cnt, _In_ unsigned int max_retries)
+constexpr auto can_retry(_In_ unsigned int retry_cnt, _In_ unsigned int max_attempts)
 {
-        return !max_retries || retry_cnt < max_retries;
+        return !max_attempts || retry_cnt < max_attempts;
 }
 static_assert(can_retry(0, 1));
 static_assert(!can_retry(1, 1));
@@ -121,7 +127,7 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
         PAGED_CODE();
         ObjectDelete col;
 
-        if (Registry key; NT_SUCCESS(open_parameters_key(key, KEY_QUERY_VALUE))) {
+        if (Registry key; NT_SUCCESS(open(key, DriverRegKeyPersistentState))) {
                 col = get_persistent_devices(key.get());
         }
 
@@ -131,7 +137,7 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_string(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const UNICODE_STRING &str)
+PAGED auto parse_device_str(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const UNICODE_STRING &str)
 {
         PAGED_CODE();
 
@@ -158,12 +164,13 @@ PAGED auto parse_string(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const UNIC
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_inbuf(_Inout_ vhci::ioctl::plugin_hardware* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+PAGED bool create_inbuf(
+        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
-        WDFMEMORY mem{};
+        NT_ASSERT(!result);
 
-        if (auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req))) {
+        if (auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*req), &result, reinterpret_cast<PVOID*>(&req))) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
                 req = nullptr;
         } else {
@@ -172,50 +179,47 @@ PAGED auto create_inbuf(_Inout_ vhci::ioctl::plugin_hardware* &req, _Inout_ WDF_
 
         }
 
-        return mem;
+        return req;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_outbuf(_In_ vhci::ioctl::plugin_hardware *req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+PAGED bool create_outbuf(
+        _Inout_ WDFMEMORY &result, _In_ vhci::ioctl::plugin_hardware *req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
-        
-        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
-        WDFMEMORY mem{};
+        NT_ASSERT(!result);
 
-        if (auto err = WdfMemoryCreatePreallocated(&attr, req, len, &mem)) {
+        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+
+        if (auto err = WdfMemoryCreatePreallocated(&attr, req, len, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreatePreallocated %!STATUS!", err);
         }
 
-        return mem;
+        return result;
 }
 
-/*
- * Cannot call is_persistent() at DISPATCH_LEVEL,
- * it will be called in timer routine.
- */
 _Function_class_(EVT_WDF_REQUEST_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 void on_plugin_hardware(
-        _In_ WDFREQUEST request, _In_ WDFIOTARGET, _In_ WDF_REQUEST_COMPLETION_PARAMS*, _In_ WDFCONTEXT)
+        _In_ WDFREQUEST request, _In_ WDFIOTARGET, _In_ WDF_REQUEST_COMPLETION_PARAMS*, _In_ WDFCONTEXT context)
 {
         ObjectDelete ptr(request);
+
+        auto &req = *get_attach_ctx(request);
+        auto &vhci = *get_vhci_ctx(static_cast<WDFDEVICE>(context));
+
+        auto retry_cnt = req.retry_cnt++; // from zero
+
         auto st = WdfRequestGetStatus(request);
-
-        auto &ctx = *get_attach_ctx(request);
-        auto &vhci = *get_vhci_ctx(ctx.vhci);
-
-        auto retry_cnt = ctx.retry_cnt++; // from zero
-
         auto failed = NT_ERROR(st); 
-        auto retry = failed && can_retry(st) && can_retry(retry_cnt, vhci.reattach_max_tries);
+        auto retry = failed && can_retry(st) && can_retry(retry_cnt, vhci.reattach_max_attempts);
 
-        if (!retry || get_flag(vhci.removing)) {
+        if (auto ok = retry && !get_flag(vhci.removing); !ok) {
 
                 auto s = !failed ? " " : // "" prints as "<NULL>"
-                         !retry ? ", cannot retry" : 
-                         ", vhci is being removing";
+                        !retry ? ", cannot retry" : 
+                        ", vhci is being removing";
 
                 TraceDbg("req %04x, %!STATUS!%s", ptr04x(request), st, s);
                 return;
@@ -229,10 +233,10 @@ void on_plugin_hardware(
                 return;
         }
 
-        auto secs = get_delay(ctx.delay, vhci.reattach_max_delay);
-        NT_VERIFY(!WdfTimerStart(ctx.timer, WDF_REL_TIMEOUT_IN_SEC(secs))); // @see on_attach_timer
+        auto delay = get_delay(req.delay, vhci.reattach_max_delay);
+        NT_VERIFY(!WdfTimerStart(req.timer, WDF_REL_TIMEOUT_IN_SEC(delay))); // @see on_attach_timer
 
-        TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, secs);
+        TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, delay);
         ptr.release();
 }
 
@@ -244,7 +248,9 @@ void on_plugin_hardware(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_plugin_hardware(
-        _In_ WDFIOTARGET target, _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf,  _Inout_ ObjectDelete &req)
+        _In_ WDFOBJECT vhci, _In_ WDFIOTARGET target,
+        _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf,
+        _Inout_ ObjectDelete &req)
 {
         auto request = req.get<WDFREQUEST>();
         TraceDbg("req %04x", ptr04x(request));
@@ -255,7 +261,7 @@ void send_plugin_hardware(
                 return;
         }
 
-        WdfRequestSetCompletionRoutine(request, on_plugin_hardware, WDF_NO_CONTEXT);
+        WdfRequestSetCompletionRoutine(request, on_plugin_hardware, vhci);
 
         if (!WdfRequestSend(request, target, WDF_NO_SEND_OPTIONS)) {
                 auto err = WdfRequestGetStatus(request);
@@ -266,72 +272,131 @@ void send_plugin_hardware(
 }
 
 /*
- * Removing a device from persistents allows you to stop attach attempts.
- */ 
+ * If an EvtTimerFunc callback function running at PASSIVE_LEVEL calls WdfObjectDelete,
+ * this results in deadlock. Either wait for the parent to delete the timer automatically
+ * when the device is removed - or, if you need to delete early, schedule a work item
+ * from the timer callback to delete the timer.
+ *
+ * It's weird to use WDFWORKITEM instead of setting ExecutionLevel=WdfExecutionLevelPassive for timer.
+ * But there is a problem: request deletion in EvtTimerFunc causes BSOD.
+ * Request is a parent of a timer, the timer will be implicitly deleted when the request is deleted.
+ * The workaround is to use WDFWORKITEM explicitly, it's OK to delete it from EVT_WDF_WORKITEM.
+ * PASSIVE_LEVEL is required to call is_persistent().
+ */
 _Function_class_(EVT_WDF_TIMER)
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void on_attach_timer(_In_ WDFTIMER timer)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void on_attach_timer(_In_ WDFTIMER timer)
 {
-        PAGED_CODE();
-        ObjectDelete req(WdfTimerGetParentObject(timer));
+        auto req = WdfTimerGetParentObject(timer);
+        auto r = get_attach_ctx(req);
 
-        auto &ctx = *get_attach_ctx(req.get());
-        auto &vhci = *get_vhci_ctx(ctx.vhci);
-
-        if (auto rm = get_flag(vhci.removing); rm || !is_persistent(vhci, ctx.url)) {
-                auto s = rm ? "vhci is being removing" : "is no longer persistent";
-                TraceDbg("req %04x, %s", ptr04x(req.get()), s);
-        } else {
-                TraceDbg("req %04x, retrying", ptr04x(req.get()));
-                send_plugin_hardware(vhci.target_self, ctx.inbuf, ctx.outbuf, req);
-        }
+        WdfWorkItemEnqueue(r->wi); // @see reattach
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_timer(_In_ WDFOBJECT parent)
+PAGED bool create_timer(_Inout_ WDFTIMER &result, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
-
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ExecutionLevel = WdfExecutionLevelPassive;
-        attr.ParentObject = parent;
+        NT_ASSERT(!result);
 
         WDF_TIMER_CONFIG cfg;
         WDF_TIMER_CONFIG_INIT(&cfg, on_attach_timer);
         cfg.TolerableDelay = TolerableDelayUnlimited;
 
-        WDFTIMER timer{};
-        if (auto err = WdfTimerCreate(&cfg, &attr, &timer)) {
+        if (auto err = WdfTimerCreate(&cfg, &attr, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", err);
         }
 
-        return timer;
+        return result;
 }
 
 /*
- * There is no need to call WdfTimerStop here.
- * The framework stops and deletes the timer object 
- * before calling the parent's EvtCleanupCallback.
+ * Removing a device from persistents allows you to stop attach attempts.
+ */ 
+_Function_class_(EVT_WDF_WORKITEM)
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED void NTAPI reattach(_In_ WDFWORKITEM wi)
+{
+        PAGED_CODE();
+
+        auto dev = WdfWorkItemGetParentObject(wi);
+        auto &vhci = *get_vhci_ctx(dev);
+
+        ObjectDelete req(get_request(wi));
+        auto &r = *get_attach_ctx(req.get());
+
+        if (auto rm = get_flag(vhci.removing); !rm && is_persistent(vhci, r.device_str)) {
+                send_plugin_hardware(dev, vhci.target_self, r.inbuf, r.outbuf, req);
+        } else {
+                auto s = rm ? "vhci is being removing" : "is no longer persistent";
+                TraceDbg("req %04x, %s", ptr04x(req.get()), s);
+        }
+}
+
+/*
+ * When your driver calls WdfWorkItemCreate, it must supply a handle
+ * to either a framework device object or a framework queue object.
  */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool create_attach_workitem(_Inout_ WDFWORKITEM &wi, _In_ WDFOBJECT parent, _In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(!wi);
+        NT_ASSERT(parent != request);
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, WDFREQUEST);
+        attr.ParentObject = parent;
+
+        attr.EvtCleanupCallback = [] (auto obj)
+        {
+                auto req = get_request(static_cast<WDFWORKITEM>(obj));
+                TraceDbg("cleanup, req %04x", ptr04x(req));
+        };
+
+        WDF_WORKITEM_CONFIG cfg;
+        WDF_WORKITEM_CONFIG_INIT(&cfg, reattach);
+
+        if (auto err = WdfWorkItemCreate(&cfg, &attr, &wi)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
+        } else { // init context
+                get_request(wi) = request;
+        }
+
+        return wi;
+}
+
+/*
+ * Calling WdfWorkItemFlush from within the WDFWORKITEM callback will lead to deadlock.
+ * It happens when request is deleted in EVT_WDF_WORKITEM and WdfWorkItemFlush is called here.
+ */ 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void cleanup_attach_request(_In_ WDFOBJECT obj)
 {
         PAGED_CODE();
-        TraceDbg("%04x", ptr04x(obj)); 
 
-        if (auto &ctx = *get_attach_ctx(obj); ctx.url) {
-                WdfObjectDereference(ctx.url);
+        TraceDbg("%04x", ptr04x(obj)); 
+        auto &r = *get_attach_ctx(obj);
+
+        if (auto h = r.wi) { // the parent is vhci
+                WdfObjectDelete(h); // FIXME: double deletion if vhci deletes it first as a child
+        }
+
+        if (auto h = r.device_str) {
+                WdfObjectDereference(h);
         }
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ WDFSTRING url)
+PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ WDFSTRING device_str)
 {
         PAGED_CODE();
 
@@ -353,31 +418,47 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ W
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = req.get();
 
-        r.inbuf = create_inbuf(buf, attr);
-        r.outbuf = create_outbuf(buf, attr);
-        r.timer = create_attach_timer(req.get());
+        auto ok = create_inbuf(r.inbuf, buf, attr) &&
+                  create_outbuf(r.outbuf, buf, attr) &&
+                  create_timer(r.timer, attr) &&
+                  create_attach_workitem(r.wi, vhci, req.get<WDFREQUEST>());
 
-        if (auto ok = r.inbuf && r.outbuf && r.timer; !ok) {
+        if (!ok) {
                 req.reset();
                 return req;
         }
 
         UNICODE_STRING str;
-        WdfStringGetUnicodeString(url, &str);
+        WdfStringGetUnicodeString(device_str, &str);
 
-        if (auto err = parse_string(*buf, str)) {
+        if (auto err = parse_device_str(*buf, str)) {
                 Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
                 req.reset();
                 return req;
         }
 
-        r.vhci = vhci;
-        r.delay = ctx.reattach_init_delay;
+        r.delay = ctx.reattach_first_delay;
 
-        r.url = url;
-        WdfObjectReference(url);
+        r.device_str = device_str;
+        WdfObjectReference(device_str);
 
         return req;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REGKEY_TYPE type)
+{
+        PAGED_CODE();
+
+        switch (type) {
+        case DriverRegKeyParameters:
+                return WdfDriverOpenParametersRegistryKey;
+        case DriverRegKeyPersistentState:
+                return WdfDriverOpenPersistentStateRegistryKey;
+        default:
+                return nullptr;
+        }
 }
 
 } // namespace 
@@ -386,25 +467,27 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ W
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::plugin_persistent_device(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ WDFSTRING url, _In_ bool after_delay)
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ WDFSTRING device_str, _In_ bool delayed)
 {
         PAGED_CODE();
 
         UNICODE_STRING str;
-        WdfStringGetUnicodeString(url, &str);
+        WdfStringGetUnicodeString(device_str, &str);
 
         Trace(TRACE_LEVEL_INFORMATION, "%!USTR!", &str);
 
-        if (auto req = create_attach_request(vhci, ctx, url); !req) {
+        if (auto req = create_attach_request(vhci, ctx, device_str); !req) {
                 //
-        } else if (auto &r = *get_attach_ctx(req.get()); after_delay) {
-                enum { DELAY = 30 };
+        } else if (auto &r = *get_attach_ctx(req.get()); delayed) {
+                ++r.retry_cnt;
+
+                enum { DELAY = 30 }; // long delay after UdecxUsbDevicePlugOutAndDelete
                 NT_VERIFY(!WdfTimerStart(r.timer, WDF_REL_TIMEOUT_IN_SEC(DELAY)));
 
                 TraceDbg("req %04x, delayed for %u secs.", ptr04x(req.get()), DELAY);
                 req.release();
         } else {
-                send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
+                send_plugin_hardware(vhci, ctx.target_self, r.inbuf, r.outbuf, req);
         }
 }
 
@@ -419,8 +502,8 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
         auto col = get_persistent_devices(cnt, ctx.devices_cnt);
 
         for (ULONG i = 0; i < cnt; ++i) {
-                auto url = (WDFSTRING)WdfCollectionGetItem(col.get<WDFCOLLECTION>(), i);
-                plugin_persistent_device(vhci, ctx, url);
+                auto device_str = (WDFSTRING)WdfCollectionGetItem(col.get<WDFCOLLECTION>(), i);
+                plugin_persistent_device(vhci, ctx, device_str);
         }
 }
 
@@ -457,23 +540,22 @@ PAGED NTSTATUS usbip::copy(
  * WdfDriverOpenParametersRegistryKey should not be used for write,
  * use WdfDriverOpenPersistentStateRegistryKey instead.
  *
- * HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters stores immutable data.
- * HLKM\SYSTEM\CurrentControlSet\Services\usbip2_ude\State is used to read/write persistent data.
+ * HKLM\SYSTEM\CurrentControlSet\Services\<NAME>\<KEY>:
+ * "Parameters" stores immutable data.
+ * "State" is used to read/write persistent data.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::open_parameters_key(_Out_ Registry &key, _In_ ACCESS_MASK access)
+PAGED NTSTATUS usbip::open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access)
 {
         PAGED_CODE();
-
-        const ACCESS_MASK write_flags = KEY_SET_VALUE | KEY_CREATE_SUB_KEY | KEY_WRITE | KEY_ALL_ACCESS;
-        auto f = access & write_flags ?WdfDriverOpenPersistentStateRegistryKey : WdfDriverOpenParametersRegistryKey;
-
         WDFKEY h{};
-        auto st = f(WdfGetDriver(), access, WDF_NO_OBJECT_ATTRIBUTES, &h);
+
+        auto f = get_function(type);
+        auto st = f ? f(WdfGetDriver(), access, WDF_NO_OBJECT_ATTRIBUTES, &h) : STATUS_INVALID_PARAMETER;
 
         if (NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR, "%s(access=%#lx) %!STATUS!", __func__, access, st);
+                Trace(TRACE_LEVEL_ERROR, "%!DRIVER_REGKEY_TYPE!, access %#lx, %!STATUS!", type, access, st);
         }
 
         key.reset(h);
@@ -497,14 +579,13 @@ ObjectDelete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTR
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED ObjectDelete usbip::make_device_url(_In_ WDFOBJECT parent, _In_ const device_attributes &r)
+PAGED ObjectDelete usbip::make_device_str(_In_ WDFOBJECT parent, _In_ const device_attributes &r)
 {
         PAGED_CODE();
         ObjectDelete ptr;
 
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
         USHORT cb = r.node_name.Length + r.service_name.Length + r.busid.Length + sizeof(L",,"); // see format string
-
 
         unique_ptr buf(libdrv::uninitialized, PagedPool, cb);
         if (!buf) {
@@ -537,12 +618,12 @@ PAGED ObjectDelete usbip::make_device_url(_In_ WDFOBJECT parent, _In_ const devi
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED bool usbip::is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING url)
+PAGED bool usbip::is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING device_str)
 {
         PAGED_CODE();
 
         UNICODE_STRING str;
-        WdfStringGetUnicodeString(url, &str);
+        WdfStringGetUnicodeString(device_str, &str);
 
         ULONG cnt{};
         auto col = get_persistent_devices(cnt, vhci.devices_cnt);
