@@ -76,8 +76,6 @@ HKR, Parameters, ReattachMaxDelay, %REG_DWORD%, 3600 ; seconds
 HKR, Parameters\Wdf, VerboseOn, %REG_DWORD%, 1
 HKR, Parameters\Wdf, VerifierOn, %REG_DWORD%, 1
 
-; HKR, Parameters, PersistentDevices, 0x00010000, "pc,3240,3-3"
-
 [Strings]
 Manufacturer = "USBIP-WIN2"
 DisplayName = "USBip 3.X Emulated Host Controller" ; for device and service

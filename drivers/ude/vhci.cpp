@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "vhci.h"
@@ -48,6 +48,8 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 
         ctx.devices_cnt = 0;
         ctx.usb2_ports = 0;
+
+        NT_ASSERT(IsListEmpty(&ctx.reattach_requests));
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
@@ -242,18 +244,10 @@ PAGED void init_constants(
                 }
         }
         
-        if (!first_delay) {
-                first_delay = DEF_FIRST_DELAY;
-        }
-
-        if (!max_delay) {
-                max_delay = DEF_MAX_DELAY;
-        }
-
         auto in_range = [] (auto val) { return max(MIN_DELAY, min(val, MAX_DELAY)); };
 
-        first_delay = in_range(first_delay);
-        max_delay = in_range(max_delay);
+        first_delay = first_delay ? in_range(first_delay) : DEF_FIRST_DELAY;
+        max_delay = max_delay ? in_range(max_delay) : DEF_MAX_DELAY;
 
         if (first_delay > max_delay) {
                 swap(first_delay, max_delay);
@@ -274,21 +268,25 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto init_context(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
-
         auto &ctx = *get_vhci_ctx(vhci);
-        InitializeListHead(&ctx.fileobjects);
 
         if (auto err = alloc_devices(ctx)) {
                 return err;
+        }
+
+        for (LIST_ENTRY* v[] { &ctx.fileobjects, &ctx.reattach_requests }; auto e: v) {
+                InitializeListHead(e);
         }
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = vhci;
 
-        if (auto err = WdfSpinLockCreate(&attr, &ctx.devices_lock)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
-                return err;
+        for (WDFSPINLOCK* v[] { &ctx.devices_lock, &ctx.reattach_requests_lock }; auto lck: v) {
+                if (auto err = WdfSpinLockCreate(&attr, lck)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
+                        return err;
+                }
         }
 
         if (auto err = WdfWaitLockCreate(&attr, &ctx.events_lock)) {

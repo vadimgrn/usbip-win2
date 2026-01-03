@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -51,6 +51,9 @@ struct vhci_ctx
         unsigned int reattach_max_attempts; // constants
         unsigned int reattach_first_delay;
         unsigned int reattach_max_delay;
+
+        LIST_ENTRY reattach_requests; // @see attach_ctx::entry
+        WDFSPINLOCK reattach_requests_lock;
 
         LONG removing; // use set_flag/get_flag
 };
