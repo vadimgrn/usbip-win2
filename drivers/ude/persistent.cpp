@@ -50,22 +50,6 @@ constexpr auto empty(_In_ const UNICODE_STRING &s)
 }
 
 /*
- * WskGetAddressInfo() can return STATUS_INTERNAL_ERROR(0xC00000E5), but after some delay it will succeed.
- * This can happen after reboot if dnscache(?) service is not ready yet.
- */
-constexpr auto can_retry(_In_ NTSTATUS status)
-{
-        switch (as_usbip_status(status)) {
-        case USBIP_ERROR_ABI:
-        case USBIP_ERROR_VERSION:
-        case USBIP_ERROR_PROTOCOL:
-                return false; // unrecoverable errors
-        }
-
-        return status != STATUS_CANCELLED;
-}
-
-/*
  * @param retry_cnt from zero
  */
 constexpr auto can_retry(_In_ unsigned int retry_cnt, _In_ unsigned int max_attempts)
@@ -249,8 +233,8 @@ void on_plugin_hardware(
         auto retry_cnt = req.retry_cnt++; // from zero
 
         auto st = WdfRequestGetStatus(request);
-        auto failed = NT_ERROR(st); 
-        auto retry = failed && can_retry(st) && can_retry(retry_cnt, vhci.reattach_max_attempts);
+        auto failed = NT_ERROR(st);
+        auto retry = failed && can_reattach(st) && can_retry(retry_cnt, vhci.reattach_max_attempts);
 
         if (auto ok = retry && !get_flag(vhci.removing); !ok) {
                 auto s = !failed ? " " : // "" prints as "<NULL>"
@@ -394,7 +378,9 @@ PAGED auto reinit_attach_ctx(_Inout_ attach_ctx &r, _In_ WDFSTRING device_str, _
 
         auto &req = *static_cast<vhci::ioctl::plugin_hardware*>(WdfMemoryGetBuffer(r.inbuf, nullptr));
         RtlZeroMemory(&req, sizeof(req));
+
         req.size = sizeof(req);
+        req.from_itself = true;
 
         UNICODE_STRING str;
         WdfStringGetUnicodeString(device_str, &str);
@@ -697,3 +683,24 @@ PAGED bool usbip::is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING device
 
         return false;
 }
+
+/*
+ * WskGetAddressInfo() can return STATUS_INTERNAL_ERROR(0xC00000E5), but after some delay it will succeed.
+ * This can happen after reboot if dnscache(?) service is not ready yet.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::can_reattach(_In_ NTSTATUS status)
+{
+        NT_ASSERT(NT_ERROR(status));
+
+        switch (as_usbip_status(status)) {
+        case USBIP_ERROR_ABI:
+        case USBIP_ERROR_VERSION:
+        case USBIP_ERROR_PROTOCOL:
+                return false; // unrecoverable errors
+        }
+
+        return status != STATUS_CANCELLED;
+}
+

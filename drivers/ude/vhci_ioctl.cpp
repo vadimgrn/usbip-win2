@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "vhci_ioctl.h"
@@ -41,6 +41,7 @@ struct workitem_ctx
         auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
         ADDRINFOEXW *addrinfo; // list head
+        bool reattach;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
@@ -411,7 +412,10 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 {
         PAGED_CODE();
+
         auto &ctx = *get_workitem_ctx(wi);
+        auto &vhci = *get_vhci_ctx(ctx.vhci);
+        auto &ext = ctx.ext(); 
 
         auto request = ctx.request;
         auto irp = WdfRequestWdmGetIrp(request);
@@ -422,21 +426,30 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto st = WdfRequestGetStatus(request);
         TraceDbg("%s %!STATUS!", function, st);
 
-        if (auto vc = get_vhci_ctx(ctx.vhci); get_flag(vc->removing)) {
+        if (get_flag(vhci.removing)) {
                 st = STATUS_CANCELLED;
                 TraceDbg("req %04x, set %!STATUS!, vhci is being removing", ptr04x(request), st);
-        } else if (auto &ext = ctx.ext(); auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
+        } else if (auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
                 st = on_connect(request, wi, ctx, ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
                 st = connect(request, wi, ext.sock, *ctx.addrinfo);
         }
 
-        if (st != STATUS_PENDING) {
-                TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
-                WdfRequestComplete(request, st);
-                WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup
+        if (st == STATUS_PENDING) {
+                return;
         }
+
+        TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
+        WdfRequestComplete(request, st);
+
+        if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st); !retry) {
+                //
+        } else if (auto s = make_device_str(wi, ext.attr); s && is_persistent(vhci, s.get<WDFSTRING>())) {
+                plugin_persistent_device(ctx.vhci, vhci, s.get<WDFSTRING>(), true);
+        }
+
+        WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup
 }
 
 /*
@@ -516,7 +529,7 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s", r.host, r.service, r.busid);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, from itself %!bool!", r.host, r.service, r.busid, r.from_itself);
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
@@ -528,6 +541,7 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
 
         ctx.vhci = vhci;
         ctx.request = request;
+        ctx.reattach = !r.from_itself; // if attach was not initiated by the driver itself
 
         if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);
@@ -781,7 +795,7 @@ PAGED void device_control(
 }
 
 /*
- * There is an internal lock on the registry, but that’s just to ensure that registry operations are atomic; 
+ * There is an internal lock on the registry, but thatâ€™s just to ensure that registry operations are atomic; 
  * that is, that if one thread writes a value to the registry and another thread reads that same value 
  * from the registry, then the value that comes back is either the value before the write took place 
  * or the value after the write took place, but not some sort of mixture of the two.

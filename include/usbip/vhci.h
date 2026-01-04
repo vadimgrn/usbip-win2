@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -91,12 +91,21 @@ enum {
         GET_PERSISTENT = make(function::get_persistent),
 };
 
-struct plugin_hardware : base, imported_device_location {};
+/*
+ * from_itself is for internal use only, must be set to false.
+ */
+struct plugin_hardware : base, imported_device_location
+{
+        bool from_itself; // sent by the driver to itself
+};
 
+/*
+ * reattach is for internal use only, must be set to false.
+ */
 struct plugout_hardware : base
 {
         int port; // all ports if <= 0
-        bool reattach; // if persistent, must always be set to false by libusbip
+        bool reattach; // if persistent
 };
 
 struct get_imported_devices : base

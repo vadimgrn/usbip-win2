@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -58,9 +58,10 @@ public:
         template<typename T>
         constexpr auto get() const NOEXCEPT { return static_cast<T>(m_handle); }
 
+        template<typename T = type>
         auto release() NOEXCEPT
         {
-                auto h = m_handle;
+                auto h = static_cast<T>(m_handle);
                 m_handle = None;
                 return h;
         }
