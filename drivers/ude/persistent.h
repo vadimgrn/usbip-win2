@@ -34,10 +34,6 @@ PAGED ObjectDelete make_device_str(_In_ WDFOBJECT parent, _In_ const device_attr
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED bool is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING device_str);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugin_persistent_device(
         _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ WDFSTRING device_str, _In_ bool delayed = false);
 
@@ -48,5 +44,13 @@ PAGED void plugin_persistent_devices(_In_ WDFDEVICE vhci);
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool can_reattach(_In_ NTSTATUS status);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED void cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_ WDFSTRING device_str);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool is_persistent(_In_ const vhci_ctx &vhci, _In_ WDFSTRING device_str);
 
 } // namespace usbip

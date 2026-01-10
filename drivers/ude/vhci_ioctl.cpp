@@ -446,6 +446,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st); !retry) {
                 //
         } else if (auto s = make_device_str(wi, ext.attr); s && is_persistent(vhci, s.get<WDFSTRING>())) {
+                cancel_reattach_requests(vhci, s.get<WDFSTRING>());
                 plugin_persistent_device(ctx.vhci, vhci, s.get<WDFSTRING>(), true);
         }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -24,7 +24,7 @@ namespace wdf
 class ObjectRef
 {
 public:
-        ObjectRef() = default;
+        constexpr ObjectRef() = default;
         explicit ObjectRef(WDFOBJECT handle, bool add_ref = true);
 
         ~ObjectRef();
@@ -61,7 +61,7 @@ inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 class WaitLock
 {
 public:
-        WaitLock() = default;
+        constexpr WaitLock() = default;
                 
         _IRQL_requires_max_(PASSIVE_LEVEL)
         PAGED explicit WaitLock(_In_ WDFWAITLOCK lock) : m_lock(lock) 

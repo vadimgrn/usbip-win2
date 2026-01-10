@@ -52,13 +52,15 @@ struct vhci_ctx
         unsigned int reattach_first_delay;
         unsigned int reattach_max_delay;
 
-        LIST_ENTRY reattach_requests; // @see attach_ctx::entry
-        WDFSPINLOCK reattach_requests_lock;
+        WDFCOLLECTION reattach_req; // WDFREQUEST
+        WDFWAITLOCK reattach_req_lock;
 
         LONG removing; // use set_flag/get_flag
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(vhci_ctx, get_vhci_ctx)
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_handle(_In_ vhci_ctx *ctx)
 {
         NT_ASSERT(ctx);
@@ -156,6 +158,8 @@ struct device_ctx
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_handle(_In_ device_ctx *ctx)
 {
         NT_ASSERT(ctx);
@@ -183,6 +187,9 @@ struct endpoint_ctx
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(endpoint_ctx, get_endpoint_ctx)
 
 WDF_DECLARE_CONTEXT_TYPE(UDECXUSBENDPOINT); // WdfObjectGet_UDECXUSBENDPOINT
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& get_endpoint(_In_ WDFQUEUE queue)
 {
         return *WdfObjectGet_UDECXUSBENDPOINT(queue);
@@ -201,6 +208,8 @@ struct request_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_handle(_In_ request_ctx *ctx)
 {
         NT_ASSERT(ctx);
@@ -232,6 +241,8 @@ struct fileobject_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_handle(_In_ fileobject_ctx *ctx)
 {
         NT_ASSERT(ctx);
@@ -256,11 +267,15 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline bool set_flag(_Inout_ LONG &target)
 {
         return InterlockedExchange(&target, true);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline bool get_flag(_Inout_ LONG &target)
 {
         return InterlockedCompareExchange(&target, false, false);

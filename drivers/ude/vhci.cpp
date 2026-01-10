@@ -48,8 +48,6 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
 
         ctx.devices_cnt = 0;
         ctx.usb2_ports = 0;
-
-        NT_ASSERT(IsListEmpty(&ctx.reattach_requests));
 }
 
 _Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
@@ -274,23 +272,26 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
                 return err;
         }
 
-        for (LIST_ENTRY* v[] { &ctx.fileobjects, &ctx.reattach_requests }; auto e: v) {
-                InitializeListHead(e);
-        }
+        InitializeListHead(&ctx.fileobjects);
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = vhci;
 
-        for (WDFSPINLOCK* v[] { &ctx.devices_lock, &ctx.reattach_requests_lock }; auto lck: v) {
-                if (auto err = WdfSpinLockCreate(&attr, lck)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
+        if (auto err = WdfSpinLockCreate(&attr, &ctx.devices_lock)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
+                return err;
+        }
+
+        for (WDFWAITLOCK* v[] { &ctx.events_lock, &ctx.reattach_req_lock }; auto lck: v) {
+                if (auto err = WdfWaitLockCreate(&attr, lck)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
                         return err;
                 }
         }
 
-        if (auto err = WdfWaitLockCreate(&attr, &ctx.events_lock)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
+        if (auto err = WdfCollectionCreate(&attr, &ctx.reattach_req)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", err);
                 return err;
         }
 

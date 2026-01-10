@@ -792,9 +792,9 @@ PAGED wdm::object_reference usbip::device::detach(
                 ::plugout_and_delete(vhci, device, dev.ctx_ext, port);
         }
 
-        if (auto &ctx = *get_vhci_ctx(vhci); dev_str && is_persistent(ctx, dev_str.get<WDFSTRING>())) {
-                auto delayed = plugout_and_delete;
-                plugin_persistent_device(vhci, ctx, dev_str.get<WDFSTRING>(), delayed);
+        if (dev_str) {
+                auto ctx = get_vhci_ctx(vhci);
+                plugin_persistent_device(vhci, *ctx, dev_str.get<WDFSTRING>(), true);
         }
 
         return thread;
