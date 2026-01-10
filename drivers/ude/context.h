@@ -80,6 +80,7 @@ struct device_attributes
         UNICODE_STRING node_name;
         UNICODE_STRING service_name;
         UNICODE_STRING busid;
+        WDFSTRING device_str; // node_name,service_name,busid
         //
         vhci::imported_device_properties properties; // for ioctl::get_imported_devices
 };
@@ -107,6 +108,7 @@ struct device_ctx_ext
         auto node_name() { return &attr.node_name; }
         auto service_name() { return &attr.service_name; }
         auto busid() { return &attr.busid; }
+        auto &device_str() { return attr.device_str; }
 
         auto& properties() { return attr.properties; }
 };

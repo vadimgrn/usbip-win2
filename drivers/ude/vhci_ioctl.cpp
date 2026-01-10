@@ -443,11 +443,10 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
         WdfRequestComplete(request, st);
 
-        if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st); !retry) {
-                //
-        } else if (auto s = make_device_str(wi, ext.attr); s && is_persistent(vhci, s.get<WDFSTRING>())) {
-                cancel_reattach_requests(vhci, s.get<WDFSTRING>());
-                plugin_persistent_device(ctx.vhci, vhci, s.get<WDFSTRING>(), true);
+        if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st)) {
+                auto str = ext.device_str();
+                cancel_reattach_requests(vhci, str);
+                plugin_persistent_device(ctx.vhci, vhci, str, true);
         }
 
         WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup

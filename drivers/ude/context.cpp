@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "context.h"
@@ -7,6 +7,7 @@
 #include "context.tmh"
 
 #include "driver.h"
+#include "persistent.h"
 
 #include <libdrv\strconv.h>
 #include <libdrv\wsk_cpp.h>
@@ -112,7 +113,8 @@ auto usbip::next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in) -> seqnum_t
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r)
+PAGED NTSTATUS usbip::create_device_ctx_ext(
+        _Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r)
 {
         PAGED_CODE();
 
@@ -121,7 +123,12 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDF
         }
 
         auto &ext = get_device_ctx_ext(ctx_ext);
-        return save_device_location(ext, r);
+
+        if (auto err = save_device_location(ext, r)) {
+                return err;
+        }
+
+        return make_device_str(ext.device_str(), parent, ext.attr);
 }
 
 _IRQL_requires_same_
