@@ -71,6 +71,14 @@ auto get_delay(_Inout_ unsigned int &delay, _In_ unsigned int max_delay)
         return cur;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto empty(_In_ const UNICODE_STRING &s)
+{
+        PAGED_CODE();
+        return libdrv::empty(s) || !*s.Buffer;
+}
+
 /*
  * @param dev_str1 host,port,busid
  */
@@ -132,9 +140,11 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ const UNICODE_STRING &device_str)
 {
         PAGED_CODE();
-        wdf::ObjectRef ref;
 
+        wdf::ObjectRef ref;
+        auto all = empty(device_str);
         auto col = vhci.reattach_req;
+
         wdf::WaitLock lck(vhci.reattach_req_lock);
 
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
@@ -145,7 +155,7 @@ PAGED auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ const UNICODE_STRING
                 UNICODE_STRING str;
                 WdfStringGetUnicodeString(r.device_str, &str);
 
-                if (str == device_str) {
+                if (all || str == device_str) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -208,7 +218,6 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto parse_device_str(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const UNICODE_STRING &str)
 {
         PAGED_CODE();
-        auto empty = [] (const auto &s) { return libdrv::empty(s) || !*s.Buffer; };
 
         UNICODE_STRING host;
         UNICODE_STRING service;
@@ -617,6 +626,7 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
         case USBIP_ERROR_ABI:
         case USBIP_ERROR_VERSION:
         case USBIP_ERROR_PROTOCOL:
+        case USBIP_ERROR_ST_DEV_BUSY: // stop attach attempts if it is already connected
                 return false; // unrecoverable errors
         }
 
@@ -632,12 +642,14 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_ WDFSTRING device_str)
+PAGED void usbip::cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str)
 {
         PAGED_CODE();
 
-        UNICODE_STRING str;
-        WdfStringGetUnicodeString(device_str, &str);
+        UNICODE_STRING str{};
+        if (device_str) {
+                WdfStringGetUnicodeString(device_str, &str);
+        }
 
         while (auto req = reattach_req_remove(vhci, str)) {
                 auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>()); // next WdfRequestSend will fail

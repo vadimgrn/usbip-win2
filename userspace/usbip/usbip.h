@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -31,9 +31,13 @@ struct attach_args
         std::string remote;
         std::string busid;
         bool terse{};
+        bool cancel{};
 
         // --stash
         bool stashed{};
+
+        // --cancel-all
+        bool cancel_all{};
 };
 command_t cmd_attach;
 

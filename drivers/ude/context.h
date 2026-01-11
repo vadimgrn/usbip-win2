@@ -270,6 +270,15 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT parent, _In_ const vhci::ioctl::plugin_hardware &r);
 
 _IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS init_device_attributes(
+        _Inout_ device_attributes &attr, _In_ WDFOBJECT parent, _In_ const vhci::imported_device_location &loc);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void free(_Inout_ device_attributes &r);
+
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline bool set_flag(_Inout_ LONG &target)
 {

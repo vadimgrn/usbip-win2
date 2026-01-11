@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "..\vhci.h"
@@ -276,6 +276,19 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
         }
 
         return 0;
+}
+
+bool usbip::vhci::cancel_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location)
+{
+        ioctl::cancel_attach_attempts r {{ .size = sizeof(r) }};
+
+        if (auto ok = location && assign(r, *location); !ok) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return false;
+        }
+
+        DWORD BytesReturned{}; // must be set if the last arg is NULL
+        return DeviceIoControl(dev, ioctl::CANCEL_ATTACH_ATTEMPTS, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
 
 bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)

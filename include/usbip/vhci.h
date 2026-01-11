@@ -76,6 +76,7 @@ enum class function { // 12 bit
         get_imported_devices,
         set_persistent,
         get_persistent,
+        cancel_attach_attempts,
 };
 
 constexpr auto make(function id)
@@ -89,6 +90,7 @@ enum {
         GET_IMPORTED_DEVICES = make(function::get_imported_devices),
         SET_PERSISTENT = make(function::set_persistent),
         GET_PERSISTENT = make(function::get_persistent),
+        CANCEL_ATTACH_ATTEMPTS = make(function::cancel_attach_attempts),
 };
 
 /*
@@ -98,6 +100,8 @@ struct plugin_hardware : base, imported_device_location
 {
         bool from_itself; // sent by the driver to itself
 };
+
+struct cancel_attach_attempts : base, imported_device_location {};
 
 /*
  * reattach is for internal use only, must be set to false.

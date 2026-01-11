@@ -48,6 +48,6 @@ bool can_reattach(_In_ NTSTATUS status);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_ WDFSTRING device_str);
+PAGED void cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str);
 
 } // namespace usbip

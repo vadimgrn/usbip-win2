@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbip.h"
@@ -60,7 +60,7 @@ void add_cmd_attach(CLI::App &app)
 		->callback(pack(cmd_attach, &r))
 		->require_option(1);
 
-	auto rem = cmd->add_option_group("remote", "Attach to a remote USB device");
+	auto rem = cmd->add_option_group("Remote", "Attach to a remote USB device");
 
 	rem->add_option("-r,--remote", r.remote, "Hostname/IP of a USB/IP server with exported USB devices")
 		->required();	
@@ -69,9 +69,13 @@ void add_cmd_attach(CLI::App &app)
 		->required();	
 
 	rem->add_flag("-t,--terse", r.terse, "Show port number as a result");
+        rem->add_flag("-x,--cancel", r.cancel, "Cancel attach attempts to this device");
 
-	cmd->add_option_group("stashed", "Attach to stashed USB devices")
-		->add_flag("-s,--stashed", r.stashed, "Attach to devices stashed by 'port --stash'");
+	cmd->add_option_group("Cancel")
+		->add_flag("-X,--cancel-all", r.cancel_all, "Cancel all active attach attempts");
+
+        cmd->add_option_group("Stashed", "Attach to stashed USB device(s)")
+                ->add_flag("-s,--stashed", r.stashed, "Attach to device(s) stashed by 'port --stash'");
 }
 
 void add_cmd_detach(CLI::App &app)

@@ -70,8 +70,8 @@ HKR, Parameters, TCP_KEEPCNT, %REG_DWORD%, 9
 HKR, Parameters, TCP_KEEPINTVL, %REG_DWORD%, 10
 
 HKR, Parameters, ReattachMaxAttempts, %REG_DWORD%, 0 ; infinite if zero
-HKR, Parameters, ReattachFirstDelay, %REG_DWORD%, 15 ; seconds
-HKR, Parameters, ReattachMaxDelay, %REG_DWORD%, 3600 ; seconds
+HKR, Parameters, ReattachFirstDelay, %REG_DWORD%, 1 ; seconds
+HKR, Parameters, ReattachMaxDelay, %REG_DWORD%, 1 ; seconds
 
 HKR, Parameters\Wdf, VerboseOn, %REG_DWORD%, 1
 HKR, Parameters\Wdf, VerifierOn, %REG_DWORD%, 1

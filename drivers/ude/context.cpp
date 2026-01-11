@@ -19,7 +19,7 @@ using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto save_device_location(_In_ device_ctx_ext &ext, _In_ const vhci::ioctl::plugin_hardware &r)
+PAGED auto save_device_location(_Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &r)
 {
         PAGED_CODE();
 
@@ -28,9 +28,9 @@ PAGED auto save_device_location(_In_ device_ctx_ext &ext, _In_ const vhci::ioctl
                 const char *src;
                 USHORT maxlen;
         } const v[] = {
-                { ext.node_name(), r.host, sizeof(r.host) },
-                { ext.service_name(), r.service, sizeof(r.service) },
-                { ext.busid(), r.busid, sizeof(r.busid) },
+                { &attr.node_name, r.host, sizeof(r.host) },
+                { &attr.service_name, r.service, sizeof(r.service) },
+                { &attr.busid, r.busid, sizeof(r.busid) },
         };
 
         for (auto& [dst, src, maxlen]: v) {
@@ -58,10 +58,7 @@ PAGED void destroy_device_ctx_ext(_In_ WDFOBJECT object)
         Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!/%!USTR!", ext.node_name(), ext.service_name(), ext.busid());
 
         free(ext.sock);
-
-        libdrv::FreeUnicodeString(*ext.node_name(), pooltag); // @see RtlFreeUnicodeString
-        libdrv::FreeUnicodeString(*ext.service_name(), pooltag);
-        libdrv::FreeUnicodeString(*ext.busid(), pooltag);
+        free(ext.attr);
 }
 
 _IRQL_requires_same_
@@ -123,12 +120,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         }
 
         auto &ext = get_device_ctx_ext(ctx_ext);
-
-        if (auto err = save_device_location(ext, r)) {
-                return err;
-        }
-
-        return make_device_str(ext.device_str(), parent, ext.attr);
+        return init_device_attributes(ext.attr, ctx_ext, r);
 }
 
 _IRQL_requires_same_
@@ -145,4 +137,47 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 bool usbip::is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port)
 {
         return port > 0 && port <= ctx.devices_cnt;
+}
+
+/**
+ * @see free
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::init_device_attributes(
+        _Inout_ device_attributes &attr, _In_ WDFOBJECT parent, _In_ const vhci::imported_device_location &loc)
+{
+        PAGED_CODE();
+
+        if (auto err = save_device_location(attr, loc)) {
+                return err;
+        }
+
+        if (auto &h = attr.device_str; auto err = make_device_str(h, parent, attr)) {
+                return err;
+        } else {
+                WdfObjectReference(h);
+                WdfObjectDelete(h);
+
+                return STATUS_SUCCESS;
+        }
+}
+
+/**
+ * @see init_device_attributes
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void usbip::free(_Inout_ device_attributes &r)
+{
+        PAGED_CODE();
+
+        libdrv::FreeUnicodeString(r.node_name, pooltag); // @see RtlFreeUnicodeString
+        libdrv::FreeUnicodeString(r.service_name, pooltag);
+        libdrv::FreeUnicodeString(r.busid, pooltag);
+
+        if (auto &h = r.device_str) {
+                WdfObjectDereference(h);
+                h = WDF_NO_HANDLE;
+        }
 }

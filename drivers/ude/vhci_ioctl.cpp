@@ -557,6 +557,47 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS cancel_attach_attempts(_In_ WDFREQUEST request)
+{
+        PAGED_CODE();
+        vhci::ioctl::cancel_attach_attempts *r{};
+
+        if (size_t length{}; 
+                auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
+                return err;
+        } else if (length != sizeof(*r)) {
+                return STATUS_INVALID_BUFFER_SIZE;
+        } else if (r->size != sizeof(*r)) {
+                Trace(TRACE_LEVEL_ERROR, "cancel_attach_attempts.size %lu != sizeof(cancel_attach_attempts) %Iu", 
+                        r->size, sizeof(*r));
+
+                return USBIP_ERROR_ABI;
+        }
+
+        TraceDbg("host '%s', service '%s', busid '%s'", r->host, r->service, r->busid);
+
+        auto st = STATUS_SUCCESS;
+        wdf::ObjectRef device_str;
+
+        if (*r->host && *r->service && *r->busid) {
+                device_attributes attr{};
+                if (st = init_device_attributes(attr, request, *r); NT_SUCCESS(st)) {
+                        device_str.reset(attr.device_str);
+                }
+                free(attr);
+        }
+
+        if (NT_SUCCESS(st)) {
+                auto vhci = get_vhci(request);
+                auto ctx = get_vhci_ctx(vhci);
+                cancel_reattach_requests(*ctx, device_str.get<WDFSTRING>());
+        }
+
+        return st;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
@@ -771,6 +812,9 @@ PAGED void device_control(
                 break;
         case vhci::ioctl::PLUGOUT_HARDWARE:
                 st = plugout_hardware(Request);
+                break;
+        case vhci::ioctl::CANCEL_ATTACH_ATTEMPTS:
+                st = cancel_attach_attempts(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));

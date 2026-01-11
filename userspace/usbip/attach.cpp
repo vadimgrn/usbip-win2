@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbip.h"
@@ -51,6 +51,15 @@ bool usbip::cmd_attach(void *p)
                 .service = global_args.tcp_port, 
                 .busid = args.busid,
         };
+
+        if (args.cancel || args.cancel_all) {
+                assert(args.cancel != args.cancel_all);
+                auto ok = vhci::cancel_attach_attempts(dev.get(), args.cancel ? &location : nullptr);
+                if (!ok) {
+                        spdlog::error(GetLastErrorMsg());
+                }
+                return ok;
+        }
 
         auto port = vhci::attach(dev.get(), location);
         if (!port) {

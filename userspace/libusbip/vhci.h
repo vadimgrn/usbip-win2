@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -71,6 +71,13 @@ USBIP_API std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Ou
  * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
+
+/**
+ * @param dev handle of the driver device
+ * @param location cancel attach attempts to this device or cancel all active attach attempts if NULL
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool cancel_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location);
 
 /**
  * @param dev handle of the driver device
