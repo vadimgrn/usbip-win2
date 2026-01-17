@@ -72,7 +72,7 @@ BEGIN
             VALUE "FileDescription", "usbip for USBip"
             VALUE "FileVersion", "0.9.7.5"
             VALUE "InternalName", "usbip.exe"
-            VALUE "LegalCopyright", "Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>"
+            VALUE "LegalCopyright", "Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>"
             VALUE "OriginalFilename", "usbip.exe"
             VALUE "ProductName", "USBip"
             VALUE "ProductVersion", "0.9.7.5"
