@@ -1,5 +1,6 @@
 USBip*.svg files were created in Inkscape open source vector graphics editor, https://inkscape.org/
-check.svg, close.svg, dismiss.svg are from wxMaterialDesignArtProvider, see https://github.com/perazz/wxMaterialDesignArtProvider
+check.svg, close.svg, dismiss.svg are from wxMaterialDesignArtProvider, https://github.com/perazz/wxMaterialDesignArtProvider
+attach_stop.svg, attach_stop_all.svg are from xapp-symbolic-icons, https://github.com/xapp-project/xapp-symbolic-icons
 
 Steps to create .ico from .svg
 

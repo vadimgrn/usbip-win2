@@ -31,13 +31,13 @@ struct attach_args
         std::string remote;
         std::string busid;
         bool terse{};
-        bool cancel{};
+        bool stop{};
 
         // --stash
         bool stashed{};
 
-        // --cancel-all
-        bool cancel_all{};
+        // --stop-all
+        bool stop_all{};
 };
 command_t cmd_attach;
 

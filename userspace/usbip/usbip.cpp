@@ -69,10 +69,10 @@ void add_cmd_attach(CLI::App &app)
 		->required();	
 
 	rem->add_flag("-t,--terse", r.terse, "Show port number as a result");
-        rem->add_flag("-x,--cancel", r.cancel, "Cancel attach attempts to this device");
+        rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
 
-	cmd->add_option_group("Cancel")
-		->add_flag("-X,--cancel-all", r.cancel_all, "Cancel all active attach attempts");
+	cmd->add_option_group("Stop")
+		->add_flag("-X,--stop-all", r.stop_all, "Stop all active attach attempts");
 
         cmd->add_option_group("Stashed", "Attach to stashed USB device(s)")
                 ->add_flag("-s,--stashed", r.stashed, "Attach to device(s) stashed by 'port --stash'");

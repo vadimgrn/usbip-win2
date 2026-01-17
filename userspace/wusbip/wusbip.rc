@@ -165,6 +165,12 @@ APP_DARK_CHECKED_SVG_DARK	RCDATA          "resources/app_dark_checked_dark.svg"
 APP_DARK_UNCHECKED_SVG  	RCDATA          "resources/app_dark_unchecked.svg"
 APP_DARK_UNCHECKED_SVG_DARK	RCDATA          "resources/app_dark_unchecked_dark.svg"
 
+ATTACH_STOP_SVG			RCDATA          "resources/attach_stop.svg"
+ATTACH_STOP_SVG_DARK		RCDATA          "resources/attach_stop_dark.svg"
+
+ATTACH_STOP_ALL_SVG  		RCDATA		"resources/attach_stop_all.svg"
+ATTACH_STOP_ALL_SVG_DARK	RCDATA          "resources/attach_stop_all_dark.svg"
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // Icon

@@ -52,9 +52,9 @@ bool usbip::cmd_attach(void *p)
                 .busid = args.busid,
         };
 
-        if (args.cancel || args.cancel_all) {
-                assert(args.cancel != args.cancel_all);
-                auto ok = vhci::stop_attach_attempts(dev.get(), args.cancel ? &location : nullptr);
+        if (args.stop || args.stop_all) {
+                assert(args.stop != args.stop_all);
+                auto ok = vhci::stop_attach_attempts(dev.get(), args.stop ? &location : nullptr);
                 if (!ok) {
                         spdlog::error(GetLastErrorMsg());
                 }

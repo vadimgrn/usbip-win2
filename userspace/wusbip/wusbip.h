@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -57,8 +57,10 @@ private:
 
 	void on_close(wxCloseEvent &event) override; 
 	void on_attach(wxCommandEvent &event) override;
-	void on_detach(wxCommandEvent &event) override;
-	void on_reload(wxCommandEvent &event) override;
+        void on_attach_stop(wxCommandEvent &event) override;
+        void on_attach_stop_all(wxCommandEvent &event) override;
+        void on_detach(wxCommandEvent &event) override;
+        void on_reload(wxCommandEvent &event) override;
 	void on_help_about(wxCommandEvent &event) override;
 	void add_exported_devices(wxCommandEvent &event) override;
 	void on_select_all(wxCommandEvent &event) override;

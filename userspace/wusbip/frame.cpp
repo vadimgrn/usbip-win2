@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-cd035212)
+// C++ code generated with wxFormBuilder (version 4.2.1-ddd6fee7)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -12,12 +12,12 @@
 Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style ) : wxFrame( parent, id, title, pos, size, style )
 {
 	#if wxCHECK_VERSION(3, 1, 3)
-	[[maybe_unused]] auto pick_resname = [dark = wxSystemSettings::GetAppearance().IsDark()] (const auto& name, const auto& name_dark) noexcept -> decltype(auto)
+	[[maybe_unused]] auto pick_resname = [dark = wxSystemSettings::GetAppearance().IsDark()] (const auto& name, const auto& name_dark) -> decltype(auto)
 	{
 		return dark ? name_dark : name;
 	};
 	#else
-	[[maybe_unused]] auto pick_resname = [] (const auto& name, const auto&) noexcept -> decltype(auto) { return name; };
+	[[maybe_unused]] auto pick_resname = [] (const auto& name, const auto&) -> decltype(auto) { return name; };
 	#endif
 
 	this->SetSizeHints( wxDefaultSize, wxDefaultSize );
@@ -285,6 +285,26 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	#endif
 	m_menu_devices->Append( m_cmd_attach );
 
+	wxMenuItem* m_cmd_attach_stop;
+	m_cmd_attach_stop = new wxMenuItem( m_menu_devices, ID_ATTACH_STOP, wxString( _("Stop") ) , _("Stop attach attempts for selected devices"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_attach_stop->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {16, 16} ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_attach_stop->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {16, 16} ) );
+	#endif
+	m_menu_devices->Append( m_cmd_attach_stop );
+
+	wxMenuItem* m_cmd_attach_stop_all;
+	m_cmd_attach_stop_all = new wxMenuItem( m_menu_devices, ID_ATTACH_STOP_ALL, wxString( _("Stop All") ) , _("Stop all active attach attempts"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_cmd_attach_stop_all->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_all_svg"), wxT("attach_stop_all_svg_dark")), {16, 16} ) );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_cmd_attach_stop_all->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_all_svg"), wxT("attach_stop_all_svg_dark")), {16, 16} ) );
+	#endif
+	m_menu_devices->Append( m_cmd_attach_stop_all );
+
+	m_menu_devices->AppendSeparator();
+
 	wxMenuItem* m_cmd_detach;
 	m_cmd_detach = new wxMenuItem( m_menu_devices, wxID_CLOSE, wxString( _("Detach") ) + wxT('\t') + wxT("CTRL+D"), _("Detach selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
@@ -293,8 +313,6 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_cmd_detach->SetBitmap( wxBitmapBundle::FromSVGResource( pick_resname(wxT("close_svg"), wxT("close_svg_dark")), {16, 16} ) );
 	#endif
 	m_menu_devices->Append( m_cmd_detach );
-
-	m_menu_devices->AppendSeparator();
 
 	wxMenuItem* m_cmd_detach_all;
 	m_cmd_detach_all = new wxMenuItem( m_menu_devices, wxID_CLOSE_ALL, wxString( _("Detach &All") ) + wxT('\t') + wxT("CTRL+X"), _("Detach all devices"), wxITEM_NORMAL );
@@ -367,6 +385,12 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_auiToolBar->AddSeparator();
 
 	m_tool_attach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("check_svg"), wxT("check_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Attach selected devices"), wxEmptyString, NULL );
+
+	m_tool_attach_stop = m_auiToolBar->AddTool( wxID_ANY, _("Stop"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Stop attach attempts for selected devices"), wxEmptyString, NULL );
+
+	m_tool_attach_stop_all = m_auiToolBar->AddTool( wxID_ANY, _("Stop All"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_all_svg"), wxT("attach_stop_all_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Stop all active attach attempts"), wxEmptyString, NULL );
+
+	m_auiToolBar->AddSeparator();
 
 	m_tool_detach = m_auiToolBar->AddTool( wxID_ANY, _("Detach"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("close_svg"), wxT("close_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Detach selected devices"), wxEmptyString, NULL );
 
@@ -484,6 +508,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
 	this->Connect( m_cmd_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach_stop ), this, m_cmd_attach_stop->GetId());
+	this->Connect( m_cmd_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach_stop_all ), this, m_cmd_attach_stop_all->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
 	this->Connect( m_cmd_detach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach_all ), this, m_cmd_detach_all->GetId());
@@ -499,6 +526,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_tool_attach_stop->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop ) );
+	this->Connect( m_tool_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_tool_attach_stop_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop_all ) );
 	this->Connect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	this->Connect( m_tool_detach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Connect( m_tool_detach_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach_all ) );
@@ -534,6 +564,7 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zebra_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
 	this->Disconnect( wxID_OPEN, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( ID_ATTACH_STOP, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( wxID_CLOSE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_LOG_WINDOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
@@ -542,6 +573,9 @@ Frame::~Frame()
 	this->Disconnect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( m_tool_attach_stop->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop ) );
+	this->Disconnect( m_tool_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( m_tool_attach_stop_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop_all ) );
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( m_tool_detach_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach_all ) );

@@ -258,7 +258,7 @@ const char* usbip::device_control_name(ULONG ioctl_code)
 	case vhci::ioctl::GET_IMPORTED_DEVICES: return "vhci_get_imported_devices";
 	case vhci::ioctl::GET_PERSISTENT: return "vhci_get_persistent";
 	case vhci::ioctl::SET_PERSISTENT: return "vhci_set_persistent";
-        case vhci::ioctl::CANCEL_ATTACH_ATTEMPTS: return "cancel_attach_attempts";
+        case vhci::ioctl::STOP_ATTACH_ATTEMPTS: return "stop_attach_attempts";
 
 	case IOCTL_USB_DIAG_IGNORE_HUBS_ON: return "USB_DIAG_IGNORE_HUBS_ON";
 	case IOCTL_USB_DIAG_IGNORE_HUBS_OFF: return "USB_DIAG_IGNORE_HUBS_OFF";

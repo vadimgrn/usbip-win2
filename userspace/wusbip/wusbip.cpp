@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wusbip.h"
@@ -316,7 +316,7 @@ auto get_saved()
         return result;
 }
 
-auto to_string(_In_ _In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev)
+auto to_string(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev)
 {
         wxASSERT(tree.GetColumnCount() > COL_LAST_VISIBLE);
 
@@ -347,6 +347,7 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
 
         return servers;
 }
+
 } // namespace
 
 
@@ -872,6 +873,42 @@ void MainFrame::on_attach(wxCommandEvent&)
         }
 }
 
+void MainFrame::on_attach_stop(wxCommandEvent&)
+{
+        wxLogVerbose(wxString::FromAscii(__func__));
+        auto &vhci = get_vhci();
+
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+
+                auto server = tree.GetItemParent(dev);
+                auto loc = make_device_location(tree, server, dev);
+
+                if (vhci::stop_attach_attempts(vhci.get(), &loc)) {
+                        continue;
+                }
+
+                auto err = GetLastError();
+
+                auto url = tree.GetItemText(server);
+                auto busid = tree.GetItemText(dev);
+
+                wxLogError(_("Could not stop attach attempts %s/%s\nError %lu\n%s"),
+                              url, busid, err, GetLastErrorMsg(err));
+
+                break;
+        }
+}
+
+void MainFrame::on_attach_stop_all(wxCommandEvent&)
+{
+        wxLogVerbose(wxString::FromAscii(__func__));
+        
+        if (auto &vhci = get_vhci(); !vhci::stop_attach_attempts(vhci.get(), nullptr)) {
+                auto err = GetLastError();
+                wxLogError(_("Could not stop attach attempts\nError %lu\n%s"), err, GetLastErrorMsg(err));
+        }
+}
+
 void MainFrame::on_detach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
@@ -1347,7 +1384,11 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
                 { wxID_SEPARATOR, nullptr, nullptr },
                 { wxID_OPEN, m_menu_devices, &MainFrame::on_attach },
+                { ID_ATTACH_STOP, m_menu_devices, &MainFrame::on_attach_stop },
+                { ID_ATTACH_STOP_ALL, m_menu_devices, &MainFrame::on_attach_stop_all },
+                { wxID_SEPARATOR, nullptr, nullptr },
                 { wxID_CLOSE, m_menu_devices, &MainFrame::on_detach },
+                { wxID_CLOSE_ALL, m_menu_devices, &MainFrame::on_detach_all },
                 { wxID_SEPARATOR, nullptr, nullptr },
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },

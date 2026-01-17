@@ -1,5 +1,5 @@
 ﻿///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-cd035212)
+// C++ code generated with wxFormBuilder (version 4.2.1-ddd6fee7)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -43,6 +43,8 @@ class Frame : public wxFrame
 		{
 			ID_TOGGLE_AUTO = 6000,
 			ID_EDIT_NOTES,
+			ID_ATTACH_STOP,
+			ID_ATTACH_STOP_ALL,
 			ID_TOGGLE_LOG_WINDOW,
 		};
 
@@ -59,6 +61,8 @@ class Frame : public wxFrame
 		wxAuiToolBar* m_auiToolBar;
 		wxAuiToolBarItem* m_tool_reload;
 		wxAuiToolBarItem* m_tool_attach;
+		wxAuiToolBarItem* m_tool_attach_stop;
+		wxAuiToolBarItem* m_tool_attach_stop_all;
 		wxAuiToolBarItem* m_tool_detach;
 		wxAuiToolBarItem* m_tool_detach_all;
 		wxAuiToolBarItem* m_tool_load;
@@ -103,6 +107,8 @@ class Frame : public wxFrame
 		virtual void on_reload( wxCommandEvent& event ) { event.Skip(); }
 		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_attach_stop( wxCommandEvent& event ) { event.Skip(); }
+		virtual void on_attach_stop_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_detach_all( wxCommandEvent& event ) { event.Skip(); }
 		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
