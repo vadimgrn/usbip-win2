@@ -77,7 +77,7 @@ AppPublisherURL=https://github.com/vadimgrn/usbip-win2
 WizardStyle=modern
 DefaultDirName={autopf}\{#ProductName}
 DefaultGroupName={#ProductName}
-#if Platform = "x86" ; This avoid to install 32-bit drivers on 64-bit systems
+#if Platform == "x86" ; This avoid to install 32-bit drivers on 64-bit systems
     ArchitecturesAllowed=x86
 #else ; Does this autorize x64 driver on arm64 systems ?
     ArchitecturesAllowed=x64compatible
