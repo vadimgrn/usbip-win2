@@ -444,9 +444,9 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         WdfRequestComplete(request, st);
 
         if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st)) {
-                auto str = ext.device_str();
-                cancel_reattach_requests(vhci, str);
-                plugin_persistent_device(ctx.vhci, vhci, str, true);
+                auto device_str = ext.device_str();
+                stop_attach_attempts(vhci, device_str);
+                start_attach_attempts(ctx.vhci, vhci, device_str, true);
         }
 
         WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup
@@ -557,10 +557,10 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS cancel_attach_attempts(_In_ WDFREQUEST request)
+PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
-        vhci::ioctl::cancel_attach_attempts *r{};
+        vhci::ioctl::stop_attach_attempts *r{};
 
         if (size_t length{}; 
                 auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
@@ -568,7 +568,7 @@ PAGED NTSTATUS cancel_attach_attempts(_In_ WDFREQUEST request)
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
         } else if (r->size != sizeof(*r)) {
-                Trace(TRACE_LEVEL_ERROR, "cancel_attach_attempts.size %lu != sizeof(cancel_attach_attempts) %Iu", 
+                Trace(TRACE_LEVEL_ERROR, "stop_attach_attempts.size %lu != sizeof(stop_attach_attempts) %Iu", 
                         r->size, sizeof(*r));
 
                 return USBIP_ERROR_ABI;
@@ -590,7 +590,7 @@ PAGED NTSTATUS cancel_attach_attempts(_In_ WDFREQUEST request)
         if (NT_SUCCESS(st)) {
                 auto vhci = get_vhci(request);
                 auto ctx = get_vhci_ctx(vhci);
-                cancel_reattach_requests(*ctx, device_str.get<WDFSTRING>());
+                stop_attach_attempts(*ctx, device_str.get<WDFSTRING>());
         }
 
         return st;
@@ -709,6 +709,9 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         return STATUS_SUCCESS;
 }
 
+/*
+ * @see get_persistent_devices
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto set_persistent(_In_ WDFREQUEST request)
@@ -737,8 +740,7 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
 }
 
 /*
- * KEY_SET_VALUE is added to access the same key that is used by set_persistent.
- * @see open_parameters_key
+ * @see get_persistent_devices
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -813,8 +815,8 @@ PAGED void device_control(
         case vhci::ioctl::PLUGOUT_HARDWARE:
                 st = plugout_hardware(Request);
                 break;
-        case vhci::ioctl::CANCEL_ATTACH_ATTEMPTS:
-                st = cancel_attach_attempts(Request);
+        case vhci::ioctl::STOP_ATTACH_ATTEMPTS:
+                st = stop_attach_attempts(Request);
                 break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));

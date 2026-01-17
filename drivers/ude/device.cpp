@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device.h"
@@ -795,7 +795,8 @@ PAGED wdm::object_reference usbip::device::detach(
 
         if (device_str) {
                 auto ctx = get_vhci_ctx(vhci);
-                plugin_persistent_device(vhci, *ctx, device_str.get<WDFSTRING>(), true);
+                auto delayed = plugout_and_delete;
+                start_attach_attempts(vhci, *ctx, device_str.get<WDFSTRING>(), delayed);
         }
 
         return thread;

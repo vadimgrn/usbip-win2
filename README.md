@@ -54,8 +54,9 @@
 - Install git
   - Run Visual Studio Installer
   - Select "Individual components" tab
-  - Type "git" in search box
-  - Check "Git for Windows"
+  - Find and check
+    - Git for Windows
+    - Windows Driver Kit
   - Install selected items
 - Clone project using git or download an archive from github and extract source code
 - Run `bootstrap.bat`

@@ -6,8 +6,8 @@
 #include "trace.h"
 #include "persistent.tmh"
 
-#include "context.h"
 #include "driver.h"
+#include "context.h"
 
 #include <libdrv/strconv.h>
 #include <resources/messages.h>
@@ -27,9 +27,13 @@ struct attach_ctx
         WDFSTRING device_str; // host,port,busid
         WDFDEVICE vhci;
 
-        WDFTIMER timer;
         WDFMEMORY inbuf;
         WDFMEMORY outbuf;
+
+        WDFSPINLOCK lock;
+        WDFTIMER timer;
+        int timer_queued;
+        bool cancelled;
 
         unsigned int retry_cnt;
         unsigned int delay;
@@ -53,18 +57,41 @@ constexpr auto can_retry(_In_ unsigned int retry_cnt, _In_ unsigned int max_atte
 {
         return !max_attempts || retry_cnt < max_attempts;
 }
+static_assert(can_retry(0, 0));
 static_assert(can_retry(0, 1));
 static_assert(!can_retry(1, 1));
 
+/*
+total = 0
+delay = 30 # ReattachFirstDelay
+max_delay = 3600 # ReattachMaxDelay
+
+for i in range(12): # ReattachMaxAttempts
+        total = total + delay
+        hours = int(total/(60*60))
+
+        mins = int((total - 60*60*hours)/60)
+        assert mins < 60
+
+        secs = total - 60*60*hours - 60*mins
+        assert secs < 60
+
+        print(f"{i}, delay={delay}s, total={total}s -> {hours}h, {mins}m, {secs}s")
+
+        if delay != max_delay:
+                delay = int(3*delay/2) # get_delay()
+                if delay > max_delay:
+                        delay = max_delay
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_delay(_Inout_ unsigned int &delay, _In_ unsigned int max_delay)
+constexpr auto get_delay(_Inout_ unsigned int &delay, _In_ unsigned int max_delay)
 {
         auto cur = delay;
         NT_ASSERT(cur && cur <= max_delay);
 
         if (cur != max_delay) {
-                auto next = 2ULL*cur;
+                auto next = 3ULL*cur/2;
                 delay = next < max_delay ? static_cast<unsigned int>(next) : max_delay;
         }
 
@@ -194,6 +221,9 @@ PAGED auto get_persistent_devices(_In_ WDFKEY key)
         return col;
 }
 
+/*
+ * @see set_persistent/get_persistent
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
@@ -307,7 +337,20 @@ void on_plugin_hardware(
         }
 
         auto delay = get_delay(req.delay, vhci.reattach_max_delay);
-        NT_VERIFY(!WdfTimerStart(req.timer, WDF_REL_TIMEOUT_IN_SEC(delay))); // @see on_attach_timer
+
+        {
+                wdf::Lock lck(req.lock);
+
+                if (req.cancelled) {
+                        TraceDbg("req %04x, was cancelled", ptr04x(request));
+                        return;
+                }
+
+                NT_ASSERT(!req.timer_queued);
+                ++req.timer_queued;
+
+                NT_VERIFY(!WdfTimerStart(req.timer, WDF_REL_TIMEOUT_IN_SEC(delay))); // @see on_attach_timer
+        }
 
         TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, delay);
         ptr.release();
@@ -344,8 +387,8 @@ void send_plugin_hardware(
 
 /*
  * If an EvtTimerFunc callback function running at PASSIVE_LEVEL calls WdfObjectDelete,
- * this results in deadlock. Request is a parent of a timer,
- * the timer will be implicitly deleted when the request is deleted.
+ * this results in deadlock. Request is a parent of a timer, the timer will be
+ * implicitly deleted when the request is deleted.
  */
 _Function_class_(EVT_WDF_TIMER)
 _IRQL_requires_same_
@@ -353,11 +396,22 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void on_attach_timer(_In_ WDFTIMER timer)
 {
         ObjectDelete req(WdfTimerGetParentObject(timer));
-
         auto &r = *get_attach_ctx(req.get());
-        auto &vhci = *get_vhci_ctx(r.vhci);
 
-        if (get_flag(vhci.removing)) [[unlikely]] {
+        bool cancelled;
+        {
+                wdf::Lock lck(r.lock);
+
+                if (cancelled = r.cancelled; --r.timer_queued) {
+                        NT_ASSERT(r.timer_queued == 1);
+                        NT_ASSERT(cancelled);
+                        req.release();
+                }
+        }
+
+        if (cancelled){
+                TraceDbg("req %04x, was cancelled", ptr04x(req.get()));
+        } else if (auto &vhci = *get_vhci_ctx(r.vhci); get_flag(vhci.removing)) [[unlikely]] {
                 TraceDbg("req %04x, vhci is being removing", ptr04x(req.get()));
         } else {
                 send_plugin_hardware(vhci.target_self, r.inbuf, r.outbuf, req);
@@ -377,6 +431,20 @@ PAGED bool create_timer(_Inout_ WDFTIMER &result, _Inout_ WDF_OBJECT_ATTRIBUTES 
 
         if (auto err = WdfTimerCreate(&cfg, &attr, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", err);
+        }
+
+        return result;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED bool create_lock(_Inout_ WDFSPINLOCK &result, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+{
+        PAGED_CODE();
+        NT_ASSERT(!result);
+
+        if (auto err = WdfSpinLockCreate(&attr, &result)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
         }
 
         return result;
@@ -457,6 +525,7 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ W
         auto ok = create_inbuf(r.inbuf, buf, attr) &&
                   create_outbuf(r.outbuf, buf, attr) &&
                   create_timer(r.timer, attr) &&
+                  create_lock(r.lock, attr) &&
                   init_attach_ctx(ctx, r, device_str) &&
                   reattach_req_add(ctx, req.get());
 
@@ -469,6 +538,9 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ W
 
 /*
  * WDF does not have a function for DriverRegKeySharedPersistentState yet.
+ *
+ * To debug persistent devices, add this line to .inf and make function to always return WdfDriverOpenParametersRegistryKey.
+ * HKR, Parameters, PersistentDevices, 0x00010000, "pc,3240,3-3", "pc,3240,3-2","google.com,3240,3-1","microsoft.com,3240,3-4"
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -486,12 +558,48 @@ PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REG
                 return nullptr;
         }
 }
+
+/*
+ * WdfTimerStop is not called here because if on_plugin_hardware() deletes request,
+ * concurrent calls to WdfTimerStop on the same timer object will break into the debugger
+ * if Verifier is enabled. The timer callback will be fired. If it calls WdfRequestSend,
+ * STATUS_CANCELLED will be immetiately returned due to previosly called WdfRequestCancelSentRequest.
+ * WdfRequestReuse does not clear cancellation flag.
+ *
+ * If timer in system queue, its callback will delete cancelled request sooner or later.
+ * The latter is a problem, these requests will be piling up and can cause Denial Of Service.
+ * To run timer callback ASAP, WdfTimerStart is called.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void cancel_reattach_req(_In_ WDFREQUEST request)
+{
+        auto delivered = WdfRequestCancelSentRequest(request); // next WdfRequestSend will return STATUS_CANCELLED
+        TraceDbg("%04x, cancel request was delivered %!BOOLEAN!", ptr04x(request), delivered);
+
+        auto &r = *get_attach_ctx(request);
+        wdf::Lock lck(r.lock); // raises IRQL
+
+        r.cancelled = true;
+
+        if (!r.timer_queued) {
+                return;
+        }
+
+        NT_ASSERT(r.timer_queued == 1);
+
+        auto was_queued = WdfTimerStart(r.timer, WDF_REL_TIMEOUT_IN_MS(1)); // run ASAP to delete request
+        r.timer_queued += !was_queued; // was removed from queue, but its calback has not been called yet
+
+        TraceDbg("%04x, timer was in queue %!BOOLEAN!", ptr04x(request), was_queued);
+}
+
 } // namespace 
 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::plugin_persistent_device(
+PAGED void usbip::start_attach_attempts(
         _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ WDFSTRING device_str, _In_ bool delayed)
 {
         PAGED_CODE();
@@ -512,12 +620,30 @@ PAGED void usbip::plugin_persistent_device(
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
         } else {
                 ++r.retry_cnt;
+                ++r.timer_queued;
 
                 enum { DELAY = 30 }; // long delay after UdecxUsbDevicePlugOutAndDelete
                 NT_VERIFY(!WdfTimerStart(r.timer, WDF_REL_TIMEOUT_IN_SEC(DELAY)));
 
                 TraceDbg("req %04x, delayed for %u secs.", ptr04x(req.get()), DELAY);
                 req.release();
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str)
+{
+        PAGED_CODE();
+
+        UNICODE_STRING str{};
+        if (device_str) {
+                WdfStringGetUnicodeString(device_str, &str);
+                TraceDbg("%!USTR!", &str);
+        }
+
+        while (auto req = reattach_req_remove(vhci, str)) {
+                cancel_reattach_req(req.get<WDFREQUEST>());
         }
 }
 
@@ -532,8 +658,8 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
         auto col = get_persistent_devices(cnt, ctx.devices_cnt);
 
         for (ULONG i = 0; i < cnt; ++i) {
-                auto dev_str = (WDFSTRING)WdfCollectionGetItem(col.get<WDFCOLLECTION>(), i);
-                plugin_persistent_device(vhci, ctx, dev_str);
+                auto device_str = (WDFSTRING)WdfCollectionGetItem(col.get<WDFCOLLECTION>(), i);
+                start_attach_attempts(vhci, ctx, device_str);
         }
 }
 
@@ -569,15 +695,6 @@ PAGED NTSTATUS usbip::copy(
 /*
  * WdfDriverOpenParametersRegistryKey should not be used for write,
  * use WdfDriverOpenPersistentStateRegistryKey instead.
- *
- * To debug persistent devices, add multi-string value "PersistentDevices"
- * to HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\State
-   pc,3240,3-3
-   pc,3240,3-2
-   google.com,3240,3-1
-   microsoft.com,3240,3-4
- * You cannot add following line to .inf, there will be a compiler error.
- * HKR, Parameters, PersistentDevices, 0x00010000, "pc,3240,3-3", "pc,3240,3-2"
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -615,6 +732,9 @@ ObjectDelete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTR
 /*
  * WskGetAddressInfo() can return STATUS_INTERNAL_ERROR(0xC00000E5), but after some delay it will succeed.
  * This can happen after reboot if dnscache(?) service is not ready yet.
+ *
+ * USBIP_ERROR_ST_DEV_BUSY is here because you call attach, it can fail and start attach attemtps.
+ * You call attach again, it can succeed, but background attach attempts will not be stopped.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -626,35 +746,11 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
         case USBIP_ERROR_ABI:
         case USBIP_ERROR_VERSION:
         case USBIP_ERROR_PROTOCOL:
-        case USBIP_ERROR_ST_DEV_BUSY: // stop attach attempts if it is already connected
+        case USBIP_ERROR_ST_DEV_BUSY: // stop infinite attach attempts
                 return false; // unrecoverable errors
         }
 
         return status != STATUS_CANCELLED;
-}
-
-/*
- * WdfTimerStop is not called here because if on_plugin_hardware() deletes request,
- * concurrent calls to WdfTimerStop on the same timer object will break into the debugger
- * if Verifier is enabled. The timer callback will be fired. If it calls WdfRequestSend,
- * STATUS_CANCELLED will be immetiately returned due to previosly called WdfRequestCancelSentRequest.
- * WdfRequestReuse does not clear cancellation flag.
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str)
-{
-        PAGED_CODE();
-
-        UNICODE_STRING str{};
-        if (device_str) {
-                WdfStringGetUnicodeString(device_str, &str);
-        }
-
-        while (auto req = reattach_req_remove(vhci, str)) {
-                auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>()); // next WdfRequestSend will fail
-                TraceDbg("%!USTR! -> req %04x, cancel request was delivered %!BOOLEAN!", &str, ptr04x(req.get()), delivered);
-        }
 }
 
 /*

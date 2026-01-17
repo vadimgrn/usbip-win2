@@ -54,7 +54,7 @@ bool usbip::cmd_attach(void *p)
 
         if (args.cancel || args.cancel_all) {
                 assert(args.cancel != args.cancel_all);
-                auto ok = vhci::cancel_attach_attempts(dev.get(), args.cancel ? &location : nullptr);
+                auto ok = vhci::stop_attach_attempts(dev.get(), args.cancel ? &location : nullptr);
                 if (!ok) {
                         spdlog::error(GetLastErrorMsg());
                 }

@@ -35,19 +35,19 @@ ObjectDelete create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugin_persistent_device(
+PAGED void plugin_persistent_devices(_In_ WDFDEVICE vhci);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void start_attach_attempts(
         _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ WDFSTRING device_str, _In_ bool delayed = false);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void plugin_persistent_devices(_In_ WDFDEVICE vhci);
+PAGED void stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool can_reattach(_In_ NTSTATUS status);
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void cancel_reattach_requests(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str);
 
 } // namespace usbip
