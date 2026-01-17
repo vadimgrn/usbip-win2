@@ -147,7 +147,7 @@ auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = 
 		}
 		[[fallthrough]];
 	default:
-		return ret == len;
+		return ret == static_cast<int>(len);
 	}
 }
 

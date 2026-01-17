@@ -25,7 +25,14 @@
 #include <wx/textdlg.h>
 #include <wx/headerctrl.h>
 #include <wx/clipbrd.h>
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable: 4018 4389) // signed/unsigned mismatch
+#endif
 #include <wx/persist/dataview.h>
+#ifdef _WIN32
+#pragma warning(pop)
+#endif
 
 #include <format>
 #include <set>

@@ -26,7 +26,11 @@ inline auto what(_In_ const std::exception &e)
 }
 
 using cancel_function = decltype(CancelSynchronousIo);
+#ifdef _WIN64
 cancel_function cancel_connect;
+#else
+BOOL cancel_connect(_In_ HANDLE thread);
+#endif
 
 void run_cancellable(
         _In_ wxWindow *parent,

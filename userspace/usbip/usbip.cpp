@@ -17,8 +17,11 @@
 
 #include <resources\messages.h>
 
+#pragma warning(push)
+#pragma warning(disable: 4389) // signed/unsigned mismatch in spdlog headers
 #include <spdlog\spdlog.h>
 #include <spdlog\sinks\stdout_color_sinks.h>
+#pragma warning(pop)
 
 #include <CLI11\CLI11.hpp>
 

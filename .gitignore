@@ -8,6 +8,9 @@
 /.vs
 x64
 ARM64
+Win32
+Debug
+Release
 /packages
 /bin/usbip-*.*
 /userspace/resources/messages.h

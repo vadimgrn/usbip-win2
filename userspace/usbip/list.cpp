@@ -8,7 +8,10 @@
 #include <libusbip\vhci.h>
 #include <libusbip\persistent.h>
 
+#pragma warning(push)
+#pragma warning(disable: 4389) // signed/unsigned mismatch in spdlog headers
 #include <spdlog\spdlog.h>
+#pragma warning(pop)
 
 namespace
 {

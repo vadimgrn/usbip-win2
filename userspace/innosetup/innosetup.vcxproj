@@ -6,6 +6,10 @@
       <Configuration>Debug</Configuration>
       <Platform>ARM64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
@@ -13,6 +17,10 @@
     <ProjectConfiguration Include="Release|ARM64">
       <Configuration>Release</Configuration>
       <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
@@ -31,12 +39,22 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <ConfigurationType>Makefile</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Makefile</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -54,10 +72,16 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="PropertySheets">
@@ -72,6 +96,15 @@
     <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /Ssign_util="signtool.exe $p" /DSolutionDir=$(SolutionDir) /DPlatform=x86 /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
+    <NMakeOutput />
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /Ssign_util="signtool.exe $p" /DSolutionDir=$(SolutionDir) /DPlatform=x86 /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <NMakeBuildCommandLine>$(InnoSetupCompiler) /Ssign_util="signtool.exe $p" /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
@@ -89,6 +122,15 @@
     <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <IntDir>$(Platform)\$(Configuration)\</IntDir>
     <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <NMakeBuildCommandLine>$(InnoSetupCompiler) /Ssign_util="signtool.exe $p" /DSolutionDir=$(SolutionDir) /DPlatform=x86 /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>
+    <NMakeOutput />
+    <NMakeReBuildCommandLine>$(InnoSetupCompiler) /Ssign_util="signtool.exe $p" /DSolutionDir=$(SolutionDir) /DPlatform=x86 /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeReBuildCommandLine>
+    <NMakePreprocessorDefinitions>NDEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <NMakeCleanCommandLine>del /F /Q $(SolutionDir)$(Platform)\$(Configuration)\USBip-*-$(Configuration).exe</NMakeCleanCommandLine>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <NMakeBuildCommandLine>$(InnoSetupCompiler) /Ssign_util="signtool.exe $p" /DSolutionDir=$(SolutionDir) /DPlatform=$(Platform) /DConfiguration=$(Configuration) /DExePath=$(SolutionDir)$(Platform)\$(Configuration)\usbip.exe /DGuiExePath=$(SolutionDir)$(Platform)\$(Configuration)\wusbip.exe /DVCToolsRedistInstallDir="$(VCToolsRedistInstallDir)" setup.iss</NMakeBuildCommandLine>

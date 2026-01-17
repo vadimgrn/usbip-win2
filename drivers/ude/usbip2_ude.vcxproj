@@ -1,14 +1,20 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.x86.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.x86.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x86.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.x86.props')" />
   <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props') and '$(Platform)' == 'x64'" />
   <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props') and '$(Platform)' == 'ARM64'" />
   <Import Project="..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props" Condition="Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props')" />
+  <Import Project="..\..\packages\Microsoft.Windows.WDK.x86.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x86.props" Condition="Exists('..\..\packages\Microsoft.Windows.WDK.x86.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x86.props')" />
   <Import Project="..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props" Condition="Exists('..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props') and '$(Platform)' == 'x64'" />
   <Import Project="..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props" Condition="Exists('..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props') and '$(Platform)' == 'ARM64'" />
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM64">
       <Configuration>Debug</Configuration>
       <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
@@ -17,6 +23,10 @@
     <ProjectConfiguration Include="Release|ARM64">
       <Configuration>Release</Configuration>
       <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
@@ -84,6 +94,12 @@
     <DriverType>KMDF</DriverType>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
@@ -91,6 +107,12 @@
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
   </PropertyGroup>
   <PropertyGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+    <DriverType>KMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
     <DriverType>KMDF</DriverType>
@@ -115,6 +137,20 @@
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
     <KMDF_MINIMUM_VERSION_REQUIRED>
     </KMDF_MINIMUM_VERSION_REQUIRED>
+    <KMDF_VERSION_MINOR>27</KMDF_VERSION_MINOR>
+    <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
+    <SupportsPackaging />
+    <UdeDriver>true</UdeDriver>
+    <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
+    <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_MINIMUM_VERSION_REQUIRED />
     <KMDF_VERSION_MINOR>27</KMDF_VERSION_MINOR>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
     <CharacterSet>Unicode</CharacterSet>
@@ -149,6 +185,20 @@
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
+    <SupportsPackaging />
+    <UdeDriver>true</UdeDriver>
+    <UDE_VERSION_MAJOR>1</UDE_VERSION_MAJOR>
+    <UDE_VERSION_MINOR>1</UDE_VERSION_MINOR>
+    <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_MINIMUM_VERSION_REQUIRED />
+    <KMDF_VERSION_MINOR>27</KMDF_VERSION_MINOR>
+    <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
@@ -175,6 +225,13 @@
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(Platform)\$(ConfigurationName)\</IntDir>
+    <ApiValidator_Enable>false</ApiValidator_Enable>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <LibraryPath>$(LibraryPath)</LibraryPath>
@@ -183,11 +240,39 @@
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(Platform)\$(ConfigurationName)\</IntDir>
+    <ApiValidator_Enable>false</ApiValidator_Enable>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WppEnabled>true</WppEnabled>
+      <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
+      <WppKernelMode>true</WppKernelMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
+      <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <DriverSign>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
+    </DriverSign>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies);ntstrsafe.lib;wdmsec.lib;netio.lib;usbd.lib</AdditionalDependencies>
+      <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppRecorderEnabled>true</WppRecorderEnabled>
@@ -230,6 +315,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WppEnabled>true</WppEnabled>
+      <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppScanConfigurationData Condition="'%(ClCompile.ScanConfigurationData)' == ''">trace.h</WppScanConfigurationData>
+      <WppKernelMode>true</WppKernelMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
+      <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <DriverSign>
+      <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
+    </DriverSign>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies);Uuid.lib;ntstrsafe.lib;wdmsec.lib;netio.lib;usbd.lib</AdditionalDependencies>
+      <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppRecorderEnabled>true</WppRecorderEnabled>
@@ -293,9 +399,11 @@
     </PropertyGroup>
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.WDK.ARM64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.arm64.props'))" />
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.WDK.x64.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x64.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.WDK.x86.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x86.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.WDK.x86.10.0.26100.6584\build\native\Microsoft.Windows.WDK.x86.props'))" />
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.props'))" />
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.targets'))" />
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.arm64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.arm64.props'))" />
     <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.x64.10.0.26100.6901\build\native\Microsoft.Windows.SDK.cpp.x64.props'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Windows.SDK.CPP.x86.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.x86.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Windows.SDK.CPP.x86.10.0.26100.6584\build\native\Microsoft.Windows.SDK.cpp.x86.props'))" />
   </Target>
 </Project>

@@ -25,19 +25,32 @@ LONG g_init_flags;
 class ConcurrencyCheck
 {
 public:
+#ifdef _WIN64
         ConcurrencyCheck(_In_opt_ LONG64 *cnt) : m_cnt(cnt) {}
+#else
+        ConcurrencyCheck(_In_opt_ LONG *cnt) : m_cnt(cnt) {}
+#endif
 
         ~ConcurrencyCheck()
         {
+#ifdef _WIN64
                 NT_ASSERT(!m_cnt || InterlockedIncrement64(m_cnt) == m_val + 1); // there were no concurrent calls
+#else
+                NT_ASSERT(!m_cnt || InterlockedIncrement(m_cnt) == m_val + 1); // there were no concurrent calls
+#endif
         }
 
         ConcurrencyCheck(const ConcurrencyCheck&) = delete;
         ConcurrencyCheck& operator =(const ConcurrencyCheck&) = delete;
 
 private:
+#ifdef _WIN64
         LONG64 *m_cnt{};
         LONG64 m_val = m_cnt ? InterlockedIncrement64(m_cnt) : 0;
+#else
+        LONG *m_cnt{};
+        LONG m_val = m_cnt ? InterlockedIncrement(m_cnt) : 0;
+#endif
 };
 
 #else
@@ -45,7 +58,11 @@ private:
 class ConcurrencyCheck
 {
 public:
+#ifdef _WIN64
         ConcurrencyCheck(_In_opt_ LONG64*) {}
+#else
+        ConcurrencyCheck(_In_opt_ LONG*) {}
+#endif
 };
 
 #endif // if DBG
@@ -220,16 +237,26 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
 
+#ifdef _WIN64
         using count_t = LONG64;
+#else
+        using count_t = LONG;
+#endif
 
         count_t recv_cnt;
         count_t sent_cnt;
         count_t misc_cnt;
 
         enum : count_t { // three highest bits are flags, lower bits comprise a counter
+#ifdef _WIN64
                 SIGN = count_t(1) << 63,
                 EVENT_SET_OFFSET = 62, EVENT_SET = count_t(1) << EVENT_SET_OFFSET,
                 CLOSING = count_t(1) << 61,
+#else
+                SIGN = count_t(1) << 31,
+                EVENT_SET_OFFSET = 30, EVENT_SET = count_t(1) << EVENT_SET_OFFSET,
+                CLOSING = count_t(1) << 29,
+#endif
                 COUNT_MASK = ~(SIGN | EVENT_SET | CLOSING)
         };
 
@@ -241,7 +268,11 @@ struct wsk::SOCKET
         {
                 NTSTATUS ret;
 
+#ifdef _WIN64
                 if (auto n = InterlockedIncrement64(&invoke_cnt); n & CLOSING) {
+#else
+                if (auto n = InterlockedIncrement(&invoke_cnt); n & CLOSING) {
+#endif
                         ret = STATUS_NOT_SUPPORTED; // WSK callbacks do not complete IRP if this status is returned
                 } else {
                         ConcurrencyCheck chk(cnt);
@@ -251,8 +282,13 @@ struct wsk::SOCKET
                         static_assert(sizeof(R) == sizeof(ret)); // R must be NTSTATUS
                 }
 
+#ifdef _WIN64
                 if (InterlockedDecrement64(&invoke_cnt) == CLOSING && // count is zero, event is not set
                     !InterlockedBitTestAndSet64(&invoke_cnt, EVENT_SET_OFFSET)) {
+#else
+                if (InterlockedDecrement(&invoke_cnt) == CLOSING && // count is zero, event is not set
+                    !InterlockedBitTestAndSet(&invoke_cnt, EVENT_SET_OFFSET)) {
+#endif
                         NT_VERIFY(!KeSetEvent(&can_close, IO_NO_INCREMENT, false)); // once
                 }
 
@@ -345,14 +381,22 @@ PAGED auto wait_invokers(_Inout_ SOCKET &s)
 {
         PAGED_CODE();
 
+#ifdef _WIN64
         if (auto n = InterlockedOr64(&s.invoke_cnt, s.CLOSING); n & s.CLOSING) {
+#else
+        if (auto n = InterlockedOr(&s.invoke_cnt, s.CLOSING); n & s.CLOSING) {
+#endif
                 return STATUS_NOT_SUPPORTED; // must be called once
         } else if (n) { // count is not zero
                 NT_ASSERT((n & s.COUNT_MASK) == n);
                 auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
                 NT_VERIFY(!KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, &timeout));
         } else {
+#ifdef _WIN64
                 InterlockedBitTestAndSet64(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
+#else
+                InterlockedBitTestAndSet(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
+#endif
         }
 
         NT_ASSERT(!(s.invoke_cnt & s.COUNT_MASK));

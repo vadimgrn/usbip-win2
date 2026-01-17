@@ -77,7 +77,7 @@ AppPublisherURL=https://github.com/vadimgrn/usbip-win2
 WizardStyle=modern
 DefaultDirName={autopf}\{#ProductName}
 DefaultGroupName={#ProductName}
-ArchitecturesAllowed=x64compatible
+ArchitecturesAllowed=x86 or x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 VersionInfoVersion={#AppVersion}
 ShowLanguageDialog=no
@@ -147,7 +147,7 @@ Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
 #endif
 
 [Tasks]
-Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
+Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable({#Platform})"
 Name: modifypath; Description: "Add to &PATH environment variable for all users"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Components: gui
 

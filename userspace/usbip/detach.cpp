@@ -5,7 +5,11 @@
 #include "usbip.h"
 
 #include <libusbip\vhci.h>
+
+#pragma warning(push)
+#pragma warning(disable: 4389) // signed/unsigned mismatch in spdlog headers
 #include <spdlog\spdlog.h>
+#pragma warning(pop)
 
 bool usbip::cmd_detach(void *p)
 {
