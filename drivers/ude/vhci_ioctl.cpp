@@ -41,7 +41,7 @@ struct workitem_ctx
         auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
         ADDRINFOEXW *addrinfo; // list head
-        bool reattach;
+        bool from_itself; // attach was issued by the driver itself
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
@@ -443,7 +443,11 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
         WdfRequestComplete(request, st);
 
-        if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st)) {
+        if (ctx.from_itself) {
+                // attach was issues by the driver itself
+        } else if (NT_SUCCESS(st)) {
+                stop_attach_attempts(vhci, ext.location_hash());
+        } else if (NT_ERROR(st) && can_reattach(st)) {
                 stop_attach_attempts(vhci, ext.location_hash());
                 start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
         }
@@ -541,7 +545,7 @@ PAGED auto plugin_hardware(
 
         ctx.vhci = vhci;
         ctx.request = request;
-        ctx.reattach = !from_itself; // if attach was not initiated by the driver itself
+        ctx.from_itself = from_itself;
 
         if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);

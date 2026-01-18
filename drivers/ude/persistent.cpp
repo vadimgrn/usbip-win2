@@ -475,8 +475,8 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
                 return req;
         }
 
-        TraceDbg("%04x, %!USTR!:%!USTR!/%!USTR!", ptr04x(req.get()),
-                  &dev.node_name, &dev.service_name, &dev.busid);
+        Trace(TRACE_LEVEL_INFORMATION, "%04x, %!USTR!:%!USTR!/%!USTR!, hash %lx",
+                ptr04x(req.get()), &dev.node_name, &dev.service_name, &dev.busid, dev.location_hash);
 
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
@@ -539,7 +539,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void cancel_reattach_req(_In_ WDFREQUEST request)
 {
         auto delivered = WdfRequestCancelSentRequest(request); // next WdfRequestSend will return STATUS_CANCELLED
-        TraceDbg("%04x, cancel request was delivered %!BOOLEAN!", ptr04x(request), delivered);
 
         auto &r = *get_attach_ctx(request);
         wdf::Lock lck(r.lock); // raises IRQL
@@ -547,6 +546,7 @@ void cancel_reattach_req(_In_ WDFREQUEST request)
         r.cancelled = true;
 
         if (!r.timer_queued) {
+                TraceDbg("%04x, cancel request was delivered %!BOOLEAN!", ptr04x(request), delivered);
                 return;
         }
 
@@ -555,7 +555,8 @@ void cancel_reattach_req(_In_ WDFREQUEST request)
         auto was_queued = WdfTimerStart(r.timer, WDF_REL_TIMEOUT_IN_MS(1)); // run ASAP to delete request
         r.timer_queued += !was_queued; // was removed from queue, but its calback has not been called yet
 
-        TraceDbg("%04x, timer was in queue %!BOOLEAN!", ptr04x(request), was_queued);
+        TraceDbg("%04x, cancel request was delivered %!BOOLEAN!, timer was in queue %!BOOLEAN!",
+                  ptr04x(request), delivered, was_queued);
 }
 
 /*
@@ -588,16 +589,9 @@ PAGED void usbip::start_attach_attempts(
 
         if (get_flag(ctx.removing)) {
                 TraceDbg("vhci is being removing");
-                return;
         } else if (auto cnt = get_attach_req_count(ctx); cnt >= static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
-                return;
-        }
-
-        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!/%!USTR!, hash %lx",
-                &attr.node_name, &attr.service_name, &attr.busid, attr.location_hash);
-
-        if (auto req = create_attach_request(vhci, ctx, attr); !req) {
+        } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
                 //
         } else if (auto &r = *get_attach_ctx(req.get()); !delayed) {
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
