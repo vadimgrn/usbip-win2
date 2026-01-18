@@ -20,7 +20,7 @@ namespace
 using namespace usbip;
 
 /*
- * Context space for WDFREQUEST which is used for ioctl::plugin_hardware_2.
+ * Context space for WDFREQUEST which is used for ioctl::PLUGIN_HARDWARE_INTERNAL.
  */
 struct attach_ctx
 {
@@ -108,7 +108,7 @@ PAGED auto empty(_In_ const UNICODE_STRING &s)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_attach_req_count(_Inout_ vhci_ctx &vhci)
+auto reattach_req_count(_Inout_ vhci_ctx &vhci)
 {
         wdf::Lock(vhci.reattach_req_lock);
         return WdfCollectionGetCount(vhci.reattach_req);
@@ -246,7 +246,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool create_inbuf(
-        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware_2* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
         NT_ASSERT(!result);
@@ -262,12 +262,12 @@ PAGED bool create_inbuf(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool create_outbuf(
-        _Inout_ WDFMEMORY &result, _In_ vhci::ioctl::plugin_hardware_2 *req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+        _Inout_ WDFMEMORY &result, _In_ vhci::ioctl::plugin_hardware *req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware_2, port) + sizeof(req->port);
+        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
 
         if (auto err = WdfMemoryCreatePreallocated(&attr, req, len, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreatePreallocated %!STATUS!", err);
@@ -343,7 +343,7 @@ void send_plugin_hardware(
         TraceDbg("req %04x", ptr04x(request));
 
         if (auto err = WdfIoTargetFormatRequestForIoctl(target, request,
-                                vhci::ioctl::PLUGIN_HARDWARE, inbuf, nullptr, outbuf, nullptr)) {
+                        vhci::ioctl::PLUGIN_HARDWARE_INTERNAL, inbuf, nullptr, outbuf, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
                 return;
         }
@@ -435,12 +435,11 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
         r.delay = vhci.reattach_first_delay;
 
         size_t len;
-        auto &req = *static_cast<vhci::ioctl::plugin_hardware_2*>(WdfMemoryGetBuffer(r.inbuf, &len));
+        auto &req = *static_cast<vhci::ioctl::plugin_hardware*>(WdfMemoryGetBuffer(r.inbuf, &len));
         NT_ASSERT(len == sizeof(req));
 
         RtlZeroMemory(&req, sizeof(req));
         req.size = sizeof(req);
-        req.from_itself = true;
 
         return NT_SUCCESS(fill_location(req, attr));
 }
@@ -481,7 +480,7 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
 
-        vhci::ioctl::plugin_hardware_2 *buf{};
+        vhci::ioctl::plugin_hardware *buf{};
 
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = req.get();
@@ -589,7 +588,7 @@ PAGED void usbip::start_attach_attempts(
 
         if (get_flag(ctx.removing)) {
                 TraceDbg("vhci is being removing");
-        } else if (auto cnt = get_attach_req_count(ctx); cnt >= static_cast<ULONG>(ctx.devices_cnt)) {
+        } else if (auto cnt = reattach_req_count(ctx); cnt >= static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
         } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
                 //

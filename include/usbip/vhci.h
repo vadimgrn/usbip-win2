@@ -77,6 +77,8 @@ enum class function { // 12 bit
         set_persistent,
         get_persistent,
         stop_attach_attempts,
+        plugin_hardware_internal,
+        plugout_hardware_and_reattach,
 };
 
 constexpr auto make(function id)
@@ -91,18 +93,12 @@ enum {
         SET_PERSISTENT = make(function::set_persistent),
         GET_PERSISTENT = make(function::get_persistent),
         STOP_ATTACH_ATTEMPTS = make(function::stop_attach_attempts),
+        // for internal use only
+        PLUGIN_HARDWARE_INTERNAL = make(function::plugin_hardware_internal),
+        PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach),
 };
 
 struct plugin_hardware : base, imported_device_location {};
-
-/*
- * For internal use only, do not send it to the driver.
- */
-struct plugin_hardware_2 : plugin_hardware
-{
-        bool from_itself; // sent by the driver to itself
-};
-static_assert(sizeof(plugin_hardware_2) != sizeof(plugin_hardware));
 
 struct stop_attach_attempts : base, imported_device_location
 {
@@ -113,15 +109,6 @@ struct plugout_hardware : base
 {
         int port; // all ports if <= 0
 };
-
-/*
-* For internal use only, do not send it to the driver.
-*/
-struct plugout_hardware_2 : plugout_hardware
-{
-        bool reattach;
-};
-static_assert(sizeof(plugout_hardware_2) != sizeof(plugout_hardware));
 
 struct get_imported_devices : base
 {

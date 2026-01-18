@@ -549,18 +549,17 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port, _In_ bool reattach)
+auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port)
 {
         WDFMEMORY mem{}; 
         
-        if (vhci::ioctl::plugout_hardware_2 *req{};
+        if (vhci::ioctl::plugout_hardware *req{};
             auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req))) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
         } else {
                 RtlZeroMemory(req, sizeof(*req));
                 req->size = sizeof(*req);
                 req->port = port;
-                req->reattach = reattach;
         }
 
         return mem;
@@ -700,13 +699,15 @@ void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device, _In_ boo
         TraceDbg("req %04x, port %d, reattach %!bool!", ptr04x(request), dev.port, reattach);
 
         attr.ParentObject = request;
-        auto inbuf = create_detach_request_inbuf(attr, dev.port, reattach);
+        auto inbuf = create_detach_request_inbuf(attr, dev.port);
         if (!inbuf) {
                 return;
         }
 
-        if (auto err = WdfIoTargetFormatRequestForIoctl(ctx.target_self, request,
-                                vhci::ioctl::PLUGOUT_HARDWARE, inbuf, nullptr, WDF_NO_HANDLE, nullptr)) {
+        auto code = reattach ? vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH : vhci::ioctl::PLUGOUT_HARDWARE;
+
+        if (auto err = WdfIoTargetFormatRequestForIoctl(ctx.target_self, request, code,
+                                                        inbuf, nullptr, WDF_NO_HANDLE, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
                 return;
         }
