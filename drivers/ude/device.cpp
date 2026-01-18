@@ -553,8 +553,8 @@ auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port
 {
         WDFMEMORY mem{}; 
         
-        if (vhci::ioctl::plugout_hardware *req{};
-            auto err = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req))) {
+        if (vhci::ioctl::plugout_hardware_2 *req{};
+            auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req))) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
         } else {
                 RtlZeroMemory(req, sizeof(*req));

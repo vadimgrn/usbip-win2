@@ -20,7 +20,7 @@ namespace
 using namespace usbip;
 
 /*
- * Context space for WDFREQUEST which is used for ioctl::plugin_hardware.
+ * Context space for WDFREQUEST which is used for ioctl::plugin_hardware_2.
  */
 struct attach_ctx
 {
@@ -246,7 +246,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool create_inbuf(
-        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+        _Inout_ WDFMEMORY &result, _Inout_ vhci::ioctl::plugin_hardware_2* &req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
         NT_ASSERT(!result);
@@ -262,12 +262,12 @@ PAGED bool create_inbuf(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool create_outbuf(
-        _Inout_ WDFMEMORY &result, _In_ vhci::ioctl::plugin_hardware *req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
+        _Inout_ WDFMEMORY &result, _In_ vhci::ioctl::plugin_hardware_2 *req, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
 {
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware_2, port) + sizeof(req->port);
 
         if (auto err = WdfMemoryCreatePreallocated(&attr, req, len, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreatePreallocated %!STATUS!", err);
@@ -434,9 +434,11 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
 
         r.delay = vhci.reattach_first_delay;
 
-        auto &req = *static_cast<vhci::ioctl::plugin_hardware*>(WdfMemoryGetBuffer(r.inbuf, nullptr));
-        RtlZeroMemory(&req, sizeof(req));
+        size_t len;
+        auto &req = *static_cast<vhci::ioctl::plugin_hardware_2*>(WdfMemoryGetBuffer(r.inbuf, &len));
+        NT_ASSERT(len == sizeof(req));
 
+        RtlZeroMemory(&req, sizeof(req));
         req.size = sizeof(req);
         req.from_itself = true;
 
@@ -479,7 +481,7 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
 
-        vhci::ioctl::plugin_hardware *buf{};
+        vhci::ioctl::plugin_hardware_2 *buf{};
 
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = req.get();

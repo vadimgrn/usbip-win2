@@ -93,27 +93,35 @@ enum {
         STOP_ATTACH_ATTEMPTS = make(function::stop_attach_attempts),
 };
 
+struct plugin_hardware : base, imported_device_location {};
+
 /*
- * from_itself is for internal use only, must be set to false.
+ * For internal use only, do not send it to the driver.
  */
-struct plugin_hardware : base, imported_device_location
+struct plugin_hardware_2 : plugin_hardware
 {
         bool from_itself; // sent by the driver to itself
 };
+static_assert(sizeof(plugin_hardware_2) != sizeof(plugin_hardware));
 
 struct stop_attach_attempts : base, imported_device_location
 {
         int count; // OUT, number of canceled requests
 };
 
-/*
- * reattach is for internal use only, must be set to false.
- */
 struct plugout_hardware : base
 {
         int port; // all ports if <= 0
+};
+
+/*
+* For internal use only, do not send it to the driver.
+*/
+struct plugout_hardware_2 : plugout_hardware
+{
         bool reattach;
 };
+static_assert(sizeof(plugout_hardware_2) != sizeof(plugout_hardware));
 
 struct get_imported_devices : base
 {

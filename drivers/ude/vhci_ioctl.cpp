@@ -524,11 +524,12 @@ PAGED void getaddrinfo(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r)
+PAGED auto plugin_hardware(
+        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool from_itself)
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, from itself %!bool!", r.host, r.service, r.busid, r.from_itself);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, from itself %!bool!", r.host, r.service, r.busid, from_itself);
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
@@ -540,7 +541,7 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
 
         ctx.vhci = vhci;
         ctx.request = request;
-        ctx.reattach = !r.from_itself; // if attach was not initiated by the driver itself
+        ctx.reattach = !from_itself; // if attach was not initiated by the driver itself
 
         if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);
@@ -561,8 +562,8 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
         PAGED_CODE();
         vhci::ioctl::stop_attach_attempts *r{};
 
-        if (size_t length{}; 
-                auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
+        if (size_t length; 
+            auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
                 return err;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
@@ -606,17 +607,18 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request)
         WdfRequestSetInformation(request, 0);
 
         vhci::ioctl::plugin_hardware *r{};
+        bool from_itself{};
 
-        if (size_t length{}; 
+        if (size_t length;
             auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
                 return err;
+        } else if (r->size != length) {
+                Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
+                return USBIP_ERROR_ABI;
+        } else if (auto r2 = static_cast<vhci::ioctl::plugin_hardware_2*>(r); length == sizeof(*r2)) {
+                from_itself = r2->from_itself;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
-        } else if (r->size != sizeof(*r)) {
-                Trace(TRACE_LEVEL_ERROR, "plugin_hardware.size %lu != sizeof(plugin_hardware) %Iu", 
-                                          r->size, sizeof(*r));
-
-                return USBIP_ERROR_ABI;
         }
 
         r->port = 0;
@@ -624,7 +626,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request)
         constexpr auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
-        return plugin_hardware(request, *r);
+        return plugin_hardware(request, *r, from_itself);
 }
 
 _IRQL_requires_same_
@@ -634,20 +636,21 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
         PAGED_CODE();
 
         vhci::ioctl::plugout_hardware *r{};
+        bool reattach{};
 
         if (size_t length; 
             auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
                 return err;
+        } else if (r->size != length) {
+                Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
+                return USBIP_ERROR_ABI;
+        } else if (auto r2 = static_cast<vhci::ioctl::plugout_hardware_2*>(r); length == sizeof(*r2)) {
+                reattach = r2->reattach;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
-        } else if (r->size != sizeof(*r)) {
-                Trace(TRACE_LEVEL_ERROR, "plugout_hardware.size %lu != sizeof(plugout_hardware) %Iu",
-                                          r->size, sizeof(*r));
-
-                return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("port %d, reattach %!bool!", r->port, r->reattach);
+        TraceDbg("port %d, reattach %!bool!", r->port, reattach);
         auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
@@ -655,7 +658,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request)
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), r->reattach);
+                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
         } else {
                 st = STATUS_DEVICE_NOT_CONNECTED;
         }
