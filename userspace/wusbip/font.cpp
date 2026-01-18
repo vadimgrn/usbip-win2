@@ -118,6 +118,9 @@ bool usbip::set_font_size(_In_ wxLogWindow *wnd, _In_ int pt)
         return set_font_size(wnd->GetFrame(), pt);
 }
 
+/*
+ * FIXME: does not work, always returns 8
+ */
 int usbip::get_font_size(_In_ wxLogWindow *log)
 {
         return get_font_size(log->GetFrame());

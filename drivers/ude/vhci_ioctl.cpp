@@ -444,9 +444,8 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         WdfRequestComplete(request, st);
 
         if (auto retry = ctx.reattach && NT_ERROR(st) && can_reattach(st)) {
-                auto device_str = ext.device_str();
-                stop_attach_attempts(vhci, device_str);
-                start_attach_attempts(ctx.vhci, vhci, device_str, true);
+                stop_attach_attempts(vhci, ext.location_hash());
+                start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
         }
 
         WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup
@@ -529,7 +528,7 @@ PAGED auto plugin_hardware( _In_ WDFREQUEST request, _In_ const vhci::ioctl::plu
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s, busid %s, from itself %!bool!", r.host, r.service, r.busid, r.from_itself);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, from itself %!bool!", r.host, r.service, r.busid, r.from_itself);
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
@@ -576,21 +575,24 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
 
         TraceDbg("host '%s', service '%s', busid '%s'", r->host, r->service, r->busid);
 
-        auto st = STATUS_SUCCESS;
-        wdf::ObjectRef device_str;
+        ULONG location_hash{};
+        NTSTATUS st;
 
-        if (*r->host && *r->service && *r->busid) {
-                device_attributes attr{};
-                if (st = init_device_attributes(attr, request, *r); NT_SUCCESS(st)) {
-                        device_str.reset(attr.device_str);
-                }
+        if (auto cnt = bool(*r->host) + bool(*r->service) + bool(*r->busid); !cnt) {
+                st = STATUS_SUCCESS; // stop all
+        } else if (cnt != 3) {
+                st = STATUS_INVALID_PARAMETER;
+        } else if (device_attributes attr{}; NT_SUCCESS(st = init_device_attributes(attr, *r))) {
+                location_hash = attr.location_hash;
                 free(attr);
         }
 
         if (NT_SUCCESS(st)) {
                 auto vhci = get_vhci(request);
                 auto ctx = get_vhci_ctx(vhci);
-                stop_attach_attempts(*ctx, device_str.get<WDFSTRING>());
+
+                r->count = stop_attach_attempts(*ctx, location_hash);
+                WdfRequestSetInformation(request, sizeof(*r));
         }
 
         return st;

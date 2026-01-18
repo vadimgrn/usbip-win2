@@ -29,6 +29,20 @@ auto attach_stashed_devices(HANDLE dev)
         return success;
 }
 
+auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
+{
+        auto cnt = vhci::stop_attach_attempts(dev, loc);
+        auto ok = cnt >= 0;
+
+        if (ok) {
+                spdlog::debug("{} request(s) stopped", cnt);
+        } else {
+                spdlog::error(GetLastErrorMsg());
+        }
+
+        return ok;
+}
+
 } // namespace
 
 
@@ -54,11 +68,7 @@ bool usbip::cmd_attach(void *p)
 
         if (args.stop || args.stop_all) {
                 assert(args.stop != args.stop_all);
-                auto ok = vhci::stop_attach_attempts(dev.get(), args.stop ? &location : nullptr);
-                if (!ok) {
-                        spdlog::error(GetLastErrorMsg());
-                }
-                return ok;
+                return stop_attach_attempts(dev.get(), args.stop ? &location : nullptr);
         }
 
         auto port = vhci::attach(dev.get(), location);

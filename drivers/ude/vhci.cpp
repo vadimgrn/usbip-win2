@@ -278,16 +278,16 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = vhci;
 
-        if (auto err = WdfSpinLockCreate(&attr, &ctx.devices_lock)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
-                return err;
-        }
-
-        for (WDFWAITLOCK* v[] { &ctx.events_lock, &ctx.reattach_req_lock }; auto lck: v) {
-                if (auto err = WdfWaitLockCreate(&attr, lck)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
+        for (WDFSPINLOCK* v[] { &ctx.devices_lock, &ctx.reattach_req_lock }; auto lck: v) {
+                if (auto err = WdfSpinLockCreate(&attr, lck)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
                         return err;
                 }
+        }
+
+        if (auto err = WdfWaitLockCreate(&attr, &ctx.events_lock)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
+                return err;
         }
 
         if (auto err = WdfCollectionCreate(&attr, &ctx.reattach_req)) {
@@ -874,9 +874,7 @@ PAGED NTSTATUS usbip::vhci::fill(_Out_ imported_device &dev, _In_ const device_a
 
 //      imported_device_location
         dev.port = port;
-        if (auto err = copy(dev.host, sizeof(dev.host), r.node_name, 
-                            dev.service, sizeof(dev.service), r.service_name,  
-                            dev.busid, sizeof(dev.busid), r.busid)) {
+        if (auto err = fill_location(dev, r)) {
                 return err;
         }
 //

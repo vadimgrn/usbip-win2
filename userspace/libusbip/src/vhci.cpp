@@ -278,17 +278,25 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
         return 0;
 }
 
-bool usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location)
+int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location)
 {
         ioctl::stop_attach_attempts r {{ .size = sizeof(r) }};
 
         if (location && !assign(r, *location)) {
                 SetLastError(ERROR_INVALID_PARAMETER);
-                return false;
+                return -1;
         }
-
-        DWORD BytesReturned{}; // must be set if the last arg is NULL
-        return DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
+        
+        if (DWORD BytesReturned{}; // must be set if the last arg is NULL
+            !DeviceIoControl(dev,ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
+                return -1;
+        } else if (BytesReturned != sizeof(r)) [[unlikely]] {
+                SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
+                return -1;
+        } else {
+                assert(r.count >= 0);
+                return r.count;
+        }
 }
 
 bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)

@@ -75,9 +75,9 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
 /**
  * @param dev handle of the driver device
  * @param location stop attach attempts to this device or stop all active attach attempts if NULL
- * @return call GetLastError() if false is returned
+ * @return number of canceled requests, call GetLastError() if -1 is returned
  */
-USBIP_API bool stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location);
+USBIP_API int stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location);
 
 /**
  * @param dev handle of the driver device

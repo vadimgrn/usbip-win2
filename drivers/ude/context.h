@@ -53,7 +53,7 @@ struct vhci_ctx
         unsigned int reattach_max_delay;
 
         WDFCOLLECTION reattach_req; // WDFREQUEST
-        WDFWAITLOCK reattach_req_lock;
+        WDFSPINLOCK reattach_req_lock;
 
         LONG removing; // use set_flag/get_flag
 };
@@ -80,7 +80,7 @@ struct device_attributes
         UNICODE_STRING node_name;
         UNICODE_STRING service_name;
         UNICODE_STRING busid;
-        WDFSTRING device_str; // node_name,service_name,busid
+        ULONG location_hash; // hash(node_name,service_name,busid)
         //
         vhci::imported_device_properties properties; // for ioctl::get_imported_devices
 };
@@ -108,8 +108,8 @@ struct device_ctx_ext
         auto node_name() { return &attr.node_name; }
         auto service_name() { return &attr.service_name; }
         auto busid() { return &attr.busid; }
-        auto &device_str() { return attr.device_str; }
 
+        auto location_hash() const { return attr.location_hash; }
         auto& properties() { return attr.properties; }
 };
 
@@ -271,8 +271,7 @@ PAGED NTSTATUS create_device_ctx_ext(_Inout_ WDFMEMORY &ctx_ext, _In_ WDFOBJECT 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS init_device_attributes(
-        _Inout_ device_attributes &attr, _In_ WDFOBJECT parent, _In_ const vhci::imported_device_location &loc);
+PAGED NTSTATUS init_device_attributes(_Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

@@ -24,7 +24,7 @@ using namespace usbip;
  */
 struct attach_ctx
 {
-        WDFSTRING device_str; // host,port,busid
+        ULONG location_hash; // hash(host,port,busid)
         WDFDEVICE vhci;
 
         WDFMEMORY inbuf;
@@ -106,31 +106,19 @@ PAGED auto empty(_In_ const UNICODE_STRING &s)
         return libdrv::empty(s) || !*s.Buffer;
 }
 
-/*
- * @param dev_str1 host,port,busid
- */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED inline bool operator == (_In_ const UNICODE_STRING &dev_str1, _In_ const UNICODE_STRING &dev_str2)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_attach_req_count(_Inout_ vhci_ctx &vhci)
 {
-        PAGED_CODE();
-        return RtlEqualUnicodeString(&dev_str1, &dev_str2, true); // case insensitive
+        wdf::Lock(vhci.reattach_req_lock);
+        return WdfCollectionGetCount(vhci.reattach_req);
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED inline auto operator != (_In_ const UNICODE_STRING &dev_str1, _In_ const UNICODE_STRING &dev_str2)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto reattach_req_add(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 {
-        PAGED_CODE();
-        return !(dev_str1 == dev_str2);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto reattach_req_add(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
-{
-        PAGED_CODE();
-        wdf::WaitLock lck(vhci.reattach_req_lock);
+        wdf::Lock lck(vhci.reattach_req_lock);
 
         if (auto err = WdfCollectionAdd(vhci.reattach_req, request)) {
                 Trace(TRACE_LEVEL_ERROR, "%04x, WdfCollectionAdd %!STATUS!", ptr04x(request), err);
@@ -145,13 +133,11 @@ PAGED auto reattach_req_add(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
  * imp_WdfCollectionRemove:WDFOBJECT XXX not in WDFCOLLECTION XXX, 0xc0000225(STATUS_NOT_FOUND)
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 {
-        PAGED_CODE();
-
         auto col = vhci.reattach_req;
-        wdf::WaitLock lck(vhci.reattach_req_lock);
+        wdf::Lock lck(vhci.reattach_req_lock);
 
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
@@ -162,27 +148,23 @@ PAGED void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
         }
 }
 
+/**
+ * @param location_hash remove unconditionally if zero
+ */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ const UNICODE_STRING &device_str)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
 {
-        PAGED_CODE();
-
         wdf::ObjectRef ref;
-        auto all = empty(device_str);
         auto col = vhci.reattach_req;
 
-        wdf::WaitLock lck(vhci.reattach_req_lock);
+        wdf::Lock lck(vhci.reattach_req_lock);
 
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
                 auto req = WdfCollectionGetItem(col, i);
-                auto &r = *get_attach_ctx(req);
-
-                UNICODE_STRING str;
-                WdfStringGetUnicodeString(r.device_str, &str);
-
-                if (all || str == device_str) {
+                
+                if (auto r = get_attach_ctx(req); !location_hash || location_hash == r->location_hash) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -240,34 +222,25 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 }
 
 /*
- * @param str host,port,busid
- * @see make_device_str
+ * @param r must be zeroed
+ * @param device_str host,port,busid
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_device_str(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const UNICODE_STRING &str)
+PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
 {
         PAGED_CODE();
-
-        UNICODE_STRING host;
-        UNICODE_STRING service;
-        UNICODE_STRING busid;
-
         const auto sep = L',';
 
-        libdrv::split(host, busid, str, sep);
-        if (empty(host)) {
+        libdrv::split(r.node_name, r.busid, device_str, sep);
+        if (empty(r.node_name)) {
                 return STATUS_INVALID_PARAMETER;
         }
 
-        libdrv::split(service, busid, busid, sep);
-        if (empty(service) || empty(busid)) {
-                return STATUS_INVALID_PARAMETER;
-        }
+        libdrv::split(r.service_name, r.busid, r.busid, sep);
 
-        return copy(r.host, sizeof(r.host), host, 
-                    r.service, sizeof(r.service), service, 
-                    r.busid, sizeof(r.busid), busid);
+        return  empty(r.service_name) || empty(r.busid) ? STATUS_INVALID_PARAMETER :
+                hash_location(r.location_hash, r);
 }
 
 _IRQL_requires_same_
@@ -452,9 +425,13 @@ PAGED bool create_lock(_Inout_ WDFSPINLOCK &result, _Inout_ WDF_OBJECT_ATTRIBUTE
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ WDFSTRING device_str)
+PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ const device_attributes &attr)
 {
         PAGED_CODE();
+
+        r.location_hash = attr.location_hash;
+        NT_ASSERT(r.location_hash);
+
         r.delay = vhci.reattach_first_delay;
 
         auto &req = *static_cast<vhci::ioctl::plugin_hardware*>(WdfMemoryGetBuffer(r.inbuf, nullptr));
@@ -463,18 +440,7 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ W
         req.size = sizeof(req);
         req.from_itself = true;
 
-        UNICODE_STRING str;
-        WdfStringGetUnicodeString(device_str, &str);
-
-        if (auto err = parse_device_str(req, str)) {
-                Trace(TRACE_LEVEL_ERROR, "'%!USTR!' parse %!STATUS!", &str, err);
-                return false;
-        }
-
-        r.device_str = device_str;
-        WdfObjectReference(device_str);
-
-        return true;
+        return NT_SUCCESS(fill_location(req, attr));
 }
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
@@ -485,20 +451,15 @@ PAGED void cleanup_attach_request(_In_ WDFOBJECT obj)
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(obj));
 
-        auto &r = *get_attach_ctx(obj);
-        auto &vhci = *get_vhci_ctx(r.vhci);
+        auto r = get_attach_ctx(obj);
+        auto vhci = get_vhci_ctx(r->vhci);
 
-        reattach_req_remove(vhci, obj);
-
-        if (auto &h = r.device_str) {
-                WdfObjectDereference(h);
-                h = WDF_NO_HANDLE;
-        }
+        reattach_req_remove(*vhci, obj);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ WDFSTRING device_str)
+PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ const device_attributes &dev)
 {
         PAGED_CODE();
 
@@ -512,7 +473,8 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ W
                 return req;
         }
 
-        TraceDbg("%04x", ptr04x(req.get()));
+        TraceDbg("%04x, %!USTR!:%!USTR!/%!USTR!", ptr04x(req.get()),
+                  &dev.node_name, &dev.service_name, &dev.busid);
 
         auto &r = *get_attach_ctx(req.get());
         r.vhci = vhci;
@@ -526,7 +488,7 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ W
                   create_outbuf(r.outbuf, buf, attr) &&
                   create_timer(r.timer, attr) &&
                   create_lock(r.lock, attr) &&
-                  init_attach_ctx(ctx, r, device_str) &&
+                  init_attach_ctx(ctx, r, dev) &&
                   reattach_req_add(ctx, req.get());
 
         if (!ok) {
@@ -594,27 +556,46 @@ void cancel_reattach_req(_In_ WDFREQUEST request)
         TraceDbg("%04x, timer was in queue %!BOOLEAN!", ptr04x(request), was_queued);
 }
 
+/*
+ * @param device_str host,port,busid
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto hash_device_str(_Inout_ ULONG &hash, _In_ const UNICODE_STRING &device_str)
+{
+        PAGED_CODE();
+
+        if (auto err = RtlHashUnicodeString(&device_str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &device_str, err);
+                hash = 0;
+                return err;
+        }
+
+        return STATUS_SUCCESS;
+}
+
 } // namespace 
 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::start_attach_attempts(
-        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ WDFSTRING device_str, _In_ bool delayed)
+        _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &ctx, _In_ const device_attributes &attr, _In_ bool delayed)
 {
         PAGED_CODE();
 
         if (get_flag(ctx.removing)) {
                 TraceDbg("vhci is being removing");
                 return;
+        } else if (auto cnt = get_attach_req_count(ctx); cnt >= static_cast<ULONG>(ctx.devices_cnt)) {
+                Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
+                return;
         }
 
-        if (UNICODE_STRING str; true) {
-                WdfStringGetUnicodeString(device_str, &str);
-                Trace(TRACE_LEVEL_INFORMATION, "%!USTR!", &str);
-        }
+        Trace(TRACE_LEVEL_INFORMATION, "%!USTR!:%!USTR!/%!USTR!, hash %lx",
+                &attr.node_name, &attr.service_name, &attr.busid, attr.location_hash);
 
-        if (auto req = create_attach_request(vhci, ctx, device_str); !req) {
+        if (auto req = create_attach_request(vhci, ctx, attr); !req) {
                 //
         } else if (auto &r = *get_attach_ctx(req.get()); !delayed) {
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
@@ -632,19 +613,19 @@ PAGED void usbip::start_attach_attempts(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_opt_ WDFSTRING device_str)
+PAGED int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
 {
         PAGED_CODE();
+        TraceDbg("hash %lx", location_hash);
 
-        UNICODE_STRING str{};
-        if (device_str) {
-                WdfStringGetUnicodeString(device_str, &str);
-                TraceDbg("%!USTR!", &str);
-        }
+        int cnt = 0;
 
-        while (auto req = reattach_req_remove(vhci, str)) {
+        while (auto req = reattach_req_remove(vhci, location_hash)) {
                 cancel_reattach_req(req.get<WDFREQUEST>());
+                ++cnt;
         }
+
+        return cnt;
 }
 
 _IRQL_requires_same_
@@ -658,17 +639,24 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
         auto col = get_persistent_devices(cnt, ctx.devices_cnt);
 
         for (ULONG i = 0; i < cnt; ++i) {
-                auto device_str = (WDFSTRING)WdfCollectionGetItem(col.get<WDFCOLLECTION>(), i);
-                start_attach_attempts(vhci, ctx, device_str);
+
+                auto str = (WDFSTRING)WdfCollectionGetItem(col.get<WDFCOLLECTION>(), i);
+
+                UNICODE_STRING device_str;
+                WdfStringGetUnicodeString(str, &device_str);
+
+                if (device_attributes attr{}; auto err = parse_device_str(attr, device_str)) {
+                        Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, err);
+                } else {
+                        start_attach_attempts(vhci, ctx, attr);
+                }
         }
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::copy(
-        _Inout_ char *host, _In_ USHORT host_sz, _In_ const UNICODE_STRING &uhost,
-        _Inout_ char *service, _In_ USHORT service_sz, _In_ const UNICODE_STRING &uservice,
-        _Inout_ char *busid, _In_ USHORT busid_sz, _In_ const UNICODE_STRING &ubusid)
+PAGED NTSTATUS usbip::fill_location(
+        _Inout_ vhci::imported_device_location &r, _In_ const device_attributes &attr)
 {
         PAGED_CODE();
 
@@ -677,9 +665,9 @@ PAGED NTSTATUS usbip::copy(
                 USHORT dst_sz;
                 const UNICODE_STRING &src;
         } const v[] = {
-                {host, host_sz, uhost},
-                {service, service_sz, uservice},
-                {busid, busid_sz, ubusid},
+                { r.host, sizeof(r.host), attr.node_name },
+                { r.service, sizeof(r.service), attr.service_name },
+                { r.busid, sizeof(r.busid), attr.busid },
         };
 
         for (auto &[dst, dst_sz, src]: v) {
@@ -753,17 +741,12 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
         return status != STATUS_CANCELLED;
 }
 
-/*
- * @param device_str contains 'host,port,busid' if returns success
- * @see parse_device_str
- */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::make_device_str(
-        _Inout_ WDFSTRING &device_str, _In_ WDFOBJECT parent, _In_ const device_attributes &r)
+PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attributes &r)
 {
         PAGED_CODE();
-        NT_ASSERT(!device_str);
+        hash = 0;
 
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
         USHORT cb = r.node_name.Length + r.service_name.Length + r.busid.Length + sizeof(L",,"); // see format string
@@ -774,24 +757,15 @@ PAGED NTSTATUS usbip::make_device_str(
                 return USBD_STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        UNICODE_STRING str{ 
+        UNICODE_STRING device_str { 
                 .MaximumLength = cb, 
                 .Buffer = buf.get<wchar_t>()
         };
 
-        if (auto err = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid)) {
+        if (auto err = RtlUnicodeStringPrintf(&device_str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", err);
                 return err;
         }
 
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = parent;
-
-        if (auto err = WdfStringCreate(&str, &attr, &device_str)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfStringCreate('%!USTR!') %!STATUS!", &str, err);
-                return err;
-        }
-
-        return STATUS_SUCCESS;
+        return hash_device_str(hash, device_str);
 }

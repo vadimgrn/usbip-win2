@@ -580,17 +580,15 @@ auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port
  * 
  * We have to close a socket and free a port in detach() instead of device_cleanup, 
  * otherwise next plugin_hardware will fail with ST_DEV_BUSY because the socket is still connected.
+ *
+ * @param ext its WDFMEMORY must be WdfObjectReference-d before the call
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugout_and_delete(
-        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device, _In_ WDFMEMORY ctx_ext, _In_ int port)
+        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device, _In_ const device_ctx_ext &ext, _In_ int port)
 {
         PAGED_CODE();
-
-        wdf::ObjectRef ref(ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
-        auto &ext = get_device_ctx_ext(ctx_ext);
-
         device_state_changed(vhci, ext.attr, port, vhci::state::unplugging);
 
         if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) {
@@ -783,20 +781,17 @@ PAGED wdm::object_reference usbip::device::detach(
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        wdf::ObjectRef device_str;
-        if (reattach) {
-                auto &ext = dev.ext();
-                device_str.reset(ext.device_str());
-        }
+        auto &ext = get_device_ctx_ext(dev.ctx_ext);
+        wdf::ObjectRef ref(dev.ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
 
         if (plugout_and_delete) {
-                ::plugout_and_delete(vhci, device, dev.ctx_ext, port);
+                ::plugout_and_delete(vhci, device, ext, port);
         }
 
-        if (device_str) {
+        if (reattach) {
                 auto ctx = get_vhci_ctx(vhci);
                 auto delayed = plugout_and_delete;
-                start_attach_attempts(vhci, *ctx, device_str.get<WDFSTRING>(), delayed);
+                start_attach_attempts(vhci, *ctx, ext.attr, delayed);
         }
 
         return thread;

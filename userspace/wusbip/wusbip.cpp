@@ -873,17 +873,23 @@ void MainFrame::on_attach(wxCommandEvent&)
         }
 }
 
+/*
+ * FIXME: wxLogStatus does not show message if toolbar button is pressed, from menu is OK
+ */
 void MainFrame::on_attach_stop(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
+
         auto &vhci = get_vhci();
+        int total = 0;
 
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
 
                 auto server = tree.GetItemParent(dev);
                 auto loc = make_device_location(tree, server, dev);
 
-                if (vhci::stop_attach_attempts(vhci.get(), &loc)) {
+                if (auto cnt = vhci::stop_attach_attempts(vhci.get(), &loc); cnt >= 0) {
+                        total += cnt;
                         continue;
                 }
 
@@ -897,15 +903,20 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
 
                 break;
         }
+
+        wxLogStatus(_("%d request(s) stopped"), total);
 }
 
 void MainFrame::on_attach_stop_all(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
-        
-        if (auto &vhci = get_vhci(); !vhci::stop_attach_attempts(vhci.get(), nullptr)) {
+        auto &vhci = get_vhci();
+
+        if (auto cnt = vhci::stop_attach_attempts(vhci.get(), nullptr); cnt < 0) {
                 auto err = GetLastError();
                 wxLogError(_("Could not stop attach attempts\nError %lu\n%s"), err, GetLastErrorMsg(err));
+        } else {
+                wxLogStatus(_("%d request(s) stopped"), cnt);
         }
 }
 

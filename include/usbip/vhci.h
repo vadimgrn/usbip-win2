@@ -101,7 +101,10 @@ struct plugin_hardware : base, imported_device_location
         bool from_itself; // sent by the driver to itself
 };
 
-struct stop_attach_attempts : base, imported_device_location {};
+struct stop_attach_attempts : base, imported_device_location
+{
+        int count; // OUT, number of canceled requests
+};
 
 /*
  * reattach is for internal use only, must be set to false.
