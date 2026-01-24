@@ -565,7 +565,7 @@
             <event name="OnMenuSelection">on_view_reset</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Devices</property>
           <property name="name">m_menu_devices</property>
           <property name="permission">protected</property>
@@ -626,7 +626,7 @@
             <property name="label">Stop</property>
             <property name="name">m_cmd_attach_stop</property>
             <property name="permission">none</property>
-            <property name="shortcut"></property>
+            <property name="shortcut">ALT+T</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_attach_stop</event>
             <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
@@ -1398,7 +1398,7 @@
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
-          <property name="alignment">wxALIGN_RIGHT</property>
+          <property name="alignment">wxALIGN_CENTER</property>
           <property name="flag">wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">DeviceId</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>

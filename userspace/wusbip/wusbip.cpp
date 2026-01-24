@@ -121,7 +121,7 @@ auto as_set(_In_ std::vector<device_columns> v)
                 std::make_move_iterator(v.end()));
 }
 
-void log(_In_ const device_state &st)
+void log(_In_ const device_state_ex &st)
 {
         auto &d = st.device;
         auto &loc = d.location;
@@ -358,7 +358,7 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
 class DeviceStateEvent : public wxEvent
 {
 public:
-        DeviceStateEvent(_In_ device_state st) : 
+        DeviceStateEvent(_In_ device_state_ex st) : 
                 wxEvent(0, EVT_DEVICE_STATE),
                 m_state(std::move(st)) {}
 
@@ -368,7 +368,7 @@ public:
         auto& get() noexcept { return m_state; }
 
 private:
-        device_state m_state;
+        device_state_ex m_state;
 };
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
@@ -546,7 +546,7 @@ void MainFrame::read_loop()
 
         std::unique_ptr<MainFrame, decltype(on_exit)> ptr(this, on_exit);
 
-        for (device_state st; vhci::read_device_state(m_read.get(), st); ) {
+        for (device_state_ex st; vhci::read_device_state(m_read.get(), st); ) {
                 auto evt = new DeviceStateEvent(std::move(st));
                 QueueEvent(evt); // see on_device_state()
         }
@@ -1359,7 +1359,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
                 auto [item, added] = find_or_add_device(dev.location);
                 wxASSERT(added);
                 
-                device_state st { 
+                device_state st {
                         .device = std::move(dev), 
                         .state = state::plugged 
                 };

@@ -238,7 +238,7 @@ inline auto get_vhci(_In_ WDFREQUEST Request)
 struct fileobject_ctx
 {
         LIST_ENTRY entry; // head is vhci_ctx::fileobjects
-        WDFCOLLECTION events; // WDFMEMORY(device_state) that are waiting for IRP_MJ_READ
+        WDFCOLLECTION events; // WDFMEMORY(device_state_ex) that are waiting for IRP_MJ_READ
         bool process_events; // if IRP_MJ_READ was issued, see vhci_ctx::events_subscribers
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(fileobject_ctx, get_fileobject_ctx)

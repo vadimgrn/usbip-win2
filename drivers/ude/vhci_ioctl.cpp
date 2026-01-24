@@ -927,7 +927,7 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
 
         TraceDbg("fobj %04x, request %04x, length %Iu", ptr04x(fileobj), ptr04x(request), length);
 
-        if (length != sizeof(vhci::device_state)) {
+        if (length != sizeof(vhci::device_state_ex)) {
                 WdfRequestCompleteWithInformation(request, STATUS_INVALID_BUFFER_SIZE, 0);
                 return;
         }

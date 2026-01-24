@@ -94,13 +94,15 @@ auto make_imported_device(_In_ const vhci::imported_device &s)
         return d;
 }
 
-auto make_device_state(_In_ const vhci::device_state &r)
+auto make_device_state(_In_ const vhci::device_state_ex &r)
 {
-        return device_state {
+        device_state_ex st {{
                 .device = make_imported_device(r),
-                .state = static_cast<state>(r.state),
-                .source_id = r.source_id
-        };
+                .state = static_cast<state>(r.state)
+        }};
+
+        st.source_id = r.source_id;
+        return st;
 }
 
 void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_device *src, _In_ size_t cnt)
@@ -311,13 +313,13 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 
 USBIP_API DWORD usbip::vhci::get_device_state_size() noexcept
 {
-        return sizeof(vhci::device_state);
+        return sizeof(vhci::device_state_ex);
 }
 
 USBIP_API bool usbip::vhci::get_device_state(
-        _Inout_ usbip::device_state &result, _In_ const void *data, _In_ DWORD length)
+        _Inout_ usbip::device_state_ex &result, _In_ const void *data, _In_ DWORD length)
 {
-        auto r = reinterpret_cast<const vhci::device_state*>(data);
+        auto r = reinterpret_cast<const vhci::device_state_ex*>(data);
         assert(get_device_state_size() == sizeof(*r));
 
         if (!(r && length == sizeof(*r))) {
@@ -332,13 +334,24 @@ USBIP_API bool usbip::vhci::get_device_state(
         return true;
 }
 
+USBIP_API bool usbip::vhci::get_device_state(
+        _Inout_ usbip::device_state &result, _In_ const void *data, _In_ DWORD length)
+{
+        usbip::device_state_ex st;
+        auto ok = get_device_state(st, data, length);
+        if (ok) {
+                result = st;
+        }
+        return ok;
+}
+
 /*
  * ReadFile returns TRUE for STATUS_END_OF_FILE.
  * @see UDE driver, EVT_WDF_IO_QUEUE_IO_READ
  */
-bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state &result)
+bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state_ex &result)
 {
-        vhci::device_state r;
+        vhci::device_state_ex r;
 
         if (DWORD actual; !ReadFile(dev, &r, sizeof(r), &actual, nullptr)) {
                 return false;
@@ -348,4 +361,14 @@ bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state
         } else {
                 return get_device_state(result, &r, actual);
         }
+}
+
+bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state &result)
+{
+        usbip::device_state_ex st;
+        auto ok = read_device_state(dev, st);
+        if (ok) {
+                result = st;
+        }
+        return ok;
 }

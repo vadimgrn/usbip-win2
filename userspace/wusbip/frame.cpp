@@ -286,7 +286,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_attach_stop;
-	m_cmd_attach_stop = new wxMenuItem( m_menu_devices, ID_ATTACH_STOP, wxString( _("Stop") ) , _("Stop attach attempts for selected devices"), wxITEM_NORMAL );
+	m_cmd_attach_stop = new wxMenuItem( m_menu_devices, ID_ATTACH_STOP, wxString( _("Stop") ) + wxT('\t') + wxT("ALT+T"), _("Stop attach attempts for selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_attach_stop->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -448,7 +448,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Auto"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Notes"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("DeviceId"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_RIGHT, wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("DeviceId"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("SourceId"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_HIDDEN );
 
 

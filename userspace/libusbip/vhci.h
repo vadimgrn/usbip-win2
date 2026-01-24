@@ -43,7 +43,15 @@ struct device_state
 {
         imported_device device;
         state state = state::unplugged;
-        ULONG source_id; // unique for current set of event issuers
+};
+
+/*
+ * There can be multiple event sources for one device,
+ * each of them emits events with a unique source_id.
+ */
+struct device_state_ex : device_state
+{
+        ULONG source_id;
 };
 
 } // namespace usbip
@@ -104,6 +112,7 @@ USBIP_API DWORD get_device_state_size() noexcept;
  * @param length data length, must be equal to get_device_state_size()
  * @return call GetLastError() if false is returned
  */
+USBIP_API bool get_device_state(_Inout_ device_state_ex &result, _In_ const void *data, _In_ DWORD length);
 USBIP_API bool get_device_state(_Inout_ device_state &result, _In_ const void *data, _In_ DWORD length);
 
 /**
@@ -111,6 +120,7 @@ USBIP_API bool get_device_state(_Inout_ device_state &result, _In_ const void *d
  * @param result data that was obtained by read operation on the given handle
  * @return call GetLastError() if false is returned
  */
+USBIP_API bool read_device_state(_In_ HANDLE dev, _Inout_ device_state_ex &result);
 USBIP_API bool read_device_state(_In_ HANDLE dev, _Inout_ device_state &result);
 
 } // namespace usbip::vhci

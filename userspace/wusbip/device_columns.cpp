@@ -113,6 +113,15 @@ auto usbip::make_device_columns(_In_ const device_state &st) ->
         dc[COL_STATE] = to_string(st.state);
         flags |= mkflag(COL_STATE);
 
+        return ret;
+}
+
+auto usbip::make_device_columns(_In_ const device_state_ex &st) ->
+        std::pair<device_columns, unsigned int> 
+{
+        auto ret = make_device_columns(static_cast<const device_state&>(st));
+        auto &[dc, flags] = ret;
+
         dc[COL_SOURCE_ID] = to_wxstring(st.source_id);
         flags |= mkflag(COL_SOURCE_ID);
 
