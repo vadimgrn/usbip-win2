@@ -208,7 +208,7 @@
             <event name="OnMenuSelection">on_exit</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">Edit</property>
           <property name="name">m_menu_edit</property>
           <property name="permission">protected</property>
@@ -240,7 +240,7 @@
             <property name="shortcut">CTRL+C</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_copy_rows</event>
-            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+            <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
           </object>
           <object class="separator" expanded="false">
             <property name="name">m_separator6</property>
@@ -614,7 +614,7 @@
             <property name="shortcut">CTRL+T</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_attach</event>
-            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+            <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From SVG Resource; attach_stop_svg; attach_stop_svg_dark; [16; 16]</property>
@@ -629,7 +629,7 @@
             <property name="shortcut">ALT+T</property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_attach_stop</event>
-            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+            <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From SVG Resource; attach_stop_all_svg; attach_stop_all_svg_dark; [16; 16]</property>
@@ -763,7 +763,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="false">
+      <object class="wxAuiToolBar" expanded="true">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -848,7 +848,7 @@
           <property name="statusbar"></property>
           <property name="tooltip">Attach selected devices</property>
           <event name="OnToolClicked">on_attach</event>
-          <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+          <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
         </object>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From SVG Resource; attach_stop_svg; attach_stop_svg_dark; [24; 24]</property>
@@ -861,7 +861,7 @@
           <property name="statusbar"></property>
           <property name="tooltip">Stop attach attempts for selected devices</property>
           <event name="OnToolClicked">on_attach_stop</event>
-          <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+          <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
         </object>
         <object class="tool" expanded="false">
           <property name="bitmap">Load From SVG Resource; attach_stop_all_svg; attach_stop_all_svg_dark; [24; 24]</property>

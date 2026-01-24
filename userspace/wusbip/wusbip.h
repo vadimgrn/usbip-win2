@@ -56,8 +56,6 @@ private:
 	static wxWithImages::Images get_tree_images();
 
 	void on_close(wxCloseEvent &event) override; 
-	void on_attach(wxCommandEvent &event) override;
-        void on_attach_stop(wxCommandEvent &event) override;
         void on_attach_stop_all(wxCommandEvent &event) override;
         void on_detach(wxCommandEvent &event) override;
         void on_reload(wxCommandEvent &event) override;
@@ -66,13 +64,16 @@ private:
 	void on_select_all(wxCommandEvent &event) override;
 	void on_has_devices_update_ui(wxUpdateUIEvent &event) override;
 	void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
-	void on_toggle_auto(wxCommandEvent &event) override;
+        void on_has_any_selected_devices_update_ui(wxUpdateUIEvent &event) override;
+        void on_toggle_auto(wxCommandEvent &event) override;
 	void on_item_context_menu(wxTreeListEvent &event) override;
 	void on_view_reset(wxCommandEvent &event) override;
 	void on_help_about_lib(wxCommandEvent&) override;
 	void on_copy_rows(wxCommandEvent &event) override;
+        void on_attach(wxCommandEvent &event) override;
+        void on_attach_stop(wxCommandEvent &event) override;
 
-	void on_save(wxCommandEvent &event) override;
+        void on_save(wxCommandEvent &event) override;
 	void on_save_selected(wxCommandEvent &event) override;
 	void on_load(wxCommandEvent &event) override;
 

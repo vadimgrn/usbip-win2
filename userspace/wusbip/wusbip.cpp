@@ -86,16 +86,6 @@ void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &sa
 }
 
 /*
- * @see is_empty(_In_ const device_columns &dc)
- * @see is_empty(_In_ const imported_device &d)
- */
-auto is_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev) noexcept
-{
-        auto &s = tree.GetItemText(dev, COL_DEVID); 
-        return s.empty();
-}
-
-/*
  * For device_state.state 
  */
 constexpr auto is_port_residual(_In_ state st)
@@ -217,22 +207,37 @@ auto update_from_saved(
         return flags;
 }
 
-auto is_server(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem item)
+using predicate_f = std::function<bool(const wxTreeListCtrl&, wxTreeListItem)>;
+
+auto is_server(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem item) // predicate_f
 {
         return tree.GetItemParent(item) == tree.GetRootItem();
 }
 
-auto is_server_or_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem item)
+/*
+ * @see is_empty(_In_ const device_columns &dc)
+ * @see is_empty(_In_ const imported_device &d)
+ */
+auto is_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev) // predicate_f
+{
+        auto &s = tree.GetItemText(dev, COL_DEVID); 
+        return s.empty();
+}
+
+auto is_server_or_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem item) // predicate_f
 {
         return is_server(tree, item) || is_empty(tree, item);
 }
 
-auto get_devices(_In_ const wxTreeListCtrl &tree)
+/**
+ * @param except_for is_server, is_empty, is_server_or_empty
+ */
+auto get_devices(_In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except_for)
 {
         wxTreeListItems v;
 
         for (auto item = tree.GetFirstItem(); item.IsOk(); item = tree.GetNextItem(item)) {
-                if (!is_server_or_empty(tree, item)) {
+                if (!except_for(tree, item)) {
                         v.push_back(item);
                 }
         }
@@ -240,18 +245,22 @@ auto get_devices(_In_ const wxTreeListCtrl &tree)
         return v;
 }
 
-auto get_selected_devices(_In_ const wxTreeListCtrl &tree)
+/**
+ * @param except_for is_server, is_empty, is_server_or_empty
+ */
+auto get_selected_devices(_In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except_for)
 {
         wxTreeListItems v;
         tree.GetSelections(v);
 
-        auto pred = [&tree] (auto &item) { return is_server_or_empty(tree, item); };
-        std::erase_if(v, pred); // v.erase(std::remove_if(v.begin(), v.end(), pred), v.end());
+        auto pred = [except_for, &tree] (auto &item) { return except_for(tree, item); };
+        std::erase_if(v, pred);
 
         return v;
 }
 
-auto make_device_location(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem server, _In_ wxTreeListItem device)
+auto make_device_location(
+        _In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem server, _In_ wxTreeListItem device)
 {
         auto &url = tree.GetItemText(server);
         auto &busid = tree.GetItemText(device);
@@ -600,7 +609,9 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 auto &url = tree.GetItemText(server);
                 auto &busid = tree.GetItemText(dev);
                 wxLogVerbose(_("Added %s/%s"), url, busid);
-        } else if (st.state == state::disconnected && is_empty(tree, dev)) { // connection has failed/closed
+        }
+
+        if (st.state == state::disconnected && is_empty(tree, dev)) { // connection has failed/closed
                 wxLogVerbose(_("Transient device removed"));
                 remove_device(dev);
                 return;
@@ -641,20 +652,28 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 
 void MainFrame::on_has_devices_update_ui(wxUpdateUIEvent &event)
 {
-        auto v = get_devices(*m_treeListCtrl);
+        auto v = get_devices(*m_treeListCtrl, is_server_or_empty);
         event.Enable(!v.empty());
 }
 
 void MainFrame::on_has_selected_devices_update_ui(wxUpdateUIEvent &event)
 {
-        auto v = get_selected_devices(*m_treeListCtrl);
+        auto v = get_selected_devices(*m_treeListCtrl, is_server_or_empty);
+        event.Enable(!v.empty());
+}
+
+void MainFrame::on_has_any_selected_devices_update_ui(wxUpdateUIEvent &event)
+{
+        auto v = get_selected_devices(*m_treeListCtrl, is_server); // OK if is_empty()
         event.Enable(!v.empty());
 }
 
 void MainFrame::on_copy_rows(wxCommandEvent&)
 {
         wxString rows;
-        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+
+        for (auto &tree = *m_treeListCtrl;
+             auto &dev: get_selected_devices(tree, is_server)) {
                 rows += to_string(tree, dev) + L'\n';
         }
 
@@ -679,7 +698,7 @@ wxTreeListItem MainFrame::get_edit_notes_device()
         auto &tree = *m_treeListCtrl;
         wxTreeListItem item;
 
-        if (auto v = get_selected_devices(tree); v.size() == 1) {
+        if (auto v = get_selected_devices(tree, is_server_or_empty); v.size() == 1) {
                 item = v.front();
         }
 
@@ -857,7 +876,7 @@ void MainFrame::on_attach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
-        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
                 auto server = tree.GetItemParent(dev);
                 auto url = tree.GetItemText(server);
@@ -873,9 +892,6 @@ void MainFrame::on_attach(wxCommandEvent&)
         }
 }
 
-/*
- * FIXME: wxLogStatus does not show message if toolbar button is pressed, from menu is OK
- */
 void MainFrame::on_attach_stop(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
@@ -883,7 +899,7 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
         auto &vhci = get_vhci();
         int total = 0;
 
-        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
                 auto server = tree.GetItemParent(dev);
                 auto loc = make_device_location(tree, server, dev);
@@ -924,7 +940,7 @@ void MainFrame::on_detach(wxCommandEvent&)
 {
         wxLogVerbose(wxString::FromAscii(__func__));
 
-        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server_or_empty)) {
 
                 if (auto port = get_port(dev); !port) {
                         // 
@@ -1236,7 +1252,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
 
 void MainFrame::on_toggle_auto(wxCommandEvent&)
 {
-        for (auto &dev: get_selected_devices(*m_treeListCtrl)) {
+        for (auto &dev: get_selected_devices(*m_treeListCtrl, is_server_or_empty)) {
                 auto ok = is_persistent(dev);
                 set_persistent(dev, !ok);
         }
@@ -1287,13 +1303,13 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
 
 void MainFrame::on_save(wxCommandEvent&)
 {
-        auto devices = get_devices(*m_treeListCtrl);
+        auto devices = get_devices(*m_treeListCtrl, is_server_or_empty);
         save(devices);
 }
 
 void MainFrame::on_save_selected(wxCommandEvent&)
 {
-        if (auto devices = get_selected_devices(*m_treeListCtrl); devices.empty()) {
+        if (auto devices = get_selected_devices(*m_treeListCtrl, is_server_or_empty); devices.empty()) {
                 wxMessageBox(_("There are no selected devices"), _("Save selected"), wxICON_WARNING);
         } else {
                 save(devices);

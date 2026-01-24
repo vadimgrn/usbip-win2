@@ -470,7 +470,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_select_all ), this, m_select_all->GetId());
 	this->Connect( m_select_all->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_copy_rows ), this, m_copy_rows->GetId());
-	this->Connect( m_copy_rows->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_copy_rows->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_toggle_auto ), this, m_toggle_auto->GetId());
 	this->Connect( m_toggle_auto->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
@@ -507,9 +507,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_reload ), this, m_cmd_reload->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::add_exported_devices ), this, m_cmd_add->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach ), this, m_cmd_attach->GetId());
-	this->Connect( m_cmd_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_cmd_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach_stop ), this, m_cmd_attach_stop->GetId());
-	this->Connect( m_cmd_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_cmd_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_attach_stop_all ), this, m_cmd_attach_stop_all->GetId());
 	m_menu_devices->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_detach ), this, m_cmd_detach->GetId());
 	this->Connect( m_cmd_detach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
@@ -525,9 +525,9 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_auiToolBar->Connect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
 	this->Connect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Connect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
-	this->Connect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Connect( m_tool_attach_stop->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop ) );
-	this->Connect( m_tool_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Connect( m_tool_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Connect( m_tool_attach_stop_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop_all ) );
 	this->Connect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	this->Connect( m_tool_detach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
@@ -549,7 +549,7 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_start_in_tray_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_close_to_tray_update_ui ) );
 	this->Disconnect( wxID_SELECTALL, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_devices_update_ui ) );
-	this->Disconnect( wxID_COPY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( wxID_COPY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_AUTO, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_EDIT_NOTES, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_notes_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
@@ -563,8 +563,8 @@ Frame::~Frame()
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_zebra_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_labels_update_ui ) );
-	this->Disconnect( wxID_OPEN, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
-	this->Disconnect( ID_ATTACH_STOP, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( wxID_OPEN, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
+	this->Disconnect( ID_ATTACH_STOP, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Disconnect( wxID_CLOSE, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_LOG_WINDOW, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_show_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_log_verbose_update_ui ) );
@@ -572,9 +572,9 @@ Frame::~Frame()
 	m_auiToolBar->Disconnect( wxEVT_MOUSEWHEEL, wxMouseEventHandler( Frame::on_frame_mouse_wheel ), NULL, this );
 	this->Disconnect( m_tool_reload->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_reload ) );
 	this->Disconnect( m_tool_attach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach ) );
-	this->Disconnect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( m_tool_attach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Disconnect( m_tool_attach_stop->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop ) );
-	this->Disconnect( m_tool_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
+	this->Disconnect( m_tool_attach_stop->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Disconnect( m_tool_attach_stop_all->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_attach_stop_all ) );
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_COMMAND_TOOL_CLICKED, wxCommandEventHandler( Frame::on_detach ) );
 	this->Disconnect( m_tool_detach->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
