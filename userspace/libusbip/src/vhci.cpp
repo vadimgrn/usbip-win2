@@ -98,7 +98,8 @@ auto make_device_state(_In_ const vhci::device_state &r)
 {
         return device_state {
                 .device = make_imported_device(r),
-                .state = static_cast<state>(r.state)
+                .state = static_cast<state>(r.state),
+                .source_id = r.source_id
         };
 }
 

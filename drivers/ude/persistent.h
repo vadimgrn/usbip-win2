@@ -44,8 +44,8 @@ PAGED void start_attach_attempts(
         _In_ WDFDEVICE vhci, _Inout_ vhci_ctx &vctx, _In_ const device_attributes &attr, _In_ bool delayed = false);
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
+_IRQL_requires_max_(DISPATCH_LEVEL)
+int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

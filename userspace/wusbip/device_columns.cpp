@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2024-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device_columns.h"
@@ -113,5 +113,19 @@ auto usbip::make_device_columns(_In_ const device_state &st) ->
         dc[COL_STATE] = to_string(st.state);
         flags |= mkflag(COL_STATE);
 
+        dc[COL_SOURCE_ID] = to_wxstring(st.source_id);
+        flags |= mkflag(COL_SOURCE_ID);
+
         return ret;
+}
+
+wxString usbip::to_wxstring(_In_ unsigned long source_id)
+{
+        static_assert(sizeof(ULONG) == sizeof(source_id));
+
+        wxString s;
+        if (source_id) {
+                s = wxString::Format(L"%lx", source_id);
+        }
+        return s;
 }

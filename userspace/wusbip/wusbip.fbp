@@ -763,7 +763,7 @@
           </object>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="true">
+      <object class="wxAuiToolBar" expanded="false">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -837,7 +837,7 @@
         <object class="toolSeparator" expanded="false">
           <property name="permission">protected</property>
         </object>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap">Load From SVG Resource; check_svg; check_svg_dark; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -850,7 +850,7 @@
           <event name="OnToolClicked">on_attach</event>
           <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap">Load From SVG Resource; attach_stop_svg; attach_stop_svg_dark; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -863,7 +863,7 @@
           <event name="OnToolClicked">on_attach_stop</event>
           <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap">Load From SVG Resource; attach_stop_all_svg; attach_stop_all_svg_dark; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -875,7 +875,7 @@
           <property name="tooltip">Stop all active attach attempts</property>
           <event name="OnToolClicked">on_attach_stop_all</event>
         </object>
-        <object class="toolSeparator" expanded="true">
+        <object class="toolSeparator" expanded="false">
           <property name="permission">protected</property>
         </object>
         <object class="tool" expanded="false">
@@ -891,7 +891,7 @@
           <event name="OnToolClicked">on_detach</event>
           <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
         </object>
-        <object class="tool" expanded="true">
+        <object class="tool" expanded="false">
           <property name="bitmap">Load From SVG Resource; dismiss_svg; ; [24; 24]</property>
           <property name="context_menu">0</property>
           <property name="id">wxID_ANY</property>
@@ -931,7 +931,7 @@
           <event name="OnToolClicked">on_save</event>
         </object>
       </object>
-      <object class="wxAuiToolBar" expanded="true">
+      <object class="wxAuiToolBar" expanded="false">
         <property name="BottomDockable">1</property>
         <property name="LeftDockable">1</property>
         <property name="RightDockable">1</property>
@@ -1397,16 +1397,16 @@
           <property name="name">Notes</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
-        <object class="wxTreeListCtrlColumn" expanded="true">
-          <property name="alignment">wxALIGN_CENTER</property>
+        <object class="wxTreeListCtrlColumn" expanded="false">
+          <property name="alignment">wxALIGN_RIGHT</property>
           <property name="flag">wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">DeviceId</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">
-          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="alignment">wxALIGN_CENTER</property>
           <property name="flag">wxCOL_HIDDEN</property>
-          <property name="name">Saved State</property>
+          <property name="name">SourceId</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
       </object>

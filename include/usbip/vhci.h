@@ -59,9 +59,14 @@ struct imported_device : imported_device_location, imported_device_properties {}
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
+/*
+ * There can be simultaneous requests to attach the same device,
+ * each of them has unique source_id.
+ */
 struct device_state : base, imported_device
 {
         state state;
+        ULONG source_id;
 };
 
 } // namespace usbip::vhci

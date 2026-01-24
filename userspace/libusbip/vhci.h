@@ -43,6 +43,7 @@ struct device_state
 {
         imported_device device;
         state state = state::unplugged;
+        ULONG source_id; // unique for current set of event issuers
 };
 
 } // namespace usbip

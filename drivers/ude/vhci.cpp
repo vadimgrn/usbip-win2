@@ -671,6 +671,26 @@ auto get_port_range(_In_ const vhci_ctx &vhci, _In_ usb_device_speed speed)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
+PAGED auto make_source_id(_In_ const void *ptr)
+{
+        PAGED_CODE();
+        wchar_t buf[17];
+
+        UNICODE_STRING s {
+                .MaximumLength = sizeof(*buf)*sizeof(buf), // bytes
+                .Buffer = buf
+        };
+
+        NT_VERIFY(NT_SUCCESS(RtlIntPtrToUnicodeString(reinterpret_cast<ULONG_PTR>(ptr), 16, &s)));
+
+        ULONG hash{};
+        NT_VERIFY(NT_SUCCESS(RtlHashUnicodeString(&s, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)));
+
+        return hash;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED auto make_device_state(
         _In_ WDFOBJECT parent, _In_ const device_attributes &dev, _In_ int port, _In_ vhci::state state)
 {
@@ -691,6 +711,7 @@ PAGED auto make_device_state(
         RtlZeroMemory(r, sizeof(*r));
         r->size = sizeof(*r);
         r->state = state;
+        r->source_id = make_source_id(&dev); // CONTAINING_RECORD(&dev, device_ctx_ext, attr)
 
         if (auto err = fill(*r, dev, port)) {
                 WdfObjectDelete(mem);
@@ -749,7 +770,7 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
         for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
                 if (fobj.process_events) {
-                        process_event(vhci.reads, fobj, evt, 2*vhci.devices_cnt);
+                        process_event(vhci.reads, fobj, evt, 4*vhci.devices_cnt);
                         ++cnt;
                 }
         }

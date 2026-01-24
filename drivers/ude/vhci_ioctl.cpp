@@ -826,9 +826,6 @@ PAGED void device_control(
         case vhci::ioctl::PLUGOUT_HARDWARE:
                 st = plugout_hardware(Request, reattach);
                 break;
-        case vhci::ioctl::STOP_ATTACH_ATTEMPTS:
-                st = stop_attach_attempts(Request);
-                break;
         case IOCTL_USB_USER_REQUEST:
                 NT_ASSERT(!has_urb(Request));
                 if (USBUSER_REQUEST_HEADER *hdr; 
@@ -872,6 +869,8 @@ PAGED decltype(get_persistent) *get_parallel_handler(_In_ ULONG IoControlCode)
                 return set_persistent;
         case vhci::ioctl::GET_PERSISTENT:
                 return get_persistent;
+        case vhci::ioctl::STOP_ATTACH_ATTEMPTS:
+                return stop_attach_attempts;
         default:
                 return nullptr;
         }

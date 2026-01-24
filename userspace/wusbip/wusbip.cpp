@@ -126,9 +126,9 @@ void log(_In_ const device_state &st)
         auto &d = st.device;
         auto &loc = d.location;
 
-        auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}", 
-                                loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), 
-                                d.port, d.devid, static_cast<int>(d.speed), d.vendor, d.product);
+        auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}, source {:x}",
+                                loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), d.port,
+                                d.devid, static_cast<int>(d.speed), d.vendor, d.product, st.source_id);
 
         wxLogVerbose(wxString::FromUTF8(s));
 }
@@ -139,8 +139,8 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
         auto &url = tree.GetItemText(server);
 
         auto s = wxString::Format(
-                        L"%s: %s/%s, port '%s', devid '%s', speed '%s', vendor '%s', product '%s', "
-                        L"state '%s', saved state '%s', auto '%s', notes '%s'", 
+                        L"%s:%s/%s, port '%s', devid '%s', speed '%s', vendor '%s', "
+                        L"product '%s', state '%s', auto '%s', notes '%s', source '%s'", 
                         prefix, url,
                         tree.GetItemText(dev, COL_BUSID),
                         tree.GetItemText(dev, COL_PORT),
@@ -149,9 +149,9 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
                         tree.GetItemText(dev, COL_VENDOR), 
                         tree.GetItemText(dev, COL_PRODUCT), 
                         tree.GetItemText(dev, COL_STATE), 
-                        tree.GetItemText(dev, COL_SAVED_STATE), 
                         tree.GetItemText(dev, COL_PERSISTENT), 
-                        tree.GetItemText(dev, COL_NOTES));
+                        tree.GetItemText(dev, COL_NOTES),
+                        tree.GetItemText(dev, COL_SOURCE_ID));
 
         wxLogVerbose(s);
 }
@@ -217,10 +217,14 @@ auto update_from_saved(
         return flags;
 }
 
+auto is_server(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem item)
+{
+        return tree.GetItemParent(item) == tree.GetRootItem();
+}
+
 auto is_server_or_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem item)
 {
-        return  is_empty(tree, item) ||
-                tree.GetItemParent(item) == tree.GetRootItem(); // server
+        return is_server(tree, item) || is_empty(tree, item);
 }
 
 auto get_devices(_In_ const wxTreeListCtrl &tree)
@@ -582,8 +586,6 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
         auto &tree = *m_treeListCtrl;
 
         auto &st = event.get();
-        auto st_empty = is_empty(st.device);
-
         log(st);
 
         if (m_taskbar_icon && m_taskbar_icon->IsIconInstalled()) {
@@ -598,27 +600,21 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 auto &url = tree.GetItemText(server);
                 auto &busid = tree.GetItemText(dev);
                 wxLogVerbose(_("Added %s/%s"), url, busid);
-        } else {
-                log(tree, dev, _("Before"));
-        }
-
-        if (st.state == state::connecting) {
-                auto state = tree.GetItemText(dev, COL_STATE); // can be empty
-                tree.SetItemText(dev, COL_SAVED_STATE, state);
-                wxLogVerbose(_("Current state '%s' saved"), state);
-        }
-
-        if (!(st_empty && st.state == state::disconnected)) { // connection has failed/closed
-                //
-        } else if (auto saved_state = tree.GetItemText(dev, COL_SAVED_STATE); saved_state.empty()) {
+        } else if (st.state == state::disconnected && is_empty(tree, dev)) { // connection has failed/closed
                 wxLogVerbose(_("Transient device removed"));
                 remove_device(dev);
                 return;
-        } else {
-                tree.SetItemText(dev, COL_STATE, saved_state);
-                wxLogVerbose(_("Saved state '%s' restored"), saved_state);
-                log(tree, dev, _("After"));
+        }
+
+        if (auto &cur_id = tree.GetItemText(dev, COL_SOURCE_ID); cur_id.empty() || st.state == state::plugged) {
+                // update state and source_id
+        } else if (auto id = to_wxstring(st.source_id); id != cur_id) {
+                wxLogVerbose(_("Skip event from source %s != %s"), id, cur_id);
                 return;
+        }
+
+        if (st.state == state::disconnected || st.state == state::unplugged) { // could be the last event for the source
+                st.source_id = 0; // clear COL_SOURCE_ID
         }
 
         auto [dc, flags] = make_device_columns(st);
@@ -629,10 +625,14 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 flags |= mkflag(COL_PORT);
         }
 
-        if (added || st_empty) {
+        if (added || is_empty(st.device)) {
                 auto persistent = get_persistent(vhci::open()); // see comments above
                 auto saved = as_set(get_saved());
                 flags = update_from_saved(dc, flags, persistent, &saved, false);
+        }
+
+        if (!added) {
+                log(tree, dev, _("Before"));
         }
 
         update_device(dev, dc, flags);
@@ -958,6 +958,7 @@ wxTreeListItem MainFrame::find_or_add_server(_In_ const wxString &url)
 
         for (auto item = tree.GetFirstItem(); item.IsOk(); item = tree.GetNextSibling(item)) {
                 if (tree.GetItemText(item) == url) {
+                        wxASSERT(is_server(tree, item));
                         return server = item;
                 }
         }
@@ -1200,8 +1201,8 @@ void MainFrame::on_item_activated(wxTreeListEvent &event)
 {
         auto &tree = *m_treeListCtrl;
         
-        if (auto item = event.GetItem(); tree.GetItemParent(item) == tree.GetRootItem()) {
-                // item is a server
+        if (auto item = event.GetItem(); is_server(tree, item)) {
+                //
         } else if (auto state = tree.GetItemText(item, COL_STATE); state == to_string(state::unplugged)) {
                 on_attach(event); 
         } else if (state == to_string(state::plugged)) {

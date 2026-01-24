@@ -448,8 +448,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_treeListCtrl->AppendColumn( _("State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Auto"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
 	m_treeListCtrl->AppendColumn( _("Notes"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("DeviceId"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
-	m_treeListCtrl->AppendColumn( _("Saved State"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_LEFT, wxCOL_HIDDEN );
+	m_treeListCtrl->AppendColumn( _("DeviceId"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_RIGHT, wxCOL_HIDDEN|wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE );
+	m_treeListCtrl->AppendColumn( _("SourceId"), wxCOL_WIDTH_AUTOSIZE, wxALIGN_CENTER, wxCOL_HIDDEN );
 
 
 	m_mgr.Update();

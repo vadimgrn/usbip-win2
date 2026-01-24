@@ -32,8 +32,6 @@ struct attach_ctx
 
         WDFSPINLOCK lock;
         WDFTIMER timer;
-        int timer_queued;
-        bool cancelled;
 
         unsigned int retry_cnt;
         unsigned int delay;
@@ -85,7 +83,7 @@ for i in range(12): # ReattachMaxAttempts
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto get_delay(_Inout_ unsigned int &delay, _In_ unsigned int max_delay)
+auto get_delay(_Inout_ unsigned int &delay, _In_ unsigned int max_delay)
 {
         auto cur = delay;
         NT_ASSERT(cur && cur <= max_delay);
@@ -224,6 +222,7 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 /*
  * @param r must be zeroed
  * @param device_str host,port,busid
+ * @see hash_location
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -310,22 +309,9 @@ void on_plugin_hardware(
         }
 
         auto delay = get_delay(req.delay, vhci.reattach_max_delay);
-
-        {
-                wdf::Lock lck(req.lock);
-
-                if (req.cancelled) {
-                        TraceDbg("req %04x, was cancelled", ptr04x(request));
-                        return;
-                }
-
-                NT_ASSERT(!req.timer_queued);
-                ++req.timer_queued;
-
-                NT_VERIFY(!WdfTimerStart(req.timer, WDF_REL_TIMEOUT_IN_SEC(delay))); // @see on_attach_timer
-        }
-
         TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, delay);
+
+        NT_VERIFY(!WdfTimerStart(req.timer, WDF_REL_TIMEOUT_IN_SEC(delay))); // @see on_attach_timer
         ptr.release();
 }
 
@@ -369,22 +355,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void on_attach_timer(_In_ WDFTIMER timer)
 {
         ObjectDelete req(WdfTimerGetParentObject(timer));
+
         auto &r = *get_attach_ctx(req.get());
+        auto &vhci = *get_vhci_ctx(r.vhci);
 
-        bool cancelled;
-        {
-                wdf::Lock lck(r.lock);
-
-                if (cancelled = r.cancelled; --r.timer_queued) {
-                        NT_ASSERT(r.timer_queued == 1);
-                        NT_ASSERT(cancelled);
-                        req.release();
-                }
-        }
-
-        if (cancelled){
-                TraceDbg("req %04x, was cancelled", ptr04x(req.get()));
-        } else if (auto &vhci = *get_vhci_ctx(r.vhci); get_flag(vhci.removing)) [[unlikely]] {
+        if (get_flag(vhci.removing)) [[unlikely]] {
                 TraceDbg("req %04x, vhci is being removing", ptr04x(req.get()));
         } else {
                 send_plugin_hardware(vhci.target_self, r.inbuf, r.outbuf, req);
@@ -522,63 +497,13 @@ PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REG
         }
 }
 
-/*
- * WdfTimerStop is not called here because if on_plugin_hardware() deletes request,
- * concurrent calls to WdfTimerStop on the same timer object will break into the debugger
- * if Verifier is enabled. The timer callback will be fired. If it calls WdfRequestSend,
- * STATUS_CANCELLED will be immetiately returned due to previosly called WdfRequestCancelSentRequest.
- * WdfRequestReuse does not clear cancellation flag.
- *
- * If timer in system queue, its callback will delete cancelled request sooner or later.
- * The latter is a problem, these requests will be piling up and can cause Denial Of Service.
- * To run timer callback ASAP, WdfTimerStart is called.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void cancel_reattach_req(_In_ WDFREQUEST request)
-{
-        auto delivered = WdfRequestCancelSentRequest(request); // next WdfRequestSend will return STATUS_CANCELLED
-
-        auto &r = *get_attach_ctx(request);
-        wdf::Lock lck(r.lock); // raises IRQL
-
-        r.cancelled = true;
-
-        if (!r.timer_queued) {
-                TraceDbg("%04x, cancel request was delivered %!BOOLEAN!", ptr04x(request), delivered);
-                return;
-        }
-
-        NT_ASSERT(r.timer_queued == 1);
-
-        auto was_queued = WdfTimerStart(r.timer, WDF_REL_TIMEOUT_IN_MS(1)); // run ASAP to delete request
-        r.timer_queued += !was_queued; // was removed from queue, but its calback has not been called yet
-
-        TraceDbg("%04x, cancel request was delivered %!BOOLEAN!, timer was in queue %!BOOLEAN!",
-                  ptr04x(request), delivered, was_queued);
-}
-
-/*
- * @param device_str host,port,busid
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto hash_device_str(_Inout_ ULONG &hash, _In_ const UNICODE_STRING &device_str)
-{
-        PAGED_CODE();
-
-        if (auto err = RtlHashUnicodeString(&device_str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &device_str, err);
-                hash = 0;
-                return err;
-        }
-
-        return STATUS_SUCCESS;
-}
-
 } // namespace 
 
-
+/*
+ * There can be many reattach requests that are canceled but its timer callback has not been called yet.
+ * Because of that the limit of active requests is 4x higher than the number of hub ports.
+ * @see stop_attach_attempts
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void usbip::start_attach_attempts(
@@ -588,7 +513,7 @@ PAGED void usbip::start_attach_attempts(
 
         if (get_flag(ctx.removing)) {
                 TraceDbg("vhci is being removing");
-        } else if (auto cnt = reattach_req_count(ctx); cnt >= static_cast<ULONG>(ctx.devices_cnt)) {
+        } else if (auto cnt = reattach_req_count(ctx); cnt >= 4*static_cast<ULONG>(ctx.devices_cnt)) {
                 Trace(TRACE_LEVEL_WARNING, "too many active attach requests, %lu", cnt);
         } else if (auto req = create_attach_request(vhci, ctx, attr); !req) {
                 //
@@ -596,7 +521,6 @@ PAGED void usbip::start_attach_attempts(
                 send_plugin_hardware(ctx.target_self, r.inbuf, r.outbuf, req);
         } else {
                 ++r.retry_cnt;
-                ++r.timer_queued;
 
                 enum { DELAY = 30 }; // long delay after UdecxUsbDevicePlugOutAndDelete
                 NT_VERIFY(!WdfTimerStart(r.timer, WDF_REL_TIMEOUT_IN_SEC(DELAY)));
@@ -606,18 +530,30 @@ PAGED void usbip::start_attach_attempts(
         }
 }
 
+/*
+ * You cannot access request's context space here even when an extra reference is acquired.
+ * The request can be in undefined state (completing/completed), a BSOD can occur.
+ *
+ * The timer callback will be fired. If it calls WdfRequestSend, STATUS_CANCELLED
+ * will be immetiately returned due to previosly called WdfRequestCancelSentRequest.
+ * WdfRequestReuse does not clear cancellation flag.
+ *
+ * If timer in system queue, its callback will delete cancelled request sooner or later.
+ * The latter is a problem, these requests will be piling up and can cause Denial Of Service.
+ */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+int usbip::stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
 {
-        PAGED_CODE();
-        TraceDbg("hash %lx", location_hash);
-
         int cnt = 0;
 
         while (auto req = reattach_req_remove(vhci, location_hash)) {
-                cancel_reattach_req(req.get<WDFREQUEST>());
+
                 ++cnt;
+                auto delivered = WdfRequestCancelSentRequest(req.get<WDFREQUEST>());
+
+                TraceDbg("hash %lx -> req %04x, cancel request was delivered %!BOOLEAN!",
+                          location_hash, ptr04x(req.get()), delivered);
         }
 
         return cnt;
@@ -736,6 +672,9 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
         return status != STATUS_CANCELLED;
 }
 
+/*
+ * @see parse_device_str
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attributes &r)
@@ -752,15 +691,20 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
                 return USBD_STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        UNICODE_STRING device_str { 
+        UNICODE_STRING str { 
                 .MaximumLength = cb, 
                 .Buffer = buf.get<wchar_t>()
         };
 
-        if (auto err = RtlUnicodeStringPrintf(&device_str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid)) {
+        if (auto err = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid)) {
                 Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", err);
                 return err;
         }
 
-        return hash_device_str(hash, device_str);
+        if (auto err = RtlHashUnicodeString(&str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &str, err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
 }

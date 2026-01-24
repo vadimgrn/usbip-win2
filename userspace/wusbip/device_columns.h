@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2024-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -24,15 +24,15 @@ enum column_pos_t { // columns order in the tree
 	COL_PERSISTENT,
 	COL_NOTES,
 	COL_DEVID,
-	COL_LAST_VISIBLE = COL_DEVID,
-	COL_SAVED_STATE, // hidden
+        COL_LAST_VISIBLE = COL_DEVID,
+        COL_SOURCE_ID, // hidden
 
 	UPD_COL_FIRST = COL_PORT,
-	UPD_COL_LAST  = COL_LAST_VISIBLE,
+	UPD_COL_LAST  = COL_SOURCE_ID,
 };
 
 enum { // for device_columns only
-	DEV_COL_URL = COL_LAST_VISIBLE + 1, // use get_url()
+	DEV_COL_URL = COL_SOURCE_ID + 1, // use get_url()
 	DEV_COL_CNT
 };
 
@@ -60,6 +60,7 @@ std::pair<device_columns, unsigned int> make_device_columns(_In_ const device_st
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const imported_device &dev);
 
 bool is_empty(_In_ const imported_device &d) noexcept;
+wxString to_wxstring(_In_ unsigned long source_id);
 
 /*
  * @see make_cmp_key
