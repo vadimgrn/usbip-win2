@@ -35,6 +35,7 @@ The following steps should be done for each of these platforms, Windows 11 24H2 
   - Select “HLK Version 24H2 CompatPlaylist x64 ARM64.xml“
 - Prepare data for **“Static Tools Logo Test“**
   - Read instructions from [codeql.txt](codeql.txt)
+  - When you're ready to test your driver using the Windows Hardware Lab Kit, copy the driver verification log to the %systemdrive%\DVL directory on the test computer. Delete the contents of the directory on the test computer before you copy the new driver verification log.
   - See also [CodeQL and the Static Tools Logo Test](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/static-tools-and-codeql)
   - See also [How to Create a Driver Verification Log](https://learn.microsoft.com/en-us/windows-hardware/drivers/develop/creating-a-driver-verification-log)
 - Run all tests and [create a submission package](https://learn.microsoft.com/en-us/windows-hardware/test/hlk/getstarted/step-8-create-a-submission-package) for the tested platform

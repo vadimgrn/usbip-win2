@@ -37,14 +37,6 @@ struct attach_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(attach_ctx, get_attach_ctx);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto get_handle(_In_ attach_ctx *ctx)
-{
-        NT_ASSERT(ctx);
-        return static_cast<WDFREQUEST>(WdfObjectContextGetObject(ctx));
-}
-
 /*
  * @param retry_cnt from zero
  */
