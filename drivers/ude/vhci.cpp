@@ -208,10 +208,9 @@ PAGED void init_constants(
 {
         PAGED_CODE();
 
-        enum {
-                HOUR = 60*60, DAY = 24*HOUR, // seconds
-                DEF_FIRST_DELAY = 15, DEF_MAX_DELAY = HOUR,
-                MIN_DELAY = 1, MAX_DELAY = DAY 
+        enum { // seconds
+                DEF_FIRST_DELAY = 30, DEF_MAX_DELAY = 8*60, // @see .inf, ReattachFirstDelay, ReattachMaxDelay
+                MIN_DELAY = 1, MAX_DELAY = 60*60
         };
 
         Registry key; 
@@ -677,7 +676,7 @@ PAGED auto make_source_id(_In_ const void *ptr)
         wchar_t buf[17];
 
         UNICODE_STRING s {
-                .MaximumLength = sizeof(*buf)*sizeof(buf), // bytes
+                .MaximumLength = sizeof(buf), // bytes
                 .Buffer = buf
         };
 

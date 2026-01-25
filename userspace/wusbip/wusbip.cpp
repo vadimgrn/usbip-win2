@@ -153,13 +153,13 @@ auto load_license()
         auto hres = FindResource(nullptr, MAKEINTRESOURCE(IDR_LICENSE), RT_RCDATA);
         if (!hres) {
                 auto err = GetLastError();
-                return s = wxString::Format(L"FindResource error %lu\n%s", err, wxSysErrorMsg(err));
+                return s = wxString::Format(_("FindResource error %lu\n%s"), err, wxSysErrorMsg(err));
         }
 
         auto hmem = LoadResource(nullptr, hres);
         if (!hmem) {
                 auto err = GetLastError();
-                return s = wxString::Format(L"LoadResource error %lu\n%s", err, wxSysErrorMsg(err));
+                return s = wxString::Format(_("LoadResource error %lu\n%s"), err, wxSysErrorMsg(err));
         }
 
         auto txt = LockResource(hmem);
@@ -229,10 +229,8 @@ auto is_server_or_empty(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem ite
         return is_server(tree, item) || is_empty(tree, item);
 }
 
-/**
- * @param except_for is_server, is_empty, is_server_or_empty
- */
-auto get_devices(_In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except_for)
+auto get_devices(
+        _In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except_for = is_server_or_empty)
 {
         wxTreeListItems v;
 
@@ -245,10 +243,8 @@ auto get_devices(_In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except
         return v;
 }
 
-/**
- * @param except_for is_server, is_empty, is_server_or_empty
- */
-auto get_selected_devices(_In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except_for)
+auto get_selected_devices(
+        _In_ const wxTreeListCtrl &tree, _In_ const predicate_f &except_for = is_server_or_empty)
 {
         wxTreeListItems v;
         tree.GetSelections(v);
@@ -575,7 +571,7 @@ void MainFrame::break_read_loop()
 
         for (int i = 0; i < 300 && !cancel_read(); ++i, std::this_thread::sleep_for(std::chrono::milliseconds(100))) {
                 if (auto err = GetLastError(); err != ERROR_NOT_FOUND) { // could not find a request to cancel
-                        wxLogError(L"CancelSynchronousIo error %lu\n%s", err, wxSysErrorMsg(err));
+                        wxLogError(_("CancelSynchronousIo error %lu\n%s"), err, wxSysErrorMsg(err));
                         break; // wxLogSysError does not compile if wxNO_IMPLICIT_WXSTRING_ENCODING is set
                 }
         }
@@ -652,13 +648,13 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
 
 void MainFrame::on_has_devices_update_ui(wxUpdateUIEvent &event)
 {
-        auto v = get_devices(*m_treeListCtrl, is_server_or_empty);
+        auto v = get_devices(*m_treeListCtrl);
         event.Enable(!v.empty());
 }
 
 void MainFrame::on_has_selected_devices_update_ui(wxUpdateUIEvent &event)
 {
-        auto v = get_selected_devices(*m_treeListCtrl, is_server_or_empty);
+        auto v = get_selected_devices(*m_treeListCtrl);
         event.Enable(!v.empty());
 }
 
@@ -698,7 +694,7 @@ wxTreeListItem MainFrame::get_edit_notes_device()
         auto &tree = *m_treeListCtrl;
         wxTreeListItem item;
 
-        if (auto v = get_selected_devices(tree, is_server_or_empty); v.size() == 1) {
+        if (auto v = get_selected_devices(tree); v.size() == 1) {
                 item = v.front();
         }
 
@@ -936,22 +932,35 @@ void MainFrame::on_attach_stop_all(wxCommandEvent&)
         }
 }
 
+DWORD MainFrame::detach(_In_ int port)
+{
+        wxLogVerbose(_("Detach port %d"), port);
+        auto err = ERROR_SUCCESS;
+
+        auto f = [&err, port]
+        {
+                if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
+                        err = GetLastError();
+                }
+        };
+
+        auto msg = wxString::Format(_("Port %d"), port);
+        run_cancellable(this, msg, _("Detaching"), std::move(f));
+
+        return err;
+}
+
 void MainFrame::on_detach(wxCommandEvent&)
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server_or_empty)) {
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
 
                 if (auto port = get_port(dev); !port) {
                         // 
-                } else if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
-                        auto err = GetLastError();
-
-                        auto server = tree.GetItemParent(dev);
-                        auto url = tree.GetItemText(server);
-                        auto busid = tree.GetItemText(dev);
-
-                        wxLogError(_("Could not detach %s/%s\nError %lu\n%s"), url, busid, err, GetLastErrorMsg(err));
+                } else if (auto err = detach(port)) {
+                        if (err != ERROR_OPERATION_ABORTED) {
+                                wxLogError(_("Could not detach port %d\nError %lu\n%s"),
+                                              port, err, GetLastErrorMsg(err));
+                        }
                         break;
                 }
         }
@@ -959,11 +968,9 @@ void MainFrame::on_detach(wxCommandEvent&)
 
 void MainFrame::on_detach_all(wxCommandEvent&) 
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
-
-        if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), -1)) {
-                auto err = GetLastError();
-                wxLogError(_("Could detach all devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
+        if (auto err = detach(0); err && err != ERROR_OPERATION_ABORTED) {
+                wxLogError(_("Could not detach all devices\nError %lu\n%s"),
+                              err, GetLastErrorMsg(err));
         }
 }
 
@@ -1252,7 +1259,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
 
 void MainFrame::on_toggle_auto(wxCommandEvent&)
 {
-        for (auto &dev: get_selected_devices(*m_treeListCtrl, is_server_or_empty)) {
+        for (auto &dev: get_selected_devices(*m_treeListCtrl)) {
                 auto ok = is_persistent(dev);
                 set_persistent(dev, !ok);
         }
@@ -1303,13 +1310,13 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
 
 void MainFrame::on_save(wxCommandEvent&)
 {
-        auto devices = get_devices(*m_treeListCtrl, is_server_or_empty);
+        auto devices = get_devices(*m_treeListCtrl);
         save(devices);
 }
 
 void MainFrame::on_save_selected(wxCommandEvent&)
 {
-        if (auto devices = get_selected_devices(*m_treeListCtrl, is_server_or_empty); devices.empty()) {
+        if (auto devices = get_selected_devices(*m_treeListCtrl); devices.empty()) {
                 wxMessageBox(_("There are no selected devices"), _("Save selected"), wxICON_WARNING);
         } else {
                 save(devices);

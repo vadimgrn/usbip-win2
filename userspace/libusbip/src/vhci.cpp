@@ -340,7 +340,7 @@ USBIP_API bool usbip::vhci::get_device_state(
         usbip::device_state_ex st;
         auto ok = get_device_state(st, data, length);
         if (ok) {
-                result = st;
+                result = std::move(st);
         }
         return ok;
 }
@@ -368,7 +368,7 @@ bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state
         usbip::device_state_ex st;
         auto ok = read_device_state(dev, st);
         if (ok) {
-                result = st;
+                result = std::move(st);
         }
         return ok;
 }

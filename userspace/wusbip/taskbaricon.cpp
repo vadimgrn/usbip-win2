@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
@@ -71,7 +71,7 @@ void TaskBarIcon::on_left_dclick(wxTaskBarIconEvent&)
 
 void TaskBarIcon::show_balloon(_In_ const wxString &text, _In_ int flags)
 {
-        wxLogVerbose(L"Balloon '%s', cancel %d", text, m_cancel);
+        wxLogVerbose(_("Balloon '%s', cancel %d"), text, m_cancel);
 
         if (m_cancel) {
                 auto ok = ShowBalloon(wxEmptyString, wxEmptyString, 0, 0); 

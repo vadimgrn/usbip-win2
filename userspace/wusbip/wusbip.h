@@ -131,6 +131,7 @@ private:
 
 	void remove_device(_In_ wxTreeListItem dev);
 	DWORD attach(_In_ const wxString &url, _In_ const wxString &busid);
+        DWORD detach(_In_ int port);
 	
 	void post_refresh();
 	void post_exit();

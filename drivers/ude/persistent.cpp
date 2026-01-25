@@ -61,11 +61,16 @@ static_assert(!can_retry(1, 1));
 
 /*
 total = 0
-delay = 30 # ReattachFirstDelay
-max_delay = 3600 # ReattachMaxDelay
+max_total = 2*60*60 # two hours
 
-for i in range(12): # ReattachMaxAttempts
+delay = 30 # ReattachFirstDelay
+max_delay = 8*60 # ReattachMaxDelay
+
+for i in range(100): # ReattachMaxAttempts
         total = total + delay
+        if total > max_total:
+            break
+        
         hours = int(total/(60*60))
 
         mins = int((total - 60*60*hours)/60)

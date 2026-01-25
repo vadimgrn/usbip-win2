@@ -16,25 +16,25 @@ struct device_state;
 struct device_state_ex;
 
 enum column_pos_t { // columns order in the tree
-	COL_BUSID,
-	COL_PORT,
-	COL_SPEED,
-	COL_VENDOR,
-	COL_PRODUCT,
-	COL_STATE,
-	COL_PERSISTENT,
-	COL_NOTES,
-	COL_DEVID,
+        COL_BUSID,
+        COL_PORT,
+        COL_SPEED,
+        COL_VENDOR,
+        COL_PRODUCT,
+        COL_STATE,
+        COL_PERSISTENT,
+        COL_NOTES,
+        COL_DEVID,
         COL_LAST_VISIBLE = COL_DEVID,
         COL_SOURCE_ID, // hidden
 
-	UPD_COL_FIRST = COL_PORT,
-	UPD_COL_LAST  = COL_SOURCE_ID,
+        UPD_COL_FIRST = COL_PORT,
+        UPD_COL_LAST  = COL_SOURCE_ID,
 };
 
 enum { // for device_columns only
-	DEV_COL_URL = COL_SOURCE_ID + 1, // use get_url()
-	DEV_COL_CNT
+        DEV_COL_URL = COL_SOURCE_ID + 1, // use get_url()
+        DEV_COL_CNT
 };
 
 using device_columns = std::array<wxString, DEV_COL_CNT>; // indexed by visible columns only and DEV_COL_URL
