@@ -433,6 +433,7 @@ void MainFrame::init()
 
         init_tree_list();
 
+        Bind(wxEVT_TIMER, &MainFrame::on_status_bar_timer, this);
         Bind(EVT_DEVICE_STATE, &MainFrame::on_device_state, this);
 }
 
@@ -916,7 +917,7 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
                 break;
         }
 
-        wxLogStatus(_("%d request(s) stopped"), total);
+        set_status_text(wxString::Format(_("%d request(s) stopped"), total));
 }
 
 void MainFrame::on_attach_stop_all(wxCommandEvent&)
@@ -928,7 +929,7 @@ void MainFrame::on_attach_stop_all(wxCommandEvent&)
                 auto err = GetLastError();
                 wxLogError(_("Could not stop attach attempts\nError %lu\n%s"), err, GetLastErrorMsg(err));
         } else {
-                wxLogStatus(_("%d request(s) stopped"), cnt);
+                set_status_text(wxString::Format(_("%d request(s) stopped"), cnt));
         }
 }
 
@@ -1300,7 +1301,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
         cfg.Flush();
         cfg.SetPath(path);
 
-        wxLogStatus(_("%zu device(s) saved"), devices.size());
+        set_status_text(wxString::Format(_("%zu device(s) saved"), devices.size()), std::chrono::seconds(30));
 
         if (auto &vhci = get_vhci(); !vhci::set_persistent(vhci.get(), persistent)) {
                 auto err = GetLastError();
@@ -1355,7 +1356,7 @@ void MainFrame::on_load(wxCommandEvent&)
                 ++cnt;
         }
 
-        wxLogStatus(_("%d device(s) loaded"), cnt);
+        set_status_text(wxString::Format(_("%d device(s) loaded"), cnt), std::chrono::seconds(30));
 }
 
 void MainFrame::on_reload(wxCommandEvent &event)
@@ -1514,4 +1515,23 @@ void MainFrame::on_view_appearance(wxCommandEvent &event)
         wxGetApp().write_appearance(val);
 
         wxLogStatus(_("Restart the app to change its appearance"));
+}
+
+void MainFrame::set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration)
+{
+        if (auto ms = duration_cast<std::chrono::milliseconds>(duration).count(); m_status_bar_timer.StartOnce(ms)) {
+                m_statusBar->PushStatusText(text);
+                ++m_status_text_pushes;
+        } else {
+                wxLogDebug(_("Could not start status bar timer"));
+        }
+}
+
+void MainFrame::on_status_bar_timer(wxTimerEvent&)
+{
+        for (int i = 0; i < m_status_text_pushes; ++i) {
+                m_statusBar->PopStatusText();
+        }
+
+        m_status_text_pushes = 0;
 }

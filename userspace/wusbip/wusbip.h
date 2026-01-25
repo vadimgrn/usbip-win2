@@ -12,6 +12,7 @@
 
 #include <thread>
 #include <mutex>
+#include <chrono>
 
 class wxLogWindow;
 class TaskBarIcon;
@@ -36,6 +37,8 @@ public:
 	auto& get_menu_devices() const noexcept { return *m_menu_devices; }
 	auto& get_menu_file() const noexcept { return *m_menu_file; }
 
+	void set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration = std::chrono::seconds(10));
+
 private:
 	friend class wxPersistentMainFrame;
 	enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
@@ -52,6 +55,9 @@ private:
 	std::mutex m_read_close_mtx;
 
 	std::thread m_read_thread{ &MainFrame::read_loop, this };
+
+        int m_status_text_pushes{};
+        wxTimer m_status_bar_timer{this};
 
 	static wxWithImages::Images get_tree_images();
 
@@ -114,6 +120,7 @@ private:
 	void on_view_font_default(wxCommandEvent &event) override;
 
 	void on_view_appearance(wxCommandEvent &event) override;
+	void on_status_bar_timer(wxTimerEvent&);
 
 	void init();
 	void check_view_appearance(_In_ int appearance);

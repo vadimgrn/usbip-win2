@@ -25,13 +25,12 @@ using namespace usbip;
 struct attach_ctx
 {
         ULONG location_hash; // hash(host,port,busid)
+
         WDFDEVICE vhci;
+        WDFTIMER timer;
 
         WDFMEMORY inbuf;
         WDFMEMORY outbuf;
-
-        WDFSPINLOCK lock;
-        WDFTIMER timer;
 
         unsigned int retry_cnt;
         unsigned int delay;
@@ -391,20 +390,6 @@ PAGED bool create_timer(_Inout_ WDFTIMER &result, _Inout_ WDF_OBJECT_ATTRIBUTES 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED bool create_lock(_Inout_ WDFSPINLOCK &result, _Inout_ WDF_OBJECT_ATTRIBUTES &attr)
-{
-        PAGED_CODE();
-        NT_ASSERT(!result);
-
-        if (auto err = WdfSpinLockCreate(&attr, &result)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
-        }
-
-        return result;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ const device_attributes &attr)
 {
         PAGED_CODE();
@@ -468,7 +453,6 @@ PAGED auto create_attach_request(_In_ WDFDEVICE vhci, _In_ vhci_ctx &ctx, _In_ c
         auto ok = create_inbuf(r.inbuf, buf, attr) &&
                   create_outbuf(r.outbuf, buf, attr) &&
                   create_timer(r.timer, attr) &&
-                  create_lock(r.lock, attr) &&
                   init_attach_ctx(ctx, r, dev) &&
                   reattach_req_add(ctx, req.get());
 
