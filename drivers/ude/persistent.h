@@ -51,4 +51,18 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool can_reattach(_In_ NTSTATUS status);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto get_next_delay(_In_ unsigned int delay, _In_ unsigned int max_delay)
+{
+        NT_ASSERT(delay && delay <= max_delay);
+
+        if (delay != max_delay) {
+                auto next = 3ULL*delay/2;
+                delay = next < max_delay ? static_cast<unsigned int>(next) : max_delay;
+        }
+
+        return delay;
+}
+
 } // namespace usbip

@@ -37,61 +37,6 @@ struct attach_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(attach_ctx, get_attach_ctx);
 
-/*
- * @param retry_cnt from zero
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto can_retry(_In_ unsigned int retry_cnt, _In_ unsigned int max_attempts)
-{
-        return !max_attempts || retry_cnt < max_attempts;
-}
-static_assert(can_retry(0, 0));
-static_assert(can_retry(0, 1));
-static_assert(!can_retry(1, 1));
-
-/*
-total = 0
-max_total = 2*60*60 # two hours
-
-delay = 30 # ReattachFirstDelay
-max_delay = 8*60 # ReattachMaxDelay
-
-for i in range(100): # ReattachMaxAttempts
-        total = total + delay
-        if total > max_total:
-            break
-        
-        hours = int(total/(60*60))
-
-        mins = int((total - 60*60*hours)/60)
-        assert mins < 60
-
-        secs = total - 60*60*hours - 60*mins
-        assert secs < 60
-
-        print(f"{i}, delay={delay}s, total={total}s -> {hours}h, {mins}m, {secs}s")
-
-        if delay != max_delay:
-                delay = int(3*delay/2) # get_delay()
-                if delay > max_delay:
-                        delay = max_delay
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto get_delay(_Inout_ unsigned int &delay, _In_ unsigned int max_delay)
-{
-        auto cur = delay;
-        NT_ASSERT(cur && cur <= max_delay);
-
-        if (cur != max_delay) {
-                auto next = 3ULL*cur/2;
-                delay = next < max_delay ? static_cast<unsigned int>(next) : max_delay;
-        }
-
-        return cur;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto empty(_In_ const UNICODE_STRING &s)
@@ -158,7 +103,7 @@ auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
 
                 auto req = WdfCollectionGetItem(col, i);
                 
-                if (auto r = get_attach_ctx(req); !location_hash || location_hash == r->location_hash) {
+                if (!location_hash || location_hash == get_attach_ctx(req)->location_hash) {
                         ref.reset(req);
                         WdfCollectionRemoveItem(col, i);
                         break;
@@ -285,7 +230,7 @@ void on_plugin_hardware(
 
         auto st = WdfRequestGetStatus(request);
         auto failed = NT_ERROR(st);
-        auto retry = failed && can_reattach(st) && can_retry(retry_cnt, vhci.reattach_max_attempts);
+        auto retry = failed && can_reattach(st) && retry_cnt < vhci.reattach_max_attempts;
 
         if (auto ok = retry && !get_flag(vhci.removing); !ok) {
                 auto s = !failed ? " " : // "" prints as "<NULL>"
@@ -304,10 +249,12 @@ void on_plugin_hardware(
                 return;
         }
 
-        auto delay = get_delay(req.delay, vhci.reattach_max_delay);
-        TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, delay);
+        auto delay = req.delay;
+        req.delay = get_next_delay(delay, vhci.reattach_max_delay);
 
+        TraceDbg("req %04x, %!STATUS!, retry #%u in %u secs.", ptr04x(request), st, retry_cnt, delay);
         NT_VERIFY(!WdfTimerStart(req.timer, WDF_REL_TIMEOUT_IN_SEC(delay))); // @see on_attach_timer
+
         ptr.release();
 }
 
@@ -653,7 +600,7 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
         return status != STATUS_CANCELLED;
 }
 
-/*
+ /*
  * @see parse_device_str
  */
 _IRQL_requires_same_

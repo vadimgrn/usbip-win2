@@ -69,7 +69,7 @@ HKR, Parameters, TCP_KEEPCNT, %REG_DWORD%, 9
 ; The time (in seconds) between individual keepalive probes
 HKR, Parameters, TCP_KEEPINTVL, %REG_DWORD%, 10
 
-HKR, Parameters, ReattachMaxAttempts, %REG_DWORD%, 20; infinite if zero
+HKR, Parameters, ReattachMaxAttempts, %REG_DWORD%, 20
 HKR, Parameters, ReattachFirstDelay, %REG_DWORD%, 30 ; seconds
 HKR, Parameters, ReattachMaxDelay, %REG_DWORD%, 480 ; seconds
 

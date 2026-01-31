@@ -38,6 +38,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto &ctx = *get_vhci_ctx(vhci);
 
         set_flag(ctx.removing); // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
+        stop_attach_attempts(ctx, 0);
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
@@ -201,6 +202,55 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
         return STATUS_SUCCESS;
 }
 
+/*
+total = 0
+max_total = 2*60*60 # two hours
+
+delay = 30 # ReattachFirstDelay
+max_delay = 8*60 # ReattachMaxDelay
+
+for i in range(100): # ReattachMaxAttempts
+        total = total + delay
+        if total > max_total:
+            break
+        
+        hours = int(total/(60*60))
+
+        mins = int((total - 60*60*hours)/60)
+        assert mins < 60
+
+        secs = total - 60*60*hours - 60*mins
+        assert secs < 60
+
+        print(f"{i}, delay={delay}s, total={total}s -> {hours}h, {mins}m, {secs}s")
+
+        if delay != max_delay:
+                delay = int(3*delay/2) # get_delay()
+                if delay > max_delay:
+                        delay = max_delay
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto get_max_attach_attempts(
+        _In_ unsigned int first_delay, _In_ unsigned int max_delay, _In_ unsigned int max_total_delay)
+{
+        auto cnt = 0U;
+
+        for (auto delay = first_delay, total = 0U; ; ++cnt) {
+
+                if (total += delay; total <= max_total_delay) {
+                        delay = get_next_delay(delay, max_delay);
+                } else {
+                        break;
+                }
+        }
+
+        return cnt;
+}
+
+/*
+ * @see .inf, ReattachMaxAttempts, ReattachFirstDelay, ReattachMaxDelay
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void init_constants(
@@ -209,12 +259,16 @@ PAGED void init_constants(
         PAGED_CODE();
 
         enum { // seconds
-                DEF_FIRST_DELAY = 30, DEF_MAX_DELAY = 8*60, // @see .inf, ReattachFirstDelay, ReattachMaxDelay
-                MIN_DELAY = 1, MAX_DELAY = 60*60
+                HOUR = 60*60,
+                DEF_FIRST_DELAY = 30, DEF_MAX_DELAY = 8*60, // see .inf
+                DEF_MAX_ATTEMPTS = get_max_attach_attempts(DEF_FIRST_DELAY, DEF_MAX_DELAY, 2*HOUR), 
+                MIN_DELAY = 1, MAX_DELAY = HOUR, MAX_TOTAL_DELAY = 72*HOUR
         };
+        static_assert(DEF_MAX_ATTEMPTS == 20); // see.inf
 
         Registry key; 
         if (NT_ERROR(open(key, DriverRegKeyParameters))) {
+                max_attempts = DEF_MAX_ATTEMPTS;
                 first_delay = DEF_FIRST_DELAY;
                 max_delay = DEF_MAX_DELAY;
                 return;
@@ -248,6 +302,10 @@ PAGED void init_constants(
 
         if (first_delay > max_delay) {
                 swap(first_delay, max_delay);
+        }
+
+        if (auto n = get_max_attach_attempts(first_delay, max_delay, MAX_TOTAL_DELAY); max_attempts > n) {
+                max_attempts = n;
         }
 
         TraceDbg("%S=%u, %S=%u, %S=%u", v[0].name, max_attempts, v[1].name, first_delay, v[2].name, max_delay);
