@@ -8,6 +8,7 @@
 
 #include "driver.h"
 #include "context.h"
+#include "vhci.h"
 
 #include <libdrv/strconv.h>
 #include <resources/messages.h>
@@ -230,7 +231,8 @@ void on_plugin_hardware(
 
         auto st = WdfRequestGetStatus(request);
         auto failed = NT_ERROR(st);
-        auto retry = failed && can_reattach(st) && retry_cnt < vhci.reattach_max_attempts;
+        auto retry = failed && retry_cnt < vhci.reattach_max_attempts &&
+                     can_reattach(req.vhci, req.location_hash, st);
 
         if (auto ok = retry && !get_flag(vhci.removing); !ok) {
                 auto s = !failed ? " " : // "" prints as "<NULL>"
@@ -585,7 +587,7 @@ ObjectDelete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTR
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-bool usbip::can_reattach(_In_ NTSTATUS status)
+bool usbip::can_reattach(_In_ WDFDEVICE vhci, _In_ ULONG location_hash, _In_ NTSTATUS status)
 {
         NT_ASSERT(NT_ERROR(status));
 
@@ -593,8 +595,9 @@ bool usbip::can_reattach(_In_ NTSTATUS status)
         case USBIP_ERROR_ABI:
         case USBIP_ERROR_VERSION:
         case USBIP_ERROR_PROTOCOL:
-        case USBIP_ERROR_ST_DEV_BUSY: // stop infinite attach attempts
                 return false; // unrecoverable errors
+        case USBIP_ERROR_ST_DEV_BUSY:
+                return !vhci::has_device(vhci, location_hash);
         }
 
         return status != STATUS_CANCELLED;

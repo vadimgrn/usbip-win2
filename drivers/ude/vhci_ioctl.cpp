@@ -445,10 +445,10 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 
         if (ctx.internal) {
                 // attach was issues by the driver itself
-        } else if (NT_SUCCESS(st)) {
-                stop_attach_attempts(vhci, ext.location_hash());
-        } else if (NT_ERROR(st) && can_reattach(st)) {
-                stop_attach_attempts(vhci, ext.location_hash());
+        } else if (auto hash = ext.location_hash(); NT_SUCCESS(st)) {
+                stop_attach_attempts(vhci, hash);
+        } else if (NT_ERROR(st) && can_reattach(ctx.vhci, hash, st)) {
+                stop_attach_attempts(vhci, hash);
                 start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
         }
 

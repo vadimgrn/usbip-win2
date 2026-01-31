@@ -49,7 +49,7 @@ int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-bool can_reattach(_In_ NTSTATUS status);
+bool can_reattach(_In_ WDFDEVICE vhci, _In_ ULONG location_hash, _In_ NTSTATUS status);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

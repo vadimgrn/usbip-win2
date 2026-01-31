@@ -38,7 +38,6 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto &ctx = *get_vhci_ctx(vhci);
 
         set_flag(ctx.removing); // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
-        stop_attach_attempts(ctx, 0);
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
@@ -485,8 +484,9 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(vhci));
         
-        if (auto ctx = get_vhci_ctx(vhci); true) {
-                set_flag(ctx->removing);
+        if (auto &ctx = *get_vhci_ctx(vhci); true) {
+                set_flag(ctx.removing);
+                stop_attach_attempts(ctx, 0);
         }
 
         vhci::detach_all_devices(vhci, true);
@@ -893,13 +893,34 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
                 handle = WDF_NO_HANDLE;
                 port = 0;
         }
-        lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
         if (portnum) {
                 WdfObjectDereference(device);
         }
         
         return portnum;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::vhci::has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash)
+{
+        NT_ASSERT(location_hash);
+
+        auto &ctx = *get_vhci_ctx(vhci);
+        wdf::Lock lck(ctx.devices_lock); 
+
+        for (int i = 0; i < ctx.devices_cnt; ++i) {
+
+                if (auto hdev = ctx.devices[i]) {
+                        auto dev = get_device_ctx(hdev);
+                        if (auto &ext = dev->ext(); ext.location_hash() == location_hash) {
+                                return true;
+                        }
+                }
+        }
+
+        return false;
 }
 
 _IRQL_requires_same_
@@ -918,7 +939,6 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
                 NT_ASSERT(get_device_ctx(handle)->port == port);
                 ptr.reset(handle); // adds reference
         }
-        lck.release(); // explicit call to satisfy code analyzer and get rid of warning C28166
 
         return ptr;
 }

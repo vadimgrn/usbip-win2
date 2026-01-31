@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -27,6 +27,10 @@ int claim_roothub_port(_In_ UDECXUSBDEVICE device);
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 int reclaim_roothub_port(_In_ UDECXUSBDEVICE device);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
