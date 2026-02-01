@@ -620,7 +620,7 @@
             <property name="bitmap">Load From SVG Resource; attach_stop_svg; attach_stop_svg_dark; [16; 16]</property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Stop attach attempts for selected devices</property>
+            <property name="help">Stop attach attempts to selected devices</property>
             <property name="id">ID_ATTACH_STOP</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Stop</property>
@@ -859,7 +859,7 @@
           <property name="name">m_tool_attach_stop</property>
           <property name="permission">protected</property>
           <property name="statusbar"></property>
-          <property name="tooltip">Stop attach attempts for selected devices</property>
+          <property name="tooltip">Stop attach attempts to selected devices</property>
           <event name="OnToolClicked">on_attach_stop</event>
           <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
         </object>

@@ -286,7 +286,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	m_menu_devices->Append( m_cmd_attach );
 
 	wxMenuItem* m_cmd_attach_stop;
-	m_cmd_attach_stop = new wxMenuItem( m_menu_devices, ID_ATTACH_STOP, wxString( _("Stop") ) + wxT('\t') + wxT("ALT+T"), _("Stop attach attempts for selected devices"), wxITEM_NORMAL );
+	m_cmd_attach_stop = new wxMenuItem( m_menu_devices, ID_ATTACH_STOP, wxString( _("Stop") ) + wxT('\t') + wxT("ALT+T"), _("Stop attach attempts to selected devices"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
 	m_cmd_attach_stop->SetBitmaps( wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {16, 16} ) );
 	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
@@ -386,7 +386,7 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 
 	m_tool_attach = m_auiToolBar->AddTool( wxID_ANY, _("Attach"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("check_svg"), wxT("check_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Attach selected devices"), wxEmptyString, NULL );
 
-	m_tool_attach_stop = m_auiToolBar->AddTool( wxID_ANY, _("Stop"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Stop attach attempts for selected devices"), wxEmptyString, NULL );
+	m_tool_attach_stop = m_auiToolBar->AddTool( wxID_ANY, _("Stop"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_svg"), wxT("attach_stop_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Stop attach attempts to selected devices"), wxEmptyString, NULL );
 
 	m_tool_attach_stop_all = m_auiToolBar->AddTool( wxID_ANY, _("Stop All"), wxBitmapBundle::FromSVGResource( pick_resname(wxT("attach_stop_all_svg"), wxT("attach_stop_all_svg_dark")), {24, 24} ), wxNullBitmap, wxITEM_NORMAL, _("Stop all active attach attempts"), wxEmptyString, NULL );
 

@@ -14,7 +14,7 @@
 #include <mutex>
 #include <chrono>
 
-class wxLogWindow;
+class LogWindow;
 class TaskBarIcon;
 class wxDataViewColumn;
 
@@ -46,7 +46,7 @@ private:
 	bool m_start_in_tray{};
 	bool m_close_to_tray{};
 
-	wxLogWindow *m_log{};
+        LogWindow *m_log{};
 	TreeListItemComparator m_tree_cmp;
 	std::unique_ptr<TaskBarIcon> m_taskbar_icon;
 	std::unique_ptr<wxMenu> m_tree_popup_menu;

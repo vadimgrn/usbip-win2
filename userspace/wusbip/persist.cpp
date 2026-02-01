@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2024-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "persist.h"
@@ -60,7 +60,7 @@ void wxPersistentMainFrame::Save() const
 
         if (auto log = frame.m_log) {
                 SaveValue(m_log_verbose, log->GetLogLevel() == VERBOSE_LOGLEVEL);
-                SaveValue(m_log_font_size, get_font_size(log));
+                SaveValue(m_log_font_size, log->get_font_size());
         }
 
         if (auto tb = frame.m_auiToolBar) {
@@ -112,7 +112,7 @@ void wxPersistentMainFrame::do_restore()
         }
 
         if (int pt{}; RestoreValue(m_log_font_size, &pt)) {
-                set_font_size(frame.m_log, pt);
+                frame.m_log->set_font_size(pt);
         }
 
         if (bool ok{}; RestoreValue(m_toolbar_labels, &ok) && ok != frame.m_auiToolBar->HasFlag(wxAUI_TB_TEXT)) {

@@ -1,100 +1,60 @@
 /*
- * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2024-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "font.h"
 
-#include <wx/log.h>
 #include <wx/frame.h>
 #include <wx/window.h>
 #include <wx/treelist.h>
-
-#include <functional>
 
 namespace
 {
 
 using namespace usbip;
 
-void for_each_child(_In_ wxWindow *wnd, _In_ const std::function<void (wxWindow*)> &f)
-{
-        wxASSERT(wnd);
-        auto &lst = wnd->GetChildren();
-
-        for (auto node = lst.GetFirst(); node; node = node->GetNext()) {
-                auto child = static_cast<wxWindow*>(node->GetData());
-                f(child);
-        }
-}
-
 auto do_set_font_size(_In_ wxWindow *wnd, _In_ int pt)
 {
-        if (auto font = wnd->GetFont(); !font.IsOk()) {
-                return false;
-        } else if (font.GetPointSize() == pt) {
-                return true;
-        } else {
-                font.SetPointSize(pt);
-                return wnd->SetFont(font);
-        }
-}
-
-/*
- * auto f = dir > 0 ? &wxFont::MakeLarger : &wxFont::MakeSmaller;
- * (font.*f)();
- */
-auto do_change_font_size(_In_ wxWindow *wnd, _In_ int dir)
-{
         auto font = wnd->GetFont();
-        if (!font.IsOk()) {
-                return false;
-        }
-
-        auto pt = font.GetPointSize();
-
-        if (!dir) {
-                if (auto def_pt = wxNORMAL_FONT->GetPointSize(); pt != def_pt) {
-                        pt = def_pt;
-                } else {
-                        return true;
-                }
-        } else if (dir > 0 && pt < FONT_MAX_POINT) {
-                ++pt;
-        } else if (dir < 0 && pt > FONT_MIN_POINT) {
-                --pt;
-        } else {
-                return false;
-        }
-
         font.SetPointSize(pt);
         return wnd->SetFont(font);
 }
 
-bool change_font_size(_In_ wxWindow *wnd, _In_ int dir, _In_ bool resursive)
+auto do_change_font_size(_In_ wxWindow *wnd, _In_ int dir)
 {
-        auto ok = do_change_font_size(wnd, dir);
-        if (ok && resursive) {
-                auto f = [dir] (auto wnd) { change_font_size(wnd, dir, true); }; // recursion
-                for_each_child(wnd, f);
-        }
-        return ok;
+        auto font = wnd->GetFont();
+        change_font_size(font, dir);
+        return wnd->SetFont(font);
 }
 
 } // namespace
 
 
-bool usbip::change_font_size(_In_ wxWindow *wnd, _In_ int dir, _In_ bool resursive)
+void usbip::change_font_size(_Inout_ wxFont &font, _In_ int dir)
 {
-        auto ok = ::change_font_size(wnd, dir, resursive);
-        if (ok) {
-                wnd->Refresh(false);
+        wxASSERT(font.IsOk());
+        int pt;
+
+        if (!dir) {
+                pt = wxNORMAL_FONT->GetPointSize();
+        } else if (pt = font.GetPointSize(); dir > 0) {
+                 ++pt;
+        } else {
+                --pt;
         }
-        return ok;
+
+        font.SetPointSize(pt);
 }
 
-bool usbip::change_font_size(_In_ wxTreeListCtrl *tree, _In_ int dir)
+bool usbip::change_font_size(_In_ wxWindow *wnd, _In_ int dir, _In_ bool resursive)
 {
-        return change_font_size(tree, dir, false);
+        auto ok = do_change_font_size(wnd, dir);
+        if (ok && resursive) {
+                for (auto child: wnd->GetChildren()) {
+                        change_font_size(child, dir, true); // recursion
+                }
+        }
+        return ok;
 }
 
 int usbip::get_font_size(_In_ wxWindow *wnd)
@@ -105,25 +65,18 @@ int usbip::get_font_size(_In_ wxWindow *wnd)
 
 bool usbip::set_font_size(_In_ wxWindow *wnd, _In_ int pt)
 {
-        auto ok = valid_font_size(pt) && do_set_font_size(wnd, pt);
+        auto ok = do_set_font_size(wnd, pt);
         if (ok) {
-                auto f = [pt] (auto wnd) { set_font_size(wnd, pt); }; // recursion
-                for_each_child(wnd, f);
+                for (auto child: wnd->GetChildren()) {
+                        set_font_size(child, pt); // recursion
+                }
         }
         return ok;
 }
 
-bool usbip::set_font_size(_In_ wxLogWindow *wnd, _In_ int pt)
+bool usbip::change_font_size(_In_ wxTreeListCtrl *tree, _In_ int dir)
 {
-        return set_font_size(wnd->GetFrame(), pt);
-}
-
-/*
- * FIXME: does not work, always returns 8
- */
-int usbip::get_font_size(_In_ wxLogWindow *log)
-{
-        return get_font_size(log->GetFrame());
+        return change_font_size(tree, dir, false);
 }
 
 bool usbip::set_font_size(_In_ wxTreeListCtrl *tree, _In_ int pt)

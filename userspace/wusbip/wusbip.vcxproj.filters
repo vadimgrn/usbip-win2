@@ -56,40 +56,108 @@
     <None Include="resources\power_settings_new.svg">
       <Filter>Resources</Filter>
     </None>
-    <None Include="resources\Add_dark.svg" />
-    <None Include="resources\appearance.svg" />
-    <None Include="resources\appearance_dark.svg" />
-    <None Include="resources\copy_dark.svg" />
-    <None Include="resources\check_dark.svg" />
-    <None Include="resources\close_dark.svg" />
-    <None Include="resources\refresh_dark.svg" />
-    <None Include="resources\Comment_Edit_dark.svg" />
-    <None Include="resources\Save_dark.svg" />
-    <None Include="resources\save_alt_dark.svg" />
-    <None Include="resources\Save_Multiple_dark.svg" />
-    <None Include="resources\Select_All_On_dark.svg" />
-    <None Include="resources\power_settings_new_dark.svg" />
-    <None Include="resources\replay_dark.svg" />
-    <None Include="resources\Info_dark.svg" />
-    <None Include="resources\usb_dark.svg" />
-    <None Include="resources\text_increase_dark.svg" />
-    <None Include="resources\text_decrease_dark.svg" />
-    <None Include="resources\view_columns.svg" />
-    <None Include="resources\view_columns_dark.svg" />
-    <None Include="resources\computer.svg" />
-    <None Include="resources\computer_dark.svg" />
-    <None Include="resources\app_light_checked.svg" />
-    <None Include="resources\app_light_checked_dark.svg" />
-    <None Include="resources\app_light_unchecked.svg" />
-    <None Include="resources\app_light_unchecked_dark.svg" />
-    <None Include="resources\app_dark_checked.svg" />
-    <None Include="resources\app_dark_checked_dark.svg" />
-    <None Include="resources\app_dark_unchecked.svg" />
-    <None Include="resources\app_dark_unchecked_dark.svg" />
-    <None Include="resources\attach_stop.svg" />
-    <None Include="resources\attach_stop_dark.svg" />
-    <None Include="resources\attach_stop_all.svg" />
-    <None Include="resources\attach_stop_all_dark.svg" />
+    <None Include="resources\app_dark_checked.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_dark_checked_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_dark_unchecked.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_dark_unchecked_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_light_checked.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_light_checked_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_light_unchecked.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\app_light_unchecked_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\appearance.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\appearance_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\attach_stop.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\attach_stop_all.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\attach_stop_all_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\attach_stop_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\check_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\close_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Comment_Edit_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\computer.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\computer_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\copy_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Add_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Info_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\refresh_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\replay_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\save_alt_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Save_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Save_Multiple_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\Select_All_On_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\power_settings_new_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\text_decrease_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\text_increase_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\usb_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\view_columns.svg">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="resources\view_columns_dark.svg">
+      <Filter>Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="wusbip.cpp" />

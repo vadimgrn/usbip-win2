@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "log.h"
@@ -11,8 +11,6 @@
 #include <wx/menuitem.h>
 #include <wx/textctrl.h>
 #include <wx/persist/toplevel.h>
-
-#include <memory>
 
 LogWindow::LogWindow(
         _In_ wxWindow *parent, 
@@ -34,23 +32,47 @@ LogWindow::LogWindow(
         wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(LogWindow::on_font_increase), this, font_incr->GetId());
         wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(LogWindow::on_font_decrease), this, font_decr->GetId());
         wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(LogWindow::on_font_default), this, font_dflt->GetId());
-        wnd->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(LogWindow::on_mouse_wheel), this);
+        m_ctrl->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(LogWindow::on_mouse_wheel), this);
 
         wxPersistentRegisterAndRestore(wnd, wxString::FromAscii(__func__));
 
         if (wxSystemSettings::GetAppearance().IsDark()) {
-                tune_dark_appearance();
+                m_ctrl->SetDefaultStyle(*wxWHITE);
         }
 }
 
-void LogWindow::tune_dark_appearance()
+wxTextCtrl* LogWindow::do_get_control()
 {
         for (auto fr = GetFrame(); auto child: fr->GetChildren()) {
-
-                if (auto ctl = dynamic_cast<wxTextCtrl*>(child)) {
-                        ctl->SetDefaultStyle(*wxWHITE);
+                if (auto ctrl = wxDynamicCast(child, wxTextCtrl)) {
+                        return ctrl;
                 }
         }
+
+        wxASSERT(!"wxTextCtrl not found");
+        return nullptr;
+}
+
+wxFont LogWindow::get_font() const
+{
+        return m_ctrl->GetDefaultStyle().GetFont();
+}
+
+int LogWindow::get_font_size() const
+{
+        return get_font().GetPointSize();
+}
+
+bool LogWindow::set_font_size(_In_ int pt)
+{
+        wxTextAttr attr;
+        attr.SetFontPointSize(pt);
+
+        auto lines = m_ctrl->GetNumberOfLines();
+        auto end = m_ctrl->XYToPosition(0, lines - 1);
+
+        return m_ctrl->SetStyle(0, end, attr) && // for existing lines
+               m_ctrl->SetDefaultStyle(attr); // for new lines
 }
 
 void LogWindow::set_accelerators(
@@ -92,26 +114,35 @@ void LogWindow::DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In
         }
 }
 
+void LogWindow::change_font_size(_In_ int dir)
+{
+        auto font = get_font();
+        usbip::change_font_size(font, dir);
+        set_font_size(font.GetPointSize());
+}
+
 void LogWindow::on_font_increase(_In_ wxCommandEvent&)
 {
-        usbip::change_font_size(GetFrame(), 1);
+        change_font_size(1);
 }
 
 void LogWindow::on_font_decrease(_In_ wxCommandEvent&)
 {
-        usbip::change_font_size(GetFrame(), -1);
+        change_font_size(-1);
 }
 
 void LogWindow::on_font_default(_In_ wxCommandEvent&)
 {
-        usbip::change_font_size(GetFrame(), 0);
+        change_font_size(0);
 }
 
 void LogWindow::on_mouse_wheel(_In_ wxMouseEvent &event)
 {
+        wxASSERT(event.GetEventObject() == m_ctrl);
+
         if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
-                auto wnd = static_cast<wxWindow*>(event.GetEventObject());
-                usbip::change_font_size(wnd, event.GetWheelRotation());
+                auto dir = event.GetWheelRotation();
+                change_font_size(dir);
         }
 }
 

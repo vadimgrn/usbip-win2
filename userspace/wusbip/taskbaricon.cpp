@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2024-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "taskbaricon.h"
@@ -49,7 +49,7 @@ std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
 
 MainFrame& TaskBarIcon::frame() const
 {
-        return *static_cast<MainFrame*>(wxGetApp().GetMainTopWindow());
+        return *wxStaticCast(wxGetApp().GetMainTopWindow(), MainFrame);
 }
 
 void TaskBarIcon::on_open(wxCommandEvent&)

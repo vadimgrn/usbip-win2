@@ -1476,12 +1476,6 @@ void MainFrame::on_help_about_lib(wxCommandEvent&)
         wxInfoMessageBox(this);
 }
 
-/*
- * FIXME: how to layout controls after font size change?
- * 
- * auto wnd = static_cast<wxWindow*>(event.GetEventObject());
- * change_font_size(wnd, event.GetWheelRotation());
- */
 void MainFrame::on_frame_mouse_wheel(wxMouseEvent &event)
 {
         on_tree_mouse_wheel(event);
@@ -1490,7 +1484,8 @@ void MainFrame::on_frame_mouse_wheel(wxMouseEvent &event)
 void MainFrame::on_tree_mouse_wheel(_In_ wxMouseEvent &event)
 {
         if (event.GetModifiers() == wxMOD_CONTROL) { // only Ctrl is depressed
-                change_font_size(m_treeListCtrl, event.GetWheelRotation());
+                auto dir = event.GetWheelRotation();
+                change_font_size(m_treeListCtrl, dir);
         }
 }
 

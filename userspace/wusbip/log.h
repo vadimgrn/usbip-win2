@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -24,11 +24,19 @@ public:
 		_In_ const wxMenuItem *font_decr,
 		_In_ const wxMenuItem *font_dflt);
 
-private:
-	void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
-	void tune_dark_appearance();
+        int get_font_size() const;
+        bool set_font_size(_In_ int pt);
 
-	void on_font_increase(_In_ wxCommandEvent &event);
+private:
+        wxTextCtrl *m_ctrl = do_get_control();
+
+        wxTextCtrl *do_get_control();
+        wxFont get_font() const;
+        void change_font_size(_In_ int dir);
+
+        void DoLogRecord(_In_ wxLogLevel level, _In_ const wxString &msg, _In_ const wxLogRecordInfo &info) override;
+
+        void on_font_increase(_In_ wxCommandEvent &event);
 	void on_font_decrease(_In_ wxCommandEvent &event);
 	void on_font_default(_In_ wxCommandEvent &event);
 	void on_mouse_wheel(_In_ wxMouseEvent &event);
