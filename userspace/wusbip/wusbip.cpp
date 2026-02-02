@@ -514,7 +514,7 @@ void MainFrame::on_close(wxCloseEvent &event)
         break_read_loop();
         m_read_thread.join();
 
-        Frame::on_close(event);
+        event.Skip();
 }
 
 void MainFrame::on_exit(wxCommandEvent&)
@@ -1509,7 +1509,7 @@ void MainFrame::on_view_appearance(wxCommandEvent &event)
         auto val = get_appearance_value(event.GetId());
         wxGetApp().write_appearance(val);
 
-        wxLogStatus(_("Restart the app to change its appearance"));
+        wxLogStatus(_("Restart the app to change the appearance"));
 }
 
 void MainFrame::set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration)

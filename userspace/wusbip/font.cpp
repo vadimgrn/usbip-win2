@@ -33,15 +33,9 @@ auto do_change_font_size(_In_ wxWindow *wnd, _In_ int dir)
 void usbip::change_font_size(_Inout_ wxFont &font, _In_ int dir)
 {
         wxASSERT(font.IsOk());
-        int pt;
 
-        if (!dir) {
-                pt = wxNORMAL_FONT->GetPointSize();
-        } else if (pt = font.GetPointSize(); dir > 0) {
-                 ++pt;
-        } else {
-                --pt;
-        }
+        auto pt = !dir ? wxNORMAL_FONT->GetPointSize() :
+                   font.GetPointSize() + (dir > 0 ? 1 : -1);
 
         font.SetPointSize(pt);
 }

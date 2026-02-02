@@ -34,14 +34,24 @@ std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
                 item->SetBitmaps(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FULL_SCREEN), wxASCII_STR(wxART_MENU)));
         }
 
-        menu->AppendSeparator();
+        struct {
+                int id;
+                wxEventFunction f;
+                wxMenu *menu;
+        } const cmds[] {
+                {},
+                { MainFrame::ID_ATTACH_STOP_ALL, wxCommandEventHandler(MainFrame::on_attach_stop_all), fr.m_menu_devices },
+                { wxID_CLOSE_ALL, wxCommandEventHandler(MainFrame::on_detach_all), fr.m_menu_devices },
+                {},
+                { wxID_EXIT, wxCommandEventHandler(MainFrame::on_exit), fr.m_menu_file },
+        };
 
-        if (auto id = wxID_CLOSE_ALL; clone_menu_item(*menu, id, fr.get_menu_devices())) {
-                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainFrame::on_detach_all), &fr, id);
-        }
-
-        if (auto id = wxID_EXIT; clone_menu_item(*menu, id, fr.get_menu_file())) {
-                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(MainFrame::on_exit), &fr, id);
+        for (auto [id, handler, src]: cmds) {
+                if (!id) {
+                        menu->AppendSeparator();
+                } else if (clone_menu_item(*menu, id, *src)) {
+                        Bind(wxEVT_COMMAND_MENU_SELECTED, handler, &fr, id);
+                }
         }
 
         return menu;

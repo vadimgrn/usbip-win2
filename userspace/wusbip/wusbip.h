@@ -34,14 +34,13 @@ public:
 	void on_exit(wxCommandEvent &event) override;
 	void on_detach_all(wxCommandEvent &event) override;
 
-	auto& get_menu_devices() const noexcept { return *m_menu_devices; }
-	auto& get_menu_file() const noexcept { return *m_menu_file; }
-
-	void set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration = std::chrono::seconds(10));
+        void set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration = std::chrono::seconds(10));
 
 private:
-	friend class wxPersistentMainFrame;
-	enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
+        friend class TaskBarIcon;
+        friend class wxPersistentMainFrame;
+
+        enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
 
 	bool m_start_in_tray{};
 	bool m_close_to_tray{};

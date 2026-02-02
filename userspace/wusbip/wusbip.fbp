@@ -40,7 +40,7 @@
       <property name="context_menu">1</property>
       <property name="drag_accept_files">0</property>
       <property name="enabled">1</property>
-      <property name="event_handler">impl_virtual</property>
+      <property name="event_handler">decl_pure_virtual</property>
       <property name="extra_style"></property>
       <property name="fg"></property>
       <property name="font"></property>
@@ -50,7 +50,7 @@
       <property name="minimum_size"></property>
       <property name="name">Frame</property>
       <property name="pos"></property>
-      <property name="size">1000,600</property>
+      <property name="size">1200,600</property>
       <property name="style">wxDEFAULT_FRAME_STYLE</property>
       <property name="subclass">; ; forward_declare</property>
       <property name="title"></property>

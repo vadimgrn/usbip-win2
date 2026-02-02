@@ -76,57 +76,57 @@ class Frame : public wxFrame
 		wxTreeListCtrl* m_treeListCtrl;
 
 		// Virtual event handlers, override them in your derived class
-		virtual void on_close( wxCloseEvent& event ) { event.Skip(); }
-		virtual void on_frame_mouse_wheel( wxMouseEvent& event ) { event.Skip(); }
-		virtual void on_load( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_save( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_save_selected( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_has_selected_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_start_in_tray( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_start_in_tray_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_close_to_tray( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_close_to_tray_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_exit( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_select_all( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_has_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_copy_rows( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_has_any_selected_devices_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_toggle_auto( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_edit_notes( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_edit_notes_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_view_column( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_view_appearance( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_zebra( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_zebra_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_view_labels( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_view_font_increase( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_font_decrease( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_font_default( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_view_reset( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_reload( wxCommandEvent& event ) { event.Skip(); }
-		virtual void add_exported_devices( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_attach( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_attach_stop( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_attach_stop_all( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_detach( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_detach_all( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_log_show( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_log_verbose( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_log_verbose_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_log_library( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_log_library_update_ui( wxUpdateUIEvent& event ) { event.Skip(); }
-		virtual void on_help_about( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_help_about_lib( wxCommandEvent& event ) { event.Skip(); }
-		virtual void on_item_activated( wxTreeListEvent& event ) { event.Skip(); }
-		virtual void on_item_context_menu( wxTreeListEvent& event ) { event.Skip(); }
+		virtual void on_close( wxCloseEvent& event ) = 0;
+		virtual void on_frame_mouse_wheel( wxMouseEvent& event ) = 0;
+		virtual void on_load( wxCommandEvent& event ) = 0;
+		virtual void on_save( wxCommandEvent& event ) = 0;
+		virtual void on_save_selected( wxCommandEvent& event ) = 0;
+		virtual void on_has_selected_devices_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_start_in_tray( wxCommandEvent& event ) = 0;
+		virtual void on_start_in_tray_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_close_to_tray( wxCommandEvent& event ) = 0;
+		virtual void on_close_to_tray_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_exit( wxCommandEvent& event ) = 0;
+		virtual void on_select_all( wxCommandEvent& event ) = 0;
+		virtual void on_has_devices_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_copy_rows( wxCommandEvent& event ) = 0;
+		virtual void on_has_any_selected_devices_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_toggle_auto( wxCommandEvent& event ) = 0;
+		virtual void on_edit_notes( wxCommandEvent& event ) = 0;
+		virtual void on_edit_notes_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_view_column( wxCommandEvent& event ) = 0;
+		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_view_appearance( wxCommandEvent& event ) = 0;
+		virtual void on_view_zebra( wxCommandEvent& event ) = 0;
+		virtual void on_view_zebra_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_view_labels( wxCommandEvent& event ) = 0;
+		virtual void on_view_labels_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_view_font_increase( wxCommandEvent& event ) = 0;
+		virtual void on_view_font_decrease( wxCommandEvent& event ) = 0;
+		virtual void on_view_font_default( wxCommandEvent& event ) = 0;
+		virtual void on_view_reset( wxCommandEvent& event ) = 0;
+		virtual void on_reload( wxCommandEvent& event ) = 0;
+		virtual void add_exported_devices( wxCommandEvent& event ) = 0;
+		virtual void on_attach( wxCommandEvent& event ) = 0;
+		virtual void on_attach_stop( wxCommandEvent& event ) = 0;
+		virtual void on_attach_stop_all( wxCommandEvent& event ) = 0;
+		virtual void on_detach( wxCommandEvent& event ) = 0;
+		virtual void on_detach_all( wxCommandEvent& event ) = 0;
+		virtual void on_log_show( wxCommandEvent& event ) = 0;
+		virtual void on_log_show_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_log_verbose( wxCommandEvent& event ) = 0;
+		virtual void on_log_verbose_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_log_library( wxCommandEvent& event ) = 0;
+		virtual void on_log_library_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_help_about( wxCommandEvent& event ) = 0;
+		virtual void on_help_about_lib( wxCommandEvent& event ) = 0;
+		virtual void on_item_activated( wxTreeListEvent& event ) = 0;
+		virtual void on_item_context_menu( wxTreeListEvent& event ) = 0;
 
 
 	public:
 
-		Frame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 1000,600 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
+		Frame( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = wxEmptyString, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 1200,600 ), long style = wxDEFAULT_FRAME_STYLE|wxTAB_TRAVERSAL );
 		wxAuiManager m_mgr;
 
 		~Frame();
