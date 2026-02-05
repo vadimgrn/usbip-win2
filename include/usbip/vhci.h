@@ -86,7 +86,7 @@ enum class function { // 12 bit
         set_persistent,
         get_persistent,
         stop_attach_attempts,
-        plugin_hardware_internal,
+        plugin_hardware_once,
         plugout_hardware_and_reattach,
 };
 
@@ -102,9 +102,8 @@ enum {
         SET_PERSISTENT = make(function::set_persistent),
         GET_PERSISTENT = make(function::get_persistent),
         STOP_ATTACH_ATTEMPTS = make(function::stop_attach_attempts),
-        // for internal use only
-        PLUGIN_HARDWARE_INTERNAL = make(function::plugin_hardware_internal),
-        PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach),
+        PLUGIN_HARDWARE_ONCE = make(function::plugin_hardware_once),
+        PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach), // for internal use only
 };
 
 struct plugin_hardware : base, imported_device_location {};
