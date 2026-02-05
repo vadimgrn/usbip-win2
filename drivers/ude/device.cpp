@@ -9,6 +9,7 @@
 #include "driver.h"
 #include "ioctl.h"
 #include "vhci.h"
+#include "session.h"
 #include "network.h"
 #include "persistent.h"
 #include "wsk_receive.h"
@@ -527,9 +528,14 @@ PAGED auto create_spin_lock(_Out_ WDFSPINLOCK *handle, _In_ WDFOBJECT parent)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
+PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ ULONG session_id)
 {
         PAGED_CODE();
+
+        NT_ASSERT(session_id != INVALID_SESSION_ID);
+        dev.owner_session_id = session_id;
+
+        InitializeListHead(&dev.requests);
 
         WDFSPINLOCK *v[] = {
                 &dev.send_lock,
@@ -543,7 +549,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 }
         }
 
-        InitializeListHead(&dev.requests);
         return STATUS_SUCCESS;
 }
 
@@ -611,7 +616,8 @@ PAGED void plugout_and_delete(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext)
+PAGED NTSTATUS usbip::device::create(
+        _Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext, _In_ ULONG session_id)
 {
         PAGED_CODE();
 
@@ -643,11 +649,11 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         ctx.ctx_ext = ctx_ext;
         ext.ctx = &ctx;
 
-        if (auto err = init_device(device, ctx)) {
+        if (auto err = init_device(device, ctx, session_id)) {
                 return err;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, owner session id %lx", ptr04x(device), ctx.owner_session_id);
         return STATUS_SUCCESS;
 }
 
