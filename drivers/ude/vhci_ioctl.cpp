@@ -41,7 +41,7 @@ struct workitem_ctx
         auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
         ADDRINFOEXW *addrinfo; // list head
-        bool internal; // attach was issued by the driver itself
+        bool one_attempt;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
@@ -443,8 +443,8 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
         WdfRequestComplete(request, st);
 
-        if (ctx.internal) {
-                // attach was issues by the driver itself
+        if (ctx.one_attempt) {
+                //
         } else if (auto hash = ext.location_hash(); NT_SUCCESS(st)) {
                 stop_attach_attempts(vhci, hash);
         } else if (NT_ERROR(st) && can_reattach(ctx.vhci, hash, st)) {
@@ -529,11 +529,11 @@ PAGED void getaddrinfo(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
-        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool internal)
+        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once)
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, internal %!bool!", r.host, r.service, r.busid, internal);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, once %!bool!", r.host, r.service, r.busid, once);
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
@@ -545,7 +545,7 @@ PAGED auto plugin_hardware(
 
         ctx.vhci = vhci;
         ctx.request = request;
-        ctx.internal = internal;
+        ctx.one_attempt = once;
 
         if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);
@@ -605,7 +605,7 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool internal)
+PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
 {
         PAGED_CODE();
         WdfRequestSetInformation(request, 0);
@@ -627,7 +627,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool internal)
         constexpr auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
-        return plugin_hardware(request, *r, internal);
+        return plugin_hardware(request, *r, once);
 }
 
 _IRQL_requires_same_
@@ -808,17 +808,17 @@ PAGED void device_control(
                   ptr04x(Request), device_control_name(IoControlCode), IoControlCode, 
                   OutputBufferLength, InputBufferLength);
 
-        bool internal{};
+        bool once{};
         bool reattach{};
 
         NTSTATUS st;
 
         switch (IoControlCode) {
-        case vhci::ioctl::PLUGIN_HARDWARE_INTERNAL:
-                internal = true;
+        case vhci::ioctl::PLUGIN_HARDWARE_ONCE:
+                once = true;
                 [[fallthrough]];
         case vhci::ioctl::PLUGIN_HARDWARE:
-                st = plugin_hardware(Request, internal);
+                st = plugin_hardware(Request, once);
                 break;
         case vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH:
                 reattach = true;

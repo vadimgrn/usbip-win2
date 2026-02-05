@@ -208,7 +208,7 @@ max_total = 2*60*60 # two hours
 delay = 30 # ReattachFirstDelay
 max_delay = 8*60 # ReattachMaxDelay
 
-for i in range(100): # ReattachMaxAttempts
+for i in range(1000): # ReattachMaxAttempts
         total = total + delay
         if total > max_total:
             break

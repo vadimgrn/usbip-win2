@@ -274,7 +274,7 @@ void send_plugin_hardware(
         TraceDbg("req %04x", ptr04x(request));
 
         if (auto err = WdfIoTargetFormatRequestForIoctl(target, request,
-                        vhci::ioctl::PLUGIN_HARDWARE_INTERNAL, inbuf, nullptr, outbuf, nullptr)) {
+                        vhci::ioctl::PLUGIN_HARDWARE_ONCE, inbuf, nullptr, outbuf, nullptr)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
                 return;
         }

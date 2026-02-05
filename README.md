@@ -50,10 +50,9 @@
 - SDK/WDK installation is not required, [NuGet](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget#how-to-install-wdk-nuget) will install them automatically
 
 ### Build Visual Studio solution
-- Install git
+- Install required components
   - Run Visual Studio Installer
-  - Select "Individual components" tab
-  - Find and check
+  - Select "Individual components" tab, find and check
     - Git for Windows
     - Windows Driver Kit
   - Install selected items

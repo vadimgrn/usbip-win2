@@ -55,7 +55,14 @@ wxTextCtrl* LogWindow::do_get_control()
 
 wxFont LogWindow::get_font() const
 {
-        return m_ctrl->GetDefaultStyle().GetFont();
+        auto &attr = m_ctrl->GetDefaultStyle();
+        auto font = attr.GetFont();
+
+        if (!font.IsOk()) { // assertion failure in wxWidgets during closing the app
+                font = *wxNORMAL_FONT;
+        }
+
+        return font;
 }
 
 int LogWindow::get_font_size() const
