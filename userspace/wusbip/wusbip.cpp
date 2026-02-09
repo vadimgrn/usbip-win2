@@ -891,8 +891,6 @@ void MainFrame::on_attach(wxCommandEvent&)
 
 void MainFrame::on_attach_stop(wxCommandEvent&)
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
-
         auto &vhci = get_vhci();
         int total = 0;
 
@@ -922,7 +920,6 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
 
 void MainFrame::on_attach_stop_all(wxCommandEvent&)
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
         auto &vhci = get_vhci();
 
         if (auto cnt = vhci::stop_attach_attempts(vhci.get(), nullptr); cnt < 0) {
@@ -1512,8 +1509,13 @@ void MainFrame::on_view_appearance(wxCommandEvent &event)
         wxLogStatus(_("Restart the app to change the appearance"));
 }
 
-void MainFrame::set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration)
+void MainFrame::set_status_text(
+        _In_ const wxString &text, _In_ std::chrono::seconds duration, _In_ bool verbose_log)
 {
+        if (verbose_log) {
+                wxLogVerbose(text);
+        }
+
         if (auto ms = duration_cast<std::chrono::milliseconds>(duration).count(); m_status_bar_timer.StartOnce(ms)) {
                 m_statusBar->PushStatusText(text);
                 ++m_status_text_pushes;

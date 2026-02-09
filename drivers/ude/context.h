@@ -103,7 +103,6 @@ struct device_ctx_ext
         wsk::SOCKET *sock;
 
         device_attributes attr;
-        bool ep0_added;
 
         auto node_name() { return &attr.node_name; }
         auto service_name() { return &attr.service_name; }
@@ -144,11 +143,6 @@ struct device_ctx
 
         WDFSPINLOCK send_lock; // for WskSend on sock()
 
-        int port; // vhci_ctx.devices[port - 1]
-        seqnum_t seqnum; // @see next_seqnum
-
-        LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
-
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
 
@@ -157,6 +151,14 @@ struct device_ctx
         UINT64 cancelable_requests; // marked as
 
         _KTHREAD *recv_thread;
+
+        int port; // vhci_ctx.devices[port - 1]
+        seqnum_t seqnum; // @see next_seqnum
+
+        LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
+
+        bool ep0_added: 1;
+        bool patch_intvl: 1;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 

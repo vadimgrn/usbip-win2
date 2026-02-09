@@ -364,8 +364,8 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         } else { // default control pipe always added first
                 NT_ASSERT(epd == EP0);
                 static_cast<USB_ENDPOINT_DESCRIPTOR&>(endp.descriptor) = epd;
-                dev.ext().ep0_added = true;
                 dev.ep0 = endpoint;
+                dev.ep0_added = true;
         }
 
         if (auto dispatch = usb_endpoint_type(epd) == UsbdPipeTypeControl ?
@@ -585,10 +585,11 @@ auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void plugout_and_delete(
-        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device, _In_ const device_ctx_ext &ext, _In_ int port)
+        _In_ WDFDEVICE vhci, _In_ UDECXUSBDEVICE device,
+        _In_ const device_attributes &attr, _In_ int port, _In_ bool force_delete)
 {
         PAGED_CODE();
-        device_state_changed(vhci, ext.attr, port, vhci::state::unplugging);
+        device_state_changed(vhci, attr, port, vhci::state::unplugging);
 
         if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
@@ -596,10 +597,8 @@ PAGED void plugout_and_delete(
         }
         // device and device_ctx may already be destroyed, do not use
 
-        auto force_delete = !ext.ep0_added;
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, done, force delete %d", ptr04x(device), force_delete);
-
-        device_state_changed(vhci, ext.attr, port, vhci::state::unplugged);
+        device_state_changed(vhci, attr, port, vhci::state::unplugged);
 
         if (force_delete) { // FIXME: may cause BSOD if something changes in future UDE releases
                 WdfObjectDelete(device);
@@ -786,7 +785,8 @@ PAGED wdm::object_reference usbip::device::detach(
         wdf::ObjectRef ref(dev.ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
 
         if (plugout_and_delete) {
-                ::plugout_and_delete(vhci, device, ext, port);
+                auto force_delete = !dev.ep0_added;
+                ::plugout_and_delete(vhci, device, ext.attr, port, force_delete);
         }
 
         if (reattach) {

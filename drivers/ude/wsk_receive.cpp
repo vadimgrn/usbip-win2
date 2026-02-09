@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wsk_receive.h"
@@ -135,21 +135,33 @@ PAGED void fix_full_speed_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *c
 	PAGED_CODE();
 
 	for (auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cd); 
-	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE)); 
-	     cur = libdrv::next(cur)) {
+	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_INTERFACE_DESCRIPTOR_TYPE));
+             cur = libdrv::next(cur)) {
 
-		auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
+                if (auto &ifd = *reinterpret_cast<USB_INTERFACE_DESCRIPTOR*>(cur);
+                    ifd.bInterfaceClass != USB_DEVICE_CLASS_AUDIO) {
+                        //
+                } else for (int i = 0; i < ifd.bNumEndpoints; ++i) {
 
-		if (auto t = usb_endpoint_type(e); t == UsbdPipeTypeIsochronous || t == UsbdPipeTypeInterrupt) { // IN/OUT
+                        cur = libdrv::next(cur);
 
-			auto val = e.bInterval; // always treated as high-speed device despite it is full-speed
-			e.bInterval = to_high_speed_interval(val);
+                        if (cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE); !cur) {
+                                Trace(TRACE_LEVEL_ERROR, "Could not find endpoint[%d] for interface %d.%d",
+                                        i, ifd.bInterfaceNumber, ifd.bAlternateSetting);
+                                return;
+                        } else if (auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
+                                   usb_endpoint_type(e) == UsbdPipeTypeIsochronous) { // IN/OUT
 
-			TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, bmAttributes %#x, "
-				 "wMaxPacketSize %d, bInterval %d (patched value is %d)", 
-				  e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
-				  e.wMaxPacketSize, val, e.bInterval);
-		}
+                                auto val = e.bInterval; // always treated as high-speed device despite it is full-speed
+                                e.bInterval = to_high_speed_interval(val);
+
+                                TraceDbg("interface %d.%d, endpoint[%d]: bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, "
+                                         "bmAttributes %#x, wMaxPacketSize %d, bInterval %d (patched value is %d)", 
+                                        ifd.bInterfaceNumber, ifd.bAlternateSetting, i,
+                                        e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
+                                        e.wMaxPacketSize, val, e.bInterval);
+                        }
+                }
 	}
 }
 
@@ -289,7 +301,7 @@ PAGED void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS stat
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
+PAGED void post_control_transfer(_Inout_ device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
 {
 	PAGED_CODE();
 
@@ -314,9 +326,9 @@ PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CON
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
 			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
-			if (dev.speed() == USB_SPEED_FULL) {
-				fix_full_speed_endpoint_interval(&d);
-			}
+                        if (dev.patch_intvl) {
+                                fix_full_speed_endpoint_interval(&d);
+                        }
 		}
 		break;
 	case USB_DEVICE_DESCRIPTOR_TYPE:
@@ -324,6 +336,8 @@ PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CON
 		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
 			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
+                        dev.patch_intvl = dev.speed() == USB_SPEED_FULL &&
+                                (!d.bDeviceClass || d.bDeviceClass == USB_DEVICE_CLASS_AUDIO);
 		}
 		break;
 	}
@@ -331,7 +345,7 @@ PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CON
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
+PAGED void post_process_transfer_buffer(_Inout_ device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
 {
 	PAGED_CODE();
 

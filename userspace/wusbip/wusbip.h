@@ -34,7 +34,8 @@ public:
 	void on_exit(wxCommandEvent &event) override;
 	void on_detach_all(wxCommandEvent &event) override;
 
-        void set_status_text(_In_ const wxString &text, _In_ std::chrono::seconds duration = std::chrono::seconds(10));
+        void set_status_text(_In_ const wxString &text,
+                _In_ std::chrono::seconds duration = std::chrono::seconds(10), _In_ bool verbose_log = true);
 
 private:
         friend class TaskBarIcon;
