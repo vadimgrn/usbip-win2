@@ -177,9 +177,6 @@ struct endpoint_ctx
         WDFQUEUE queue; // child
         USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
 
-        CCHAR priority_boost; 
-        static_assert(!IO_NO_INCREMENT);
-
         // UCHAR interface_number; // interface to which it belongs
         // UCHAR alternate_setting;
 

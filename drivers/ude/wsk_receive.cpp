@@ -710,14 +710,7 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 			  req.seqnum, get_usbd_status(urb_st), status, info);
 	}
 
-	auto endp = get_endpoint_ctx(req.endpoint);
 	libdrv::RaiseIrql lvl(DISPATCH_LEVEL);
-
-	if (auto boost = endp->priority_boost) {
-		WdfRequestCompleteWithPriorityBoost(request, status, boost); // UdecxUrbComplete has no PriorityBoost
-	} else {
-		UdecxUrbCompleteWithNtStatus(request, status);
-		static_assert(!IO_NO_INCREMENT);
-	}
+	UdecxUrbCompleteWithNtStatus(request, status);
 }
 
