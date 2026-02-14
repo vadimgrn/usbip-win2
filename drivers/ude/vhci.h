@@ -38,7 +38,7 @@ wdf::ObjectRef get_device(_In_ WDFDEVICE vhci, _In_ int port);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async = false);
+PAGED void detach_all_devices(_In_ ULONG session_id, _In_ WDFDEVICE vhci, _In_ bool async = false);
 
 struct imported_device;
 enum class state;

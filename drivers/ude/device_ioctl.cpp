@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device_ioctl.h"
@@ -13,6 +13,7 @@
 #include "wsk_receive.h"
 #include "proto.h"
 #include "network.h"
+#include "session.h"
 #include "ioctl.h"
 
 #include "filter_request.h"
@@ -589,18 +590,37 @@ void NTAPI usbip::device::internal_control(
 {
         if (IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB) {
                 auto st = STATUS_INVALID_DEVICE_REQUEST;
-                Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), 
-                                                                 IoControlCode, st);
+                Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!",
+                        internal_device_control_name(IoControlCode), IoControlCode, st);
+
                 WdfRequestComplete(request, st);
                 return;
         }
 
         auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
-        
-        if (auto dev = get_device_ctx(endp.device); get_flag(dev->unplugged)) {
+        auto &dev = *get_device_ctx(endp.device);
+
+        if (get_flag(dev.unplugged)) {
                 UdecxUrbComplete(request, USBD_STATUS_DEVICE_GONE);
-        } else if (auto st = usb_submit_urb(*dev, endpoint, endp, request); st != STATUS_PENDING) {
+                return;
+        }
+
+        auto st = STATUS_SUCCESS;
+
+        if (WdfRequestGetRequestorMode(request) == UserMode) {
+                auto session_id = get_session_id(request);
+                NT_ASSERT(session_id != INVALID_SESSION_ID);
+
+                Trace(TRACE_LEVEL_INFORMATION, "req %04x, session id %lx", ptr04x(request), session_id);
+                st = check_session_access(dev, session_id);
+        } 
+
+        if (NT_SUCCESS(st)) {
+                st = usb_submit_urb(dev, endpoint, endp, request);
+        }
+
+        if (st != STATUS_PENDING) {
                 if (st) {
                         TraceDbg("%!STATUS!", st);
                 }

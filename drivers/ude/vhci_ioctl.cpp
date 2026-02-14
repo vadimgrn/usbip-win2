@@ -7,11 +7,12 @@
 #include "vhci_ioctl.tmh"
 
 #include "context.h"
-#include "vhci.h"
 #include "device.h"
 #include "network.h"
-#include "ioctl.h"
+#include "session.h"
 #include "persistent.h"
+#include "ioctl.h"
+#include "vhci.h"
 
 #include <usbip\proto_op.h>
 
@@ -280,7 +281,8 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         }
 
         UDECXUSBDEVICE dev{};
-        if (auto err = device::create(dev, ctx.vhci, ctx.ctx_ext)) {
+        if (auto session_id = get_session_id(request);
+            auto err = device::create(dev, ctx.vhci, ctx.ctx_ext, session_id)) {
                 return err;
         }
         ctx.ctx_ext = WDF_NO_HANDLE; // now dev owns it
@@ -647,17 +649,24 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
                 return USBIP_ERROR_ABI;
         }
 
-        TraceDbg("port %d, reattach %!bool!", r->port, reattach);
-        auto st = STATUS_SUCCESS;
+        auto session_id = get_session_id(request); // can be INVALID_SESSION_ID when called from EVT_WDF_DEVICE_QUERY_REMOVE
+        TraceDbg("session id %lx, port %d, reattach %!bool!", session_id, r->port, reattach);
+
+        NTSTATUS st;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
-                vhci::detach_all_devices(vhci);
+                vhci::detach_all_devices(session_id, vhci);
+                st = STATUS_SUCCESS;
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
-        } else if (auto dev = vhci::get_device(vhci, r->port)) {
-                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
-        } else {
+        } else if (auto dev = vhci::get_device(vhci, r->port); !dev) {
                 st = STATUS_DEVICE_NOT_CONNECTED;
+        } else if (auto dc = get_device_ctx(dev.get());
+                   NT_ERROR(st = check_session_access(*dc, session_id))) {
+                Trace(TRACE_LEVEL_INFORMATION, "port %d, owner session id %lx, %!STATUS!",
+                        r->port, dc->owner_session_id, st);
+        } else {
+                device::detach_and_delete(dev.get<UDECXUSBDEVICE>(), reattach);
         }
 
         return st;
@@ -693,6 +702,7 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
         ULONG cnt = 0;
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
+
                 if (auto dev = vhci::get_device(vhci, port); !dev) {
                         //
                 } else if (cnt == max_cnt) {

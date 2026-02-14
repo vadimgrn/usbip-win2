@@ -9,6 +9,7 @@
 #include "driver.h"
 #include "ioctl.h"
 #include "vhci.h"
+#include "session.h"
 #include "network.h"
 #include "persistent.h"
 #include "wsk_receive.h"
@@ -530,6 +531,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
+        InitializeListHead(&dev.requests);
 
         WDFSPINLOCK *v[] = {
                 &dev.send_lock,
@@ -543,7 +545,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                 }
         }
 
-        InitializeListHead(&dev.requests);
         return STATUS_SUCCESS;
 }
 
@@ -610,7 +611,8 @@ PAGED void plugout_and_delete(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext)
+PAGED NTSTATUS usbip::device::create(
+        _Out_ UDECXUSBDEVICE &device, _In_ WDFDEVICE vhci, _In_ WDFMEMORY ctx_ext, _In_ ULONG session_id)
 {
         PAGED_CODE();
 
@@ -639,6 +641,8 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         auto &ctx = *get_device_ctx(device);
 
         ctx.vhci = vhci;
+        ctx.owner_session_id = session_id; // can be INVALID_SESSION_ID when ioctl was self by the driver to itself
+
         ctx.ctx_ext = ctx_ext;
         ext.ctx = &ctx;
 
@@ -646,7 +650,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
                 return err;
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, owner session id %lx", ptr04x(device), ctx.owner_session_id);
         return STATUS_SUCCESS;
 }
 
