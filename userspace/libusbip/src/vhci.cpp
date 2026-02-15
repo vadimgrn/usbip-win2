@@ -252,18 +252,24 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
         return result;
 }
 
-int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
+USBIP_API int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location, _In_ unsigned long options)
 {
+        if (options && options != ATTACH_ONCE) {
+                SetLastError(ERROR_INVALID_PARAMETER);
+                return 0;
+        }
+
         ioctl::plugin_hardware r {{ .size = sizeof(r) }};
         if (!assign(r, location)) {
                 SetLastError(ERROR_INVALID_PARAMETER);
                 return 0;
         }
 
+        auto ctl = options & ATTACH_ONCE ? ioctl::PLUGIN_HARDWARE_ONCE : ioctl::PLUGIN_HARDWARE;
         constexpr auto outlen = offsetof(ioctl::plugin_hardware, port) + sizeof(r.port);
 
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-            DeviceIoControl(dev, ioctl::PLUGIN_HARDWARE, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
+            DeviceIoControl(dev, ctl, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
 
                 if (BytesReturned != outlen) [[unlikely]] {
                         SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
@@ -279,6 +285,11 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
         }
 
         return 0;
+}
+
+int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
+{
+        return attach(dev, location, 0);
 }
 
 int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location)

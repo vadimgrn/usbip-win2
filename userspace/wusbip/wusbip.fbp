@@ -606,7 +606,7 @@
             <property name="checked">0</property>
             <property name="enabled">1</property>
             <property name="help">Attach selected devices</property>
-            <property name="id">wxID_OPEN</property>
+            <property name="id">ID_ATTACH</property>
             <property name="kind">wxITEM_NORMAL</property>
             <property name="label">Attach</property>
             <property name="name">m_cmd_attach</property>
@@ -615,6 +615,25 @@
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_attach</event>
             <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
+          </object>
+          <object class="wxMenuItem" expanded="true">
+            <property name="bitmap">Load From File; </property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Attach selected devices, disable automatic attach attempts</property>
+            <property name="id">ID_ATTACH_ONCE</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Attach Once</property>
+            <property name="name">m_cmd_attach_once</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_attach_once</event>
+            <event name="OnUpdateUI">on_has_any_selected_devices_update_ui</event>
+          </object>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator121</property>
+            <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From SVG Resource; attach_stop_svg; attach_stop_svg_dark; [16; 16]</property>

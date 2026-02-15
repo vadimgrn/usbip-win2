@@ -74,10 +74,23 @@ USBIP_API Handle open(_In_ bool overlapped = false);
  */
 USBIP_API std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &success);
 
+/*
+ * @see attach
+ */
+enum attach_flags_t : unsigned long {
+        ATTACH_ONCE = 1 // do not run automatic attach attempts if an error is returned
+};
+
 /**
  * @param dev handle of the driver device
  * @param location remote device to attach to
+ * @param options see attach_flags_t
  * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
+ */
+USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location, _In_ unsigned long options);
+
+/**
+ * The same as attach(..., options=0)
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
 

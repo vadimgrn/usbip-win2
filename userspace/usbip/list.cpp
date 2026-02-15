@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbip.h"
@@ -57,7 +57,7 @@ void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
 	printf(s.c_str());
 }
 
-auto list_stashed_devices()
+auto list_persistent_devices()
 {
 	bool success{};
 	
@@ -78,8 +78,8 @@ auto list_stashed_devices()
 bool usbip::cmd_list(void *p)
 {
 	auto &args = *reinterpret_cast<list_args*>(p);
-	if (args.stashed) {
-		return list_stashed_devices();
+	if (args.persistent) {
+		return list_persistent_devices();
 	}
 
 	auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str());

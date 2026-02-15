@@ -43,6 +43,8 @@ class Frame : public wxFrame
 		{
 			ID_TOGGLE_AUTO = 6000,
 			ID_EDIT_NOTES,
+			ID_ATTACH,
+			ID_ATTACH_ONCE,
 			ID_ATTACH_STOP,
 			ID_ATTACH_STOP_ALL,
 			ID_TOGGLE_LOG_WINDOW,
@@ -108,6 +110,7 @@ class Frame : public wxFrame
 		virtual void on_reload( wxCommandEvent& event ) = 0;
 		virtual void add_exported_devices( wxCommandEvent& event ) = 0;
 		virtual void on_attach( wxCommandEvent& event ) = 0;
+		virtual void on_attach_once( wxCommandEvent& event ) = 0;
 		virtual void on_attach_stop( wxCommandEvent& event ) = 0;
 		virtual void on_attach_stop_all( wxCommandEvent& event ) = 0;
 		virtual void on_detach( wxCommandEvent& event ) = 0;
