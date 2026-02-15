@@ -841,7 +841,7 @@ void MainFrame::on_close_to_tray(wxCommandEvent &event)
         m_close_to_tray = checked;
 }
 
-DWORD MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
+DWORD MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid, _In_ bool once)
 {
         wxString hostname;
         wxString service;
@@ -857,9 +857,9 @@ DWORD MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
         };
 
         DWORD err{};
-        auto f = [&err, loc = std::move(loc), vhci = get_vhci().get()]
+        auto f = [&err, loc = std::move(loc), vhci = get_vhci().get(), once]
         { 
-                auto port = vhci::attach(vhci, loc); 
+                auto port = vhci::attach(vhci, loc, once); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
         };
 
@@ -869,9 +869,9 @@ DWORD MainFrame::attach(_In_ const wxString &url, _In_ const wxString &busid)
         return err;
 }
 
-void MainFrame::on_attach(wxCommandEvent&)
+void MainFrame::attach(_In_ bool once)
 {
-        wxLogVerbose(wxString::FromAscii(__func__));
+        wxLogVerbose(L"%s, once %d", wxString::FromAscii(__func__), once);
 
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
@@ -879,7 +879,7 @@ void MainFrame::on_attach(wxCommandEvent&)
                 auto url = tree.GetItemText(server);
                 auto busid = tree.GetItemText(dev);
 
-                if (auto err = attach(url,  busid)) {
+                if (auto err = attach(url, busid, once)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
                                               url, busid, err, GetLastErrorMsg(err));
@@ -1412,20 +1412,24 @@ std::unique_ptr<wxMenu> MainFrame::create_menu(_In_ const menu_item_descr *items
 
 std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
 {
+        const menu_item_descr separator {wxID_SEPARATOR, nullptr, nullptr};
+
         const auto items = std::to_array<menu_item_descr>({
                 { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
                 { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
-                { wxID_SEPARATOR, nullptr, nullptr },
-                { wxID_OPEN, m_menu_devices, &MainFrame::on_attach },
+                separator,
+                { ID_ATTACH, m_menu_devices, &MainFrame::on_attach },
+                { ID_ATTACH_ONCE, m_menu_devices, &MainFrame::on_attach_once },
+                separator,
                 { ID_ATTACH_STOP, m_menu_devices, &MainFrame::on_attach_stop },
                 { ID_ATTACH_STOP_ALL, m_menu_devices, &MainFrame::on_attach_stop_all },
-                { wxID_SEPARATOR, nullptr, nullptr },
+                separator,
                 { wxID_CLOSE, m_menu_devices, &MainFrame::on_detach },
                 { wxID_CLOSE_ALL, m_menu_devices, &MainFrame::on_detach_all },
-                { wxID_SEPARATOR, nullptr, nullptr },
+                separator,
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
-                { wxID_SEPARATOR, nullptr, nullptr },
+                separator,
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
         });
 

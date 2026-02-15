@@ -76,7 +76,8 @@ private:
 	void on_view_reset(wxCommandEvent &event) override;
 	void on_help_about_lib(wxCommandEvent&) override;
 	void on_copy_rows(wxCommandEvent &event) override;
-        void on_attach(wxCommandEvent &event) override;
+        void on_attach(wxCommandEvent&) override { attach(false); }
+        void on_attach_once(wxCommandEvent&) override { attach(true); }
         void on_attach_stop(wxCommandEvent &event) override;
 
         void on_save(wxCommandEvent &event) override;
@@ -137,7 +138,9 @@ private:
 	std::pair<wxTreeListItem, bool> find_or_add_device(_In_ const usbip::device_columns &dc);
 
 	void remove_device(_In_ wxTreeListItem dev);
-	DWORD attach(_In_ const wxString &url, _In_ const wxString &busid);
+
+        void attach(_In_ bool once);
+        DWORD attach(_In_ const wxString &url, _In_ const wxString &busid, _In_ bool once);
         DWORD detach(_In_ int port);
 	
 	void post_refresh();
