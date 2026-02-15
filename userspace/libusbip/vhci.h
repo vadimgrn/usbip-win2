@@ -77,7 +77,13 @@ USBIP_API std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Ou
 /**
  * @param dev handle of the driver device
  * @param location remote device to attach to
+ * @param once do not run automatic attach attempts if an error is returned
  * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
+ */
+USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location, _In_ bool once);
+
+/**
+ * The same as attach(..., once=false)
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbip.h"
@@ -61,7 +61,7 @@ bool usbip::cmd_port(void *p)
         spdlog::debug("{} imported usb device(s)", devices.size());
 
         std::vector<device_location> dl;
-        if (args.stash) {
+        if (args.persistent) {
                 dl.reserve(devices.size());
         }
 
@@ -77,7 +77,7 @@ bool usbip::cmd_port(void *p)
                                        "====================\n");
                         }
                         print(d);
-                        if (args.stash) {
+                        if (args.persistent) {
                                 dl.push_back(std::move(d.location));
                         }
                 }
@@ -85,7 +85,7 @@ bool usbip::cmd_port(void *p)
 
         success = found || ports.empty();
 
-        if (args.stash && !vhci::set_persistent(dev.get(), dl)) {
+        if (args.persistent && !vhci::set_persistent(dev.get(), dl)) {
                 spdlog::error(GetLastErrorMsg());
                 success = false;
         }

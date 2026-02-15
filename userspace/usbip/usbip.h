@@ -32,9 +32,10 @@ struct attach_args
         std::string busid;
         bool terse{};
         bool stop{};
+        bool once{};
 
-        // --stash
-        bool stashed{};
+        // --persistent,--stashed
+        bool persistent{};
 
         // --stop-all
         bool stop_all{};
@@ -52,15 +53,15 @@ struct list_args
         // --remote
         std::string remote;
 
-        // --stashed
-        bool stashed{};
+        // --persistent,--stashed
+        bool persistent{};
 };
 command_t cmd_list;
 
 struct port_args
 {
         std::set<int> ports;
-        bool stash{};
+        bool persistent{};
 };
 command_t cmd_port;
 

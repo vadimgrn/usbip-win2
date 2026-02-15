@@ -56,7 +56,7 @@ void add_cmd_attach(CLI::App &app)
 {
 	static attach_args r;
 
-	auto cmd = app.add_subcommand("attach", "Attach to a remote/stashed USB device(s)")
+	auto cmd = app.add_subcommand("attach", "Attach to a remote/persistent USB device(s)")
 		->callback(pack(cmd_attach, &r))
 		->require_option(1);
 
@@ -69,13 +69,15 @@ void add_cmd_attach(CLI::App &app)
 		->required();	
 
 	rem->add_flag("-t,--terse", r.terse, "Show port number as a result");
-        rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
+
+        auto stop = rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
+        rem->add_flag("--once", r.once, "Do not run automatic attach attempts if the command fails")->excludes(stop);
 
 	cmd->add_option_group("Stop")
 		->add_flag("-X,--stop-all", r.stop_all, "Stop all active attach attempts");
 
-        cmd->add_option_group("Stashed", "Attach to stashed USB device(s)")
-                ->add_flag("-s,--stashed", r.stashed, "Attach to device(s) stashed by 'port --stash'");
+        cmd->add_option_group("Persistent", "Attach to persistent USB device(s)")
+                ->add_flag("-s,--stashed,--persistent", r.persistent, "Attach to persistent device(s) stashed by 'port --stash'");
 }
 
 void add_cmd_detach(CLI::App &app)
@@ -96,16 +98,16 @@ void add_cmd_list(CLI::App &app)
 {
 	static list_args r;
 
-	auto cmd = app.add_subcommand("list", "List exportable/stashed USB devices")
+	auto cmd = app.add_subcommand("list", "List exportable/persistent USB devices")
 		->callback(pack(cmd_list, &r))
 		->require_option(1);
 
-	cmd->add_option_group("remote", "List exportable USB devices")
+	cmd->add_option_group("Remote", "List exportable USB devices")
 		->add_option("-r,--remote", r.remote, "List exportable devices on a remote")
 		->required();
 
-	cmd->add_option_group("stashed", "List stashed USB devices")
-		->add_flag("-s,--stashed", r.stashed, "List devices stashed by 'port --stash'");
+	cmd->add_option_group("Persistent", "List persistent USB devices")
+		->add_flag("-s,--stashed,--persistent", r.persistent, "List persistent devices stashed by 'port --stash'");
 }
 
 void add_cmd_port(CLI::App &app)
@@ -115,8 +117,8 @@ void add_cmd_port(CLI::App &app)
 	auto cmd = app.add_subcommand("port", "Show/stash imported USB devices")
 		->callback(pack(cmd_port, &r));
 
-	cmd->add_flag("-s,--stash", r.stash,
-		      "Devices listed by the command will be attached each time the driver is loaded");
+	cmd->add_flag("-s,--stash,--persistent", r.persistent,
+		      "Devices listed by the command will be attached every time the driver is loaded (aka persistent devices)");
 	
 	cmd->add_option("number", r.ports, "Hub port number")
 		->check(CLI::Range(1, MAX_HUB_PORTS))

@@ -13,7 +13,7 @@ namespace
 
 using namespace usbip;
 
-auto attach_stashed_devices(HANDLE dev)
+auto attach_persistent_devices(HANDLE dev)
 {
         bool success;
         
@@ -56,8 +56,8 @@ bool usbip::cmd_attach(void *p)
                 return false;
         }
 
-        if (args.stashed) {
-                return attach_stashed_devices(dev.get());
+        if (args.persistent) {
+                return attach_persistent_devices(dev.get());
         }
 
         device_location location {
@@ -71,7 +71,7 @@ bool usbip::cmd_attach(void *p)
                 return stop_attach_attempts(dev.get(), args.stop ? &location : nullptr);
         }
 
-        auto port = vhci::attach(dev.get(), location);
+        auto port = vhci::attach(dev.get(), location, args.once);
         if (!port) {
                 spdlog::error(GetLastErrorMsg());
                 return false;
