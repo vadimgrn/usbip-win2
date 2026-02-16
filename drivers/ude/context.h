@@ -155,6 +155,7 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
 
+        ULONG owner_session_id; // session ID of the process that attached this device
         LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
 
         bool ep0_added: 1;

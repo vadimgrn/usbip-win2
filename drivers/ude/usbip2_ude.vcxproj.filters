@@ -38,6 +38,7 @@
     <ClInclude Include="persistent.h" />
     <ClInclude Include="filter_request.h" />
     <ClInclude Include="endpoint_list.h" />
+    <ClInclude Include="session.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="vhci.cpp" />
@@ -56,6 +57,7 @@
     <ClCompile Include="persistent.cpp" />
     <ClCompile Include="filter_request.cpp" />
     <ClCompile Include="endpoint_list.cpp" />
+    <ClCompile Include="session.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_ude.inf" />
