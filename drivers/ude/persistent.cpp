@@ -21,7 +21,7 @@ namespace
 using namespace usbip;
 
 /*
- * Context space for WDFREQUEST which is used for ioctl::PLUGIN_HARDWARE_INTERNAL.
+ * Context space for WDFREQUEST which is used for attach attempts.
  */
 struct attach_ctx
 {

@@ -6,7 +6,7 @@
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USB/IP server at least for kernels 4.19 - 6.14
+- Works with Linux USB/IP server at least for kernels 4.19 - 6.17
 - **[WHLK](https://en.wikipedia.org/wiki/Windows_Hardware_Lab_Kit) certified drivers**
   - WHLK certification was made possible thanks to [Open Source Codesigning Initiative](https://github.com/OSSign)
 - **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#install-usbip)** before installing USBip
