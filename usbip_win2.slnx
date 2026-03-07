@@ -1,0 +1,40 @@
+<Solution>
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="drivers/libdrv/libdrv.vcxproj" Id="27ab4325-4980-4634-9818-ae6bd61de532">
+    <Deploy />
+  </Project>
+  <Project Path="drivers/package/package.vcxproj" Id="b7b9ac6f-45cc-4c98-9136-3d6e8f50ad1c">
+    <BuildDependency Project="drivers/ude/usbip2_ude.vcxproj" />
+    <Deploy />
+  </Project>
+  <Project Path="drivers/ude/usbip2_ude.vcxproj" Id="3a3812ce-3370-4b5f-829d-43433267b154">
+    <BuildDependency Project="userspace/resources/resources.vcxproj" />
+    <Deploy />
+  </Project>
+  <Project Path="drivers/ude_filter/ude_filter.vcxproj" Id="f40cf5cc-4395-4958-b248-25a2bf91d735">
+    <Deploy />
+  </Project>
+  <Project Path="userspace/devnode/devnode.vcxproj" Id="7a610672-f2ef-4048-883a-41195d0977dc">
+    <BuildDependency Project="userspace/libusbip/libusbip.vcxproj" />
+  </Project>
+  <Project Path="userspace/innosetup/innosetup.vcxproj" Id="0b54108e-9fb0-45ea-b252-cebc68a5ccf0">
+    <BuildDependency Project="userspace/wusbip/wusbip.vcxproj" />
+  </Project>
+  <Project Path="userspace/libusbip/libusbip.vcxproj" Id="35196d26-e918-4002-b87e-1eec2bf54444">
+    <BuildDependency Project="userspace/resources/resources.vcxproj" />
+  </Project>
+  <Project Path="userspace/libusbip_check/libusbip_check.vcxproj" Id="48394b64-9cbb-4006-a144-2529d1c45546">
+    <BuildDependency Project="userspace/libusbip/libusbip.vcxproj" />
+  </Project>
+  <Project Path="userspace/resources/resources.vcxproj" Id="ef113e88-152a-4eb5-811c-1d499c3248a0" />
+  <Project Path="userspace/usbip/usbip.vcxproj" Id="36cee68d-d6cf-4413-978c-794488f44555">
+    <BuildDependency Project="userspace/libusbip/libusbip.vcxproj" />
+    <BuildDependency Project="userspace/resources/resources.vcxproj" />
+  </Project>
+  <Project Path="userspace/wusbip/wusbip.vcxproj">
+    <BuildDependency Project="userspace/libusbip/libusbip.vcxproj" />
+  </Project>
+</Solution>

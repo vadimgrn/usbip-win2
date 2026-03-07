@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{4aa823f8-7c8a-4a4b-a106-e9f630cd001a}</ProjectGuid>
+    <ProjectGuid>{DCEE5171-B4D9-D234-64B0-4A94110B21FE}</ProjectGuid>
     <RootNamespace>wusbip</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
