@@ -13,4 +13,6 @@ ARM64
 /userspace/resources/messages.h
 /userspace/resources/messages.rc
 /userspace/resources/MSG*.bin
+/userspace/pyusbip/usbip.py
+/userspace/pyusbip/usbip_wrap.cpp
 /userspace/wusbip/vcpkg_installed

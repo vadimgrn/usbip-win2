@@ -29,6 +29,7 @@
   <Project Path="userspace/libusbip_check/libusbip_check.vcxproj" Id="48394b64-9cbb-4006-a144-2529d1c45546">
     <BuildDependency Project="userspace/libusbip/libusbip.vcxproj" />
   </Project>
+  <Project Path="userspace/pyusbip/pyusbip.vcxproj" Id="1154ac47-e363-48fd-9fa7-eeaa72ec5fe8" />
   <Project Path="userspace/resources/resources.vcxproj" Id="ef113e88-152a-4eb5-811c-1d499c3248a0" />
   <Project Path="userspace/usbip/usbip.vcxproj" Id="36cee68d-d6cf-4413-978c-794488f44555">
     <BuildDependency Project="userspace/libusbip/libusbip.vcxproj" />

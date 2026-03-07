@@ -13,3 +13,6 @@ indent_size = 8
 
 [*.h]
 indent_size = 8
+
+[*.py]
+indent_size = 4
