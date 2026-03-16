@@ -166,6 +166,36 @@ PAGED void fix_full_speed_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *c
 }
 
 /*
+ * UDE/USBHUB3 internally treats all devices as High-Speed.
+ * Full-Speed bulk endpoints have wMaxPacketSize <= 64, but HS requires 512.
+ * USBHUB3 rejects the configuration descriptor if bulk endpoints don't match HS rules,
+ * causing repeated enumeration failures ("Invalid Configuration Descriptor").
+ *
+ * @see fix_full_speed_endpoint_interval
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED void fix_full_speed_bulk_max_packet_size(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
+{
+	PAGED_CODE();
+
+	for (auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cd);
+	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE));
+	     cur = libdrv::next(cur)) {
+
+		auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
+
+		if (usb_endpoint_type(e) == UsbdPipeTypeBulk && e.wMaxPacketSize > 0 && e.wMaxPacketSize <= 64) {
+			auto val = e.wMaxPacketSize;
+			e.wMaxPacketSize = 512;
+
+			TraceDbg("bEndpointAddress %#x, wMaxPacketSize %d (patched to %d, FS bulk -> HS)",
+				  e.bEndpointAddress, val, e.wMaxPacketSize);
+		}
+	}
+}
+
+/*
  * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == actual_length,
  * src->offset is ignored for that reason.
  *
@@ -328,6 +358,9 @@ PAGED void post_control_transfer(_Inout_ device_ctx &dev, _In_ const _URB_CONTRO
 			log(d);
                         if (dev.patch_intvl) {
                                 fix_full_speed_endpoint_interval(&d);
+                        }
+                        if (dev.speed() == USB_SPEED_FULL) {
+                                fix_full_speed_bulk_max_packet_size(&d);
                         }
 		}
 		break;
