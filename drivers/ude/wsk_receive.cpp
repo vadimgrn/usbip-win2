@@ -19,7 +19,6 @@
 #include <libdrv\usbdsc.h>
 #include <libdrv\irp.h>
 #include <libdrv\pdu.h>
-#include <libdrv\ch9.h>
 
 extern "C" {
 #include <usbdlib.h>
@@ -82,85 +81,106 @@ PAGED inline auto& get_ret_submit(_In_ const wsk_context &ctx)
 }
 
 /*
+ * For LS/FS interrupt endpoint only.
+ * @param bInterval milliseconds
+ * @return 1-16, for HS interrupt endpoint
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
+{
+        PAGED_CODE();
+        enum { MIN_INTVL = 1, MAX_INTVL = 16 }; // result
+
+        NT_ASSERT(bInterval);
+        auto microframes = 8*bInterval;
+	
+        for (UCHAR i = MIN_INTVL; i <= MAX_INTVL; ++i) {
+                if ((1 << (i - 1)) >= microframes) {
+                        return i;
+                }
+        }
+	
+        return MAX_INTVL;
+}
+
+/*
+ * UDE/USBHUB3 internally treats all devices as High-Speed.
+ * Full-Speed bulk endpoints have wMaxPacketSize <= 64, but HS requires 512.
+ * USBHUB3 rejects the configuration descriptor if bulk endpoints don't match HS rules,
+ * causing repeated enumeration failures ("Invalid Configuration Descriptor").
+ *
+ * USB_SPEED_FULL audio devices do not work if ISOCH IN/OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1. 
+ * ucx01000!UrbHandler_USBPORTStyle_Legacy_IsochTransfer completes IRP with USBD_STATUS_INVALID_PARAMETER,
+ * this error can be observed in the filter driver, this driver will not get ISOCH transfers at all.
+ * it always treats bInterval as 0.125ms intervals, and it doesn't care if everything else in the device
+ * descriptor or speed is correct.
+ *
  * Isochronous transfers can only be used by full-speed and high-speed devices.
  * For devices and host controllers that can operate at full speed, the period is measured in units of 1 millisecond frames.
  * 
  * For devices and host controllers that can operate at high speed, the period is measured in units of microframes.
  * There are eight microframes in each 1 millisecond frame.
  * The period is related to the value in bInterval by the formula 2**(bInterval - 1), the result is number of microframes.
- * 
- * @param bInterval value for full-speed device, milliseconds
- * @return equivalent interval value for high-speed device
- * 
- * @see USB_ENDPOINT_DESCRIPTOR structure (usbspec.h)
- * @see 5.6.4 Isochronous Transfer Bus Access Constraints
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
-{
-	PAGED_CODE();
-	NT_ASSERT(bInterval);
-
-	if (bInterval == 1) {
-		return 4; // 2**(4-1) = 8 microframes or 1ms
-	} else if (bInterval < 4) {
-		return 5; // 16mf or 2ms
-	} else if (bInterval < 8) {
-		return 6; // 32mf or 4ms
-	} else if (bInterval < 16) {
-		return 7; // 64mf or 8ms
-	} else if (bInterval < 32) {
-		return 8; // 128mf or 16ms
-	} else { // up to 255
-		return 9; // 256mf or 32ms
-	}
-}
-
-/*
- * USB_SPEED_FULL audio devices do not work if ISOCH IN/OUT USB_ENDPOINT_DESCRIPTOR.bInterval = 1. 
- * ucx01000!UrbHandler_USBPORTStyle_Legacy_IsochTransfer completes IRP with USBD_STATUS_INVALID_PARAMETER,
- * this error can be observed in the filter driver, this driver will not get ISOCH transfers at all.
  *
- * UDE (perhaps due to its dependency on USBHUB3) does not support 1ms polling, 
- * it always treats bInterval as 0.125ms intervals, and it doesn't care 
- * if everything else in the device descriptor or speed is correct.
+ * 5.5.3 Control Transfer Packet Size Constraints
+ * The allowable maximum control transfer data payload sizes for full-speed devices is 8, 16, 32, or 64 bytes;
+ * for high-speed devices, it is 64 bytes and for low-speed devices, it is 8 bytes.
  * 
- * @see libdrv::find_next
+ * 5.6.4 Isochronous Transfer Bus Access Constraints
+ * An isochronous endpoint must specify its required bus access period. Full-/high-speed endpoints must specify
+ * a desired period as (2**bInterval-1)*F, where bInterval is in the range 1-16 and F is 125µs for high-speed
+ * and 1ms for full-speed.
+ * 
+ * 5.7.4 Interrupt Transfer Packet Size Constraints
+ * A full-speed endpoint can specify a desired period from 1 ms to 255 ms. Low-speed endpoints are limited
+ * to specifying only 10 ms to 255 ms. High-speed endpoints can specify a desired period (2**bInterval-1)*125µs,
+ * where bInterval is in the range 1-16.
+ *
+ * 5.8.3 Bulk Transfer Packet Size Constraints
+ * An endpoint for bulk transfers specifies the maximum data payload size that the endpoint can accept from
+ * or transmit to the bus. The USB defines the allowable maximum bulk data payload sizes to be only 8, 16,
+ * 32, or 64 bytes for full-speed endpoints and 512 bytes for high-speed endpoints. A low-speed device must
+ * not have bulk endpoints
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void fix_full_speed_endpoint_interval(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
+PAGED void patch_config(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
 	PAGED_CODE();
 
 	for (auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cd); 
-	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_INTERFACE_DESCRIPTOR_TYPE));
+	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE));
              cur = libdrv::next(cur)) {
 
-                if (auto &ifd = *reinterpret_cast<USB_INTERFACE_DESCRIPTOR*>(cur);
-                    ifd.bInterfaceClass != USB_DEVICE_CLASS_AUDIO) {
-                        //
-                } else for (int i = 0; i < ifd.bNumEndpoints; ++i) {
+                auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
-                        cur = libdrv::next(cur);
+                auto old_pkt = e.wMaxPacketSize; // maximum payload size for this endpoint
+                auto old_intvl = e.bInterval; // polling interval, frames
 
-                        if (cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE); !cur) {
-                                Trace(TRACE_LEVEL_ERROR, "Could not find endpoint[%d] for interface %d.%d",
-                                        i, ifd.bInterfaceNumber, ifd.bAlternateSetting);
-                                return;
-                        } else if (auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
-                                   usb_endpoint_type(e) == UsbdPipeTypeIsochronous) { // IN/OUT
+                switch (usb_endpoint_type(e)) {
+                case UsbdPipeTypeBulk:
+                        e.wMaxPacketSize = 512; // fixed value for HS
+                        break;
+                case UsbdPipeTypeIsochronous: // 2**(bInterval - 1) frames
+                        enum { MIN_INTVL = 1, MAX_INTVL = 16 };
+                        NT_ASSERT(e.bInterval >= MIN_INTVL);
+                        NT_ASSERT(e.bInterval <= MAX_INTVL);
+                        e.bInterval = min(e.bInterval + 3, MAX_INTVL); // 2**(bInterval-1) microframes
+                        break;
+                case UsbdPipeTypeInterrupt: // 1-255 ms
+                        e.bInterval = to_high_speed_interval(e.bInterval); // 2**(bInterval-1) microframes
+                        break;
+                case UsbdPipeTypeControl:
+                        Trace(TRACE_LEVEL_WARNING, "control endpoint found in configuration descriptor");
+                        break;
+                }
 
-                                auto val = e.bInterval; // always treated as high-speed device despite it is full-speed
-                                e.bInterval = to_high_speed_interval(val);
-
-                                TraceDbg("interface %d.%d, endpoint[%d]: bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, "
-                                         "bmAttributes %#x, wMaxPacketSize %d, bInterval %d (patched value is %d)", 
-                                        ifd.bInterfaceNumber, ifd.bAlternateSetting, i,
-                                        e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
-                                        e.wMaxPacketSize, val, e.bInterval);
-                        }
+                if (auto equal = e.wMaxPacketSize == old_pkt && e.bInterval == old_intvl; !equal) {
+                        TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, "
+                                "bmAttributes %#x, wMaxPacketSize %d (was %d), bInterval %d (was %d)", 
+                                e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
+                                e.wMaxPacketSize, old_pkt, e.bInterval, old_intvl);
                 }
 	}
 }
@@ -301,7 +321,7 @@ PAGED void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS stat
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void post_control_transfer(_Inout_ device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
+PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
 {
 	PAGED_CODE();
 
@@ -326,8 +346,8 @@ PAGED void post_control_transfer(_Inout_ device_ctx &dev, _In_ const _URB_CONTRO
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
 			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
-                        if (dev.patch_intvl) {
-                                fix_full_speed_endpoint_interval(&d);
+                        if (dev.speed() < USB_SPEED_HIGH) {
+                                patch_config(&d);
                         }
 		}
 		break;
@@ -336,8 +356,6 @@ PAGED void post_control_transfer(_Inout_ device_ctx &dev, _In_ const _URB_CONTRO
 		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
 			NT_ASSERT(libdrv::is_valid(d));
 			log(d);
-                        dev.patch_intvl = dev.speed() == USB_SPEED_FULL &&
-                                (!d.bDeviceClass || d.bDeviceClass == USB_DEVICE_CLASS_AUDIO);
 		}
 		break;
 	}
@@ -345,7 +363,7 @@ PAGED void post_control_transfer(_Inout_ device_ctx &dev, _In_ const _URB_CONTRO
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void post_process_transfer_buffer(_Inout_ device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
+PAGED void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
 {
 	PAGED_CODE();
 

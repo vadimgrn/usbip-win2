@@ -156,9 +156,7 @@ struct device_ctx
         seqnum_t seqnum; // @see next_seqnum
 
         LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
-
-        bool ep0_added: 1;
-        bool patch_intvl: 1;
+        bool ep0_added;
 };        
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
