@@ -50,6 +50,12 @@ AddReg         = ude_Device_Service_AddReg
 
 [ude_Device_Service_AddReg]
 
+; Registry Values for Debugging WDF Drivers
+; Set these values ONLY while you are developing your driver
+; HKR, Parameters\Wdf, VerboseOn, %REG_DWORD%, 1
+; HKR, Parameters\Wdf, VerifierOn, %REG_DWORD%, 1
+; HKR, Parameters\Wdf, VerifyDownLevel, %REG_DWORD%, 1
+
 ; Inflight Trace Recorder (IFR) parameter "VerboseOn".
 ; The default setting of zero causes the IFR to log errors, warnings, and informational events
 HKR, Parameters, VerboseOn, %REG_DWORD%, 1 ; show TRACE_LEVEL_VERBOSE
@@ -72,9 +78,6 @@ HKR, Parameters, TCP_KEEPINTVL, %REG_DWORD%, 10
 HKR, Parameters, ReattachMaxAttempts, %REG_DWORD%, 20
 HKR, Parameters, ReattachFirstDelay, %REG_DWORD%, 30 ; seconds
 HKR, Parameters, ReattachMaxDelay, %REG_DWORD%, 480 ; seconds
-
-HKR, Parameters\Wdf, VerboseOn, %REG_DWORD%, 1
-HKR, Parameters\Wdf, VerifierOn, %REG_DWORD%, 1
 
 [Strings]
 Manufacturer = "USBIP-WIN2"
