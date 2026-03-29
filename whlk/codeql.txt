@@ -4,7 +4,7 @@ mkdir D:\codeql-home
 cd D:\codeql-home
 
 # Select the appropriate CodeQL version for your driver
-# CLI_VERSION, microsoft/windows-drivers PACK_VERSION, BRANCH
+# CLI_VERSION, microsoft/windows-drivers PACK_VERSION
 
 # Download and extract required CLI_VERSION of codeql-win64.zip
 

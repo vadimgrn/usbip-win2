@@ -192,7 +192,7 @@ PAGED bool create_inbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        if (auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*req), &result, reinterpret_cast<PVOID*>(&req))) {
+        if (auto err = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &result, reinterpret_cast<PVOID*>(&req))) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
                 req = nullptr;
         }
