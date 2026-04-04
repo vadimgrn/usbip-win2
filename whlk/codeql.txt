@@ -15,7 +15,8 @@ codeql pack download microsoft/windows-drivers@PACK_VERSION
 rmdir /S /Q D:\codeql-home\databases
 D:\codeql-home\codeql\codeql database create D:\codeql-home\databases --language=cpp --source-root=D:\usbip-win2\drivers\ude --command="msbuild -target:usbip2_ude:rebuild -p:Configuration="Release" -p:Platform=x64 D:\usbip-win2\usbip_win2.slnx"
 
-codeql database analyze ..\databases %USERPROFILE%\.codeql\packages\microsoft\windows-drivers\PACK_VERSION\windows-driver-suites\mustrun.qls --download --format=sarifv2.1.0 --output=D:\usbip-win2\drivers\ude\result.sarif
+codeql database analyze ..\databases microsoft/windows-drivers@PACK_VERSION --download --format=sarifv2.1.0 --output=D:\usbip-win2\drivers\ude\result.sarif
+#                                    microsoft/windows-drivers@PACK_VERSION:windows-driver-suites/mustrun.qls
 
 # VisualStudio 2022
 # Select usbip2_ude project

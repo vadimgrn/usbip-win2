@@ -155,6 +155,10 @@ rd /S /Q "%APPDIR%"
 - Use the tools for software tracing, such as TraceView, Tracelog, Tracefmt, and Tracepdb to configure, start, and stop tracing sessions and to display and filter trace messages
 - These tools are included in the [Windows Driver Kit](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-step-3-install-windows-11-version-22h2-wdk)
 - **Pick "Select Components/Program DataBase files" during USBip installation**
+- Enable verbose logging
+  - Run as Administrator `%WINDIR%\system32\reg.exe add HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters\Wdf /v VerboseOn /t REG_DWORD /d 1 /f`
+  - Reboot machine
+  - When you finish with logs, run `%WINDIR%\system32\reg.exe delete HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters\Wdf /v VerboseOn /f`
 - Start log sessions for drivers (run commands as Administrator)
 ```
 rem change to your WDK version
