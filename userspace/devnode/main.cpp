@@ -83,7 +83,7 @@ auto get_class_guid(_Inout_ std::wstring &class_name, _In_ PCWSTR infname)
 {
         auto guid = GUID_NULL;
 
-        if (WCHAR name[MAX_CLASS_NAME_LEN]; SetupDiGetINFClass(infname, &guid, name, ARRAYSIZE(name), nullptr)) {
+        if (WCHAR name[MAX_CLASS_NAME_LEN]; SetupDiGetINFClass(infname, &guid, name, std::size(name), nullptr)) {
                 class_name = name;
         } else {
                 errmsg("SetupDiGetINFClass", infname);

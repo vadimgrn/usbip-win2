@@ -47,9 +47,9 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
                 size_t len;
                 const std::string &src;
         } const v[] = {
-                { dst.busid, ARRAYSIZE(dst.busid), src.busid },
-                { dst.service, ARRAYSIZE(dst.service), src.service },
-                { dst.host, ARRAYSIZE(dst.host), src.hostname },
+                { dst.busid, std::size(dst.busid), src.busid },
+                { dst.service, std::size(dst.service), src.service },
+                { dst.host, std::size(dst.host), src.hostname },
         };
 
         for (auto &i: v) {
@@ -73,9 +73,9 @@ auto make_device_location(_In_ const vhci::imported_device_location &src)
                 const char *src;
                 size_t maxlen;
         } const v[] = {
-                { dst.hostname, src.host, ARRAYSIZE(src.host) },
-                { dst.service, src.service, ARRAYSIZE(src.service) },
-                { dst.busid, src.busid, ARRAYSIZE(src.busid) },
+                { dst.hostname, src.host, std::size(src.host) },
+                { dst.service, src.service, std::size(src.service) },
+                { dst.busid, src.busid, std::size(src.busid) },
         };
 
         for (auto &i: v) {
@@ -186,7 +186,7 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
 
         auto idx = static_cast<int>(state);
-        return idx >= 0 && idx < ARRAYSIZE(v) ? v[idx] : "";
+        return idx >= 0 && idx < std::size(v) ? v[idx] : "";
 }
 
 auto usbip::vhci::open(_In_ bool overlapped) -> Handle

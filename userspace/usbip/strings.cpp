@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "strings.h"
@@ -30,7 +30,7 @@ const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
          static_assert(UsbHighSpeed == 2);
          static_assert(UsbSuperSpeed == 3);
 
-         return speed >= 0 && speed < ARRAYSIZE(names) ? names[speed] : "Unknown Speed";
+         return speed >= 0 && speed < std::size(names) ? names[speed] : "Unknown Speed";
 }
 
 std::string usbip::get_product(const UsbIds &ids, uint16_t vendor, uint16_t product)

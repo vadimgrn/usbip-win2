@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "utils.h"
@@ -106,12 +106,12 @@ bool usbip::init(_Inout_ wxString &err)
 
 const wchar_t* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
 {
-        return speed >= 0 && speed < ARRAYSIZE(g_usb_speed_str) ? g_usb_speed_str[speed] : L"?";
+        return speed >= 0 && speed < std::size(g_usb_speed_str) ? g_usb_speed_str[speed] : L"?";
 }
 
 bool usbip::get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept
 {
-        for (int i = 0; i < ARRAYSIZE(g_usb_speed_str); ++i) {
+        for (int i = 0; i < std::size(g_usb_speed_str); ++i) {
                 if (speed.IsSameAs(g_usb_speed_str[i], false)) {
                         val = static_cast<USB_DEVICE_SPEED>(i);
                         return true;

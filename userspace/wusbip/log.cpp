@@ -100,7 +100,7 @@ void LogWindow::set_accelerators(
                 { dflt->GetFlags(), dflt->GetKeyCode(), font_dflt->GetId() }, 
         };
 
-        wxAcceleratorTable table(ARRAYSIZE(entries), entries);
+        wxAcceleratorTable table(std::size(entries), entries);
         GetFrame()->SetAcceleratorTable(table);
 }
 
