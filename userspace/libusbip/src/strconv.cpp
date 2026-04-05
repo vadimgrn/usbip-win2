@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "strconv.h"
@@ -66,7 +66,7 @@ std::vector<std::wstring> usbip::split_multi_sz(_In_ std::wstring_view str)
 
         while (auto len = wcsnlen_s(str.data(), str.size())) {
                 v.emplace_back(str.data(), len);
-                str.remove_prefix(min(len + 1, str.size())); // skip L'\0'
+                str.remove_prefix(std::min(len + 1, str.size())); // skip L'\0'
         }
 
         return v;
