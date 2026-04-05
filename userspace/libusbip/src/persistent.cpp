@@ -8,6 +8,7 @@
 
 #include <usbip\vhci.h>
 #include <ranges>
+#include <span>
 
 namespace
 {
@@ -68,8 +69,10 @@ auto get_persistent_devices(_In_ HANDLE dev)
 
         for (DWORD BytesReturned{}; ; ) { // must be set if the last arg is NULL
 
+                auto bytes = std::span(*val).size_bytes();
+
                 auto ok = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
-                                          val->data(), static_cast<DWORD>(size_bytes(*val)), &BytesReturned, nullptr);
+                                          val->data(), static_cast<DWORD>(bytes), &BytesReturned, nullptr);
 
                 if (ok || GetLastError() == ERROR_MORE_DATA) { // WdfRegistryQueryValue -> STATUS_BUFFER_OVERFLOW
                         val->resize(BytesReturned/sizeof(val->front()));
@@ -96,8 +99,10 @@ bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_
                 return false;
         }
 
+        auto bytes = std::span(val).size_bytes();
         DWORD BytesReturned{}; // must be set if the last arg is NULL
-        auto ok = DeviceIoControl(dev, ioctl::SET_PERSISTENT, val.data(), DWORD(size_bytes(val)),
+
+        auto ok = DeviceIoControl(dev, ioctl::SET_PERSISTENT, val.data(), static_cast<DWORD>(bytes),
                                   nullptr, 0, &BytesReturned, nullptr);
 
         assert(!BytesReturned);
