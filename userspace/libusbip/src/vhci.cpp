@@ -13,6 +13,8 @@
 #include <initguid.h>
 #include <usbip\vhci.h>
 
+#include <span>
+
 namespace
 {
 
@@ -38,7 +40,7 @@ constexpr auto map_attach_error(_In_ DWORD err)
         return err;
 }
 
-auto assign(_Out_ vhci::imported_device_location &dst, _In_ const device_location &src)
+auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_location &src)
 {
         struct {
                 char *dst;
@@ -58,11 +60,14 @@ auto assign(_Out_ vhci::imported_device_location &dst, _In_ const device_locatio
                 }
         }
 
+        assert(!dst.port);
         return true;
 }
 
-void assign(_Out_ device_location &dst, _In_ const vhci::imported_device_location &src)
+auto make_device_location(_In_ const vhci::imported_device_location &src)
 {
+        device_location dst;
+
         struct {
                 std::string &dst;
                 const char *src;
@@ -76,43 +81,43 @@ void assign(_Out_ device_location &dst, _In_ const vhci::imported_device_locatio
         for (auto &i: v) {
                 i.dst.assign(i.src, strnlen(i.src, i.maxlen));
         }
+
+        return dst;
 }
 
-auto make_imported_device(_In_ const vhci::imported_device &s)
+auto make_imported_device(_In_ const vhci::imported_device &d)
 {
-        imported_device d { 
+        return imported_device { 
                 // imported_device_location
-                .port = s.port,
+                .location = make_device_location(d),
+                .port = d.port,
                 // imported_device_properties
-                .devid = s.devid,
-                .speed = win_speed(s.speed),
-                .vendor = s.vendor,
-                .product = s.product,
+                .devid = d.devid,
+                .speed = win_speed(d.speed),
+                .vendor = d.vendor,
+                .product = d.product
         };
-
-        assign(d.location, s);
-        return d;
 }
 
-auto make_device_state(_In_ const vhci::device_state_ex &r)
+auto make_imported_devices(_In_ const std::span<const vhci::imported_device> devices)
 {
-        device_state_ex st {{
-                .device = make_imported_device(r),
-                .state = static_cast<state>(r.state)
-        }};
+        std::vector<imported_device> v;
+        v.reserve(devices.size());
 
-        st.source_id = r.source_id;
-        return st;
-}
-
-void assign(_Out_ std::vector<imported_device> &dst, _In_ const vhci::imported_device *src, _In_ size_t cnt)
-{
-        assert(dst.empty());
-        dst.reserve(cnt);
-
-        for (size_t i = 0; i < cnt; ++i) {
-                dst.push_back(make_imported_device(src[i]));
+        for (auto &d: devices) {
+                v.push_back(make_imported_device(d));
         }
+
+        return v;
+}
+
+auto make_device_state(_In_ const vhci::device_state &r)
+{
+        return device_state {
+                .device = make_imported_device(r),
+                .state = static_cast<state>(r.state),
+                .source_id = r.source_id
+        };
 }
 
 auto get_path()
@@ -206,10 +211,9 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
         return h;
 }
 
-std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDLE dev, _Out_ bool &success)
+std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_devices(_In_ HANDLE dev)
 {
-        success = false;
-        std::vector<usbip::imported_device> result;
+        std::optional<std::vector<usbip::imported_device>> devices;
 
         constexpr auto devices_offset = offsetof(ioctl::get_imported_devices, devices);
 
@@ -228,28 +232,27 @@ std::vector<usbip::imported_device> usbip::vhci::get_imported_devices(_In_ HANDL
 
                         if (BytesReturned < devices_offset) [[unlikely]] {
                                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
-                                return result;
+                                return devices;
                         }
                                 
                         buf.resize(BytesReturned);
                         break;
 
                 } else if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-                        return result;
+                        return devices;
                 }
         }
 
-        auto devices_size = buf.size() - devices_offset;
-        success = !(devices_size % sizeof(*r->devices));
-
-        if (!success) {
+        if (auto devices_size = buf.size() - devices_offset;
+            auto reminder = devices_size % sizeof(*r->devices)) { // must be zero
                 libusbip::output("{}: N*sizeof(imported_device) != {}", __func__, devices_size);
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
-        } else if (auto cnt = devices_size/sizeof(*r->devices)) {
-                assign(result, r->devices, cnt);
+        } else {
+                auto cnt = devices_size/sizeof(*r->devices);
+                devices = make_imported_devices({r->devices, cnt});
         }
 
-        return result;
+        return devices;
 }
 
 USBIP_API int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location, _In_ unsigned long options)
@@ -324,62 +327,43 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
 
 USBIP_API DWORD usbip::vhci::get_device_state_size() noexcept
 {
-        return sizeof(vhci::device_state_ex);
+        return sizeof(vhci::device_state);
 }
 
-USBIP_API bool usbip::vhci::get_device_state(
-        _Inout_ usbip::device_state_ex &result, _In_ const void *data, _In_ DWORD length)
+USBIP_API std::optional<usbip::device_state> usbip::vhci::get_device_state(_In_ const void *data, _In_ DWORD length)
 {
-        auto r = reinterpret_cast<const vhci::device_state_ex*>(data);
+        std::optional<usbip::device_state> state;
+
+        auto r = reinterpret_cast<const vhci::device_state*>(data);
         assert(get_device_state_size() == sizeof(*r));
 
-        if (!(r && length == sizeof(*r))) {
+        if (auto ok = r && length == sizeof(*r); !ok) {
                 SetLastError(ERROR_INVALID_PARAMETER);
-                return false;
         } else if (r->size != sizeof(*r)) {
                 SetLastError(USBIP_ERROR_ABI);
-                return false;
+        } else {
+                state = make_device_state(*r);
         }
 
-        result = make_device_state(*r);
-        return true;
-}
-
-USBIP_API bool usbip::vhci::get_device_state(
-        _Inout_ usbip::device_state &result, _In_ const void *data, _In_ DWORD length)
-{
-        usbip::device_state_ex st;
-        auto ok = get_device_state(st, data, length);
-        if (ok) {
-                result = std::move(st);
-        }
-        return ok;
+        return state;
 }
 
 /*
  * ReadFile returns TRUE for STATUS_END_OF_FILE.
  * @see UDE driver, EVT_WDF_IO_QUEUE_IO_READ
  */
-bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state_ex &result)
+std::optional<usbip::device_state> usbip::vhci::read_device_state(_In_ HANDLE dev)
 {
-        vhci::device_state_ex r;
+        std::optional<usbip::device_state> state;
+        DWORD actual;
 
-        if (DWORD actual; !ReadFile(dev, &r, sizeof(r), &actual, nullptr)) {
-                return false;
+        if (vhci::device_state r; !ReadFile(dev, &r, sizeof(r), &actual, nullptr)) {
+                //
         } else if (!actual) {
                 SetLastError(ERROR_HANDLE_EOF);
-                return false;
         } else {
-                return get_device_state(result, &r, actual);
+                state = get_device_state(&r, actual);
         }
-}
 
-bool usbip::vhci::read_device_state(_In_ HANDLE dev, _Inout_ usbip::device_state &result)
-{
-        usbip::device_state_ex st;
-        auto ok = read_device_state(dev, st);
-        if (ok) {
-                result = std::move(st);
-        }
-        return ok;
+        return state;
 }

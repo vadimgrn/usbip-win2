@@ -85,9 +85,6 @@ void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &sa
         }
 }
 
-/*
- * For device_state.state 
- */
 constexpr auto is_port_residual(_In_ state st)
 {
         switch (st) {
@@ -111,7 +108,7 @@ auto as_set(_In_ std::vector<device_columns> v)
                 std::make_move_iterator(v.end()));
 }
 
-void log(_In_ const device_state_ex &st)
+void log(_In_ const device_state &st)
 {
         auto &d = st.device;
         auto &loc = d.location;
@@ -267,12 +264,11 @@ auto make_device_location(
 auto get_persistent(_In_ const Handle &vhci = get_vhci())
 {
         std::set<device_location> result;
-        bool success{};
 
-        if (auto lst = vhci::get_persistent(vhci.get(), success); !success) {
+        if (auto v = vhci::get_persistent(vhci.get()); !v) {
                 auto err = GetLastError();
                 wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, GetLastErrorMsg(err));
-        } else for (auto &loc: lst) {
+        } else for (auto &loc: *v) {
                 if (auto [i, inserted] = result.insert(std::move(loc)); !inserted) {
                         wxLogVerbose(_("%s: failed to insert %s:%s/%s"), 
                                         wxString::FromAscii(__func__), wxString::FromUTF8(i->hostname), 
@@ -363,7 +359,7 @@ auto get_servers(_In_ const std::vector<device_columns> &devices)
 class DeviceStateEvent : public wxEvent
 {
 public:
-        DeviceStateEvent(_In_ device_state_ex st) : 
+        DeviceStateEvent(_In_ device_state st) : 
                 wxEvent(0, EVT_DEVICE_STATE),
                 m_state(std::move(st)) {}
 
@@ -373,7 +369,7 @@ public:
         auto& get() noexcept { return m_state; }
 
 private:
-        device_state_ex m_state;
+        device_state m_state;
 };
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
@@ -552,8 +548,8 @@ void MainFrame::read_loop()
 
         std::unique_ptr<MainFrame, decltype(on_exit)> ptr(this, on_exit);
 
-        for (device_state_ex st; vhci::read_device_state(m_read.get(), st); ) {
-                auto evt = new DeviceStateEvent(std::move(st));
+        while (auto state = vhci::read_device_state(m_read.get())) {
+                auto evt = new DeviceStateEvent(std::move(*state));
                 QueueEvent(evt); // see on_device_state()
         }
 
@@ -1136,12 +1132,11 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
         auto dev = [this, host = std::move(u8_host), port = std::move(u8_port), &persistent, &saved] (auto, auto &device)
         {
-                device_state st {
+                device_state state {
                         .device = make_imported_device(std::move(host), std::move(port), device),
-                        .state = state::unplugged
                 };
 
-                auto [dc, flags] = make_device_columns(st);
+                auto [dc, flags] = make_device_columns(state);
                 flags = update_from_saved(dc, flags, persistent, &saved);
 
                 auto [item, added] = find_or_add_device(dc);
@@ -1371,9 +1366,8 @@ void MainFrame::on_reload(wxCommandEvent &event)
 
         auto &vhci = get_vhci();
 
-        bool ok{};
-        auto devices = vhci::get_imported_devices(vhci.get(), ok);
-        if (!ok) {
+        auto devices = vhci::get_imported_devices(vhci.get());
+        if (!devices) {
                 auto err = GetLastError();
                 wxLogError(_("Could not get imported devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
                 return;
@@ -1382,7 +1376,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
         auto persistent = get_persistent(vhci);
         auto saved = as_set(get_saved());
 
-        for (auto &dev: devices) {
+        for (auto &dev: *devices) {
                 auto [item, added] = find_or_add_device(dev.location);
                 wxASSERT(added);
                 

@@ -759,7 +759,7 @@ PAGED auto make_device_state(
         attr.ParentObject = parent;
 
         WDFMEMORY mem{};
-        vhci::device_state_ex *r{};
+        vhci::device_state *r{};
         if (auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*r), &mem, reinterpret_cast<PVOID*>(&r))) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
                 return mem;
@@ -986,14 +986,14 @@ PAGED void usbip::vhci::complete_read(_In_ WDFREQUEST request, _In_ WDFMEMORY ev
 {
         PAGED_CODE();
 
-        device_state_ex *dst{};
+        device_state *dst{};
         auto dst_sz = sizeof(*dst);
 
         auto st = WdfRequestRetrieveOutputBuffer(request, dst_sz, reinterpret_cast<PVOID*>(&dst), nullptr);
         
         if (NT_SUCCESS(st)) {
                 size_t size{};
-                *dst = *reinterpret_cast<device_state_ex*>(WdfMemoryGetBuffer(evt, &size));
+                *dst = *reinterpret_cast<device_state*>(WdfMemoryGetBuffer(evt, &size));
                 NT_ASSERT(size == dst_sz);
         } else {
                 Trace(TRACE_LEVEL_ERROR, "WdfRequestRetrieveOutputBuffer %!STATUS!", st);

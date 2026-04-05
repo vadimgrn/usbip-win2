@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "..\persistent.h"
@@ -62,22 +62,22 @@ auto parse_device_location(_In_ const std::string &str)
         return dl;
 }
 
-auto get_persistent_devices(_In_ HANDLE dev, _Out_ bool &success)
+auto get_persistent_devices(_In_ HANDLE dev)
 {
-        std::wstring val(512, L'\0');
+        std::optional<std::wstring> val(std::in_place, 512, L'\0');
 
         for (DWORD BytesReturned{}; ; ) { // must be set if the last arg is NULL
 
-                success = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
-                                          val.data(), DWORD(size_bytes(val)), &BytesReturned, nullptr);
+                auto ok = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
+                                          val->data(), static_cast<DWORD>(size_bytes(*val)), &BytesReturned, nullptr);
 
-                if (success || GetLastError() == ERROR_MORE_DATA) { // WdfRegistryQueryValue -> STATUS_BUFFER_OVERFLOW
-                        val.resize(BytesReturned/sizeof(val[0]));
-                        if (success) {
+                if (ok || GetLastError() == ERROR_MORE_DATA) { // WdfRegistryQueryValue -> STATUS_BUFFER_OVERFLOW
+                        val->resize(BytesReturned/sizeof(val->front()));
+                        if (ok) {
                                 break;
                         }
                 } else {
-                        val.clear();
+                        val.reset();
                         break;
                 }
         }
@@ -104,26 +104,31 @@ bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_
         return ok;
 }
 
-auto usbip::vhci::get_persistent(_In_ HANDLE dev, _Out_ bool &success) -> std::vector<device_location>
+auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<device_location>>
 {
-        std::vector<device_location> devs;
+        std::optional<std::vector<device_location>> devs;
 
-        auto multi_sz = get_persistent_devices(dev, success);
-        if (multi_sz.empty()) {
-                if (!success && GetLastError() == ERROR_FILE_NOT_FOUND) { // persistent_devices_value_name is absent
-                        success = true; // not saved yet
+        auto multi_sz = get_persistent_devices(dev);
+        if (!multi_sz) {
+                if (GetLastError() == ERROR_FILE_NOT_FOUND) { // persistent_devices_value_name is absent
+                        devs.emplace(); // not an error
                 }
                 return devs;
         }
 
-        for (auto &ws: split_multi_sz(multi_sz)) {
+        auto strings = split_multi_sz(*multi_sz);
+
+        devs.emplace();
+        devs->reserve(strings.size());
+
+        for (auto &ws: strings) {
 
                 auto s = wchar_to_utf8(ws);
                 
                 if (auto d = parse_device_location(s); is_malformed(d)) {
                         libusbip::output("malformed '{}'", s);
                 } else {
-                        devs.push_back(std::move(d));
+                        devs->push_back(std::move(d));
                 }
         }
 

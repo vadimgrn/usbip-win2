@@ -59,17 +59,17 @@ void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
 
 auto list_persistent_devices()
 {
-	bool success{};
-	
 	if (auto dev = vhci::open(); !dev) {
 		spdlog::error(GetLastErrorMsg());
-	} else if (auto v = vhci::get_persistent(dev.get(), success); !success) {
+                return false;
+        } else if (auto v = vhci::get_persistent(dev.get()); !v) {
 		spdlog::error(GetLastErrorMsg());
-	} else for (auto &i: v) {
+                return false;
+        } else for (auto &i: *v) {
 		printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
-	}
+        }
 
-	return success;
+        return true;
 }
 
 } // namespace

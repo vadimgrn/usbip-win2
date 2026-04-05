@@ -13,7 +13,6 @@ namespace usbip
 struct device_location;
 struct imported_device;
 struct device_state;
-struct device_state_ex;
 
 enum column_pos_t { // columns order in the tree
         COL_BUSID,
@@ -57,9 +56,8 @@ static_assert(mkflags({COL_PORT, COL_SPEED, COL_VENDOR}) == 0b1110);
 device_location make_device_location(_In_ const device_columns &dc);
 device_location make_device_location(_In_ const wxString &url, _In_ const wxString &busid);
 
-std::pair<device_columns, unsigned int> make_device_columns(_In_ const device_state &st);
-std::pair<device_columns, unsigned int> make_device_columns(_In_ const device_state_ex &st);
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const imported_device &dev);
+std::pair<device_columns, unsigned int> make_device_columns(_In_ const device_state &st);
 
 bool is_empty(_In_ const imported_device &d) noexcept;
 wxString to_wxstring(_In_ unsigned long source_id);

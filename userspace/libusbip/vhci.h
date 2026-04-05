@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 
 /*
  * Strings encoding is UTF8. 
@@ -39,18 +40,14 @@ struct imported_device
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
+/*
+ * There can be multiple event sources for the same device,
+ * each of them emits events with a unique source_id.
+ */
 struct device_state
 {
         imported_device device;
         state state = state::unplugged;
-};
-
-/*
- * There can be multiple event sources for one device,
- * each of them emits events with a unique source_id.
- */
-struct device_state_ex : device_state
-{
         ULONG source_id;
 };
 
@@ -69,10 +66,9 @@ USBIP_API Handle open(_In_ bool overlapped = false);
 
 /**
  * @param dev handle of the driver device
- * @param success call GetLastError() if false is returned
- * @return imported devices
+ * @return imported devices if the result contains a value, otherwise call GetLastError()
  */
-USBIP_API std::vector<imported_device> get_imported_devices(_In_ HANDLE dev, _Out_ bool &success);
+USBIP_API std::optional<std::vector<imported_device>> get_imported_devices(_In_ HANDLE dev);
 
 /*
  * @see attach
@@ -120,20 +116,17 @@ USBIP_API const char* get_state_str(_In_ state state) noexcept;
 USBIP_API DWORD get_device_state_size() noexcept;
 
 /**
- * @param result constructed from passed data
  * @param data that was read from the device handle
  * @param length data length, must be equal to get_device_state_size()
- * @return call GetLastError() if false is returned
+ * @return state constructed from passed data if the result contains a value, otherwise call GetLastError()
  */
-USBIP_API bool get_device_state(_Inout_ device_state_ex &result, _In_ const void *data, _In_ DWORD length);
-USBIP_API bool get_device_state(_Inout_ device_state &result, _In_ const void *data, _In_ DWORD length);
+USBIP_API std::optional<device_state> get_device_state(_In_ const void *data, _In_ DWORD length);
 
 /**
  * @param dev handle of the driver device that must be opened for serialized I/O
- * @param result data that was obtained by read operation on the given handle
- * @return call GetLastError() if false is returned
+ * @return state that was obtained by read operation on the given handle
+           if the result contains a value, otherwise call GetLastError()
  */
-USBIP_API bool read_device_state(_In_ HANDLE dev, _Inout_ device_state_ex &result);
-USBIP_API bool read_device_state(_In_ HANDLE dev, _Inout_ device_state &result);
+USBIP_API std::optional<device_state> read_device_state(_In_ HANDLE dev);
 
 } // namespace usbip::vhci

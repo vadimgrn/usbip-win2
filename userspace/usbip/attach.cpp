@@ -15,18 +15,17 @@ using namespace usbip;
 
 auto attach_persistent_devices(HANDLE dev)
 {
-        bool success;
-        
-        if (auto v = vhci::get_persistent(dev, success); !success) {
+        if (auto v = vhci::get_persistent(dev); !v) {
                 spdlog::error(GetLastErrorMsg());
-        } else for (auto &i: v) {
+                return false;
+        } else for (auto &i: *v) {
                 printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
                 if (!vhci::attach(dev, i)) {
                         spdlog::error(GetLastErrorMsg());
                 }
         }
 
-        return success;
+        return true;
 }
 
 auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
