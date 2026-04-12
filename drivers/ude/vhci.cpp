@@ -12,7 +12,7 @@
 #include "persistent.h"
 
 #include <libdrv/wdm_cpp.h>
-#include <libdrv/pair.h>
+#include <libdrv/utils.h>
 
 #include <ntstrsafe.h>
 #include <usbdlib.h>

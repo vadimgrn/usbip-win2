@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -119,14 +119,5 @@ enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 const char *ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-WSK_DATA_INDICATION *tail(_In_opt_ WSK_DATA_INDICATION *di);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-size_t size(_In_opt_ const WSK_DATA_INDICATION *di);
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto size(_In_ const WSK_DATA_INDICATION &di) { return size(&di); }
 
 } // namespace wsk

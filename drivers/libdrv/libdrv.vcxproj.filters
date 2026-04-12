@@ -32,7 +32,6 @@
     </ClInclude>
     <ClInclude Include="wdf_cpp.h" />
     <ClInclude Include="ch9.h" />
-    <ClInclude Include="pair.h" />
     <ClInclude Include="unique_ptr.h" />
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="ioctl.h" />
@@ -45,6 +44,7 @@
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
     <ClInclude Include="wait_timeout.h" />
     <ClInclude Include="wdm_cpp.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

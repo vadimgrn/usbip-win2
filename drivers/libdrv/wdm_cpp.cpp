@@ -3,7 +3,7 @@
  */
 
 #include "wdm_cpp.h"
-#include "pair.h" // swap
+#include "utils.h"
 
 #include <wdm.h>
 
@@ -68,6 +68,6 @@ void* wdm::object_reference::release()
 
 void wdm::object_reference::swap(_Inout_ object_reference &other)
 {
-	::swap(m_obj, other.m_obj);
-	::swap(m_defer_delete, other.m_defer_delete);
+        ::swap(m_obj, other.m_obj);
+        ::swap(m_defer_delete, other.m_defer_delete);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2025-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once

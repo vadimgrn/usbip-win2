@@ -257,8 +257,8 @@
     <ClInclude Include="irp.h" />
     <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="codeseg.h" />
+    <ClInclude Include="utils.h" />
     <ClInclude Include="wdm_cpp.h" />
-    <ClInclude Include="pair.h" />
     <ClInclude Include="remove_lock.h" />
     <ClInclude Include="select.h" />
     <ClInclude Include="unique_ptr.h" />

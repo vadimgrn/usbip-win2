@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <ntddk.h>
@@ -807,23 +807,4 @@ const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG 
                                         Flags & WSK_FLAG_AT_DISPATCH_LEVEL ? ":AT_DISPATCH_LEVEL" : "");
 
         return st != STATUS_INVALID_PARAMETER ? buf : "ReceiveEventFlags invalid parameter";
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-size_t wsk::size(_In_opt_ const WSK_DATA_INDICATION *di)
-{
-        size_t total = 0;
-
-        for ( ; di; di = di->Next) {
-                total += di->Buffer.Length;
-        }
-
-        return total;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-WSK_DATA_INDICATION* wsk::tail(_In_opt_ WSK_DATA_INDICATION *di)
-{
-        for ( ; di && di->Next; di = di->Next);
-        return di;
 }
