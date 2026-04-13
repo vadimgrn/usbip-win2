@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "..\remote.h"
@@ -327,7 +327,16 @@ auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const
 {
 	std::unique_ptr<ADDRINFOEX, decltype(FreeAddrInfoEx)&> ptr(nullptr, FreeAddrInfoEx);
 
-	NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
+        auto host = utf8_to_wchar(hostname);
+        auto svc = utf8_to_wchar(service);
+
+        if (!(host && svc)) {
+                last.error = host.error_or(svc.error());
+                libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, last.error);
+                return ptr; 
+        }
+
+        NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
 	if (!evt) {
 		last.error = WSAGetLastError();
 		libusbip::output("CreateEvent error {}", last.error);
@@ -336,16 +345,13 @@ auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const
 
 	OVERLAPPED ovlp { .hEvent = evt.get() };
 
-	auto host = utf8_to_wchar(hostname);
-	auto svc = utf8_to_wchar(service);
-
 	const ADDRINFOEX hints{ .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM };
 	ADDRINFOEX *result{};
 	HANDLE cancel{};
 
 	libusbip::output("resolving {}:{}", hostname, service);
 
-	last.error = GetAddrInfoEx(host.c_str(), svc.c_str(), NS_ALL, nullptr, 
+	last.error = GetAddrInfoEx(host->c_str(), svc->c_str(), NS_ALL, nullptr, 
 				   &hints, &result, nullptr, &ovlp, nullptr, &cancel);
 
 	switch (last.error) {
@@ -385,11 +391,17 @@ const char* usbip::get_tcp_port() noexcept
  */
 auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Socket
 {
-	auto host = utf8_to_wchar(hostname);
+        set_last_error last(NO_ERROR); // restore after sock.close()
+        Socket sock;
+
+        auto host = utf8_to_wchar(hostname);
 	auto svc = utf8_to_wchar(service);
 
-	set_last_error last(NO_ERROR); // restore after sock.close()
-	Socket sock;
+        if (!(host && svc)) {
+                last.error = host.error_or(svc.error());
+                libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, last.error);
+                return sock;
+        }
 
 	for (auto family: {AF_INET, AF_INET6}) {
 
@@ -402,7 +414,7 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Sock
 			//
 		} else if (!set_options(last, sock.get())) {
 			//
-		} else if (!connect_by_name(sock.get(), host.c_str(), svc.c_str())) {
+		} else if (!connect_by_name(sock.get(), host->c_str(), svc->c_str())) {
 			last.error = WSAGetLastError();
 			libusbip::output("WSAConnectByName(family={}) error {}", family, last.error);
 			break; // it makes no sense to try next family

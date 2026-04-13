@@ -6,58 +6,71 @@
 
 #include <windows.h>
 
-#include <cassert>
 #include <memory>
 #include <format>
 
-std::wstring usbip::utf8_to_wchar(_In_ std::string_view s)
+std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
 {
-        std::wstring ws;
-
-        auto f = [] (auto &s, auto buf, auto cch) { 
+        auto f = [] (const auto &s, auto buf, auto cch) { 
                 return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, 
                                            s.data(), static_cast<int>(s.size()), buf, cch); 
         };
 
         auto cch = f(s, nullptr, 0);
         if (!cch) {
-                auto err = GetLastError();
-                return ws = L"MultiByteToWideChar error " + std::format(L"{:#x}", err);
+                return std::unexpected(GetLastError());
         }
 
-        ws.resize(cch);
+        std::wstring ws(cch, L'\0');
 
-        if (auto n = f(s, ws.data(), cch); n != cch) [[unlikely]] {
+        if (auto n = f(s, ws.data(), cch); !n) [[unlikely]] {
+                return std::unexpected(GetLastError());
+        } else if (n != cch) [[unlikely]] {
                 ws.resize(n);
-                assert(!"MultiByteToWideChar");
         }
 
 	return ws;
 }
  
-std::string usbip::wchar_to_utf8(_In_ std::wstring_view ws)
+std::expected<std::string, DWORD> usbip::wchar_to_utf8(_In_ std::wstring_view ws)
 {
-        std::string s;
-
-        auto f = [] (auto &ws, auto buf, auto cb) {
+        auto f = [] (const auto &ws, auto buf, auto cb) {
                 return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(), static_cast<int>(ws.size()), 
                                            buf, cb, nullptr, nullptr);
         };
 
         auto cb = f(ws, nullptr, 0);
         if (!cb) {
-                auto err = GetLastError();
-                return s = "WideCharToMultiByte error " + std::format("{:#x}", err);
+                return std::unexpected(GetLastError());
         }
 
-        s.resize(cb);
+        std::string s(cb, '\0');
 
-        if (auto n = f(ws, s.data(), cb); n != cb) [[unlikely]] {
+        if (auto n = f(ws, s.data(), cb); !n) [[unlikely]] {
+                return std::unexpected(GetLastError());
+        } else if (n != cb) [[unlikely]] {
                 s.resize(n);
-                assert(!"WideCharToMultiByte");
         }
 
         return s;
+}
+
+std::wstring usbip::utf8_to_wchar_or_errmsg(_In_ std::string_view s)
+{
+        auto ws = utf8_to_wchar(s);
+        if (!ws) {
+                ws = std::format(L"utf8_to_wchar error {}", ws.error());
+        }
+        return *ws;
+}
+
+std::string usbip::wchar_to_utf8_or_errmsg(_In_ std::wstring_view ws)
+{
+        auto s = wchar_to_utf8(ws);
+        if (!s) {
+                s = std::format("wchar_to_utf8 error {}", s.error());
+        }
+        return *s;
 }
 
 std::vector<std::wstring> usbip::split_multi_sz(_In_ std::wstring_view str)

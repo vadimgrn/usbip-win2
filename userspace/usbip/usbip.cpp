@@ -38,9 +38,9 @@ auto get_ids_data()
 
 auto get_version()
 {
-	win::FileVersion fv;
-	auto ver = fv.GetFileVersion();
-	return wchar_to_utf8(ver); // CLI::narrow(ver)
+        win::FileVersion fv;
+        auto ver = fv.GetFileVersion();
+        return wchar_to_utf8_or_errmsg(ver);
 }
 
 auto pack(command_t cmd, void *p) 

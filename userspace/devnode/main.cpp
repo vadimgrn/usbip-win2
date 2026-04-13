@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <windows.h>
@@ -66,7 +66,7 @@ auto get_version(_In_ const wchar_t *program)
 {
         win::FileVersion fv(program);
         auto ver = fv.GetFileVersion();
-        return wchar_to_utf8(ver); // CLI::narrow(ver)
+        return wchar_to_utf8_or_errmsg(ver);
 }
 
 /*

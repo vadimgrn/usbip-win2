@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 #include "..\format_message.h"
 #include "strconv.h"
@@ -19,8 +19,7 @@ std::wstring usbip::wformat_message(
                 std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(buf, LocalFree);
                 msg.assign(buf, cch);
         } else {
-                auto err = GetLastError();
-                msg = L"FormatMessageW error " + std::format(L"{:#x}", err);
+                msg = std::format(L"FormatMessageW error {:#x}", GetLastError());
         }
 
         return msg;
@@ -29,11 +28,11 @@ std::wstring usbip::wformat_message(
 std::string usbip::format_message(_In_ DWORD msg_id, _In_ DWORD lang_id) 
 { 
         auto ws = wformat_message(msg_id, lang_id);
-        return wchar_to_utf8(ws);
+        return wchar_to_utf8_or_errmsg(ws);
 }
 
 std::string usbip::format_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id)
 {
         auto ws = wformat_message(module, msg_id, lang_id);
-        return wchar_to_utf8(ws);
+        return wchar_to_utf8_or_errmsg(ws);
 }

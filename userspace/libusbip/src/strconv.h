@@ -8,12 +8,19 @@
 
 #include <string>
 #include <vector>
+#include <expected>
 
 namespace usbip
 {
 
-USBIP_API std::wstring utf8_to_wchar(_In_ std::string_view s);
-USBIP_API std::string wchar_to_utf8(_In_ std::wstring_view ws);
+/**
+ * @return value or result of GetLastError()
+ */
+USBIP_API std::expected<std::wstring, unsigned long> utf8_to_wchar(_In_ std::string_view s);
+USBIP_API std::expected<std::string,  unsigned long> wchar_to_utf8(_In_ std::wstring_view ws);
+
+USBIP_API std::wstring utf8_to_wchar_or_errmsg(_In_ std::string_view s);
+USBIP_API std::string  wchar_to_utf8_or_errmsg(_In_ std::wstring_view ws);
 
 /**
  * Empty strings or strings beginning with L'\0' will be skipped.
