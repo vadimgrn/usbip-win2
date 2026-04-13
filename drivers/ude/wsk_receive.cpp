@@ -743,6 +743,10 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	}
 
 	libdrv::RaiseIrql lvl(DISPATCH_LEVEL);
-	UdecxUrbCompleteWithNtStatus(request, status);
-}
 
+	if (NT_SUCCESS(status)) {
+		UdecxUrbComplete(request, urb_st);
+	} else {
+		UdecxUrbCompleteWithNtStatus(request, status);
+	}
+}
