@@ -20,7 +20,7 @@ auto attach_persistent_devices(HANDLE dev)
                 return false;
         } else for (auto &i: *v) {
                 printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
-                if (!vhci::attach(dev, i)) {
+                if (vhci::attach_args args{ .location = std::move(i) }; !vhci::attach(dev, args)) {
                         spdlog::error(GetLastErrorMsg());
                 }
         }
@@ -59,20 +59,22 @@ bool usbip::cmd_attach(void *p)
                 return attach_persistent_devices(dev.get());
         }
 
-        device_location location {
-                .hostname = args.remote, 
-                .service = global_args.tcp_port, 
-                .busid = args.busid,
+        vhci::attach_args cmd_args {
+                .location {
+                        .hostname = std::move(args.remote), 
+                        .service = global_args.tcp_port, 
+                        .busid = std::move(args.busid),
+                },
+                .serial = std::move(args.serial),
+                .once = args.once
         };
 
         if (args.stop || args.stop_all) {
                 assert(args.stop != args.stop_all);
-                return stop_attach_attempts(dev.get(), args.stop ? &location : nullptr);
+                return stop_attach_attempts(dev.get(), args.stop ? &cmd_args.location : nullptr);
         }
 
-        auto options = args.once ? vhci::ATTACH_ONCE : 0;
-
-        auto port = vhci::attach(dev.get(), location, options);
+        auto port = vhci::attach(dev.get(), cmd_args);
         if (!port) {
                 spdlog::error(GetLastErrorMsg());
                 return false;

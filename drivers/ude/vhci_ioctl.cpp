@@ -533,7 +533,9 @@ PAGED auto plugin_hardware(
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, once %!bool!", r.host, r.service, r.busid, once);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %!bool!",
+                r.host, r.service, r.busid, r.serial, once);
+
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
@@ -605,6 +607,16 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto validate_serial(_In_ const vhci::ioctl::plugin_hardware &r)
+{
+        PAGED_CODE();
+        constexpr SSIZE_T maxlen = ARRAYSIZE(r.serial);
+        auto len = is_ascii_alnum(r.serial, maxlen);
+        return len >= 0 && len < maxlen;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
 {
         PAGED_CODE();
@@ -620,6 +632,9 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         } else if (r->size != length) {
                 Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
                 return USBIP_ERROR_ABI;
+        } else if (!validate_serial(*r)) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%.31s'", r->serial);
+                return USBIP_ERROR_SERIAL_NUMBER;
         }
 
         r->port = 0;

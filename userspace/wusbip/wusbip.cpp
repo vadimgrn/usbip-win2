@@ -838,7 +838,7 @@ void MainFrame::on_close_to_tray(wxCommandEvent &event)
 }
 
 DWORD MainFrame::attach(
-        _In_ const wxString &url, _In_ const wxString &busid, _In_ unsigned long options)
+        _In_ const wxString &url, _In_ const wxString &busid, _In_ bool once)
 {
         wxString hostname;
         wxString service;
@@ -847,16 +847,20 @@ DWORD MainFrame::attach(
                 return ERROR_INVALID_PARAMETER;
         }
 
-        device_location loc {
-                .hostname = hostname.ToStdString(wxConvUTF8),
-                .service = service.ToStdString(wxConvUTF8),
-                .busid = busid.ToStdString(wxConvUTF8),
+        vhci::attach_args args {
+                .location {
+                        .hostname = hostname.ToStdString(wxConvUTF8),
+                        .service = service.ToStdString(wxConvUTF8),
+                        .busid = busid.ToStdString(wxConvUTF8),
+                },
+                //.serial = ,
+                .once = once
         };
 
         DWORD err{};
-        auto f = [&err, loc = std::move(loc), vhci = get_vhci().get(), options]
+        auto f = [&err, args = std::move(args), vhci = get_vhci().get()]
         { 
-                auto port = vhci::attach(vhci, loc, options); 
+                auto port = vhci::attach(vhci, args); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
         };
 
@@ -868,12 +872,12 @@ DWORD MainFrame::attach(
 
 void MainFrame::on_attach_once(wxCommandEvent&)
 {
-        attach(vhci::ATTACH_ONCE);
+        attach(true);
 }
 
-void MainFrame::attach(_In_ unsigned long options)
+void MainFrame::attach(_In_ bool once)
 {
-        wxLogVerbose(L"%s, options %#lx", wxString::FromAscii(__func__), options);
+        wxLogVerbose(L"%s, once %d", wxString::FromAscii(__func__), once);
 
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
@@ -881,7 +885,7 @@ void MainFrame::attach(_In_ unsigned long options)
                 auto url = tree.GetItemText(server);
                 auto busid = tree.GetItemText(dev);
 
-                if (auto err = attach(url, busid, options)) {
+                if (auto err = attach(url, busid, once)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
                                               url, busid, err, GetLastErrorMsg(err));

@@ -22,6 +22,28 @@
  * Strings encoding is UTF8. 
  */
 
+namespace usbip
+{
+
+/*
+ * Buffer length for USB_DEVICE_DESCRIPTOR.iSerialNumber string in characters,
+ * including the terminating '\0'.
+ */
+enum { SERIAL_BUFSZ = 32 };
+
+/**
+ * Check that the string consists only of ASCII alphanumeric characters.
+ * @param s null-ternimated ASCII string
+ * @param maxlen max buffer size
+ * @return < 0 if parameters/characters are invalid,
+ *         otherwise the same as strnlen(s, maxlen)
+ */
+constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, _In_ SSIZE_T maxlen);
+constexpr auto is_ascii(_In_ unsigned char ch) { return ch < 0x7F; }
+
+} // namespace usbip
+
+
 namespace usbip::vhci
 {
 
@@ -53,6 +75,9 @@ struct imported_device_properties
 
         UINT16 vendor;
         UINT16 product;
+
+        char serial[SERIAL_BUFSZ];
+        UCHAR iserial; // USB_DEVICE_DESCRIPTOR.iSerialNumber
 };
 
 struct imported_device : imported_device_location, imported_device_properties {};
@@ -102,7 +127,10 @@ enum {
         PLUGOUT_HARDWARE_AND_REATTACH = make(function::plugout_hardware_and_reattach), // for internal use only
 };
 
-struct plugin_hardware : base, imported_device_location {};
+struct plugin_hardware : base, imported_device_location
+{
+        char serial[SERIAL_BUFSZ];
+};
 
 struct stop_attach_attempts : base, imported_device_location
 {
@@ -125,3 +153,43 @@ constexpr auto get_imported_devices_size(_In_ ULONG n)
 }
 
 } // namespace usbip::vhci::ioctl
+
+
+/*
+ * UTF-8 is designed so that all ASCII characters (0–127)
+ * are represented by a single byte with the high bit set to 0.
+ */
+constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, _In_ SSIZE_T maxlen)
+{
+        if (!(s && maxlen >= 0)) {
+                return -1;
+        }
+
+        for (SSIZE_T i = 0; i < maxlen; ++i) {
+
+                unsigned char c = s[i];
+                if (!c) {
+                        return i;
+                }
+
+                auto alnum = (c <= 'z' && c >= 'a') ||
+                             (c <= 'Z' && c >= 'A') ||
+                             (c <= '9' && c >= '0');
+
+                if (!alnum) {
+                        return -1;
+                }
+        }
+
+        return maxlen;
+}
+
+static_assert(usbip::is_ascii_alnum(nullptr, 1) < 0);
+static_assert(usbip::is_ascii_alnum("", -1) < 0);
+static_assert(usbip::is_ascii_alnum("", 0) == 0);
+static_assert(usbip::is_ascii_alnum("", 1) == 0);
+static_assert(usbip::is_ascii_alnum("1", 2) == 1);
+static_assert(usbip::is_ascii_alnum("1@", 3) < 0);
+static_assert(usbip::is_ascii_alnum("1", 1) == 1);
+static_assert(usbip::is_ascii_alnum("1\000W", 4) == 1);
+

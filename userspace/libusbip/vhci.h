@@ -36,7 +36,16 @@ struct imported_device
 
         UINT16 vendor{};
         UINT16 product{};
+
+        std::string serial; // only filled if you set it during attach
 };
+
+/*
+ * Serial number must contain no more than 31 alphanumeric ASCII characters.
+ * @param serial number of usb device
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool validate_device_serial(_In_ const std::string &serial);
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
@@ -70,25 +79,23 @@ USBIP_API Handle open(_In_ bool overlapped = false);
  */
 USBIP_API std::optional<std::vector<imported_device>> get_imported_devices(_In_ HANDLE dev);
 
-/*
- * @see attach
+
+/**
+ * @see validate_device_serial
  */
-enum attach_flags_t : unsigned long {
-        ATTACH_ONCE = 1 // do not run automatic attach attempts if an error is returned
+struct attach_args
+{
+        device_location location;
+        std::string serial; // optional device serial number if you want to set/override it
+        bool once; // do not run automatic attach attempts if an error is returned
 };
 
 /**
  * @param dev handle of the driver device
- * @param location remote device to attach to
- * @param options see attach_flags_t
+ * @param args arguments
  * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
  */
-USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location, _In_ unsigned long options);
-
-/**
- * The same as attach(..., options=0)
- */
-USBIP_API int attach(_In_ HANDLE dev, _In_ const device_location &location);
+USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);
 
 /**
  * @param dev handle of the driver device

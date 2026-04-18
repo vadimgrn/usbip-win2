@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device_ioctl.h"
@@ -152,6 +152,58 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
         return STATUS_PENDING;
 }
 
+/*
+ * @return device string descriptor index or zero if not a such kind of request
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_device_string_descr(_In_ const USB_DEFAULT_PIPE_SETUP_PACKET &s)
+{
+        return  s.bmRequestType.B == (USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE) &&
+                s.bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+                s.wValue.HiByte == USB_STRING_DESCRIPTOR_TYPE ?
+                s.wValue.LowByte : UCHAR(); // string index, zero for list of supported languages
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto fill_usb_device_serial(
+        _Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ const vhci::imported_device_properties &props)
+{
+        constexpr UCHAR str_offs = __builtin_offsetof(USB_STRING_DESCRIPTOR, bString);
+
+        if (r.TransferBufferLength < str_offs) {
+                Trace(TRACE_LEVEL_ERROR,"TransferBufferLength(%lu) < %d", r.TransferBufferLength, str_offs);
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        auto &sd = *reinterpret_cast<USB_STRING_DESCRIPTOR*>(r.TransferBuffer); // UdecxUrbRetrieveBuffer
+        sd.bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+        sd.bLength = str_offs;
+
+        auto buf_cch = (r.TransferBufferLength - str_offs)/sizeof(*sd.bString);
+
+        for (UCHAR i = 0; i < ARRAYSIZE(props.serial); ++i) {
+
+                if (UCHAR ch = props.serial[i]; !ch) {
+                        sd.bLength += i*sizeof(*sd.bString);
+                        r.TransferBufferLength = sd.bLength; // UdecxUrbSetBytesCompleted
+                        return STATUS_SUCCESS;
+                } else if (!is_ascii(ch)) {
+                        Trace(TRACE_LEVEL_ERROR, "serial '%.31s' contains a non-ASCII character #%d %#02x", props.serial, i, ch);
+                        return STATUS_INVALID_PARAMETER;
+                } else if (i < buf_cch) {
+                        sd.bString[i] = ch;
+                } else {
+                        Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu) is too small", r.TransferBufferLength);
+                        return STATUS_BUFFER_TOO_SMALL;
+                }
+        }
+
+        Trace(TRACE_LEVEL_ERROR, "serial '%.31s' does not have trailing zero", props.serial);
+        return STATUS_INVALID_PARAMETER;
+}
+
 using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, endpoint_ctx&, WDFREQUEST, URB&);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -195,6 +247,14 @@ auto control_transfer(
         } else if (buf_len < pkt.wLength) {
                 Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu) < wLength(%d)", buf_len, pkt.wLength);
                 return STATUS_INVALID_PARAMETER;
+        }
+
+        if (auto idx = get_device_string_descr(pkt); !idx) {
+                // not a string descriptor request or get list of supported languages
+        } else if (auto &props = dev.ext().properties(); idx != props.iserial) {
+                // not a iSerialNumber
+        } else if (auto st = fill_usb_device_serial(r, props); NT_SUCCESS(st)) {
+                return st;
         }
 
         wsk_context_ptr ctx(&dev, request);
