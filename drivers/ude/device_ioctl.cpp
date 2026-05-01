@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "device_ioctl.h"
@@ -27,6 +27,8 @@
 #include <libdrv\usb_util.h>
 #include <libdrv\dbgcommon.h>
 #include <libdrv\usbd_helper.h>
+
+#include <ntstrsafe.h>
 
 namespace
 {
@@ -152,6 +154,54 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
         return STATUS_PENDING;
 }
 
+/*
+ * @return device string descriptor index or zero if not a such kind of request
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_device_string_descr(_In_ const USB_DEFAULT_PIPE_SETUP_PACKET &s)
+{
+        return  s.bmRequestType.B == (USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE) &&
+                s.bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+                s.wValue.HiByte == USB_STRING_DESCRIPTOR_TYPE ?
+                s.wValue.LowByte : UCHAR(); // string index, zero for list of supported languages
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto fill_usb_device_serial(
+        _Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ const vhci::imported_device_properties &props)
+{
+        constexpr UCHAR hdr_sz = libdrv::usb_string_descr_size(0);
+
+        if (r.TransferBufferLength < hdr_sz) {
+                Trace(TRACE_LEVEL_ERROR,"TransferBufferLength(%lu) < %d", r.TransferBufferLength, hdr_sz);
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        size_t serial_cch;
+        if (auto err = RtlStringCchLengthA(props.serial, ARRAYSIZE(props.serial), &serial_cch)) {
+                Trace(TRACE_LEVEL_ERROR,"RtlStringCchLengthA('%.15s') %!STATUS!", props.serial, err);
+                return err;
+        }
+
+        auto &sd = *reinterpret_cast<USB_STRING_DESCRIPTOR*>(r.TransferBuffer); // UdecxUrbRetrieveBuffer
+        sd.bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
+        sd.bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+
+        auto buf_cch = (r.TransferBufferLength - hdr_sz)/sizeof(*sd.bString);
+        auto cch = min(buf_cch, serial_cch);
+
+        for (auto i = 0U; i < cch; ++i) {
+                UCHAR ch = props.serial[i];
+                NT_ASSERT(is_ascii(ch));
+                sd.bString[i] = ch;
+        }
+
+        r.TransferBufferLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
+        return STATUS_SUCCESS;
+}
+
 using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, endpoint_ctx&, WDFREQUEST, URB&);
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -195,6 +245,14 @@ auto control_transfer(
         } else if (buf_len < pkt.wLength) {
                 Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu) < wLength(%d)", buf_len, pkt.wLength);
                 return STATUS_INVALID_PARAMETER;
+        }
+
+        if (auto idx = get_device_string_descr(pkt); !idx) {
+                // not a string descriptor request or get list of supported languages
+        } else if (auto &props = dev.ext().properties(); idx != props.iserial) {
+                // not a iSerialNumber
+        } else if (auto st = fill_usb_device_serial(r, props); NT_SUCCESS(st)) {
+                return st;
         }
 
         wsk_context_ptr ctx(&dev, request);

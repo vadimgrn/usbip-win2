@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -21,10 +21,16 @@ enum op_status_t // op_common.status
         ST_ERROR // ST_DEV_ERR?
 };
 
+/*
+ * SERIAL_BUFSZ
+ *      buffer length for USB_DEVICE_DESCRIPTOR.iSerialNumber
+ *      string in characters, including the terminating '\0'.
+ */
 enum { 
         USBIP_VERSION = 0x111, // protocol
         DEV_PATH_MAX = 256, 
-        BUS_ID_SIZE = 32 
+        BUS_ID_SIZE = 32,
+        SERIAL_BUFSZ = 16,
 };
 
 } // namespace usbip

@@ -10,6 +10,7 @@
 namespace usbip
 {
 
+struct persistent_device;
 struct device_location;
 struct imported_device;
 struct device_state;
@@ -24,7 +25,8 @@ enum column_pos_t { // columns order in the tree
         COL_PERSISTENT,
         COL_NOTES,
         COL_DEVID,
-        COL_LAST_VISIBLE = COL_DEVID,
+        COL_SERIAL,
+        COL_LAST_VISIBLE = COL_SERIAL,
         COL_SOURCE_ID, // hidden
 
         UPD_COL_FIRST = COL_PORT,
@@ -53,8 +55,8 @@ constexpr auto mkflags(_In_ std::initializer_list<column_pos_t> columns) noexcep
 }
 static_assert(mkflags({COL_PORT, COL_SPEED, COL_VENDOR}) == 0b1110);
 
-device_location make_device_location(_In_ const device_columns &dc);
-device_location make_device_location(_In_ const wxString &url, _In_ const wxString &busid);
+persistent_device make_persistent_device(_In_ const device_columns &dc);
+persistent_device make_persistent_device(_In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial);
 
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const imported_device &dev);
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const device_state &st);
@@ -72,12 +74,12 @@ constexpr auto get_cmp_key(_In_ const device_columns &dc)
 
 constexpr auto operator == (_In_ const device_columns &a, _In_ const device_columns &b)
 {
-	return get_cmp_key(a) == get_cmp_key(b);
+        return get_cmp_key(a) == get_cmp_key(b);
 }
 
 constexpr auto operator <=> (_In_ const device_columns &a, _In_ const device_columns &b)
 {
-	return get_cmp_key(a) <=> get_cmp_key(b);
+        return get_cmp_key(a) <=> get_cmp_key(b);
 }
 
 } // namespace usbip

@@ -57,23 +57,27 @@ bool usbip::is_empty(_In_ const imported_device &d) noexcept
         return !d.devid;
 }
 
-auto usbip::make_device_location(_In_ const wxString &url, _In_ const wxString &busid) -> device_location
+auto usbip::make_persistent_device(
+        _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial) -> persistent_device
 {
         wxString hostname;
         wxString service;
         split_server_url(url, hostname, service);
 
-        return device_location {
-                .hostname = hostname.ToStdString(wxConvUTF8), 
-                .service = service.ToStdString(wxConvUTF8), 
-                .busid = busid.ToStdString(wxConvUTF8), 
+        return persistent_device {
+                .location {
+                        .hostname = hostname.utf8_string(), 
+                        .service = service.utf8_string(), 
+                        .busid = busid.utf8_string()
+                },
+                .serial = serial.utf8_string()
         };
 }
 
-auto usbip::make_device_location(_In_ const device_columns &dc) -> device_location
+auto usbip::make_persistent_device(_In_ const device_columns &dc) -> persistent_device
 {
 	auto &url = get_url(dc);
-	return make_device_location(url, dc[COL_BUSID]);
+	return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL]);
 }
 
 auto usbip::make_device_columns(_In_ const imported_device &dev) ->
@@ -99,6 +103,11 @@ auto usbip::make_device_columns(_In_ const imported_device &dev) ->
         if (dev.port) {
                 dc[COL_PORT] = wxString::Format(L"%03d", dev.port); // XXX for proper sorting
                 flags |= mkflag(COL_PORT);
+        }
+
+        if (!dev.serial.empty()) {
+                dc[COL_SERIAL] = wxString::FromUTF8(dev.serial);
+                flags |= mkflag(COL_SERIAL);
         }
 
         return res;

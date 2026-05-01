@@ -9,8 +9,10 @@
 #include "driver.h"
 #include "persistent.h"
 
-#include <libdrv\strconv.h>
-#include <libdrv\wsk_cpp.h>
+#include <libdrv/strconv.h>
+#include <libdrv/wsk_cpp.h>
+
+#include <ntstrsafe.h>
 
 namespace
 {
@@ -120,7 +122,18 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         }
 
         auto &ext = get_device_ctx_ext(ctx_ext);
-        return init_device_attributes(ext.attr, r);
+
+        if (auto err = init_device_attributes(ext.attr, r)) {
+                return err;
+        }
+
+        if (auto &props = ext.properties();
+            auto err = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial))) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%.15s') %!STATUS!", r.serial, err);
+                return err;
+        }
+
+        return STATUS_SUCCESS;
 }
 
 _IRQL_requires_same_

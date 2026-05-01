@@ -1,4 +1,4 @@
-;// Copyright (C) 2023 - 2024 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+;// Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 ;//
 ;#pragma once
 ;
@@ -141,4 +141,12 @@ Facility=Library
 SymbolicName=USBIP_ERROR_DRIVER_RESPONSE
 Language=English
 Unexpected response from the driver (length, content, etc.).
+.
+
+MessageId=
+Severity=Error
+Facility=Driver
+SymbolicName=USBIP_ERROR_SERIAL_NUMBER
+Language=English
+USB device serial number must contain no more than 15 alphanumeric ASCII characters.
 .

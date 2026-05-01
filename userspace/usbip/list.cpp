@@ -9,6 +9,7 @@
 #include <libusbip\persistent.h>
 
 #include <spdlog\spdlog.h>
+#include <print>
 
 namespace
 {
@@ -18,8 +19,8 @@ using namespace usbip;
 void on_device_count(int count)
 {
 	if (count) {
-		printf("Exportable USB devices\n"
-			"======================\n");
+		std::println("Exportable USB devices\n"
+			     "======================");
 	}
 }
 
@@ -41,7 +42,7 @@ void on_device(int, const usb_device &d)
 		lines += '\n';
 	}
 
-	printf(lines.c_str());
+        std::print("{}", lines);
 }
 
 void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
@@ -54,7 +55,7 @@ void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
 		s += '\n';
 	}
 
-	printf(s.c_str());
+        std::print("{}", s);
 }
 
 auto list_persistent_devices()
@@ -66,7 +67,8 @@ auto list_persistent_devices()
 		spdlog::error(GetLastErrorMsg());
                 return false;
         } else for (auto &i: *v) {
-		printf("%s:%s/%s\n", i.hostname.c_str(), i.service.c_str(), i.busid.c_str());
+                auto &loc = i.location;
+                std::println("{}:{}/{}\t{}", loc.hostname, loc.service, loc.busid, i.serial);
         }
 
         return true;

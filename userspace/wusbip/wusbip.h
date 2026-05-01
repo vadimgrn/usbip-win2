@@ -76,7 +76,7 @@ private:
 	void on_view_reset(wxCommandEvent &event) override;
 	void on_help_about_lib(wxCommandEvent&) override;
 	void on_copy_rows(wxCommandEvent &event) override;
-        void on_attach(wxCommandEvent&) override { attach(0); }
+        void on_attach(wxCommandEvent&) override { attach(false); }
         void on_attach_once(wxCommandEvent&) override;
         void on_attach_stop(wxCommandEvent &event) override;
 
@@ -111,10 +111,11 @@ private:
 	void on_view_labels(wxCommandEvent &event) override;
 	void on_view_labels_update_ui(wxUpdateUIEvent &event) override;
 
-	void on_edit_notes(wxCommandEvent &event) override;
-	void on_edit_notes_update_ui(wxUpdateUIEvent &event) override;
+        void on_edit_device_update_ui(wxUpdateUIEvent &event) override;
+        void on_edit_notes(wxCommandEvent &event) override;
+        void on_edit_serial(wxCommandEvent &event) override;
 
-	void on_frame_mouse_wheel(wxMouseEvent &event) override;
+        void on_frame_mouse_wheel(wxMouseEvent &event) override;
 
 	void on_view_font_increase(wxCommandEvent & event) override;
 	void on_view_font_decrease(wxCommandEvent & event) override;
@@ -122,6 +123,10 @@ private:
 
 	void on_view_appearance(wxCommandEvent &event) override;
 	void on_status_bar_timer(wxTimerEvent&);
+
+        void edit_column_dlg(
+                _In_ const wxString &title, _In_ usbip::column_pos_t col, _In_ int maxlen,
+                _In_ const std::function<wxString (const wxString&)> &validator);
 
 	void init();
 	void check_view_appearance(_In_ int appearance);
@@ -139,8 +144,8 @@ private:
 
 	void remove_device(_In_ wxTreeListItem dev);
 
-        void attach(_In_ unsigned long options);
-        DWORD attach(_In_ const wxString &url, _In_ const wxString &busid, _In_ unsigned long options);
+        void attach(_In_ bool once);
+        DWORD attach(_In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ bool once);
         DWORD detach(_In_ int port);
 	
 	void post_refresh();
@@ -159,7 +164,7 @@ private:
 	void set_menu_columns_labels();
 
 	int get_port(_In_ wxTreeListItem dev) const;
-	wxTreeListItem get_edit_notes_device();
+	wxTreeListItem get_edit_device();
 
 	void save(_In_ const wxTreeListItems &devices);
 	void on_tree_mouse_wheel(_In_ wxMouseEvent &event);

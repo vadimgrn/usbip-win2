@@ -4,8 +4,10 @@
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-#include <libdrv\wdf_cpp.h>
+#include <usbip/consts.h>
+
+#include <libdrv/codeseg.h>
+#include <libdrv/wdf_cpp.h>
 
 namespace usbip
 {
@@ -50,6 +52,10 @@ int stop_attach_attempts(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash);
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool can_reattach(_In_ WDFDEVICE vhci, _In_ ULONG location_hash, _In_ NTSTATUS status);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS validate_serial_number(_In_ const char (&serial)[SERIAL_BUFSZ]);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

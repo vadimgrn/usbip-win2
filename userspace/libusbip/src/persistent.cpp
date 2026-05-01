@@ -7,6 +7,8 @@
 #include "output.h"
 
 #include <usbip\vhci.h>
+
+#include <cassert>
 #include <ranges>
 #include <span>
 
@@ -15,24 +17,31 @@ namespace
 
 using namespace usbip;
 
-auto is_malformed(_In_ const device_location &d)
+auto is_malformed(_In_ const device_location &d) noexcept
 {
         return d.hostname.empty() || d.service.empty() || d.busid.empty();
 }
 
-std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<device_location> &v)
+auto is_malformed(_In_ const persistent_device &d) noexcept
+{
+        return is_malformed(d.location) || !validate_device_serial(d.serial);
+}
+
+std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persistent_device> &v)
 {
         std::wstring multi_sz;
 
-        for (auto &i: v) {
-                if (is_malformed(i)) {
-                        libusbip::output("malformed device_location{ hostname='{}', service='{}', busid='{}' }", 
-                                          i.hostname, i.service, i.busid);
+        for (auto &d: v) {
+                auto &dl = d.location;
+
+                if (is_malformed(d)) {
+                        libusbip::output("malformed persistent_device( hostname='{}', service='{}', busid='{}', serial='{}' )",
+                                          dl.hostname, dl.service, dl.busid, d.serial);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                if (auto s = std::format("{},{},{}", i.hostname, i.service, i.busid);
+                if (auto s = std::format("{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial);
                     auto ws = utf8_to_wchar(s)) {
                         *ws += L'\0';
                         multi_sz += *ws;
@@ -49,24 +58,28 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<device_l
         return multi_sz;
 }
 
-auto parse_device_location(_In_ const std::string &str)
+auto parse_persistent_device(_In_ const std::string &str)
 {
-        device_location dl;
+        persistent_device dev;
+        auto &loc = dev.location;
 
-        auto f = [] (auto r) { return std::string_view(r.begin(), r.end()); };
-        auto v = str | std::views::split(',') | std::views::transform(std::move(f));
+        auto v = str | std::views::split(',');
+        auto it = v.begin();
 
-        if (auto i = v.begin(), end = v.end(); i != end) {
-                dl.hostname = *i;
-                if (++i != end) {
-                        dl.service = *i;
-                        if (++i != end) {
-                                dl.busid.assign((*i).data(), &str.back() + 1); // tail
-                        }
-                }
+        if (it != v.end()) {
+                loc.hostname = std::string_view(*it++);
+        }
+        if (it != v.end()) {
+                loc.service = std::string_view(*it++);
+        }
+        if (it != v.end()) {
+                loc.busid = std::string_view(*it++);
+        }
+        if (it != v.end()) {
+                dev.serial.assign((*it).begin(), str.end()); // remaining suffix
         }
 
-        return dl;
+        return dev;
 }
 
 auto get_persistent_devices(_In_ HANDLE dev)
@@ -97,7 +110,7 @@ auto get_persistent_devices(_In_ HANDLE dev)
 } // namespace
 
 
-bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_location> &devices)
+bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<persistent_device> &devices)
 {
         auto val = ::make_multi_sz(devices);
         if (!val) {
@@ -115,9 +128,9 @@ bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<device_
         return ok;
 }
 
-auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<device_location>>
+auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<persistent_device>>
 {
-        std::optional<std::vector<device_location>> devs;
+        std::optional<std::vector<persistent_device>> devs;
 
         auto multi_sz = get_persistent_devices(dev);
         if (!multi_sz) {
@@ -135,7 +148,7 @@ auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<d
         for (auto &ws: strings) {
                 if (auto s = wchar_to_utf8(ws); !s) {
                         libusbip::output("wchar_to_utf8 error {}", s.error());
-                } else if (auto d = parse_device_location(*s); is_malformed(d)) {
+                } else if (auto d = parse_persistent_device(*s); is_malformed(d)) {
                         libusbip::output("malformed '{}'", *s);
                 } else {
                         devs->push_back(std::move(d));

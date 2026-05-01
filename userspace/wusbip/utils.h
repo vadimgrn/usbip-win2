@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -63,19 +63,29 @@ inline auto wx_string(_In_ std::wstring_view s)
         return wxString(s.data(), s.length());
 }
 
-constexpr auto tie(_In_ const device_location &loc)
+constexpr auto get_cmp_key(_In_ const device_location &d)
 {
-        return std::tie(loc.hostname, loc.service, loc.busid); // tuple of lvalue references
+        return std::tie(d.hostname, d.service, d.busid); // tuple of lvalue references
 }
 
 constexpr auto operator == (_In_ const device_location &a, _In_ const device_location &b)
 {
-        return tie(a) == tie(b);
+        return get_cmp_key(a) == get_cmp_key(b);
 }
 
 constexpr auto operator <=> (_In_ const device_location &a, _In_ const device_location &b)
 {
-        return tie(a) <=> tie(b);
+        return get_cmp_key(a) <=> get_cmp_key(b);
+}
+
+constexpr auto operator == (_In_ const persistent_device &a, _In_ const persistent_device &b)
+{
+        return a.location == b.location; // ignore serial
+}
+
+constexpr auto operator <=> (_In_ const persistent_device &a, _In_ const persistent_device &b)
+{
+        return a.location <=> b.location; // ignore serial
 }
 
 } // namespace usbip

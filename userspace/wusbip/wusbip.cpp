@@ -63,8 +63,9 @@ consteval auto get_saved_keys()
                 { L"speed", COL_SPEED },
                 { L"vendor", COL_VENDOR },
                 { L"product", COL_PRODUCT },
+                { L"serial", COL_SERIAL },
                 { L"notes", COL_NOTES },
-        });
+                });
 }
 
 consteval auto get_saved_flags()
@@ -101,11 +102,12 @@ constexpr auto is_port_residual(_In_ state st)
         }
 }
 
-auto as_set(_In_ std::vector<device_columns> v)
+template<typename T>
+requires std::three_way_comparable<T>
+auto as_set(_In_ std::vector<T> v)
 {
-        return std::set<device_columns>(
-                std::make_move_iterator(v.begin()), 
-                std::make_move_iterator(v.end()));
+        return std::set<T>(std::make_move_iterator(v.begin()),
+                           std::make_move_iterator(v.end()));
 }
 
 void log(_In_ const device_state &st)
@@ -126,8 +128,8 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
         auto &url = tree.GetItemText(server);
 
         auto s = wxString::Format(
-                        L"%s:%s/%s, port '%s', devid '%s', speed '%s', vendor '%s', "
-                        L"product '%s', state '%s', auto '%s', notes '%s', source '%s'", 
+                        L"%s:%s/%s, port '%s', devid '%s', speed '%s', vendor '%s', product '%s', "
+                        L"serial '%s', state '%s', auto '%s', notes '%s', source '%s'", 
                         prefix, url,
                         tree.GetItemText(dev, COL_BUSID),
                         tree.GetItemText(dev, COL_PORT),
@@ -135,6 +137,7 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
                         tree.GetItemText(dev, COL_SPEED),
                         tree.GetItemText(dev, COL_VENDOR), 
                         tree.GetItemText(dev, COL_PRODUCT), 
+                        tree.GetItemText(dev, COL_SERIAL), 
                         tree.GetItemText(dev, COL_STATE), 
                         tree.GetItemText(dev, COL_PERSISTENT), 
                         tree.GetItemText(dev, COL_NOTES),
@@ -167,7 +170,7 @@ auto load_license()
 
 auto update_from_saved(
         _Inout_ device_columns &dc, _In_ unsigned int flags,
-        _In_ const std::set<device_location> &persistent, 
+        _In_ const std::set<persistent_device> &persistent, 
         _In_opt_ const std::set<device_columns> *saved = nullptr,
         _In_ bool notes_only = true)
 {
@@ -192,7 +195,7 @@ auto update_from_saved(
                 }
         }
 
-        if (auto loc = make_device_location(dc); persistent.contains(loc)) {
+        if (auto pd = make_persistent_device(dc); persistent.contains(pd)) {
                 dc[COL_PERSISTENT] = g_persistent_mark;
 
                 constexpr auto pers_flag = mkflag(COL_PERSISTENT);
@@ -252,28 +255,25 @@ auto get_selected_devices(
         return v;
 }
 
-auto make_device_location(
+auto make_persistent_device(
         _In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem server, _In_ wxTreeListItem device)
 {
         auto &url = tree.GetItemText(server);
         auto &busid = tree.GetItemText(device);
+        auto &serial = tree.GetItemText(device, COL_SERIAL);
 
-        return usbip::make_device_location(url, busid);
+        return usbip::make_persistent_device(url, busid, serial);
 }
 
 auto get_persistent(_In_ const Handle &vhci = get_vhci())
 {
-        std::set<device_location> result;
+        std::set<persistent_device> result;
 
-        if (auto v = vhci::get_persistent(vhci.get()); !v) {
+        if (auto v = vhci::get_persistent(vhci.get())) {
+                result = as_set(*v);
+        } else {
                 auto err = GetLastError();
                 wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, GetLastErrorMsg(err));
-        } else for (auto &loc: *v) {
-                if (auto [i, inserted] = result.insert(std::move(loc)); !inserted) {
-                        wxLogVerbose(_("%s: failed to insert %s:%s/%s"), 
-                                        wxString::FromAscii(__func__), wxString::FromUTF8(i->hostname), 
-                                        wxString::FromUTF8(i->service), wxString::FromUTF8(i->busid));
-                }
         }
 
         return result;
@@ -308,10 +308,6 @@ auto get_saved()
 
                 if (dev[COL_BUSID].empty()) {
                         continue;
-                }
-
-                if (auto &devid = dev[COL_DEVID]; devid.empty()) { // FIXME: remove after 0.9.7.6 release, temporary
-                        devid = L'0';
                 }
 
                 result.push_back(std::move(dev));
@@ -686,7 +682,7 @@ void MainFrame::on_select_all(wxCommandEvent&)
         m_treeListCtrl->SelectAll();
 }
 
-wxTreeListItem MainFrame::get_edit_notes_device()
+wxTreeListItem MainFrame::get_edit_device()
 {
         auto &tree = *m_treeListCtrl;
         wxTreeListItem item;
@@ -698,15 +694,17 @@ wxTreeListItem MainFrame::get_edit_notes_device()
         return item;
 }
 
-void MainFrame::on_edit_notes_update_ui(wxUpdateUIEvent &event)
+void MainFrame::on_edit_device_update_ui(wxUpdateUIEvent &event)
 {
-        auto item = get_edit_notes_device();
+        auto item = get_edit_device();
         event.Enable(item.IsOk());
 }
 
-void MainFrame::on_edit_notes(wxCommandEvent&)
+void MainFrame::edit_column_dlg(
+        _In_ const wxString &title, _In_ column_pos_t col, _In_ int maxlen,
+        _In_ const std::function<wxString (const wxString&)> &validator)
 {
-        auto dev = get_edit_notes_device();
+        auto dev = get_edit_device();
         if (!dev.IsOk()) {
                 return;
         }
@@ -714,23 +712,58 @@ void MainFrame::on_edit_notes(wxCommandEvent&)
         auto &tree = *m_treeListCtrl;
         auto server = tree.GetItemParent(dev);
 
-        auto url = tree.GetItemText(server);
-        auto busid = tree.GetItemText(dev);
-        auto caption = wxString::Format(_("Notes for %s/%s"), url, busid);
+        auto &url = tree.GetItemText(server);
+        auto &busid = tree.GetItemText(dev);
+        auto caption = wxString::Format(_("%s for %s/%s"), title, url, busid);
 
-        auto vendor = tree.GetItemText(dev, COL_VENDOR);
-        auto product = tree.GetItemText(dev, COL_PRODUCT);
+        auto &vendor = tree.GetItemText(dev, COL_VENDOR);
+        auto &product = tree.GetItemText(dev, COL_PRODUCT);
         auto message = wxString::Format(L"%s\n%s", vendor, product);
 
-        auto notes = tree.GetItemText(dev, COL_NOTES);
+        for (auto value = tree.GetItemText(dev, col); ;) {
 
-        wxTextEntryDialog dlg(this, message, caption, notes, wxTextEntryDialogStyle);
-        dlg.SetMaxLength(256);
+                wxTextEntryDialog dlg(this, message, caption, value, wxTextEntryDialogStyle);
+                dlg.SetMaxLength(maxlen);
 
-        if (dlg.ShowModal() == wxID_OK) {
-                notes = dlg.GetValue();
-                tree.SetItemText(dev, COL_NOTES, notes);
+                if (dlg.ShowModal() != wxID_OK) {
+                        break;
+                }
+
+                value = dlg.GetValue();
+
+                if (!validator) {
+                        //
+                } else if (auto err = validator(value); !err.empty()) {
+                        wxMessageDialog(this, err, title, wxICON_ERROR).ShowModal();
+                        continue;
+                }
+
+                tree.SetItemText(dev, col, value);
+                break;
         }
+}
+
+void MainFrame::on_edit_notes(wxCommandEvent&)
+{
+        enum { MAXLEN = 256 };
+        edit_column_dlg(_("Notes"), COL_NOTES, MAXLEN, nullptr);
+}
+
+void MainFrame::on_edit_serial(wxCommandEvent&)
+{
+        auto validator = [] (const wxString &serial)
+        {
+                wxString err;
+                if (auto s = serial.utf8_string(); !validate_device_serial(s)) {
+                        err = GetLastErrorMsg();
+                }
+                return err;
+        };
+
+        enum { MAXLEN = 15 };
+        wxASSERT(!validate_device_serial(std::string('0', MAXLEN + 1)));
+
+        edit_column_dlg(_("Serial Number"), COL_SERIAL, MAXLEN, validator);
 }
 
 bool MainFrame::is_persistent(_In_ wxTreeListItem device)
@@ -838,7 +871,7 @@ void MainFrame::on_close_to_tray(wxCommandEvent &event)
 }
 
 DWORD MainFrame::attach(
-        _In_ const wxString &url, _In_ const wxString &busid, _In_ unsigned long options)
+        _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ bool once)
 {
         wxString hostname;
         wxString service;
@@ -847,16 +880,20 @@ DWORD MainFrame::attach(
                 return ERROR_INVALID_PARAMETER;
         }
 
-        device_location loc {
-                .hostname = hostname.ToStdString(wxConvUTF8),
-                .service = service.ToStdString(wxConvUTF8),
-                .busid = busid.ToStdString(wxConvUTF8),
+        vhci::attach_args args {
+                .location {
+                        .hostname = hostname.utf8_string(),
+                        .service = service.utf8_string(),
+                        .busid = busid.utf8_string(),
+                },
+                .serial = serial.utf8_string(),
+                .once = once
         };
 
         DWORD err{};
-        auto f = [&err, loc = std::move(loc), vhci = get_vhci().get(), options]
+        auto f = [&err, args = std::move(args), vhci = get_vhci().get()]
         { 
-                auto port = vhci::attach(vhci, loc, options); 
+                auto port = vhci::attach(vhci, args); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
         };
 
@@ -868,20 +905,21 @@ DWORD MainFrame::attach(
 
 void MainFrame::on_attach_once(wxCommandEvent&)
 {
-        attach(vhci::ATTACH_ONCE);
+        attach(true);
 }
 
-void MainFrame::attach(_In_ unsigned long options)
+void MainFrame::attach(_In_ bool once)
 {
-        wxLogVerbose(L"%s, options %#lx", wxString::FromAscii(__func__), options);
+        wxLogVerbose(L"%s, once %d", wxString::FromAscii(__func__), once);
 
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
                 auto server = tree.GetItemParent(dev);
-                auto url = tree.GetItemText(server);
-                auto busid = tree.GetItemText(dev);
+                auto &url = tree.GetItemText(server);
+                auto &busid = tree.GetItemText(dev);
+                auto &serial = tree.GetItemText(dev, COL_SERIAL);
 
-                if (auto err = attach(url, busid, options)) {
+                if (auto err = attach(url, busid, serial, once)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
                                               url, busid, err, GetLastErrorMsg(err));
@@ -899,17 +937,17 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree, is_server)) {
 
                 auto server = tree.GetItemParent(dev);
-                auto loc = make_device_location(tree, server, dev);
+                auto pd = make_persistent_device(tree, server, dev);
 
-                if (auto cnt = vhci::stop_attach_attempts(vhci.get(), &loc); cnt >= 0) {
+                if (auto cnt = vhci::stop_attach_attempts(vhci.get(), &pd.location); cnt >= 0) {
                         total += cnt;
                         continue;
                 }
 
                 auto err = GetLastError();
 
-                auto url = tree.GetItemText(server);
-                auto busid = tree.GetItemText(dev);
+                auto &url = tree.GetItemText(server);
+                auto &busid = tree.GetItemText(dev);
 
                 wxLogError(_("Could not stop attach attempts %s/%s\nError %lu\n%s"),
                               url, busid, err, GetLastErrorMsg(err));
@@ -1119,8 +1157,8 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto port = wxString::Format(L"%d", m_spinCtrlPort->GetValue());
         wxLogVerbose(L"%s, host='%s', port='%s'", wxString::FromAscii(__func__), host, port);
 
-        auto u8_host = host.ToStdString(wxConvUTF8);
-        auto u8_port = port.ToStdString(wxConvUTF8);
+        auto u8_host = host.utf8_string();
+        auto u8_port = port.utf8_string();
 
         auto sock = connect(host, port, u8_host, u8_port);
         if (!sock) {
@@ -1225,7 +1263,7 @@ void MainFrame::on_item_activated(wxTreeListEvent &event)
         
         if (auto item = event.GetItem(); is_server(tree, item)) {
                 //
-        } else if (auto state = tree.GetItemText(item, COL_STATE); state == to_string(state::unplugged)) {
+        } else if (auto &state = tree.GetItemText(item, COL_STATE); state == to_string(state::unplugged)) {
                 on_attach(event); 
         } else if (state == to_string(state::plugged)) {
                 on_detach(event);
@@ -1250,7 +1288,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         auto &tree = *m_treeListCtrl;
 
         wxASSERT(!tree.GetFirstChild(dev).IsOk());
-        auto str = tree.GetItemText(dev, COL_PORT);
+        auto &str = tree.GetItemText(dev, COL_PORT);
 
         int port;
         return str.ToInt(&port) ? port : 0;
@@ -1272,7 +1310,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
         cfg.DeleteGroup(g_key_devices);
         cfg.SetPath(g_key_devices);
 
-        std::vector<device_location> persistent;
+        std::vector<persistent_device> persistent;
         auto &tree = *m_treeListCtrl;
 
         for (int cnt = 0; auto &dev: devices) {
@@ -1280,17 +1318,17 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
                 cfg.SetPath(wxString::Format(L"%d", ++cnt));
 
                 auto server = tree.GetItemParent(dev);
-                auto url = tree.GetItemText(server);
+                auto &url = tree.GetItemText(server);
 
                 cfg.Write(g_key_url, url);
 
                 for (auto [key, col] : get_saved_keys()) {
-                        auto value = tree.GetItemText(dev, col);
+                        auto &value = tree.GetItemText(dev, col);
                         cfg.Write(key, value);
                 }
 
                 if (is_persistent(dev)) {
-                        persistent.emplace_back(make_device_location(tree, server, dev));
+                        persistent.emplace_back(make_persistent_device(tree, server, dev));
                 }
 
                 cfg.SetPath(L"..");
@@ -1428,6 +1466,7 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_CLOSE_ALL, m_menu_devices, &MainFrame::on_detach_all },
                 separator,
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
+                { ID_EDIT_SERIAL, m_menu_edit, &MainFrame::on_edit_serial },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
                 separator,
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },

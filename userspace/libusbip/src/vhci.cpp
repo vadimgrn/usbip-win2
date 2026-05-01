@@ -40,6 +40,19 @@ constexpr auto map_attach_error(_In_ DWORD err)
         return err;
 }
 
+auto assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const std::string &serial)
+{
+        if (!validate_device_serial(serial)) {
+                *r.serial = '\0';
+        } else if (auto err = strncpy_s(r.serial, serial.data(), serial.size())) {
+                libusbip::output("strncpy_s('{}') error #{} {}", serial, err, std::generic_category().message(err));
+        } else {
+                return USBIP_ERROR_SUCCESS;
+        }
+
+        return USBIP_ERROR_SERIAL_NUMBER;
+}
+
 auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_location &src)
 {
         struct {
@@ -56,12 +69,22 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
                 if (auto err = strncpy_s(i.dst, i.len, i.src.data(), i.src.size())) {
                         libusbip::output("strncpy_s('{}') error #{} {}", i.src, err, 
                                           std::generic_category().message(err));
-                        return false;
+
+                        return ERROR_INVALID_PARAMETER;
                 }
         }
 
         assert(!dst.port);
-        return true;
+        return ERROR_SUCCESS;
+}
+
+DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
+{
+        if (auto err = assign(r, args.serial)) {
+                return err;
+        }
+
+        return assign(r, args.location);
 }
 
 auto make_device_location(_In_ const vhci::imported_device_location &src)
@@ -87,7 +110,7 @@ auto make_device_location(_In_ const vhci::imported_device_location &src)
 
 auto make_imported_device(_In_ const vhci::imported_device &d)
 {
-        return imported_device { 
+        return imported_device {
                 // imported_device_location
                 .location = make_device_location(d),
                 .port = d.port,
@@ -95,7 +118,8 @@ auto make_imported_device(_In_ const vhci::imported_device &d)
                 .devid = d.devid,
                 .speed = win_speed(d.speed),
                 .vendor = d.vendor,
-                .product = d.product
+                .product = d.product,
+                .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) }
         };
 }
 
@@ -166,6 +190,23 @@ auto get_path()
 
 } // namespace
 
+
+bool usbip::validate_device_serial(_In_ const std::string &serial) noexcept
+{
+        auto sz = ssize(serial);
+        auto valid = sz < SERIAL_BUFSZ;
+
+        if (valid) {
+                auto len = is_ascii_alnum(serial.data(), sz);
+                valid = len >= 0 && len == sz;
+        }
+
+        if (!valid) {
+                SetLastError(USBIP_ERROR_SERIAL_NUMBER);
+        }
+
+        return valid;
+}
 
 const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
 {
@@ -255,20 +296,16 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
         return devices;
 }
 
-USBIP_API int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location, _In_ unsigned long options)
+int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
-        if (options && options != ATTACH_ONCE) {
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return 0;
-        }
-
         ioctl::plugin_hardware r {{ .size = sizeof(r) }};
-        if (!assign(r, location)) {
-                SetLastError(ERROR_INVALID_PARAMETER);
+
+        if (auto err = assign(r, args)) {
+                SetLastError(err);
                 return 0;
         }
 
-        auto ctl = options & ATTACH_ONCE ? ioctl::PLUGIN_HARDWARE_ONCE : ioctl::PLUGIN_HARDWARE;
+        auto ctl = args.once ? ioctl::PLUGIN_HARDWARE_ONCE : ioctl::PLUGIN_HARDWARE;
         constexpr auto outlen = offsetof(ioctl::plugin_hardware, port) + sizeof(r.port);
 
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
@@ -288,11 +325,6 @@ USBIP_API int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &l
         }
 
         return 0;
-}
-
-int usbip::vhci::attach(_In_ HANDLE dev, _In_ const device_location &location)
-{
-        return attach(dev, location, 0);
 }
 
 int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location)
@@ -325,12 +357,12 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
 
-USBIP_API DWORD usbip::vhci::get_device_state_size() noexcept
+DWORD usbip::vhci::get_device_state_size() noexcept
 {
         return sizeof(vhci::device_state);
 }
 
-USBIP_API std::optional<usbip::device_state> usbip::vhci::get_device_state(_In_ const void *data, _In_ DWORD length)
+std::optional<usbip::device_state> usbip::vhci::get_device_state(_In_ const void *data, _In_ DWORD length)
 {
         std::optional<usbip::device_state> state;
 
