@@ -163,25 +163,35 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 /*
  * @param r must be zeroed
- * @param device_str host,port,busid
+ * @param device_str host,port,busid[,serial]
  * @see hash_location
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
+PAGED NTSTATUS parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
 {
         PAGED_CODE();
-        const auto sep = L',';
 
-        libdrv::split(r.node_name, r.busid, device_str, sep);
-        if (empty(r.node_name)) {
-                return STATUS_INVALID_PARAMETER;
+        const auto sep = L',';
+        auto tail = device_str;
+
+        for (UNICODE_STRING* v[] { &r.node_name, &r.service_name, &r.busid }; auto head: v) {
+                libdrv::split(*head, tail, tail, sep);
+                if (empty(*head)) {
+                        return STATUS_INVALID_PARAMETER;
+                }
         }
 
-        libdrv::split(r.service_name, r.busid, r.busid, sep);
+        if (auto &serial = r.properties.serial; // optional
+            auto err = libdrv::unicode_to_utf8(serial, sizeof(serial), tail)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &tail, err);
+                return err;
+        } else if (err = validate_serial_number(serial); err) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%.15s'", serial);
+                return err;
+        }
 
-        return  empty(r.service_name) || empty(r.busid) ? STATUS_INVALID_PARAMETER :
-                hash_location(r.location_hash, r);
+        return hash_location(r.location_hash, r);
 }
 
 _IRQL_requires_same_
@@ -346,6 +356,12 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
 
         RtlZeroMemory(&req, sizeof(req));
         req.size = sizeof(req);
+
+        if (auto &serial = attr.properties.serial;
+            auto err = RtlStringCbCopyNA(req.serial, sizeof(req.serial), serial, sizeof(serial))) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%.15s') %!STATUS!", serial, err);
+                return false;
+        }
 
         return NT_SUCCESS(fill_location(req, attr));
 }
@@ -638,4 +654,12 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         }
 
         return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::validate_serial_number(_In_ const char (&serial)[SERIAL_BUFSZ])
+{
+        auto len = is_ascii_alnum(serial, SERIAL_BUFSZ);
+        return len >= 0 && len < SERIAL_BUFSZ ? USBIP_ERROR_SUCCESS : USBIP_ERROR_SERIAL_NUMBER;
 }

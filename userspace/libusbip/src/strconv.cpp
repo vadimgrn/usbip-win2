@@ -55,21 +55,33 @@ std::expected<std::string, DWORD> usbip::wchar_to_utf8(_In_ std::wstring_view ws
         return s;
 }
 
-std::wstring usbip::utf8_to_wchar_or_errmsg(_In_ std::string_view s)
+std::wstring usbip::utf8_to_wchar_or(_In_ std::string_view s, _In_ std::optional<std::wstring_view> val)
 {
         auto ws = utf8_to_wchar(s);
-        if (!ws) {
+
+        if (ws) {
+                //
+        } else if (val) {
+                ws = *val;
+        } else {
                 ws = std::format(L"utf8_to_wchar error {}", ws.error());
         }
+
         return *ws;
 }
 
-std::string usbip::wchar_to_utf8_or_errmsg(_In_ std::wstring_view ws)
+std::string usbip::wchar_to_utf8_or(_In_ std::wstring_view ws, _In_ std::optional<std::string_view> val)
 {
         auto s = wchar_to_utf8(ws);
-        if (!s) {
+
+        if (s) {
+                //
+        } else if (val) {
+                s = *val;
+        } else {
                 s = std::format("wchar_to_utf8 error {}", s.error());
         }
+
         return *s;
 }
 

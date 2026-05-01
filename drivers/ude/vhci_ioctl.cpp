@@ -533,7 +533,9 @@ PAGED auto plugin_hardware(
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, once %!bool!", r.host, r.service, r.busid, once);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %!bool!",
+                r.host, r.service, r.busid, r.serial, once);
+
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
@@ -620,6 +622,9 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         } else if (r->size != length) {
                 Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
                 return USBIP_ERROR_ABI;
+        } else if (err = validate_serial_number(r->serial); err) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%.15s'", r->serial);
+                return err;
         }
 
         r->port = 0;

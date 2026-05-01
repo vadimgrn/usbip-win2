@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -19,6 +19,18 @@ struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 	UCHAR Pad;
 };
 static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
+
+constexpr auto usb_string_descr_size(_In_ UCHAR n)
+{
+        auto cb = __builtin_offsetof(USB_STRING_DESCRIPTOR, bString) + n*sizeof(*USB_STRING_DESCRIPTOR::bString);
+        NT_ASSERT(cb < MAXIMUM_USB_STRING_LENGTH);
+
+        static_assert(MAXIMUM_USB_STRING_LENGTH == MAXUCHAR);
+        return static_cast<UCHAR>(cb);
+}
+
+static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
+static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
 
 constexpr auto is_valid(_In_ const USB_COMMON_DESCRIPTOR &d)
 {

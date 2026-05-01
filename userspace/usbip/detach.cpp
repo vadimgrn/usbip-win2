@@ -1,11 +1,13 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbip.h"
 
 #include <libusbip\vhci.h>
 #include <spdlog\spdlog.h>
+
+#include <print>
 
 bool usbip::cmd_detach(void *p)
 {
@@ -22,9 +24,9 @@ bool usbip::cmd_detach(void *p)
 	if (!ok) {
 		spdlog::error(GetLastErrorMsg());		
 	} else if (args.port <= 0) {
-		printf("all ports are detached\n");
+		std::println("all ports are detached");
 	} else {
-		printf("port %d is succesfully detached\n", args.port);
+                std::println("port {} is succesfully detached", args.port);
 	}
 
 	return ok;

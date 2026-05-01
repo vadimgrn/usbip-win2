@@ -8,8 +8,8 @@
 #include <libusbip\vhci.h>
 #include <libusbip\persistent.h>
 
-#include <format>
 #include <spdlog\spdlog.h>
+#include <print>
 
 namespace
 {
@@ -27,14 +27,15 @@ void print(const imported_device &d)
          {}
            -> usbip://{}:{}/{}
            -> remote bus/dev {:03}/{:03}
-)";
-        auto &loc = d.location;
-        auto msg = std::format(fmt, d.port, get_speed_str(d.speed),
-                                product,
-                                loc.hostname, loc.service, loc.busid,
-                                bus, dev);
+           -> serial '{}')";
 
-        printf(msg.c_str());
+        auto &loc = d.location;
+
+        std::println(fmt, d.port, get_speed_str(d.speed),
+                          product,
+                          loc.hostname, loc.service, loc.busid,
+                          bus, dev,
+                          d.serial);
 }
 
 } // namespace
@@ -58,9 +59,10 @@ bool usbip::cmd_port(void *p)
 
         spdlog::debug("{} imported usb device(s)", devices->size());
 
-        std::vector<device_location> dl;
+        std::optional<std::vector<persistent_device>> persistent;
         if (args.persistent) {
-                dl.reserve(devices->size());
+                persistent.emplace();
+                persistent->reserve(devices->size());
         }
 
         auto &ports = args.ports; 
@@ -71,19 +73,23 @@ bool usbip::cmd_port(void *p)
                 if (ports.empty() || ports.contains(d.port)) {
                         if (!found) {
                                 found = true;
-                                printf("Imported USB devices\n"
-                                       "====================\n");
+                                std::println("Imported USB devices\n"
+                                             "====================");
                         }
                         print(d);
-                        if (args.persistent) {
-                                dl.push_back(std::move(d.location));
+                        if (persistent) {
+                                persistent_device pd {
+                                        .location = std::move(d.location),
+                                        .serial = std::move(d.serial),
+                                };
+                                persistent->push_back(std::move(pd));
                         }
                 }
         }
 
         auto ok = found || ports.empty();
 
-        if (args.persistent && !vhci::set_persistent(dev.get(), dl)) {
+        if (persistent && !vhci::set_persistent(dev.get(), *persistent)) {
                 spdlog::error(GetLastErrorMsg());
                 ok = false;
         }

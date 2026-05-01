@@ -30,6 +30,7 @@ struct attach_args
         // --remote
         std::string remote;
         std::string busid;
+        std::string serial;
         bool terse{};
         bool stop{};
         bool once{};

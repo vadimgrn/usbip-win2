@@ -28,7 +28,7 @@ inline void output(std::wstring_view fmt, Args&&... args)
 {
         if (output_function) {
                 auto ws = vformat(fmt, std::make_wformat_args(args...));
-                output_function(usbip::wchar_to_utf8_or_errmsg(ws));
+                output_function(usbip::wchar_to_utf8_or(ws));
         }
 }
 

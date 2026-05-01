@@ -344,8 +344,8 @@ PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CON
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
-			NT_ASSERT(libdrv::is_valid(d));
-			log(d);
+                        NT_ASSERT(libdrv::is_valid(d));
+                        log(d);
                         if (dev.speed() < USB_SPEED_HIGH) {
                                 patch_config(&d);
                         }
@@ -354,11 +354,17 @@ PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CON
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
 		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
-			NT_ASSERT(libdrv::is_valid(d));
-			log(d);
-		}
-		break;
-	}
+                        NT_ASSERT(libdrv::is_valid(d));
+                        log(d);
+                        if (auto &props = dev.ext().properties(); *props.serial) {
+                                if (!d.iSerialNumber) {
+                                        d.iSerialNumber = MAXUCHAR; // max possible
+                                }
+                                props.iserial = d.iSerialNumber;
+                        }
+                }
+                break;
+        }
 }
 
 _IRQL_requires_same_

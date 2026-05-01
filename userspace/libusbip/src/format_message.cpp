@@ -28,11 +28,11 @@ std::wstring usbip::wformat_message(
 std::string usbip::format_message(_In_ DWORD msg_id, _In_ DWORD lang_id) 
 { 
         auto ws = wformat_message(msg_id, lang_id);
-        return wchar_to_utf8_or_errmsg(ws);
+        return wchar_to_utf8_or(ws);
 }
 
 std::string usbip::format_message(_In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id)
 {
         auto ws = wformat_message(module, msg_id, lang_id);
-        return wchar_to_utf8_or_errmsg(ws);
+        return wchar_to_utf8_or(ws);
 }

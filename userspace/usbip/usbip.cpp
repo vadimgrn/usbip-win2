@@ -21,6 +21,7 @@
 #include <spdlog\sinks\stdout_color_sinks.h>
 
 #include <CLI11\CLI11.hpp>
+#include <print>
 
 namespace
 {
@@ -40,7 +41,7 @@ auto get_version()
 {
         win::FileVersion fv;
         auto ver = fv.GetFileVersion();
-        return wchar_to_utf8_or_errmsg(ver);
+        return wchar_to_utf8_or(ver);
 }
 
 auto pack(command_t cmd, void *p) 
@@ -50,6 +51,15 @@ auto pack(command_t cmd, void *p)
 			exit(EXIT_FAILURE); // throw CLI::RuntimeError(EXIT_FAILURE);
 		}
 	};
+}
+
+auto serial_validator(const std::string &serial)
+{
+        std::string s;
+        if (!validate_device_serial(serial)) {
+                s = GetLastErrorMsg();
+        }
+        return s;
 }
 
 void add_cmd_attach(CLI::App &app)
@@ -68,6 +78,7 @@ void add_cmd_attach(CLI::App &app)
 	rem->add_option("-b,--bus-id", r.busid, "Bus Id of the USB device on a server")
 		->required();	
 
+	rem->add_option("--serial", r.serial, "device serial number")->check(serial_validator);
 	rem->add_flag("-t,--terse", r.terse, "Show port number as a result");
 
         auto stop = rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
@@ -220,7 +231,7 @@ int wmain(int argc, wchar_t *argv[])
 	try {
 		ret = run(argc, argv);
 	} catch (std::exception &e) {
-		printf("exception: %s\n", e.what());
+                std::println("exception: {}", e.what());
 	}
 
 	return ret;

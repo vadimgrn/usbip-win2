@@ -66,7 +66,7 @@ auto get_version(_In_ const wchar_t *program)
 {
         win::FileVersion fv(program);
         auto ver = fv.GetFileVersion();
-        return wchar_to_utf8_or_errmsg(ver);
+        return wchar_to_utf8_or(ver);
 }
 
 /*
