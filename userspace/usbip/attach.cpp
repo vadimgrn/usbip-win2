@@ -21,7 +21,7 @@ auto attach_persistent_devices(HANDLE dev)
                 return false;
         } else for (auto &i: *v) {
                 auto &loc = i.location;
-                std::println("{}:{}/{}\t{}", loc.hostname, loc.service, loc.busid, i.serial);
+                std::println("{}:{}/{} {}", loc.hostname, loc.service, loc.busid, i.serial);
 
                 vhci::attach_args args {
                         .location = std::move(i.location),

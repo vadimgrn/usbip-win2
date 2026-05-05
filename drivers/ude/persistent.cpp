@@ -168,21 +168,18 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
+PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
 {
         PAGED_CODE();
-
         const auto sep = L',';
-        auto tail = device_str;
 
-        for (UNICODE_STRING* v[] { &r.node_name, &r.service_name, &r.busid }; auto head: v) {
-                libdrv::split(*head, tail, tail, sep);
-                if (empty(*head)) {
-                        return STATUS_INVALID_PARAMETER;
-                }
-        }
+        libdrv::split(r.node_name, r.service_name, device_str, sep);
+        libdrv::split(r.service_name, r.busid, r.service_name, sep);
 
-        if (auto &serial = r.properties.serial; // optional
+        UNICODE_STRING tail; // optional serial
+        libdrv::split(r.busid, tail, r.busid, sep);
+
+        if (auto &serial = r.properties.serial;
             auto err = libdrv::unicode_to_utf8(serial, sizeof(serial), tail)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &tail, err);
                 return err;
@@ -191,7 +188,8 @@ PAGED NTSTATUS parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE
                 return err;
         }
 
-        return hash_location(r.location_hash, r);
+        return  empty(r.node_name) || empty(r.service_name) || empty(r.busid) ?
+                STATUS_INVALID_PARAMETER : hash_location(r.location_hash, r);
 }
 
 _IRQL_requires_same_

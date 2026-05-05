@@ -50,12 +50,11 @@ PAGED void split(
 
 /**
  * @param s string to search
- * @param ch character to search in a string
- * @param from position to start a search
- * @return position of the first found character in the string or -1 if not found 
+ * @param ch character to search
+ * @return position of the first found character or -1
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch, _In_ int from = 0);
+PAGED int strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch);
 
 } // namespace libdrv

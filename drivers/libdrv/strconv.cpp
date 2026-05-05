@@ -3,9 +3,10 @@
  */
 
 #include "strconv.h"
+#include <ntstrsafe.h>
 
 /*
- * @see RtlUnicodeStringToUTF8String
+ * @see RtlUnicodeStringToUTF8String since Windows 10, version 2004
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -26,10 +27,6 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_opt_ char *utf8, _In_ USHORT maxlen,
 {
         PAGED_CODE();
 
-        if (!utf8) {
-                return STATUS_INVALID_PARAMETER_1;
-        }
-
         UTF8_STRING s { .MaximumLength = maxlen, .Buffer = utf8 };
         auto st = unicode_to_utf8(s, src);
 
@@ -40,8 +37,9 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_opt_ char *utf8, _In_ USHORT maxlen,
         return st;
 }
 
-/*
+/** 
  * @return libdrv::FreeUnicodeString must be used to release a memory
+ * @see RtlUTF8StringToUnicodeString since Windows 10, version 2004
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -54,24 +52,20 @@ PAGED NTSTATUS libdrv::utf8_to_unicode(
                 return STATUS_ALREADY_INITIALIZED;
         }
 
-        ULONG dst_bytes{};
-        if (auto st = RtlUTF8ToUnicodeN(nullptr, 0, &dst_bytes, src.Buffer, src.Length); NT_ERROR(st)) {
+        ULONG actual;
+        if (auto st = RtlUTF8ToUnicodeN(nullptr, 0, &actual, src.Buffer, src.Length); NT_ERROR(st)) {
                 return st;
         }
 
-        dst.Buffer = (WCHAR*)ExAllocatePoolUninitialized(pooltype, dst_bytes, pooltag);
+        dst.Buffer = (WCHAR*)ExAllocatePoolUninitialized(pooltype, actual, pooltag);
         if (!dst.Buffer) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        ULONG actual{};
-        auto st = RtlUTF8ToUnicodeN(dst.Buffer, dst_bytes, &actual, src.Buffer, src.Length);
+        dst.MaximumLength = static_cast<USHORT>(actual);
 
-        NT_ASSERT(NT_SUCCESS(st));
-        NT_ASSERT(actual == dst_bytes);
-        
+        auto st = RtlUTF8ToUnicodeN(dst.Buffer, dst.MaximumLength, &actual, src.Buffer, src.Length);
         dst.Length = static_cast<USHORT>(actual);
-        dst.MaximumLength = static_cast<USHORT>(dst_bytes);
 
         return st;
 }
@@ -88,12 +82,13 @@ PAGED NTSTATUS libdrv::utf8_to_unicode(
 {
         PAGED_CODE();
 
-        if (!utf8) {
-                return STATUS_INVALID_PARAMETER_2;
+        size_t cb;
+        if (auto err = RtlStringCbLengthA(utf8, maxlen, &cb)) { 
+                return err;
         }
 
         UTF8_STRING u8 {
-                .Length = static_cast<USHORT>(strnlen(utf8, maxlen)),
+                .Length = static_cast<USHORT>(cb),
                 .MaximumLength = maxlen, 
                 .Buffer = const_cast<char*>(utf8)
         };
@@ -115,11 +110,11 @@ void libdrv::FreeUnicodeString(_Inout_ UNICODE_STRING &s, _In_ ULONG pooltag)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED int libdrv::strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch, _In_ int from)
+PAGED int libdrv::strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
 {
         PAGED_CODE();
 
-        for (auto i = from; i < s.Length; ++i) {
+        for (int i = 0; i < s.Length/sizeof(*s.Buffer); ++i) {
                 if (s.Buffer[i] == ch) {
                         return i;
                 }
@@ -147,11 +142,11 @@ PAGED void libdrv::split(
         auto s = str.Buffer;
         auto len = str.Length;
 
-        head.Length = USHORT(pos)*sizeof(*s);
+        head.Length = static_cast<USHORT>(pos)*sizeof(*s);
         head.MaximumLength = head.Length;
-        head.Buffer = s;
+        head.Buffer = head.Length ? s : nullptr;
 
         tail.Length = len - (head.Length + sizeof(*s));
         tail.MaximumLength = tail.Length;
-        tail.Buffer = tail.Length ? ++pos + s : nullptr;
+        tail.Buffer = tail.Length ? s + pos + 1 : nullptr;
 }
