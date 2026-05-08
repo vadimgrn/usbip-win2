@@ -38,15 +38,15 @@
 - SDK for third party developers (libusbip public API)
 - InnoSetup installer is used for installation of drivers and userspace stuff
 - Windows 10 version 1903 or later is required
-- C++ 20 is used for all projects
-- Visual Studio 2022 is used
+- C++ 23 is used for all projects
+- Visual Studio 2026 is used
 - Server (stub driver) is removed
 - x64/arm64 builds only
 
 ## Build
 
 ### Build Tools
-- [Visual Studio 2022](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-visual-studio-step-1-install-visual-studio-2022)
+- [Visual Studio 2026](https://learn.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk#download-icon-for-visual-studio-step-1-install-visual-studio-2026)
 - SDK/WDK installation is not required, [NuGet](https://learn.microsoft.com/en-us/windows-hardware/drivers/install-the-wdk-using-nuget#how-to-install-wdk-nuget) will install them automatically
 
 ### Build Visual Studio solution

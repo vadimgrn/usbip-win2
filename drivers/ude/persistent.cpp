@@ -216,7 +216,7 @@ PAGED bool create_outbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        constexpr auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+        constexpr auto len = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
 
         if (auto err = WdfMemoryCreatePreallocated(&attr, req, len, &result)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreatePreallocated %!STATUS!", err);

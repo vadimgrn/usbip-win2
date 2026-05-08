@@ -629,7 +629,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
 
         r->port = 0;
 
-        constexpr auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
+        constexpr auto written = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
         return plugin_hardware(request, *r, once);
