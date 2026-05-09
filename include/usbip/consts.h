@@ -8,8 +8,10 @@ namespace usbip
 {
 
 constexpr auto &tcp_port = "3240";
-constexpr auto &driver_filename = L"usbip2_ude"; // used by filter driver
 constexpr auto &persistent_devices_value_name = L"PersistentDevices";
+
+constexpr auto &driver_filename = L"usbip2_ude"; // used by filter driver
+constexpr auto &ude_hwid = L"ROOT\\USBIP_WIN2\\UDE"; // @see usbip2_ude.inf
 
 enum op_status_t // op_common.status
 {

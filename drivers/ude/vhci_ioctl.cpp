@@ -657,7 +657,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
         auto session_id = get_session_id(request); // can be INVALID_SESSION_ID when called from EVT_WDF_DEVICE_QUERY_REMOVE
         TraceDbg("session id %lx, port %d, reattach %!bool!", session_id, r->port, reattach);
 
-        NTSTATUS st;
+        auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;

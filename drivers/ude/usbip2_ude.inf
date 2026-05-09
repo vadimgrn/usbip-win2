@@ -26,6 +26,7 @@ usbip2_ude.sys = 1
 %Manufacturer%=Standard,NT$ARCH$.10.0...17763
 
 [Standard.NT$ARCH$.10.0...17763]
+"USBip Bus Extender"=ude_Device, ROOT\USBIP_WIN2\BUS
 %DisplayName%=ude_Device, ROOT\USBIP_WIN2\UDE
 
 [ude_Device.NT]

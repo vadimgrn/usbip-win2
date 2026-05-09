@@ -148,9 +148,9 @@ auto make_device_state(_In_ const vhci::device_state &r)
         };
 }
 
-auto get_path()
+auto get_path(const GUID &interface_guid)
 {
-        auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
+        auto guid = const_cast<GUID*>(&interface_guid);
         std::wstring path;
 
         for (std::wstring multi_sz; true; ) {
@@ -266,15 +266,31 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
         }
 
         Handle h;
+        auto path = get_path(vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
 
-        if (auto path = get_path(); !path.empty()) {
+        if (path.empty()) { // if controller is missing, ask the Bus Enumerator to spawn one for this session
+                if (auto bus_path = get_path(vhci::GUID_DEVINTERFACE_USBIP_BUS); !bus_path.empty()) {
+                        if (Handle bus{CreateFile(bus_path.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)}) {
+                                DWORD bytes{};
+                                DeviceIoControl(bus.get(), ioctl::SPAWN_SESSION_HC, nullptr, 0, nullptr, 0, &bytes, nullptr);
+                                for (int i = 0; i < 50; ++i) { // wait for PnP manager to surface the new isolated device node
+                                        Sleep(100);
+                                        if (path = get_path(vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER); !path.empty()) {
+                                                break;
+                                        }
+                                }
+                        }
+                }
+        }
+
+        if (!path.empty()) {
                 h.reset(CreateFile(path.c_str(), 
-                                GENERIC_READ | GENERIC_WRITE, 
-                                FILE_SHARE_READ | FILE_SHARE_WRITE, 
-                                nullptr, // lpSecurityAttributes
-                                OPEN_EXISTING, 
-                                FlagsAndAttributes,
-                                nullptr)); // hTemplateFile
+                        GENERIC_READ | GENERIC_WRITE, 
+                        FILE_SHARE_READ | FILE_SHARE_WRITE, 
+                        nullptr, // lpSecurityAttributes
+                        OPEN_EXISTING, 
+                        FlagsAndAttributes,
+                        nullptr)); // hTemplateFile
         }
 
         return h;

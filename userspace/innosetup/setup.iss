@@ -51,7 +51,7 @@
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
 
-#define CLIENT_HWID "ROOT\USBIP_WIN2\UDE"
+#define BUS_HWID "ROOT\USBIP_WIN2\BUS"
 
 ; Project's test certificate is no longer installed for github releases since 0.9.7.5.
 ; But it is required during the development.
@@ -155,7 +155,7 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
 #endif
 
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; Flags: runhidden; Components: client
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#BUS_HWID}"; Flags: runhidden; Components: client
 
 Filename: {sys}\WindowsPowerShell\v1.0\powershell.exe; Parameters: "-ExecutionPolicy Bypass -Command ""(Get-Content '{tmp}\task_detach_all.xml') -replace 'USBIP_DIR', '{app}' | Set-Content '{tmp}\task_detach_all.xml'"""; Flags: runhidden; Components: client
 Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /xml {tmp}\task_detach_all.xml"; Flags: runhidden; Components: client
@@ -163,7 +163,7 @@ Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /
 [UninstallRun]
 
 Filename: {sys}\schtasks.exe; Parameters: "/delete /tn ""{#TaskDetachAll}"" /f"; Flags: runhidden; Components: client
-Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "remove {#BUS_HWID} root"; Flags: runhidden; Components: client
 
 ; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
 Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#UdeDriver}    {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client

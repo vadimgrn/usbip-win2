@@ -18,6 +18,13 @@ enum : ULONG {
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto is_valid_user_session_id(_In_ ULONG session_id)
+{
+        return !(session_id == SYSTEM_SESSION_ID || session_id == INVALID_SESSION_ID);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 ULONG get_session_id(_In_ WDFREQUEST request);
 
 _IRQL_requires_same_
@@ -31,5 +38,13 @@ NTSTATUS check_session_access(_In_ const device_ctx &dev, _In_ WDFREQUEST reques
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS check_session_access(_In_ const device_ctx &dev, _In_ ULONG session_id);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(APC_LEVEL)
+PAGED NTSTATUS get_session_id(_Inout_ ULONG &session_id, _In_ WDFDEVICE dev);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(APC_LEVEL)
+PAGED NTSTATUS set_session_id(_In_ WDFDEVICE dev, _In_ ULONG session_id);
 
 } // namespace usbip
