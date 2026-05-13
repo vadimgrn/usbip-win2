@@ -14,6 +14,7 @@
 #include <usbip\vhci.h>
 
 #include <span>
+#include <random>
 
 namespace
 {
@@ -191,10 +192,15 @@ auto get_path()
 } // namespace
 
 
+int usbip::get_device_serial_maxlen() noexcept
+{
+        return SERIAL_BUFSZ - 1; // without '\0'
+}
+
 bool usbip::validate_device_serial(_In_ const std::string &serial) noexcept
 {
         auto sz = ssize(serial);
-        auto valid = sz < SERIAL_BUFSZ;
+        auto valid = sz <= get_device_serial_maxlen();
 
         if (valid) {
                 auto len = is_ascii_alnum(serial.data(), sz);
@@ -206,6 +212,25 @@ bool usbip::validate_device_serial(_In_ const std::string &serial) noexcept
         }
 
         return valid;
+}
+
+std::string usbip::generate_device_serial()
+{
+        constexpr std::string_view chars =
+                "abcdefghijklmnopqrstuvwxyz"
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "0123456789";
+
+        thread_local std::mt19937 rng(std::random_device{}());
+        thread_local std::uniform_int_distribution<std::size_t> dist(0, chars.size() - 1);
+
+        auto len = get_device_serial_maxlen();
+        std::string serial(len, '\0');
+
+        std::ranges::generate(serial, [&chars] { return chars[dist(rng)]; } );
+
+        assert(validate_device_serial(serial));
+        return serial;
 }
 
 const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept

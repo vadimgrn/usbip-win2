@@ -114,6 +114,7 @@ private:
         void on_edit_device_update_ui(wxUpdateUIEvent &event) override;
         void on_edit_notes(wxCommandEvent &event) override;
         void on_edit_serial(wxCommandEvent &event) override;
+        void on_edit_gen_serial(wxCommandEvent &event) override;
 
         void on_frame_mouse_wheel(wxMouseEvent &event) override;
 

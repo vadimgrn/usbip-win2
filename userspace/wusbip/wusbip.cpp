@@ -760,10 +760,17 @@ void MainFrame::on_edit_serial(wxCommandEvent&)
                 return err;
         };
 
-        enum { MAXLEN = 15 };
-        wxASSERT(!validate_device_serial(std::string('0', MAXLEN + 1)));
+        auto maxlen = get_device_serial_maxlen();
+        edit_column_dlg(_("Serial Number"), COL_SERIAL, maxlen, validator);
+}
 
-        edit_column_dlg(_("Serial Number"), COL_SERIAL, MAXLEN, validator);
+void MainFrame::on_edit_gen_serial(wxCommandEvent&)
+{
+        if (auto dev = get_edit_device(); dev.IsOk()) {
+                auto s = generate_device_serial();
+                auto ws = wxString::FromAscii(s.data(), s.size());
+                m_treeListCtrl->SetItemText(dev, COL_SERIAL, ws);
+        }
 }
 
 bool MainFrame::is_persistent(_In_ wxTreeListItem device)
@@ -1467,6 +1474,7 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 separator,
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
                 { ID_EDIT_SERIAL, m_menu_edit, &MainFrame::on_edit_serial },
+                { ID_EDIT_GEN_SERIAL, m_menu_edit, &MainFrame::on_edit_gen_serial },
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
                 separator,
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },

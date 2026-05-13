@@ -46,16 +46,9 @@ struct imported_device
         std::string serial; // only filled if you set it in attach_args
 };
 
-/**
- * Serial number must contain no more than 15 alphanumeric ASCII characters.
- * @param serial number of usb device
- * @return call GetLastError() if false is returned
- */
-USBIP_API bool validate_device_serial(_In_ const std::string &serial) noexcept;
-
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
 
-/*
+/**
  * There can be multiple event sources for the same device,
  * each of them emits events with a unique source_id.
  */
@@ -65,6 +58,25 @@ struct device_state
         state state = state::unplugged;
         ULONG source_id;
 };
+
+/**
+ * @return max length of usb device serial number, constant
+ */
+USBIP_API int get_device_serial_maxlen() noexcept;
+
+/**
+ * Serial number must contain no more than N alphanumeric ASCII characters.
+ * @param serial number of usb device
+ * @return call GetLastError() if false is returned
+ * @see get_device_serial_maxlen
+ */
+USBIP_API bool validate_device_serial(_In_ const std::string &serial) noexcept;
+
+/**
+ * The function is thread-safe.
+ * @return unique serial number for the device
+ */
+USBIP_API std::string generate_device_serial();
 
 } // namespace usbip
 
@@ -87,7 +99,9 @@ USBIP_API std::optional<std::vector<imported_device>> get_imported_devices(_In_ 
 
 
 /**
+ * @see generate_device_serial
  * @see validate_device_serial
+ * @see get_device_serial_maxlen
  */
 struct attach_args
 {

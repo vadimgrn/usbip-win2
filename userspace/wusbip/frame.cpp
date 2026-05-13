@@ -116,6 +116,15 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	#endif
 	m_menu_edit->Append( m_edit_serial );
 
+	wxMenuItem* m_edit_gen_serial;
+	m_edit_gen_serial = new wxMenuItem( m_menu_edit, ID_EDIT_GEN_SERIAL, wxString( _("Generate Serial") ) , _("Generate unique serial number"), wxITEM_NORMAL );
+	#ifdef __WXMSW__
+	m_edit_gen_serial->SetBitmaps( wxNullBitmap );
+	#elif (defined( __WXGTK__ ) || defined( __WXOSX__ ))
+	m_edit_gen_serial->SetBitmap( wxNullBitmap );
+	#endif
+	m_menu_edit->Append( m_edit_gen_serial );
+
 	wxMenuItem* m_edit_notes;
 	m_edit_notes = new wxMenuItem( m_menu_edit, ID_EDIT_NOTES, wxString( _("Notes") ) + wxT('\t') + wxT("CTRL+N"), _("Edit notes for the device"), wxITEM_NORMAL );
 	#ifdef __WXMSW__
@@ -500,6 +509,8 @@ Frame::Frame( wxWindow* parent, wxWindowID id, const wxString& title, const wxPo
 	this->Connect( m_toggle_auto->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_serial ), this, m_edit_serial->GetId());
 	this->Connect( m_edit_serial->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_device_update_ui ) );
+	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_gen_serial ), this, m_edit_gen_serial->GetId());
+	this->Connect( m_edit_gen_serial->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_device_update_ui ) );
 	m_menu_edit->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_edit_notes ), this, m_edit_notes->GetId());
 	this->Connect( m_edit_notes->GetId(), wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_device_update_ui ) );
 	m_menu_columns->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( Frame::on_view_column ), this, m_view_busid->GetId());
@@ -583,6 +594,7 @@ Frame::~Frame()
 	this->Disconnect( wxID_COPY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_any_selected_devices_update_ui ) );
 	this->Disconnect( ID_TOGGLE_AUTO, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_has_selected_devices_update_ui ) );
 	this->Disconnect( ID_EDIT_SERIAL, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_device_update_ui ) );
+	this->Disconnect( ID_EDIT_GEN_SERIAL, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_device_update_ui ) );
 	this->Disconnect( ID_EDIT_NOTES, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_edit_device_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );
 	this->Disconnect( wxID_ANY, wxEVT_UPDATE_UI, wxUpdateUIEventHandler( Frame::on_view_column_update_ui ) );

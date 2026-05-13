@@ -37,7 +37,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto vhci = static_cast<WDFDEVICE>(object);
         auto &ctx = *get_vhci_ctx(vhci);
 
-        set_flag(ctx.removing); // used to set in EVT_WDF_DEVICE_QUERY_REMOVE
+        set_flag(ctx.removing); // used to set earlear
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
