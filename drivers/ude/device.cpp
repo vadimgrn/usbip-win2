@@ -605,6 +605,58 @@ PAGED void plugout_and_delete(
         }
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void async_detach_and_delete(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool reattach)
+{
+        auto &ctx = *get_vhci_ctx(vhci);
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ParentObject = vhci;
+
+        auto req_ptr = create_request(ctx.target_self, attr);
+        if (!req_ptr) {
+                return;
+        }
+        auto request = req_ptr.get<WDFREQUEST>();
+
+        TraceDbg("req %04x, port %d, reattach %!bool!", ptr04x(request), port, reattach);
+
+        attr.ParentObject = request;
+        auto inbuf = create_detach_request_inbuf(attr, port);
+        if (!inbuf) {
+                return;
+        }
+
+        auto code = reattach ? vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH : vhci::ioctl::PLUGOUT_HARDWARE;
+
+        if (auto err = WdfIoTargetFormatRequestForIoctl(ctx.target_self, request, code,
+                inbuf, nullptr, WDF_NO_HANDLE, nullptr)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
+                return;
+        }
+
+        auto completion = [] (auto request, auto, auto, auto ctx)
+        {
+                auto st = WdfRequestGetStatus(request);
+                auto port = static_cast<int>(reinterpret_cast<intptr_t>(ctx));
+                TraceDbg("req %04x, port %d, %!STATUS!", ptr04x(request), port, st);
+
+                WdfObjectDelete(request);
+        };
+
+        auto context = reinterpret_cast<void*>(static_cast<intptr_t>(port));
+        WdfRequestSetCompletionRoutine(request, completion, context);
+
+        if (!WdfRequestSend(request, ctx.target_self, WDF_NO_SEND_OPTIONS)) {
+                auto err = WdfRequestGetStatus(request);
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestSend %!STATUS!", err);
+        } else {
+                req_ptr.release(); // will be deleted in the completion routine
+        }
+}
+
 } // namespace
 
 
@@ -683,52 +735,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device, _In_ bool reattach)
 {
         auto &dev = *get_device_ctx(device);
-        auto &ctx = *get_vhci_ctx(dev.vhci);
+        ::async_detach_and_delete(dev.vhci, dev.port, reattach);
+}
 
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
-        attr.ParentObject = dev.vhci;
-
-        auto req_ptr = create_request(ctx.target_self, attr);
-        if (!req_ptr) {
-                return;
-        }
-        auto request = req_ptr.get<WDFREQUEST>();
-
-        TraceDbg("req %04x, port %d, reattach %!bool!", ptr04x(request), dev.port, reattach);
-
-        attr.ParentObject = request;
-        auto inbuf = create_detach_request_inbuf(attr, dev.port);
-        if (!inbuf) {
-                return;
-        }
-
-        auto code = reattach ? vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH : vhci::ioctl::PLUGOUT_HARDWARE;
-
-        if (auto err = WdfIoTargetFormatRequestForIoctl(ctx.target_self, request, code,
-                                                        inbuf, nullptr, WDF_NO_HANDLE, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
-                return;
-        }
-
-        auto completion = [] (auto request, auto, auto, auto ctx)
-        {
-                auto st = WdfRequestGetStatus(request);
-                auto port = static_cast<int>(reinterpret_cast<intptr_t>(ctx));
-                TraceDbg("req %04x, port %d, %!STATUS!", ptr04x(request), port, st);
-
-                WdfObjectDelete(request);
-        };
-
-        auto context = reinterpret_cast<void*>(static_cast<intptr_t>(dev.port));
-        WdfRequestSetCompletionRoutine(request, completion, context);
-
-        if (!WdfRequestSend(request, ctx.target_self, WDF_NO_SEND_OPTIONS)) {
-                auto err = WdfRequestGetStatus(request);
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestSend %!STATUS!", err);
-        } else {
-                req_ptr.release(); // will be deleted in the completion routine
-        }
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::async_detach_and_delete_all(_In_ WDFDEVICE vhci)
+{
+        ::async_detach_and_delete(vhci, -1, false);
 }
 
 /*

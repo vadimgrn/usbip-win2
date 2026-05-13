@@ -489,7 +489,7 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
                 stop_attach_attempts(ctx, 0);
         }
 
-        vhci::detach_all_devices(vhci, true);
+        async_detach_and_delete_all(vhci);
         purge_read_queue(vhci); // detach notifications may not be received
 
         return STATUS_SUCCESS;
@@ -945,7 +945,7 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
 
@@ -953,13 +953,8 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool async)
         auto &ctx = *get_vhci_ctx(vhci);
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
- 
-                if (auto dev = get_device(vhci, port); auto hdev = dev.get<UDECXUSBDEVICE>()) {
-                        if (async) {
-                                device::async_detach_and_delete(hdev);
-                        } else {
-                                device::detach_and_delete(hdev);
-                        }
+                if (auto dev = get_device(vhci, port)) {
+                        device::detach_and_delete(dev.get<UDECXUSBDEVICE>());
                 }
         }
 }

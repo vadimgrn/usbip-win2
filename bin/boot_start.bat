@@ -1,6 +1,9 @@
 @echo off
 
-set NAME=USBip
+rem change to your WDK version
+set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64
+
+set NAME=usbip
 
 set LOG=HKLM\System\CurrentControlSet\Control\WMI\Autologger\%NAME%
 set LOG_UDE=%LOG%-ude

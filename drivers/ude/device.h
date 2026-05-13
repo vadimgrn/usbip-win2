@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -14,7 +14,13 @@
 
 namespace usbip
 {
-        struct device_ctx_ext;
+
+struct device_ctx_ext;
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void async_detach_and_delete_all(_In_ WDFDEVICE vhci);
+
 } // namespace usbip
 
 
