@@ -1013,7 +1013,7 @@ void MainFrame::on_detach(wxCommandEvent&)
 
 void MainFrame::on_detach_all(wxCommandEvent&) 
 {
-        if (auto err = detach(0); err && err != ERROR_OPERATION_ABORTED) {
+        if (auto err = detach(vhci::port_all); err && err != ERROR_OPERATION_ABORTED) {
                 wxLogError(_("Could not detach all devices\nError %lu\n%s"),
                               err, GetLastErrorMsg(err));
         }

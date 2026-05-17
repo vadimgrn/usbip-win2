@@ -136,9 +136,11 @@ struct stop_attach_attempts : base, imported_device_location
         int count; // OUT, number of canceled requests
 };
 
+enum { PORT_ALL_CLOSEONLY = -2, PORT_ALL };
+
 struct plugout_hardware : base
 {
-        int port; // all ports if <= 0
+        int port;
 };
 
 struct get_imported_devices : base

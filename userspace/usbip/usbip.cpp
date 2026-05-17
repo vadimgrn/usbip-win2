@@ -93,16 +93,22 @@ void add_cmd_attach(CLI::App &app)
 
 void add_cmd_detach(CLI::App &app)
 {
-	static detach_args r;
+	static detach_args r {
+                .port = vhci::port_all
+        };
 
 	auto cmd = app.add_subcommand("detach", "Detach a remote USB device")
 		->callback(pack(cmd_detach, &r))
 		->require_option(1);
 
-	cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in")
+	auto opt_port = cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in")
 		->check(CLI::Range(1, MAX_HUB_PORTS));
 
-	cmd->add_flag("-a,--all", [&port = r.port] (auto) { port = -1; }, "Detach all devices");
+	cmd->add_option("-a,--all", "Detach all devices")
+		->each( [&port = r.port] (const auto&) noexcept { port = vhci::port_all_closeonly; } ) // will not be called if argument is not passed
+		->check(CLI::IsMember({"closeonly"}))
+		->expected(0, 1)
+		->excludes(opt_port);
 }
 
 void add_cmd_list(CLI::App &app)

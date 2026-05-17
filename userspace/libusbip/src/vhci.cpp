@@ -21,6 +21,9 @@ namespace
 
 using namespace usbip;
 
+static_assert(static_cast<int>(vhci::port_all) == vhci::ioctl::PORT_ALL);
+static_assert(static_cast<int>(vhci::port_all_closeonly) == vhci::ioctl::PORT_ALL_CLOSEONLY);
+
 constexpr auto map_attach_error(_In_ DWORD err)
 {
         switch (err) {

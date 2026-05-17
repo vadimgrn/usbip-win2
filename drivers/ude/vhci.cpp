@@ -466,6 +466,9 @@ PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
 }
 
 /* 
+ * Windows does not call the EvtDeviceQueryRemove callback
+ * during a standard system reboot or shutdown.
+ * 
  * This callback determines whether a specified device can be stopped and removed.
  * The framework does not synchronize the EvtDeviceQueryRemove callback function 
  * with other PnP and power management callback functions.
@@ -473,7 +476,7 @@ PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
  * VHCI device will not be removed until all FILEOBJECT-s will be closed.
  * The uninstaller will block on the command that removes VHCI device node.
  * Cancelling read requests forces apps to close handle of VHCI device.
- * 
+ *
  * FIXME: can be called several times (if IRP_MN_CANCEL_REMOVE_DEVICE was issued?).
  */
 _Function_class_(EVT_WDF_DEVICE_QUERY_REMOVE)
@@ -945,7 +948,7 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci)
+PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci, _In_ bool plugout_and_delete)
 {
         PAGED_CODE();
 
@@ -954,7 +957,7 @@ PAGED void usbip::vhci::detach_all_devices(_In_ WDFDEVICE vhci)
 
         for (int port = 1; port <= ctx.devices_cnt; ++port) {
                 if (auto dev = get_device(vhci, port)) {
-                        device::detach_and_delete(dev.get<UDECXUSBDEVICE>());
+                        device::detach(dev.get<UDECXUSBDEVICE>(), plugout_and_delete);
                 }
         }
 }
