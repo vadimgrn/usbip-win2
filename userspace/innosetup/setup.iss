@@ -46,6 +46,7 @@
 #define Company GetFileCompany(ExePath)
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
+#define TaskDetachAll "USBip Detach All On Reboot Or Shutdown"
 
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
@@ -135,6 +136,7 @@ Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
+Source: {#SolutionDir + "userspace\innosetup\task_detach_all.xml"}; DestDir: "{tmp}"; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
   Source: {#CertFilePath}; DestDir: "{tmp}"; Components: main
@@ -155,13 +157,17 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; Flags: runhidden; Components: client
 Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
 
+Filename: {sys}\WindowsPowerShell\v1.0\powershell.exe; Parameters: "-ExecutionPolicy Bypass -Command ""(Get-Content '{tmp}\task_detach_all.xml') -replace 'USBIP_DIR', '{app}' | Set-Content '{tmp}\task_detach_all.xml'"""; Flags: runhidden; Components: client
+Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /xml {tmp}\task_detach_all.xml"; Flags: runhidden; Components: client
+
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden
+Filename: {sys}\schtasks.exe; Parameters: "/delete /tn ""{#TaskDetachAll}"" /f"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client
 
 ; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#UdeDriver}    {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#FilterDriver} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#UdeDriver}    {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client
+Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#FilterDriver} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
   Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden

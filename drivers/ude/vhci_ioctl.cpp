@@ -656,7 +656,8 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
         auto st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
-                vhci::detach_all_devices(vhci);
+                auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
+                vhci::detach_all_devices(vhci, plugout_and_delete);
         } else if (auto ctx = get_vhci_ctx(vhci); !is_valid_port(*ctx, r->port)) {
                 st = STATUS_INVALID_PARAMETER;
         } else if (auto dev = vhci::get_device(vhci, r->port)) {
