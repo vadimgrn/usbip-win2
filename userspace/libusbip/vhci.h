@@ -124,9 +124,14 @@ USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);
  */
 USBIP_API int stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location);
 
+enum { port_all_closeonly = -2, port_all };
+
 /**
  * @param dev handle of the driver device
- * @param port hub port number, <= 0 means detach all ports
+ * @param port hub port number starting from 1
+ *        port_all - detach all ports
+ *        port_all_closeonly - close tcp/ip connections for all ports,
+ *              use to skip unnecessary steps on Windows reboot/shutdown
  * @return call GetLastError() if false is returned
  */
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);

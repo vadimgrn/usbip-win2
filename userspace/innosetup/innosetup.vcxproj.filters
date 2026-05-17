@@ -4,4 +4,7 @@
     <None Include="setup.iss" />
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <Xml Include="task_detach_all.xml" />
+  </ItemGroup>
 </Project>
