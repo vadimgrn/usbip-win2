@@ -25,6 +25,18 @@ using namespace usbip;
 enum { ARG_URB, ARG_TAG };
 
 /*
+ * IRP context slots used on the caller's IRP when translating a legacy vendor/class URB
+ * into URB_FUNCTION_CONTROL_TRANSFER_EX form. Independent of ARG_URB / ARG_TAG above,
+ * which are used on a synthetic IRP allocated inside send_request().
+ *
+ * ARG_TRANSLATE_ORIG_URB: pointer to the caller's original _URB_CONTROL_VENDOR_OR_CLASS_REQUEST
+ *                        URB. Status fields are copied back on completion.
+ * ARG_TRANSLATE_EX_URB:   pointer to the URB_FUNCTION_CONTROL_TRANSFER_EX URB we allocated
+ *                        and assigned to the next IRP stack location. Freed on completion.
+ */
+enum { ARG_TRANSLATE_ORIG_URB = 2, ARG_TRANSLATE_EX_URB = 3 };
+
+/*
  * @param result of make_irp() 
  * IO_REMOVE_LOCK must be used because IRP_MN_REMOVE_DEVICE can remove FiDO prior this callback.
  */
@@ -234,6 +246,144 @@ auto pre_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ libdrv::Remov
 	return IoCallDriver(fltr.target, irp);
 }
 
+/*
+ * Completion routine for IRPs whose URB was translated from a legacy vendor/class form
+ * into URB_FUNCTION_CONTROL_TRANSFER_EX in translate_legacy_urb_pre_process(). Copies the
+ * response status and actual transfer length from our EX URB back into the caller's
+ * original URB, then frees the EX URB.
+ *
+ * The IO Manager has popped the stack back to our filter's stack location by the time
+ * this routine runs, so urb_from_irp(irp) returns the original URB.
+ */
+_Function_class_(IO_COMPLETION_ROUTINE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS translate_irp_completed(
+	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+{
+	auto &fltr = *static_cast<filter_ext*>(context);
+	libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
+
+	auto orig_urb = libdrv::argv<URB*, ARG_TRANSLATE_ORIG_URB>(irp);
+	auto ex_urb   = libdrv::argv<URB*, ARG_TRANSLATE_EX_URB>(irp);
+
+	NT_ASSERT(orig_urb);
+	NT_ASSERT(ex_urb);
+
+	const auto status   = irp->IoStatus.Status;
+	const auto ex_ustat = ex_urb->UrbHeader.Status;
+	const auto ex_len   = ex_urb->UrbControlTransferEx.TransferBufferLength;
+
+	// Mirror the response back into the original URB so the upper driver sees a
+	// well-formed completed legacy URB. UrbControlVendorClassRequest and
+	// UrbControlTransferEx share the URB union; we write through the original
+	// URB's vendor-class view explicitly to keep the source of truth tied to
+	// the struct the caller originally built.
+	orig_urb->UrbHeader.Status                        = ex_ustat;
+	orig_urb->UrbControlVendorClassRequest.TransferBufferLength = ex_len;
+
+	if (NT_ERROR(status) || USBD_ERROR(ex_ustat)) {
+		Trace(TRACE_LEVEL_ERROR,
+			"dev %04x, %s (translated), USBD_STATUS_%s, %!STATUS!",
+			ptr04x(fltr.self), urb_function_str(orig_urb->UrbHeader.Function),
+			get_usbd_status(ex_ustat), status);
+	} else {
+		TraceDbg("dev %04x, %s (translated), bytes %lu",
+			ptr04x(fltr.self), urb_function_str(orig_urb->UrbHeader.Function), ex_len);
+	}
+
+	USBD_UrbFree(fltr.device.usbd_handle, ex_urb);
+
+	libdrv::argv<ARG_TRANSLATE_ORIG_URB>(irp) = nullptr;
+	libdrv::argv<ARG_TRANSLATE_EX_URB>(irp)   = nullptr;
+
+	if (irp->PendingReturned) {
+		IoMarkIrpPending(irp);
+	}
+
+	return ContinueCompletion;
+}
+
+/*
+ * Translate a legacy vendor/class URB (URB_FUNCTION_VENDOR_*/CLASS_*) into the
+ * URB_FUNCTION_CONTROL_TRANSFER_EX form UDECX accepts, swap it into the next IRP
+ * stack location, and forward. On completion translate_irp_completed restores the
+ * caller's view. See issue #167.
+ *
+ * If allocation fails we fall through to standard forwarding — the URB will be
+ * rejected by UDECX as before, matching pre-fix behaviour with no regression.
+ */
+_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_same_
+auto translate_legacy_urb_pre_process(
+	_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ libdrv::RemoveLockGuard &lck)
+{
+	auto orig_urb = libdrv::urb_from_irp(irp);
+	NT_ASSERT(orig_urb);
+	NT_ASSERT(filter::is_legacy_vendor_class_function(orig_urb->UrbHeader.Function));
+
+	auto &src = orig_urb->UrbControlVendorClassRequest;
+
+	// wLength is a 16-bit field in the setup packet; a control transfer cannot exceed it.
+	if (src.TransferBufferLength > MAXUSHORT) {
+		Trace(TRACE_LEVEL_ERROR, "dev %04x, %s: TransferBufferLength %lu exceeds MAXUSHORT",
+			ptr04x(fltr.self), urb_function_str(orig_urb->UrbHeader.Function),
+			src.TransferBufferLength);
+		orig_urb->UrbHeader.Status = USBD_STATUS_INVALID_PARAMETER;
+		return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
+	}
+
+	IoCopyCurrentIrpStackLocationToNext(irp);
+	auto next_stack = IoGetNextIrpStackLocation(irp);
+
+	libdrv::urb_ptr ex_urb(fltr.device.usbd_handle);
+	if (auto err = ex_urb.alloc(next_stack)) {
+		Trace(TRACE_LEVEL_ERROR, "USBD_UrbAllocate %!STATUS! — falling back to unmodified forward",
+			err);
+		// Fall back: forward the original URB. UDECX will reject it but we preserve
+		// existing behaviour and the caller sees the same error it would have without us.
+		if (auto routine_err = IoSetCompletionRoutineEx(fltr.target, irp, irp_completed,
+								&fltr, true, true, true)) {
+			Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", routine_err);
+			IoSkipCurrentIrpStackLocation(irp);
+		} else {
+			lck.clear();
+		}
+		return IoCallDriver(fltr.target, irp);
+	}
+
+	filter::translate_legacy_vendor_class(ex_urb.get()->UrbControlTransferEx, src);
+
+	TraceDbg("dev %04x, %s -> CONTROL_TRANSFER_EX, len %lu, dir %s",
+		ptr04x(fltr.self), urb_function_str(orig_urb->UrbHeader.Function),
+		src.TransferBufferLength,
+		(src.TransferFlags & USBD_TRANSFER_DIRECTION_IN) ? "IN" : "OUT");
+
+	libdrv::argv<ARG_TRANSLATE_ORIG_URB>(irp) = orig_urb;
+	libdrv::argv<ARG_TRANSLATE_EX_URB>(irp)   = ex_urb.release();
+
+	if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, translate_irp_completed,
+						&fltr, true, true, true)) {
+		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS! (translate path)", err);
+		// We never forwarded the IRP, so no lower driver will dereference the next
+		// stack location's URB pointer. Still, restore orig_urb into next_stack's
+		// Parameters.Others.Argument1 before freeing the EX URB, so we don't leave
+		// a dangling pointer that driver-verifier would flag.
+		auto ex_to_free = libdrv::argv<URB*, ARG_TRANSLATE_EX_URB>(irp);
+		if (ex_to_free) {
+			next_stack->Parameters.Others.Argument1 = orig_urb;
+			USBD_UrbFree(fltr.device.usbd_handle, ex_to_free);
+			libdrv::argv<ARG_TRANSLATE_EX_URB>(irp)   = nullptr;
+			libdrv::argv<ARG_TRANSLATE_ORIG_URB>(irp) = nullptr;
+		}
+		orig_urb->UrbHeader.Status = USBD_STATUS_INSUFFICIENT_RESOURCES;
+		return CompleteRequest(irp, err);
+	}
+
+	lck.clear();
+	return IoCallDriver(fltr.target, irp);
+}
+
 } // namespace
 
 
@@ -251,5 +401,18 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	return fltr.is_hub ? ForwardIrp(fltr, irp) : pre_process_irp(fltr, irp, lck);
+	if (fltr.is_hub) {
+		return ForwardIrp(fltr, irp);
+	}
+
+	// Route legacy vendor/class URBs through the translation path so UDECX accepts them.
+	// See issue #167 / ftdibus.sys et al.
+	if (libdrv::has_urb(irp)) {
+		if (auto urb = libdrv::urb_from_irp(irp);
+		    urb && filter::is_legacy_vendor_class_function(urb->UrbHeader.Function)) {
+			return translate_legacy_urb_pre_process(fltr, irp, lck);
+		}
+	}
+
+	return pre_process_irp(fltr, irp, lck);
 }
