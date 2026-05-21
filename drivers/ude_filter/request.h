@@ -77,4 +77,40 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void pack_request(_Out_ _URB_CONTROL_TRANSFER_EX &r, _In_ void *TransferBuffer, _In_ USHORT function);
 
+/*
+ * URB functions that wrap a vendor or class-specific control transfer in the legacy
+ * _URB_CONTROL_VENDOR_OR_CLASS_REQUEST struct. UDECX does not accept these — it expects
+ * the URB_FUNCTION_CONTROL_TRANSFER_EX setup-packet form. Translation is required for
+ * drivers that build URBs via UsbBuildVendorRequest() (e.g. ftdibus.sys for FTDI D2XX
+ * private commands). See issue #167.
+ */
+constexpr auto is_legacy_vendor_class_function(_In_ int function)
+{
+        switch (function) {
+        case URB_FUNCTION_VENDOR_DEVICE:
+        case URB_FUNCTION_VENDOR_INTERFACE:
+        case URB_FUNCTION_VENDOR_ENDPOINT:
+        case URB_FUNCTION_VENDOR_OTHER:
+        case URB_FUNCTION_CLASS_DEVICE:
+        case URB_FUNCTION_CLASS_INTERFACE:
+        case URB_FUNCTION_CLASS_ENDPOINT:
+        case URB_FUNCTION_CLASS_OTHER:
+                return true;
+        }
+
+        return false;
+}
+
+/*
+ * Translate a legacy vendor/class URB into URB_FUNCTION_CONTROL_TRANSFER_EX form.
+ * @src must satisfy is_legacy_vendor_class_function(src.Hdr.Function).
+ * @dst is fully overwritten. TransferBuffer / TransferBufferMDL are passed through unchanged;
+ * the caller still owns the buffer.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void translate_legacy_vendor_class(
+        _Out_ _URB_CONTROL_TRANSFER_EX &dst,
+        _In_ const _URB_CONTROL_VENDOR_OR_CLASS_REQUEST &src);
+
 } // namespace usbip::filter
