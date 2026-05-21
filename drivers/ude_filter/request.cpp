@@ -32,9 +32,14 @@ void usbip::filter::pack_request(
 namespace
 {
 
+constexpr UCHAR SETUP_TYPE_RECIP_INVALID = 0xFF;
+
 /*
  * Derive the (type, recipient) pair for the setup packet's bmRequestType byte from
- * a legacy vendor/class URB function code.
+ * a legacy vendor/class URB function code. Returns SETUP_TYPE_RECIP_INVALID for any
+ * function code outside the supported set; static_assert below guarantees every
+ * function accepted by is_legacy_vendor_class_function() maps to a valid value, so
+ * the invalid return is statically unreachable when callers validate first.
  */
 constexpr auto setup_type_recipient(_In_ USHORT function) -> UCHAR
 {
@@ -48,9 +53,25 @@ constexpr auto setup_type_recipient(_In_ USHORT function) -> UCHAR
         case URB_FUNCTION_CLASS_ENDPOINT:   return UCHAR(USB_TYPE_CLASS  | USB_RECIP_ENDPOINT);
         case URB_FUNCTION_CLASS_OTHER:      return UCHAR(USB_TYPE_CLASS  | USB_RECIP_OTHER);
         }
-        NT_ASSERTMSG("unexpected URB function", false);
-        return 0;
+        return SETUP_TYPE_RECIP_INVALID;
 }
+
+// Compile-time coverage check: every function code that passes the public
+// is_legacy_vendor_class_function() gate must produce a valid bmRequestType byte.
+// Adding a new URB function to one switch without the other is now a build error.
+static_assert(setup_type_recipient(URB_FUNCTION_VENDOR_DEVICE)    != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_VENDOR_INTERFACE) != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_VENDOR_ENDPOINT)  != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_VENDOR_OTHER)     != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_CLASS_DEVICE)     != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_CLASS_INTERFACE)  != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_CLASS_ENDPOINT)   != SETUP_TYPE_RECIP_INVALID);
+static_assert(setup_type_recipient(URB_FUNCTION_CLASS_OTHER)      != SETUP_TYPE_RECIP_INVALID);
+
+// Carry forward only those TransferFlags bits that are documented for
+// URB_FUNCTION_CONTROL_TRANSFER_EX. Mask out anything else the caller may have
+// set on the legacy URB so we never propagate undefined bits to UDECX.
+constexpr ULONG CONTROL_TRANSFER_FLAGS_MASK = USBD_TRANSFER_DIRECTION_IN | USBD_SHORT_TRANSFER_OK;
 
 } // namespace
 
@@ -68,13 +89,17 @@ void usbip::filter::translate_legacy_vendor_class(
         const auto function = src.Hdr.Function;
         NT_ASSERT(is_legacy_vendor_class_function(function));
 
+        const auto type_recip = setup_type_recipient(function);
+        NT_ASSERT(type_recip != SETUP_TYPE_RECIP_INVALID); // guaranteed by static_assert coverage above
+
         RtlZeroMemory(&dst, sizeof(dst));
 
         dst.Hdr.Length   = sizeof(dst);
         dst.Hdr.Function = URB_FUNCTION_CONTROL_TRANSFER_EX;
 
         dst.PipeHandle           = nullptr; // default control pipe
-        dst.TransferFlags        = src.TransferFlags | USBD_DEFAULT_PIPE_TRANSFER;
+        dst.TransferFlags        = USBD_DEFAULT_PIPE_TRANSFER
+                                 | (src.TransferFlags & CONTROL_TRANSFER_FLAGS_MASK);
         dst.TransferBufferLength = src.TransferBufferLength;
         dst.TransferBuffer       = src.TransferBuffer;
         dst.TransferBufferMDL    = src.TransferBufferMDL;
@@ -86,8 +111,7 @@ void usbip::filter::translate_legacy_vendor_class(
         // by Microsoft as "Reserved. Do not use." We intentionally ignore it — the direction,
         // type, and recipient are fully determined by the URB function code and TransferFlags.
         auto &setup = get_setup_packet(dst);
-        setup.bmRequestType = UCHAR((dir_in ? USB_DIR_IN : USB_DIR_OUT)
-                                  | setup_type_recipient(function));
+        setup.bmRequestType = UCHAR((dir_in ? USB_DIR_IN : USB_DIR_OUT) | type_recip);
         setup.bRequest      = src.Request;
         setup.wValue.W      = src.Value;
         setup.wIndex.W      = src.Index;
