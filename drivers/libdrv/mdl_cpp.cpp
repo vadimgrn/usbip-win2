@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "mdl_cpp.h"
@@ -8,9 +8,7 @@
 * @see reactos\ntoskrnl\io\iomgr\iomdl.c
 */
 usbip::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
-        m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr))
-{
-}
+        m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr)) {}
 
 /*
  * Impossible to build partial MDL for a chain, only for THIS SourceMdl.
@@ -19,7 +17,7 @@ usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) :
         Mdl((char*)MmGetMdlVirtualAddress(SourceMdl) + Offset, Length)
 {
         NT_ASSERT(!SourceMdl->Next);
-        NT_ASSERT(Offset + Length <= MmGetMdlByteCount(SourceMdl)); // usbip::size(SourceMdl)
+        NT_ASSERT(Offset + Length <= MmGetMdlByteCount(SourceMdl));
 
         if (m_mdl) {
                 NT_ASSERT(!partial());

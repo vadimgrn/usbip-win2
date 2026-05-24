@@ -10,6 +10,7 @@
 #include "wsk_context.h"
 #include "device.h"
 #include "request_list.h"
+#include "urbtransfer.h"
 #include "network.h"
 #include "driver.h"
 #include "ioctl.h"
@@ -29,9 +30,12 @@ namespace
 
 using namespace usbip;
 
-constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
 {
-	return  actual_length >= 0 && static_cast<ULONG>(actual_length) <= TransferBufferLength ? 
+        PAGED_CODE();
+        return  actual_length >= 0 && static_cast<ULONG>(actual_length) <= TransferBufferLength ? 
 		STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
 }
 
@@ -300,11 +304,11 @@ PAGED auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &r
 	UCHAR *buffer{};
 
 	if (is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
-		ULONG length; // full, not actual
-		if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
-			Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
-			return err;
-		}
+                if (ULONG length; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
+                        Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!",
+                                                  urb_function_str(urb.UrbHeader.Function), err);
+                        return err;
+                }
 	}
 
 	return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
@@ -392,16 +396,17 @@ PAGED auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit
 		return isoch_transfer(ctx, ret, urb);
 	}
 
-	UCHAR *TransferBuffer{};
-	ULONG TransferBufferLength{};
+        UCHAR *TransferBuffer{};
+        ULONG TransferBufferLength{};
 
-	if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) {
+        if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) {
 		return err == STATUS_INVALID_PARAMETER ? STATUS_SUCCESS : err; // OK if URB has no transfer buffer
 	}
 
-	auto st = STATUS_SUCCESS;
+        TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
+        auto st = STATUS_SUCCESS;
 
-	if (TransferBufferLength != ULONG(ret.actual_length)) { // prepare_wsk_mdl can set it
+	if (TransferBufferLength != static_cast<ULONG>(ret.actual_length)) { // prepare_wsk_mdl can set it
 		st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 	}
@@ -429,14 +434,14 @@ PAGED auto ret_submit(_Inout_ wsk_context &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_mdl_chain(_In_ wsk_context &ctx)
+PAGED auto make_mdl_chain(_In_ wsk_context &ctx, _In_ bool has_gap_mdl)
 {
 	PAGED_CODE();
 	MDL *head{};
 
 	if (!ctx.is_isoc) { // IN
 		head = ctx.mdl_buf.get();
-		NT_ASSERT(!head->Next);
+		NT_ASSERT(has_gap_mdl == static_cast<bool>(head->Next));
 	} else if (auto &chain = ctx.mdl_buf) { // isoch IN
 		auto t = tail(chain);
 		t->Next = ctx.mdl_isoc.get();
@@ -448,12 +453,36 @@ PAGED auto make_mdl_chain(_In_ wsk_context &ctx)
 	return head;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto make_mdl(_Inout_ unique_ptr &buf, _Inout_ Mdl &mdl, _In_ ULONG length)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(!buf);
+        NT_ASSERT(!mdl);
+        NT_ASSERT(length);
+
+        if (buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, length); !buf) {
+                Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", length);
+        } else if (mdl = Mdl(buf.get(), length); !mdl) {
+                Trace(TRACE_LEVEL_ERROR, "Cannot allocate MDL");
+        } else {
+                return mdl.prepare_nonpaged();
+        }
+
+        return STATUS_INSUFFICIENT_RESOURCES;
+}
+
 /*
  * If response from a server has data (actual_length > 0), URB function MUST copy it to URB
  * even if UrbHeader.Status != USBD_STATUS_SUCCESS.
  * 
  * Ensure that URB has TransferBuffer and its size is sufficient.
  * Do others checks when payload will be read.
+ *
+ * UdecxUrbRetrieveBuffer can return Length that less than URB.TransferBufferLength,
+ * TransferBufferLength must be used instead.
  * 
  * recv_payload -> prepare_wsk_mdl, there is payload to receive.
  * Payload layout:
@@ -462,27 +491,30 @@ PAGED auto make_mdl_chain(_In_ wsk_context &ctx)
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ URB &urb)
+PAGED auto prepare_wsk_mdl(
+        _Inout_ MDL* &mdl, _Inout_ unique_ptr &gap_buf, _Inout_ Mdl &gap_mdl, _Inout_ wsk_context &ctx)
 {
 	PAGED_CODE();
 
-	mdl = nullptr;
-	auto &ret = get_ret_submit(ctx);
+        NT_ASSERT(!mdl);
+        NT_ASSERT(!gap_buf);
+        NT_ASSERT(!gap_mdl);
 
+        auto &ret = get_ret_submit(ctx);
 	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
 		return err;
 	}
 
-	UCHAR *TransferBuffer{};
-	ULONG TransferBufferLength{};
+        auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
 
-	if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) { // URB must have transfer buffer
-		Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!", 
-			                  urb_function_str(urb.UrbHeader.Function), err);
-		return err;
-	}
+        ULONG TransferBufferLength{};
+        if (UCHAR *buf; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buf, &TransferBufferLength)) { // URB must have transfer buffer
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!", urb_function_str(urb.UrbHeader.Function), err);
+                return err;
+        }
+        TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
 
-	auto dir_out = is_transfer_dir_out(ctx.hdr);
+        auto dir_out = is_transfer_dir_out(ctx.hdr);
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload
@@ -495,7 +527,7 @@ PAGED auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ UR
 	if (fail || !TransferBufferLength) {
 		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
 			                  TransferBufferLength, ret.actual_length, ctx.hdr.direction);
-		return STATUS_INVALID_BUFFER_SIZE;
+                return STATUS_INVALID_BUFFER_SIZE;
 	}
 
 	if (dir_out) {
@@ -504,9 +536,16 @@ PAGED auto prepare_wsk_mdl(_Out_ MDL* &mdl, _Inout_ wsk_context &ctx, _Inout_ UR
 	} else if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, ret.actual_length, IoWriteAccess, urb)) {
 		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
 		return err;
-	}
+        } else if (auto len = size(ctx.mdl_buf); len < ret.actual_length) {
+                auto gap = static_cast<ULONG>(ret.actual_length - len);
+                if (err = make_mdl(gap_buf, gap_mdl, gap); err) {
+                        return err;
+                }
+                NT_ASSERT(!ctx.mdl_buf.next());
+                ctx.mdl_buf.next(gap_mdl);
+        }
 
-	mdl = make_mdl_chain(ctx);
+	mdl = make_mdl_chain(ctx, gap_mdl.get());
 	return STATUS_SUCCESS;
 }
 
@@ -536,24 +575,15 @@ PAGED auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	PAGED_CODE();
 
-	if (ULONG(length) != length) {
-		Trace(TRACE_LEVEL_ERROR, "Buffer size truncation: ULONG(%lu) != size_t(%Iu)", ULONG(length), length);
+	if (auto len = static_cast<ULONG>(length); len != length) {
+		Trace(TRACE_LEVEL_ERROR, "Buffer size truncation: ULONG(%lu) != size_t(%Iu)", len, length);
 		return STATUS_INVALID_PARAMETER;
 	}
 
-	unique_ptr payload(libdrv::uninitialized, NonPagedPoolNx, length);
-
-	if (auto ptr = payload.get()) {
-		ctx.mdl_buf = Mdl(ptr, ULONG(length));
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", length);
-		return STATUS_INSUFFICIENT_RESOURCES;
-	}
-
-	if (auto err = ctx.mdl_buf.prepare_nonpaged()) {
-		Trace(TRACE_LEVEL_ERROR, "prepare_nonpaged %!STATUS!", err);
-		return err;
-	}
+        unique_ptr payload;
+        if (auto err = make_mdl(payload, ctx.mdl_buf, static_cast<ULONG>(length))) {
+                return err;
+        }
 
 	WSK_BUF buf{ .Mdl = ctx.mdl_buf.get(), .Length = length };
 	return receive(ctx, buf);
@@ -565,15 +595,16 @@ PAGED auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	PAGED_CODE();
 
-	auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
-	WSK_BUF buf{ .Length = length };
+        WSK_BUF buf{ .Length = length };
+        unique_ptr gap_buf;
+        Mdl gap_mdl;
 
-	if (auto err = prepare_wsk_mdl(buf.Mdl, ctx, urb)) {
-		Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
-		return err;
-	}
+        if (auto err = prepare_wsk_mdl(buf.Mdl, gap_buf, gap_mdl, ctx)) {
+                Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
+                return err;
+        }
 
-	return receive(ctx, buf);
+        return receive(ctx, buf);
 }
 
 /*

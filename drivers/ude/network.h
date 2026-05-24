@@ -1,15 +1,15 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-#include <libdrv\mdl_cpp.h>
-#include <libdrv\wsk_cpp.h>
+#include <libdrv/codeseg.h>
+#include <libdrv/mdl_cpp.h>
+#include <libdrv/wsk_cpp.h>
 
-#include <usbip\consts.h>
-#include <resources\messages.h>
+#include <usbip/consts.h>
+#include <resources/messages.h>
 
 struct _URB;
 struct usbip_header;

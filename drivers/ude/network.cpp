@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "network.h"
@@ -8,11 +8,11 @@
 
 #include "urbtransfer.h"
 
-#include <usbip\proto.h>
-#include <usbip\proto_op.h>
+#include <usbip/proto.h>
+#include <usbip/proto_op.h>
 
-#include <libdrv\dbgcommon.h>
-#include <libdrv\usbd_helper.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/usbd_helper.h>
 
 #include <libusbip/src/op_common.h>
 
@@ -88,7 +88,16 @@ PAGED USBIP_STATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expec
 
 /*
  * URB must have TransferBuffer* members.
+ * 
  * TransferBuffer && TransferBufferMDL can be both not NULL for bulk/int at least.
+ * Microsoft documentation specifically states that a client driver can safely
+ * populate both fields at the same time. If you do this, both pointers
+ * must point to the exact same underlying memory buffer.
+ *
+ * Use TransferBufferMDL if it is present: Hardware and lower-level drivers
+ * (like the HCD processing requests at DISPATCH_LEVEL) prioritize the MDL.
+ * The MDL provides the safe physical memory locking required for DMA) transactions.
+ * If you need a virtual pointer to inspect or write data in your code, use TransferBuffer. 
  * 
  * TransferBufferMDL can be a chain and have size greater than mdl_size. 
  * TransferBufferMDL is not used directly because of BSODs in random third-party drivers during "usbip detach".
@@ -124,13 +133,22 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
 
         if (auto head = r.TransferBufferMDL) { // preferable case because it is locked-down, can be a chain
 
-                if (auto len = size(head); len < r.TransferBufferLength) { // must describe full buffer
+                enum { MAX_GAP = PAGE_SIZE/2 }; // arbitrary
+
+                if (auto len = static_cast<ULONG>(size(head));
+                    len < mdl_size && ((mdl_size - len >= MAX_GAP) || operation == IoReadAccess || head->Next)) {
+                        Trace(TRACE_LEVEL_ERROR, "MDL size %Iu < mdl_size(%Iu)", len, mdl_size);
                         return STATUS_BUFFER_TOO_SMALL;
                 } else if (!head->Next) { // source MDL is not a chain
-                        mdl = Mdl(head, 0, mdl_size);
+                        // The caller may have asked for more than this MDL covers (e.g. Mm partial-final-cluster
+                        // paging IO where cdrom.sys rounded URB.TransferBufferLength up to a sector). Build a partial MDL
+                        // on what is actually locked down; the caller is responsible for chaining a gap MDL.
+                        mdl = Mdl(head, 0, min(len, mdl_size));
                         return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
-                } else if (buf = MmGetSystemAddressForMdlSafe(head, make_priority(operation)); !buf) {
-                        return STATUS_INSUFFICIENT_RESOURCES;        
+                }
+
+                if (buf = MmGetSystemAddressForMdlSafe(head, make_priority(operation)); !buf) {
+                        return STATUS_UNSUCCESSFUL;        
                 } else { // IoBuildPartialMdl doesn't treat SourceMdl as a chain and can't be used
                         probe_and_lock = false;
                 }

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "utils.h"
 #include <wdm.h>
 
 namespace libdrv
@@ -20,7 +21,7 @@ public:
         enum { pooltag = PoolTag };
 
         constexpr unique_ptr() = default;
-        unique_ptr(_In_ void *ptr) : m_ptr(ptr) {}
+        constexpr unique_ptr(_In_ void *ptr) : m_ptr(ptr) {}
 
         unique_ptr(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
                 m_ptr(ExAllocatePoolZero(PoolType, NumberOfBytes, pooltag)) {}
@@ -35,16 +36,16 @@ public:
                 }
         }
 
-        explicit operator bool() const { return m_ptr; }
-        auto operator!() const { return !m_ptr; }
+        constexpr explicit operator bool() const { return m_ptr; }
+        constexpr auto operator!() const { return !m_ptr; }
 
-        auto get() const { return m_ptr; }
+        constexpr auto get() const { return m_ptr; }
 
         template<typename T>
-        auto get() const { return static_cast<T*>(m_ptr); }
+        constexpr auto get() const { return static_cast<T*>(m_ptr); }
 
         template<typename T = void>
-        auto release()
+        constexpr auto release()
         {
                 auto ptr = get<T>();
                 m_ptr = nullptr;
@@ -66,7 +67,7 @@ public:
                 }
         }
 
-        void swap(_Inout_ unique_ptr &p) { ::swap(m_ptr, p.m_ptr); }
+        constexpr void swap(_Inout_ unique_ptr &p) { ::swap(m_ptr, p.m_ptr); }
 
 private:
         void *m_ptr{};
@@ -74,7 +75,7 @@ private:
 
 
 template<ULONG PoolTag>
-inline void swap(_Inout_ unique_ptr<PoolTag> &a, _Inout_ unique_ptr<PoolTag> &b)
+constexpr void swap(_Inout_ unique_ptr<PoolTag> &a, _Inout_ unique_ptr<PoolTag> &b)
 {
         a.swap(b);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -23,6 +23,8 @@ struct UrbTransfer
 	decltype(type::TransferBufferMDL) TransferBufferMDL;
 };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto has_transfer_buffer(_In_ const URB &urb)
 {
         switch (urb.UrbHeader.Function) {
@@ -68,16 +70,20 @@ constexpr auto has_transfer_buffer(_In_ const URB &urb)
         return false;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& AsUrbTransfer(_In_ URB &urb) 
 { 
-	NT_ASSERT(has_transfer_buffer(urb));
-	return reinterpret_cast<UrbTransfer&>(urb); 
+        NT_ASSERT(has_transfer_buffer(urb));
+        return reinterpret_cast<UrbTransfer&>(urb);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto& AsUrbTransfer(_In_ const URB &urb) 
 { 
-	NT_ASSERT(has_transfer_buffer(urb));
-	return reinterpret_cast<const UrbTransfer&>(urb); 
+        NT_ASSERT(has_transfer_buffer(urb));
+        return reinterpret_cast<const UrbTransfer&>(urb);
 }
 
 } // namespace usbip

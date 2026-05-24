@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -17,6 +17,7 @@ size_t size(_In_opt_ const MDL *mdl);
 class Mdl
 {
 public:
+        constexpr Mdl() = default;
         Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
         Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length);
 
@@ -28,10 +29,10 @@ public:
         Mdl(Mdl&& m) : m_mdl(m.release()) {}
         Mdl& operator =(Mdl&& m);
 
-        explicit operator bool() const { return m_mdl; }
-        auto operator !() const { return !m_mdl; }
+        constexpr explicit operator bool() const { return m_mdl; }
+        constexpr auto operator !() const { return !m_mdl; }
 
-        auto get() const { return m_mdl; }
+        constexpr auto get() const { return m_mdl; }
 
         auto vaddr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : nullptr; }
         auto size() const { return m_mdl ? MmGetMdlByteCount(m_mdl) : 0; }
