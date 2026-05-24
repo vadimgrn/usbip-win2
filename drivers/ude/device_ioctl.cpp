@@ -170,7 +170,8 @@ auto get_device_string_descr(_In_ const USB_DEFAULT_PIPE_SETUP_PACKET &s)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto fill_usb_device_serial(
-        _Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ const vhci::imported_device_properties &props)
+        _In_ WDFREQUEST request, _Inout_ _URB_CONTROL_TRANSFER_EX &r,
+        _In_ const vhci::imported_device_properties &props)
 {
         constexpr UCHAR hdr_sz = libdrv::usb_string_descr_size(0);
 
@@ -185,17 +186,23 @@ auto fill_usb_device_serial(
                 return err;
         }
 
-        auto &sd = *reinterpret_cast<USB_STRING_DESCRIPTOR*>(r.TransferBuffer); // UdecxUrbRetrieveBuffer
-        sd.bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
-        sd.bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+        USB_STRING_DESCRIPTOR *sd{};
+        if (ULONG length; // can differ from r.TransferBufferLength, see prepare_wsk_mdl
+            auto err = UdecxUrbRetrieveBuffer(request, reinterpret_cast<UCHAR**>(&sd), &length)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
+                return err;
+        }
 
-        auto buf_cch = (r.TransferBufferLength - hdr_sz)/sizeof(*sd.bString);
+        sd->bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
+        sd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+
+        auto buf_cch = (r.TransferBufferLength - hdr_sz)/sizeof(sd->bString);
         auto cch = min(buf_cch, serial_cch);
 
         for (auto i = 0U; i < cch; ++i) {
                 UCHAR ch = props.serial[i];
                 NT_ASSERT(is_ascii(ch));
-                sd.bString[i] = ch;
+                sd->bString[i] = ch;
         }
 
         r.TransferBufferLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
@@ -251,7 +258,7 @@ auto control_transfer(
                 // not a string descriptor request or get list of supported languages
         } else if (auto &props = dev.ext().properties(); idx != props.iserial) {
                 // not a iSerialNumber
-        } else if (auto st = fill_usb_device_serial(r, props); NT_SUCCESS(st)) {
+        } else if (auto st = fill_usb_device_serial(request, r, props); NT_SUCCESS(st)) {
                 return st;
         }
 
