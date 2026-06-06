@@ -27,6 +27,7 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
 
         ctx->mdl_hdr.reset();
         ctx->mdl_buf.reset();
+        ctx->mdl_buf_tail.reset();
         ctx->mdl_isoc.reset();
 
         if (auto irp = ctx->wsk_irp) {
@@ -93,6 +94,28 @@ auto alloc_wsk_context(_In_ ULONG NumberOfPackets)
         return ctx;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto alloc_buf_tail(_Inout_ void* &buf, _In_ ULONG length)
+{
+        enum { MAXLEN = PAGE_SIZE/2 }; // arbitrary
+        auto st = STATUS_SUCCESS;
+
+        if (length > MAXLEN) {
+                Trace(TRACE_LEVEL_ERROR, "length %lu > MAXLEN %d", length, MAXLEN);
+                st = STATUS_BUFFER_TOO_SMALL;
+        } else if (buf) {
+                // allocate once
+        } else if (unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
+                Trace(TRACE_LEVEL_ERROR, "Can't allocate %d bytes", MAXLEN);
+                st = STATUS_INSUFFICIENT_RESOURCES;
+        } else {
+                buf = ptr.release();
+        }
+
+        return st;
+}
+
 } // namespace
 
 
@@ -143,6 +166,7 @@ auto usbip::alloc_wsk_context(
 
 /*
  * alloc_wsk_context sets dev, request, is_isoc. It's safe do not clear them.
+ * Retain mdl_buf_tail.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -163,25 +187,24 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::alloc_buf_tail(_Inout_ wsk_context &ctx, _In_ ULONG length)
+NTSTATUS usbip::alloc_mdl_buf_tail(_Inout_ wsk_context &ctx, _In_ ULONG length)
 {
-        enum { MAXLEN = PAGE_SIZE/2 }; // arbitrary
-
-        if (length > MAXLEN) {
-                Trace(TRACE_LEVEL_ERROR, "length %lu > MAXLEN %d", length, MAXLEN);
-                return STATUS_BUFFER_TOO_SMALL;
+        if (auto err = alloc_buf_tail(ctx.buf_tail, length)) {
+                return err;
         }
 
-        if (auto &buf = ctx.buf_tail) {
-                //
-        } else if (unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
-                Trace(TRACE_LEVEL_ERROR, "Can't allocate %d bytes", MAXLEN);
-                return STATUS_INSUFFICIENT_RESOURCES;
+        auto st = STATUS_SUCCESS;
+
+        if (auto &mdl = ctx.mdl_buf_tail; mdl.size() == length) {
+                NT_ASSERT(!mdl.next());
+        } else if (mdl = Mdl(ctx.buf_tail, length); !mdl) {
+                Trace(TRACE_LEVEL_ERROR, "Cannot allocate MDL");
+                st = STATUS_INSUFFICIENT_RESOURCES;
         } else {
-                buf = ptr.release();
+                st = mdl.prepare_nonpaged();
         }
 
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
