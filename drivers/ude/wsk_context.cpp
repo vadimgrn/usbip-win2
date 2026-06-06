@@ -6,14 +6,13 @@
 #include "trace.h"
 #include "wsk_context.tmh"
 
-#include <libdrv/codeseg.h>
+#include "driver.h"
 
 namespace
 {
 
 using namespace usbip;
 
-ULONG g_tag;
 bool g_initialized;
 LOOKASIDE_LIST_EX g_lookaside;
 
@@ -34,11 +33,9 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
                 IoFreeIrp(irp);
         }
 
-        if (auto ptr = ctx->isoc) {
-                ExFreePoolWithTag(ptr, g_tag);
+        for (void* v[] { ctx->buf_tail, ctx->isoc, ctx }; auto ptr: v) {
+                unique_ptr{ptr};
         }
-
-        ExFreePoolWithTag(ctx, g_tag);
 }
 
 _IRQL_requires_same_
@@ -46,12 +43,14 @@ _Function_class_(allocate_function_ex)
 void *allocate_function_ex(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {
         NT_ASSERT(PoolType == NonPagedPoolNx);
-        NT_ASSERT(Tag == g_tag);
+        wsk_context *ctx{};
 
-        auto ctx = (wsk_context*)ExAllocatePoolZero(PoolType, NumberOfBytes, Tag);
-        if (!ctx) {
+        if (unique_ptr ptr(PoolType, NumberOfBytes); !ptr) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", NumberOfBytes);
                 return nullptr;
+        } else {
+                ctx = ptr.release<wsk_context>();
+                NT_ASSERT(Tag == ptr.pooltag);
         }
 
         ctx->mdl_hdr = Mdl(&ctx->hdr, sizeof(ctx->hdr));
@@ -103,15 +102,14 @@ auto alloc_wsk_context(_In_ ULONG NumberOfPackets)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::init_wsk_context_list(_In_ ULONG tag)
+NTSTATUS usbip::init_wsk_context_list()
 {
         if (g_initialized) {
                 return STATUS_ALREADY_INITIALIZED;
         }
 
-        g_tag = tag;
         auto err = ExInitializeLookasideListEx(&g_lookaside, allocate_function_ex, free_function_ex, 
-                                               NonPagedPoolNx, 0, sizeof(wsk_context), tag, 0);
+                                               NonPagedPoolNx, 0, sizeof(wsk_context), unique_ptr::pooltag, 0);
 
         g_initialized = !err;
         return err;
@@ -165,7 +163,30 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
+NTSTATUS usbip::alloc_buf_tail(_Inout_ wsk_context &ctx, _In_ ULONG length)
+{
+        enum { MAXLEN = PAGE_SIZE/2 }; // arbitrary
+
+        if (length > MAXLEN) {
+                Trace(TRACE_LEVEL_ERROR, "length %lu > MAXLEN %d", length, MAXLEN);
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
+        if (auto &buf = ctx.buf_tail) {
+                //
+        } else if (unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
+                Trace(TRACE_LEVEL_ERROR, "Can't allocate %d bytes", MAXLEN);
+                return STATUS_INSUFFICIENT_RESOURCES;
+        } else {
+                buf = ptr.release();
+        }
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
 {
         NT_ASSERT(NumberOfPackets != number_of_packets_non_isoch);
 
@@ -177,16 +198,16 @@ NTSTATUS usbip::prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets)
         ULONG isoc_len = NumberOfPackets*sizeof(*ctx.isoc);
 
         if (ctx.isoc_alloc_cnt < NumberOfPackets) {
-                auto isoc = (iso_packet_descriptor*)ExAllocatePoolZero(NonPagedPoolNx, isoc_len, g_tag);
+                unique_ptr isoc(NonPagedPoolNx, isoc_len);
                 if (!isoc) {
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
 
                 if (ctx.isoc) {
-                        ExFreePoolWithTag(ctx.isoc, g_tag);
+                        unique_ptr(ctx.isoc);
                 }
 
-                ctx.isoc = isoc;
+                ctx.isoc = isoc.release<iso_packet_descriptor>();
                 ctx.isoc_alloc_cnt = NumberOfPackets;
 
                 ctx.mdl_isoc.reset();

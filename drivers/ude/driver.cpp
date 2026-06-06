@@ -57,7 +57,7 @@ CS_INIT auto init()
 {
 	PAGED_CODE();
 
-	if (auto err = init_wsk_context_list(pooltag)) {
+	if (auto err = init_wsk_context_list()) {
 		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", err);
 		return err;
 	}

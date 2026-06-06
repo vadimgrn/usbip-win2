@@ -133,10 +133,8 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
 
         if (auto head = r.TransferBufferMDL) { // preferable case because it is locked-down, can be a chain
 
-                enum { MAX_GAP = PAGE_SIZE/2 }; // arbitrary
-
-                if (auto len = static_cast<ULONG>(size(head));
-                    len < mdl_size && ((mdl_size - len >= MAX_GAP) || operation == IoReadAccess || head->Next)) {
+                if (auto len = static_cast<ULONG>(size(head)); 
+                    len < mdl_size && (head->Next || operation == IoReadAccess)) {
                         Trace(TRACE_LEVEL_ERROR, "MDL size %Iu < mdl_size(%Iu)", len, mdl_size);
                         return STATUS_BUFFER_TOO_SMALL;
                 } else if (!head->Next) { // source MDL is not a chain

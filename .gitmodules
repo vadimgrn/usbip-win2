@@ -2,5 +2,3 @@
 	path = vcpkg
 	url = https://github.com/microsoft/vcpkg.git
 	ignore = all
-	
-

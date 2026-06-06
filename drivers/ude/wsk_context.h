@@ -26,6 +26,7 @@ struct wsk_context
         // preallocated data
 
         IRP *wsk_irp;
+        void *buf_tail; // TransferBufferMDL may describe a buffer shorter than required
 
         Mdl mdl_hdr;
         usbip::header hdr;
@@ -39,7 +40,7 @@ struct wsk_context
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS init_wsk_context_list(_In_ ULONG tag);
+NTSTATUS init_wsk_context_list();
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -57,7 +58,11 @@ void free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS prepare_isoc(_In_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
+NTSTATUS alloc_buf_tail(_Inout_ wsk_context &ctx, _In_ ULONG length);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPackets);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

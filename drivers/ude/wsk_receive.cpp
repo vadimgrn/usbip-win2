@@ -455,23 +455,38 @@ PAGED auto make_mdl_chain(_In_ wsk_context &ctx, _In_ bool has_gap_mdl)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_mdl(_Inout_ unique_ptr &buf, _Inout_ Mdl &mdl, _In_ ULONG length)
+PAGED auto make_mdl(_Inout_ Mdl &mdl, _In_ void *buf, _In_ ULONG length)
 {
         PAGED_CODE();
 
-        NT_ASSERT(!buf);
         NT_ASSERT(!mdl);
+        NT_ASSERT(buf);
+        NT_ASSERT(length);
+
+        if (mdl = Mdl(buf, length); !mdl) {
+                Trace(TRACE_LEVEL_ERROR, "Cannot allocate MDL");
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        return mdl.prepare_nonpaged();
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto make_mdl(_Inout_ Mdl &mdl, _Inout_ unique_ptr &buf, _In_ ULONG length)
+{
+        PAGED_CODE();
+
+        NT_ASSERT(!mdl);
+        NT_ASSERT(!buf);
         NT_ASSERT(length);
 
         if (buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, length); !buf) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", length);
-        } else if (mdl = Mdl(buf.get(), length); !mdl) {
-                Trace(TRACE_LEVEL_ERROR, "Cannot allocate MDL");
-        } else {
-                return mdl.prepare_nonpaged();
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        return STATUS_INSUFFICIENT_RESOURCES;
+        return make_mdl(mdl, buf.get(), length);
 }
 
 /*
@@ -491,14 +506,11 @@ PAGED auto make_mdl(_Inout_ unique_ptr &buf, _Inout_ Mdl &mdl, _In_ ULONG length
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto prepare_wsk_mdl(
-        _Inout_ MDL* &mdl, _Inout_ unique_ptr &gap_buf, _Inout_ Mdl &gap_mdl, _Inout_ wsk_context &ctx)
+PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ Mdl &mdl_buf_tail, _Inout_ wsk_context &ctx)
 {
 	PAGED_CODE();
-
         NT_ASSERT(!mdl);
-        NT_ASSERT(!gap_buf);
-        NT_ASSERT(!gap_mdl);
+        NT_ASSERT(!mdl_buf_tail);
 
         auto &ret = get_ret_submit(ctx);
 	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
@@ -537,15 +549,18 @@ PAGED auto prepare_wsk_mdl(
 		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
 		return err;
         } else if (auto len = size(ctx.mdl_buf); len < ret.actual_length) {
-                auto gap = static_cast<ULONG>(ret.actual_length - len);
-                if (err = make_mdl(gap_buf, gap_mdl, gap); err) {
+
+                if (auto gap = static_cast<ULONG>(ret.actual_length - len); (err = alloc_buf_tail(ctx, gap))) {
+                        return err;
+                } else if (err = make_mdl(mdl_buf_tail, ctx.buf_tail, gap); err) {
                         return err;
                 }
+
                 NT_ASSERT(!ctx.mdl_buf.next());
-                ctx.mdl_buf.next(gap_mdl);
+                ctx.mdl_buf.next(mdl_buf_tail);
         }
 
-	mdl = make_mdl_chain(ctx, gap_mdl.get());
+	mdl = make_mdl_chain(ctx, mdl_buf_tail.get());
 	return STATUS_SUCCESS;
 }
 
@@ -581,7 +596,7 @@ PAGED auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 	}
 
         unique_ptr payload;
-        if (auto err = make_mdl(payload, ctx.mdl_buf, static_cast<ULONG>(length))) {
+        if (auto err = make_mdl(ctx.mdl_buf, payload, static_cast<ULONG>(length))) {
                 return err;
         }
 
@@ -595,11 +610,10 @@ PAGED auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	PAGED_CODE();
 
+        Mdl mdl_buf_tail;
         WSK_BUF buf{ .Length = length };
-        unique_ptr gap_buf;
-        Mdl gap_mdl;
 
-        if (auto err = prepare_wsk_mdl(buf.Mdl, gap_buf, gap_mdl, ctx)) {
+        if (auto err = prepare_wsk_mdl(buf.Mdl, mdl_buf_tail, ctx)) {
                 Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
                 return err;
         }
