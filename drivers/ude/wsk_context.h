@@ -6,8 +6,9 @@
 
 #include <libdrv/wdf_cpp.h>
 
-#include <usbip\proto.h>
-#include <libdrv\mdl_cpp.h>
+#include <usbip/proto.h>
+#include <libdrv/irp.h>
+#include <libdrv/mdl_cpp.h>
 
 namespace usbip
 {
@@ -25,7 +26,7 @@ struct wsk_context
 
         // preallocated data
 
-        IRP *wsk_irp;
+        libdrv::irp_ptr wsk_irp;
 
         void *buf_tail;
         Mdl mdl_buf_tail; // mdl_buf may describe a buffer shorter than required

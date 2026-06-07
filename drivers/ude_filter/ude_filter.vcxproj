@@ -107,7 +107,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAdditionalConfigurationFile>
       </WppAdditionalConfigurationFile>
-      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -129,7 +129,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAdditionalConfigurationFile>
       </WppAdditionalConfigurationFile>
-      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -151,7 +151,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAdditionalConfigurationFile>
       </WppAdditionalConfigurationFile>
-      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -173,7 +173,7 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAdditionalConfigurationFile>
       </WppAdditionalConfigurationFile>
-      <AdditionalIncludeDirectories>..;..\..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>

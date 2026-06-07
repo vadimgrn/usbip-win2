@@ -46,7 +46,7 @@ CS_INIT auto driver_create(_In_ DRIVER_OBJECT *DriverObject, _In_ UNICODE_STRING
 
 	WDF_DRIVER_CONFIG cfg;
 	WDF_DRIVER_CONFIG_INIT(&cfg, DeviceAdd);
-	cfg.DriverPoolTag = pooltag;
+	cfg.DriverPoolTag = unique_ptr::pooltag;
 
 	return WdfDriverCreate(DriverObject, RegistryPath, &attr, &cfg, nullptr);
 }

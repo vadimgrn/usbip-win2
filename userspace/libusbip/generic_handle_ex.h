@@ -32,17 +32,17 @@ public:
         constexpr generic_handle() NOEXCEPT = default;
         constexpr explicit generic_handle(type h) NOEXCEPT : m_handle(h) {}
 
-        ~generic_handle() 
+        ~generic_handle()
         {
                 if (*this) {
-                        close_handle(m_handle, tag_type());
+                        close_handle(m_handle, tag_type{});
                 }
         }
 
         generic_handle(const generic_handle&) = delete;
         generic_handle& operator=(const generic_handle&) = delete;
 
-        generic_handle(generic_handle&& h) NOEXCEPT : m_handle(h.release()) {}
+        constexpr generic_handle(generic_handle&& h) NOEXCEPT : m_handle(h.release()) {}
 
         auto& operator=(generic_handle&& h) NOEXCEPT
         {
@@ -58,13 +58,10 @@ public:
         template<typename T>
         constexpr auto get() const NOEXCEPT { return static_cast<T>(m_handle); }
 
-        template<typename T = type>
-        auto release() NOEXCEPT
-        {
-                auto h = static_cast<T>(m_handle);
-                m_handle = None;
-                return h;
-        }
+        constexpr auto release() NOEXCEPT { return do_release(); }
+
+        template<typename T>
+        constexpr auto release() NOEXCEPT { return static_cast<T>(do_release()); }
 
         void reset(type h = None) NOEXCEPT
         {
@@ -76,7 +73,7 @@ public:
 
         void close() NOEXCEPT { reset(); }
 
-        void swap(generic_handle &h) NOEXCEPT
+        constexpr void swap(generic_handle &h) NOEXCEPT
         {
                 auto tmp = h.m_handle;
                 h.m_handle = m_handle;
@@ -85,12 +82,19 @@ public:
 
 private:
         type m_handle = None;
+
+        constexpr type do_release() NOEXCEPT
+        {
+                auto h = m_handle;
+                m_handle = None;
+                return h;
+        }
 };
 
 
 template<typename Handle, typename Tag, auto NoneValue>
-inline void swap(generic_handle<Handle, Tag, NoneValue> &a, 
-                 generic_handle<Handle, Tag, NoneValue> &b) NOEXCEPT
+constexpr void swap(generic_handle<Handle, Tag, NoneValue> &a, 
+                    generic_handle<Handle, Tag, NoneValue> &b) NOEXCEPT
 {
         a.swap(b);
 }

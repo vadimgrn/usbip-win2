@@ -38,7 +38,7 @@ PAGED auto save_device_location(_Inout_ device_attributes &attr, _In_ const vhci
         for (auto& [dst, src, maxlen]: v) {
                 if (!*src) {
                         // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
-                } else if (auto err = libdrv::utf8_to_unicode(*dst, src, maxlen, PagedPool, pooltag)) {
+                } else if (auto err = libdrv::utf8_to_unicode(*dst, src, maxlen, PagedPool, unique_ptr::pooltag)) {
                         Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, err);
                         return err;
                 }
@@ -178,7 +178,7 @@ PAGED void usbip::free(_Inout_ device_attributes &r)
 {
         PAGED_CODE();
 
-        libdrv::FreeUnicodeString(r.node_name, pooltag); // @see RtlFreeUnicodeString
-        libdrv::FreeUnicodeString(r.service_name, pooltag);
-        libdrv::FreeUnicodeString(r.busid, pooltag);
+        libdrv::FreeUnicodeString(r.node_name, unique_ptr::pooltag); // @see RtlFreeUnicodeString
+        libdrv::FreeUnicodeString(r.service_name, unique_ptr::pooltag);
+        libdrv::FreeUnicodeString(r.busid, unique_ptr::pooltag);
 }

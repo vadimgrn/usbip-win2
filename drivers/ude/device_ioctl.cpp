@@ -140,7 +140,7 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
 
-        auto wsk_irp = ctx->wsk_irp; // do not access ctx or wsk_irp after send
+        auto wsk_irp = ctx->wsk_irp.get(); // do not access ctx or wsk_irp after send
         IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
 
         NTSTATUS st;

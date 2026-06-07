@@ -46,7 +46,7 @@ auto free(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 		unique_ptr b(urb->UrbControlTransferEx.TransferBuffer);
 	}
 
-	IoFreeIrp(irp);
+        libdrv::irp_ptr{irp};
 	return tag;
 }
 
@@ -130,7 +130,8 @@ void select_configuration(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
 	}
 
-	if (ULONG len{}; unique_ptr buf = clone(len, r, NonPagedPoolNx, buf.pooltag)) {
+        ULONG len{};
+        if (unique_ptr buf(clone(len, r, NonPagedPoolNx, buf.pooltag)); buf) {
 		send_request(fltr, lck, buf, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);

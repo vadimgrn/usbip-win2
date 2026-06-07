@@ -9,7 +9,6 @@
 namespace usbip
 {
 
-const ULONG pooltag = 'ICHV';
-using unique_ptr = libdrv::unique_ptr<pooltag>;
+using unique_ptr = libdrv::unique_ptr<'ICHV'>;
 
 } // namespace usbip

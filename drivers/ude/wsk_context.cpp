@@ -29,10 +29,7 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
         ctx->mdl_buf.reset();
         ctx->mdl_buf_tail.reset();
         ctx->mdl_isoc.reset();
-
-        if (auto irp = ctx->wsk_irp) {
-                IoFreeIrp(irp);
-        }
+        ctx->wsk_irp.reset();
 
         for (void* v[] { ctx->buf_tail, ctx->isoc, ctx }; auto ptr: v) {
                 unique_ptr{ptr};
@@ -62,8 +59,7 @@ void *allocate_function_ex(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _
                 return nullptr;
         }
 
-        ctx->wsk_irp = IoAllocateIrp(1, false);
-        if (!ctx->wsk_irp) {
+        if (ctx->wsk_irp = libdrv::irp_ptr(1, false); !ctx->wsk_irp) {
                 Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp -> NULL");
                 free_function_ex(ctx, list);
                 return nullptr;
@@ -179,7 +175,7 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp)
         ctx->mdl_buf.reset();
 
         if (reuse_irp) {
-                IoReuseIrp(ctx->wsk_irp, STATUS_SUCCESS);
+                IoReuseIrp(ctx->wsk_irp.get(), STATUS_SUCCESS);
         }
 
         ExFreeToLookasideListEx(&g_lookaside, ctx);

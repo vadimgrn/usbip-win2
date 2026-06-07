@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "pnp.h"
@@ -10,8 +10,9 @@
 #include "irp.h"
 #include "query_interface.h"
 
-#include <libdrv\remove_lock.h>
-#include <libdrv\ioctl.h>
+#include <libdrv/remove_lock.h>
+#include <libdrv/unique_ptr.h>
+#include <libdrv/ioctl.h>
 
 #include <usbbusif.h>
 #include <wdmguid.h>
@@ -44,15 +45,15 @@ PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 	PAGED_CODE();
 
 	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
-	auto dst = (DEVICE_RELATIONS*)ExAllocatePoolUninitialized(PagedPool, sz, pooltag);
+        unique_ptr ptr(libdrv::uninitialized, PagedPool, sz);
 
-	if (dst) {
-		RtlCopyMemory(dst, &src, sz);
+	if (ptr) {
+		RtlCopyMemory(ptr.get(), &src, sz);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
 	}
 
-	return dst;
+	return ptr.release<DEVICE_RELATIONS>();
 }
 
 _IRQL_requires_same_
@@ -82,25 +83,21 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
 
 	for (ULONG i = 0; i < r.Count; ++i) {
 		auto pdo = r.Objects[i];
-		if (!(previous && contains(*previous, pdo))) {
+		if (auto ok = previous && contains(*previous, pdo); !ok) {
 			TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
 			do_add_device(fltr.self->DriverObject, pdo, &fltr);
 		}
 	}
 
-	auto assign = [] (auto &ptr, auto addr) 
-	{
-		if (ptr) {
-			ExFreePoolWithTag(ptr, pooltag);
-		}
-		ptr = addr;
-	};
+        unique_ptr prev(previous);
 
-	if (!r.Count) {
-		assign(previous, nullptr);
-	} else if (auto ptr = clone(r)) { // leave as is in case of an error
-		assign(previous, ptr);
-	}
+        if (!r.Count) {
+                previous = nullptr;
+        } else if (auto ptr = clone(r)) {
+                previous = ptr;
+        } else { // leave as is
+                prev.release();
+        }
 }
 
 /*

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include <ntifs.h>
@@ -24,7 +24,7 @@ PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
 {
 	PAGED_CODE();
 
-	IoInitializeRemoveLock(&f.remove_lock, pooltag, 0, 0);
+	IoInitializeRemoveLock(&f.remove_lock, unique_ptr::pooltag, 0, 0);
 
 	if (!parent) {
 		NT_ASSERT(f.is_hub);
@@ -45,15 +45,12 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 	PAGED_CODE();
 
 	if (f.is_hub) {
-		auto &hub = f.hub;
-		if (auto ptr = hub.previous) {
-			ExFreePoolWithTag(ptr, pooltag);
-		}
+                unique_ptr{f.hub.previous};
 	} else {
 		auto &dev = f.device;
 		NT_ASSERT(!dev.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
 
-		if (auto lck = dev.parent_remove_lock) {
+                if (auto lck = dev.parent_remove_lock) {
 			IoReleaseRemoveLock(lck, 0);
 		}
 	}
@@ -200,7 +197,7 @@ PAGED NTSTATUS usbip::do_add_device(
 	if (fltr->is_hub) {
 		//
 	} else if (auto &dev = fltr->device;
-		   auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, pooltag, &dev.usbd_handle)) {
+		   auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, unique_ptr::pooltag, &dev.usbd_handle)) {
 		Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
 		destroy(*fltr);
 		return err;

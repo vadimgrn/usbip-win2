@@ -1,13 +1,41 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
+#include <libusbip/generic_handle_ex.h>
 #include "codeseg.h"
+
+namespace usbip
+{
+
+struct irp_ptr_tag {};
+using irp_ptr_base = generic_handle<IRP*, irp_ptr_tag, nullptr>;
+
+template<>
+inline void close_handle(_In_ irp_ptr_base::type irp, _In_ irp_ptr_base::tag_type)
+{
+        IoFreeIrp(irp);
+}
+
+} // namespace usbip
+
 
 namespace libdrv
 {
+
+using usbip::swap;
+
+class irp_ptr : public usbip::irp_ptr_base
+{
+public:
+        using usbip::irp_ptr_base::irp_ptr_base;
+
+        irp_ptr(_In_ CCHAR StackSize, _In_ bool ChargeQuota) :
+                irp_ptr(IoAllocateIrp(StackSize, ChargeQuota)) {}
+};
+
 
 class RaiseIrql
 {
@@ -26,36 +54,6 @@ public:
 
 private:
 	KIRQL old_irql{};
-};
-
-
-class irp_ptr
-{
-public:
-	template<typename ...Args>
-	irp_ptr(Args&&... args) : m_irp(IoAllocateIrp(args...)) {}
-
-	~irp_ptr()
-	{
-		if (m_irp) {
-			IoFreeIrp(m_irp);
-		}
-	}
-
-	explicit operator bool() const { return m_irp; }
-	auto operator !() const { return !m_irp; }
-
-	auto get() const { return m_irp; }
-	
-	auto release() 
-	{ 
-		auto irp = m_irp;
-		m_irp = nullptr; 
-		return irp;
-	}
-
-private:
-	IRP *m_irp{};
 };
 
 
@@ -109,3 +107,4 @@ inline void CompleteRequest(_In_ IRP *irp)
 }
 
 } // namespace libdrv
+
