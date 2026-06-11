@@ -71,22 +71,28 @@ inline auto get_irp(_In_ LIST_ENTRY *entry)
  * The fourth parameter is used by WSK. 
  */
 template<auto N>
-inline decltype(auto) argv(_In_ IRP *irp)
+inline decltype(auto) argv(_In_ IRP *irp) // -> void*&
 {
 	NT_ASSERT(irp);
         return irp->Tail.Overlay.DriverContext[N];
 }
 
 template<typename R, auto N>
-inline auto argv(_In_ IRP *irp) // -> pointer
+inline auto argv(_In_ IRP *irp) // pointer
 {
 	return static_cast<R>(argv<N>(irp));
+}
+
+template<auto N>
+inline decltype(auto) argvi(_In_ IRP *irp) // -> uintptr_t&
+{
+        return reinterpret_cast<uintptr_t&>(argv<N>(irp));
 }
 
 template<typename R, auto N>
 inline auto argvi(_In_ IRP *irp) // -> integral
 {
-	return static_cast<R>(reinterpret_cast<uintptr_t>(argv<N>(irp)));
+	return static_cast<R>(argvi<N>(irp));
 }
 
 _IRQL_requires_same_

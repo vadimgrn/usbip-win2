@@ -8,9 +8,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS libdrv::ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
-	NT_ASSERT(devobj);
-	IoSkipCurrentIrpStackLocation(irp);
-	return IoCallDriver(devobj, irp);
+        NT_ASSERT(devobj);
+        IoSkipCurrentIrpStackLocation(irp);
+        return IoCallDriver(devobj, irp);
 }
 
 /*

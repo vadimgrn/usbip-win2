@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -34,8 +34,14 @@ public:
 		return st;
 	}
 
+        explicit operator bool() const { return m_urb; }
+        auto operator !() const { return !m_urb; }
+
 	auto handle() const { return m_handle; }
 	auto get() const { return m_urb; }
+
+        auto operator ->() const { return m_urb; }
+        auto& operator *() const { return *m_urb; }
 
 	auto release() 
 	{
