@@ -141,7 +141,7 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::R
 
 	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
 	destroy(fltr);
-	return st;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -228,11 +228,9 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
 	case IRP_MN_START_DEVICE: // must be started after lower device objects
-		{
-			auto st = ForwardIrpSynchronously(fltr, irp);
-			CompleteRequest(irp);
-			return st;
-		}
+		if (auto st = ForwardIrpSynchronously(fltr, irp); true) {
+		        return CompleteRequest(irp, st);
+	        }
 	case IRP_MN_REMOVE_DEVICE:
 		return remove_device(fltr, irp, lck);
 	case IRP_MN_QUERY_DEVICE_RELATIONS:

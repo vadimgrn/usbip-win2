@@ -11,10 +11,11 @@ namespace usbip
 {
 
 struct irp_ptr_tag {};
-using irp_ptr_base = generic_handle<IRP*, irp_ptr_tag, nullptr>;
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 template<>
-inline void close_handle(_In_ irp_ptr_base::type irp, _In_ irp_ptr_base::tag_type)
+inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_tag)
 {
         IoFreeIrp(irp);
 }
@@ -27,13 +28,17 @@ namespace libdrv
 
 using usbip::swap;
 
-class irp_ptr : public usbip::irp_ptr_base
+class irp_ptr : public usbip::generic_handle<IRP*, usbip::irp_ptr_tag, nullptr>
 {
 public:
-        using usbip::irp_ptr_base::irp_ptr_base;
+        using usbip::generic_handle<IRP*, usbip::irp_ptr_tag, nullptr>::generic_handle;
 
         irp_ptr(_In_ CCHAR StackSize, _In_ bool ChargeQuota) :
                 irp_ptr(IoAllocateIrp(StackSize, ChargeQuota)) {}
+
+	auto operator &() const { return get(); }
+	auto operator ->() const { return get(); }
+	auto& operator *() const { return *get(); }
 };
 
 
@@ -57,36 +62,59 @@ private:
 };
 
 
-inline auto list_entry(_In_ IRP *irp)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto list_entry(_In_ IRP *irp)
 {
 	return &irp->Tail.Overlay.ListEntry;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_irp(_In_ LIST_ENTRY *entry)
 {
 	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
 }
 
 /*
- * The fourth parameter is used by WSK. 
+ * IRP.Tail.Overlay.DriverContext[] must not be used.
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 template<auto N>
 inline decltype(auto) argv(_In_ IRP *irp)
 {
-	NT_ASSERT(irp);
-        return irp->Tail.Overlay.DriverContext[N];
+        auto loc = IoGetCurrentIrpStackLocation(irp);
+        auto &p = loc->Parameters.Others;
+
+        static_assert(N >= 0);
+        static_assert(N < sizeof(p)/sizeof(p.Argument1));
+
+        return (&p.Argument1)[N];
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 template<typename R, auto N>
-inline auto argv(_In_ IRP *irp) // -> pointer
+inline decltype(auto) argv(_In_ IRP *irp)
 {
-	return static_cast<R>(argv<N>(irp));
+        return static_cast<R>(argv<N>(irp));
 }
 
-template<typename R, auto N>
-inline auto argvi(_In_ IRP *irp) // -> integral
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+template<auto N>
+inline decltype(auto) argvi(_In_ IRP *irp)
 {
-	return static_cast<R>(reinterpret_cast<uintptr_t>(argv<N>(irp)));
+        return reinterpret_cast<uintptr_t&>(argv<N>(irp));
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+template<typename R, auto N>
+inline decltype(auto) argvi(_In_ IRP *irp)
+{
+        return static_cast<R>(argvi<N>(irp));
 }
 
 _IRQL_requires_same_
@@ -101,6 +129,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void CompleteRequest(_In_ IRP *irp)
 {
         IoCompleteRequest(irp, IO_NO_INCREMENT);

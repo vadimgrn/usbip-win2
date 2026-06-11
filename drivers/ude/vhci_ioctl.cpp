@@ -13,11 +13,12 @@
 #include "ioctl.h"
 #include "persistent.h"
 
-#include <usbip\proto_op.h>
+#include <usbip/proto_op.h>
 
-#include <libdrv\dbgcommon.h>
-#include <libdrv\strconv.h>
-#include <libdrv\irp.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/strconv.h>
+#include <libdrv/utils.h>
+#include <libdrv/irp.h>
 
 #include <ntstrsafe.h>
 #include <usbuser.h>
@@ -30,7 +31,7 @@ using namespace usbip;
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
 
-enum { ARG_INFO, ARG_FUNCTION, ARG_AI }; // the fourth parameter is used by WSK subsystem
+enum { ARG_INFO, ARG_FUNCTION, ARG_AI };
 
 struct workitem_ctx
 {
@@ -52,7 +53,7 @@ PAGED auto set_args(_In_ WDFREQUEST request, _In_ const char *function, _In_opt_
         PAGED_CODE();
         auto irp = WdfRequestWdmGetIrp(request);
 
-        libdrv::argv<ARG_INFO>(irp) = reinterpret_cast<void*>(WdfRequestGetInformation(request)); // backup
+        libdrv::argvi<ARG_INFO>(irp) = WdfRequestGetInformation(request); // backup
         libdrv::argv<ARG_FUNCTION>(irp) = const_cast<char*>(function);
         libdrv::argv<ARG_AI>(irp) = const_cast<ADDRINFOEXW*>(ai);
 
@@ -420,8 +421,8 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto request = ctx.request;
         auto irp = WdfRequestWdmGetIrp(request);
 
-        WdfRequestSetInformation(request, libdrv::argvi<ULONG_PTR, ARG_INFO>(irp)); // restore
         auto function = libdrv::argv<const char*, ARG_FUNCTION>(irp);
+        WdfRequestSetInformation(request, libdrv::argvi<ARG_INFO>(irp)); // restore
 
         auto st = WdfRequestGetStatus(request);
         TraceDbg("%s %!STATUS!", function, st);
