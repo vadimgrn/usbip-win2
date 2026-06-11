@@ -78,7 +78,7 @@ inline decltype(auto) argv(_In_ IRP *irp) // -> void*&
 }
 
 template<typename R, auto N>
-inline auto argv(_In_ IRP *irp) // pointer
+inline auto argv(_In_ IRP *irp) // -> pointer
 {
 	return static_cast<R>(argv<N>(irp));
 }

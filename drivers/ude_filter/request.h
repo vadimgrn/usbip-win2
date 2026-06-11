@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -35,6 +35,8 @@ static_assert(sizeof(const_part) == 2*sizeof(USHORT));
 } // namespace impl
 
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_request_function(_In_ int function)
 {
         switch (function) {
@@ -58,6 +60,8 @@ inline auto is_request(_In_ const _URB_CONTROL_TRANSFER_EX &r)
                 get_setup_packet(r) == impl::setup_packet;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_function(_Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool clear = false)
 {
         static_assert(sizeof(r.Hdr.Function) == sizeof(USHORT));
