@@ -141,8 +141,6 @@ struct device_ctx
         UDECXUSBENDPOINT ep0; // default control pipe
         WDFSPINLOCK endpoint_list_lock; // for endpoint_ctx::entry
 
-        WDFSPINLOCK send_lock; // for WskSend on sock()
-
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
 
@@ -155,9 +153,12 @@ struct device_ctx
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
 
+        SLIST_HEADER pending_sends;
+        LONG sending;
+
         LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
         bool ep0_added;
-};        
+};
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 
 _IRQL_requires_same_

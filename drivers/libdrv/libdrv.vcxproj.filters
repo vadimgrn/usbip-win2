@@ -12,6 +12,7 @@
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="select.cpp" />
     <ClCompile Include="wdm_cpp.cpp" />
+    <ClCompile Include="lists.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
@@ -45,6 +46,7 @@
     <ClInclude Include="wait_timeout.h" />
     <ClInclude Include="wdm_cpp.h" />
     <ClInclude Include="utils.h" />
+    <ClInclude Include="lists.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="usbip">

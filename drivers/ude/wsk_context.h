@@ -10,6 +10,8 @@
 #include <libdrv/irp.h>
 #include <libdrv/mdl_cpp.h>
 
+#include <wsk.h>
+
 namespace usbip
 {
 
@@ -23,6 +25,9 @@ struct wsk_context
 
         WDFREQUEST request; // can be WDF_NO_HANDLE
         Mdl mdl_buf; // describes URB_FROM_IRP()->TransferBuffer(MDL)
+
+        SLIST_ENTRY entry; // head is device_ctx::pending_sends
+        WSK_BUF wsk_buf; // .Mdl used to point to mdl_hdr or mdl_buf
 
         // preallocated data
 
@@ -39,7 +44,6 @@ struct wsk_context
         ULONG isoc_alloc_cnt;
         bool is_isoc;
 };
-
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -92,12 +96,15 @@ public:
         explicit operator bool() const { return m_ctx; }
         auto operator !() const { return !m_ctx; }
 
+        auto& operator &() const { return m_ctx; }
         auto operator ->() const { return m_ctx; }
         auto& operator *() const { return *m_ctx; }
 
         seqnum_t seqnum(bool byte_swap) const;
 
+        auto get() const { return m_ctx; }
         wsk_context *release();
+
         void reset(wsk_context *ctx, bool reuse);
 
 private:

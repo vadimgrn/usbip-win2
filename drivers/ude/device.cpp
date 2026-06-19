@@ -16,6 +16,7 @@
 #include "request_list.h"
 #include "endpoint_list.h"
 
+#include <libdrv/lists.h>
 #include <libdrv/dbgcommon.h>
 #include <libdrv/wait_timeout.h>
 
@@ -68,6 +69,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         }
 
         // all resources must be freed
+        NT_ASSERT(libdrv::empty(&dev.pending_sends));
         NT_ASSERT(IsListEmpty(&dev.requests));
         NT_ASSERT(get_flag(dev.unplugged));
         NT_ASSERT(!dev.port);
@@ -279,7 +281,7 @@ NTSTATUS function_suspend_and_wake(
  * it can be called concurrently from UDECX_USB_ENDPOINT_CALLBACKS.EvtUsbEndpointPurge.
  * If set SynchronizationScopeDevice for UDECXUSBENDPOINT, UdecxUsbEndpointCreate 
  * will return STATUS_WDF_SYNCHRONIZATION_SCOPE_INVALID. For these reasons,
- * explicit WDFSPINLOCK device_ctx.send_lock is used to serialize WskSend calls.
+ * device_ctx.pending_sends is used to serialize WskSend calls.
  * 
  * Using power-managed queues for I/O requests that require the device to be in its working state, 
  * and using queues that are not power-managed for all other requests.
@@ -532,7 +534,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         PAGED_CODE();
 
         WDFSPINLOCK *v[] = {
-                &dev.send_lock,
                 &dev.endpoint_list_lock,
                 &dev.requests_lock,
         };
@@ -544,6 +545,8 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         }
 
         InitializeListHead(&dev.requests);
+        InitializeSListHead(&dev.pending_sends);
+
         return STATUS_SUCCESS;
 }
 

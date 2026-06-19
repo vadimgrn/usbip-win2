@@ -16,17 +16,18 @@
 #include "ioctl.h"
 
 #include "filter_request.h"
-#include <ude_filter\request.h>
+#include <ude_filter/request.h>
 
-#include <libdrv\irp.h>
-#include <libdrv\pdu.h>
-#include <libdrv\ch9.h>
-#include <libdrv\ch11.h>
-#include <libdrv\usbdsc.h>
-#include <libdrv\wsk_cpp.h>
-#include <libdrv\usb_util.h>
-#include <libdrv\dbgcommon.h>
-#include <libdrv\usbd_helper.h>
+#include <libdrv/irp.h>
+#include <libdrv/pdu.h>
+#include <libdrv/ch9.h>
+#include <libdrv/ch11.h>
+#include <libdrv/lists.h>
+#include <libdrv/usbdsc.h>
+#include <libdrv/wsk_cpp.h>
+#include <libdrv/usb_util.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/usbd_helper.h>
 
 #include <ntstrsafe.h>
 
@@ -108,6 +109,40 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void send_pending(_Inout_ device_ctx &dev)
+{
+        if (InterlockedExchange(&dev.sending, true)) {
+                return; // the other thread won the race
+        }
+
+        do {
+                for (auto entry = libdrv::reverse(InterlockedFlushSList(&dev.pending_sends)); entry; ) {
+
+                        auto &ctx = *CONTAINING_RECORD(entry, wsk_context, entry);
+                        {
+                                auto nxt = entry->Next;
+                                entry->Next = nullptr;
+                                entry = nxt;
+                        }
+                        auto req = ctx.request;
+                        auto irp = ctx.wsk_irp.get();
+
+                        auto buf = ctx.wsk_buf;
+                        ctx.wsk_buf = WSK_BUF{};
+
+                        auto st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, irp);
+
+                        TraceWSK("req %04x -> wsk irp %04x, %Iu bytes, %!STATUS!",
+                                  ptr04x(req), ptr04x(irp), buf.Length, st);
+                }
+
+                InterlockedExchange(&dev.sending, false);
+
+        } while (!(libdrv::empty(&dev.pending_sends) || InterlockedExchange(&dev.sending, true)));
+}
+
 /*
  * switch (wdf::Lock lck(...); auto st = send(...))
  * is not used due to unspecified evaluation order of init-statement and condition.
@@ -120,13 +155,12 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_ device_ctx &dev,
+auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Inout_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
         auto request = ctx->request; // can be WDF_NO_HANDLE, do not access after send
 
-        WSK_BUF buf{};
-        if (auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
+        if (auto &buf = ctx->wsk_buf; auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
                 return err;
         } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
@@ -139,17 +173,10 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _In_ wsk_context_ptr &ctx, _Inout_
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
+        IoSetCompletionRoutine(ctx->wsk_irp.get(), send_complete, ctx.get(), true, true, true);
 
-        auto wsk_irp = ctx->wsk_irp.get(); // do not access ctx or wsk_irp after send
-        IoSetCompletionRoutine(wsk_irp, send_complete, ctx.release(), true, true, true);
-
-        NTSTATUS st;
-        {
-                wdf::Lock lck(dev.send_lock); // EvtUsbEndpointPurge, EvtIoInternalDeviceControl on other queues
-                st = send(dev.sock(), &buf, WSK_FLAG_NODELAY, wsk_irp); // completion handler will be called anyway
-        }
-        TraceWSK("req %04x -> wsk irp %04x, %Iu bytes, %!STATUS!", 
-                  ptr04x(request), ptr04x(wsk_irp), buf.Length, st);
+        InterlockedPushEntrySList(&dev.pending_sends, &ctx.release()->entry);
+        send_pending(dev);
 
         return STATUS_PENDING;
 }

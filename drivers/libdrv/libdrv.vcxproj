@@ -26,6 +26,7 @@
   <ItemGroup>
     <ClCompile Include="dbgcommon.cpp" />
     <ClCompile Include="irp.cpp" />
+    <ClCompile Include="lists.cpp" />
     <ClCompile Include="mdl_cpp.cpp" />
     <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="select.cpp" />
@@ -253,6 +254,7 @@
     <ClInclude Include="dbgcommon.h" />
     <ClInclude Include="ioctl.h" />
     <ClInclude Include="irp.h" />
+    <ClInclude Include="lists.h" />
     <ClInclude Include="mdl_cpp.h" />
     <ClInclude Include="codeseg.h" />
     <ClInclude Include="utils.h" />
