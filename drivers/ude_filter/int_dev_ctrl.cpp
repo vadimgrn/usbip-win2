@@ -53,9 +53,7 @@ auto send_request(
 	_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, 
 	_Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
 {
-	auto target = fltr.target;
-
-	libdrv::irp_ptr irp(target->StackSize, false);
+	libdrv::irp_ptr irp(fltr.target->StackSize, false);
 	if (!irp) {
 		Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp error");
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -72,17 +70,14 @@ auto send_request(
 		return err;
 	}
 
-        if (auto err = IoSetCompletionRoutineEx(target, irp.get(), request_complete, &fltr, true, true, true)) {
-                Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
-                return err;
-        }
+        IoSetCompletionRoutine(irp.get(), request_complete, &fltr, true, true, true);
 
         filter::pack_request(urb->UrbControlTransferEx, TransferBuffer.release(), function);
         libdrv::argv<ARG_URB>(irp.get()) = urb.release();
         libdrv::argv<ARG_TAG>(irp.get()) = lck.clear();
 
-        TraceDbg("dev %04x, irp %04x -> target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(target));
-        return IoCallDriver(target, irp.release()); // completion routine will be called anyway
+        TraceDbg("dev %04x, irp %04x -> target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(fltr.target));
+        return IoCallDriver(fltr.target, irp.release()); // completion routine will be called anyway
 }
 
 _IRQL_requires_same_
@@ -360,17 +355,13 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
+        lck.clear();
+
         auto ctx = libdrv::has_urb(irp) ?
                    try_legacy_ctrl(fltr, irp, *libdrv::urb_from_irp(irp)) : nullptr;
 
         IoCopyCurrentIrpStackLocationToNext(irp);
-
-        if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, irp_complete, ctx, true, true, true)) {
-                Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
-                IoSkipCurrentIrpStackLocation(irp); // forward and forget
-        } else {
-                lck.clear();
-        }
+        IoSetCompletionRoutine(irp, irp_complete, ctx, true, true, true);
 
         return IoCallDriver(fltr.target, irp);
 }
