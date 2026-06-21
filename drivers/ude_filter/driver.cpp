@@ -29,20 +29,41 @@ PAGED void driver_unload(_In_ DRIVER_OBJECT *drvobj)
 	WPP_CLEANUP(drvobj);
 }
 
+_Function_class_(IO_COMPLETION_ROUTINE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS irp_complete(
+        _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+{
+        auto fltr = static_cast<filter_ext*>(context);
+        libdrv::RemoveLockGuard{fltr->remove_lock, libdrv::adopt_lock, irp};
+
+        if (irp->PendingReturned) {
+                IoMarkIrpPending(irp);
+        }
+
+        return ContinueCompletion;
+}
+
 _Function_class_(DRIVER_DISPATCH)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 {
-	auto &f = *get_filter_ext(devobj);
+	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(f.remove_lock);
+	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
 
-	return ForwardIrp(f, irp);
+        lck.clear();
+
+        IoCopyCurrentIrpStackLocationToNext(irp);
+        IoSetCompletionRoutine(irp, irp_complete, &fltr, true, true, true);
+
+        return IoCallDriver(fltr.target, irp);
 }
 
 } // namespace

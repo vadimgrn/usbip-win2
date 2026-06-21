@@ -298,7 +298,9 @@ NTSTATUS irp_complete(
         auto &fltr = *get_filter_ext(devobj);
         libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
 
-        if (auto function = static_cast<USHORT>(reinterpret_cast<uintptr_t>(context))) { // legacy control transfer
+        if (auto val = reinterpret_cast<uintptr_t>(context); fltr.is_hub) {
+                NT_ASSERT(!val);
+        } else if (auto function = static_cast<USHORT>(val)) { // legacy control transfer
 
                 auto urb = libdrv::urb_from_irp(irp);
                 control_to_vendor_class(*urb, function);
@@ -318,21 +320,21 @@ NTSTATUS irp_complete(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void *try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
+auto try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
 {
         auto bmRequestType = get_request_type(urb);
         if (!bmRequestType) {
-                return nullptr;
+                return 0;
         }
 
-        auto function = urb.UrbHeader.Function;
+        int function = urb.UrbHeader.Function;
         NT_ASSERT(function);
 
         TraceDbg("dev %04x, irp %04x -> target %04x, %s", ptr04x(fltr.self), ptr04x(irp),
                   ptr04x(fltr.target), urb_function_str(function));
 
         vendor_class_to_control(urb, bmRequestType); // changes function
-        return reinterpret_cast<void*>(static_cast<uintptr_t>(function));
+        return function;
 }
 
 } // namespace
@@ -345,23 +347,19 @@ _Dispatch_type_(IRP_MJ_INTERNAL_DEVICE_CONTROL)
 NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
-        if (fltr.is_hub) {
-                return ForwardIrp(fltr, irp);
-        }
 
 	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
-
         lck.clear();
 
-        auto ctx = libdrv::has_urb(irp) ?
-                   try_legacy_ctrl(fltr, irp, *libdrv::urb_from_irp(irp)) : nullptr;
+        uintptr_t ctx = !fltr.is_hub && libdrv::has_urb(irp) ?
+                        try_legacy_ctrl(fltr, irp, *libdrv::urb_from_irp(irp)) : 0;
 
         IoCopyCurrentIrpStackLocationToNext(irp);
-        IoSetCompletionRoutine(irp, irp_complete, ctx, true, true, true);
+        IoSetCompletionRoutine(irp, irp_complete, reinterpret_cast<void*>(ctx), true, true, true);
 
         return IoCallDriver(fltr.target, irp);
 }

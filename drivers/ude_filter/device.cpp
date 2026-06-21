@@ -28,7 +28,7 @@ PAGED auto init(_Inout_ filter_ext &f, _In_opt_ filter_ext *parent)
 
 	if (!parent) {
 		NT_ASSERT(f.is_hub);
-	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, 0)) {
+	} else if (auto lck = &parent->remove_lock; auto err = IoAcquireRemoveLock(lck, nullptr)) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return err;
 	} else {
@@ -51,7 +51,7 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 		NT_ASSERT(!dev.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
 
                 if (auto lck = dev.parent_remove_lock) {
-			IoReleaseRemoveLock(lck, 0);
+			IoReleaseRemoveLock(lck, nullptr);
 		}
 	}
 }
