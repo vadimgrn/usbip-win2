@@ -36,11 +36,15 @@ public:
         auto acquired() const { return m_acquired; }
         auto tag() const { return m_tag; }
 
-        void clear() 
+        auto clear() 
         { 
                 m_acquired = STATUS_INVALID_ADDRESS;
                 m_lock = nullptr; 
-                m_tag = nullptr; 
+
+                auto tag = m_tag;
+                m_tag = nullptr;
+
+                return tag;
         }
 
         void release_and_wait()

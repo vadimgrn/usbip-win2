@@ -29,8 +29,9 @@ _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS request_complete(
-	_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+	_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
+        NT_ASSERT(!devobj);
         auto &fltr = *static_cast<filter_ext*>(context);
 
         libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, libdrv::argv<ARG_TAG>(irp));
@@ -60,9 +61,10 @@ auto send_request(
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
-	auto next = IoGetNextIrpStackLocation(irp.get());
-	next->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
-	libdrv::DeviceIoControlCode(next) = IOCTL_INTERNAL_USB_SUBMIT_URB;
+        auto next = IoGetNextIrpStackLocation(irp.get());
+
+        next->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
+        libdrv::DeviceIoControlCode(next) = IOCTL_INTERNAL_USB_SUBMIT_URB;
 
 	libdrv::urb_ptr urb(fltr.device.usbd_handle);
 	if (auto err = urb.alloc(next)) {
@@ -77,9 +79,7 @@ auto send_request(
 
         filter::pack_request(urb->UrbControlTransferEx, TransferBuffer.release(), function);
         libdrv::argv<ARG_URB>(irp.get()) = urb.release();
-
-        libdrv::argv<ARG_TAG>(irp.get()) = lck.tag();
-        lck.clear();
+        libdrv::argv<ARG_TAG>(irp.get()) = lck.clear();
 
         TraceDbg("dev %04x, irp %04x -> target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(target));
         return IoCallDriver(target, irp.release()); // completion routine will be called anyway
@@ -240,46 +240,6 @@ constexpr auto get_request_type(_In_ const URB &urb)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto get_urb_function(_In_ UCHAR bmRequestType)
-{
-        USHORT f;
-        bmRequestType &= (USB_TYPE_MASK | USB_RECIP_MASK);
-
-        switch (bmRequestType) {
-        case USB_TYPE_VENDOR | USB_RECIP_DEVICE:
-                f = URB_FUNCTION_VENDOR_DEVICE;
-                break;
-        case USB_TYPE_VENDOR | USB_RECIP_INTERFACE:
-                f = URB_FUNCTION_VENDOR_INTERFACE;
-                break;
-        case USB_TYPE_VENDOR | USB_RECIP_ENDPOINT:
-                f = URB_FUNCTION_VENDOR_ENDPOINT;
-                break;
-        case USB_TYPE_VENDOR | USB_RECIP_OTHER:
-                f = URB_FUNCTION_VENDOR_OTHER;
-                break;
-        case USB_TYPE_CLASS | USB_RECIP_DEVICE:
-                f = URB_FUNCTION_CLASS_DEVICE;
-                break;
-        case USB_TYPE_CLASS | USB_RECIP_INTERFACE:
-                f = URB_FUNCTION_CLASS_INTERFACE;
-                break;
-        case USB_TYPE_CLASS | USB_RECIP_ENDPOINT:
-                f = URB_FUNCTION_CLASS_ENDPOINT;
-                break;
-        case USB_TYPE_CLASS | USB_RECIP_OTHER:
-                f = URB_FUNCTION_CLASS_OTHER;
-                break;
-        default:
-                return USHORT{};
-        }
-
-        NT_ASSERT(f);
-        return f;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 void vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
 {
         auto &d = urb.UrbControlTransfer;
@@ -302,64 +262,13 @@ void vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void control_to_vendor_class(_Inout_ URB &urb)
+void control_to_vendor_class(_Inout_ URB &urb, _In_ USHORT function)
 {
         auto &r = urb.UrbControlVendorClassRequest;
-
-        if (auto f = get_urb_function(r.RequestTypeReservedBits)) {
-                r.Hdr.Function = f;
-        } else {
-                Trace(TRACE_LEVEL_ERROR, "unexpected RequestTypeReservedBits %#x", r.RequestTypeReservedBits);
-        }
-
+        r.Hdr.Function = function;
         r.TransferFlags &= ~USBD_DEFAULT_PIPE_TRANSFER; // clear flag
         r.RequestTypeReservedBits = 0;
         r.Reserved1 = 0;
-}
-
-_Function_class_(IO_COMPLETION_ROUTINE)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS legacy_ctrl_complete(
-        _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
-{
-        auto &fltr = *static_cast<filter_ext*>(context);
-        libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
-
-        auto urb = libdrv::urb_from_irp(irp);
-        control_to_vendor_class(*urb);
-
-        TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self),
-                  ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
-
-        if (irp->PendingReturned) {
-                IoMarkIrpPending(irp);
-        }
-
-        return ContinueCompletion;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto send_legacy_ctrl(
-        _In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck,
-        _In_ IRP *irp, _Inout_ URB &urb, _In_ UCHAR bmRequestType)
-{
-        IoCopyCurrentIrpStackLocationToNext(irp);
-
-        if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, legacy_ctrl_complete, &fltr, true, true, true)) {
-                Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
-                IoSkipCurrentIrpStackLocation(irp); // forward and forget
-        } else {
-                TraceDbg("dev %04x, irp %04x -> target %04x, %s", ptr04x(fltr.self), ptr04x(irp),
-                          ptr04x(fltr.target), urb_function_str(urb.UrbHeader.Function));
-
-                vendor_class_to_control(urb, bmRequestType);
-                lck.clear();
-                
-        }
-
-        return IoCallDriver(fltr.target, irp);
 }
 
 /*
@@ -388,12 +297,22 @@ void post_process_irp(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lc
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_complete(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
+NTSTATUS irp_complete(
+        _In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
-        auto &fltr = *static_cast<filter_ext*>(context);
-	libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
+        auto &fltr = *get_filter_ext(devobj);
+        libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
 
-        post_process_irp(fltr, lck, irp);
+        if (auto function = static_cast<USHORT>(reinterpret_cast<uintptr_t>(context))) { // legacy control transfer
+
+                auto urb = libdrv::urb_from_irp(irp);
+                control_to_vendor_class(*urb, function);
+
+                TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self),
+                          ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
+        } else {
+                post_process_irp(fltr, lck, irp);
+        }
 
         if (irp->PendingReturned) {
                 IoMarkIrpPending(irp);
@@ -402,20 +321,23 @@ NTSTATUS irp_complete(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpr
         return ContinueCompletion;
 }
 
-_IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
-auto pre_process_irp(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ libdrv::RemoveLockGuard &lck)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void *try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
 {
-	IoCopyCurrentIrpStackLocationToNext(irp);
+        auto bmRequestType = get_request_type(urb);
+        if (!bmRequestType) {
+                return nullptr;
+        }
 
-	if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, irp_complete, &fltr, true, true, true)) {
-		Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
-		IoSkipCurrentIrpStackLocation(irp); // forward and forget
-	} else {
-		lck.clear();
-	}
+        auto function = urb.UrbHeader.Function;
+        NT_ASSERT(function);
 
-        return IoCallDriver(fltr.target, irp);
+        TraceDbg("dev %04x, irp %04x -> target %04x, %s", ptr04x(fltr.self), ptr04x(irp),
+                  ptr04x(fltr.target), urb_function_str(function));
+
+        vendor_class_to_control(urb, bmRequestType); // changes function
+        return reinterpret_cast<void*>(static_cast<uintptr_t>(function));
 }
 
 } // namespace
@@ -428,6 +350,9 @@ _Dispatch_type_(IRP_MJ_INTERNAL_DEVICE_CONTROL)
 NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
+        if (fltr.is_hub) {
+                return ForwardIrp(fltr, irp);
+        }
 
 	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
@@ -435,16 +360,17 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-        if (fltr.is_hub) {
-                return ForwardIrp(fltr, irp);
+        auto ctx = libdrv::has_urb(irp) ?
+                   try_legacy_ctrl(fltr, irp, *libdrv::urb_from_irp(irp)) : nullptr;
+
+        IoCopyCurrentIrpStackLocationToNext(irp);
+
+        if (auto err = IoSetCompletionRoutineEx(fltr.target, irp, irp_complete, ctx, true, true, true)) {
+                Trace(TRACE_LEVEL_ERROR, "IoSetCompletionRoutineEx %!STATUS!", err);
+                IoSkipCurrentIrpStackLocation(irp); // forward and forget
+        } else {
+                lck.clear();
         }
 
-        if (!libdrv::has_urb(irp)) {
-                //
-        } else if (auto &urb = *libdrv::urb_from_irp(irp);
-                   auto bmRequestType = get_request_type(urb)) {
-                return send_legacy_ctrl(fltr, lck, irp, urb, bmRequestType);
-        }
-
-        return pre_process_irp(fltr, irp, lck);
+        return IoCallDriver(fltr.target, irp);
 }
