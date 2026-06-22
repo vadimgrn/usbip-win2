@@ -38,7 +38,8 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
 
 _IRQL_requires_same_
 _Function_class_(allocate_function_ex)
-void *allocate_function_ex(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
+void *allocate_function_ex(
+        _In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ [[maybe_unused]] ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {
         NT_ASSERT(PoolType == NonPagedPoolNx);
         wsk_context *ctx{};

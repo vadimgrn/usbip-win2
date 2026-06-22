@@ -434,7 +434,7 @@ PAGED auto ret_submit(_Inout_ wsk_context &ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_mdl_chain(_In_ wsk_context &ctx, _In_ bool has_buf_tail)
+PAGED auto make_mdl_chain(_In_ wsk_context &ctx, _In_ [[maybe_unused]] bool has_buf_tail)
 {
 	PAGED_CODE();
 	MDL *head{};
