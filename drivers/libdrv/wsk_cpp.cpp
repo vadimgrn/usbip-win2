@@ -585,7 +585,7 @@ PAGED NTSTATUS wsk::control(
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable)
+PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, _In_ ULONG EventMask, _In_ bool wait4disable)
 {
         PAGED_CODE();
 
@@ -593,7 +593,10 @@ PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, ULONG EventMask, b
                 return STATUS_INVALID_PARAMETER;
         }
 
-        WSK_EVENT_CALLBACK_CONTROL r{ &NPI_WSK_INTERFACE_ID, EventMask };
+        WSK_EVENT_CALLBACK_CONTROL r {
+                .NpiId = &NPI_WSK_INTERFACE_ID,
+                .EventMask = EventMask
+        };
 
         return control(sock, WskSetOption, SO_WSK_EVENT_CALLBACK, SOL_SOCKET,
                        sizeof(r), &r, 0, nullptr, nullptr, wait4disable, nullptr);
@@ -704,7 +707,7 @@ PAGED NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddre
  * Error if optval is ULONG, one byte is written actually.
  */
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
+PAGED NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, _In_ bool &optval)
 {
         PAGED_CODE();
         return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
@@ -715,7 +718,7 @@ PAGED NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, bool &optval)
  * TCP_KEEPIDLE default is 2*60*60 sec.
  */
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intvl)
+PAGED NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, _In_ int idle, _In_ int cnt, _In_ int intvl)
 {
         PAGED_CODE();
 
@@ -748,7 +751,7 @@ PAGED NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, int idle, int cnt, int intv
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl)
+PAGED NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, _In_ int *idle, _In_ int *cnt, _In_ int *intvl)
 {
         PAGED_CODE();
 
@@ -777,7 +780,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS wsk::initialize()
 {
         PAGED_CODE();
-        WSK_CLIENT_NPI npi{ .Dispatch = &g_Dispatch };
+        WSK_CLIENT_NPI npi { .Dispatch = &g_Dispatch };
 
         auto st = WskRegister(&npi, &g_Registration);
         if (NT_SUCCESS(st)) {

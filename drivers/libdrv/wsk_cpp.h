@@ -53,7 +53,7 @@ PAGED NTSTATUS control(
         _Out_opt_ SIZE_T *OutputSizeReturnedIrp);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS event_callback_control(_In_ SOCKET *sock, ULONG EventMask, bool wait4disable);
+PAGED NTSTATUS event_callback_control(_In_ SOCKET *sock, _In_ ULONG EventMask, _In_ bool wait4disable);
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress);
@@ -92,13 +92,13 @@ void free(_Inout_ SOCKET* &sock);
 //
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS get_keepalive(_In_ SOCKET *sock, bool &optval);
+PAGED NTSTATUS get_keepalive(_In_ SOCKET *sock, _In_ bool &optval);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, int *idle, int *cnt, int *intvl);
+PAGED NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, _In_ int *idle, _In_ int *cnt, _In_ int *intvl);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS set_keepalive(_In_ SOCKET *sock, int idle = 0, int cnt = 0, int intvl = 0);
+PAGED NTSTATUS set_keepalive(_In_ SOCKET *sock, _In_ int idle = 0, _In_ int cnt = 0, _In_ int intvl = 0);
 
 //
 
