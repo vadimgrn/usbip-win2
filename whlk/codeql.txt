@@ -4,19 +4,20 @@ mkdir D:\codeql-home
 cd D:\codeql-home
 
 # Select the appropriate CodeQL version for your driver
-# CLI_VERSION, microsoft/windows-drivers PACK_VERSION
+# CLI_VERSION(2.20.1), microsoft/windows-drivers PACK_VERSION(1.8.0)
 
 # Download and extract required CLI_VERSION of codeql-win64.zip
 
 cd codeql
-codeql pack download microsoft/windows-drivers@PACK_VERSION
+codeql pack download microsoft/cpp-queries@0.0.4
+codeql pack download microsoft/windows-drivers@1.8.0
 
 # Launch Developer Command Prompt for VS2022
 rmdir /S /Q D:\codeql-home\databases
 D:\codeql-home\codeql\codeql database create D:\codeql-home\databases --language=cpp --source-root=D:\usbip-win2\drivers\ude --command="msbuild -target:usbip2_ude:rebuild -p:Configuration="Release" -p:Platform=x64 D:\usbip-win2\usbip_win2.slnx"
 
-codeql database analyze ..\databases microsoft/windows-drivers@PACK_VERSION --download --format=sarifv2.1.0 --output=D:\usbip-win2\drivers\ude\result.sarif
-#                                    microsoft/windows-drivers@PACK_VERSION:windows-driver-suites/mustrun.qls
+codeql database analyze ..\databases microsoft/windows-drivers@1.8.0:windows-driver-suites/mustrun.qls --download --format=sarifv2.1.0 --output=D:\usbip-win2\drivers\ude\result.sarif
+#                                    
 
 # VisualStudio 2022
 # Select usbip2_ude project
