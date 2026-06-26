@@ -55,6 +55,6 @@ NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST remove_request(_In_ device_ctx &dev, _In_ const request_search &crit, _In_ bool unmark_cancelable = true);
+WDFREQUEST remove_request(_Inout_ device_ctx &dev, _In_ const request_search &crit, _In_ bool unmark_cancelable = true);
 
 } // namespace usbip::device

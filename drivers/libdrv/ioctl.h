@@ -5,6 +5,7 @@
 #pragma once
 
 #include <wdm.h>
+#include <usb.h>
 #include <usbioctl.h>
 
 namespace libdrv
@@ -37,6 +38,8 @@ inline auto has_urb(_In_ IRP *irp)
 	return has_urb(stack);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto urb_from_irp(_In_ IRP *irp)
 {
 	return static_cast<URB*>(URB_FROM_IRP(irp));

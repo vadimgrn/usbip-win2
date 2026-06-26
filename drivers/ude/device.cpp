@@ -6,19 +6,19 @@
 #include "trace.h"
 #include "device.tmh"
 
-#include "driver.h"
 #include "ioctl.h"
 #include "vhci.h"
-#include "network.h"
+#include "driver.h"
 #include "persistent.h"
-#include "wsk_receive.h"
+#include "ring_buffer.h"
 #include "device_ioctl.h"
 #include "request_list.h"
 #include "endpoint_list.h"
+#include "wsk_receive_irp.h"
+#include "wsk_receive_events.h"
 
 #include <libdrv/lists.h>
 #include <libdrv/dbgcommon.h>
-#include <libdrv/wait_timeout.h>
 
 namespace
 {
@@ -74,38 +74,6 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         NT_ASSERT(get_flag(dev.unplugged));
         NT_ASSERT(!dev.port);
         NT_ASSERT(!dev.recv_thread);
-}
-
-/*
- * @return object_reference defer dereference of receive thread if it executes this function
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recv_thread_join(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
-{
-        PAGED_CODE();
-        wdm::object_reference thread(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev.recv_thread), nullptr), false);
-
-        if (!thread) {
-                TraceDbg("dev %04x, was not created", ptr04x(device));
-                return thread;
-        } else if (thread.get() == KeGetCurrentThread()) { // called by receive thread
-                thread.set_defer_delete();
-                return thread;
-        }
-
-        NT_ASSERT(get_flag(dev.unplugged)); // thread checks it
-        TraceDbg("dev %04x", ptr04x(device));
-
-        if (auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
-            auto err = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout)) {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), err);
-        } else {
-                TraceDbg("dev %04x, joined", ptr04x(device));
-        }
-
-        thread.reset(); // it's safe to dereference(delete) now
-        return thread;
 }
 
 /*
@@ -705,34 +673,6 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         return STATUS_SUCCESS;
 }
 
-/*
- * ObDereferenceObject must be called as soon as it is done with this thread
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::device::recv_thread_start(_In_ UDECXUSBDEVICE device)
-{
-        PAGED_CODE();
-        const auto access = THREAD_ALL_ACCESS;
-
-        HANDLE handle{};
-        if (auto err = PsCreateSystemThread(&handle, access, nullptr, nullptr, nullptr, recv_thread_function, device)) {
-                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
-                return err;
-        }
-
-        auto dev = get_device_ctx(device);
-
-        PVOID thread{};
-        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, &thread, nullptr)));
-
-        NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev->recv_thread), thread));
-        NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
-
-        TraceDbg("dev %04x", ptr04x(device));
-        return STATUS_SUCCESS;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::device::async_detach_and_delete(_In_ UDECXUSBDEVICE device, _In_ bool reattach)
@@ -786,20 +726,23 @@ PAGED wdm::object_reference usbip::device::detach(
                 return thread;
         }
 
-        if (close_socket(dev.sock())) {
+        bool socket_closed{};
+        if (auto f = dev.use_wsk_events ? events::stop_receive_data : stop_receive_data_irp) {
+                thread = f(device, socket_closed);
+        }
+
+        if (socket_closed) {
                 Trace(TRACE_LEVEL_INFORMATION, "dev %04x, connection closed", ptr04x(device));
                 device_state_changed(dev, vhci::state::disconnected);
         }
-
-        thread = recv_thread_join(device, dev);
 
         auto port = vhci::reclaim_roothub_port(device);
         if (port) {
                 Trace(TRACE_LEVEL_INFORMATION, "port %d released", port);
         }
 
-        auto &ext = get_device_ctx_ext(dev.ctx_ext);
         wdf::ObjectRef ref(dev.ctx_ext); // prevent its destruction after UdecxUsbDevicePlugOutAndDelete
+        auto &ext = get_device_ctx_ext(dev.ctx_ext);
 
         if (plugout_and_delete) {
                 auto force_delete = !dev.ep0_added;

@@ -6,20 +6,17 @@
 #include "trace.h"
 #include "wsk_receive.tmh"
 
-#include "context.h"
-#include "wsk_context.h"
-#include "device.h"
-#include "request_list.h"
-#include "urbtransfer.h"
-#include "network.h"
-#include "driver.h"
 #include "ioctl.h"
+#include "context.h"
+#include "ring_buffer.h"
+#include "wsk_context.h"
+#include "urbtransfer.h"
+#include "request_list.h"
 
-#include <libdrv\usbd_helper.h>
-#include <libdrv\dbgcommon.h>
-#include <libdrv\usbdsc.h>
-#include <libdrv\irp.h>
-#include <libdrv\pdu.h>
+#include <libdrv/usbd_helper.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/usbdsc.h>
+#include <libdrv/pdu.h>
 
 extern "C" {
 #include <usbdlib.h>
@@ -31,29 +28,9 @@ namespace
 using namespace usbip;
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
 {
-        PAGED_CODE();
-        return  actual_length >= 0 && static_cast<ULONG>(actual_length) <= TransferBufferLength ? 
-		STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
-{
-	PAGED_CODE();
-	auto err = check(TransferBufferLength, actual_length);
-	TransferBufferLength = err ? 0 : actual_length;
-	return err;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
-{
-	PAGED_CODE();
 	TraceUrb("DEV: bLength %d, bcdUSB %#x, bDeviceClass %#x, bDeviceSubClass %#x, bDeviceProtocol %#x, "
 		"bMaxPacketSize0 %d, idVendor %#x, idProduct %#x, bcdDevice %#x, "
 		"iManufacturer %d, iProduct %d, iSerialNumber %d, bNumConfigurations %d",
@@ -63,25 +40,13 @@ PAGED void log(_In_ const USB_DEVICE_DESCRIPTOR &d)
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 {
-	PAGED_CODE();
 	TraceUrb("CFG: bLength %d, wTotalLength %hu(%#x), bNumInterfaces %d, "
 		 "bConfigurationValue %d, iConfiguration %d, bmAttributes %#x, MaxPower %d",
 		  d.bLength, d.wTotalLength, d.wTotalLength, d.bNumInterfaces, 
 		  d.bConfigurationValue, d.iConfiguration, d.bmAttributes, d.MaxPower);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED inline auto& get_ret_submit(_In_ const wsk_context &ctx)
-{
-	PAGED_CODE();
-
-	auto &hdr = ctx.hdr;
-	NT_ASSERT(hdr.command == RET_SUBMIT);
-	return hdr.ret_submit;
 }
 
 /*
@@ -90,10 +55,8 @@ PAGED inline auto& get_ret_submit(_In_ const wsk_context &ctx)
  * @return 1-16, for HS interrupt endpoint
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
+UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
 {
-        PAGED_CODE();
         enum { MIN_INTVL = 1, MAX_INTVL = 16 }; // result
 
         NT_ASSERT(bInterval);
@@ -148,11 +111,9 @@ PAGED UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
  * not have bulk endpoints
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void patch_config(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void patch_config(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
-	PAGED_CODE();
-
 	for (auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cd); 
 	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE));
              cur = libdrv::next(cur)) {
@@ -204,12 +165,10 @@ PAGED void patch_config(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
  * <linux>/drivers/usb/usbip/usbip_common.c, usbip_pad_iso
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ ULONG length, 
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ ULONG length, 
 	_In_ const iso_packet_descriptor *src)
 {
-	PAGED_CODE();
-
 	NT_ASSERT(length <= r.TransferBufferLength);
 	auto dir_out = !buffer;
 
@@ -276,10 +235,9 @@ PAGED auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer
  * Layout: transfer buffer(IN only), usbip_iso_packet_descriptor[].
  */
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
-	PAGED_CODE();
 	auto cnt = ret.number_of_packets;
 
 	auto &r = urb.UrbIsochronousTransfer;
@@ -315,27 +273,16 @@ PAGED auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &r
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
 {
-	PAGED_CODE();
-	complete(request, status);
-	request = WDF_NO_HANDLE;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
-{
-	PAGED_CODE();
-
 	auto dsc = static_cast<USB_COMMON_DESCRIPTOR*>(TransferBuffer);
 	auto dsc_len = static_cast<UINT16>(r.TransferBufferLength);
 
 	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
-		is_transfer_dir_in(r) &&
-		get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
-		dsc_len >= sizeof(*dsc);
+		   is_transfer_dir_in(r) &&
+		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
+		   dsc_len >= sizeof(*dsc);
 
 	if (!ok) {
 		return;
@@ -372,11 +319,9 @@ PAGED void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CON
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const URB &urb, _In_ void *TransferBuffer)
 {
-	PAGED_CODE();
-
 	switch (urb.UrbHeader.Function) {
 	case URB_FUNCTION_CONTROL_TRANSFER_EX:
 	case URB_FUNCTION_CONTROL_TRANSFER: // structures are binary compatible, see urbtransfer.cpp
@@ -386,14 +331,14 @@ PAGED void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const U
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
-	PAGED_CODE();
-	urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
+        auto &dev = *ctx.dev;
+        urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
 	if (is_isoch(urb)) {
-		return isoch_transfer(ctx, ret, urb);
+		return dev.use_wsk_events ? STATUS_NOT_IMPLEMENTED : isoch_transfer(ctx, ret, urb);
 	}
 
         UCHAR *TransferBuffer{};
@@ -411,202 +356,22 @@ PAGED auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit
 		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 	}
 
-	if (NT_SUCCESS(st) && TransferBufferLength) {
-		post_process_transfer_buffer(*ctx.dev, urb, TransferBuffer);
-	}
+        if (TransferBufferLength) {
+                if (dev.use_wsk_events && is_transfer_dir_in(ctx.hdr)) {
+                        ring_buffer rb(dev.recv_buf);
+                        [[maybe_unused]] auto n = rb.peek(TransferBuffer, TransferBufferLength);
+                        NT_ASSERT(n == TransferBufferLength);
+                }
+                if (NT_SUCCESS(st)) {
+                        post_process_transfer_buffer(*ctx.dev, urb, TransferBuffer);
+                }
+        }
 
 	return st;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto ret_submit(_Inout_ wsk_context &ctx)
-{
-	PAGED_CODE();
+} // namespace
 
-	auto &ret = get_ret_submit(ctx);
-	auto urb = try_get_urb(ctx.request); // IOCTL_INTERNAL_USB_SUBMIT_URB
-
-	return  urb ? ret_submit_urb(ctx, ret, *urb) :
-		ret.status ? STATUS_UNSUCCESSFUL : 
-		STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_mdl_chain(_In_ wsk_context &ctx, _In_ [[maybe_unused]] bool has_buf_tail)
-{
-	PAGED_CODE();
-	MDL *head{};
-
-	if (!ctx.is_isoc) { // IN
-		head = ctx.mdl_buf.get();
-		NT_ASSERT(static_cast<bool>(head->Next) == has_buf_tail);
-	} else if (auto &chain = ctx.mdl_buf) { // isoch IN
-		auto t = tail(chain);
-		t->Next = ctx.mdl_isoc.get();
-		head = chain.get();
-	} else { // isoch OUT or IN with zero actual_length
-		head = ctx.mdl_isoc.get();
-	}
-
-	return head;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto make_mdl(_Inout_ Mdl &mdl, _Inout_ unique_ptr &buf, _In_ ULONG length)
-{
-        PAGED_CODE();
-
-        NT_ASSERT(!mdl);
-        NT_ASSERT(!buf);
-        NT_ASSERT(length);
-
-        if (buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, length); !buf) {
-                Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", length);
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        if (mdl = Mdl(buf.get(), length); !mdl) {
-                Trace(TRACE_LEVEL_ERROR, "Cannot allocate MDL");
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        return mdl.prepare_nonpaged();
-}
-
-/*
- * If response from a server has data (actual_length > 0), URB function MUST copy it to URB
- * even if UrbHeader.Status != USBD_STATUS_SUCCESS.
- * 
- * Ensure that URB has TransferBuffer and its size is sufficient.
- * Do others checks when payload will be read.
- *
- * UdecxUrbRetrieveBuffer can return Length that less than URB.TransferBufferLength,
- * TransferBufferLength must be used instead.
- * 
- * recv_payload -> prepare_wsk_mdl, there is payload to receive.
- * Payload layout:
- * a) DIR_IN: any type of transfer, [transfer_buffer] OR|AND [usbip_iso_packet_descriptor...]
- * b) DIR_OUT: ISOCH, <usbip_iso_packet_descriptor...>
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
-{
-	PAGED_CODE();
-        NT_ASSERT(!mdl);
-
-        auto &ret = get_ret_submit(ctx);
-	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
-		return err;
-	}
-
-        auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
-
-        ULONG TransferBufferLength{};
-        if (UCHAR *buf; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buf, &TransferBufferLength)) { // URB must have transfer buffer
-                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!", urb_function_str(urb.UrbHeader.Function), err);
-                return err;
-        }
-        TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
-
-        auto dir_out = is_transfer_dir_out(ctx.hdr);
-	bool fail{};
-
-	if (ctx.is_isoc) { // always has payload
-		fail = check(TransferBufferLength, ret.actual_length); // do not change buffer length
-	} else { // actual_length MUST be assigned, must not have payload for OUT
-		fail = assign(TransferBufferLength, ret.actual_length) || dir_out;
-		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
-	}
-
-	if (fail || !TransferBufferLength) {
-		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
-			                  TransferBufferLength, ret.actual_length, ctx.hdr.direction);
-                return STATUS_INVALID_BUFFER_SIZE;
-	}
-
-        bool has_tail{};
-
-	if (dir_out) {
-		NT_ASSERT(ctx.is_isoc);
-		NT_ASSERT(!ctx.mdl_buf);
-	} else if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, ret.actual_length, IoWriteAccess, urb)) {
-		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
-		return err;
-        } else if (auto len = size(ctx.mdl_buf); len < ret.actual_length) {
-
-                if (auto gap = static_cast<ULONG>(ret.actual_length - len);
-                    (err = alloc_mdl_buf_tail(ctx, gap))) {
-                        return err;
-                }
-
-                NT_ASSERT(!ctx.mdl_buf.next());
-                ctx.mdl_buf.next(ctx.mdl_buf_tail);
-                has_tail = true;
-        }
-
-	mdl = make_mdl_chain(ctx, has_tail);
-	return STATUS_SUCCESS;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto receive(_Inout_ wsk_context &ctx, _Inout_ WSK_BUF &buf)
-{
-	PAGED_CODE();
-
-	auto &dev = *ctx.dev;
-	NT_ASSERT(verify(buf, ctx.is_isoc));
-
-	SIZE_T actual{};
-	auto st = receive(dev.sock(), &buf, WSK_FLAG_WAITALL, &actual);
-
-	TraceWSK("req %04x, %!STATUS!, %Iu byte(s)", ptr04x(ctx.request), st, actual);
-
-	return  NT_ERROR(st) ? st :
-		actual == buf.Length ? STATUS_SUCCESS :
-		actual ? STATUS_RECEIVE_PARTIAL : 
-		STATUS_CONNECTION_DISCONNECTED; // EOF
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
-{
-	PAGED_CODE();
-
-	if (auto len = static_cast<ULONG>(length); len != length) {
-		Trace(TRACE_LEVEL_ERROR, "Buffer size truncation: ULONG(%lu) != size_t(%Iu)", len, length);
-		return STATUS_INVALID_PARAMETER;
-	}
-
-        unique_ptr payload;
-        if (auto err = make_mdl(ctx.mdl_buf, payload, static_cast<ULONG>(length))) {
-                return err;
-        }
-
-	WSK_BUF buf{ .Mdl = ctx.mdl_buf.get(), .Length = length };
-	return receive(ctx, buf);
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
-{
-	PAGED_CODE();
-
-        WSK_BUF buf{ .Length = length };
-
-        if (auto err = prepare_wsk_mdl(buf.Mdl, ctx)) {
-                Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
-                return err;
-        }
-
-        return receive(ctx, buf);
-}
 
 /*
  * For RET_UNLINK irp was completed right after CMD_UNLINK was issued.
@@ -618,14 +383,11 @@ PAGED auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
  * See: <kernel>/Documentation/usb/usbip_protocol.rst
  */
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto ret_command(_Inout_ wsk_context &ctx)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+WDFREQUEST usbip::ret_command(_In_ const header &hdr, _Inout_ device_ctx &dev)
 {
-	PAGED_CODE();
-	auto &hdr = ctx.hdr;
-
 	auto request = hdr.command == RET_SUBMIT ? // request must be completed
-		       device::remove_request(*ctx.dev, hdr.seqnum) : WDF_NO_HANDLE;
+		       device::remove_request(dev, hdr.seqnum) : WDF_NO_HANDLE;
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
 	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
@@ -635,10 +397,21 @@ PAGED auto ret_command(_Inout_ wsk_context &ctx)
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto validate_header(_Inout_ header &hdr)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::ret_submit(_Inout_ wsk_context &ctx)
 {
-	PAGED_CODE();
+        auto &ret = get_ret_submit(ctx.hdr);
+        auto urb = try_get_urb(ctx.request); // IOCTL_INTERNAL_USB_SUBMIT_URB
+
+        return  urb ? ret_submit_urb(ctx, ret, *urb) :
+                ret.status ? STATUS_UNSUCCESSFUL : 
+                STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::validate(_Inout_ header &hdr)
+{
 	byteswap_header(hdr, swap_dir::net2host);
 
 	auto cmd = static_cast<request_type>(hdr.command);
@@ -671,78 +444,6 @@ PAGED auto validate_header(_Inout_ header &hdr)
 	return ok;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto recv_usbip_header(_Inout_ wsk_context &ctx)
-{
-	PAGED_CODE();
-
-	ctx.mdl_buf.reset();
-	ctx.mdl_hdr.next(nullptr);
-
-	WSK_BUF buf{ .Mdl = ctx.mdl_hdr.get(), .Length = sizeof(ctx.hdr) };
-
-	if (auto err = receive(ctx, buf)) {
-		return err;
-	}
-
-	return validate_header(ctx.hdr) ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
-{
-	PAGED_CODE();
-
-	for (NTSTATUS status{}; !(status || get_flag(dev.unplugged) || recv_usbip_header(ctx)); ) {
-
-		NT_ASSERT(!ctx.request); // must be completed and zeroed on every loop
-		ctx.request = ret_command(ctx);
-
-		if (auto sz = get_payload_size(ctx.hdr); !sz) {
-			//
-		} else if (get_flag(dev.unplugged)) {
-			status = STATUS_CANCELLED; // do not receive payload
-		} else {
-			auto f = ctx.request ? recv_payload : drain_payload;
-			status = f(ctx, sz);
-		}
-
-		if (auto &req = ctx.request) {
-			auto st = status ? status : ret_submit(ctx);
-			complete_and_set_null(req, st);
-		}
-	}
-}
-
-} // namespace
-
-
-_IRQL_requires_same_
-_Function_class_(KSTART_ROUTINE)
-PAGED void usbip::recv_thread_function(_In_ void *context)
-{
-	PAGED_CODE();
-
-	auto device = static_cast<UDECXUSBDEVICE>(context);
-	TraceDbg("dev %04x", ptr04x(device));
-
-	auto &dev = *get_device_ctx(device);
-
-	if (auto ctx = alloc_wsk_context(&dev, WDF_NO_HANDLE)) {
-		recv_loop(dev, *ctx);
-		NT_ASSERT(!ctx->request);
-		free(ctx, true);
-	}
-
-	if (!get_flag(dev.unplugged)) {
-		TraceDbg("dev %04x, detaching", ptr04x(device));
-		device::async_detach_and_delete(device, true); // detach will be called by this thread
-	}
-
-	TraceDbg("dev %04x, exited", ptr04x(device));
-}
 
 /*
  * To ensure compatibility with existing USB drivers, the UDE client must call WdfRequestComplete at DISPATCH_LEVEL.

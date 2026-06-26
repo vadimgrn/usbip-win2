@@ -83,6 +83,7 @@ void add_cmd_attach(CLI::App &app)
 
         auto stop = rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
         rem->add_flag("--once", r.once, "Do not run automatic attach attempts if the command fails")->excludes(stop);
+        rem->add_flag("--events", r.use_wsk_events, "Use events to receive data from the network")->excludes(stop);
 
 	cmd->add_option_group("Stop")
 		->add_flag("-X,--stop-all", r.stop_all, "Stop all active attach attempts");

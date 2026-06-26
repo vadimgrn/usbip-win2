@@ -104,7 +104,7 @@ NTSTATUS usbip::device::mark_request_cancelable(_Inout_ device_ctx &dev, _In_ se
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::device::remove_request(
-        _In_ device_ctx &dev, _In_ const request_search &crit, _In_ bool unmark_cancelable)
+        _Inout_ device_ctx &dev, _In_ const request_search &crit, _In_ bool unmark_cancelable)
 {
         wdf::Lock lck(dev.requests_lock);
 

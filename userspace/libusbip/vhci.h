@@ -26,10 +26,17 @@ struct device_location
         std::string busid;
 };
 
+/**
+ * @see generate_device_serial
+ * @see validate_device_serial
+ * @see get_device_serial_maxlen
+ */
 struct persistent_device
 {
         device_location location;
-        std::string serial;
+        std::string serial; // optional device serial number if you want to set/override it
+        bool once: 1; // do not run automatic attach attempts if an error is returned
+        bool use_wsk_events: 1;
 };
 
 struct imported_device
@@ -97,18 +104,7 @@ USBIP_API Handle open(_In_ bool overlapped = false);
  */
 USBIP_API std::optional<std::vector<imported_device>> get_imported_devices(_In_ HANDLE dev);
 
-
-/**
- * @see generate_device_serial
- * @see validate_device_serial
- * @see get_device_serial_maxlen
- */
-struct attach_args
-{
-        device_location location;
-        std::string serial; // optional device serial number if you want to set/override it
-        bool once; // do not run automatic attach attempts if an error is returned
-};
+using attach_args = persistent_device;
 
 /**
  * @param dev handle of the driver device

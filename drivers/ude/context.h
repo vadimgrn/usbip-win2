@@ -6,6 +6,7 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\ch9.h>
+#include <libdrv\wdm_cpp.h>
 #include <libdrv\wdf_cpp.h>
 
 #include <usbip\proto.h>
@@ -71,8 +72,8 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
 
-struct wsk_context;
 struct device_ctx;
+struct ring_buffer_data;
 
 struct device_attributes
 {
@@ -109,7 +110,7 @@ struct device_ctx_ext
         auto busid() { return &attr.busid; }
 
         auto location_hash() const { return attr.location_hash; }
-        auto& properties() { return attr.properties; }
+        auto&& properties(this auto&& self) { return self.attr.properties; }
 };
 
 /*
@@ -148,7 +149,10 @@ struct device_ctx
         UINT64 sent_requests; // were sent successfully
         UINT64 cancelable_requests; // marked as
 
-        _KTHREAD *recv_thread;
+        union {
+                _KTHREAD *recv_thread;
+                ring_buffer_data *recv_buf;
+        };
 
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum
@@ -157,7 +161,10 @@ struct device_ctx
         LONG sending;
 
         LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
-        bool ep0_added;
+
+        bool ep0_added: 1;
+        bool use_wsk_events: 1;
+
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 

@@ -19,14 +19,12 @@ auto attach_persistent_devices(HANDLE dev)
         if (auto v = vhci::get_persistent(dev); !v) {
                 spdlog::error(GetLastErrorMsg());
                 return false;
-        } else for (auto &i: *v) {
-                auto &loc = i.location;
-                std::println("{}:{}/{} {}", loc.hostname, loc.service, loc.busid, i.serial);
+        } else for (auto &args: *v) {
+                auto &loc = args.location;
 
-                vhci::attach_args args {
-                        .location = std::move(i.location),
-                        .serial = std::move(i.serial)
-                }; 
+                std::println("{}:{}/{}, serial='{}', events={}",
+                                loc.hostname, loc.service, loc.busid,
+                                args.serial, int(args.use_wsk_events));
 
                 if (!vhci::attach(dev, args)) {
                         spdlog::error(GetLastErrorMsg());
@@ -74,7 +72,8 @@ bool usbip::cmd_attach(void *p)
                         .busid = std::move(args.busid),
                 },
                 .serial = std::move(args.serial),
-                .once = args.once
+                .once = args.once,
+                .use_wsk_events = args.use_wsk_events
         };
 
         if (args.stop || args.stop_all) {

@@ -811,3 +811,13 @@ const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG 
 
         return st != STATUS_INVALID_PARAMETER ? buf : "ReceiveEventFlags invalid parameter";
 }
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* wsk::DisconnectEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags)
+{
+        auto st = RtlStringCbPrintfA(buf, len, "%s%s",
+                Flags & WSK_FLAG_ABORTIVE ? ":ABORTIVE" : "",
+                Flags & WSK_FLAG_AT_DISPATCH_LEVEL ? ":AT_DISPATCH_LEVEL" : "");
+
+        return st != STATUS_INVALID_PARAMETER ? buf : "DisconnectEventFlags invalid parameter";
+}

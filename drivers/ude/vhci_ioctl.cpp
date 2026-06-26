@@ -12,6 +12,8 @@
 #include "network.h"
 #include "ioctl.h"
 #include "persistent.h"
+#include "wsk_receive_irp.h"
+#include "wsk_receive_events.h"
 
 #include <usbip/proto_op.h>
 
@@ -33,6 +35,12 @@ static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
 
 enum { ARG_INFO, ARG_FUNCTION, ARG_AI };
 
+constinit WSK_CLIENT_CONNECTION_DISPATCH wsk_dispatch
+{
+        .WskReceiveEvent = events::receive,
+        .WskDisconnectEvent = events::disconnect
+};
+
 struct workitem_ctx
 {
         WDFDEVICE vhci;
@@ -42,7 +50,9 @@ struct workitem_ctx
         auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
         ADDRINFOEXW *addrinfo; // list head
-        bool one_attempt;
+
+        bool one_attempt: 1;
+        bool use_wsk_events: 1;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
@@ -192,7 +202,8 @@ PAGED NTSTATUS plugin(_In_ UDECXUSBDEVICE device, _Inout_ int &port, _Inout_ boo
                 plugged = true;
         }
 
-        return device::recv_thread_start(device);
+        auto f = dev.use_wsk_events ? events::start_receive_data : start_receive_data_irp;
+        return f(device);
 }
 
 _IRQL_requires_same_
@@ -286,6 +297,9 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         }
         ctx.ctx_ext = WDF_NO_HANDLE; // now dev owns it
 
+        auto &dev_ctx = *get_device_ctx(dev);
+        dev_ctx.use_wsk_events = ctx.use_wsk_events;
+
         if (bool plugout_and_delete{}; auto err = plugin(dev, r->port, plugout_and_delete)) {
                 device::detach(dev, plugout_and_delete);
                 if (!plugout_and_delete) {
@@ -296,10 +310,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), r->port);
 
-        if (auto dc = get_device_ctx(dev)) {
-                device_state_changed(*dc, vhci::state::plugged);
-        }
-
+        device_state_changed(dev_ctx, vhci::state::plugged);
         return STATUS_SUCCESS;
 }
 
@@ -322,14 +333,14 @@ NTSTATUS irp_complete(
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
+PAGED auto create_socket(_Inout_ SOCKET* &sock, _In_ const ADDRINFOEXW &ai, _In_ void *socket_ctx)
 {
         PAGED_CODE();
         NT_ASSERT(!sock);
 
         if (auto err = socket(sock, static_cast<ADDRESS_FAMILY>(ai.ai_family), 
                                 static_cast<USHORT>(ai.ai_socktype), ai.ai_protocol, 
-                                WSK_FLAG_CONNECTION_SOCKET, nullptr, nullptr)) {
+                                WSK_FLAG_CONNECTION_SOCKET, socket_ctx, &wsk_dispatch)) {
                 NT_ASSERT(!sock);
                 Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", err);
                 return err;
@@ -354,7 +365,7 @@ PAGED auto create_socket(_Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto connect(
-        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ wsk::SOCKET* &sock, _In_ const ADDRINFOEXW &ai)
+        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ device_ctx_ext &ext, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
 
@@ -366,14 +377,14 @@ PAGED auto connect(
                 TraceDbg("%!BIN!", WppBinary(&v6.sin6_addr, sizeof(v6.sin6_addr)));
         }
 
-        if (auto err = create_socket(sock, ai)) {
+        if (auto err = create_socket(ext.sock, ai, &ext)) {
                 return err;
         }
 
         auto irp = set_args(request, __func__, &ai);
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
 
-        auto st = connect(sock, ai.ai_addr, irp); // completion handler will be called anyway
+        auto st = connect(ext.sock, ai.ai_addr, irp); // completion handler will be called anyway
         TraceDbg("%!STATUS!", st);
 
         return STATUS_PENDING;
@@ -400,7 +411,7 @@ PAGED auto on_connect(
                 free(ext.sock);
 
                 if (st != STATUS_CANCELLED && ai.ai_next) {
-                        st = connect(request, wi, ext.sock, *ai.ai_next);
+                        st = connect(request, wi, ext, *ai.ai_next);
                 }
         }
 
@@ -434,7 +445,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
                 st = on_connect(request, wi, ctx, ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
-                st = connect(request, wi, ext.sock, *ctx.addrinfo);
+                st = connect(request, wi, ext, *ctx.addrinfo);
         }
 
         if (st == STATUS_PENDING) {
@@ -530,12 +541,12 @@ PAGED void getaddrinfo(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
-        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once)
+        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once, _In_ bool use_wsk_events)
 {
         PAGED_CODE();
 
-        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %!bool!",
-                r.host, r.service, r.busid, r.serial, once);
+        Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %!bool!, wsk events %!bool!",
+                r.host, r.service, r.busid, r.serial, once, use_wsk_events);
 
         auto vhci = get_vhci(request);
 
@@ -549,6 +560,7 @@ PAGED auto plugin_hardware(
         ctx.vhci = vhci;
         ctx.request = request;
         ctx.one_attempt = once;
+        ctx.use_wsk_events = use_wsk_events;
 
         if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);
@@ -633,7 +645,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         constexpr auto written = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
-        return plugin_hardware(request, *r, once);
+        return plugin_hardware(request, *r, once, r->use_wsk_events);
 }
 
 _IRQL_requires_same_

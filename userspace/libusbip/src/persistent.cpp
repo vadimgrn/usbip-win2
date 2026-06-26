@@ -8,6 +8,7 @@
 
 #include <usbip\vhci.h>
 
+#include <charconv>
 #include <ranges>
 #include <span>
 
@@ -34,13 +35,14 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persiste
                 auto &dl = d.location;
 
                 if (is_malformed(d)) {
-                        libusbip::output("malformed persistent_device( hostname='{}', service='{}', busid='{}', serial='{}' )",
-                                          dl.hostname, dl.service, dl.busid, d.serial);
+                        libusbip::output("malformed persistent_device( hostname='{}', service='{}', "
+                                         "busid='{}', serial='{}', use_wsk_events='{}' )",
+                                          dl.hostname, dl.service, dl.busid, d.serial, d.use_wsk_events);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                if (auto s = std::format("{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial);
+                if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, d.use_wsk_events);
                     auto ws = utf8_to_wchar(s)) {
                         *ws += L'\0';
                         multi_sz += *ws;
@@ -68,14 +70,24 @@ auto parse_persistent_device(_In_ const std::string &str)
         if (it != v.end()) {
                 loc.hostname = std::string_view(*it++);
         }
+
         if (it != v.end()) {
                 loc.service = std::string_view(*it++);
         }
+
         if (it != v.end()) {
                 loc.busid = std::string_view(*it++);
         }
+
         if (it != v.end()) {
-                dev.serial.assign((*it).begin(), str.end()); // remaining suffix
+                dev.serial = std::string_view(*it++);
+        }
+
+        if (it != v.end()) {
+                std::string_view s((*it).begin(), str.end()); // remaining suffix
+                unsigned char val{};
+                std::from_chars(s.data(), s.data() + s.size(), val);
+                dev.use_wsk_events = val;
         }
 
         return dev;

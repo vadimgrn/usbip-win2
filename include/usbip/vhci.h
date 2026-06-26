@@ -129,6 +129,7 @@ enum {
 struct plugin_hardware : base, imported_device_location
 {
         char serial[SERIAL_BUFSZ];
+        bool use_wsk_events;
 };
 
 struct stop_attach_attempts : base, imported_device_location

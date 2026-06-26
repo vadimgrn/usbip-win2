@@ -84,6 +84,8 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
 
 DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
 {
+        r.use_wsk_events = args.use_wsk_events;
+
         if (auto err = assign(r, args.serial)) {
                 return err;
         }
