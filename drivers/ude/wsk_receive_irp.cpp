@@ -2,24 +2,24 @@
  * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "wsk_receive.h"
+#include "wsk_receive_irp.h"
 #include "trace.h"
-#include "wsk_receive.tmh"
+#include "wsk_receive_irp.tmh"
 
 #include "context.h"
-#include "wsk_context.h"
-#include "device.h"
-#include "request_list.h"
-#include "urbtransfer.h"
-#include "network.h"
-#include "driver.h"
 #include "ioctl.h"
+#include "device.h"
+#include "driver.h"
+#include "network.h"
+#include "wsk_context.h"
+#include "urbtransfer.h"
+#include "request_list.h"
 
-#include <libdrv\usbd_helper.h>
-#include <libdrv\dbgcommon.h>
-#include <libdrv\usbdsc.h>
-#include <libdrv\irp.h>
-#include <libdrv\pdu.h>
+#include <libdrv/wait_timeout.h>
+#include <libdrv/usbd_helper.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/usbdsc.h>
+#include <libdrv/pdu.h>
 
 extern "C" {
 #include <usbdlib.h>
@@ -716,12 +716,9 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 	}
 }
 
-} // namespace
-
-
 _IRQL_requires_same_
 _Function_class_(KSTART_ROUTINE)
-PAGED void usbip::recv_thread_function(_In_ void *context)
+PAGED void recv_thread_function(_In_ void *context)
 {
 	PAGED_CODE();
 
@@ -742,6 +739,73 @@ PAGED void usbip::recv_thread_function(_In_ void *context)
 	}
 
 	TraceDbg("dev %04x, exited", ptr04x(device));
+}
+
+} // namespace
+
+
+/*
+ * ObDereferenceObject must be called as soon as it is done with this thread
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::start_receive_data_irp(_In_ UDECXUSBDEVICE device)
+{
+        PAGED_CODE();
+        const auto access = THREAD_ALL_ACCESS;
+
+        HANDLE handle{};
+        if (auto err = PsCreateSystemThread(&handle, access, nullptr, nullptr, nullptr, recv_thread_function, device)) {
+                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
+                return err;
+        }
+
+        auto dev = get_device_ctx(device);
+
+        PVOID thread{};
+        NT_VERIFY(NT_SUCCESS(ObReferenceObjectByHandle(handle, access, *PsThreadType, KernelMode, &thread, nullptr)));
+
+        NT_VERIFY(!InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev->recv_thread), thread));
+        NT_VERIFY(NT_SUCCESS(ZwClose(handle)));
+
+        TraceDbg("dev %04x", ptr04x(device));
+        return STATUS_SUCCESS;
+}
+
+/*
+ * @return object_reference defer dereference of receive thread if it executes this function
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED wdm::object_reference usbip::stop_receive_data_irp(_In_ UDECXUSBDEVICE device, _Inout_ bool &socket_closed)
+{
+        PAGED_CODE();
+
+        auto &dev = *get_device_ctx(device);
+        socket_closed = close_socket(dev.sock());
+
+        wdm::object_reference thread(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&dev.recv_thread), nullptr), false);
+
+        if (!thread) {
+                TraceDbg("dev %04x, was not created", ptr04x(device));
+                return thread;
+        } else if (thread.get() == KeGetCurrentThread()) { // called by receive thread
+                thread.set_defer_delete();
+                return thread;
+        }
+
+        NT_ASSERT(get_flag(dev.unplugged)); // thread checks it
+        TraceDbg("dev %04x", ptr04x(device));
+
+        if (auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
+                auto err = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout)) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), err);
+        } else {
+                TraceDbg("dev %04x, joined", ptr04x(device));
+        }
+
+        thread.reset(); // it's safe to dereference(delete) now
+        return thread;
 }
 
 /*

@@ -1,18 +1,25 @@
-﻿/*
+/*
  * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include <libdrv/codeseg.h>
+#include <libdrv/wdm_cpp.h>
 #include <libdrv/wdf_cpp.h>
+
+#include <UdeCxTypes.h>
 
 namespace usbip
 {
 
 _IRQL_requires_same_
-_Function_class_(KSTART_ROUTINE)
-PAGED void recv_thread_function(_In_ void *context);
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS start_receive_data_irp(_In_ UDECXUSBDEVICE device);
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED wdm::object_reference stop_receive_data_irp(_In_ UDECXUSBDEVICE device, _Inout_ bool &socket_closed);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

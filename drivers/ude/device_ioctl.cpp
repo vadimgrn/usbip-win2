@@ -10,7 +10,7 @@
 #include "wsk_context.h"
 #include "device.h"
 #include "request_list.h"
-#include "wsk_receive.h"
+#include "wsk_receive_irp.h"
 #include "proto.h"
 #include "network.h"
 #include "ioctl.h"

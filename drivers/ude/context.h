@@ -6,6 +6,7 @@
 
 #include <libdrv\codeseg.h>
 #include <libdrv\ch9.h>
+#include <libdrv\wdm_cpp.h>
 #include <libdrv\wdf_cpp.h>
 
 #include <usbip\proto.h>
@@ -73,6 +74,7 @@ bool is_valid_port(_In_ const vhci_ctx &ctx, _In_ int port);
 
 struct wsk_context;
 struct device_ctx;
+struct ring_buffer_data;
 
 struct device_attributes
 {
@@ -109,7 +111,7 @@ struct device_ctx_ext
         auto busid() { return &attr.busid; }
 
         auto location_hash() const { return attr.location_hash; }
-        auto& properties() { return attr.properties; }
+        auto& properties(this auto&& self) { return self.attr.properties; }
 };
 
 /*
@@ -149,6 +151,13 @@ struct device_ctx
         UINT64 cancelable_requests; // marked as
 
         _KTHREAD *recv_thread;
+        ring_buffer_data *recv_buf;
+
+        using start_receive_f = NTSTATUS (UDECXUSBDEVICE device);
+        start_receive_f *start_receive_data;
+
+        using stop_receive_f = wdm::object_reference (UDECXUSBDEVICE device, bool &disconnected);
+        stop_receive_f *stop_receive_data;
 
         int port; // vhci_ctx.devices[port - 1]
         seqnum_t seqnum; // @see next_seqnum

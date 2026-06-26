@@ -25,6 +25,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\userspace\libusbip\src\proto_op.cpp" />
+    <ClCompile Include="ring_buffer.cpp" />
     <ClCompile Include="context.cpp" />
     <ClCompile Include="device_ioctl.cpp" />
     <ClCompile Include="request_list.cpp" />
@@ -39,7 +40,8 @@
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="vhci_ioctl.cpp" />
     <ClCompile Include="wsk_context.cpp" />
-    <ClCompile Include="wsk_receive.cpp" />
+    <ClCompile Include="wsk_receive_events.cpp" />
+    <ClCompile Include="wsk_receive_irp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\usbip\ch9.h" />
@@ -47,6 +49,7 @@
     <ClInclude Include="..\..\include\usbip\proto.h" />
     <ClInclude Include="..\..\include\usbip\proto_op.h" />
     <ClInclude Include="..\..\include\usbip\vhci.h" />
+    <ClInclude Include="ring_buffer.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="device_ioctl.h" />
     <ClInclude Include="request_list.h" />
@@ -63,7 +66,8 @@
     <ClInclude Include="vhci_ioctl.h" />
     <ClInclude Include="trace.h" />
     <ClInclude Include="wsk_context.h" />
-    <ClInclude Include="wsk_receive.h" />
+    <ClInclude Include="wsk_receive_events.h" />
+    <ClInclude Include="wsk_receive_irp.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="usbip2_ude.inf" />
