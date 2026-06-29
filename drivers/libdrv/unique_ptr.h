@@ -47,6 +47,12 @@ public:
         unique_ptr(_In_ const uninitialized_t&, _In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
                 unique_ptr(ExAllocatePoolUninitialized(PoolType, NumberOfBytes, pooltag)) {}
 
+        unique_ptr(const unique_ptr&) = delete;
+        unique_ptr& operator=(const unique_ptr&) = delete;
+
+        unique_ptr(unique_ptr&&) = default;
+        unique_ptr& operator=(unique_ptr&&) = default;
+
         using base::get;
         using base::release;
 
