@@ -18,10 +18,6 @@
 #include <libdrv/usbdsc.h>
 #include <libdrv/pdu.h>
 
-extern "C" {
-#include <usbdlib.h>
-}
-
 namespace
 {
 
@@ -112,26 +108,32 @@ UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void patch_config(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
+void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
-	for (auto cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cd); 
-	     bool(cur = USBD_ParseDescriptors(cd, cd->wTotalLength, cur, USB_ENDPOINT_DESCRIPTOR_TYPE));
-             cur = libdrv::next(cur)) {
+        for (USB_COMMON_DESCRIPTOR *cur{};
+             (cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
+
+                if (cur->bLength < sizeof(USB_ENDPOINT_DESCRIPTOR)) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "Truncated endpoint descriptor discovered, bLength %d", cur->bLength);
+                        break;
+                }
 
                 auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
-                auto old_pkt = e.wMaxPacketSize; // maximum payload size for this endpoint
+                auto old_pkt = e.wMaxPacketSize; // max payload size for this endpoint
                 auto old_intvl = e.bInterval; // polling interval, frames
 
                 switch (usb_endpoint_type(e)) {
                 case UsbdPipeTypeBulk:
                         e.wMaxPacketSize = 512; // fixed value for HS
                         break;
-                case UsbdPipeTypeIsochronous: // 2**(bInterval - 1) frames
-                        enum { MIN_INTVL = 1, MAX_INTVL = 16 };
-                        NT_ASSERT(e.bInterval >= MIN_INTVL);
-                        NT_ASSERT(e.bInterval <= MAX_INTVL);
-                        e.bInterval = min(e.bInterval + 3, MAX_INTVL); // 2**(bInterval-1) microframes
+                case UsbdPipeTypeIsochronous:
+                        enum : UCHAR { MIN_INTVL = 1, MAX_INTVL = 16 };
+                        if (!(e.bInterval >= MIN_INTVL && e.bInterval <= MAX_INTVL)) [[unlikely]] {
+                                Trace(TRACE_LEVEL_WARNING, "Isochronous interval %d out of spec bounds", e.bInterval);
+                                e.bInterval = min(max(e.bInterval, MIN_INTVL), MAX_INTVL);
+                        }
+                        e.bInterval = min(static_cast<UCHAR>(e.bInterval + 3), MAX_INTVL);
                         break;
                 case UsbdPipeTypeInterrupt: // 1-255 ms
                         e.bInterval = to_high_speed_interval(e.bInterval); // 2**(bInterval-1) microframes
@@ -141,13 +143,13 @@ void patch_config(_In_ USB_CONFIGURATION_DESCRIPTOR *cd)
                         break;
                 }
 
-                if (auto equal = e.wMaxPacketSize == old_pkt && e.bInterval == old_intvl; !equal) {
+                if (auto eq = e.wMaxPacketSize == old_pkt && e.bInterval == old_intvl; !eq) {
                         TraceDbg("bLength %d, %!usb_descriptor_type!, bEndpointAddress %#x, "
                                 "bmAttributes %#x, wMaxPacketSize %d (was %d), bInterval %d (was %d)", 
                                 e.bLength, e.bDescriptorType, e.bEndpointAddress, e.bmAttributes, 
                                 e.wMaxPacketSize, old_pkt, e.bInterval, old_intvl);
                 }
-	}
+        }
 }
 
 /*

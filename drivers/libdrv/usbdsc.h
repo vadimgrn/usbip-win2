@@ -20,29 +20,37 @@ struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 };
 static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto usb_string_descr_size(_In_ UCHAR n)
 {
         auto cb = __builtin_offsetof(USB_STRING_DESCRIPTOR, bString) + n*sizeof(*USB_STRING_DESCRIPTOR::bString);
-        NT_ASSERT(cb < MAXIMUM_USB_STRING_LENGTH);
-
-        static_assert(MAXIMUM_USB_STRING_LENGTH == MAXUCHAR);
+        if (cb >= MAXIMUM_USB_STRING_LENGTH) [[unlikely]] {
+                return UCHAR{};
+        }
         return static_cast<UCHAR>(cb);
 }
 
 static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
 static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_COMMON_DESCRIPTOR &d)
 {
 	return d.bLength >= sizeof(d);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_DEVICE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) && 
 		d.bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) &&
@@ -50,18 +58,22 @@ constexpr auto is_valid(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 		d.wTotalLength > d.bLength;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_INTERFACE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) &&
 		d.bDescriptorType == USB_INTERFACE_DESCRIPTOR_TYPE;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_STRING_DESCRIPTOR &d)
 {
-	return  d.bLength >= sizeof(USB_COMMON_DESCRIPTOR) && // string length can be zero
-		d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE;
+        return  d.bLength >= sizeof(USB_COMMON_DESCRIPTOR) && 
+                d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && 
+                !(d.bLength % 2); // crucial check for UTF-16 character sizing
 }
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool is_valid(_In_ const USB_OS_STRING_DESCRIPTOR &d);
@@ -90,7 +102,7 @@ inline auto next(_In_ const USBD_INTERFACE_INFORMATION *d)
  * @return next found descriptor or nullptr
  */
 _IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 USB_COMMON_DESCRIPTOR *find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbdsc.h"
@@ -9,26 +9,38 @@
  * @see reactos\drivers\usb\usbd\usbd.c
  */
 _IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 USB_COMMON_DESCRIPTOR* libdrv::find_next(
-	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur)
+        _In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur)
 {
-	NT_ASSERT(cfg);
-	auto end = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(reinterpret_cast<char*>(cfg) + cfg->wTotalLength);
+        if (!(cfg && is_valid(*cfg))) {
+                return nullptr;
+        }
 
-	cur = cur ? next(cur) : reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
+        const auto* const cfg_bytes = reinterpret_cast<char*>(cfg);
+        const auto* const end_bytes = cfg_bytes + cfg->wTotalLength;
 
-	NT_ASSERT(cur >= static_cast<void*>(cfg));
-	NT_ASSERT(cur <= end);
+        cur = cur ? next(cur) : reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
 
-	for (USB_COMMON_DESCRIPTOR *nxt; 
-	     cur + 1 <= end && is_valid(*cur) && (nxt = next(cur)) <= end; cur = nxt) {
-		if (cur->bDescriptorType == type) {
-			return cur;
-		}
-	}
+        NT_ASSERT(reinterpret_cast<char*>(cur) >= cfg_bytes);
+        NT_ASSERT(reinterpret_cast<char*>(cur) <= end_bytes);
 
-	return nullptr;
+        for ( ; reinterpret_cast<char*>(cur) + sizeof(*cur) <= end_bytes; cur = next(cur)) {
+                
+                if (!is_valid(*cur)) [[unlikely]] {
+                        break; 
+                }
+
+                if (reinterpret_cast<char*>(cur) + cur->bLength > end_bytes) [[unlikely]] {
+                        break;
+                }
+
+                if (cur->bDescriptorType == type) {
+                        return cur;
+                }
+        }
+
+        return nullptr;
 }
 
 _IRQL_requires_same_
