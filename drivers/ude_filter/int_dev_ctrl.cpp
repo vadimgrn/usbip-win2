@@ -236,7 +236,7 @@ constexpr auto get_request_type(_In_ const URB &urb)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
+auto vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
 {
         auto &d = urb.UrbControlTransfer;
         auto &s = urb.UrbControlVendorClassRequest;
@@ -244,27 +244,32 @@ void vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
         static_assert(sizeof(d) == sizeof(s));
         NT_ASSERT(d.Hdr.Length == sizeof(d));
 
-        d.Hdr.Function = URB_FUNCTION_CONTROL_TRANSFER;
+        auto val = (uintptr_t(s.RequestTypeReservedBits) << 32) |
+                   (uintptr_t(s.Reserved1) << 16) | s.Hdr.Function;
 
+        d.Hdr.Function = URB_FUNCTION_CONTROL_TRANSFER;
         NT_ASSERT(!d.PipeHandle); // s.Reserved
+
+        NT_ASSERT(!(d.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER));
         d.TransferFlags |= USBD_DEFAULT_PIPE_TRANSFER;
 
-        NT_ASSERT(!s.RequestTypeReservedBits);
         s.RequestTypeReservedBits = bmRequestType;
-
-        NT_ASSERT(!s.Reserved1);
         s.Reserved1 = static_cast<USHORT>(s.TransferBufferLength); // get_setup_packet(d).wLength
+
+        NT_ASSERT(val);
+        return val;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void control_to_vendor_class(_Inout_ URB &urb, _In_ USHORT function)
+void control_to_vendor_class(_Inout_ URB &urb, _In_ uintptr_t val)
 {
         auto &r = urb.UrbControlVendorClassRequest;
-        r.Hdr.Function = function;
+
+        r.Hdr.Function = val & MAXUSHORT;
         r.TransferFlags &= ~USBD_DEFAULT_PIPE_TRANSFER; // clear flag
-        r.RequestTypeReservedBits = 0;
-        r.Reserved1 = 0;
+        r.RequestTypeReservedBits = (val >> 32) & MAXUCHAR;
+        r.Reserved1 = (val >> 16) & MAXUSHORT;
 }
 
 /*
@@ -301,11 +306,9 @@ NTSTATUS irp_complete(
 
         if (auto val = reinterpret_cast<uintptr_t>(context); fltr.is_hub) {
                 NT_ASSERT(!val);
-        } else if (auto function = static_cast<USHORT>(val)) { // legacy control transfer
-
+        } else if (val) { // legacy control transfer
                 auto urb = libdrv::urb_from_irp(irp);
-                control_to_vendor_class(*urb, function);
-
+                control_to_vendor_class(*urb, val);
                 TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self),
                           ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
         } else {
@@ -321,21 +324,17 @@ NTSTATUS irp_complete(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
+uintptr_t try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
 {
         auto bmRequestType = get_request_type(urb);
         if (!bmRequestType) {
                 return 0;
         }
 
-        int function = urb.UrbHeader.Function;
-        NT_ASSERT(function);
-
         TraceDbg("dev %04x, irp %04x -> target %04x, %s", ptr04x(fltr.self), ptr04x(irp),
-                  ptr04x(fltr.target), urb_function_str(function));
+                  ptr04x(fltr.target), urb_function_str(urb.UrbHeader.Function));
 
-        vendor_class_to_control(urb, bmRequestType); // changes function
-        return function;
+        return vendor_class_to_control(urb, bmRequestType);
 }
 
 } // namespace
@@ -356,8 +355,8 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	}
         lck.clear();
 
-        uintptr_t ctx = !fltr.is_hub && libdrv::has_urb(irp) ?
-                        try_legacy_ctrl(fltr, irp, *libdrv::urb_from_irp(irp)) : 0;
+        auto ctx = !fltr.is_hub && libdrv::has_urb(irp) ?
+                    try_legacy_ctrl(fltr, irp, *libdrv::urb_from_irp(irp)) : 0;
 
         IoCopyCurrentIrpStackLocationToNext(irp);
         IoSetCompletionRoutine(irp, irp_complete, reinterpret_cast<void*>(ctx), true, true, true);
