@@ -78,18 +78,16 @@ auto received(_Inout_ device_ctx &dev, _In_ const char *data, _In_ size_t len)
                 }
 
                 if (ctx.request = ret_command(hdr, dev); ctx.request) {
-
-                        auto n = rb.skip(sizeof(hdr));
-                        NT_ASSERT(n == sizeof(hdr));
-
-                        expected -= sizeof(hdr);
-
+                        expected -= rb.skip(sizeof(hdr));
                         auto st = ret_submit(ctx);
+                        if (st == STATUS_DATA_NOT_ACCEPTED) [[unlikely]] {
+                                complete(ctx.request, STATUS_UNSUCCESSFUL);
+                                return false;
+                        }
                         complete(ctx.request, st);
                 }
 
-                auto n = rb.skip(expected);
-                NT_ASSERT(n == expected);
+                rb.skip(expected);
         }
 
         return !len;
@@ -126,10 +124,11 @@ NTSTATUS usbip::events::receive(
         auto &dev = *ext->ctx;
         auto device = get_handle(&dev);
 
-	if (char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ]; true) {
-		TraceDbg("dev %04x, DataIndication %04x, BytesIndicated %Iu, Flags[%s]", ptr04x(device),
-                          ptr04x(DataIndication), BytesIndicated, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
-	}
+        if (WPP_LEVEL_FLAGS_ENABLED(TRACE_LEVEL_VERBOSE, FLAG_WSK)) {
+                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
+                TraceWSK("dev %04x, BytesIndicated %Iu, Flags[%s]", ptr04x(device),
+                          BytesIndicated, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
+        }
 
         if (!DataIndication) [[unlikely]] { // the socket must be closed ASAP
                 return stop_receive(device, dev, STATUS_SUCCESS);
@@ -217,7 +216,11 @@ PAGED wdm::object_reference usbip::events::stop_receive_data(_In_ UDECXUSBDEVICE
         }
 
         socket_closed = close_socket(dev.sock());
-        free(dev.recv_buf);
+
+        if (auto &buf = dev.recv_buf) {
+                TraceDbg("ring buffer capacity %Iu", buf->capacity);
+                free(buf);
+        }
 
         return wdm::object_reference();
 }

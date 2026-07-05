@@ -334,7 +334,7 @@ void post_process_transfer_buffer(_In_ const device_ctx &dev, _In_ const URB &ur
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
+auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
         auto &dev = *ctx.dev;
         urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
@@ -361,8 +361,10 @@ NTSTATUS ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &
         if (TransferBufferLength) {
                 if (dev.use_wsk_events && is_transfer_dir_in(ctx.hdr)) {
                         ring_buffer rb(dev.recv_buf);
-                        [[maybe_unused]] auto n = rb.peek(TransferBuffer, TransferBufferLength);
-                        NT_ASSERT(n == TransferBufferLength);
+                        if (auto n = rb.peek(TransferBuffer, TransferBufferLength); n != TransferBufferLength) {
+                                Trace(TRACE_LEVEL_ERROR, "TransferBufferLength %lu != consumed %Iu", TransferBufferLength, n);
+                                st = STATUS_DATA_NOT_ACCEPTED;
+                        }
                 }
                 if (NT_SUCCESS(st)) {
                         post_process_transfer_buffer(*ctx.dev, urb, TransferBuffer);
