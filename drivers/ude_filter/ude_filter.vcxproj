@@ -63,6 +63,7 @@
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <_NT_TARGET_VERSION>0xA000006</_NT_TARGET_VERSION>
     <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
@@ -154,10 +155,15 @@
       <AdditionalIncludeDirectories>..;..\..\include;..\..\userspace;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <Optimization>MaxSpeed</Optimization>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)WppRecorder.lib;$(DDK_LIB_PATH)Usbdex.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">

@@ -148,6 +148,7 @@
     <KMDF_VERSION_MINOR>27</KMDF_VERSION_MINOR>
     <Driver_SpectreMitigation>Spectre</Driver_SpectreMitigation>
     <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
@@ -241,6 +242,9 @@
       <WppAdditionalConfigurationFile>custom_wpp.ini</WppAdditionalConfigurationFile>
       <AdditionalOptions>/Zc:__cplusplus %(ClCompile.AdditionalOptions)</AdditionalOptions>
       <PreprocessorDefinitions>POOL_ZERO_DOWN_LEVEL_SUPPORT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <Optimization>MaxSpeed</Optimization>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <DriverSign>
       <FileDigestAlgorithm>certHash</FileDigestAlgorithm>
@@ -248,6 +252,7 @@
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);ntstrsafe.lib;wdmsec.lib;netio.lib;usbd.lib</AdditionalDependencies>
       <AdditionalOptions>/PDBALTPATH:%_PDB% %(AdditionalOptions)</AdditionalOptions>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
