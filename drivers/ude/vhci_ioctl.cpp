@@ -35,12 +35,6 @@ static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
 
 enum { ARG_INFO, ARG_FUNCTION, ARG_AI };
 
-constinit WSK_CLIENT_CONNECTION_DISPATCH wsk_dispatch
-{
-        .WskReceiveEvent = events::receive,
-        .WskDisconnectEvent = events::disconnect
-};
-
 struct workitem_ctx
 {
         WDFDEVICE vhci;
@@ -340,7 +334,7 @@ PAGED auto create_socket(_Inout_ SOCKET* &sock, _In_ const ADDRINFOEXW &ai, _In_
 
         if (auto err = socket(sock, static_cast<ADDRESS_FAMILY>(ai.ai_family), 
                                 static_cast<USHORT>(ai.ai_socktype), ai.ai_protocol, 
-                                WSK_FLAG_CONNECTION_SOCKET, socket_ctx, &wsk_dispatch)) {
+                                WSK_FLAG_CONNECTION_SOCKET, socket_ctx, events::get_dispatch())) {
                 NT_ASSERT(!sock);
                 Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", err);
                 return err;

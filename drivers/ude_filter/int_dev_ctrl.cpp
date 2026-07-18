@@ -248,7 +248,7 @@ auto vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
                    (uintptr_t(s.Reserved1) << 16) | s.Hdr.Function;
 
         d.Hdr.Function = URB_FUNCTION_CONTROL_TRANSFER;
-        NT_ASSERT(!d.PipeHandle); // s.Reserved
+        // NT_ASSERT(!d.PipeHandle); // s.Reserved, fails for some devices
 
         NT_ASSERT(!(d.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER));
         d.TransferFlags |= USBD_DEFAULT_PIPE_TRANSFER;

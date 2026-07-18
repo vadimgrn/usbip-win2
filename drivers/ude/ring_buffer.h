@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <ntdef.h>
+#include <wdm.h>
 
 namespace usbip
 {
@@ -19,7 +19,8 @@ struct ring_buffer_data
         size_t head; // write index
         size_t tail; // read index
 
-        char buf[ANYSIZE_ARRAY]; // buf[capacity]
+        char *buf; // points to data
+//      char data[capacity]; // @see realloc
 };
 
 _IRQL_requires_same_
@@ -36,15 +37,11 @@ void free(_Inout_ ring_buffer_data* &p);
 class ring_buffer
 {
 public:
-        constexpr ring_buffer(_In_ ring_buffer_data* &data) : m_data(data) {}
-
-        ring_buffer(_In_ const ring_buffer&) = delete;
-        ring_buffer& operator =(_In_ const ring_buffer&) = delete;
+        constexpr ring_buffer() = default;
+        constexpr ring_buffer(_In_opt_ ring_buffer_data *data) : m_data(data) {}
 
         constexpr explicit operator bool() const { return m_data; }
         constexpr auto operator !() const { return !m_data; }
-
-        auto realloc(_In_ size_t bytes) { return usbip::realloc(m_data, bytes); }
 
         auto capacity() const { return m_data ? m_data->capacity : 0; }
         auto size() const { return m_data ? m_data->size : 0; }
@@ -62,7 +59,7 @@ public:
         bool peek_hdr(_Inout_ header &hdr) const;
 
 private:
-        ring_buffer_data* &m_data;
+        ring_buffer_data *m_data{};
 };
 
 } // namespace usbip

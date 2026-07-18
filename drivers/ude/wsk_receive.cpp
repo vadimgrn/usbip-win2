@@ -51,6 +51,7 @@ void log(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
  * @return 1-16, for HS interrupt endpoint
  */
 _IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 UCHAR to_high_speed_interval(_In_ UCHAR bInterval)
 {
         enum { MIN_INTVL = 1, MAX_INTVL = 16 }; // result
@@ -127,13 +128,13 @@ void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
                 case UsbdPipeTypeBulk:
                         e.wMaxPacketSize = 512; // fixed value for HS
                         break;
-                case UsbdPipeTypeIsochronous:
+                case UsbdPipeTypeIsochronous: // 2**(bInterval - 1) frames
                         enum : UCHAR { MIN_INTVL = 1, MAX_INTVL = 16 };
                         if (!(e.bInterval >= MIN_INTVL && e.bInterval <= MAX_INTVL)) [[unlikely]] {
                                 Trace(TRACE_LEVEL_WARNING, "Isochronous interval %d out of spec bounds", e.bInterval);
                                 e.bInterval = min(max(e.bInterval, MIN_INTVL), MAX_INTVL);
                         }
-                        e.bInterval = min(static_cast<UCHAR>(e.bInterval + 3), MAX_INTVL);
+                        e.bInterval = min(static_cast<UCHAR>(e.bInterval + 3), MAX_INTVL); // 2**(bInterval-1) microframes
                         break;
                 case UsbdPipeTypeInterrupt: // 1-255 ms
                         e.bInterval = to_high_speed_interval(e.bInterval); // 2**(bInterval-1) microframes
@@ -152,6 +153,29 @@ void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
         }
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto validate(_In_ const iso_packet_descriptor &sd, _In_ ULONG64 dd_offset, _In_ ULONG TransferBufferLength)
+{
+        if (sd.actual_length > sd.length) [[unlikely]] {
+                Trace(TRACE_LEVEL_ERROR, "actual_length %u > length %u", sd.actual_length, sd.length);
+                return false;
+        }
+
+        if (sd.offset != dd_offset) [[unlikely]] { // buffer is compacted, but offsets are intact
+                Trace(TRACE_LEVEL_ERROR, "offset %u != Offset %Iu", sd.offset, dd_offset);
+                return false;
+        }
+
+        if (dd_offset + sd.actual_length > TransferBufferLength) [[unlikely]] {
+                Trace(TRACE_LEVEL_ERROR, "offset %u + actual_length %u > TransferBufferLength %lu",
+                                          sd.offset, sd.actual_length, TransferBufferLength);
+                return false;
+        }
+
+        return true;
+}
+
 /*
  * Buffer from the server has no gaps (compacted), SUM(src->actual_length) == actual_length,
  * src->offset is ignored for that reason.
@@ -168,69 +192,102 @@ void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto fill_isoc_data(_Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ ULONG length, 
-	_In_ const iso_packet_descriptor *src)
+auto fill_isoc_data(
+        _Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ ULONG actual_length, _In_ const iso_packet_descriptor *src)
 {
-	NT_ASSERT(length <= r.TransferBufferLength);
-	auto dir_out = !buffer;
+	bool dir_in = buffer;
 
-	for (auto i = LONG64(r.NumberOfPackets) - 1; i >= 0; --i) { // set dd.Status and dd.Length
+	for (auto i = static_cast<LONG64>(r.NumberOfPackets) - 1; i >= 0; --i) { // set dd.Status and dd.Length
+                auto &sd = src[i];
 
-		auto sd = src + i;
-		auto dd = r.IsoPacket + i;
+                auto &dd = r.IsoPacket[i];
+                NT_ASSERT(!dd.Length);
+                dd.Status = sd.status ? to_windows_status_isoch(sd.status) : USBD_STATUS_SUCCESS;
 
-		dd->Status = sd->status ? to_windows_status_isoch(sd->status) : USBD_STATUS_SUCCESS;
+                if (!(dir_in && sd.actual_length)) { // dd->Length is not used for OUT transfers
+                        continue;
+                }
 
-		if (dir_out) {
-			continue; // dd->Length is not used for OUT transfers
-		}
+                if (!validate(sd, dd.Offset, r.TransferBufferLength)) [[unlikely]] {
+                        return STATUS_INVALID_PARAMETER;
+                }
 
-		if (!sd->actual_length) {
-			dd->Length = 0;
-			continue;
-		}
+                dd.Length = sd.actual_length;
 
-		if (sd->actual_length > sd->length) {
-			Trace(TRACE_LEVEL_ERROR, "actual_length(%u) > length(%u)", sd->actual_length, sd->length);
-			return STATUS_INVALID_PARAMETER;
-		}
+                if (actual_length < sd.actual_length) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "actual_length %lu < [].actual_length %lu", actual_length, sd.actual_length);
+                        return STATUS_INVALID_PARAMETER;
+                }
 
-		if (sd->offset != dd->Offset) { // buffer is compacted, but offsets are intact
-			Trace(TRACE_LEVEL_ERROR, "src.offset(%u) != dst.Offset(%lu)", sd->offset, dd->Offset);
-			return STATUS_INVALID_PARAMETER;
-		}
+                actual_length -= sd.actual_length;
 
-		if (length >= sd->actual_length) {
-			length -= sd->actual_length;
-		} else {
-			Trace(TRACE_LEVEL_ERROR, "length(%lu) >= actual_length(%u)", length, sd->actual_length);
-			return STATUS_INVALID_PARAMETER;
-		}
+                if (auto src_offset = actual_length; dd.Offset < src_offset) [[unlikely]] { // buffer has no gaps
+                        Trace(TRACE_LEVEL_ERROR, "Offset %lu < src_offset %lu", dd.Offset, src_offset);
+                        return STATUS_INVALID_PARAMETER;
+                } else if (dd.Offset > src_offset) {
+                        RtlMoveMemory(buffer + dd.Offset, buffer + src_offset, sd.actual_length);
+                }
+        }
 
-		if (dd->Offset + sd->actual_length > r.TransferBufferLength) {
-			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) + src.actual_length(%u) > r.TransferBufferLength(%lu)",
-				dd->Offset, sd->actual_length, r.TransferBufferLength);
-			return STATUS_INVALID_PARAMETER;
-		}
-		
-		if (dd->Offset < length) { // source buffer has no gaps
-			Trace(TRACE_LEVEL_ERROR, "dst.Offset(%lu) < length(%lu)", dd->Offset, length);
-			return STATUS_INVALID_PARAMETER;
-		}
+        if (dir_in && actual_length) {
+                Trace(TRACE_LEVEL_ERROR,"SUM([].actual_length) != actual_length, delta is %Iu", actual_length);
+                return STATUS_INVALID_PARAMETER; 
+        }
 
-		if (dd->Offset > length) {
-			RtlMoveMemory(buffer + dd->Offset, buffer + length, sd->actual_length);
-		}
+        return STATUS_SUCCESS;
+}
 
-		dd->Length = sd->actual_length;
-	}
+/**
+ * @see libdrv::get_payload_size
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto fill_isoc_data(
+        _Inout_ _URB_ISOCH_TRANSFER &r, _In_opt_ UCHAR *buffer, _In_ size_t actual_length, _In_ ring_buffer_data *data)
+{
+        bool dir_in = buffer;
+        auto iso_len = r.NumberOfPackets*sizeof(iso_packet_descriptor);
 
-	if (length && !dir_out) {
-		Trace(TRACE_LEVEL_ERROR, "SUM(actual_length) != actual_length, delta is %lu", length);
-		return STATUS_INVALID_PARAMETER; 
-	}
+        ring_buffer rb(data);
+        if (auto payload = (dir_in ? actual_length : 0) + iso_len; rb.size() < payload) {
+                Trace(TRACE_LEVEL_ERROR, "buffer size %Iu < %Iu", rb.size(), payload);
+                return STATUS_BUFFER_TOO_SMALL;
+        }
 
-	return STATUS_SUCCESS;
+        auto iso_data = *data; // shares the same buffer with rb
+        ring_buffer iso(&iso_data); // usbip_iso_packet_descriptor[]
+        if (dir_in) {
+                iso.skip(actual_length);
+        }
+
+        for (ULONG i = 0; i < r.NumberOfPackets; ++i) { // set dd.Status and dd.Length
+
+                iso_packet_descriptor sd;
+                iso.read(&sd, sizeof(sd));
+                byteswap(&sd, 1);
+
+                auto &dd = r.IsoPacket[i];
+                NT_ASSERT(!dd.Length);
+                dd.Status = sd.status ? to_windows_status_isoch(sd.status) : USBD_STATUS_SUCCESS;
+
+                if (!(dir_in && sd.actual_length)) { // dd->Length is not used for OUT transfers
+                        continue;
+                }
+
+                if (!validate(sd, dd.Offset, r.TransferBufferLength)) [[unlikely]] {
+                        return STATUS_INVALID_PARAMETER;
+                }
+
+                dd.Length = sd.actual_length;
+                rb.read(buffer + dd.Offset, sd.actual_length);
+        }
+
+        if (rb.skip(iso_len); rb.size() != iso.size()) {
+                Trace(TRACE_LEVEL_ERROR, "ring buffer size %Iu != iso[] size %Iu", rb.size(), iso.size());
+                return STATUS_INVALID_BUFFER_SIZE; 
+        }
+
+        return STATUS_SUCCESS;
 }
 
 /*
@@ -240,7 +297,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
-	auto cnt = ret.number_of_packets;
+        auto cnt = ret.number_of_packets;
 
 	auto &r = urb.UrbIsochronousTransfer;
 	r.ErrorCount = ret.error_count;
@@ -253,36 +310,46 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _I
 		r.StartFrame = ret.start_frame;
 	}
 
-	if (cnt >= 0 && ULONG(cnt) == r.NumberOfPackets) {
-		NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
-		byteswap(ctx.isoc, cnt);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) != NumberOfPackets(%lu)", cnt, r.NumberOfPackets);
-		return STATUS_INVALID_PARAMETER;
-	}
+	if (!(cnt >= 0 && static_cast<ULONG>(cnt) == r.NumberOfPackets)) {
+                Trace(TRACE_LEVEL_ERROR, "number_of_packets %d != NumberOfPackets %lu", cnt, r.NumberOfPackets);
+                return STATUS_INVALID_PARAMETER;
+        }
 
-	UCHAR *buffer{};
+        if (!(ret.actual_length >= 0 && static_cast<ULONG>(ret.actual_length) <= r.TransferBufferLength)) { // compacted
+                Trace(TRACE_LEVEL_ERROR,"0 >= actual_length(%d) <= TransferBufferLength(%lu)",
+                                         ret.actual_length, r.TransferBufferLength);
+                return STATUS_INVALID_PARAMETER;
+        }
 
-	if (is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
-                if (ULONG length; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
-                        Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!",
-                                                  urb_function_str(urb.UrbHeader.Function), err);
-                        return err;
-                }
-	}
+        UCHAR *buffer;
 
-	return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
+        if (is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
+                buffer = nullptr;
+        } else if (ULONG length; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
+                return err;
+        }
+
+        if (auto &dev = *ctx.dev; dev.use_wsk_events) {
+                return fill_isoc_data(r, buffer, ret.actual_length, dev.recv_buf);
+        }
+
+        NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
+        byteswap(ctx.isoc, cnt);
+
+        return fill_isoc_data(r, buffer, ret.actual_length, ctx.isoc);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_TRANSFER &r, _In_ void *TransferBuffer)
 {
-	auto dsc = static_cast<USB_COMMON_DESCRIPTOR*>(TransferBuffer);
+        NT_ASSERT(is_transfer_dir_in(r));
+
+        auto dsc = static_cast<USB_COMMON_DESCRIPTOR*>(TransferBuffer);
 	auto dsc_len = static_cast<UINT16>(r.TransferBufferLength);
 
 	auto ok = (r.TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) &&
-		   is_transfer_dir_in(r) &&
 		   get_setup_packet(r).bRequest == USB_REQUEST_GET_DESCRIPTOR &&
 		   dsc_len >= sizeof(*dsc);
 
@@ -336,42 +403,42 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
-        auto &dev = *ctx.dev;
         urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
 	if (is_isoch(urb)) {
-		return dev.use_wsk_events ? STATUS_NOT_IMPLEMENTED : isoch_transfer(ctx, ret, urb);
+		return isoch_transfer(ctx, ret, urb);
 	}
 
         UCHAR *TransferBuffer{};
         ULONG TransferBufferLength{};
 
         if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) {
-		return err == STATUS_INVALID_PARAMETER ? STATUS_SUCCESS : err; // OK if URB has no transfer buffer
-	}
-
-        TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
-        auto st = STATUS_SUCCESS;
-
-	if (TransferBufferLength != static_cast<ULONG>(ret.actual_length)) { // prepare_wsk_mdl can set it
-		st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
-		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
-	}
-
-        if (TransferBufferLength) {
-                if (dev.use_wsk_events && is_transfer_dir_in(ctx.hdr)) {
-                        ring_buffer rb(dev.recv_buf);
-                        if (auto n = rb.peek(TransferBuffer, TransferBufferLength); n != TransferBufferLength) {
-                                Trace(TRACE_LEVEL_ERROR, "TransferBufferLength %lu != consumed %Iu", TransferBufferLength, n);
-                                st = STATUS_DATA_NOT_ACCEPTED;
-                        }
-                }
-                if (NT_SUCCESS(st)) {
-                        post_process_transfer_buffer(*ctx.dev, urb, TransferBuffer);
-                }
+                return err == STATUS_INVALID_PARAMETER ? STATUS_SUCCESS : err; // OK if URB has no transfer buffer
         }
 
-	return st;
+        TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
+
+        if (TransferBufferLength != static_cast<ULONG>(ret.actual_length)) { // prepare_wsk_mdl can set it
+		auto st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
+                if (st) {
+                        return st;
+                }
+	}
+
+        if (TransferBufferLength && is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
+                auto &dev = *ctx.dev;
+                if (dev.use_wsk_events) {
+                        ring_buffer rb(dev.recv_buf);
+                        if (auto n = rb.read(TransferBuffer, TransferBufferLength); n != TransferBufferLength) {
+                                Trace(TRACE_LEVEL_ERROR, "read %Iu != TransferBufferLength %lu", n, TransferBufferLength);
+                                return STATUS_INVALID_BUFFER_SIZE;
+                        }
+                }
+                post_process_transfer_buffer(dev, urb, TransferBuffer);
+        }
+
+        return STATUS_SUCCESS;
 }
 
 } // namespace

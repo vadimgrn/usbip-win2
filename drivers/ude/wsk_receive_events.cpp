@@ -19,22 +19,10 @@ namespace
 {
 
 using namespace usbip;
-const ULONG WskEvents[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto make_event_mask()
-{
-        ULONG mask = 0;
-        for (auto evt: WskEvents) {
-                mask |= evt;
-        }
-        return mask;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto received(_Inout_ device_ctx &dev, _In_ const char *data, _In_ size_t len)
+auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const char *data, _In_ size_t len)
 {
         NT_ASSERT(len);
 
@@ -45,9 +33,7 @@ auto received(_Inout_ device_ctx &dev, _In_ const char *data, _In_ size_t len)
 
         for (auto has_hdr = rb.peek_hdr(hdr); len || has_hdr; has_hdr = rb.peek_hdr(hdr)) {
 
-                if (!len) {
-                        // has_hdr
-                } else if (auto n = rb.write(data, len)) {
+                if (auto n = rb.write(data, len)) {
                         data += n;
                         len -= n;
                         if (!has_hdr) {
@@ -65,29 +51,35 @@ auto received(_Inout_ device_ctx &dev, _In_ const char *data, _In_ size_t len)
 
                 auto expected = get_total_size(hdr);
 
-                if (auto cap = rb.capacity(); cap < expected) [[unlikely]] {
-                        if (auto err = rb.realloc(expected)) {
-                                return false;
-                        } else {
-                                TraceDbg("ring buffer capacity %Iu -> %Iu", cap, rb.capacity());
-                        }
+                if (rb.capacity() >= expected) [[likely]] {
+                        //
+                } else if (auto err = realloc(dev.recv_buf, expected)) {
+                        return false;
+                } else {
+                        rb = ring_buffer(dev.recv_buf);
+                        TraceDbg("dev %04x, ring buffer capacity %Iu", ptr04x(device), rb.capacity());
                 }
 
                 if (rb.size() < expected) {
                         break;
                 }
 
-                if (ctx.request = ret_command(hdr, dev); ctx.request) {
-                        expected -= rb.skip(sizeof(hdr));
-                        auto st = ret_submit(ctx);
-                        if (st == STATUS_DATA_NOT_ACCEPTED) [[unlikely]] {
-                                complete(ctx.request, STATUS_UNSUCCESSFUL);
-                                return false;
-                        }
-                        complete(ctx.request, st);
+                if (ctx.request = ret_command(hdr, dev); !ctx.request) {
+                        rb.skip(expected);
+                        continue;
                 }
 
-                rb.skip(expected);
+                expected = rb.size() - expected;
+                rb.skip(sizeof(hdr));
+
+                auto st = ret_submit(ctx); // must consume payload
+                complete(ctx.request, st);
+
+                if (rb.size() != expected) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "dev %04x, ring buffer size %Iu != %Iu", 
+                                                  ptr04x(device), rb.size(), expected);
+                        return false;
+                }
         }
 
         return !len;
@@ -95,25 +87,22 @@ auto received(_Inout_ device_ctx &dev, _In_ const char *data, _In_ size_t len)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto stop_receive(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ NTSTATUS st)
+auto async_reattach(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ NTSTATUS st)
 {
         if (get_flag(dev.unplugged)) {
                 TraceDbg("dev %04x, %!STATUS!", ptr04x(device), st);
         } else {
                 TraceDbg("dev %04x, detaching, %!STATUS!", ptr04x(device), st);
-                device::async_detach_and_delete(device, NT_ERROR(st));
+                device::async_detach_and_delete(device, true);
         }
 
         return st;
 }
 
-} // namespace
-
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Must_inspect_result_
-NTSTATUS usbip::events::receive(
+auto wsk_receive(
         _In_opt_ void *SocketContext, _In_ ULONG Flags,
 	_In_opt_ _WSK_DATA_INDICATION *DataIndication,
         _In_ SIZE_T BytesIndicated, _Inout_ SIZE_T *BytesAccepted)
@@ -130,8 +119,8 @@ NTSTATUS usbip::events::receive(
                           BytesIndicated, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
         }
 
-        if (!DataIndication) [[unlikely]] { // the socket must be closed ASAP
-                return stop_receive(device, dev, STATUS_SUCCESS);
+        if (!DataIndication) [[unlikely]] { // the socket must be closed ASAP, WSK_EVENT_DISCONNECT will not be called
+                return async_reattach(device, dev, STATUS_SUCCESS);
         }
 
         for (auto di = DataIndication; di; di = di->Next) {
@@ -148,14 +137,14 @@ NTSTATUS usbip::events::receive(
                         auto addr = (const char*)MmGetSystemAddressForMdlSafe(mdl, priority);
                         if (!addr) [[unlikely]] {
                                 Trace(TRACE_LEVEL_ERROR, "MmGetSystemAddressForMdlSafe error");
-                                return stop_receive(device, dev, STATUS_DATA_NOT_ACCEPTED);
+                                return async_reattach(device, dev, STATUS_DATA_NOT_ACCEPTED);
                         }
 
                         SIZE_T len = MmGetMdlByteCount(mdl) - offset;
                         len = min(len, length);
 
-                        if (!received(dev, addr + offset, len)) [[unlikely]] {
-                                return stop_receive(device, dev, STATUS_DATA_NOT_ACCEPTED);
+                        if (!received(device, dev, addr + offset, len)) [[unlikely]] {
+                                return async_reattach(device, dev, STATUS_DATA_NOT_ACCEPTED);
                         }
 
                         *BytesAccepted += len;
@@ -170,17 +159,47 @@ NTSTATUS usbip::events::receive(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Must_inspect_result_
-NTSTATUS usbip::events::disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
+auto wsk_disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
 {
         auto ext = static_cast<device_ctx_ext*>(SocketContext);
-        auto device = get_handle(ext->ctx);
+        auto &dev = *ext->ctx;
+        auto device = get_handle(&dev);
 
         if (char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFBZ]; true) {
                 TraceDbg("dev %04x, Flags[%s]", ptr04x(device), wsk::DisconnectEventFlags(buf, sizeof(buf), Flags));
         }
 
-        device::async_detach_and_delete(device);
-        return STATUS_SUCCESS;
+        return async_reattach(device, dev, STATUS_SUCCESS);
+}
+
+const WSK_CLIENT_CONNECTION_DISPATCH wsk_dispatch
+{
+        .WskReceiveEvent = wsk_receive,
+        .WskDisconnectEvent = wsk_disconnect
+};
+
+const ULONG wsk_events[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto make_event_mask()
+{
+        ULONG mask = 0;
+        for (auto evt: wsk_events) {
+                mask |= evt;
+        }
+        return mask;
+}
+
+} // namespace
+
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED const void* usbip::events::get_dispatch()
+{
+        PAGED_CODE();
+        return &wsk_dispatch;
 }
 
 _IRQL_requires_same_
@@ -209,7 +228,7 @@ PAGED wdm::object_reference usbip::events::stop_receive_data(_In_ UDECXUSBDEVICE
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
-        for (auto evt: WskEvents) {
+        for (auto evt: wsk_events) {
                 if (auto err = wsk::event_callback_control(dev.sock(), WSK_EVENT_DISABLE | evt, true)) {
                         Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, err);
                 }

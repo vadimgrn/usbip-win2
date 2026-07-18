@@ -17,8 +17,8 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
                 return nullptr;
         }
 
-        const auto* const cfg_bytes = reinterpret_cast<char*>(cfg);
-        const auto* const end_bytes = cfg_bytes + cfg->wTotalLength;
+        auto cfg_bytes = reinterpret_cast<char*>(cfg);
+        auto end_bytes = cfg_bytes + cfg->wTotalLength;
 
         cur = cur ? next(cur) : reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
 
