@@ -1,5 +1,3 @@
-@echo off
-
 rem change to your WDK version
 set PATH=%PATH%;C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64
 
