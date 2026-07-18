@@ -247,6 +247,21 @@
             <property name="permission">none</property>
           </object>
           <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From SVG Resource; COMMENT_EDIT_SVG; COMMENT_EDIT_SVG_DARK; [16; 16]</property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
+            <property name="help">Edit notes for the device</property>
+            <property name="id">ID_EDIT_NOTES</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Notes</property>
+            <property name="name">m_edit_notes</property>
+            <property name="permission">none</property>
+            <property name="shortcut">CTRL+N</property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_edit_notes</event>
+            <event name="OnUpdateUI">on_edit_device_update_ui</event>
+          </object>
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -265,6 +280,25 @@
             <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
+            <property name="help">Toggle Receive for selected devices</property>
+            <property name="id">ID_TOGGLE_RECEIVE</property>
+            <property name="kind">wxITEM_NORMAL</property>
+            <property name="label">Toggle Receive</property>
+            <property name="name">m_toggle_receive</property>
+            <property name="permission">none</property>
+            <property name="shortcut"></property>
+            <property name="unchecked_bitmap"></property>
+            <event name="OnMenuSelection">on_toggle_receive</event>
+            <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
+          </object>
+          <object class="separator" expanded="true">
+            <property name="name">m_separator61</property>
+            <property name="permission">none</property>
+          </object>
+          <object class="wxMenuItem" expanded="false">
+            <property name="bitmap">Load From File; </property>
+            <property name="checked">0</property>
+            <property name="enabled">1</property>
             <property name="help">Edit serial number for the device</property>
             <property name="id">ID_EDIT_SERIAL</property>
             <property name="kind">wxITEM_NORMAL</property>
@@ -276,7 +310,7 @@
             <event name="OnMenuSelection">on_edit_serial</event>
             <event name="OnUpdateUI">on_edit_device_update_ui</event>
           </object>
-          <object class="wxMenuItem" expanded="true">
+          <object class="wxMenuItem" expanded="false">
             <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
@@ -289,21 +323,6 @@
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
             <event name="OnMenuSelection">on_edit_gen_serial</event>
-            <event name="OnUpdateUI">on_edit_device_update_ui</event>
-          </object>
-          <object class="wxMenuItem" expanded="false">
-            <property name="bitmap">Load From SVG Resource; COMMENT_EDIT_SVG; COMMENT_EDIT_SVG_DARK; [16; 16]</property>
-            <property name="checked">0</property>
-            <property name="enabled">1</property>
-            <property name="help">Edit notes for the device</property>
-            <property name="id">ID_EDIT_NOTES</property>
-            <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Notes</property>
-            <property name="name">m_edit_notes</property>
-            <property name="permission">none</property>
-            <property name="shortcut">CTRL+N</property>
-            <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_edit_notes</event>
             <event name="OnUpdateUI">on_edit_device_update_ui</event>
           </object>
         </object>
@@ -460,6 +479,21 @@
               <property name="kind">wxITEM_CHECK</property>
               <property name="label">?</property>
               <property name="name">m_view_serial</property>
+              <property name="permission">none</property>
+              <property name="shortcut"></property>
+              <property name="unchecked_bitmap"></property>
+              <event name="OnMenuSelection">on_view_column</event>
+              <event name="OnUpdateUI">on_view_column_update_ui</event>
+            </object>
+            <object class="wxMenuItem" expanded="false">
+              <property name="bitmap"></property>
+              <property name="checked">0</property>
+              <property name="enabled">1</property>
+              <property name="help"></property>
+              <property name="id">wxID_ANY</property>
+              <property name="kind">wxITEM_CHECK</property>
+              <property name="label">?</property>
+              <property name="name">m_view_receive</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -1471,6 +1505,12 @@
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
           <property name="name">Serial Number</property>
+          <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
+        </object>
+        <object class="wxTreeListCtrlColumn" expanded="true">
+          <property name="alignment">wxALIGN_LEFT</property>
+          <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
+          <property name="name">Receive</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">

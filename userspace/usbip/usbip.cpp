@@ -5,22 +5,22 @@
 #include "usbip.h"
 #include "resource.h"
 
-#include <libusbip\output.h>
-#include <libusbip\win_handle.h>
-#include <libusbip\win_socket.h>
-#include <libusbip\format_message.h>
-#include <libusbip\vhci.h>
+#include <libusbip/vhci.h>
+#include <libusbip/output.h>
+#include <libusbip/win_handle.h>
+#include <libusbip/win_socket.h>
+#include <libusbip/format_message.h>
 
-#include <libusbip\src\usb_ids.h>
-#include <libusbip\src\strconv.h>
-#include <libusbip\src\file_ver.h>
+#include <libusbip/src/usb_ids.h>
+#include <libusbip/src/strconv.h>
+#include <libusbip/src/file_ver.h>
 
-#include <resources\messages.h>
+#include <resources/messages.h>
 
-#include <spdlog\spdlog.h>
-#include <spdlog\sinks\stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
-#include <CLI11\CLI11.hpp>
+#include <CLI11/CLI11.hpp>
 #include <print>
 
 namespace
@@ -29,6 +29,9 @@ namespace
 using namespace usbip;
 
 const auto MAX_HUB_PORTS = 255; // @see drivers/usbip_ude/vhci.cpp, set_usb_ports_cnt
+
+auto& str_zero_copy = "zero-copy";
+auto& str_low_latency = "low-latency";
 
 auto get_ids_data()
 {
@@ -84,12 +87,14 @@ void add_cmd_attach(CLI::App &app)
         auto stop = rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
         rem->add_flag("--once", r.once, "Do not start automatic attach attempts if cannot connect")->excludes(stop);
 
-        auto &zero_copy = "zero-copy";
-        auto receive = [&val = r.wsk_events, zero_copy] (const auto &choice) { val = choice != zero_copy; };
+        auto receive = [&recv = r.recv, low_lat = str_low_latency] (const auto &choice)
+        {
+                recv = choice == low_lat ? receive::low_latency : receive::zero_copy;
+        };
 
         rem->add_option_function<std::string>("--receive", receive, "How to receive data from the network")
-                ->check(CLI::IsMember({zero_copy, "low-latency"}))
-                ->default_str(zero_copy)
+                ->check(CLI::IsMember({str_zero_copy, str_low_latency}))
+                ->default_str(str_zero_copy)
                 ->excludes(stop);
 
 	cmd->add_option_group("Stop")
@@ -217,6 +222,11 @@ auto run(int argc, wchar_t *argv[])
 
 } // namespace
 
+
+const char* usbip::get_receive_str(_In_ receive recv) noexcept
+{
+        return recv == receive::low_latency ? str_low_latency : str_zero_copy;
+}
 
 std::string usbip::GetLastErrorMsg(unsigned long msg_id)
 {

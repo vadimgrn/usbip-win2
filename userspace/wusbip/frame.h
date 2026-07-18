@@ -41,10 +41,11 @@ class Frame : public wxFrame
 	protected:
 		enum
 		{
-			ID_TOGGLE_AUTO = 6000,
+			ID_EDIT_NOTES = 6000,
+			ID_TOGGLE_AUTO,
+			ID_TOGGLE_RECEIVE,
 			ID_EDIT_SERIAL,
 			ID_EDIT_GEN_SERIAL,
-			ID_EDIT_NOTES,
 			ID_ATTACH,
 			ID_ATTACH_ONCE,
 			ID_ATTACH_STOP,
@@ -95,11 +96,12 @@ class Frame : public wxFrame
 		virtual void on_has_devices_update_ui( wxUpdateUIEvent& event ) = 0;
 		virtual void on_copy_rows( wxCommandEvent& event ) = 0;
 		virtual void on_has_any_selected_devices_update_ui( wxUpdateUIEvent& event ) = 0;
-		virtual void on_toggle_auto( wxCommandEvent& event ) = 0;
-		virtual void on_edit_serial( wxCommandEvent& event ) = 0;
-		virtual void on_edit_device_update_ui( wxUpdateUIEvent& event ) = 0;
-		virtual void on_edit_gen_serial( wxCommandEvent& event ) = 0;
 		virtual void on_edit_notes( wxCommandEvent& event ) = 0;
+		virtual void on_edit_device_update_ui( wxUpdateUIEvent& event ) = 0;
+		virtual void on_toggle_auto( wxCommandEvent& event ) = 0;
+		virtual void on_toggle_receive( wxCommandEvent& event ) = 0;
+		virtual void on_edit_serial( wxCommandEvent& event ) = 0;
+		virtual void on_edit_gen_serial( wxCommandEvent& event ) = 0;
 		virtual void on_view_column( wxCommandEvent& event ) = 0;
 		virtual void on_view_column_update_ui( wxUpdateUIEvent& event ) = 0;
 		virtual void on_view_appearance( wxCommandEvent& event ) = 0;

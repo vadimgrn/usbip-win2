@@ -172,12 +172,6 @@ auto wsk_disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
         return async_reattach(device, dev, STATUS_SUCCESS);
 }
 
-const WSK_CLIENT_CONNECTION_DISPATCH wsk_dispatch
-{
-        .WskReceiveEvent = wsk_receive,
-        .WskDisconnectEvent = wsk_disconnect
-};
-
 const ULONG wsk_events[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
 
 _IRQL_requires_same_
@@ -191,16 +185,16 @@ constexpr auto make_event_mask()
         return mask;
 }
 
+const WSK_CLIENT_CONNECTION_DISPATCH g_dispatch
+{
+        .WskReceiveEvent = wsk_receive,
+        .WskDisconnectEvent = wsk_disconnect
+};
+
 } // namespace
 
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED const void* usbip::events::get_dispatch()
-{
-        PAGED_CODE();
-        return &wsk_dispatch;
-}
+const void *usbip::events::wsk_dispatch = &g_dispatch;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

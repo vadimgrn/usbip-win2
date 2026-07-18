@@ -58,6 +58,7 @@ wxMenuItem* clone_menu_item(_In_ wxMenu &dest, _In_ int item_id, _In_ const wxMe
                 dest.AppendSeparator();
         } else if (auto item = src.FindItem(item_id)) {
                 clone = dest.Append(item_id, item->GetItemLabel(), item->GetHelp(), item->GetKind());
+                clone->Enable(item->IsEnabled());
                 for (auto checked: {false, true}) {
                         clone->SetBitmap(item->GetBitmap(checked), checked);
                 }

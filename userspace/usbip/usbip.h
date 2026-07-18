@@ -4,16 +4,19 @@
 
 #pragma once
 
-#include <string>
 #include <set>
+#include <string>
 
-#include <libusbip\remote.h>
+#include <libusbip/remote.h>
 
 namespace usbip
 {
 
 class UsbIds;
 const UsbIds& get_ids();
+
+enum class receive;
+const char *get_receive_str(_In_ receive recv) noexcept;
 
 std::string GetLastErrorMsg(unsigned long msg_id = ~0UL);
 
@@ -34,7 +37,7 @@ struct attach_args
         bool terse{};
         bool stop{};
         bool once{};
-        bool wsk_events{};
+        receive recv{}; // receive::zero_copy;
 
         // --persistent,--stashed
         bool persistent{};

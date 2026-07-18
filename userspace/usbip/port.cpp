@@ -5,10 +5,10 @@
 #include "usbip.h"
 #include "strings.h"
 
-#include <libusbip\vhci.h>
-#include <libusbip\persistent.h>
+#include <libusbip/vhci.h>
+#include <libusbip/persistent.h>
 
-#include <spdlog\spdlog.h>
+#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -26,18 +26,18 @@ void print(const imported_device &d)
         constexpr auto &fmt = R"(Port {:02}: device in use at {}
          {}
            -> usbip://{}:{}/{}
-           -> remote bus/dev {:03}/{:03}
-           -> serial='{}'
-           -> wsk_events={})";
+           -> remote bus/dev: {:03}/{:03}
+           -> serial: {}
+           -> receive: {})";
 
         auto &loc = d.location;
 
         std::println(fmt, d.port, get_speed_str(d.speed),
-                          product,
-                          loc.hostname, loc.service, loc.busid,
-                          bus, dev,
-                          d.serial,
-                          d.wsk_events);
+                        product,
+                        loc.hostname, loc.service, loc.busid,
+                        bus, dev,
+                        d.serial,
+                        get_receive_str(d.recv));
 }
 
 } // namespace
@@ -83,7 +83,7 @@ bool usbip::cmd_port(void *p)
                                 persistent_device pd {
                                         .location = std::move(d.location),
                                         .serial = std::move(d.serial),
-                                        .wsk_events = d.wsk_events
+                                        .recv = d.recv
                                 };
                                 persistent->push_back(std::move(pd));
                         }

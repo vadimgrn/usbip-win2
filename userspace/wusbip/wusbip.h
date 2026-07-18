@@ -72,6 +72,7 @@ private:
 	void on_has_selected_devices_update_ui(wxUpdateUIEvent &event) override;
         void on_has_any_selected_devices_update_ui(wxUpdateUIEvent &event) override;
         void on_toggle_auto(wxCommandEvent &event) override;
+        void on_toggle_receive(wxCommandEvent &event) override;
 	void on_item_context_menu(wxTreeListEvent &event) override;
 	void on_view_reset(wxCommandEvent &event) override;
 	void on_help_about_lib(wxCommandEvent&) override;
@@ -145,15 +146,17 @@ private:
 
 	void remove_device(_In_ wxTreeListItem dev);
 
-        void attach(_In_ bool once);
-        DWORD attach(_In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ bool once);
         DWORD detach(_In_ int port);
-	
+        void attach(_In_ bool once);
+
+        DWORD attach(_In_ const wxString &url, _In_ const wxString &busid,
+                     _In_ const wxString &serial, _In_ const wxString &receive, _In_ bool once);
+
 	void post_refresh();
 	void post_exit();
 
-	bool is_persistent(_In_ wxTreeListItem device);
-	void set_persistent(_In_ wxTreeListItem device, _In_ bool persistent);
+	bool is_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col);
+	void set_checked(_In_ wxTreeListItem device, _In_ usbip::column_pos_t col, _In_ bool checked);
 
 	void update_device(_In_ wxTreeListItem device, _In_ const usbip::device_columns &dc, _In_ unsigned int flags);
 	

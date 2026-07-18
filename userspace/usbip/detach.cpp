@@ -3,10 +3,9 @@
  */
 
 #include "usbip.h"
+#include <libusbip/vhci.h>
 
-#include <libusbip\vhci.h>
-#include <spdlog\spdlog.h>
-
+#include <spdlog/spdlog.h>
 #include <print>
 
 bool usbip::cmd_detach(void *p)

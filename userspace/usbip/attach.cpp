@@ -3,10 +3,11 @@
  */
 
 #include "usbip.h"
-#include <libusbip\vhci.h>
-#include <libusbip\persistent.h>
 
-#include <spdlog\spdlog.h>
+#include <libusbip/vhci.h>
+#include <libusbip/persistent.h>
+
+#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -22,8 +23,9 @@ auto attach_persistent_devices(HANDLE dev)
         } else for (auto &args: *v) {
                 auto &loc = args.location;
 
-                std::println("{}:{}/{}, serial='{}', wsk_events={}, once={}", 
-                              loc.hostname, loc.service, loc.busid, args.serial, args.wsk_events, args.once);
+                std::println("{}:{}/{}, serial '{}', receive:{}, once:{}", 
+                              loc.hostname, loc.service, loc.busid, args.serial,
+                              get_receive_str(args.recv), args.once);
 
                 if (!vhci::attach(dev, args)) {
                         spdlog::error(GetLastErrorMsg());
@@ -71,7 +73,7 @@ bool usbip::cmd_attach(void *p)
                         .busid = std::move(args.busid),
                 },
                 .serial = std::move(args.serial),
-                .wsk_events = args.wsk_events,
+                .recv = args.recv,
                 .once = args.once,
         };
 

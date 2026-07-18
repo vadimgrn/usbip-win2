@@ -13,9 +13,7 @@
 namespace usbip::events
 {
 
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED const void *get_dispatch();
+extern const void *wsk_dispatch;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

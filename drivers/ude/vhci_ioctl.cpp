@@ -332,7 +332,7 @@ PAGED auto create_socket(_Inout_ SOCKET* &sock, _In_ const ADDRINFOEXW &ai, _In_
 
         if (auto err = socket(sock, static_cast<ADDRESS_FAMILY>(ai.ai_family), 
                                 static_cast<USHORT>(ai.ai_socktype), ai.ai_protocol, 
-                                WSK_FLAG_CONNECTION_SOCKET, socket_ctx, events::get_dispatch())) {
+                                WSK_FLAG_CONNECTION_SOCKET, socket_ctx, events::wsk_dispatch)) {
                 NT_ASSERT(!sock);
                 Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", err);
                 return err;

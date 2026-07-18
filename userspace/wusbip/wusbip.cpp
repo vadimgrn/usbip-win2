@@ -53,6 +53,9 @@ inline auto get_appearance_value(_In_ int itemid) noexcept
         return itemid - wxID_FILE1;
 }
 
+/*
+ * COL_PERSISTENT is not saved with these GUI flags.
+ */
 consteval auto get_saved_keys()
 {
         using key_val = std::pair<const wchar_t* const, column_pos_t>;
@@ -64,8 +67,9 @@ consteval auto get_saved_keys()
                 { L"vendor", COL_VENDOR },
                 { L"product", COL_PRODUCT },
                 { L"serial", COL_SERIAL },
+                { L"receive", COL_RECEIVE },
                 { L"notes", COL_NOTES },
-                });
+        });
 }
 
 consteval auto get_saved_flags()
@@ -77,13 +81,6 @@ consteval auto get_saved_flags()
         }
 
         return flags;
-}
-
-void set_saved_columns(_Inout_ device_columns &dc, _In_ const device_columns &saved)
-{
-        for (auto [key, col]: get_saved_keys()) {
-                dc[col] = saved[col];
-        }
 }
 
 constexpr auto is_port_residual(_In_ state st)
@@ -115,9 +112,10 @@ void log(_In_ const device_state &st)
         auto &d = st.device;
         auto &loc = d.location;
 
-        auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}, source {:x}",
-                                loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), d.port,
-                                d.devid, static_cast<int>(d.speed), d.vendor, d.product, st.source_id);
+        auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}, serial '{}', {}, source {:x}",
+                              loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), d.port, d.devid,
+                              static_cast<int>(d.speed), d.vendor, d.product, d.serial, get_receive_str(d.recv).utf8_string(),
+                              st.source_id);
 
         wxLogVerbose(wxString::FromUTF8(s));
 }
@@ -129,7 +127,7 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
 
         auto s = wxString::Format(
                         L"%s:%s/%s, port '%s', devid '%s', speed '%s', vendor '%s', product '%s', "
-                        L"serial '%s', state '%s', auto '%s', notes '%s', source '%s'", 
+                        L"serial '%s', state '%s', auto '%s', receive '%s', notes '%s', source '%s'", 
                         prefix, url,
                         tree.GetItemText(dev, COL_BUSID),
                         tree.GetItemText(dev, COL_PORT),
@@ -140,6 +138,7 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
                         tree.GetItemText(dev, COL_SERIAL), 
                         tree.GetItemText(dev, COL_STATE), 
                         tree.GetItemText(dev, COL_PERSISTENT), 
+                        tree.GetItemText(dev, COL_RECEIVE), 
                         tree.GetItemText(dev, COL_NOTES),
                         tree.GetItemText(dev, COL_SOURCE_ID));
 
@@ -168,43 +167,115 @@ auto load_license()
         return s = wxString::FromAscii(static_cast<const char*>(txt), len);
 }
 
-auto update_from_saved(
-        _Inout_ device_columns &dc, _In_ unsigned int flags,
-        _In_ const std::set<persistent_device> &persistent, 
-        _In_opt_ const std::set<device_columns> *saved = nullptr,
-        _In_ bool notes_only = true)
+/*
+ * COL_SERIAL, COL_RECEIVE are present in saved and persistent.
+ */
+enum columns : unsigned int {
+        saved_read_only = 1,
+        saved_notes = 2,
+        saved_serial = 4,
+        saved_receive = 8,
+        saved_read_write = saved_notes | saved_serial | saved_receive,
+        saved_all = saved_read_only | saved_read_write,
+
+        pers_persistent = 16,
+        pers_serial = 32,
+        pers_receive = 64,
+        pers_all = pers_persistent | pers_serial | pers_receive
+};
+
+constexpr auto get_saved_rw_pairs()
 {
-        constexpr auto saved_flags = get_saved_flags();
+        return std::to_array<std::pair<columns, column_pos_t>>({
+                { columns::saved_notes, COL_NOTES },
+                { columns::saved_serial, COL_SERIAL },
+                { columns::saved_receive, COL_RECEIVE },
+        });
+}
 
-        static_assert(saved_flags & mkflag(COL_NOTES));
-        static_assert(!(saved_flags & mkflag(COL_PERSISTENT)));
+constexpr auto get_saved_rw_flags()
+{
+        unsigned int flags{};
 
-        if (!saved) {
-                //
-        } else if (auto i = saved->find(dc); i != saved->end()) {
-
-                if (notes_only) {
-                        dc[COL_NOTES] = (*i)[COL_NOTES];
-
-                        constexpr auto notes_flag = mkflag(COL_NOTES);
-                        wxASSERT(!(flags & notes_flag));
-                        flags |= notes_flag;
-                } else {
-                        set_saved_columns(dc, *i);
-                        flags |= saved_flags;
-                }
-        }
-
-        if (auto pd = make_persistent_device(dc); persistent.contains(pd)) {
-                dc[COL_PERSISTENT] = g_persistent_mark;
-
-                constexpr auto pers_flag = mkflag(COL_PERSISTENT);
-                wxASSERT(!(flags & pers_flag));
-
-                flags |= pers_flag;
+        for (auto [dummy, col]: get_saved_rw_pairs()) {
+                flags |= mkflag(col);
         }
 
         return flags;
+}
+
+auto set_saved_read_only(_Inout_ device_columns &dc, _In_ const device_columns &saved)
+{
+        unsigned int flags{};
+        constexpr auto rw_flags = get_saved_rw_flags();
+
+        for (auto [dummy, col]: get_saved_keys()) {
+                if (auto flag = mkflag(col); !(flag & rw_flags)) {
+                        dc[col] = saved[col];
+                        flags |= flag;
+                }
+        }
+
+        return flags;
+}
+
+auto update_from_registry(
+        _Inout_ device_columns &dc, _In_ unsigned int flags, _In_ unsigned int columns,
+        _In_ const std::set<persistent_device> &persistent)
+{
+        if (persistent.empty()) {
+                return flags;
+        }
+
+        wxASSERT(columns & columns::pers_all);
+        static_assert(!(get_saved_flags() & mkflag(COL_PERSISTENT)));
+
+        auto key = make_persistent_device(dc);
+
+        if (auto pd = persistent.find(key); pd != persistent.end()) {
+
+                if (columns & columns::pers_persistent) {
+                        dc[COL_PERSISTENT] = g_persistent_mark;
+                        wxASSERT(!(flags & mkflag(COL_PERSISTENT)));
+                        flags |= mkflag(COL_PERSISTENT);
+                }
+
+                if (columns & columns::pers_serial) {
+                        dc[COL_SERIAL] = wxString::FromUTF8(pd->serial);
+                        flags |= mkflag(COL_SERIAL);
+                }
+
+                if (columns & columns::pers_receive) {
+                        dc[COL_RECEIVE] = get_receive_str(pd->recv);
+                        wxASSERT(flags & mkflag(COL_RECEIVE));
+                }
+        }
+
+        return flags;
+}
+
+auto update_from_registry(
+        _Inout_ device_columns &dc, _In_ unsigned int flags, _In_ unsigned int columns,
+        _In_ const std::set<device_columns> &saved, _In_ const std::set<persistent_device> &persistent)
+{
+        wxASSERT(columns & columns::saved_all);
+
+        if (auto i = saved.find(dc); i != saved.end()) {
+
+                if (columns & columns::saved_read_only) {
+                        flags |= set_saved_read_only(dc, *i);
+                }
+
+                for (auto [col_bit, col] : get_saved_rw_pairs()) {
+                        if (columns & col_bit) {
+                                dc[col] = (*i)[col];
+                                wxASSERT(!(flags & mkflag(col)));
+                                flags |= mkflag(col);
+                        }
+                }
+        }
+
+        return update_from_registry(dc, flags, columns, persistent);
 }
 
 using predicate_f = std::function<bool(const wxTreeListCtrl&, wxTreeListItem)>;
@@ -260,9 +331,10 @@ auto make_persistent_device(
 {
         auto &url = tree.GetItemText(server);
         auto &busid = tree.GetItemText(device);
-        auto &serial = tree.GetItemText(device, COL_SERIAL);
 
-        return usbip::make_persistent_device(url, busid, serial);
+        return usbip::make_persistent_device(url, busid,
+                        tree.GetItemText(device, COL_SERIAL),
+                        tree.GetItemText(device, COL_RECEIVE));
 }
 
 auto get_persistent(_In_ const Handle &vhci = get_vhci())
@@ -310,6 +382,7 @@ auto get_saved()
                         continue;
                 }
 
+                validate_receive_str(dev[COL_RECEIVE]);
                 result.push_back(std::move(dev));
         }
 
@@ -625,10 +698,11 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 flags |= mkflag(COL_PORT);
         }
 
-        if (added || is_empty(st.device)) {
-                auto persistent = get_persistent(vhci::open()); // see comments above
+        if (added) { // COL_SERIAL, COL_RECEIVE are actual
                 auto saved = as_set(get_saved());
-                flags = update_from_saved(dc, flags, persistent, &saved, false);
+                auto persistent = get_persistent(vhci::open());
+                constexpr auto cols = columns::saved_read_only | columns::saved_notes | columns::pers_persistent;
+                flags = update_from_registry(dc, flags, cols, saved, persistent);
         }
 
         if (!added) {
@@ -773,18 +847,18 @@ void MainFrame::on_edit_gen_serial(wxCommandEvent&)
         }
 }
 
-bool MainFrame::is_persistent(_In_ wxTreeListItem device)
+bool MainFrame::is_checked(_In_ wxTreeListItem device, _In_ column_pos_t col)
 {
         auto &tree = *m_treeListCtrl;
    
         wxASSERT(tree.GetItemParent(device).IsOk()); // server
         wxASSERT(!tree.GetFirstChild(device).IsOk());
 
-        auto &s = tree.GetItemText(device, COL_PERSISTENT);
+        auto &s = tree.GetItemText(device, col);
         return !s.empty();
 }
 
-void MainFrame::set_persistent(_In_ wxTreeListItem device, _In_ bool persistent)
+void MainFrame::set_checked(_In_ wxTreeListItem device, _In_ column_pos_t col, _In_ bool checked)
 {
         auto &tree = *m_treeListCtrl;
 
@@ -792,11 +866,11 @@ void MainFrame::set_persistent(_In_ wxTreeListItem device, _In_ bool persistent)
         wxASSERT(!tree.GetFirstChild(device).IsOk());
 
         wxString val;
-        if (persistent) {
+        if (checked) {
                 val = g_persistent_mark; // CHECK MARK, 2714 HEAVY CHECK MARK
         }
 
-        tree.SetItemText(device, COL_PERSISTENT, val);
+        tree.SetItemText(device, col, val);
 }
 
 void MainFrame::on_log_show_update_ui(wxUpdateUIEvent &event)
@@ -878,7 +952,8 @@ void MainFrame::on_close_to_tray(wxCommandEvent &event)
 }
 
 DWORD MainFrame::attach(
-        _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ bool once)
+        _In_ const wxString &url, _In_ const wxString &busid,
+        _In_ const wxString &serial, _In_ const wxString &receive, _In_ bool once)
 {
         wxString hostname;
         wxString service;
@@ -894,6 +969,7 @@ DWORD MainFrame::attach(
                         .busid = busid.utf8_string(),
                 },
                 .serial = serial.utf8_string(),
+                .recv = get_receive_val(receive),
                 .once = once
         };
 
@@ -925,8 +1001,9 @@ void MainFrame::attach(_In_ bool once)
                 auto &url = tree.GetItemText(server);
                 auto &busid = tree.GetItemText(dev);
                 auto &serial = tree.GetItemText(dev, COL_SERIAL);
+                auto &receive = tree.GetItemText(dev, COL_RECEIVE);
 
-                if (auto err = attach(url, busid, serial, once)) {
+                if (auto err = attach(url, busid, serial, receive, once)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
                                               url, busid, err, GetLastErrorMsg(err));
@@ -1180,13 +1257,22 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 device_state state {
                         .device = make_imported_device(std::move(host), std::move(port), device),
                 };
-
                 auto [dc, flags] = make_device_columns(state);
-                flags = update_from_saved(dc, flags, persistent, &saved);
 
-                auto [item, added] = find_or_add_device(dc);
-                if (!added) {
-                        flags &= ~mkflag(COL_STATE); // clear
+                wxASSERT(state.device.serial.empty());
+                wxASSERT(!(flags & mkflag(COL_SERIAL)));
+
+                wxASSERT(state.device.recv == receive::zero_copy);
+                wxASSERT(flags & mkflag(COL_RECEIVE));
+                wxASSERT(dc[COL_RECEIVE] == get_receive_str(receive::zero_copy));
+
+                auto [item, added] = find_or_add_device(dc); 
+
+                if (added) {
+                        constexpr auto cols = columns::saved_read_write | columns::pers_all;
+                        flags = update_from_registry(dc, flags, cols, saved, persistent);
+                } else {
+                        flags &= ~mkflags({COL_STATE, COL_RECEIVE}); // clear
                 }
 
                 update_device(item, dc, flags);
@@ -1304,8 +1390,18 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
 void MainFrame::on_toggle_auto(wxCommandEvent&)
 {
         for (auto &dev: get_selected_devices(*m_treeListCtrl)) {
-                auto ok = is_persistent(dev);
-                set_persistent(dev, !ok);
+                auto ok = is_checked(dev, COL_PERSISTENT);
+                set_checked(dev, COL_PERSISTENT, !ok);
+        }
+}
+
+void MainFrame::on_toggle_receive(wxCommandEvent&)
+{
+        for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
+                auto &recv = tree.GetItemText(dev, COL_RECEIVE);
+                auto r = get_receive_val(recv) == receive::zero_copy ? receive::low_latency : receive::zero_copy;
+                auto val = get_receive_str(r);
+                tree.SetItemText(dev, COL_RECEIVE, val);
         }
 }
 
@@ -1334,7 +1430,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
                         cfg.Write(key, value);
                 }
 
-                if (is_persistent(dev)) {
+                if (is_checked(dev, COL_PERSISTENT)) {
                         persistent.emplace_back(make_persistent_device(tree, server, dev));
                 }
 
@@ -1393,7 +1489,7 @@ void MainFrame::on_load(wxCommandEvent&)
                 static_assert(!(get_saved_flags() & state_flag));
 
                 dc[COL_STATE] = to_string(state::unplugged);
-                flags = update_from_saved(dc, flags | state_flag, persistent);
+                flags = update_from_registry(dc, flags | state_flag, columns::pers_all, persistent);
 
                 update_device(dev, dc, flags);
                 ++cnt;
@@ -1430,8 +1526,10 @@ void MainFrame::on_reload(wxCommandEvent &event)
                         .state = state::plugged 
                 };
 
-                auto [dc, flags] = make_device_columns(st);
-                flags = update_from_saved(dc, flags, persistent, &saved);
+                auto [dc, flags] = make_device_columns(st); // COL_SERIAL, COL_RECEIVE are actual
+
+                constexpr auto cols = columns::saved_notes | columns::pers_persistent;
+                flags = update_from_registry(dc, flags, cols, saved, persistent);
 
                 update_device(item, dc, flags);
         }
@@ -1448,7 +1546,9 @@ std::unique_ptr<wxMenu> MainFrame::create_menu(_In_ const menu_item_descr *items
 
         for (int i = 0; i < cnt; ++i) {
                 if (auto [id, src, handler] = items[i]; clone_menu_item(*menu, id, *src)) {
-                        menu->Bind(wxEVT_COMMAND_MENU_SELECTED, handler, this, id);
+                        if (handler) {
+                                menu->Bind(wxEVT_COMMAND_MENU_SELECTED, handler, this, id);
+                        }
                 }
         }
 
@@ -1462,13 +1562,14 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
         const auto items = std::to_array<menu_item_descr>({
                 { wxID_SELECTALL, m_menu_edit, &MainFrame::on_select_all },
                 { wxID_COPY, m_menu_edit, &MainFrame::on_copy_rows },
+                { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
                 separator,
+                { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
                 { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
+                { ID_TOGGLE_RECEIVE, m_menu_edit, &MainFrame::on_toggle_receive },
+                separator,
                 { ID_EDIT_SERIAL, m_menu_edit, &MainFrame::on_edit_serial },
                 { ID_EDIT_GEN_SERIAL, m_menu_edit, &MainFrame::on_edit_gen_serial },
-                { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
-                separator,
-                { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
         });
 
         return create_menu(items.data(), items.size());

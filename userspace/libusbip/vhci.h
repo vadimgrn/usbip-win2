@@ -19,6 +19,20 @@
 namespace usbip
 {
 
+/**
+ * How to optimize data reception over the network
+ * - zero_copy - use a dedicated thread which executes a loop with two blocking calls
+ *   - receive USBIP header
+ *   - receive USBIP payload, if any
+ *   - Data is written directly to URB.TransferBuffer, there is no additional copying
+ *   - Should be used for storage devices, webcams etc.
+ * - low_latency - use WSK Event Callback Functions
+ *   - Receive thread is not used, but the data is first written
+ *     to an intermediate ring buffer, then copied to URB.TransferBuffer
+ *   - Should be used for devices like HID keyboard, mouse, etc.
+ */
+enum class receive { zero_copy, low_latency };
+
 struct device_location
 {
         std::string hostname;
@@ -35,7 +49,7 @@ struct persistent_device
 {
         device_location location;
         std::string serial; ///< optional device serial number if you want to set/override it
-        bool wsk_events{}; ///< use WSK Event Callback Functions instead of a dedicated thread
+        receive recv = receive::zero_copy; ///< how to optimize data reception over the network
         bool once{}; ///< do not start automatic attach attempts if cannot connect; for attach_args only
 };
 
@@ -51,7 +65,7 @@ struct imported_device
         UINT16 product{};
 
         std::string serial; ///< only filled if you set it in attach_args
-        bool wsk_events{}; ///< @see attach_args.wsk_events
+        receive recv = receive::zero_copy; ///< @see attach_args.recv
 };
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };

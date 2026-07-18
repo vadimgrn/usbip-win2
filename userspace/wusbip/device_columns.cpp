@@ -15,6 +15,8 @@ namespace
 
 using namespace usbip;
 
+const auto recv_zero_copy = _("zero-copy");
+const auto recv_low_latency = _("low-latency");
 
 /*
  * @see get_cmp_key
@@ -57,8 +59,26 @@ bool usbip::is_empty(_In_ const imported_device &d) noexcept
         return !d.devid;
 }
 
+const wxString& usbip::get_receive_str(_In_ receive recv) noexcept
+{
+        return recv == receive::low_latency ? recv_low_latency : recv_zero_copy;
+}
+
+auto usbip::get_receive_val(_In_ const wxString &recv) noexcept -> receive
+{
+        return recv == recv_low_latency ? receive::low_latency : receive::zero_copy;
+}
+
+void usbip::validate_receive_str(_Inout_ wxString &receive)
+{
+        if (auto ok = receive == recv_zero_copy || receive == recv_low_latency; !ok) {
+                receive = recv_zero_copy;
+        }
+}
+
 auto usbip::make_persistent_device(
-        _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial) -> persistent_device
+        _In_ const wxString &url, _In_ const wxString &busid,
+        _In_ const wxString &serial, _In_ const wxString &receive) -> persistent_device
 {
         wxString hostname;
         wxString service;
@@ -71,15 +91,14 @@ auto usbip::make_persistent_device(
                         .busid = busid.utf8_string()
                 },
                 .serial = serial.utf8_string(),
-                .wsk_events = receive == wxString::FromAscii(recv_low_latency),
-                .once = persistent.empty(),
+                .recv = get_receive_val(receive)
         };
 }
 
 auto usbip::make_persistent_device(_In_ const device_columns &dc) -> persistent_device
 {
 	auto &url = get_url(dc);
-	return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL]);
+	return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE]);
 }
 
 auto usbip::make_device_columns(_In_ const imported_device &dev) ->
@@ -88,7 +107,16 @@ auto usbip::make_device_columns(_In_ const imported_device &dev) ->
         auto res = std::make_pair(make_cmp_key(dev.location), 0U);
         auto& [dc, flags] = res;
 
+        dc[COL_RECEIVE] = get_receive_str(dev.recv);
+        flags |= mkflag(COL_RECEIVE);
+
+        if (!dev.serial.empty()) {
+                dc[COL_SERIAL] = wxString::FromUTF8(dev.serial);
+                flags |= mkflag(COL_SERIAL);
+        }
+
         if (is_empty(dev)) {
+                wxASSERT(!dev.devid);
                 wxASSERT(!dev.speed);
                 wxASSERT(!dev.vendor);
                 wxASSERT(!dev.product);
@@ -107,11 +135,6 @@ auto usbip::make_device_columns(_In_ const imported_device &dev) ->
                 flags |= mkflag(COL_PORT);
         }
 
-        if (!dev.serial.empty()) {
-                dc[COL_SERIAL] = wxString::FromUTF8(dev.serial);
-                flags |= mkflag(COL_SERIAL);
-        }
-
         return res;
 }
 
@@ -122,11 +145,9 @@ auto usbip::make_device_columns(_In_ const device_state &st) ->
         auto &[dc, flags] = ret;
 
         dc[COL_STATE] = to_string(st.state);
-        flags |= mkflag(COL_STATE);
-
         dc[COL_SOURCE_ID] = to_wxstring(st.source_id);
-        flags |= mkflag(COL_SOURCE_ID);
 
+        flags |= mkflags({COL_STATE, COL_SOURCE_ID});
         return ret;
 }
 

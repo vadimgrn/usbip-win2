@@ -5,10 +5,10 @@
 #include "usbip.h"
 #include "strings.h"
 
-#include <libusbip\vhci.h>
-#include <libusbip\persistent.h>
+#include <libusbip/vhci.h>
+#include <libusbip/persistent.h>
 
-#include <spdlog\spdlog.h>
+#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -68,8 +68,9 @@ auto list_persistent_devices()
                 return false;
         } else for (auto &i: *v) {
                 auto &loc = i.location;
-                std::println("{}:{}/{}, serial='{}', wsk_events={}, once={}",
-                        loc.hostname, loc.service, loc.busid, i.serial, i.wsk_events, i.once);
+                std::println("{}:{}/{}, serial '{}', receive:{}, once:{}",
+                        loc.hostname, loc.service, loc.busid, i.serial,
+                        get_receive_str(i.recv), i.once);
         }
 
         return true;

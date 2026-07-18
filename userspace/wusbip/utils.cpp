@@ -135,7 +135,7 @@ auto usbip::make_imported_device(
                 .speed = dev.speed,
 
                 .vendor = dev.idVendor,
-                .product = dev.idProduct 
+                .product = dev.idProduct
         };
 }
 
