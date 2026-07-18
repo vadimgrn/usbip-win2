@@ -36,10 +36,12 @@ PAGED USBIP_STATUS recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_cod
 
 enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS make_transfer_buffer_mdl(
 	_Inout_ Mdl &mdl, _In_ ULONG mdl_size, _In_ LOCK_OPERATION operation, _In_ const _URB &urb);
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto verify(_In_ const WSK_BUF &buf, _In_ bool exact)
 {

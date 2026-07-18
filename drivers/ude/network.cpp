@@ -111,6 +111,8 @@ PAGED USBIP_STATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expec
  * 
  * @param mdl_size pass URB_BUF_LEN to use TransferBufferLength, real value must not be greater than TransferBufferLength
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::make_transfer_buffer_mdl(
         _Inout_ Mdl &mdl, _In_ ULONG mdl_size, _In_ LOCK_OPERATION operation, _In_ const URB &urb)
@@ -128,40 +130,42 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
                 return STATUS_SUCCESS;
         }
 
-        void *buf{};
-        bool probe_and_lock;
-
         if (auto head = r.TransferBufferMDL) { // preferable case because it is locked-down, can be a chain
 
-                if (auto len = static_cast<ULONG>(size(head)); 
-                    len < mdl_size && (head->Next || operation == IoReadAccess)) {
-                        Trace(TRACE_LEVEL_ERROR, "MDL size %Iu < mdl_size(%Iu)", len, mdl_size);
+                auto len = static_cast<ULONG>(size(head));
+
+                if (len < mdl_size && (head->Next || operation == IoReadAccess)) {
+                        Trace(TRACE_LEVEL_ERROR, "MDL size %lu < mdl_size(%lu)", len, mdl_size);
                         return STATUS_BUFFER_TOO_SMALL;
-                } else if (!head->Next) { // source MDL is not a chain
-                        // The caller may have asked for more than this MDL covers (e.g. Mm partial-final-cluster
-                        // paging IO where cdrom.sys rounded URB.TransferBufferLength up to a sector). Build a partial MDL
-                        // on what is actually locked down; the caller is responsible for chaining a gap MDL.
-                        mdl = Mdl(head, 0, min(len, mdl_size));
-                        return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+                } else if (head->Next) { 
+                        Trace(TRACE_LEVEL_ERROR, "chained MDL mapping into linear system VA space is invalid");
+                        return STATUS_NOT_SUPPORTED;
                 }
 
-                if (buf = MmGetSystemAddressForMdlSafe(head, make_priority(operation)); !buf) {
-                        return STATUS_UNSUCCESSFUL;        
-                } else { // IoBuildPartialMdl doesn't treat SourceMdl as a chain and can't be used
-                        probe_and_lock = false;
-                }
+                // The caller may have asked for more than this MDL covers (e.g. Mm partial-final-cluster
+                // paging IO where cdrom.sys rounded URB.TransferBufferLength up to a sector). Build a partial MDL
+                // on what is actually locked down; the caller is responsible for chaining a gap MDL.
+                mdl = Mdl(head, 0, min(len, mdl_size));
 
-        } else if (buf = r.TransferBuffer; buf) { // could be allocated from paged pool
-                probe_and_lock = true; // false -> DRIVER_VERIFIER_DETECTED_VIOLATION
-        } else {
+                // The partial MDL inherits the parent's locked layout, it requires no
+                // secondary pool updates. Mdl class unprepare() naturally handles locked()
+                // and partial() scenarios cleanly without needing a raw flag mutation here.
+                return mdl ? STATUS_SUCCESS : STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        if (!r.TransferBuffer) { 
                 Trace(TRACE_LEVEL_ERROR, "TransferBuffer and TransferBufferMDL are NULL");
                 return STATUS_INVALID_PARAMETER;
         }
 
-        NT_ASSERT(buf);
-        mdl = Mdl(buf, mdl_size);
+        if (KeGetCurrentIrql() > APC_LEVEL) {
+                Trace(TRACE_LEVEL_ERROR, "TransferBuffer: MmProbeAndLockPages cannot be called at DISPATCH_LEVEL");
+                return STATUS_MUTANT_NOT_OWNED; 
+        }
 
-        auto st = probe_and_lock ? mdl.prepare_paged(operation) : mdl.prepare_nonpaged();
+        mdl = Mdl(r.TransferBuffer, mdl_size);
+
+        auto st = mdl.prepare_paged(operation); // calls MmProbeAndLockPages
         if (st) {
                 mdl.reset();
         }
