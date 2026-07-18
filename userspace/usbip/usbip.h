@@ -34,7 +34,7 @@ struct attach_args
         bool terse{};
         bool stop{};
         bool once{};
-        bool use_wsk_events{};
+        bool wsk_events{};
 
         // --persistent,--stashed
         bool persistent{};

@@ -46,7 +46,7 @@ struct workitem_ctx
         ADDRINFOEXW *addrinfo; // list head
 
         bool one_attempt: 1;
-        bool use_wsk_events: 1;
+        bool wsk_events: 1;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
@@ -196,7 +196,7 @@ PAGED NTSTATUS plugin(_In_ UDECXUSBDEVICE device, _Inout_ int &port, _Inout_ boo
                 plugged = true;
         }
 
-        auto f = dev.use_wsk_events ? events::start_receive_data : start_receive_data_irp;
+        auto f = dev.wsk_events ? events::start_receive_data : start_receive_data_irp;
         return f(device);
 }
 
@@ -292,7 +292,7 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
         ctx.ctx_ext = WDF_NO_HANDLE; // now dev owns it
 
         auto &dev_ctx = *get_device_ctx(dev);
-        dev_ctx.use_wsk_events = ctx.use_wsk_events;
+        dev_ctx.wsk_events = ctx.wsk_events;
 
         if (bool plugout_and_delete{}; auto err = plugin(dev, r->port, plugout_and_delete)) {
                 device::detach(dev, plugout_and_delete);
@@ -535,12 +535,12 @@ PAGED void getaddrinfo(
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto plugin_hardware(
-        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once, _In_ bool use_wsk_events)
+        _In_ WDFREQUEST request, _In_ const vhci::ioctl::plugin_hardware &r, _In_ bool once, _In_ bool wsk_events)
 {
         PAGED_CODE();
 
         Trace(TRACE_LEVEL_INFORMATION, "%s:%s/%s, serial '%s', once %!bool!, wsk events %!bool!",
-                r.host, r.service, r.busid, r.serial, once, use_wsk_events);
+                r.host, r.service, r.busid, r.serial, once, wsk_events);
 
         auto vhci = get_vhci(request);
 
@@ -554,7 +554,7 @@ PAGED auto plugin_hardware(
         ctx.vhci = vhci;
         ctx.request = request;
         ctx.one_attempt = once;
-        ctx.use_wsk_events = use_wsk_events;
+        ctx.wsk_events = wsk_events;
 
         if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
                 WdfObjectDelete(wi);
@@ -639,7 +639,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         constexpr auto written = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
-        return plugin_hardware(request, *r, once, r->use_wsk_events);
+        return plugin_hardware(request, *r, once, r->wsk_events);
 }
 
 _IRQL_requires_same_

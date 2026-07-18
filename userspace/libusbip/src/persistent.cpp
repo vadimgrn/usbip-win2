@@ -27,6 +27,18 @@ auto is_malformed(_In_ const persistent_device &d) noexcept
         return is_malformed(d.location) || !validate_device_serial(d.serial);
 }
 
+constexpr auto pack_flags(_In_ const persistent_device &d)
+{
+        return (static_cast<unsigned int>(d.once) << 1) |
+                static_cast<unsigned int>(d.wsk_events);
+}
+
+constexpr void unpack_flags(_Inout_ persistent_device &d, _In_ unsigned int flags)
+{
+        d.once = flags & 2;
+        d.wsk_events = flags & 1;
+}
+
 std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persistent_device> &devices)
 {
         std::wstring multi_sz;
@@ -36,13 +48,15 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persiste
 
                 if (is_malformed(d)) {
                         libusbip::output("malformed persistent_device( hostname='{}', service='{}', "
-                                         "busid='{}', serial='{}', use_wsk_events='{}' )",
-                                          dl.hostname, dl.service, dl.busid, d.serial, d.use_wsk_events);
+                                         "busid='{}', serial='{}', once={}, wsk_events={} )",
+                                          dl.hostname, dl.service, dl.busid, d.serial, d.once, d.wsk_events);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, d.use_wsk_events);
+                auto flags = pack_flags(d);
+
+                if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, flags);
                     auto ws = utf8_to_wchar(s)) {
                         *ws += L'\0';
                         multi_sz += *ws;
@@ -85,9 +99,9 @@ auto parse_persistent_device(_In_ const std::string &str)
 
         if (it != v.end()) {
                 std::string_view s((*it).begin(), str.end()); // remaining suffix
-                unsigned char val{};
-                std::from_chars(s.data(), s.data() + s.size(), val);
-                dev.use_wsk_events = val;
+                unsigned int flags{};
+                std::from_chars(s.data(), s.data() + s.size(), flags);
+                unpack_flags(dev, flags);
         }
 
         return dev;

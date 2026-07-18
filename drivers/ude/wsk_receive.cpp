@@ -330,7 +330,7 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _I
                 return err;
         }
 
-        if (auto &dev = *ctx.dev; dev.use_wsk_events) {
+        if (auto &dev = *ctx.dev; dev.wsk_events) {
                 return fill_isoc_data(r, buffer, ret.actual_length, dev.recv_buf);
         }
 
@@ -428,7 +428,7 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret,
 
         if (TransferBufferLength && is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
                 auto &dev = *ctx.dev;
-                if (dev.use_wsk_events) {
+                if (dev.wsk_events) {
                         ring_buffer rb(dev.recv_buf);
                         if (auto n = rb.read(TransferBuffer, TransferBufferLength); n != TransferBufferLength) {
                                 Trace(TRACE_LEVEL_ERROR, "read %Iu != TransferBufferLength %lu", n, TransferBufferLength);

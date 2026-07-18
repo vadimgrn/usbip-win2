@@ -163,7 +163,7 @@ struct device_ctx
         LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
 
         bool ep0_added: 1;
-        bool use_wsk_events: 1;
+        bool wsk_events: 1;
 
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)

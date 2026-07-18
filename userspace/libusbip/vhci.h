@@ -35,8 +35,8 @@ struct persistent_device
 {
         device_location location;
         std::string serial; // optional device serial number if you want to set/override it
-        bool once: 1; // do not run automatic attach attempts if an error is returned
-        bool use_wsk_events: 1;
+        bool once: 1; // do not start automatic attach attempts if cannot connect
+        bool wsk_events: 1; // use WSK Event Callback Functions instead of a dedicated thread
 };
 
 struct imported_device

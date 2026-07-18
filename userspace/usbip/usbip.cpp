@@ -82,8 +82,15 @@ void add_cmd_attach(CLI::App &app)
 	rem->add_flag("-t,--terse", r.terse, "Show port number as a result");
 
         auto stop = rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
-        rem->add_flag("--once", r.once, "Do not run automatic attach attempts if the command fails")->excludes(stop);
-        rem->add_flag("--events", r.use_wsk_events, "Use events to receive data from the network")->excludes(stop);
+        rem->add_flag("--once", r.once, "Do not start automatic attach attempts if cannot connect")->excludes(stop);
+
+        auto &zero_copy = "zero-copy";
+        auto receive = [&val = r.wsk_events, zero_copy] (const auto &choice) { val = choice != zero_copy; };
+
+        rem->add_option_function<std::string>("--receive", receive, "How to receive data from the network")
+                ->check(CLI::IsMember({zero_copy, "low-latency"}))
+                ->default_str(zero_copy)
+                ->excludes(stop);
 
 	cmd->add_option_group("Stop")
 		->add_flag("-X,--stop-all", r.stop_all, "Stop all active attach attempts");
