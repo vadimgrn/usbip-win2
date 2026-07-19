@@ -136,6 +136,7 @@ struct device_ctx
 
         auto speed() const { return ext().properties().speed; }
         auto devid() const { return ext().properties().devid; }
+        auto wsk_events() const { return ext().properties().wsk_events; }
 
         WDFDEVICE vhci; // parent, virtual (emulated) host controller interface
 
@@ -161,10 +162,7 @@ struct device_ctx
         LONG sending;
 
         LONG unplugged; // initiated detach that may still be ongoing, use set_flag/get_flag
-
-        bool ep0_added: 1;
-        bool wsk_events: 1;
-
+        bool ep0_added;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(device_ctx, get_device_ctx)
 

@@ -163,7 +163,7 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 
 /*
  * @param r must be zeroed
- * @param device_str host,port,busid[,serial]
+ * @param device_str host,port,busid,serial,flags
  * @see hash_location
  */
 _IRQL_requires_same_
@@ -171,25 +171,41 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STRING &device_str)
 {
         PAGED_CODE();
-        const auto sep = L',';
 
-        libdrv::split(r.node_name, r.service_name, device_str, sep);
-        libdrv::split(r.service_name, r.busid, r.service_name, sep);
+        if (empty(device_str)) {
+                return STATUS_INVALID_PARAMETER;
+        }
 
-        UNICODE_STRING tail; // optional serial
-        libdrv::split(r.busid, tail, r.busid, sep);
+        UNICODE_STRING serial;
+        auto tail = device_str;
+        UNICODE_STRING* v[] { &r.node_name, &r.service_name, &r.busid, &serial, &tail };
 
-        if (auto &serial = r.properties.serial;
-            auto err = libdrv::unicode_to_utf8(serial, sizeof(serial), tail)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &tail, err);
+        for (int i = 0; i < ARRAYSIZE(v) - 1; ++i) {
+                libdrv::split(*v[i], tail, tail, L',');
+        }
+
+        if (empty(r.node_name) || empty(r.service_name) || empty(r.busid)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if (auto &u8_serial = r.properties.serial;
+            auto err = libdrv::unicode_to_utf8(u8_serial, sizeof(u8_serial), serial)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, err);
                 return err;
-        } else if (err = validate_serial_number(serial); err) {
-                Trace(TRACE_LEVEL_ERROR, "bad serial '%.15s'", serial);
+        } else if (err = validate_serial_number(u8_serial); err) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%!USTR!'", &serial);
                 return err;
         }
 
-        return  empty(r.node_name) || empty(r.service_name) || empty(r.busid) ?
-                STATUS_INVALID_PARAMETER : hash_location(r.location_hash, r);
+        if (ULONG val; auto err = RtlUnicodeStringToInteger(&tail, 0, &val)) {
+                NT_ASSERT(err == STATUS_INVALID_PARAMETER); // string is empty
+                NT_ASSERT(empty(tail));
+        } else {
+                bool once; // ignore, does not make sence for persistent
+                unpack_attach_flags(once, r.properties.wsk_events, val);
+        }
+
+        return hash_location(r.location_hash, r);
 }
 
 _IRQL_requires_same_
@@ -355,9 +371,11 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
         RtlZeroMemory(&req, sizeof(req));
         req.size = sizeof(req);
 
-        if (auto &serial = attr.properties.serial;
-            auto err = RtlStringCbCopyNA(req.serial, sizeof(req.serial), serial, sizeof(serial))) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%.15s') %!STATUS!", serial, err);
+        auto &props = attr.properties;
+        req.wsk_events = props.wsk_events;
+
+        if (auto err = RtlStringCbCopyNA(req.serial, sizeof(req.serial), props.serial, sizeof(props.serial))) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", props.serial, err);
                 return false;
         }
 
@@ -442,6 +460,7 @@ PAGED decltype(WdfDriverOpenParametersRegistryKey) *get_function(_In_ DRIVER_REG
 }
 
 } // namespace 
+
 
 /*
  * There can be many reattach requests that are canceled but its timer callback has not been called yet.

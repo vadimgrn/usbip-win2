@@ -27,18 +27,6 @@ auto is_malformed(_In_ const persistent_device &d) noexcept
         return is_malformed(d.location) || !validate_device_serial(d.serial);
 }
 
-constexpr auto pack_flags(_In_ const persistent_device &d)
-{
-        return (static_cast<unsigned int>(d.once) << 1) |
-                static_cast<unsigned int>(d.wsk_events);
-}
-
-constexpr void unpack_flags(_Inout_ persistent_device &d, _In_ unsigned int flags)
-{
-        d.once = flags & 2;
-        d.wsk_events = flags & 1;
-}
-
 std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persistent_device> &devices)
 {
         std::wstring multi_sz;
@@ -48,13 +36,13 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persiste
 
                 if (is_malformed(d)) {
                         libusbip::output("malformed persistent_device( hostname='{}', service='{}', "
-                                         "busid='{}', serial='{}', once={}, wsk_events={} )",
-                                          dl.hostname, dl.service, dl.busid, d.serial, d.once, d.wsk_events);
+                                         "busid='{}', serial='{}', wsk_events={}, once={} )",
+                                          dl.hostname, dl.service, dl.busid, d.serial, d.wsk_events, d.once);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
 
-                auto flags = pack_flags(d);
+                auto flags = pack_attach_flags(d.once, d.wsk_events);
 
                 if (auto s = std::format("{},{},{},{},{}", dl.hostname, dl.service, dl.busid, d.serial, flags);
                     auto ws = utf8_to_wchar(s)) {
@@ -99,9 +87,9 @@ auto parse_persistent_device(_In_ const std::string &str)
 
         if (it != v.end()) {
                 std::string_view s((*it).begin(), str.end()); // remaining suffix
-                unsigned int flags{};
+                ULONG flags{};
                 std::from_chars(s.data(), s.data() + s.size(), flags);
-                unpack_flags(dev, flags);
+                unpack_attach_flags(dev.once, dev.wsk_events, flags);
         }
 
         return dev;

@@ -27,7 +27,8 @@ void print(const imported_device &d)
          {}
            -> usbip://{}:{}/{}
            -> remote bus/dev {:03}/{:03}
-           -> serial '{}')";
+           -> serial='{}'
+           -> wsk_events={})";
 
         auto &loc = d.location;
 
@@ -35,7 +36,8 @@ void print(const imported_device &d)
                           product,
                           loc.hostname, loc.service, loc.busid,
                           bus, dev,
-                          d.serial);
+                          d.serial,
+                          d.wsk_events);
 }
 
 } // namespace
@@ -81,6 +83,7 @@ bool usbip::cmd_port(void *p)
                                 persistent_device pd {
                                         .location = std::move(d.location),
                                         .serial = std::move(d.serial),
+                                        .wsk_events = d.wsk_events
                                 };
                                 persistent->push_back(std::move(pd));
                         }

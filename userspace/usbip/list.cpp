@@ -68,7 +68,8 @@ auto list_persistent_devices()
                 return false;
         } else for (auto &i: *v) {
                 auto &loc = i.location;
-                std::println("{}:{}/{} {}", loc.hostname, loc.service, loc.busid, i.serial);
+                std::println("{}:{}/{}, serial='{}', wsk_events={}, once={}",
+                        loc.hostname, loc.service, loc.busid, i.serial, i.wsk_events, i.once);
         }
 
         return true;

@@ -114,6 +114,10 @@ PAGED int libdrv::strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
 {
         PAGED_CODE();
 
+        if (!s.Buffer) {
+                return -1;
+        }
+
         for (int i = 0; i < s.Length/sizeof(*s.Buffer); ++i) {
                 if (s.Buffer[i] == ch) {
                         return i;
@@ -123,6 +127,10 @@ PAGED int libdrv::strchr(_In_ const UNICODE_STRING &s, _In_ WCHAR ch)
         return -1;
 }
 
+/*
+ * Do not set .Buffer to NULL, RTL functions will return STATUS_INVALID_PARAMETER
+ * instead of treating it as an empty string.
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void libdrv::split(
@@ -135,7 +143,9 @@ PAGED void libdrv::split(
         auto pos = strchr(str, sep);
         if (pos < 0) {
                 head = str;
-                tail = UNICODE_STRING{};
+                tail.Length = 0;
+                tail.MaximumLength = 0;
+                tail.Buffer = str.Buffer;
                 return;
         }
 
@@ -144,9 +154,9 @@ PAGED void libdrv::split(
 
         head.Length = static_cast<USHORT>(pos)*sizeof(*s);
         head.MaximumLength = head.Length;
-        head.Buffer = head.Length ? s : nullptr;
+        head.Buffer = s;
 
         tail.Length = len - (head.Length + sizeof(*s));
         tail.MaximumLength = tail.Length;
-        tail.Buffer = tail.Length ? s + pos + 1 : nullptr;
+        tail.Buffer = s + pos + 1;
 }

@@ -22,7 +22,7 @@ namespace usbip
 struct device_location
 {
         std::string hostname;
-        std::string service; // TCP/IP port number or symbolic name
+        std::string service; ///< TCP/IP port number or symbolic name
         std::string busid;
 };
 
@@ -34,15 +34,15 @@ struct device_location
 struct persistent_device
 {
         device_location location;
-        std::string serial; // optional device serial number if you want to set/override it
-        bool once: 1; // do not start automatic attach attempts if cannot connect
-        bool wsk_events: 1; // use WSK Event Callback Functions instead of a dedicated thread
+        std::string serial; ///< optional device serial number if you want to set/override it
+        bool wsk_events{}; ///< use WSK Event Callback Functions instead of a dedicated thread
+        bool once{}; ///< do not start automatic attach attempts if cannot connect; for attach_args only
 };
 
 struct imported_device
 {
         device_location location;
-        int port{}; // hub port number, >= 1
+        int port{}; ///< hub port number, >= 1
 
         UINT32 devid{};
         USB_DEVICE_SPEED speed = UsbLowSpeed;
@@ -50,7 +50,8 @@ struct imported_device
         UINT16 vendor{};
         UINT16 product{};
 
-        std::string serial; // only filled if you set it in attach_args
+        std::string serial; ///< only filled if you set it in attach_args
+        bool wsk_events{}; ///< @see attach_args.wsk_events
 };
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };
@@ -63,7 +64,7 @@ struct device_state
 {
         imported_device device;
         state state = state::unplugged;
-        ULONG source_id;
+        ULONG source_id{};
 };
 
 /**

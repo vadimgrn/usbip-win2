@@ -125,7 +125,8 @@ auto make_imported_device(_In_ const vhci::imported_device &d)
                 .speed = win_speed(d.speed),
                 .vendor = d.vendor,
                 .product = d.product,
-                .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) }
+                .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) },
+                .wsk_events = d.wsk_events
         };
 }
 

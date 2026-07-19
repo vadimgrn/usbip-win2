@@ -295,7 +295,7 @@ auto fill_isoc_data(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
+auto isoch_transfer(_In_ wsk_context &ctx, _In_ bool wsk_events, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
         auto cnt = ret.number_of_packets;
 
@@ -330,8 +330,8 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ const header_ret_submit &ret, _I
                 return err;
         }
 
-        if (auto &dev = *ctx.dev; dev.wsk_events) {
-                return fill_isoc_data(r, buffer, ret.actual_length, dev.recv_buf);
+        if (wsk_events) {
+                return fill_isoc_data(r, buffer, ret.actual_length, ctx.dev->recv_buf);
         }
 
         NT_ASSERT(r.NumberOfPackets == number_of_packets(ctx));
@@ -403,10 +403,13 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret, _Inout_ URB &urb)
 {
+        auto &dev = *ctx.dev;
+        auto wsk_events = dev.wsk_events();
+
         urb.UrbHeader.Status = ret.status ? to_windows_status(ret.status) : USBD_STATUS_SUCCESS;
 
 	if (is_isoch(urb)) {
-		return isoch_transfer(ctx, ret, urb);
+		return isoch_transfer(ctx, wsk_events, ret, urb);
 	}
 
         UCHAR *TransferBuffer{};
@@ -427,8 +430,7 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret,
 	}
 
         if (TransferBufferLength && is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
-                auto &dev = *ctx.dev;
-                if (dev.wsk_events) {
+                if (wsk_events) {
                         ring_buffer rb(dev.recv_buf);
                         if (auto n = rb.read(TransferBuffer, TransferBufferLength); n != TransferBufferLength) {
                                 Trace(TRACE_LEVEL_ERROR, "read %Iu != TransferBufferLength %lu", n, TransferBufferLength);

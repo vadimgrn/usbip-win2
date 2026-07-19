@@ -727,7 +727,7 @@ PAGED wdm::object_reference usbip::device::detach(
         }
 
         bool socket_closed{};
-        if (auto f = dev.wsk_events ? events::stop_receive_data : stop_receive_data_irp) {
+        if (auto f = dev.wsk_events() ? events::stop_receive_data : stop_receive_data_irp) {
                 thread = f(device, socket_closed);
         }
 

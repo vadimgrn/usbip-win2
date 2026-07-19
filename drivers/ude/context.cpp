@@ -120,16 +120,17 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
         if (auto err = alloc_device_ctx_ext(ctx_ext, parent)) {
                 return err;
         }
-
         auto &ext = get_device_ctx_ext(ctx_ext);
 
         if (auto err = init_device_attributes(ext.attr, r)) {
                 return err;
         }
 
-        if (auto &props = ext.properties();
-            auto err = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial))) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%.15s') %!STATUS!", r.serial, err);
+        auto &props = ext.properties();
+        props.wsk_events = r.wsk_events;
+
+        if (auto err = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial))) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", r.serial, err);
                 return err;
         }
 

@@ -40,6 +40,22 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_ascii(_In_ unsigned char ch) { return ch < 0x7F; }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto pack_attach_flags(_In_ bool once, _In_ bool wsk_events)
+{
+        return (static_cast<ULONG>(once) << 1) |
+                static_cast<ULONG>(wsk_events);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, _In_ ULONG flags)
+{
+        once = flags & 2;
+        wsk_events = flags & 1;
+}
+
 } // namespace usbip
 
 
@@ -77,6 +93,8 @@ struct imported_device_properties
 
         char serial[SERIAL_BUFSZ];
         UCHAR iserial; // USB_DEVICE_DESCRIPTOR.iSerialNumber
+
+        bool wsk_events;
 };
 
 struct imported_device : imported_device_location, imported_device_properties {};

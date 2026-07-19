@@ -70,7 +70,9 @@ auto usbip::make_persistent_device(
                         .service = service.utf8_string(), 
                         .busid = busid.utf8_string()
                 },
-                .serial = serial.utf8_string()
+                .serial = serial.utf8_string(),
+                .wsk_events = receive == wxString::FromAscii(recv_low_latency),
+                .once = persistent.empty(),
         };
 }
 
