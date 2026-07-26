@@ -139,6 +139,14 @@ void endpoint_reset(_In_ UDECXUSBENDPOINT endp, _In_ WDFREQUEST request)
         }
 }
 
+/*
+ * WdfIoQueuePurge delivers queued canceled requests to EvtIoCanceledOnQueue and dispatches
+ * EvtRequestCancel for driver-owned cancelable requests. While the purge is in progress,
+ * WdfRequestMarkCancelableEx returns STATUS_CANCELLED for a request whose WskSend has
+ * just completed, which routes it through CMD_UNLINK and the completion DPC as well.
+ * The purge-complete callback runs only after the driver has completed every delivered
+ * request, so no manual sweep of in-flight requests is needed here.
+ */
 _Function_class_(EVT_UDECX_USB_ENDPOINT_PURGE)
 _IRQL_requires_same_
 void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
@@ -264,6 +272,7 @@ PAGED auto create_endpoint_queue(
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, dispatch_type);
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoInternalDeviceControl = device::internal_control;
+        cfg.EvtIoCanceledOnQueue = device::cancel_queued_request;
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBENDPOINT);

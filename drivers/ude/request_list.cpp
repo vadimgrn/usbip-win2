@@ -347,3 +347,17 @@ void usbip::device::finish_request(_In_ WDFREQUEST request, _In_ NTSTATUS status
         enqueue_completion_dpc_if_needed(dev, enqueue);
 }
 
+_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::device::cancel_queued_request(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
+{
+        auto endpoint = get_endpoint(queue);
+        auto &dev = *get_device_ctx(get_endpoint_ctx(endpoint)->device);
+
+        if (auto status = initialize_request(dev, request, endpoint)) {
+                UdecxUrbCompleteWithNtStatus(request, status); // low-resource fallback, cannot use the DPC without request_ctx
+                return;
+        }
+        finish_request(request, STATUS_CANCELLED);
+}

@@ -48,4 +48,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void finish_request(_In_ WDFREQUEST request, _In_ NTSTATUS status);
 
+_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void cancel_queued_request(_In_ WDFQUEUE queue, _In_ WDFREQUEST request);
+
 } // namespace usbip::device
