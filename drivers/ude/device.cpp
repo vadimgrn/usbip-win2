@@ -71,6 +71,8 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         // all resources must be freed
         NT_ASSERT(libdrv::empty(&dev.pending_sends));
         NT_ASSERT(IsListEmpty(&dev.requests));
+        NT_ASSERT(IsListEmpty(&dev.request_completions));
+        NT_ASSERT(!dev.request_completion_dpc_active);
         NT_ASSERT(get_flag(dev.unplugged));
         NT_ASSERT(!dev.port);
         NT_ASSERT(!dev.recv_thread);
@@ -513,9 +515,11 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         }
 
         InitializeListHead(&dev.requests);
+        InitializeListHead(&dev.request_completions);
         InitializeSListHead(&dev.pending_sends);
+        dev.request_completion_dpc_active = false;
 
-        return STATUS_SUCCESS;
+        return device::create_request_completion_dpc(device, dev);
 }
 
 _IRQL_requires_same_

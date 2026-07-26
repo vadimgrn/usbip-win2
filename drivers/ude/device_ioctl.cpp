@@ -429,36 +429,11 @@ auto isoch_transfer(
         return send(endpoint, ctx, dev, false, &urb);
 }
 
-/*
- * @see WdfRequestForwardToParentDeviceIoQueue
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto allocate_request_ctx(_In_ WDFREQUEST request)
-{
-        WDF_OBJECT_ATTRIBUTES attr;
-        WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, request_ctx); // as for WdfDeviceInitSetRequestAttributes
-
-        if (auto err = WdfObjectAllocateContext(request, &attr, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfObjectAllocateContext %!STATUS!", err);
-                return err;
-        }
-
-        TraceDbg("%04x", ptr04x(request));
-        return STATUS_SUCCESS;
-}
-
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto usb_submit_urb(
         _In_ device_ctx &dev, _In_ UDECXUSBENDPOINT endpoint, _In_ endpoint_ctx &endp, _In_ WDFREQUEST request)
 {
-        if (get_request_ctx(request)) [[likely]] {
-                // NULL for some devices
-        } else if (auto err = allocate_request_ctx(request)) {
-                return err;
-        }
-
         auto &urb = get_urb(request);
         urb_function_t *handler{};
 
@@ -689,13 +664,19 @@ void NTAPI usbip::device::internal_control(
 
         auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
-        
-        if (auto dev = get_device_ctx(endp.device); get_flag(dev->unplugged)) {
-                UdecxUrbComplete(request, USBD_STATUS_DEVICE_GONE);
-        } else if (auto st = usb_submit_urb(*dev, endpoint, endp, request); st != STATUS_PENDING) {
+        auto &dev = *get_device_ctx(endp.device);
+        if (auto status = ensure_request_context(request, endpoint)) {
+                UdecxUrbCompleteWithNtStatus(request, status); // low-resource fallback, cannot use the DPC without request_ctx
+                return;
+        }
+
+        if (get_flag(dev.unplugged)) {
+                get_urb(request).UrbHeader.Status = USBD_STATUS_DEVICE_GONE;
+                complete(request, STATUS_SUCCESS);
+        } else if (auto st = usb_submit_urb(dev, endpoint, endp, request); st != STATUS_PENDING) {
                 if (st) {
                         TraceDbg("%!STATUS!", st);
                 }
-                UdecxUrbCompleteWithNtStatus(request, st);
+                complete(request, st);
         }
 }

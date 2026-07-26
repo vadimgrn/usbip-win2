@@ -519,13 +519,26 @@ bool usbip::validate(_Inout_ header &hdr)
 
 
 /*
- * To ensure compatibility with existing USB drivers, the UDE client must call WdfRequestComplete at DISPATCH_LEVEL.
+ * Publish a terminal request status. The device completion DPC performs the
+ * actual UDE completion.
  * @see Write a UDE client driver
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
+	device::finish_request(request, status);
+}
+
+/*
+ * UDE requires URBs to be completed from a separate DPC at DISPATCH_LEVEL.
+ * This routine is called only by request_completion_dpc.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(DISPATCH_LEVEL)
+void usbip::complete_now(_In_ WDFREQUEST request, _In_ NTSTATUS status)
+{
+	NT_ASSERT(KeGetCurrentIrql() == DISPATCH_LEVEL);
 	auto irp = WdfRequestWdmGetIrp(request);
 
 	auto info = irp->IoStatus.Information;
@@ -537,7 +550,6 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		if (status) {
 			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
-		libdrv::RaiseIrql lvl(DISPATCH_LEVEL);
 		WdfRequestComplete(request, status);
 		return;
 	}
@@ -550,11 +562,9 @@ void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	}
 
 	if (status || urb_st) {
-		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
+		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix",
 			  req.seqnum, get_usbd_status(urb_st), status, info);
 	}
-
-	libdrv::RaiseIrql lvl(DISPATCH_LEVEL);
 
 	if (NT_SUCCESS(status)) {
 		UdecxUrbComplete(request, urb_st);

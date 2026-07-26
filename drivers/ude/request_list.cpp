@@ -9,11 +9,78 @@
 #include "context.h"
 #include "wsk_context.h"
 #include "device_ioctl.h"
+#include "wsk_receive.h"
 
 namespace
 {
 
 using namespace usbip;
+
+/*
+ * @return true if the caller must enqueue device_ctx::request_completion_dpc.
+ * requests_lock must be held.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(DISPATCH_LEVEL)
+bool arm_completion_locked(_Inout_ device_ctx &dev, _Inout_ request_ctx &req)
+{
+        if (req.completion_queued) {
+                return false;
+        }
+
+        req.completion_queued = true;
+        InsertTailList(&dev.request_completions, &req.completion_entry);
+
+        if (dev.request_completion_dpc_active) {
+                return false;
+        }
+
+        dev.request_completion_dpc_active = true;
+        return true;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void enqueue_completion_dpc_if_needed(_Inout_ device_ctx &dev, _In_ bool enqueue)
+{
+        if (enqueue) {
+                NT_VERIFY(WdfDpcEnqueue(dev.request_completion_dpc));
+        }
+}
+
+_Function_class_(EVT_WDF_DPC)
+_IRQL_requires_same_
+_IRQL_requires_(DISPATCH_LEVEL)
+void request_completion_dpc(_In_ WDFDPC dpc)
+{
+        auto device = static_cast<UDECXUSBDEVICE>(WdfDpcGetParentObject(dpc));
+        auto &dev = *get_device_ctx(device);
+
+        for (;;) {
+                WDFREQUEST request;
+                NTSTATUS status;
+
+                {
+                        wdf::Lock lck(dev.requests_lock);
+
+                        if (IsListEmpty(&dev.request_completions)) {
+                                dev.request_completion_dpc_active = false;
+                                return;
+                        }
+
+                        auto entry = RemoveHeadList(&dev.request_completions);
+                        auto req = CONTAINING_RECORD(entry, request_ctx, completion_entry);
+
+                        InitializeListHead(&req->completion_entry);
+
+                        request = get_handle(req);
+                        status = req->completion_status;
+                }
+
+                // Do not touch request or its context after this call. UDE can reuse it immediately.
+                complete_now(request, status);
+        }
+}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -48,6 +115,74 @@ void cancel_request(_In_ WDFREQUEST request)
 
 } // namespace
 
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS usbip::device::create_request_completion_dpc(
+        _In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
+{
+        PAGED_CODE();
+
+        WDF_DPC_CONFIG cfg;
+        WDF_DPC_CONFIG_INIT(&cfg, request_completion_dpc);
+        cfg.AutomaticSerialization = FALSE;
+
+        WDF_OBJECT_ATTRIBUTES attr;
+        WDF_OBJECT_ATTRIBUTES_INIT(&attr);
+        attr.ParentObject = device;
+
+        return WdfDpcCreate(&cfg, &attr, &dev.request_completion_dpc);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS usbip::device::ensure_request_context(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endpoint)
+{
+        NT_ASSERT(endpoint);
+        auto req = get_request_ctx(request);
+
+        if (!req) {
+                WDF_OBJECT_ATTRIBUTES attr;
+                WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, request_ctx);
+
+                if (auto status = WdfObjectAllocateContext(
+                        request, &attr, reinterpret_cast<void**>(&req))) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfObjectAllocateContext %!STATUS!", status);
+                        return status;
+                }
+        }
+
+        // A WDFREQUEST can be reused; its context is not zeroed between transfers.
+        InitializeListHead(&req->completion_entry);
+        req->endpoint = endpoint;
+        req->seqnum = {};
+        req->completion_status = STATUS_PENDING;
+        req->completion_queued = false;
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::device::finish_request(_In_ WDFREQUEST request, _In_ NTSTATUS status)
+{
+        auto &req = *get_request_ctx(request);
+        auto device = get_endpoint_ctx(req.endpoint)->device;
+        auto &dev = *get_device_ctx(device);
+        bool enqueue{};
+
+        {
+                wdf::Lock lck(dev.requests_lock);
+
+                if (!req.completion_queued) {
+                        req.completion_status = status;
+                }
+
+                enqueue = arm_completion_locked(dev, req);
+        }
+
+        enqueue_completion_dpc_if_needed(dev, enqueue);
+}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
