@@ -220,6 +220,7 @@ struct request_ctx
         NTSTATUS completion_status;
         bool listed;
         bool cancelable;
+        bool send_pending;
         bool response_in_progress;
         bool terminal;
         // committed to completion; stays true while the DPC owns the entry,

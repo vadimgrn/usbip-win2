@@ -21,10 +21,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void check_request_locked(_In_ [[maybe_unused]] const request_ctx &req)
 {
         NT_ASSERT(req.endpoint);
-        NT_ASSERT(!req.cancelable || req.listed);
+        NT_ASSERT(!req.cancelable || (req.listed && !req.send_pending));
         NT_ASSERT(!req.response_in_progress || (!req.listed && !req.cancelable));
         NT_ASSERT(!req.terminal || (!req.listed && !req.cancelable && !req.response_in_progress));
-        NT_ASSERT(!req.completion_queued || (req.terminal && !req.response_in_progress));
+        NT_ASSERT(!req.completion_queued ||
+                  (req.terminal && !req.send_pending && !req.response_in_progress));
 }
 
 _IRQL_requires_same_
@@ -47,7 +48,7 @@ _IRQL_requires_(DISPATCH_LEVEL)
 bool arm_completion_locked(_Inout_ device_ctx &dev, _Inout_ request_ctx &req)
 {
         if (!req.terminal || req.listed || req.cancelable ||
-             req.response_in_progress || req.completion_queued) {
+             req.send_pending || req.response_in_progress || req.completion_queued) {
                 // a terminal request must be unlisted and not cancelable; refuse to complete otherwise
                 NT_ASSERT(!req.terminal || (!req.listed && !req.cancelable));
                 return false;
@@ -172,6 +173,7 @@ NTSTATUS usbip::device::initialize_request(
 
         // A WDFREQUEST can be reused; its context is not zeroed between transfers.
         NT_ASSERT(!req->listed);
+        NT_ASSERT(!req->send_pending);
         NT_ASSERT(!req->response_in_progress);
 
         InitializeListHead(&req->entry);
@@ -181,6 +183,7 @@ NTSTATUS usbip::device::initialize_request(
         req->completion_status = STATUS_PENDING;
         req->listed = false;
         req->cancelable = false;
+        req->send_pending = false;
         req->response_in_progress = false;
         req->terminal = false;
         req->completion_queued = false;
@@ -199,17 +202,22 @@ void usbip::device::append_request(_Inout_ device_ctx &dev, _In_ const wsk_conte
 
         NT_ASSERT(req.endpoint);
         NT_ASSERT(!req.listed);
+        NT_ASSERT(!req.send_pending);
         NT_ASSERT(!req.terminal);
 
         req.seqnum = wsk.hdr.seqnum;
         NT_ASSERT(is_valid_seqnum(req.seqnum));
 
         req.listed = true;
+        req.send_pending = true;
         InsertTailList(&dev.requests, &req.entry);
         check_request_locked(req);
 }
 
 /*
+ * The WDFREQUEST cannot be completed until this function clears send_pending.
+ * That keeps the upper URB TransferBufferMDL valid for the entire WskSend.
+ *
  * @return a WdfRequestMarkCancelableEx error. The caller must issue UNLINK and
  *         finish the request for that error.
  */
@@ -218,6 +226,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::device::on_send_complete(
         _Inout_ device_ctx &dev,
         _In_ WDFREQUEST request,
+        _In_ seqnum_t seqnum,
         _In_ NTSTATUS send_status)
 {
         bool enqueue{};
@@ -226,6 +235,15 @@ NTSTATUS usbip::device::on_send_complete(
         {
                 wdf::Lock lck(dev.requests_lock);
                 auto &req = *get_request_ctx(request);
+
+                NT_ASSERT(req.seqnum == seqnum);
+                NT_ASSERT(req.send_pending);
+
+                if (req.seqnum != seqnum || !req.send_pending) {
+                        return STATUS_INVALID_DEVICE_STATE;
+                }
+
+                req.send_pending = false;
 
                 if (!NT_SUCCESS(send_status)) {
                         remove_listed_locked(req);

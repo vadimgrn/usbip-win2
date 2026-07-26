@@ -34,7 +34,8 @@ void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS on_send_complete(_Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ NTSTATUS send_status);
+NTSTATUS on_send_complete(
+        _Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ seqnum_t seqnum, _In_ NTSTATUS send_status);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

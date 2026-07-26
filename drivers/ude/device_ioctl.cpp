@@ -51,27 +51,40 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
         auto request = ctx->request; // can be WDF_NO_HANDLE
         auto &dev = *ctx->dev;
+        auto seqnum = request ? ctx.seqnum(true) : seqnum_t{};
 
         auto &wsk = wsk_irp->IoStatus;
-        TraceWSK("req %04x -> wsk irp %04x, %!STATUS!, Information %Iu",
-                  ptr04x(request), ptr04x(wsk_irp), wsk.Status, wsk.Information);
+        auto wsk_status = wsk.Status;
+        TraceWSK("req %04x -> wsk irp %04x, %!STATUS!, Information %Iu", 
+                  ptr04x(request), ptr04x(wsk_irp), wsk_status, wsk.Information);
 
+        /*
+         * WskSend is finished. Drop the partial MDL before publishing send completion:
+         * it describes pages owned by the upper URB and does not lock them itself.
+         */
+        ctx->mdl_hdr.next(nullptr);
+        ctx->mdl_buf.reset();
+
+        if (wsk_status == STATUS_FILE_FORCED_CLOSED && !get_flag(dev.unplugged)) {
+                auto device = get_handle(&dev);
+                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(device), wsk_status);
+                device::async_detach_and_delete(device, true);
+        }
+
+        /*
+         * Publishing send completion is the last operation: the completion DPC can
+         * complete the request on another processor immediately after that.
+         */
         if (!request) {
                 // nothing to do
-        } else if (NT_SUCCESS(wsk.Status)) {
+        } else if (NT_SUCCESS(wsk_status)) {
                 ++dev.sent_requests;
-                if (auto err = device::on_send_complete(dev, request, wsk.Status)) {
+                if (auto err = device::on_send_complete(dev, request, seqnum, wsk_status)) {
                         auto device = get_handle(&dev);
                         device::send_cmd_unlink_and_complete(device, request, err);
                 }
         } else {
-                NT_VERIFY(NT_SUCCESS(device::on_send_complete(dev, request, wsk.Status)));
-        }
-
-        if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !get_flag(dev.unplugged)) {
-                auto device = get_handle(&dev);
-                TraceDbg("dev %04x, unplugging after %!STATUS!", ptr04x(device), wsk.Status);
-                device::async_detach_and_delete(device, true);
+                NT_VERIFY(NT_SUCCESS(device::on_send_complete(dev, request, seqnum, wsk_status)));
         }
 
         return StopCompletion;
