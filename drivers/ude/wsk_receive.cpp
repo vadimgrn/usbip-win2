@@ -460,7 +460,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::ret_command(_In_ const header &hdr, _Inout_ device_ctx &dev)
 {
 	auto request = hdr.command == RET_SUBMIT ? // request must be completed
-		       device::remove_request(dev, hdr.seqnum) : WDF_NO_HANDLE;
+		       device::begin_response(dev, hdr.seqnum) : WDF_NO_HANDLE;
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
 	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
@@ -519,8 +519,8 @@ bool usbip::validate(_Inout_ header &hdr)
 
 
 /*
- * Publish a terminal request status. The device completion DPC performs the
- * actual UDE completion.
+ * Publish a terminal request state. The device completion DPC performs the
+ * actual UDE completion after both response processing and WskSend are done.
  * @see Write a UDE client driver
  */
 _IRQL_requires_same_
@@ -562,7 +562,7 @@ void usbip::complete_now(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	}
 
 	if (status || urb_st) {
-		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix",
+		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
 			  req.seqnum, get_usbd_status(urb_st), status, info);
 	}
 

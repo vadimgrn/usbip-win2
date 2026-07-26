@@ -144,13 +144,8 @@ _IRQL_requires_same_
 void endpoint_purge(_In_ UDECXUSBENDPOINT endpoint)
 {
         auto &endp = *get_endpoint_ctx(endpoint);
-        auto &dev = *get_device_ctx(endp.device);
 
         TraceDbg("dev %04x, endp %04x, queue %04x", ptr04x(endp.device), ptr04x(endpoint), ptr04x(endp.queue));
-
-        while (auto request = device::remove_request(dev, endpoint)) {
-                device::send_cmd_unlink_and_cancel(endp.device, request);
-        }
 
         auto purge_complete = [] ([[maybe_unused]] auto queue, auto ctx) // EVT_WDF_IO_QUEUE_STATE
         { 

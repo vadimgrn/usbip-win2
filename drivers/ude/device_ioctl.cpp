@@ -49,25 +49,23 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 {
         wsk_context_ptr ctx(static_cast<wsk_context*>(context), true);
 
-        auto request = ctx->request; // can be WDF_NO_HANDLE or already completed
+        auto request = ctx->request; // can be WDF_NO_HANDLE
         auto &dev = *ctx->dev;
 
         auto &wsk = wsk_irp->IoStatus;
-        TraceWSK("req %04x -> wsk irp %04x, %!STATUS!, Information %Iu", 
+        TraceWSK("req %04x -> wsk irp %04x, %!STATUS!, Information %Iu",
                   ptr04x(request), ptr04x(wsk_irp), wsk.Status, wsk.Information);
 
         if (!request) {
                 // nothing to do
         } else if (NT_SUCCESS(wsk.Status)) {
                 ++dev.sent_requests;
-                if (auto seqnum = ctx.seqnum(true); auto err = device::mark_request_cancelable(dev, seqnum)) {
+                if (auto err = device::on_send_complete(dev, request, wsk.Status)) {
                         auto device = get_handle(&dev);
                         device::send_cmd_unlink_and_complete(device, request, err);
                 }
-        } else if (device::remove_request(dev, request, false)) {
-                complete(request, wsk.Status);
         } else {
-                TraceDbg("req %04x not found, could not complete", ptr04x(request));
+                NT_VERIFY(NT_SUCCESS(device::on_send_complete(dev, request, wsk.Status)));
         }
 
         if (wsk.Status == STATUS_FILE_FORCED_CLOSED && !get_flag(dev.unplugged)) {
@@ -160,6 +158,12 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Ino
 {
         auto request = ctx->request; // can be WDF_NO_HANDLE, do not access after send
 
+        if (request && endpoint) {
+                if (auto status = device::initialize_request(dev, request, endpoint)) {
+                        return status;
+                }
+        }
+
         if (auto &buf = ctx->wsk_buf; auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
                 return err;
         } else {
@@ -169,7 +173,7 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Ino
         }
 
         if (request && endpoint) {
-                device::append_request(dev, *ctx, endpoint);
+                device::append_request(dev, *ctx);
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -665,11 +669,11 @@ void NTAPI usbip::device::internal_control(
         auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
         auto &dev = *get_device_ctx(endp.device);
-        if (auto status = ensure_request_context(request, endpoint)) {
+        if (auto status = initialize_request(dev, request, endpoint)) {
                 UdecxUrbCompleteWithNtStatus(request, status); // low-resource fallback, cannot use the DPC without request_ctx
                 return;
         }
-
+        
         if (get_flag(dev.unplugged)) {
                 get_urb(request).UrbHeader.Status = USBD_STATUS_DEVICE_GONE;
                 complete(request, STATUS_SUCCESS);
