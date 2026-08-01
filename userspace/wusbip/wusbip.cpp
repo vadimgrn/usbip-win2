@@ -1400,7 +1400,7 @@ void MainFrame::on_toggle_receive(wxCommandEvent&)
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
                 auto &recv = tree.GetItemText(dev, COL_RECEIVE);
                 auto r = get_receive_val(recv) == receive::zero_copy ? receive::low_latency : receive::zero_copy;
-                auto val = get_receive_str(r);
+                auto &val = get_receive_str(r);
                 tree.SetItemText(dev, COL_RECEIVE, val);
         }
 }

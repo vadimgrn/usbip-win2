@@ -6,7 +6,7 @@
 
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
-- Works with Linux USB/IP server at least for kernels 4.19 - 6.17
+- Works with Linux USB/IP server at least for kernels 4.19 - 7.0
 - **[WHLK](https://en.wikipedia.org/wiki/Windows_Hardware_Lab_Kit) certified drivers**
   - WHLK certification was made possible thanks to [Open Source Codesigning Initiative](https://github.com/OSSign)
 - **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#install-usbip)** before installing USBip
@@ -27,21 +27,17 @@
   - [Memory Descriptor List](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) is used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
   - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data from URB transfer buffer
   - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
-- A dedicated thread is created for each virtual device to receive data from a server
-
-## Differences with [cezanne/usbip-win](https://github.com/cezanne/usbip-win)
-- The 2-Clause BSD License since release 0.9.7.0
-- WHLK certified drivers
-- Brand new UDE driver, not inherited from the parent repo
-- Full-featured GUI app
-- Userspace code is fully rewritten (libusbip and usbip utility)
-- SDK for third party developers (libusbip public API)
-- InnoSetup installer is used for installation of drivers and userspace stuff
-- Windows 10 version 1903 or later is required
-- C++ 23 is used for all projects
-- Visual Studio 2026 is used
-- Server (stub driver) is removed
-- x64/arm64 builds only
+- Two implementations of receiving data from the network
+  - Zero Copy
+    - this is the default
+    - for each virtual device, a dedicated thread is created that executes a loop with two blocking calls
+      - receive USBIP header
+      - receive USBIP payload, if any
+    - data is written directly to URB.TransferBuffer, there is no additional copying
+   - Low Latency
+     - WSK Event Callback Functions are used
+     - receive thread is not required
+     - data is first written to an intermediate ring buffer, then copied to URB.TransferBuffer
 
 ## Build
 
