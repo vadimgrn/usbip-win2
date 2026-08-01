@@ -23,7 +23,11 @@ namespace
 
 using namespace usbip;
 
-enum { ARG_TAG, ARG_URB };
+struct irp_args
+{
+        URB *urb;
+        void *tag;
+};
 
 _Function_class_(IO_COMPLETION_ROUTINE)
 _IRQL_requires_same_
@@ -33,13 +37,15 @@ NTSTATUS request_complete(
         _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         NT_ASSERT(!devobj);
-        auto &fltr = *static_cast<filter_ext*>(context);
 
-        libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, libdrv::argv<ARG_TAG>(irp));
+        auto &fltr = *static_cast<filter_ext*>(context);
+        auto &args = libdrv::get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp));
+
+        libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, args.tag);
         NT_ASSERT(lck.tag() != irp);
 
         libdrv::irp_ptr rip(irp);
-        libdrv::urb_ptr urb(fltr.device.usbd_handle, libdrv::argv<URB*, ARG_URB>(irp));
+        libdrv::urb_ptr urb(fltr.device.usbd_handle, args.urb);
 
         TraceDbg("dev %04x, irp %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
                   ptr04x(irp), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb.get())));
@@ -54,12 +60,13 @@ auto send_request(
 	_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, 
 	_Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
 {
-	libdrv::irp_ptr irp(fltr.target->StackSize, false);
+	libdrv::irp_ptr irp(fltr.target->StackSize + 1, false); // plus one for this driver's parameters
 	if (!irp) {
 		Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp error");
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 
+        IoSetNextIrpStackLocation(irp.get());
         auto next = IoGetNextIrpStackLocation(irp.get());
 
         next->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
@@ -74,8 +81,10 @@ auto send_request(
         IoSetCompletionRoutine(irp.get(), request_complete, &fltr, true, true, true);
 
         filter::pack_request(urb->UrbControlTransferEx, TransferBuffer.release(), function);
-        libdrv::argv<ARG_URB>(irp.get()) = urb.release();
-        libdrv::argv<ARG_TAG>(irp.get()) = lck.clear();
+
+        auto &args = libdrv::get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp.get()));
+        args.urb = urb.release();
+        args.tag = lck.clear();
 
         TraceDbg("dev %04x, irp %04x -> target %04x", ptr04x(fltr.self), ptr04x(irp.get()), ptr04x(fltr.target));
         return IoCallDriver(fltr.target, irp.release()); // completion routine will be called anyway

@@ -81,40 +81,16 @@ inline auto get_irp(_In_ LIST_ENTRY *entry)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-template<auto N>
-inline decltype(auto) argv(_In_ IRP *irp)
+template<typename T>
+inline auto& get_params_others(_In_ IO_STACK_LOCATION *loc)
 {
-        auto loc = IoGetCurrentIrpStackLocation(irp);
+        NT_ASSERT(loc);
         auto &p = loc->Parameters.Others;
 
-        static_assert(N >= 0);
-        static_assert(N < sizeof(p)/sizeof(p.Argument1));
+        static_assert(sizeof(T) <= sizeof(p));
+        static_assert(alignof(T) <= alignof(decltype(p))); 
 
-        return (&p.Argument1)[N];
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-template<typename R, auto N>
-inline decltype(auto) argv(_In_ IRP *irp)
-{
-        return static_cast<R>(argv<N>(irp));
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-template<auto N>
-inline decltype(auto) argvi(_In_ IRP *irp)
-{
-        return reinterpret_cast<uintptr_t&>(argv<N>(irp));
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-template<typename R, auto N>
-inline decltype(auto) argvi(_In_ IRP *irp)
-{
-        return static_cast<R>(argvi<N>(irp));
+        return reinterpret_cast<T&>(p);
 }
 
 _IRQL_requires_same_

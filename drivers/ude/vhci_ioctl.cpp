@@ -20,7 +20,6 @@
 #include <libdrv/dbgcommon.h>
 #include <libdrv/strconv.h>
 #include <libdrv/utils.h>
-#include <libdrv/irp.h>
 
 #include <ntstrsafe.h>
 #include <usbuser.h>
@@ -33,7 +32,12 @@ using namespace usbip;
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
 
-enum { ARG_INFO, ARG_FUNCTION, ARG_AI };
+struct irp_args
+{
+        ULONG_PTR info;
+        const char *function;
+        const ADDRINFOEXW *ai;
+};
 
 struct workitem_ctx
 {
@@ -44,22 +48,21 @@ struct workitem_ctx
         auto& ext() const { return get_device_ctx_ext(ctx_ext); }
 
         ADDRINFOEXW *addrinfo; // list head
+        irp_args args;
         bool one_attempt;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto set_args(_In_ WDFREQUEST request, _In_ const char *function, _In_opt_ const ADDRINFOEXW *ai = nullptr)
+PAGED void set_args(
+        _Inout_ irp_args &r, _In_ WDFREQUEST request,
+        _In_ const char *function, _In_opt_ const ADDRINFOEXW *ai = nullptr)
 {
         PAGED_CODE();
-        auto irp = WdfRequestWdmGetIrp(request);
-
-        libdrv::argvi<ARG_INFO>(irp) = WdfRequestGetInformation(request); // backup
-        libdrv::argv<ARG_FUNCTION>(irp) = const_cast<char*>(function);
-        libdrv::argv<ARG_AI>(irp) = const_cast<ADDRINFOEXW*>(ai);
-
-        return irp;
+        r.info = WdfRequestGetInformation(request); // backup
+        r.function = function;
+        r.ai = ai;
 }
 
 _IRQL_requires_same_
@@ -357,7 +360,9 @@ PAGED auto create_socket(_Inout_ SOCKET* &sock, _In_ const ADDRINFOEXW &ai, _In_
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto connect(
-        _In_ WDFREQUEST request, _In_ WDFWORKITEM wi, _Inout_ device_ctx_ext &ext, _In_ const ADDRINFOEXW &ai)
+        _In_ WDFREQUEST request,
+        _In_ WDFWORKITEM wi, _Inout_ workitem_ctx &ctx,
+        _Inout_ device_ctx_ext &ext, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
 
@@ -373,7 +378,9 @@ PAGED auto connect(
                 return err;
         }
 
-        auto irp = set_args(request, __func__, &ai);
+        set_args(ctx.args, request, __func__, &ai);
+
+        auto irp = WdfRequestWdmGetIrp(request);
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
 
         auto st = connect(ext.sock, ai.ai_addr, irp); // completion handler will be called anyway
@@ -403,7 +410,7 @@ PAGED auto on_connect(
                 free(ext.sock);
 
                 if (st != STATUS_CANCELLED && ai.ai_next) {
-                        st = connect(request, wi, ext, *ai.ai_next);
+                        st = connect(request, wi, ctx, ext, *ai.ai_next);
                 }
         }
 
@@ -422,22 +429,19 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto &ext = ctx.ext(); 
 
         auto request = ctx.request;
-        auto irp = WdfRequestWdmGetIrp(request);
-
-        auto function = libdrv::argv<const char*, ARG_FUNCTION>(irp);
-        WdfRequestSetInformation(request, libdrv::argvi<ARG_INFO>(irp)); // restore
+        WdfRequestSetInformation(request, ctx.args.info); // restore
 
         auto st = WdfRequestGetStatus(request);
-        TraceDbg("%s %!STATUS!", function, st);
+        TraceDbg("%s %!STATUS!", ctx.args.function, st);
 
         if (get_flag(vhci.removing)) {
                 st = STATUS_CANCELLED;
                 TraceDbg("req %04x, set %!STATUS!, vhci is being removing", ptr04x(request), st);
-        } else if (auto ai = libdrv::argv<ADDRINFOEXW*, ARG_AI>(irp)) {
+        } else if (auto ai = ctx.args.ai) {
                 st = on_connect(request, wi, ctx, ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
-                st = connect(request, wi, ext, *ctx.addrinfo);
+                st = connect(request, wi, ctx, ext, *ctx.addrinfo);
         }
 
         if (st == STATUS_PENDING) {
@@ -522,7 +526,9 @@ PAGED void getaddrinfo(
                 .ai_protocol = IPPROTO_TCP // zero isn't work
         };
 
-        auto irp = set_args(request, __func__);
+        set_args(ctx.args, request, __func__);
+
+        auto irp = WdfRequestWdmGetIrp(request);
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
 
         NT_ASSERT(!ctx.addrinfo);
