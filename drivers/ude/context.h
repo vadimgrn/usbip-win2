@@ -181,10 +181,11 @@ struct endpoint_ctx
 {
         UDECXUSBDEVICE device; // parent
         WDFQUEUE queue; // child
-        USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
 
-        // UCHAR interface_number; // interface to which it belongs
-        // UCHAR alternate_setting;
+        union { // some descriptors have extra bytes beyond sizeof(USB_ENDPOINT_DESCRIPTOR)
+                USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
+                UCHAR descriptor_raw[USB_DESCR_MAXLEN];
+        };
 
         USBD_PIPE_HANDLE PipeHandle;
         LIST_ENTRY entry; // list head if default control pipe, protected by device_ctx::endpoint_list_lock

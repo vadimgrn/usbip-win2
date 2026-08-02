@@ -300,8 +300,20 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 return STATUS_DEVICE_NOT_CONNECTED;
         }
 
-        auto &epd = data->EndpointDescriptor ? *data->EndpointDescriptor : EP0;
+        auto ep0 = !data->EndpointDescriptor;
+        auto &epd = ep0 ? EP0 : *data->EndpointDescriptor;
+
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, epd.bEndpointAddress);
+
+        if (ep0) {
+                //
+        } else if (auto len = data->EndpointDescriptorBufferLength;
+                   !(len == epd.bLength && len <= sizeof(endpoint_ctx::descriptor_raw))) {
+                Trace(TRACE_LEVEL_ERROR, "EndpointDescriptorBufferLength(%lu) <= %Iu, bLength %d",
+                                          len, sizeof(endpoint_ctx::descriptor_raw), epd.bLength);
+
+                return STATUS_INVALID_BUFFER_SIZE;
+        }
 
         UDECX_USB_ENDPOINT_CALLBACKS cb;
         UDECX_USB_ENDPOINT_CALLBACKS_INIT(&cb, endpoint_reset);
@@ -326,16 +338,13 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         endp.device = device;
         InitializeListHead(&endp.entry);
 
-        if (auto len = data->EndpointDescriptorBufferLength) {
-                NT_ASSERT(epd.bLength == len);
-                NT_ASSERT(sizeof(endp.descriptor) >= len);
-                RtlCopyMemory(&endp.descriptor, &epd, len);
-                insert_endpoint_list(endp);
-        } else { // default control pipe always added first
-                NT_ASSERT(epd == EP0);
+        if (ep0) { // default control pipe always added first
                 static_cast<USB_ENDPOINT_DESCRIPTOR&>(endp.descriptor) = epd;
                 dev.ep0 = endpoint;
                 dev.ep0_added = true;
+        } else {
+                RtlCopyMemory(endp.descriptor_raw, &epd, data->EndpointDescriptorBufferLength);
+                insert_endpoint_list(endp);
         }
 
         if (auto dispatch = usb_endpoint_type(epd) == UsbdPipeTypeControl ?
