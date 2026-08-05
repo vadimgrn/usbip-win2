@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -20,41 +20,38 @@ namespace usbip
 namespace usbip::device
 {
 
-struct request_search
-{
-        request_search(_In_ WDFREQUEST req) : request(req), what(REQUEST) {}
-        request_search(_In_ UDECXUSBENDPOINT endp) : endpoint(endp), what(ENDPOINT) {}
-
-        request_search(_In_ seqnum_t n) : 
-                request(reinterpret_cast<WDFREQUEST>(static_cast<uintptr_t>(n))), // for operator bool correctness
-                what(SEQNUM) { NT_ASSERT(seqnum == n); }
-
-        explicit operator bool() const { return request; }; // largest in union
-        auto operator !() const { return !request; }
-
-        auto multimatch() const { return what == ENDPOINT; }
-
-        union {
-                WDFREQUEST request{};
-                UDECXUSBENDPOINT endpoint;
-                seqnum_t seqnum;
-        };
-
-        enum what_t { SEQNUM, REQUEST, ENDPOINT };
-        what_t what; // union's member selector
-};
-
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS create_request_completion_dpc(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk, _In_ UDECXUSBENDPOINT endpoint);
+NTSTATUS initialize_request(_Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endpoint);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS mark_request_cancelable(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum);
+void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST remove_request(_Inout_ device_ctx &dev, _In_ const request_search &crit, _In_ bool unmark_cancelable = true);
+NTSTATUS on_send_complete(
+        _Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ seqnum_t seqnum, _In_ NTSTATUS send_status);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+WDFREQUEST begin_response(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void finish_response(_In_ WDFREQUEST request, _In_ NTSTATUS status);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void finish_request(_In_ WDFREQUEST request, _In_ NTSTATUS status);
+
+_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void cancel_queued_request(_In_ WDFQUEUE queue, _In_ WDFREQUEST request);
 
 } // namespace usbip::device

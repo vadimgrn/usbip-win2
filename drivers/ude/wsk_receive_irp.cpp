@@ -14,6 +14,7 @@
 #include "wsk_receive.h"
 #include "wsk_context.h"
 #include "urbtransfer.h"
+#include "request_list.h"
 
 #include <libdrv/wait_timeout.h>
 #include <libdrv/usbd_helper.h>
@@ -30,7 +31,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 {
         PAGED_CODE();
-        complete(request, status);
+        device::finish_response(request, status);
         request = WDF_NO_HANDLE;
 }
 

@@ -12,6 +12,7 @@
 #include "ring_buffer.h"
 #include "wsk_context.h"
 #include "wsk_receive.h"
+#include "request_list.h"
 
 #include <libdrv/pdu.h>
 
@@ -73,7 +74,7 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
                 rb.skip(sizeof(hdr));
 
                 auto st = ret_submit(ctx); // must consume payload
-                complete(ctx.request, st);
+                device::finish_response(ctx.request, st);
 
                 if (rb.size() != expected) [[unlikely]] {
                         Trace(TRACE_LEVEL_ERROR, "dev %04x, ring buffer size %Iu != %Iu", 
