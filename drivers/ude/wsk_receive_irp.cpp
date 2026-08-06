@@ -31,7 +31,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED void complete_and_set_null(_Inout_ WDFREQUEST &request, _In_ NTSTATUS status)
 {
         PAGED_CODE();
-        device::finish_response(request, status);
+        device::enqueue_for_completion(request, status);
         request = WDF_NO_HANDLE;
 }
 

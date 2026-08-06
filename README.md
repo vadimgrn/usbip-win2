@@ -29,14 +29,14 @@
   - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
 - Two implementations of receiving data from the network
   - Zero Copy
-    - this is the default
-    - for each virtual device, a dedicated thread is created that executes a loop with two blocking calls
+    - this is the default implementation
+    - a dedicated thread is created for each virtual device to execute a loop with two blocking calls
       - receive USBIP header
-      - receive USBIP payload, if any
-    - data is written directly to URB.TransferBuffer, there is no additional copying
+      - receive USBIP payload (if any)
+    - data is written directly to URB.TransferBuffer without any additional copying
    - Low Latency
-     - WSK Event Callback Functions are used
-     - receive thread is not required
+     - [WSK event callback functions](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/using-winsock-kernel-functions-vs--event-callback-functions) are used
+     - A dedicated receive thread is not required
      - data is first written to an intermediate ring buffer, then copied to URB.TransferBuffer
 
 ## Build

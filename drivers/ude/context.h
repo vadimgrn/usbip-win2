@@ -146,11 +146,9 @@ struct device_ctx
         LIST_ENTRY requests; // list head, requests that are waiting for USBIP_RET_SUBMIT from a server
         WDFSPINLOCK requests_lock;
 
-        // Requests whose terminal state is ready are completed by request_completion_dpc.
-        // request_completion_dpc_active and this list are protected by requests_lock.
-        LIST_ENTRY request_completions;
+        // requests whose terminal state is ready are completed by request_completion_dpc
+        LIST_ENTRY request_completions; // protected by requests_lock
         WDFDPC request_completion_dpc;
-        bool request_completion_dpc_active;
 
         // statistics
         UINT64 sent_requests; // were sent successfully
@@ -215,18 +213,15 @@ struct request_ctx
 {
         LIST_ENTRY entry; // head is device_ctx::requests
         LIST_ENTRY completion_entry; // head is device_ctx::request_completions
+
         UDECXUSBENDPOINT endpoint;
         seqnum_t seqnum;
 
         NTSTATUS completion_status;
-        bool listed;
         bool cancelable;
-        bool send_pending;
+        bool send_completion_pending;
         bool response_in_progress;
         bool terminal;
-        // committed to completion; stays true while the DPC owns the entry,
-        // reset only when the WDFREQUEST is reused for a new transfer
-        bool completion_queued;
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(request_ctx, get_request_ctx)
 

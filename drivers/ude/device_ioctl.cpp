@@ -55,6 +55,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
 
         auto &wsk = wsk_irp->IoStatus;
         auto wsk_status = wsk.Status;
+
         TraceWSK("req %04x -> wsk irp %04x, %!STATUS!, Information %Iu", 
                   ptr04x(request), ptr04x(wsk_irp), wsk_status, wsk.Information);
 
@@ -154,28 +155,12 @@ void send_pending(_Inout_ device_ctx &dev)
         } while (!(libdrv::empty(&dev.pending_sends) || InterlockedExchange(&dev.sending, true)));
 }
 
-/*
- * switch (wdf::Lock lck(...); auto st = send(...))
- * is not used due to unspecified evaluation order of init-statement and condition.
- * switch (init-statement; condition) {} can be treated as:
- * {
- *      auto c = condition;
- *      init-statement;
- *      switch (c) {}
- * }
- */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Inout_ device_ctx &dev,
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
         auto request = ctx->request; // can be WDF_NO_HANDLE, do not access after send
-
-        if (request && endpoint) {
-                if (auto status = device::initialize_request(dev, request, endpoint)) {
-                        return status;
-                }
-        }
 
         if (auto &buf = ctx->wsk_buf; auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
                 return err;
@@ -186,7 +171,10 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Ino
         }
 
         if (request && endpoint) {
-                device::append_request(dev, *ctx);
+                if (auto err = device::init_request_ctx(request, endpoint)) [[unlikely]] {
+                        return err;
+                }
+                device::add_request_to_sent_list(dev, request, ctx->hdr.seqnum);
         }
 
         byteswap_header(ctx->hdr, swap_dir::host2net);
@@ -546,7 +534,7 @@ void usbip::device::send_cmd_unlink_and_complete(_In_ UDECXUSBDEVICE device, _In
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, seqnum %u, wsk_context_ptr error", ptr04x(device), req.seqnum);
         }
 
-        complete(request, status);
+        device::enqueue_for_completion(request, status);
 }
 
 _IRQL_requires_same_
@@ -681,19 +669,19 @@ void NTAPI usbip::device::internal_control(
 
         auto endpoint = get_endpoint(queue);
         auto &endp = *get_endpoint_ctx(endpoint);
-        auto &dev = *get_device_ctx(endp.device);
-        if (auto status = initialize_request(dev, request, endpoint)) {
-                UdecxUrbCompleteWithNtStatus(request, status); // low-resource fallback, cannot use the DPC without request_ctx
+
+        if (auto err = init_request_ctx(request, endpoint)) {
+                UdecxUrbCompleteWithNtStatus(request, err); // low-resource fallback, cannot use the DPC without request_ctx
                 return;
         }
-        
-        if (get_flag(dev.unplugged)) {
+
+        if (auto &dev = *get_device_ctx(endp.device); get_flag(dev.unplugged)) {
                 get_urb(request).UrbHeader.Status = USBD_STATUS_DEVICE_GONE;
-                complete(request, STATUS_SUCCESS);
+                device::enqueue_for_completion(request, STATUS_SUCCESS);
         } else if (auto st = usb_submit_urb(dev, endpoint, endp, request); st != STATUS_PENDING) {
                 if (st) {
                         TraceDbg("%!STATUS!", st);
                 }
-                complete(request, st);
+                device::enqueue_for_completion(request, st);
         }
 }

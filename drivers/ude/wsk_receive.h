@@ -27,24 +27,6 @@ NTSTATUS ret_submit(_Inout_ wsk_context &ctx);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status);
-
-_IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
-void complete_now(_In_ WDFREQUEST request, _In_ NTSTATUS status);
-
-/*
- * ret_submit() set URB.UrbHeader.Status, atomic_complete set IRP.IoStatus.Status
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void complete(_In_ WDFREQUEST request)
-{
-        complete(request, WdfRequestGetStatus(request));
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto& get_ret_submit(_In_ const header &hdr)
 {
         NT_ASSERT(hdr.command == RET_SUBMIT);

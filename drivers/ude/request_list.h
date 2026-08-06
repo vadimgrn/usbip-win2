@@ -26,11 +26,11 @@ PAGED NTSTATUS create_request_completion_dpc(_In_ UDECXUSBDEVICE device, _Inout_
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS initialize_request(_Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endpoint);
+NTSTATUS init_request_ctx(_In_ WDFREQUEST request, _In_ UDECXUSBENDPOINT endpoint);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void append_request(_Inout_ device_ctx &dev, _In_ const wsk_context &wsk);
+void add_request_to_sent_list(_Inout_ device_ctx &dev, _In_ WDFREQUEST request, _In_ seqnum_t seqnum);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -39,19 +39,10 @@ NTSTATUS on_send_complete(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-WDFREQUEST begin_response(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum);
+WDFREQUEST find_sent_request(_Inout_ device_ctx &dev, _In_ seqnum_t seqnum);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void finish_response(_In_ WDFREQUEST request, _In_ NTSTATUS status);
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void finish_request(_In_ WDFREQUEST request, _In_ NTSTATUS status);
-
-_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void cancel_queued_request(_In_ WDFQUEUE queue, _In_ WDFREQUEST request);
+void enqueue_for_completion(_In_ WDFREQUEST request, _In_ NTSTATUS status);
 
 } // namespace usbip::device

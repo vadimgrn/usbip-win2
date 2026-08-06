@@ -74,7 +74,7 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
                 rb.skip(sizeof(hdr));
 
                 auto st = ret_submit(ctx); // must consume payload
-                device::finish_response(ctx.request, st);
+                device::enqueue_for_completion(ctx.request, st);
 
                 if (rb.size() != expected) [[unlikely]] {
                         Trace(TRACE_LEVEL_ERROR, "dev %04x, ring buffer size %Iu != %Iu", 

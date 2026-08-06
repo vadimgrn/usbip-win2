@@ -72,7 +72,6 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         NT_ASSERT(libdrv::empty(&dev.pending_sends));
         NT_ASSERT(IsListEmpty(&dev.requests));
         NT_ASSERT(IsListEmpty(&dev.request_completions));
-        NT_ASSERT(!dev.request_completion_dpc_active);
         NT_ASSERT(get_flag(dev.unplugged));
         NT_ASSERT(!dev.port);
         NT_ASSERT(!dev.recv_thread);
@@ -245,6 +244,18 @@ NTSTATUS function_suspend_and_wake(
         return STATUS_SUCCESS;
 }
 
+_Function_class_(EVT_WDF_IO_QUEUE_IO_CANCELED_ON_QUEUE)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void cancel_queued_request(_In_ WDFQUEUE queue, _In_ WDFREQUEST request)
+{
+        if (auto endp = get_endpoint(queue); auto err = device::init_request_ctx(request, endp)) {
+                UdecxUrbCompleteWithNtStatus(request, err); // low-resource fallback, cannot use the DPC without request_ctx
+        } else {
+                device::enqueue_for_completion(request, STATUS_CANCELLED);
+        }
+}
+
 /*
  * UDE can call EvtIoInternalDeviceControl concurrently for different queues of the same device.
  * I've caught concurrent CTRL and BULK transfer for a flash drive. 
@@ -272,7 +283,7 @@ PAGED auto create_endpoint_queue(
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, dispatch_type);
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoInternalDeviceControl = device::internal_control;
-        cfg.EvtIoCanceledOnQueue = device::cancel_queued_request;
+        cfg.EvtIoCanceledOnQueue = cancel_queued_request;
 
         WDF_OBJECT_ATTRIBUTES attr;
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, UDECXUSBENDPOINT);
@@ -530,7 +541,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         InitializeListHead(&dev.requests);
         InitializeListHead(&dev.request_completions);
         InitializeSListHead(&dev.pending_sends);
-        dev.request_completion_dpc_active = false;
 
         return device::create_request_completion_dpc(device, dev);
 }

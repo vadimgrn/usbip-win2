@@ -269,7 +269,7 @@ auto update_from_registry(
                 for (auto [col_bit, col] : get_saved_rw_pairs()) {
                         if (columns & col_bit) {
                                 dc[col] = (*i)[col];
-                                wxASSERT(!(flags & mkflag(col)));
+                                wxASSERT((col == COL_RECEIVE) == bool(flags & mkflag(col)));
                                 flags |= mkflag(col);
                         }
                 }

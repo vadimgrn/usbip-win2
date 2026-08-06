@@ -460,7 +460,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 WDFREQUEST usbip::ret_command(_In_ const header &hdr, _Inout_ device_ctx &dev)
 {
 	auto request = hdr.command == RET_SUBMIT ? // request must be completed
-		       device::begin_response(dev, hdr.seqnum) : WDF_NO_HANDLE;
+		       device::find_sent_request(dev, hdr.seqnum) : WDF_NO_HANDLE;
 
 	char buf[DBG_USBIP_HDR_BUFSZ];
 	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
@@ -515,60 +515,4 @@ bool usbip::validate(_Inout_ header &hdr)
 	}
 
 	return ok;
-}
-
-
-/*
- * Publish a terminal request state. The device completion DPC performs the
- * actual UDE completion after both response processing and WskSend are done.
- * @see Write a UDE client driver
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
-{
-	device::finish_request(request, status);
-}
-
-/*
- * UDE requires URBs to be completed from a separate DPC at DISPATCH_LEVEL.
- * This routine is called only by request_completion_dpc.
- */
-_IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
-void usbip::complete_now(_In_ WDFREQUEST request, _In_ NTSTATUS status)
-{
-	NT_ASSERT(KeGetCurrentIrql() == DISPATCH_LEVEL);
-	auto irp = WdfRequestWdmGetIrp(request);
-
-	auto info = irp->IoStatus.Information;
-	NT_ASSERT(info == WdfRequestGetInformation(request));
-
-	auto &req = *get_request_ctx(request);
-
-	if (!libdrv::has_urb(irp)) {
-		if (status) {
-			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
-		}
-		WdfRequestComplete(request, status);
-		return;
-	}
-
-	auto &urb = *libdrv::urb_from_irp(irp);
-	auto &urb_st = urb.UrbHeader.Status;
-
-	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
-		urb_st = USBD_STATUS_CANCELED; // FIXME: is this really required?
-	}
-
-	if (status || urb_st) {
-		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
-			  req.seqnum, get_usbd_status(urb_st), status, info);
-	}
-
-	if (NT_SUCCESS(status)) {
-		UdecxUrbComplete(request, urb_st);
-	} else {
-		UdecxUrbCompleteWithNtStatus(request, status);
-	}
 }
