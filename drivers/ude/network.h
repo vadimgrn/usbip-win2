@@ -24,15 +24,19 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool close_socket(_In_ SOCKET *sock);
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
+PAGED NTSTATUS send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len);
+PAGED NTSTATUS recv(_In_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len);
+
+_IRQL_requires_same_
+_IRQL_requires_(APC_LEVEL)
+PAGED NTSTATUS set_recvbuf_size(_In_ SOCKET *sock, _In_ ULONG size);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED USBIP_STATUS recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code);
+PAGED USBIP_STATUS recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code);
 
 enum : ULONG { URB_BUF_LEN = MAXULONG }; // set mdl_size to URB.TransferBufferLength
 

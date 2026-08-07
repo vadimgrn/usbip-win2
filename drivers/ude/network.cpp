@@ -16,8 +16,11 @@
 
 #include <libusbip/src/op_common.h>
 
-namespace {
+namespace
+{
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto make_priority( _In_ LOCK_OPERATION operation)
 {
         return NormalPagePriority | MdlMappingNoExecute | 
@@ -28,7 +31,7 @@ constexpr auto make_priority( _In_ LOCK_OPERATION operation)
 
 
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
+PAGED NTSTATUS usbip::send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
 
@@ -43,7 +46,7 @@ PAGED NTSTATUS usbip::send(_Inout_ SOCKET *sock, _In_ memory pool, _In_ void *da
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len)
+PAGED NTSTATUS usbip::recv(_In_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
 
@@ -58,7 +61,7 @@ PAGED NTSTATUS usbip::recv(_Inout_ SOCKET *sock, _In_ memory pool, _Inout_ void 
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED USBIP_STATUS usbip::recv_op_common(_Inout_ SOCKET *sock, _In_ UINT16 expected_code)
+PAGED USBIP_STATUS usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected_code)
 {
         PAGED_CODE();
 
@@ -204,4 +207,31 @@ PAGED bool usbip::close_socket(_In_ SOCKET *sock)
         NT_ASSERT(close(sock) == STATUS_NOT_SUPPORTED);
 
         return true;
+}
+
+/**
+ * Advanced network drivers sometimes set SO_RCVBUF to exactly 0.
+ * Purpose: This bypasses the intermediate Ancillary Function Driver (AFD.sys) kernel copying buffers entirely.
+ * Requirement: You should only do this if your WSK driver is actively utilizing standard,
+ * asynchronous WskReceive IRP pipelines instead of event callbacks. By bypassing the internal kernel buffer,
+ * the network card will directly copy incoming packet payloads into the explicit MDL (Memory Descriptor List)
+ * memory buffers provided by your pending IRPs.
+ *
+ * The Problem:
+ * When SO_RCVBUF is 0, TCP cannot slide its window or acknowledge packets unless an explicit WSK
+ * receive IRP is actively pending. During the precise fraction of a millisecond where your driver
+ * is executing step 2 (processing the header and parsing the URB), there is no pending receive IRP.
+ * Because AFD.sys has no buffer to absorb incoming stream data during that window, the local TCP stack
+ * will freeze its advertised window size to 0, choking the network sender and stalling the connection
+ * pipeline.
+ * 
+ * @param size pass zero to bypasses AFD.sys copying completely
+ */
+_IRQL_requires_same_
+_IRQL_requires_(APC_LEVEL)
+PAGED NTSTATUS usbip::set_recvbuf_size(_In_ SOCKET *sock, _In_ ULONG size)
+{
+        PAGED_CODE();
+        return control(sock, WskSetOption, SO_RCVBUF, SOL_SOCKET,
+                       sizeof(size), &size, 0, nullptr, nullptr, true, nullptr);
 }
