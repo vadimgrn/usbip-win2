@@ -188,7 +188,8 @@ struct endpoint_ctx
 
         union { // some descriptors have extra bytes beyond sizeof(USB_ENDPOINT_DESCRIPTOR)
                 USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
-                UCHAR descriptor_raw[USB_DESCR_MAXLEN];
+                UCHAR descriptor_raw[MAXUCHAR];
+                static_assert(sizeof(USB_COMMON_DESCRIPTOR::bLength) == sizeof(UCHAR));
         };
 
         USBD_PIPE_HANDLE PipeHandle;

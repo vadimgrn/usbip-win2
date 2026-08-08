@@ -322,13 +322,8 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
 
         UdecxUsbEndpointInitSetEndpointAddress(data->UdecxUsbEndpointInit, epd.bEndpointAddress);
 
-        if (ep0) {
-                //
-        } else if (auto len = data->EndpointDescriptorBufferLength;
-                   !(len == epd.bLength && len <= sizeof(endpoint_ctx::descriptor_raw))) {
-                Trace(TRACE_LEVEL_ERROR, "EndpointDescriptorBufferLength(%lu) <= %Iu, bLength %d",
-                                          len, sizeof(endpoint_ctx::descriptor_raw), epd.bLength);
-
+        if (auto len = data->EndpointDescriptorBufferLength; !(ep0 || len == epd.bLength)) {
+                Trace(TRACE_LEVEL_ERROR, "EndpointDescriptorBufferLength(%lu) != bLength(%d)", len, epd.bLength);
                 return STATUS_INVALID_BUFFER_SIZE;
         }
 

@@ -8,8 +8,6 @@
 #include <wdm.h>
 #include <usb.h>
 
-enum : UCHAR { USB_DESCR_MAXLEN = MAXUCHAR }; // UCHAR bLength;
-
 enum { // <uapi/linux/usb/ch9.h>
 
 /*

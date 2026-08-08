@@ -427,8 +427,8 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto &ctx = *get_workitem_ctx(wi);
         auto &vhci = *get_vhci_ctx(ctx.vhci);
 
-        auto &ext = ctx.ext();
-        wdf::ObjectRef ext_ref(ctx.ctx_ext); // on_connect/connected can WdfObjectDelete/null it
+        auto &ext = get_device_ctx_ext(ctx.ctx_ext);
+        wdf::ObjectRef ext_ref(ctx.ctx_ext); // on_connect/connected can WdfObjectDelete it
 
         auto request = ctx.request;
         WdfRequestSetInformation(request, ctx.args.info); // restore
