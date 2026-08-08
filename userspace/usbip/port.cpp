@@ -28,7 +28,7 @@ void print(const imported_device &d)
            -> usbip://{}:{}/{}
            -> remote bus/dev: {:03}/{:03}
            -> serial: {}
-           -> receive: {})";
+           -> mode: {})";
 
         auto &loc = d.location;
 
@@ -37,7 +37,7 @@ void print(const imported_device &d)
                         loc.hostname, loc.service, loc.busid,
                         bus, dev,
                         d.serial,
-                        get_receive_str(d.recv));
+                        to_string(d.recv_mode));
 }
 
 } // namespace
@@ -83,7 +83,7 @@ bool usbip::cmd_port(void *p)
                                 persistent_device pd {
                                         .location = std::move(d.location),
                                         .serial = std::move(d.serial),
-                                        .recv = d.recv
+                                        .recv_mode = d.recv_mode
                                 };
                                 persistent->push_back(std::move(pd));
                         }

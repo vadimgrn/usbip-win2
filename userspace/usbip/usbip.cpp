@@ -87,12 +87,12 @@ void add_cmd_attach(CLI::App &app)
         auto stop = rem->add_flag("-x,--stop", r.stop, "Stop attach attempts to this device");
         rem->add_flag("--once", r.once, "Do not start automatic attach attempts if cannot connect")->excludes(stop);
 
-        auto receive = [&recv = r.recv, low_lat = str_low_latency] (const auto &choice)
+        auto receive = [&mode = r.recv_mode, low_lat = str_low_latency] (const auto &choice)
         {
-                recv = choice == low_lat ? receive::low_latency : receive::zero_copy;
+                mode = choice == low_lat ? receive_mode::low_latency : receive_mode::zero_copy;
         };
 
-        rem->add_option_function<std::string>("--receive", receive, "How to receive data from the network")
+        rem->add_option_function<std::string>("--receive-mode", receive, "How to receive data from the network")
                 ->check(CLI::IsMember({str_zero_copy, str_low_latency}))
                 ->default_str(str_zero_copy)
                 ->excludes(stop);
@@ -223,9 +223,9 @@ auto run(int argc, wchar_t *argv[])
 } // namespace
 
 
-const char* usbip::get_receive_str(_In_ receive recv) noexcept
+const char* usbip::to_string(_In_ receive_mode mode) noexcept
 {
-        return recv == receive::low_latency ? str_low_latency : str_zero_copy;
+        return mode == receive_mode::low_latency ? str_low_latency : str_zero_copy;
 }
 
 std::string usbip::GetLastErrorMsg(unsigned long msg_id)

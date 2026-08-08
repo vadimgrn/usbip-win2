@@ -15,8 +15,8 @@ namespace usbip
 class UsbIds;
 const UsbIds& get_ids();
 
-enum class receive;
-const char *get_receive_str(_In_ receive recv) noexcept;
+enum class receive_mode;
+const char *to_string(_In_ receive_mode mode) noexcept;
 
 std::string GetLastErrorMsg(unsigned long msg_id = ~0UL);
 
@@ -37,7 +37,7 @@ struct attach_args
         bool terse{};
         bool stop{};
         bool once{};
-        receive recv{}; // receive::zero_copy;
+        receive_mode recv_mode{}; // receive_mode::zero_copy;
 
         // --persistent,--stashed
         bool persistent{};

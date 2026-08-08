@@ -42,8 +42,8 @@ class Frame : public wxFrame
 		enum
 		{
 			ID_EDIT_NOTES = 6000,
-			ID_TOGGLE_AUTO,
-			ID_TOGGLE_RECEIVE,
+			ID_FLIP_AUTO,
+			ID_FLIP_RECEIVE_MODE,
 			ID_EDIT_SERIAL,
 			ID_EDIT_GEN_SERIAL,
 			ID_ATTACH,
@@ -98,8 +98,8 @@ class Frame : public wxFrame
 		virtual void on_has_any_selected_devices_update_ui( wxUpdateUIEvent& event ) = 0;
 		virtual void on_edit_notes( wxCommandEvent& event ) = 0;
 		virtual void on_edit_device_update_ui( wxUpdateUIEvent& event ) = 0;
-		virtual void on_toggle_auto( wxCommandEvent& event ) = 0;
-		virtual void on_toggle_receive( wxCommandEvent& event ) = 0;
+		virtual void on_flip_auto( wxCommandEvent& event ) = 0;
+		virtual void on_flip_receive_mode( wxCommandEvent& event ) = 0;
 		virtual void on_edit_serial( wxCommandEvent& event ) = 0;
 		virtual void on_edit_gen_serial( wxCommandEvent& event ) = 0;
 		virtual void on_view_column( wxCommandEvent& event ) = 0;

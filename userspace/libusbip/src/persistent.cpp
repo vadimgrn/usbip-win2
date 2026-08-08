@@ -33,7 +33,7 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persiste
 
         for (auto &d: devices) {
                 auto &dl = d.location;
-                auto wsk_events = d.recv == receive::low_latency;
+                auto wsk_events = d.recv_mode == receive_mode::low_latency;
 
                 if (is_malformed(d)) {
                         libusbip::output("malformed persistent_device( hostname='{}', service='{}', "
@@ -93,7 +93,7 @@ auto parse_persistent_device(_In_ const std::string &str)
 
                 bool wsk_events;
                 unpack_attach_flags(dev.once, wsk_events, flags);
-                dev.recv = wsk_events ? receive::low_latency : receive::zero_copy;
+                dev.recv_mode = wsk_events ? receive_mode::low_latency : receive_mode::zero_copy;
         }
 
         return dev;

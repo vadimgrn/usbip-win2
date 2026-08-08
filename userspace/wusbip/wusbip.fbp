@@ -265,30 +265,30 @@
             <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Toggle Auto (aka Persistent) for selected devices</property>
-            <property name="id">ID_TOGGLE_AUTO</property>
+            <property name="help">Flip Auto (aka Persistent) for selected devices</property>
+            <property name="id">ID_FLIP_AUTO</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Toggle Auto</property>
-            <property name="name">m_toggle_auto</property>
+            <property name="label">Flip Auto</property>
+            <property name="name">m_flip_auto</property>
             <property name="permission">none</property>
             <property name="shortcut">CTRL+P</property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_toggle_auto</event>
+            <event name="OnMenuSelection">on_flip_auto</event>
             <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="wxMenuItem" expanded="true">
             <property name="bitmap">Load From File; </property>
             <property name="checked">0</property>
             <property name="enabled">1</property>
-            <property name="help">Toggle Receive for selected devices</property>
-            <property name="id">ID_TOGGLE_RECEIVE</property>
+            <property name="help">Flip Receive Mode for selected devices</property>
+            <property name="id">ID_FLIP_RECEIVE_MODE</property>
             <property name="kind">wxITEM_NORMAL</property>
-            <property name="label">Toggle Receive</property>
-            <property name="name">m_toggle_receive</property>
+            <property name="label">Flip Receive Mode</property>
+            <property name="name">m_flip_receive_mode</property>
             <property name="permission">none</property>
             <property name="shortcut"></property>
             <property name="unchecked_bitmap"></property>
-            <event name="OnMenuSelection">on_toggle_receive</event>
+            <event name="OnMenuSelection">on_flip_receive_mode</event>
             <event name="OnUpdateUI">on_has_selected_devices_update_ui</event>
           </object>
           <object class="separator" expanded="true">
@@ -326,11 +326,11 @@
             <event name="OnUpdateUI">on_edit_device_update_ui</event>
           </object>
         </object>
-        <object class="wxMenu" expanded="false">
+        <object class="wxMenu" expanded="true">
           <property name="label">View</property>
           <property name="name">m_menu_view</property>
           <property name="permission">protected</property>
-          <object class="submenu" expanded="false">
+          <object class="submenu" expanded="true">
             <property name="bitmap">Load From SVG Resource; VIEW_COLUMNS_SVG; VIEW_COLUMNS_SVG_DARK; [16; 16]</property>
             <property name="label">Columns</property>
             <property name="name">m_menu_columns</property>
@@ -493,7 +493,7 @@
               <property name="id">wxID_ANY</property>
               <property name="kind">wxITEM_CHECK</property>
               <property name="label">?</property>
-              <property name="name">m_view_receive</property>
+              <property name="name">m_view_receive_mode</property>
               <property name="permission">none</property>
               <property name="shortcut"></property>
               <property name="unchecked_bitmap"></property>
@@ -1510,7 +1510,7 @@
         <object class="wxTreeListCtrlColumn" expanded="true">
           <property name="alignment">wxALIGN_LEFT</property>
           <property name="flag">wxCOL_REORDERABLE|wxCOL_RESIZABLE|wxCOL_SORTABLE</property>
-          <property name="name">Receive</property>
+          <property name="name">Receive Mode</property>
           <property name="width">wxCOL_WIDTH_AUTOSIZE</property>
         </object>
         <object class="wxTreeListCtrlColumn" expanded="false">

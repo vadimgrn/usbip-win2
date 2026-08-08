@@ -23,9 +23,9 @@ auto attach_persistent_devices(HANDLE dev)
         } else for (auto &args: *v) {
                 auto &loc = args.location;
 
-                std::println("{}:{}/{}, serial '{}', receive:{}, once:{}", 
+                std::println("{}:{}/{}, serial '{}', mode:{}, once:{}", 
                               loc.hostname, loc.service, loc.busid, args.serial,
-                              get_receive_str(args.recv), args.once);
+                              to_string(args.recv_mode), args.once);
 
                 if (!vhci::attach(dev, args)) {
                         spdlog::error(GetLastErrorMsg());
@@ -73,7 +73,7 @@ bool usbip::cmd_attach(void *p)
                         .busid = std::move(args.busid),
                 },
                 .serial = std::move(args.serial),
-                .recv = args.recv,
+                .recv_mode = args.recv_mode,
                 .once = args.once,
         };
 

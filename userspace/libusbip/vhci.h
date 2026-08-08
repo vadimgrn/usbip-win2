@@ -31,7 +31,7 @@ namespace usbip
  *     to an intermediate ring buffer, then copied to URB.TransferBuffer
  *   - Should be used for devices like HID keyboard, mouse, etc.
  */
-enum class receive { zero_copy, low_latency };
+enum class receive_mode { zero_copy, low_latency };
 
 struct device_location
 {
@@ -49,7 +49,7 @@ struct persistent_device
 {
         device_location location;
         std::string serial; ///< optional device serial number if you want to set/override it
-        receive recv = receive::zero_copy; ///< how to optimize data reception over the network
+        receive_mode recv_mode = receive_mode::zero_copy; ///< how to optimize data reception over the network
         bool once{}; ///< do not start automatic attach attempts if cannot connect; for attach_args only
 };
 
@@ -65,7 +65,7 @@ struct imported_device
         UINT16 product{};
 
         std::string serial; ///< only filled if you set it in attach_args
-        receive recv = receive::zero_copy; ///< @see attach_args.recv
+        receive_mode recv_mode = receive_mode::zero_copy; ///< @see attach_args.recv_mode
 };
 
 enum class state { unplugged, connecting, connected, plugged, disconnected, unplugging };

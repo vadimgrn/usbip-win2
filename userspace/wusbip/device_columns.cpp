@@ -59,26 +59,26 @@ bool usbip::is_empty(_In_ const imported_device &d) noexcept
         return !d.devid;
 }
 
-const wxString& usbip::get_receive_str(_In_ receive recv) noexcept
+const wxString& usbip::to_string(_In_ receive_mode mode) noexcept
 {
-        return recv == receive::low_latency ? recv_low_latency : recv_zero_copy;
+        return mode == receive_mode::low_latency ? recv_low_latency : recv_zero_copy;
 }
 
-auto usbip::get_receive_val(_In_ const wxString &recv) noexcept -> receive
+auto usbip::to_receive_mode(_In_ const wxString &mode) noexcept -> receive_mode
 {
-        return recv == recv_low_latency ? receive::low_latency : receive::zero_copy;
+        return mode == recv_low_latency ? receive_mode::low_latency : receive_mode::zero_copy;
 }
 
-void usbip::validate_receive_str(_Inout_ wxString &receive)
+void usbip::validate_receive_mode(_Inout_ wxString &mode)
 {
-        if (auto ok = receive == recv_zero_copy || receive == recv_low_latency; !ok) {
-                receive = recv_zero_copy;
+        if (auto ok = mode == recv_zero_copy || mode == recv_low_latency; !ok) {
+                mode = recv_zero_copy;
         }
 }
 
 auto usbip::make_persistent_device(
         _In_ const wxString &url, _In_ const wxString &busid,
-        _In_ const wxString &serial, _In_ const wxString &receive) -> persistent_device
+        _In_ const wxString &serial, _In_ const wxString &recv_mode) -> persistent_device
 {
         wxString hostname;
         wxString service;
@@ -91,14 +91,14 @@ auto usbip::make_persistent_device(
                         .busid = busid.utf8_string()
                 },
                 .serial = serial.utf8_string(),
-                .recv = get_receive_val(receive)
+                .recv_mode = to_receive_mode(recv_mode)
         };
 }
 
 auto usbip::make_persistent_device(_In_ const device_columns &dc) -> persistent_device
 {
 	auto &url = get_url(dc);
-	return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE]);
+	return make_persistent_device(url, dc[COL_BUSID], dc[COL_SERIAL], dc[COL_RECEIVE_MODE]);
 }
 
 auto usbip::make_device_columns(_In_ const imported_device &dev) ->
@@ -107,8 +107,8 @@ auto usbip::make_device_columns(_In_ const imported_device &dev) ->
         auto res = std::make_pair(make_cmp_key(dev.location), 0U);
         auto& [dc, flags] = res;
 
-        dc[COL_RECEIVE] = get_receive_str(dev.recv);
-        flags |= mkflag(COL_RECEIVE);
+        dc[COL_RECEIVE_MODE] = to_string(dev.recv_mode);
+        flags |= mkflag(COL_RECEIVE_MODE);
 
         if (!dev.serial.empty()) {
                 dc[COL_SERIAL] = wxString::FromUTF8(dev.serial);

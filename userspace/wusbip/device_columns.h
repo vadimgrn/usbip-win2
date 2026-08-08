@@ -10,7 +10,7 @@
 namespace usbip
 {
 
-enum class receive;
+enum class receive_mode;
 struct persistent_device;
 struct device_location;
 struct imported_device;
@@ -27,8 +27,8 @@ enum column_pos_t { // columns order in the tree
         COL_NOTES,
         COL_DEVID,
         COL_SERIAL,
-        COL_RECEIVE,
-        COL_LAST_VISIBLE = COL_RECEIVE,
+        COL_RECEIVE_MODE,
+        COL_LAST_VISIBLE = COL_RECEIVE_MODE,
         COL_SOURCE_ID, // hidden
 
         UPD_COL_FIRST = COL_PORT,
@@ -57,14 +57,14 @@ constexpr auto mkflags(_In_ std::initializer_list<column_pos_t> columns) noexcep
 }
 static_assert(mkflags({COL_PORT, COL_SPEED, COL_VENDOR}) == 0b1110);
 
-const wxString& get_receive_str(_In_ receive recv) noexcept;
-receive get_receive_val(_In_ const wxString &receive) noexcept;
-void validate_receive_str(_Inout_ wxString &receive);
+const wxString& to_string(_In_ receive_mode mode) noexcept;
+receive_mode to_receive_mode(_In_ const wxString &mode) noexcept;
+void validate_receive_mode(_Inout_ wxString &mode);
 
 persistent_device make_persistent_device(_In_ const device_columns &dc);
 
 persistent_device make_persistent_device(
-        _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ const wxString &receive);
+        _In_ const wxString &url, _In_ const wxString &busid, _In_ const wxString &serial, _In_ const wxString &recv_mode);
 
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const imported_device &dev);
 std::pair<device_columns, unsigned int> make_device_columns(_In_ const device_state &st);

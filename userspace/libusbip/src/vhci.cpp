@@ -84,7 +84,7 @@ auto assign(_Inout_ vhci::imported_device_location &dst, _In_ const device_locat
 
 DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_args &args)
 {
-        r.wsk_events = args.recv == receive::low_latency;
+        r.wsk_events = args.recv_mode == receive_mode::low_latency;
 
         if (auto err = assign(r, args.serial)) {
                 return err;
@@ -126,7 +126,7 @@ auto make_imported_device(_In_ const vhci::imported_device &d)
                 .vendor = d.vendor,
                 .product = d.product,
                 .serial{ d.serial, strnlen(d.serial, std::size(d.serial)) },
-                .recv = d.wsk_events ? receive::low_latency : receive::zero_copy,
+                .recv_mode = d.wsk_events ? receive_mode::low_latency : receive_mode::zero_copy,
         };
 }
 

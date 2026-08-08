@@ -67,7 +67,7 @@ consteval auto get_saved_keys()
                 { L"vendor", COL_VENDOR },
                 { L"product", COL_PRODUCT },
                 { L"serial", COL_SERIAL },
-                { L"receive", COL_RECEIVE },
+                { L"receive_mode", COL_RECEIVE_MODE },
                 { L"notes", COL_NOTES },
         });
 }
@@ -114,8 +114,8 @@ void log(_In_ const device_state &st)
 
         auto s = std::format("{}:{}/{} {}, port {}, devid {:x}, speed {}, vid {:x}, pid {:x}, serial '{}', {}, source {:x}",
                               loc.hostname, loc.service, loc.busid, vhci::get_state_str(st.state), d.port, d.devid,
-                              static_cast<int>(d.speed), d.vendor, d.product, d.serial, get_receive_str(d.recv).utf8_string(),
-                              st.source_id);
+                              static_cast<int>(d.speed), d.vendor, d.product, d.serial,
+                              to_string(d.recv_mode).utf8_string(), st.source_id);
 
         wxLogVerbose(wxString::FromUTF8(s));
 }
@@ -127,7 +127,7 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
 
         auto s = wxString::Format(
                         L"%s:%s/%s, port '%s', devid '%s', speed '%s', vendor '%s', product '%s', "
-                        L"serial '%s', state '%s', auto '%s', receive '%s', notes '%s', source '%s'", 
+                        L"serial '%s', state '%s', auto '%s', mode '%s', notes '%s', source '%s'", 
                         prefix, url,
                         tree.GetItemText(dev, COL_BUSID),
                         tree.GetItemText(dev, COL_PORT),
@@ -138,7 +138,7 @@ void log(_In_ const wxTreeListCtrl &tree, _In_ wxTreeListItem dev, _In_ const wx
                         tree.GetItemText(dev, COL_SERIAL), 
                         tree.GetItemText(dev, COL_STATE), 
                         tree.GetItemText(dev, COL_PERSISTENT), 
-                        tree.GetItemText(dev, COL_RECEIVE), 
+                        tree.GetItemText(dev, COL_RECEIVE_MODE), 
                         tree.GetItemText(dev, COL_NOTES),
                         tree.GetItemText(dev, COL_SOURCE_ID));
 
@@ -168,20 +168,20 @@ auto load_license()
 }
 
 /*
- * COL_SERIAL, COL_RECEIVE are present in saved and persistent.
+ * COL_SERIAL, COL_RECEIVE_MODE are present in saved and persistent.
  */
 enum columns : unsigned int {
         saved_read_only = 1,
         saved_notes = 2,
         saved_serial = 4,
-        saved_receive = 8,
-        saved_read_write = saved_notes | saved_serial | saved_receive,
+        saved_recv_mode = 8,
+        saved_read_write = saved_notes | saved_serial | saved_recv_mode,
         saved_all = saved_read_only | saved_read_write,
 
         pers_persistent = 16,
         pers_serial = 32,
-        pers_receive = 64,
-        pers_all = pers_persistent | pers_serial | pers_receive
+        pers_recv_mode = 64,
+        pers_all = pers_persistent | pers_serial | pers_recv_mode
 };
 
 constexpr auto get_saved_rw_pairs()
@@ -189,7 +189,7 @@ constexpr auto get_saved_rw_pairs()
         return std::to_array<std::pair<columns, column_pos_t>>({
                 { columns::saved_notes, COL_NOTES },
                 { columns::saved_serial, COL_SERIAL },
-                { columns::saved_receive, COL_RECEIVE },
+                { columns::saved_recv_mode, COL_RECEIVE_MODE },
         });
 }
 
@@ -245,9 +245,9 @@ auto update_from_registry(
                         flags |= mkflag(COL_SERIAL);
                 }
 
-                if (columns & columns::pers_receive) {
-                        dc[COL_RECEIVE] = get_receive_str(pd->recv);
-                        wxASSERT(flags & mkflag(COL_RECEIVE));
+                if (columns & columns::pers_recv_mode) {
+                        dc[COL_RECEIVE_MODE] = to_string(pd->recv_mode);
+                        wxASSERT(flags & mkflag(COL_RECEIVE_MODE));
                 }
         }
 
@@ -269,7 +269,7 @@ auto update_from_registry(
                 for (auto [col_bit, col] : get_saved_rw_pairs()) {
                         if (columns & col_bit) {
                                 dc[col] = (*i)[col];
-                                wxASSERT((col == COL_RECEIVE) == bool(flags & mkflag(col)));
+                                wxASSERT((col == COL_RECEIVE_MODE) == bool(flags & mkflag(col)));
                                 flags |= mkflag(col);
                         }
                 }
@@ -334,7 +334,7 @@ auto make_persistent_device(
 
         return usbip::make_persistent_device(url, busid,
                         tree.GetItemText(device, COL_SERIAL),
-                        tree.GetItemText(device, COL_RECEIVE));
+                        tree.GetItemText(device, COL_RECEIVE_MODE));
 }
 
 auto get_persistent(_In_ const Handle &vhci = get_vhci())
@@ -382,7 +382,7 @@ auto get_saved()
                         continue;
                 }
 
-                validate_receive_str(dev[COL_RECEIVE]);
+                validate_receive_mode(dev[COL_RECEIVE_MODE]);
                 result.push_back(std::move(dev));
         }
 
@@ -698,7 +698,7 @@ void MainFrame::on_device_state(_In_ DeviceStateEvent &event)
                 flags |= mkflag(COL_PORT);
         }
 
-        if (added) { // COL_SERIAL, COL_RECEIVE are actual
+        if (added) { // COL_SERIAL, COL_RECEIVE_MODE are actual
                 auto saved = as_set(get_saved());
                 auto persistent = get_persistent(vhci::open());
                 constexpr auto cols = columns::saved_read_only | columns::saved_notes | columns::pers_persistent;
@@ -953,7 +953,7 @@ void MainFrame::on_close_to_tray(wxCommandEvent &event)
 
 DWORD MainFrame::attach(
         _In_ const wxString &url, _In_ const wxString &busid,
-        _In_ const wxString &serial, _In_ const wxString &receive, _In_ bool once)
+        _In_ const wxString &serial, _In_ const wxString &recv_mode, _In_ bool once)
 {
         wxString hostname;
         wxString service;
@@ -969,7 +969,7 @@ DWORD MainFrame::attach(
                         .busid = busid.utf8_string(),
                 },
                 .serial = serial.utf8_string(),
-                .recv = get_receive_val(receive),
+                .recv_mode = to_receive_mode(recv_mode),
                 .once = once
         };
 
@@ -1001,9 +1001,9 @@ void MainFrame::attach(_In_ bool once)
                 auto &url = tree.GetItemText(server);
                 auto &busid = tree.GetItemText(dev);
                 auto &serial = tree.GetItemText(dev, COL_SERIAL);
-                auto &receive = tree.GetItemText(dev, COL_RECEIVE);
+                auto &recv_mode = tree.GetItemText(dev, COL_RECEIVE_MODE);
 
-                if (auto err = attach(url, busid, serial, receive, once)) {
+                if (auto err = attach(url, busid, serial, recv_mode, once)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
                                               url, busid, err, GetLastErrorMsg(err));
@@ -1262,9 +1262,9 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 wxASSERT(state.device.serial.empty());
                 wxASSERT(!(flags & mkflag(COL_SERIAL)));
 
-                wxASSERT(state.device.recv == receive::zero_copy);
-                wxASSERT(flags & mkflag(COL_RECEIVE));
-                wxASSERT(dc[COL_RECEIVE] == get_receive_str(receive::zero_copy));
+                wxASSERT(state.device.recv_mode == receive_mode::zero_copy);
+                wxASSERT(flags & mkflag(COL_RECEIVE_MODE));
+                wxASSERT(dc[COL_RECEIVE_MODE] == to_string(receive_mode::zero_copy));
 
                 auto [item, added] = find_or_add_device(dc); 
 
@@ -1272,7 +1272,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                         constexpr auto cols = columns::saved_read_write | columns::pers_all;
                         flags = update_from_registry(dc, flags, cols, saved, persistent);
                 } else {
-                        flags &= ~mkflags({COL_STATE, COL_RECEIVE}); // clear
+                        flags &= ~mkflags({COL_STATE, COL_RECEIVE_MODE}); // clear
                 }
 
                 update_device(item, dc, flags);
@@ -1387,7 +1387,7 @@ int MainFrame::get_port(_In_ wxTreeListItem dev) const
         return str.ToInt(&port) ? port : 0;
 }
 
-void MainFrame::on_toggle_auto(wxCommandEvent&)
+void MainFrame::on_flip_auto(wxCommandEvent&)
 {
         for (auto &dev: get_selected_devices(*m_treeListCtrl)) {
                 auto ok = is_checked(dev, COL_PERSISTENT);
@@ -1395,13 +1395,16 @@ void MainFrame::on_toggle_auto(wxCommandEvent&)
         }
 }
 
-void MainFrame::on_toggle_receive(wxCommandEvent&)
+void MainFrame::on_flip_receive_mode(wxCommandEvent&)
 {
         for (auto &tree = *m_treeListCtrl; auto &dev: get_selected_devices(tree)) {
-                auto &recv = tree.GetItemText(dev, COL_RECEIVE);
-                auto r = get_receive_val(recv) == receive::zero_copy ? receive::low_latency : receive::zero_copy;
-                auto &val = get_receive_str(r);
-                tree.SetItemText(dev, COL_RECEIVE, val);
+                auto &mode = tree.GetItemText(dev, COL_RECEIVE_MODE);
+
+                auto r = to_receive_mode(mode) == receive_mode::zero_copy ?
+                                receive_mode::low_latency : receive_mode::zero_copy;
+
+                auto &val = to_string(r);
+                tree.SetItemText(dev, COL_RECEIVE_MODE, val);
         }
 }
 
@@ -1526,7 +1529,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
                         .state = state::plugged 
                 };
 
-                auto [dc, flags] = make_device_columns(st); // COL_SERIAL, COL_RECEIVE are actual
+                auto [dc, flags] = make_device_columns(st); // COL_SERIAL, COL_RECEIVE_MODE are actual
 
                 constexpr auto cols = columns::saved_notes | columns::pers_persistent;
                 flags = update_from_registry(dc, flags, cols, saved, persistent);
@@ -1565,8 +1568,8 @@ std::unique_ptr<wxMenu> MainFrame::create_tree_popup_menu()
                 { wxID_SAVEAS, m_menu_file, &MainFrame::on_save_selected },
                 separator,
                 { ID_EDIT_NOTES, m_menu_edit, &MainFrame::on_edit_notes },
-                { ID_TOGGLE_AUTO, m_menu_edit, &MainFrame::on_toggle_auto },
-                { ID_TOGGLE_RECEIVE, m_menu_edit, &MainFrame::on_toggle_receive },
+                { ID_FLIP_AUTO, m_menu_edit, &MainFrame::on_flip_auto },
+                { ID_FLIP_RECEIVE_MODE, m_menu_edit, &MainFrame::on_flip_receive_mode },
                 separator,
                 { ID_EDIT_SERIAL, m_menu_edit, &MainFrame::on_edit_serial },
                 { ID_EDIT_GEN_SERIAL, m_menu_edit, &MainFrame::on_edit_gen_serial },
