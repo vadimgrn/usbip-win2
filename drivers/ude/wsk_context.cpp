@@ -17,7 +17,7 @@ bool g_initialized;
 LOOKASIDE_LIST_EX g_lookaside;
 
 _IRQL_requires_same_
-_Function_class_(free_function_ex)
+_Function_class_(FREE_FUNCTION_EX)
 void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_LIST_EX*)
 {
         auto ctx = static_cast<wsk_context*>(Buffer);
@@ -37,7 +37,7 @@ void free_function_ex(_In_ __drv_freesMem(Mem) void *Buffer, _Inout_ LOOKASIDE_L
 }
 
 _IRQL_requires_same_
-_Function_class_(allocate_function_ex)
+_Function_class_(ALLOCATE_FUNCTION_EX)
 void *allocate_function_ex(
         _In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes, _In_ [[maybe_unused]] ULONG Tag, _Inout_ LOOKASIDE_LIST_EX *list)
 {

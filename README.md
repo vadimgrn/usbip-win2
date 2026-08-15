@@ -7,8 +7,8 @@
 # USB/IP Client for Windows
 - Fully compatible with [USB/IP protocol](https://www.kernel.org/doc/html/latest/usb/usbip_protocol.html)
 - Works with Linux USB/IP server at least for kernels 4.19 - 7.0
-- **[WHLK](https://en.wikipedia.org/wiki/Windows_Hardware_Lab_Kit) certified drivers**
-  - WHLK certification was made possible thanks to [Open Source Codesigning Initiative](https://github.com/OSSign)
+- **[WHLK](https://en.wikipedia.org/wiki/Windows_Hardware_Lab_Kit) certified (or attestation signed) drivers**
+  - Drivers signing is made possible by the [Open Source Codesigning Initiative](https://github.com/OSSign)
 - **Create a [restore point](https://github.com/vadimgrn/usbip-win2/tree/master?tab=readme-ov-file#install-usbip)** before installing USBip
 - [Devices](https://github.com/vadimgrn/usbip-win2/wiki#ude-driver-list-of-devices-known-to-work) that work (the list is incomplete)
 
@@ -22,21 +22,20 @@
 - A device-specific upper filter driver usbip2_filter is used as companion for UDE driver
 - [Winsock Kernel NPI](https://docs.microsoft.com/en-us/windows-hardware/drivers/network/introduction-to-winsock-kernel) is used
   - The driver establishes TCP/IP connection with a server and does data exchange
-  - This implies low latency and high throughput, absence of frequent CPU context switching and a lot of syscalls
 - [Zero copy](https://en.wikipedia.org/wiki/Zero-copy) of transfer buffers is implemented for network send and receive operations
   - [Memory Descriptor List](https://docs.microsoft.com/en-us/windows-hardware/drivers/kernel/using-mdls) is used to send multiple buffers in a single call ([vectored I/O](https://en.wikipedia.org/wiki/Vectored_I/O))
   - [WskSend](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_send) reads data from URB transfer buffer
   - [WskReceive](https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wsk/nc-wsk-pfn_wsk_receive) writes data to URB transfer buffer
 - Two implementations of receiving data from the network
   - Zero Copy
-    - this is the default implementation
-    - a dedicated thread is created for each virtual device to execute a loop with two blocking calls
+    - this is the default method
+    - a dedicated thread is created for each virtual device to execute a loop with two blocking WskReceive calls
       - receive USBIP header
       - receive USBIP payload (if any)
     - data is written directly to URB.TransferBuffer without any additional copying
    - Low Latency
      - [WSK event callback functions](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/using-winsock-kernel-functions-vs--event-callback-functions) are used
-     - A dedicated receive thread is not required
+     - no dedicated receive thread required, no CPU context switching
      - data is first written to an intermediate ring buffer, then copied to URB.TransferBuffer
 
 ## Build

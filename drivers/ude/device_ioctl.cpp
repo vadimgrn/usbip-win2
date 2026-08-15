@@ -231,7 +231,7 @@ auto fill_usb_device_serial(
         auto buf_cch = (r.TransferBufferLength - hdr_sz)/sizeof(sd->bString);
         auto cch = min(buf_cch, serial_cch);
 
-        for (auto i = 0U; i < cch; ++i) {
+        for (size_t i{}; i < cch; ++i) {
                 UCHAR ch = props.serial[i];
                 NT_ASSERT(is_ascii(ch));
                 sd->bString[i] = ch;
