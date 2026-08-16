@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -7,15 +7,11 @@
 #include <windows.h>
 #include <wx/string.h>
 
-#include <compare>
-#include <functional>
-
 class wxMenu;
 class wxMenuItem;
 class wxWindow;
 
 wxMenuItem* clone_menu_item(_In_ wxMenu &dest, _In_ int item_id, _In_ const wxMenu &src);
-std::strong_ordering operator <=> (_In_ const wxString &a, _In_ const wxString &b);
 
 namespace usbip
 {

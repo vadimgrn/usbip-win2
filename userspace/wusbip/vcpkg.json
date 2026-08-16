@@ -6,8 +6,8 @@
   "overrides": [
     {
       "name": "wxwidgets",
-      "version": "3.3.1#1"
+      "version": "3.3.3"
     }
   ],
-  "builtin-baseline": "05442024c3fda64320bd25d2251cc9807b84fb6f"
+  "builtin-baseline": "94a541197763a4f449a1b91478df48c0584a6256"
 }

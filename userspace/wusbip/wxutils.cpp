@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wxutils.h"
@@ -35,20 +35,6 @@ auto wait(_In_ HANDLE evt, _In_ DWORD timeout)
 
 } // namespace
 
-
-std::strong_ordering operator <=> (_In_ const wxString &a, _In_ const wxString &b)
-{
-        std::strong_ordering v[] { 
-                std::strong_ordering::less, 
-                std::strong_ordering::equal, 
-                std::strong_ordering::greater 
-        };
-
-        auto i = a.Cmp(b);
-        wxASSERT(i >= -1 && i <= 1);
-
-        return v[++i];
-}
 
 wxMenuItem* clone_menu_item(_In_ wxMenu &dest, _In_ int item_id, _In_ const wxMenu &src)
 {
