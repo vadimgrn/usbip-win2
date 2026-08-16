@@ -60,8 +60,9 @@ auto reattach_req_add(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 {
         wdf::Lock lck(vhci.reattach_req_lock);
 
-        if (auto err = WdfCollectionAdd(vhci.reattach_req, request)) {
-                Trace(TRACE_LEVEL_ERROR, "%04x, WdfCollectionAdd %!STATUS!", ptr04x(request), err);
+        auto st = WdfCollectionAdd(vhci.reattach_req, request);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "%04x, WdfCollectionAdd %!STATUS!", ptr04x(request), st);
                 return false;
         }
 
@@ -120,9 +121,12 @@ PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
         ObjectDelete col;
-        
-        if (WDFCOLLECTION h; auto err = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &h)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", err);
+
+        WDFCOLLECTION h;
+        auto st = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &h);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", st);
                 return col;
         } else {
                 col.reset(h);
@@ -135,8 +139,9 @@ PAGED auto get_persistent_devices(_In_ WDFKEY key)
         UNICODE_STRING value_name;
         RtlUnicodeStringInit(&value_name, persistent_devices_value_name);
 
-        if (auto err = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col.get<WDFCOLLECTION>())) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, err);
+        st = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col.get<WDFCOLLECTION>());
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, st);
                 col.reset();
         }
 
@@ -188,17 +193,25 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
                 return STATUS_INVALID_PARAMETER;
         }
 
-        if (auto &u8_serial = r.properties.serial;
-            auto err = libdrv::unicode_to_utf8(u8_serial, sizeof(u8_serial), serial)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, err);
-                return err;
-        } else if (err = validate_serial_number(u8_serial); err) {
-                Trace(TRACE_LEVEL_ERROR, "bad serial '%!USTR!'", &serial);
-                return err;
+        auto &u8_serial = r.properties.serial;
+
+        auto st = libdrv::unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, st);
+                return st;
         }
 
-        if (ULONG val; auto err = RtlUnicodeStringToInteger(&tail, 0, &val)) {
-                NT_ASSERT(err == STATUS_INVALID_PARAMETER); // string is empty
+        st = validate_serial_number(u8_serial);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "bad serial '%!USTR!'", &serial);
+                return st;
+        }
+
+        ULONG val;
+        st = RtlUnicodeStringToInteger(&tail, 0, &val);
+
+        if (NT_ERROR(st)) {
+                NT_ASSERT(st == STATUS_INVALID_PARAMETER); // string is empty
                 NT_ASSERT(empty(tail));
         } else {
                 bool once; // ignore, does not make sence for persistent
@@ -216,8 +229,9 @@ PAGED bool create_inbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        if (auto err = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &result, reinterpret_cast<PVOID*>(&req))) {
-                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
+        auto st = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &result, reinterpret_cast<PVOID*>(&req));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", st);
                 req = nullptr;
         }
 
@@ -234,8 +248,9 @@ PAGED bool create_outbuf(
 
         constexpr auto len = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
 
-        if (auto err = WdfMemoryCreatePreallocated(&attr, req, len, &result)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreatePreallocated %!STATUS!", err);
+        auto st = WdfMemoryCreatePreallocated(&attr, req, len, &result);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreatePreallocated %!STATUS!", st);
         }
 
         return result;
@@ -270,8 +285,9 @@ void on_plugin_hardware(
         WDF_REQUEST_REUSE_PARAMS params;
         WDF_REQUEST_REUSE_PARAMS_INIT(&params, WDF_REQUEST_REUSE_NO_FLAGS, STATUS_SUCCESS);
 
-        if (auto err = WdfRequestReuse(request, &params)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestReuse(%04x) %!STATUS!", ptr04x(request), err);
+        st = WdfRequestReuse(request, &params);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestReuse(%04x) %!STATUS!", ptr04x(request), st);
                 return;
         }
 
@@ -297,9 +313,11 @@ void send_plugin_hardware(
         auto request = req.get<WDFREQUEST>();
         TraceDbg("req %04x", ptr04x(request));
 
-        if (auto err = WdfIoTargetFormatRequestForIoctl(target, request,
-                        vhci::ioctl::PLUGIN_HARDWARE_ONCE, inbuf, nullptr, outbuf, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
+        auto st = WdfIoTargetFormatRequestForIoctl(target, request, vhci::ioctl::PLUGIN_HARDWARE_ONCE,
+                                                   inbuf, nullptr, outbuf, nullptr);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", st);
                 return;
         }
 
@@ -346,8 +364,9 @@ PAGED bool create_timer(_Inout_ WDFTIMER &result, _Inout_ WDF_OBJECT_ATTRIBUTES 
         WDF_TIMER_CONFIG_INIT(&cfg, on_attach_timer);
         cfg.TolerableDelay = TolerableDelayUnlimited;
 
-        if (auto err = WdfTimerCreate(&cfg, &attr, &result)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", err);
+        auto st = WdfTimerCreate(&cfg, &attr, &result);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfTimerCreate %!STATUS!", st);
         }
 
         return result;
@@ -374,8 +393,9 @@ PAGED auto init_attach_ctx(_Inout_ vhci_ctx &vhci, _Inout_ attach_ctx &r, _In_ c
         auto &props = attr.properties;
         req.wsk_events = props.wsk_events;
 
-        if (auto err = RtlStringCbCopyNA(req.serial, sizeof(req.serial), props.serial, sizeof(props.serial))) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", props.serial, err);
+        auto st = RtlStringCbCopyNA(req.serial, sizeof(req.serial), props.serial, sizeof(props.serial));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", props.serial, st);
                 return false;
         }
 
@@ -539,8 +559,11 @@ PAGED void usbip::plugin_persistent_devices(_In_ WDFDEVICE vhci)
                 UNICODE_STRING device_str;
                 WdfStringGetUnicodeString(str, &device_str);
 
-                if (device_attributes attr{}; auto err = parse_device_str(attr, device_str)) {
-                        Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, err);
+                device_attributes attr{};
+                auto st = parse_device_str(attr, device_str);
+
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "parse_device_str(%!USTR!) %!STATUS!", &device_str, st);
                 } else {
                         start_attach_attempts(vhci, ctx, attr);
                 }
@@ -565,9 +588,10 @@ PAGED NTSTATUS usbip::fill_location(
         };
 
         for (auto &[dst, dst_sz, src]: v) {
-                if (auto err = libdrv::unicode_to_utf8(dst, dst_sz, src)) {
-                        Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &src, err);
-                        return err;
+                auto st = libdrv::unicode_to_utf8(dst, dst_sz, src);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &src, st);
+                        return st;
                 }
         }
 
@@ -602,8 +626,11 @@ ObjectDelete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTR
 {
         ObjectDelete ptr;
 
-        if (WDFREQUEST req; auto err = WdfRequestCreate(&attr, target, &req)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestCreate %!STATUS!", err);
+        WDFREQUEST req;
+        auto st = WdfRequestCreate(&attr, target, &req);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestCreate %!STATUS!", st);
         } else {
                 ptr.reset(req);
         }
@@ -660,17 +687,17 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
                 .Buffer = buf.get<wchar_t>()
         };
 
-        if (auto err = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", err);
-                return err;
+        auto st = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlUnicodeStringPrintf %!STATUS!", st);
+                return st;
         }
 
-        if (auto err = RtlHashUnicodeString(&str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)) {
-                Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &str, err);
-                return err;
+        st = RtlHashUnicodeString(&str, true, HASH_STRING_ALGORITHM_DEFAULT, &hash);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlHashUnicodeString('%!USTR!') %!STATUS!", &str, st);
         }
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_

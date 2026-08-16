@@ -102,16 +102,21 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
         NT_ASSERT(!mdl);
 
         auto &ret = get_ret_submit(ctx.hdr);
-	if (auto err = prepare_isoc(ctx, ret.number_of_packets)) { // sets ctx.is_isoc
-		return err;
-	}
+
+        auto st = prepare_isoc(ctx, ret.number_of_packets); // sets ctx.is_isoc
+        if (NT_ERROR(st)) {
+                return st;
+        }
 
         auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
 
         ULONG TransferBufferLength{};
-        if (UCHAR *buf; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buf, &TransferBufferLength)) { // URB must have transfer buffer
-                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!", urb_function_str(urb.UrbHeader.Function), err);
-                return err;
+        UCHAR *buf;
+        st = UdecxUrbRetrieveBuffer(ctx.request, &buf, &TransferBufferLength); // URB must have transfer buffer
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer(%s) %!STATUS!", urb_function_str(urb.UrbHeader.Function), st);
+                return st;
         }
         TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
 
@@ -119,15 +124,16 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload
-		fail = check(TransferBufferLength, ret.actual_length); // do not change buffer length
+		fail = NT_ERROR(check(TransferBufferLength, ret.actual_length)); // do not change buffer length
 	} else { // actual_length MUST be assigned, must not have payload for OUT
-		fail = assign(TransferBufferLength, ret.actual_length) || dir_out;
+		fail = NT_ERROR(assign(TransferBufferLength, ret.actual_length)) || dir_out;
 		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 	}
 
 	if (fail || !TransferBufferLength) {
 		Trace(TRACE_LEVEL_ERROR, "TransferBufferLength(%lu), actual_length(%d), %!usbip_dir!", 
 			                  TransferBufferLength, ret.actual_length, ctx.hdr.direction);
+
                 return STATUS_INVALID_BUFFER_SIZE;
 	}
 
@@ -136,19 +142,26 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
 	if (dir_out) {
 		NT_ASSERT(ctx.is_isoc);
 		NT_ASSERT(!ctx.mdl_buf);
-	} else if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, ret.actual_length, IoWriteAccess, urb)) {
-		Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
-		return err;
-        } else if (auto len = size(ctx.mdl_buf); len < ret.actual_length) {
-
-                if (auto gap = static_cast<ULONG>(ret.actual_length - len);
-                    (err = alloc_mdl_buf_tail(ctx, gap))) {
-                        return err;
+	} else {
+                st = make_transfer_buffer_mdl(ctx.mdl_buf, ret.actual_length, IoWriteAccess, urb);
+                if (NT_ERROR(st)) {
+		        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", st);
+		        return st;
                 }
 
-                NT_ASSERT(!ctx.mdl_buf.next());
-                ctx.mdl_buf.next(ctx.mdl_buf_tail);
-                has_tail = true;
+                if (auto len = size(ctx.mdl_buf); len < ret.actual_length) {
+
+                        auto gap = static_cast<ULONG>(ret.actual_length - len);
+
+                        st = alloc_mdl_buf_tail(ctx, gap);
+                        if (NT_ERROR(st)) {
+                                return st;
+                        }
+
+                        NT_ASSERT(!ctx.mdl_buf.next());
+                        ctx.mdl_buf.next(ctx.mdl_buf_tail);
+                        has_tail = true;
+                }
         }
 
 	mdl = make_mdl_chain(ctx, has_tail);
@@ -187,8 +200,9 @@ PAGED auto drain_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 	}
 
         unique_ptr payload;
-        if (auto err = make_mdl(ctx.mdl_buf, payload, static_cast<ULONG>(length))) {
-                return err;
+        auto st = make_mdl(ctx.mdl_buf, payload, static_cast<ULONG>(length));
+        if (NT_ERROR(st)) {
+                return st;
         }
 
 	WSK_BUF buf{ .Mdl = ctx.mdl_buf.get(), .Length = length };
@@ -200,12 +214,12 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
 {
 	PAGED_CODE();
-
         WSK_BUF buf{ .Length = length };
 
-        if (auto err = prepare_wsk_mdl(buf.Mdl, ctx)) {
-                Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", err);
-                return err;
+        auto st = prepare_wsk_mdl(buf.Mdl, ctx);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "prepare_wsk_mdl %!STATUS!", st);
+                return st;
         }
 
         return receive(ctx, buf);
@@ -222,8 +236,9 @@ PAGED auto recv_usbip_header(_Inout_ wsk_context &ctx)
 
 	WSK_BUF buf{ .Mdl = ctx.mdl_hdr.get(), .Length = sizeof(ctx.hdr) };
 
-	if (auto err = receive(ctx, buf)) {
-		return err;
+        auto st = receive(ctx, buf);
+	if (NT_ERROR(st)) {
+		return st;
 	}
 
 	return validate(ctx.hdr) ? STATUS_SUCCESS : STATUS_INVALID_PARAMETER;
@@ -235,7 +250,11 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 {
 	PAGED_CODE();
 
-	for (NTSTATUS status{}; !(status || get_flag(dev.unplugged) || recv_usbip_header(ctx)); ) {
+	for (NTSTATUS status{}; NT_SUCCESS(status); ) {
+
+                if (get_flag(dev.unplugged) || NT_ERROR(recv_usbip_header(ctx))) [[unlikely]] {
+                        break;
+                }
 
 		NT_ASSERT(!ctx.request); // must be completed and zeroed on every loop
 		ctx.request = ret_command(ctx.hdr, dev);
@@ -250,7 +269,7 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 		}
 
 		if (auto &req = ctx.request) {
-			auto st = status ? status : ret_submit(ctx);
+			auto st = NT_ERROR(status) ? status : ret_submit(ctx);
 			complete_and_set_null(req, st);
 		}
 	}
@@ -295,9 +314,10 @@ PAGED NTSTATUS usbip::start_receive_data_irp(_In_ UDECXUSBDEVICE device)
         const auto access = THREAD_ALL_ACCESS;
 
         HANDLE handle{};
-        if (auto err = PsCreateSystemThread(&handle, access, nullptr, nullptr, nullptr, recv_thread_function, device)) {
-                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", err);
-                return err;
+        auto st = PsCreateSystemThread(&handle, access, nullptr, nullptr, nullptr, recv_thread_function, device);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "PsCreateSystemThread %!STATUS!", st);
+                return st;
         }
 
         auto dev = get_device_ctx(device);
@@ -337,9 +357,11 @@ PAGED wdm::object_reference usbip::stop_receive_data_irp(_In_ UDECXUSBDEVICE dev
         NT_ASSERT(get_flag(dev.unplugged)); // thread checks it
         TraceDbg("dev %04x", ptr04x(device));
 
-        if (auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
-                auto err = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout)) {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), err);
+        auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
+        auto st = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), st);
         } else {
                 TraceDbg("dev %04x, joined", ptr04x(device));
         }

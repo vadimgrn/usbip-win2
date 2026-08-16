@@ -57,17 +57,17 @@ CS_INIT auto init()
 {
 	PAGED_CODE();
 
-	if (auto err = init_wsk_context_list()) {
-		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", err);
-		return err;
+        auto st = init_wsk_context_list();
+        if (NT_ERROR(st)) {
+		Trace(TRACE_LEVEL_CRITICAL, "ExInitializeLookasideListEx %!STATUS!", st);
+		return st;
 	}
 
-	if (auto err = wsk::initialize()) {
-		Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", err);
-		return err;
-	}
-
-	return STATUS_SUCCESS;
+        st = wsk::initialize();
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", st);
+        }
+	return st;
 }
 
 } // namespace
@@ -80,9 +80,10 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNI
 {
 	ExInitializeDriverRuntime(0); // @see ExAllocatePool2
 
-	if (auto err = driver_create(DriverObject, RegistryPath)) {
-		return err;
-	}
+        auto st = driver_create(DriverObject, RegistryPath);
+        if (NT_ERROR(st)) {
+                return st;
+        }
 
 	WPP_INIT_TRACING(DriverObject, RegistryPath);
 	Trace(TRACE_LEVEL_INFORMATION, "RegistryPath '%!USTR!'", RegistryPath);

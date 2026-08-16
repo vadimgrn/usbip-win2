@@ -70,13 +70,15 @@ PAGED auto create_read_queue(_Out_ WDFQUEUE &queue, _In_ WDF_OBJECT_ATTRIBUTES &
         cfg.PowerManaged = WdfFalse;
         cfg.EvtIoCanceledOnQueue = canceled_on_queue;
 
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
+        auto st = WdfIoQueueCreate(vhci, &cfg, &attr, &queue);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", st);
+        } else {
+                TraceDbg("vhci %04x, queue %04x", ptr04x(vhci), ptr04x(queue));
         }
 
-        TraceDbg("vhci %04x, queue %04x", ptr04x(vhci), ptr04x(queue));
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -91,7 +93,8 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
         } v {def_cnt, def_cnt};
 
         Registry key;
-        if (auto err = open(key, DriverRegKeyParameters)) {
+        auto st = open(key, DriverRegKeyParameters);
+        if (NT_ERROR(st)) {
                 return v;
         }
 
@@ -108,8 +111,11 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
                 UNICODE_STRING value_name;
                 NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
 
-                if (ULONG val{}; auto err = WdfRegistryQueryULong(key.get(), &value_name, &val)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, err);
+                ULONG val{};
+                st = WdfRegistryQueryULong(key.get(), &value_name, &val);
+
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
                 } else {
                         value = val;
                 }
@@ -183,9 +189,10 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
 {
         PAGED_CODE();
 
-        if (auto err = WdfIoTargetCreate(vhci, &attr, &target)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetCreate %!STATUS!", err);
-                return err;
+        auto st = WdfIoTargetCreate(vhci, &attr, &target);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetCreate %!STATUS!", st);
+                return st;
         }
 
         auto fdo = WdfDeviceWdmGetDeviceObject(vhci);
@@ -193,12 +200,11 @@ PAGED auto create_target_self(_Out_ WDFIOTARGET &target, _In_ WDF_OBJECT_ATTRIBU
         WDF_IO_TARGET_OPEN_PARAMS params;
         WDF_IO_TARGET_OPEN_PARAMS_INIT_EXISTING_DEVICE(&params, fdo);
 
-        if (auto err = WdfIoTargetOpen(target, &params)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetOpen %!STATUS!", err);
-                return err;
+        st = WdfIoTargetOpen(target, &params);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetOpen %!STATUS!", st);
         }
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 /*
@@ -287,8 +293,11 @@ PAGED void init_constants(
                 UNICODE_STRING value_name;
                 RtlUnicodeStringInit(&value_name, name);
 
-                if (ULONG val = 0; auto err = WdfRegistryQueryULong(key.get<WDFKEY>(), &value_name, &val)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &value_name, err);
+                ULONG val{};
+                auto st = WdfRegistryQueryULong(key.get<WDFKEY>(), &value_name, &val);
+
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &value_name, st);
                 } else {
                         value = static_cast<unsigned int>(val);
                 }
@@ -324,8 +333,9 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         auto &ctx = *get_vhci_ctx(vhci);
 
-        if (auto err = alloc_devices(ctx)) {
-                return err;
+        auto st = alloc_devices(ctx);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         InitializeListHead(&ctx.fileobjects);
@@ -335,28 +345,33 @@ PAGED auto init_context(_In_ WDFDEVICE vhci)
         attr.ParentObject = vhci;
 
         for (WDFSPINLOCK* v[] { &ctx.devices_lock, &ctx.reattach_req_lock }; auto lck: v) {
-                if (auto err = WdfSpinLockCreate(&attr, lck)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
-                        return err;
+                st = WdfSpinLockCreate(&attr, lck);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", st);
+                        return st;
                 }
         }
 
-        if (auto err = WdfWaitLockCreate(&attr, &ctx.events_lock)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", err);
-                return err;
+        st = WdfWaitLockCreate(&attr, &ctx.events_lock);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWaitLockCreate %!STATUS!", st);
+                return st;
         }
 
-        if (auto err = WdfCollectionCreate(&attr, &ctx.reattach_req)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", err);
-                return err;
+        st = WdfCollectionCreate(&attr, &ctx.reattach_req);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", st);
+                return st;
         }
 
-        if (auto err = create_target_self(ctx.target_self, attr, vhci)) {
-                return err;
+        st = create_target_self(ctx.target_self, attr, vhci);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
-        if (auto err = create_read_queue(ctx.reads, attr, vhci)) {
-                return err;
+        st = create_read_queue(ctx.reads, attr, vhci);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         init_constants(ctx.reattach_max_attempts, ctx.reattach_first_delay, ctx.reattach_max_delay);
@@ -376,9 +391,10 @@ PAGED auto create_interfaces(_In_ WDFDEVICE vhci)
         };
 
         for (auto guid: v) {
-                if (auto err = WdfDeviceCreateDeviceInterface(vhci, guid, nullptr)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreateDeviceInterface(%!GUID!) %!STATUS!", guid, err);
-                        return err;
+                auto st = WdfDeviceCreateDeviceInterface(vhci, guid, nullptr);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreateDeviceInterface(%!GUID!) %!STATUS!", guid, st);
+                        return st;
                 }
         }
 
@@ -601,17 +617,17 @@ PAGED auto initialize(_Inout_ WDFDEVICE_INIT *init)
 
         WdfDeviceInitSetCharacteristics(init, FILE_AUTOGENERATED_DEVICE_NAME, true);
 
-        if (auto err = WdfDeviceInitAssignSDDLString(init, &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RW_RES_R)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDeviceInitAssignSDDLString %!STATUS!", err);
-                return err;
+        auto st = WdfDeviceInitAssignSDDLString(init, &SDDL_DEVOBJ_SYS_ALL_ADM_RWX_WORLD_RW_RES_R);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDeviceInitAssignSDDLString %!STATUS!", st);
+                return st;
         }
 
-        if (auto err = UdecxInitializeWdfDeviceInit(init)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxInitializeWdfDeviceInit %!STATUS!", err);
-                return err;
+        st = UdecxInitializeWdfDeviceInit(init);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxInitializeWdfDeviceInit %!STATUS!", st);
         }
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _Function_class_(init_func_t)
@@ -630,15 +646,16 @@ PAGED auto add_usbdevice_emulation(_In_ WDFDEVICE vhci)
 
         NT_ASSERT(cfg.NumberOfUsb20Ports + cfg.NumberOfUsb30Ports == ctx.devices_cnt);
 
-        if (auto err = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", err);
-                return err;
+        auto st = UdecxWdfDeviceAddUsbDeviceEmulation(vhci, &cfg);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxWdfDeviceAddUsbDeviceEmulation %!STATUS!", st);
+        } else {
+                Trace(TRACE_LEVEL_INFORMATION, "NumberOfUsb20Ports %d, NumberOfUsb30Ports %d", 
+                                                cfg.NumberOfUsb20Ports, cfg.NumberOfUsb30Ports);
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "NumberOfUsb20Ports %d, NumberOfUsb30Ports %d", 
-                                        cfg.NumberOfUsb20Ports, cfg.NumberOfUsb30Ports);
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _Function_class_(init_func_t)
@@ -652,9 +669,10 @@ PAGED auto configure(_In_ WDFDEVICE vhci)
                 WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS idle_settings;
                 WDF_DEVICE_POWER_POLICY_IDLE_SETTINGS_INIT(&idle_settings, IdleCannotWakeFromS0);
 
-                if (auto err = WdfDeviceAssignS0IdleSettings(vhci, &idle_settings)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceAssignS0IdleSettings %!STATUS!", err);
-                        return err;
+                auto st = WdfDeviceAssignS0IdleSettings(vhci, &idle_settings);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfDeviceAssignS0IdleSettings %!STATUS!", st);
+                        return st;
                 }
         }
 
@@ -695,17 +713,19 @@ PAGED auto create_vhci(_Out_ WDFDEVICE &vhci, _In_ WDFDEVICE_INIT *init)
         WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, vhci_ctx);
         attr.EvtCleanupCallback = vhci_cleanup;
 
-        if (auto err = WdfDeviceCreate(&init, &attr, &vhci)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", err);
-                return err;
+        auto st = WdfDeviceCreate(&init, &attr, &vhci);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDeviceCreate %!STATUS!", st);
+                return st;
         }
 
         init_func_t* const functions[] { init_context, configure, create_interfaces, 
                                          add_usbdevice_emulation, vhci::create_queues };
 
         for (auto f: functions) {
-                if (auto err = f(vhci)) {
-                        return err;
+                st = f(vhci);
+                if (NT_ERROR(st)) {
+                        return st;
                 }
         }
 
@@ -763,8 +783,10 @@ PAGED auto make_device_state(
 
         WDFMEMORY mem{};
         vhci::device_state *r{};
-        if (auto err = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*r), &mem, reinterpret_cast<PVOID*>(&r))) {
-                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
+
+        auto st = WdfMemoryCreate(&attr, PagedPool, 0, sizeof(*r), &mem, reinterpret_cast<PVOID*>(&r));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", st);
                 return mem;
         }
 
@@ -773,7 +795,8 @@ PAGED auto make_device_state(
         r->state = state;
         r->source_id = make_source_id(&dev); // CONTAINING_RECORD(&dev, device_ctx_ext, attr)
 
-        if (auto err = fill(*r, dev, port)) {
+        st = fill(*r, dev, port);
+        if (NT_ERROR(st)) {
                 WdfObjectDelete(mem);
                 mem = WDF_NO_HANDLE;
         }
@@ -801,8 +824,10 @@ PAGED void process_event(
                 vhci::complete_read(request, evt);
                 break;
         case STATUS_NO_MORE_ENTRIES:
-                if (auto err = WdfCollectionAdd(fobj.events, evt)) { // append and increment reference count
-                        Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", err);
+                st = WdfCollectionAdd(fobj.events, evt); // append and increment reference count
+
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfCollectionAdd %!STATUS!", st);
                 } else if (auto cnt = WdfCollectionGetCount(fobj.events); cnt > max_events) {
                         auto head = WdfCollectionGetFirstItem(fobj.events);
                         WdfCollectionRemove(fobj.events, head); // decrements reference count
@@ -812,6 +837,7 @@ PAGED void process_event(
                 } else {
                         TraceDbg("fobj %04x, add %04x[%lu]", ptr04x(fileobj), ptr04x(evt), cnt - 1);
                 }
+
                 break;
         default:
                 Trace(TRACE_LEVEL_ERROR, "WdfIoQueueRetrieveRequestByFileObject %!STATUS!", st);
@@ -967,15 +993,13 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::vhci::fill(_Out_ imported_device &dev, _In_ const device_attributes &r, _In_ int port)
 {
         PAGED_CODE();
-
-//      imported_device_location
         dev.port = port;
-        if (auto err = fill_location(dev, r)) {
-                return err;
+
+        auto st = fill_location(dev, r);
+        if (NT_SUCCESS(st)) {
+                static_cast<imported_device_properties&>(dev) = r.properties;
         }
-//
-        static_cast<imported_device_properties&>(dev) = r.properties;
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -1046,17 +1070,18 @@ PAGED NTSTATUS usbip::DeviceAdd(_In_ WDFDRIVER, _Inout_ WDFDEVICE_INIT *init)
 {
         PAGED_CODE();
 
-        if (auto err = initialize(init)) {
-                return err;
+        auto st = initialize(init);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         WDFDEVICE vhci{};
-        if (auto err = create_vhci(vhci, init)) { 
-                return err; // the framework handles deletion of WDFDEVICE
+        st = create_vhci(vhci, init);
+
+        if (NT_SUCCESS(st)) { // the framework handles deletion of WDFDEVICE in case of an error
+                Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
+                plugin_persistent_devices(vhci);
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "vhci %04x", ptr04x(vhci));
-        plugin_persistent_devices(vhci);
-
-        return STATUS_SUCCESS;
+        return st;
 }

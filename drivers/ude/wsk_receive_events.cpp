@@ -54,9 +54,11 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
 
                 if (rb.capacity() >= expected) [[likely]] {
                         //
-                } else if (auto err = realloc(dev.recv_buf, expected)) {
-                        return false;
                 } else {
+                        auto st = realloc(dev.recv_buf, expected);
+                        if (NT_ERROR(st)) {
+                                return false;
+                        }
                         rb = ring_buffer(dev.recv_buf);
                         TraceDbg("dev %04x, ring buffer capacity %Iu", ptr04x(device), rb.capacity());
                 }
@@ -204,16 +206,16 @@ PAGED NTSTATUS usbip::events::start_receive_data(_In_ UDECXUSBDEVICE device)
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
-        if (auto err = realloc(dev.recv_buf, 1)) { // single page, for the beginning
-                return err;
+        auto st = realloc(dev.recv_buf, 1); // single page, for the beginning
+        if (NT_ERROR(st)) {
+                return st;
         }
 
-        if (auto err = wsk::event_callback_control(dev.sock(), make_event_mask(), false)) {
-                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", err);
-                return err;
+        st = wsk::event_callback_control(dev.sock(), make_event_mask(), false);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", st);
         }
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -224,8 +226,9 @@ PAGED wdm::object_reference usbip::events::stop_receive_data(_In_ UDECXUSBDEVICE
         auto &dev = *get_device_ctx(device);
 
         for (auto evt: wsk_events) {
-                if (auto err = wsk::event_callback_control(dev.sock(), WSK_EVENT_DISABLE | evt, true)) {
-                        Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, err);
+                auto st = wsk::event_callback_control(dev.sock(), WSK_EVENT_DISABLE | evt, true);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, st);
                 }
         }
 

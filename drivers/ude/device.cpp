@@ -294,9 +294,10 @@ PAGED auto create_endpoint_queue(
         auto &endp = *get_endpoint_ctx(endpoint);
         auto &dev = *get_device_ctx(endp.device); 
 
-        if (auto err = WdfIoQueueCreate(dev.vhci, &cfg, &attr, &queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
+        auto st = WdfIoQueueCreate(dev.vhci, &cfg, &attr, &queue);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", st);
+                return st;
         }
         get_endpoint(queue) = endpoint;
 
@@ -340,9 +341,10 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
         attr.ParentObject = device;
 
         UDECXUSBENDPOINT endpoint;
-        if (auto err = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attr, &endpoint)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", err);
-                return err;
+        auto st = UdecxUsbEndpointCreate(&data->UdecxUsbEndpointInit, &attr, &endpoint);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbEndpointCreate %!STATUS!", st);
+                return st;
         }
 
         auto &endp = *get_endpoint_ctx(endpoint);
@@ -359,10 +361,12 @@ PAGED NTSTATUS endpoint_add(_In_ UDECXUSBDEVICE device, _In_ UDECX_USB_ENDPOINT_
                 insert_endpoint_list(endp);
         }
 
-        if (auto dispatch = usb_endpoint_type(epd) == UsbdPipeTypeControl ?
-                            WdfIoQueueDispatchSequential : WdfIoQueueDispatchParallel;
-            auto err = create_endpoint_queue(endp.queue, endpoint, dispatch)) {
-                return err;
+        auto dispatch = usb_endpoint_type(epd) == UsbdPipeTypeControl ?
+                        WdfIoQueueDispatchSequential : WdfIoQueueDispatchParallel;
+
+        st = create_endpoint_queue(endp.queue, endpoint, dispatch);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         {
@@ -508,12 +512,11 @@ PAGED auto create_spin_lock(_Out_ WDFSPINLOCK *handle, _In_ WDFOBJECT parent)
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = parent;
 
-        if (auto err = WdfSpinLockCreate(&attr, handle)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", err);
-                return err;
+        auto st = WdfSpinLockCreate(&attr, handle);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfSpinLockCreate %!STATUS!", st);
         }
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -528,8 +531,9 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
         };
 
         for (auto i: v) {
-                if (auto err = create_spin_lock(i, device)) {
-                        return err;
+                auto st = create_spin_lock(i, device);
+                if (NT_ERROR(st)) {
+                        return st;
                 }
         }
 
@@ -545,10 +549,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto create_detach_request_inbuf(_In_ WDF_OBJECT_ATTRIBUTES &attr, _In_ int port)
 {
         WDFMEMORY mem{}; 
-        
-        if (vhci::ioctl::plugout_hardware *req{};
-            auto err = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req))) {
-                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
+        vhci::ioctl::plugout_hardware *req{};
+        auto st = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*req), &mem, reinterpret_cast<PVOID*>(&req));
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", st);
         } else {
                 RtlZeroMemory(req, sizeof(*req));
                 req->size = sizeof(*req);
@@ -584,8 +589,9 @@ PAGED void plugout_and_delete(
         PAGED_CODE();
         device_state_changed(vhci, attr, port, vhci::state::unplugging);
 
-        if (auto err = UdecxUsbDevicePlugOutAndDelete(device)) {
-                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), err);
+        auto st = UdecxUsbDevicePlugOutAndDelete(device);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "dev %04x, UdecxUsbDevicePlugOutAndDelete %!STATUS!", ptr04x(device), st);
                 return;
         }
         // device and device_ctx may already be destroyed, do not use
@@ -624,9 +630,9 @@ void async_detach_and_delete(_In_ WDFDEVICE vhci, _In_ int port, _In_ bool reatt
 
         auto code = reattach ? vhci::ioctl::PLUGOUT_HARDWARE_AND_REATTACH : vhci::ioctl::PLUGOUT_HARDWARE;
 
-        if (auto err = WdfIoTargetFormatRequestForIoctl(ctx.target_self, request, code,
-                inbuf, nullptr, WDF_NO_HANDLE, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", err);
+        auto st = WdfIoTargetFormatRequestForIoctl(ctx.target_self, request, code, inbuf, nullptr, WDF_NO_HANDLE, nullptr);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoTargetFormatRequestForIoctl %!STATUS!", st);
                 return;
         }
 
@@ -675,9 +681,10 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         attr.EvtCleanupCallback = device_cleanup;
         attr.ParentObject = vhci;
 
-        if (auto err = UdecxUsbDeviceCreate(&init.ptr, &attr, &device)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", err);
-                return err;
+        auto st = UdecxUsbDeviceCreate(&init.ptr, &attr, &device); 
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", st);
+                return st;
         }
 
         NT_ASSERT(!init); // zeroed by UdecxUsbDeviceCreate
@@ -687,8 +694,9 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         ctx.ctx_ext = ctx_ext;
         ext.ctx = &ctx;
 
-        if (auto err = init_device(device, ctx)) {
-                return err;
+        st = init_device(device, ctx);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));

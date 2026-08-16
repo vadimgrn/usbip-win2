@@ -80,9 +80,10 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
                 // nothing to do
         } else if (NT_SUCCESS(wsk_status)) {
                 ++dev.sent_requests;
-                if (auto err = device::on_send_complete(dev, request, seqnum, wsk_status)) {
+                auto st = device::on_send_complete(dev, request, seqnum, wsk_status);
+                if (NT_ERROR(st)) {
                         auto device = get_handle(&dev);
-                        device::send_cmd_unlink_and_complete(device, request, err);
+                        device::send_cmd_unlink_and_complete(device, request, st);
                 }
         } else {
                 NT_VERIFY(NT_SUCCESS(device::on_send_complete(dev, request, seqnum, wsk_status)));
@@ -98,9 +99,10 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
         NT_ASSERT(!ctx.mdl_buf);
 
         if (transfer_buffer && is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
-                if (auto err = make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, IoReadAccess, *transfer_buffer)) {
-                        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", err);
-                        return err;
+                auto st = make_transfer_buffer_mdl(ctx.mdl_buf, URB_BUF_LEN, IoReadAccess, *transfer_buffer);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "make_transfer_buffer_mdl %!STATUS!", st);
+                        return st;
                 }
         }
 
@@ -161,9 +163,12 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Ino
         _In_ bool log_setup, _Inout_opt_ const URB* transfer_buffer = nullptr)
 {
         auto request = ctx->request; // can be WDF_NO_HANDLE, do not access after send
+        auto &buf = ctx->wsk_buf;
 
-        if (auto &buf = ctx->wsk_buf; auto err = prepare_wsk_buf(buf, *ctx, transfer_buffer)) {
-                return err;
+        auto st = prepare_wsk_buf(buf, *ctx, transfer_buffer);
+
+        if (NT_ERROR(st)) {
+                return st;
         } else {
                 char str[DBG_USBIP_HDR_BUFSZ];
                 TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x -> %Iu%s",
@@ -171,8 +176,9 @@ auto send(_In_opt_ UDECXUSBENDPOINT endpoint, _Inout_ wsk_context_ptr &ctx, _Ino
         }
 
         if (request && endpoint) {
-                if (auto err = device::init_request_ctx(request, endpoint)) [[unlikely]] {
-                        return err;
+                st = device::init_request_ctx(request, endpoint);
+                if (NT_ERROR(st)) [[unlikely]] {
+                        return st;
                 }
                 device::add_request_to_sent_list(dev, request, ctx->hdr.seqnum);
         }
@@ -213,16 +219,18 @@ auto fill_usb_device_serial(
         }
 
         size_t serial_cch;
-        if (auto err = RtlStringCchLengthA(props.serial, ARRAYSIZE(props.serial), &serial_cch)) {
-                Trace(TRACE_LEVEL_ERROR,"RtlStringCchLengthA('%.15s') %!STATUS!", props.serial, err);
-                return err;
+        auto st = RtlStringCchLengthA(props.serial, ARRAYSIZE(props.serial), &serial_cch);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR,"RtlStringCchLengthA('%.15s') %!STATUS!", props.serial, st);
+                return st;
         }
 
         USB_STRING_DESCRIPTOR *sd{};
-        if (ULONG length; // can differ from r.TransferBufferLength, see prepare_wsk_mdl
-            auto err = UdecxUrbRetrieveBuffer(request, reinterpret_cast<UCHAR**>(&sd), &length)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
-                return err;
+        ULONG length; // can differ from r.TransferBufferLength, see prepare_wsk_mdl
+        st = UdecxUrbRetrieveBuffer(request, reinterpret_cast<UCHAR**>(&sd), &length);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", st);
+                return st;
         }
 
         sd->bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
@@ -258,10 +266,12 @@ auto control_transfer(
                 endp.PipeHandle = r.PipeHandle;
         }
 
-        if (!filter::is_request(r)) {
-                //
-        } else if (auto func = filter::get_function(r, true); auto err = filter::unpack_request(dev, r, func)) {
-                return err;
+        if (filter::is_request(r)) {
+                auto func = filter::get_function(r, true);
+                auto st = filter::unpack_request(dev, r, func);
+                if (NT_ERROR(st)) {
+                        return st;
+                }
         }
 
         {
@@ -301,8 +311,9 @@ auto control_transfer(
         
         setup_dir dir_out = is_transfer_dir_out(urb.UrbControlTransfer); // default control pipe is bidirectional
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, buf_len, dir_out)) {
-                return err;
+        auto st = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, buf_len, dir_out);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         static_assert(sizeof(ctx->hdr.cmd_submit.setup) == sizeof(pkt));
@@ -340,8 +351,9 @@ auto bulk_or_interrupt_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, r.TransferBufferLength)) {
-                return err;
+        auto st = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, r.TransferFlags, r.TransferBufferLength);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         return send(endpoint, ctx, dev, false, &urb);
@@ -417,13 +429,16 @@ auto isoch_transfer(
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor, 
-                               r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength)) {
-                return err;
+        auto st = set_cmd_submit_usbip_header(ctx->hdr, dev, endp.descriptor,
+                        r.TransferFlags | USBD_START_ISO_TRANSFER_ASAP, r.TransferBufferLength);
+
+        if (NT_ERROR(st)) {
+                return st;
         }
 
-        if (auto err = repack(ctx->isoc, r)) {
-                return err;
+        st = repack(ctx->isoc, r);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         if (auto cmd = &ctx->hdr.cmd_submit) {
@@ -483,8 +498,9 @@ auto send_ep0_out(
         auto &ep0 = *get_endpoint_ctx(dev.ep0);
         const ULONG TransferFlags = USBD_DEFAULT_PIPE_TRANSFER | USBD_TRANSFER_DIRECTION_OUT;
 
-        if (auto err = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0.descriptor, TransferFlags, 0, setup_dir::out())) {
-                return err;
+        auto st = set_cmd_submit_usbip_header(ctx->hdr, dev, ep0.descriptor, TransferFlags, 0, setup_dir::out());
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         if constexpr (auto &r = get_submit_setup(ctx->hdr); true) {
@@ -661,25 +677,27 @@ void NTAPI usbip::device::internal_control(
 {
         if (IoControlCode != IOCTL_INTERNAL_USB_SUBMIT_URB) {
                 auto st = STATUS_INVALID_DEVICE_REQUEST;
-                Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), 
-                                                                 IoControlCode, st);
+                Trace(TRACE_LEVEL_ERROR, "%s(%#08lX) %!STATUS!", internal_device_control_name(IoControlCode), IoControlCode, st);
                 WdfRequestComplete(request, st);
                 return;
         }
 
         auto endpoint = get_endpoint(queue);
-        auto &endp = *get_endpoint_ctx(endpoint);
 
-        if (auto err = init_request_ctx(request, endpoint)) {
-                UdecxUrbCompleteWithNtStatus(request, err); // low-resource fallback, cannot use the DPC without request_ctx
+        auto st = init_request_ctx(request, endpoint);
+        if (NT_ERROR(st)) {
+                UdecxUrbCompleteWithNtStatus(request, st); // low-resource fallback, cannot use the DPC without request_ctx
                 return;
         }
 
-        if (auto &dev = *get_device_ctx(endp.device); get_flag(dev.unplugged)) {
+        auto &endp = *get_endpoint_ctx(endpoint);
+        auto &dev = *get_device_ctx(endp.device);
+
+        if (get_flag(dev.unplugged)) [[unlikely]] {
                 get_urb(request).UrbHeader.Status = USBD_STATUS_DEVICE_GONE;
                 device::enqueue_for_completion(request, STATUS_SUCCESS);
-        } else if (auto st = usb_submit_urb(dev, endpoint, endp, request); st != STATUS_PENDING) {
-                if (st) {
+        } else if (st = usb_submit_urb(dev, endpoint, endp, request); st != STATUS_PENDING) {
+                if (NT_ERROR(st)) {
                         TraceDbg("%!STATUS!", st);
                 }
                 device::enqueue_for_completion(request, st);

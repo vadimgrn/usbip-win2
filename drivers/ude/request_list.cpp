@@ -64,7 +64,7 @@ void remove_from_sent_list_locked(_Inout_ request_ctx &req)
  * @return true if the caller must enqueue device_ctx::request_completion_dpc.
  */
 _IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto add_to_completion_queue_locked(_Inout_ device_ctx &dev, _Inout_ request_ctx &req)
 {
         if (!req.terminal || req.cancelable || req.send_completion_pending ||
@@ -80,7 +80,7 @@ auto add_to_completion_queue_locked(_Inout_ device_ctx &dev, _Inout_ request_ctx
 }
 
 _IRQL_requires_same_
-_IRQL_requires_(DISPATCH_LEVEL)
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 {
 	auto irp = WdfRequestWdmGetIrp(request);
@@ -91,7 +91,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 	auto &req = *get_request_ctx(request);
 
 	if (!libdrv::has_urb(irp)) {
-		if (status) {
+		if (NT_ERROR(status)) {
 			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
 		WdfRequestComplete(request, status);
@@ -105,7 +105,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		urb_st = USBD_STATUS_CANCELED; // FIXME: is this really required?
 	}
 
-	if (status || urb_st) {
+	if (NT_ERROR(status) || urb_st) {
 		TraceUrb("seqnum %u, USBD_%s, %!STATUS!, Information %#Ix", 
 			  req.seqnum, get_usbd_status(urb_st), status, info);
 	}
@@ -189,12 +189,11 @@ PAGED NTSTATUS usbip::device::create_request_completion_dpc(_In_ UDECXUSBDEVICE 
         WDF_OBJECT_ATTRIBUTES_INIT(&attr);
         attr.ParentObject = device;
 
-        if (auto err = WdfDpcCreate(&cfg, &attr, &dev.request_completion_dpc)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDpcCreate %!STATUS!", err);
-                return err;
+        auto st = WdfDpcCreate(&cfg, &attr, &dev.request_completion_dpc);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDpcCreate %!STATUS!", st);
         }
-
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -211,9 +210,10 @@ NTSTATUS usbip::device::init_request_ctx(_In_ WDFREQUEST request, _In_ UDECXUSBE
                 WDF_OBJECT_ATTRIBUTES attr;
                 WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attr, request_ctx);
 
-                if (auto err = WdfObjectAllocateContext(request, &attr, reinterpret_cast<PVOID*>(&req))) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfObjectAllocateContext %!STATUS!", err);
-                        return err;
+                auto st = WdfObjectAllocateContext(request, &attr, reinterpret_cast<PVOID*>(&req));
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfObjectAllocateContext %!STATUS!", st);
+                        return st;
                 }
         }
 
@@ -302,12 +302,15 @@ NTSTATUS usbip::device::on_send_complete(
                 } else if (!in_sent_list(req)) {
                         NT_ASSERT(!"!in_sent_list");
                         mark_status = STATUS_INVALID_DEVICE_STATE;
-                } else if (auto err = WdfRequestMarkCancelableEx(request, cancel)) {
-                        mark_status = err; // STATUS_CANCELLED if the queue is being purged
-                        remove_from_sent_list_locked(req);
                 } else {
-                        req.cancelable = true;
-                        ++dev.cancelable_requests;
+                        auto st = WdfRequestMarkCancelableEx(request, cancel);
+                        if (NT_ERROR(st)) {
+                                mark_status = st; // STATUS_CANCELLED if the queue is being purged
+                                remove_from_sent_list_locked(req);
+                        } else {
+                                req.cancelable = true;
+                                ++dev.cancelable_requests;
+                        }
                 }
 
                 enqueue = add_to_completion_queue_locked(dev, req);

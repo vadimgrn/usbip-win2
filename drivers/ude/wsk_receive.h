@@ -45,9 +45,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
 {
-        auto err = check(TransferBufferLength, actual_length);
-        TransferBufferLength = err ? 0 : actual_length;
-        return err;
+        auto st = check(TransferBufferLength, actual_length);
+        TransferBufferLength = NT_ERROR(st) ? 0 : actual_length;
+        return st;
 }
 
 } // namespace usbip

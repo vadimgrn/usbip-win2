@@ -34,10 +34,11 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
-
         Mdl mdl(data, len);
-        if (auto err = pool == memory::nonpaged ? mdl.prepare_nonpaged() : mdl.prepare_paged(IoReadAccess)) {
-                return err;
+
+        auto st = pool == memory::nonpaged ? mdl.prepare_nonpaged() : mdl.prepare_paged(IoReadAccess);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         WSK_BUF buf{ .Mdl = mdl.get(), .Length = len };
@@ -49,10 +50,11 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::recv(_In_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len)
 {
         PAGED_CODE();
-
         Mdl mdl(data, len);
-        if (auto err = pool == memory::nonpaged ? mdl.prepare_nonpaged() : mdl.prepare_paged(IoWriteAccess)) {
-                return err;
+
+        auto st = pool == memory::nonpaged ? mdl.prepare_nonpaged() : mdl.prepare_paged(IoWriteAccess);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         WSK_BUF buf{ .Mdl = mdl.get(), .Length = len };
@@ -66,9 +68,10 @@ PAGED USBIP_STATUS usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected
         PAGED_CODE();
 
         op_common r{};
-        if (auto err = recv(sock, memory::stack, &r, sizeof(r))) {
-                Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", err);
-                return err;
+        auto st = recv(sock, memory::stack, &r, sizeof(r));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "Receive %!STATUS!", st);
+                return st;
         }
         byteswap(r);
 
@@ -82,11 +85,11 @@ PAGED USBIP_STATUS usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected
                 return USBIP_ERROR_PROTOCOL;
         }
 
-        auto st = static_cast<op_status_t>(r.status);
-        if (st) {
-                Trace(TRACE_LEVEL_ERROR, "code %#x, %!op_status_t!", r.code, st);
+        auto op_st = static_cast<op_status_t>(r.status);
+        if (op_st) {
+                Trace(TRACE_LEVEL_ERROR, "code %#x, %!op_status_t!", r.code, op_st);
         }
-        return op_status_error(st);
+        return op_status_error(op_st);
 }
 
 /*
@@ -169,7 +172,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
         mdl = Mdl(r.TransferBuffer, mdl_size);
 
         auto st = mdl.prepare_paged(operation); // calls MmProbeAndLockPages
-        if (st) {
+        if (NT_ERROR(st)) {
                 mdl.reset();
         }
         return st;
@@ -192,12 +195,14 @@ PAGED bool usbip::close_socket(_In_ SOCKET *sock)
                 return false;
         }
 
-        if (auto err = disconnect(sock)) { // close must be called anyway
-                Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", err);
+        auto st = disconnect(sock);
+        if (NT_ERROR(st)) { // close must be called anyway
+                Trace(TRACE_LEVEL_ERROR, "disconnect %!STATUS!", st);
         }
 
-        if (auto err = close(sock)) { // further calls must return STATUS_NOT_SUPPORTED
-                Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", err);
+        st = close(sock);
+        if (NT_ERROR(st)) { // further calls must return STATUS_NOT_SUPPORTED
+                Trace(TRACE_LEVEL_ERROR, "close %!STATUS!", st);
                 return false;
         }
 

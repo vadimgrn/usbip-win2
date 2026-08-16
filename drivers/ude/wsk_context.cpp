@@ -54,8 +54,9 @@ void *allocate_function_ex(
 
         ctx->mdl_hdr = Mdl(&ctx->hdr, sizeof(ctx->hdr));
 
-        if (auto err = ctx->mdl_hdr.prepare_nonpaged()) {
-                Trace(TRACE_LEVEL_ERROR, "mdl_hdr %!STATUS!", err);
+        auto st = ctx->mdl_hdr.prepare_nonpaged();
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "mdl_hdr %!STATUS!", st);
                 free_function_ex(ctx, list);
                 return nullptr;
         }
@@ -79,11 +80,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto alloc_wsk_context(_In_ ULONG NumberOfPackets)
 {
         auto ctx = (wsk_context*)ExAllocateFromLookasideListEx(&g_lookaside);
-
         if (!ctx) {
                 Trace(TRACE_LEVEL_ERROR, "ExAllocateFromLookasideListEx error");
-        } else if (auto err = prepare_isoc(*ctx, NumberOfPackets)) {
-                Trace(TRACE_LEVEL_ERROR, "prepare_isoc(NumberOfPackets %lu) %!STATUS!", NumberOfPackets, err);
+                return ctx;
+        }
+
+        auto st = prepare_isoc(*ctx, NumberOfPackets);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "prepare_isoc(NumberOfPackets %lu) %!STATUS!", NumberOfPackets, st);
                 free_function_ex(ctx, &g_lookaside);
                 ctx = nullptr;
         }
@@ -128,11 +132,11 @@ NTSTATUS usbip::init_wsk_context_list()
                 return STATUS_ALREADY_INITIALIZED;
         }
 
-        auto err = ExInitializeLookasideListEx(&g_lookaside, allocate_function_ex, free_function_ex, 
+        auto st = ExInitializeLookasideListEx(&g_lookaside, allocate_function_ex, free_function_ex, 
                                                NonPagedPoolNx, 0, sizeof(wsk_context), unique_ptr::pooltag, 0);
 
-        g_initialized = !err;
-        return err;
+        g_initialized = NT_SUCCESS(st);
+        return st;
 }
 
 _IRQL_requires_same_
@@ -186,11 +190,12 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::alloc_mdl_buf_tail(_Inout_ wsk_context &ctx, _In_ ULONG length)
 {
-        if (auto err = alloc_buf_tail(ctx.buf_tail, length)) {
-                return err;
+        auto st = alloc_buf_tail(ctx.buf_tail, length);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
-        auto st = STATUS_SUCCESS;
+        st = STATUS_SUCCESS;
 
         if (auto &mdl = ctx.mdl_buf_tail; mdl.size() == length) {
                 NT_ASSERT(!mdl.next());
@@ -235,8 +240,9 @@ NTSTATUS usbip::prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPacket
 
         if (ctx.mdl_isoc.size() != isoc_len) {
                 ctx.mdl_isoc = Mdl(ctx.isoc, isoc_len);
-                if (auto err = ctx.mdl_isoc.prepare_nonpaged()) {
-                        return err;
+                auto st = ctx.mdl_isoc.prepare_nonpaged();
+                if (NT_ERROR(st)) {
+                        return st;
                 }
                 NT_ASSERT(number_of_packets(ctx) == NumberOfPackets);
         }

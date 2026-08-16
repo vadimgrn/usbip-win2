@@ -37,10 +37,13 @@ PAGED auto save_device_location(_Inout_ device_attributes &attr, _In_ const vhci
 
         for (auto& [dst, src, maxlen]: v) {
                 if (!*src) {
-                        // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
-                } else if (auto err = libdrv::utf8_to_unicode(*dst, src, maxlen, PagedPool, unique_ptr::pooltag)) {
-                        Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, err);
-                        return err;
+                        continue; // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
+                }
+
+                auto st = libdrv::utf8_to_unicode(*dst, src, maxlen, PagedPool, unique_ptr::pooltag);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, st);
+                        return st;
                 }
         }
 
@@ -76,14 +79,15 @@ PAGED auto alloc_device_ctx_ext(_Inout_ WDFMEMORY &result, _In_ WDFOBJECT parent
         attr.EvtDestroyCallback = destroy_device_ctx_ext;
 
         device_ctx_ext *ext{};
+        auto st = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*ext), &result, reinterpret_cast<PVOID*>(&ext));
 
-        if (auto err = WdfMemoryCreate(&attr, NonPagedPoolNx, 0, sizeof(*ext), &result, reinterpret_cast<PVOID*>(&ext))) {
-                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", err);
-                return err;
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfMemoryCreate %!STATUS!", st);
+        } else {
+                RtlZeroMemory(ext, sizeof(*ext));
         }
 
-        RtlZeroMemory(ext, sizeof(*ext));
-        return STATUS_SUCCESS;
+        return st;
 }
 
 } // namespace
@@ -117,21 +121,24 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
 {
         PAGED_CODE();
 
-        if (auto err = alloc_device_ctx_ext(ctx_ext, parent)) {
-                return err;
+        auto st = alloc_device_ctx_ext(ctx_ext, parent); 
+        if (NT_ERROR(st)) {
+                return st;
         }
         auto &ext = get_device_ctx_ext(ctx_ext);
 
-        if (auto err = init_device_attributes(ext.attr, r)) {
-                return err;
+        st = init_device_attributes(ext.attr, r);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         auto &props = ext.properties();
         props.wsk_events = r.wsk_events;
 
-        if (auto err = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial))) {
-                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", r.serial, err);
-                return err;
+        st = RtlStringCbCopyNA(props.serial, sizeof(props.serial), r.serial, sizeof(r.serial));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "RtlStringCbCopyNA('%s') %!STATUS!", r.serial, st);
+                return st;
         }
 
         return STATUS_SUCCESS;
@@ -162,12 +169,8 @@ PAGED NTSTATUS usbip::init_device_attributes(
         _Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc)
 {
         PAGED_CODE();
-
-        if (auto err = save_device_location(attr, loc)) {
-                return err;
-        }
-
-        return hash_location(attr.location_hash, attr);
+        auto st = save_device_location(attr, loc); 
+        return NT_ERROR(st) ? st : hash_location(attr.location_hash, attr);
 }
 
 /**

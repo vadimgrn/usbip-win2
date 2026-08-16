@@ -39,7 +39,7 @@ class unique_ptr : public usbip::generic_handle<void*, usbip::pool_ptr_tag<PoolT
         using base = usbip::generic_handle<void*, usbip::pool_ptr_tag<PoolTag>, nullptr>;
         using base::base;
 public:
-        enum { pooltag = PoolTag };
+        static constexpr ULONG pooltag = PoolTag; // enum causes codeql error cpp/drivers/pool-tag-integral
 
         unique_ptr(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
                 unique_ptr(ExAllocatePoolZero(PoolType, NumberOfBytes, pooltag)) {}

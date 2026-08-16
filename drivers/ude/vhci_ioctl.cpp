@@ -96,9 +96,12 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
         static_assert(sizeof(req) == sizeof(req.hdr) + sizeof(req.body)); // packed
         auto busid = ext.busid();
 
-        if (auto &dst = req.body.busid; auto err = libdrv::unicode_to_utf8(dst, sizeof(dst), *busid)) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", busid, err);
-                return err;
+        auto &dst = req.body.busid;
+        auto st = libdrv::unicode_to_utf8(dst, sizeof(dst), *busid);
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", busid, st);
+                return st;
         }
 
         byteswap(req.hdr);
@@ -114,20 +117,24 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
         PAGED_CODE();
         RtlZeroMemory(&reply, sizeof(reply));
 
-        if (auto err = recv_op_common(ext.sock, OP_REP_IMPORT)) {
-                return err;
+        auto st = recv_op_common(ext.sock, OP_REP_IMPORT);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
-        if (auto err = recv(ext.sock, pool, &reply, sizeof(reply))) {
-                Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", err);
-                return err;
+        st = recv(ext.sock, pool, &reply, sizeof(reply));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "Receive op_import_reply %!STATUS!", st);
+                return st;
         }
         byteswap(reply);
 
-        if (char busid[sizeof(reply.udev.busid)];
-            auto err = libdrv::unicode_to_utf8(busid, sizeof(busid), *ext.busid())) {
-                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), err);
-                return err;
+        char busid[sizeof(reply.udev.busid)];
+        st = libdrv::unicode_to_utf8(busid, sizeof(busid), *ext.busid());
+
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), st);
+                return st;
         } else if (strncmp(reply.udev.busid, busid, sizeof(busid))) {
                 Trace(TRACE_LEVEL_ERROR, "Received busid '%s' != '%s'", reply.udev.busid, busid);
                 return USBIP_ERROR_PROTOCOL;
@@ -142,14 +149,16 @@ PAGED auto import_remote_device(_Inout_ device_ctx_ext &ext)
 {
         PAGED_CODE();
 
-        if (auto err = send_req_import(ext)) {
-                Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", err);
-                return err;
+        auto st = send_req_import(ext);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "Send OP_REQ_IMPORT %!STATUS!", st);
+                return st;
         }
 
         op_import_reply reply;
-        if (auto err = recv_rep_import(ext, memory::stack, reply)) {
-                return err;
+        st = recv_rep_import(ext, memory::stack, reply);
+        if (NT_ERROR(st)) {
+                return st;
         }
  
         auto &udev = reply.udev; 
@@ -190,9 +199,10 @@ PAGED NTSTATUS plugin(_In_ UDECXUSBDEVICE device, _Inout_ int &port, _Inout_ boo
         auto &portnum = speed < USB_SPEED_SUPER ? options.Usb20PortNumber : options.Usb30PortNumber;
         portnum = port;
 
-        if (auto err = UdecxUsbDevicePlugIn(device, &options)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", err);
-                return err;
+        auto st = UdecxUsbDevicePlugIn(device, &options);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUsbDevicePlugIn %!STATUS!", st);
+                return st;
         } else { // UdecxUsbDevicePlugOutAndDelete must be called instead of WdfObjectDelete
                 plugged = true;
         }
@@ -208,7 +218,8 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
         PAGED_CODE();
 
         Registry key;
-        if (auto err = open(key, DriverRegKeyParameters)) {
+        auto st = open(key, DriverRegKeyParameters);
+        if (NT_ERROR(st)) {
                 return;
         }
 
@@ -226,8 +237,11 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
                 UNICODE_STRING value_name;
                 NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
 
-                if (ULONG val{}; auto err = WdfRegistryQueryULong(key.get(), &value_name, &val)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, err);
+                ULONG val{};
+                st = WdfRegistryQueryULong(key.get(), &value_name, &val);
+
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
                 } else {
                         value = val;
                 }
@@ -249,9 +263,10 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
         int cnt{};
         int intvl{};
 
-        if (auto err = get_keepalive_opts(sock, &idle, &cnt, &intvl)) {
-                Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", err);
-                return err;
+        auto st = get_keepalive_opts(sock, &idle, &cnt, &intvl);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "get_keepalive_opts %!STATUS!", st);
+                return st;
         }
 
         Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
@@ -259,9 +274,10 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 
         query_keepalive_parameters(idle, cnt, intvl);
 
-        if (auto err = set_keepalive(sock, idle, cnt, intvl)) {
-                Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", err);
-                return err;
+        st = set_keepalive(sock, idle, cnt, intvl);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "set_keepalive %!STATUS!", st);
+                return st;
         }
 
         Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
@@ -282,22 +298,27 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
 
         device_state_changed(ctx.vhci, ext.attr, 0, vhci::state::connected);
 
-        if (auto err = import_remote_device(ext)) {
-                return err;
+        auto st = import_remote_device(ext);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         UDECXUSBDEVICE dev{};
-        if (auto err = device::create(dev, ctx.vhci, ctx.ctx_ext)) {
-                return err;
+        st = device::create(dev, ctx.vhci, ctx.ctx_ext);
+        if (NT_ERROR(st)) {
+                return st;
         }
         ctx.ctx_ext = WDF_NO_HANDLE; // now dev owns it
 
-        if (bool plugout_and_delete{}; auto err = plugin(dev, r->port, plugout_and_delete)) {
+        bool plugout_and_delete{};
+        st = plugin(dev, r->port, plugout_and_delete);
+
+        if (NT_ERROR(st)) {
                 device::detach(dev, plugout_and_delete);
                 if (!plugout_and_delete) {
                         WdfObjectDelete(dev);
                 }
-                return err;
+                return st;
         }
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), r->port);
@@ -333,28 +354,32 @@ PAGED auto create_socket(_Inout_ SOCKET* &sock, _In_ const ADDRINFOEXW &ai, _In_
         PAGED_CODE();
         NT_ASSERT(!sock);
 
-        if (auto err = socket(sock, static_cast<ADDRESS_FAMILY>(ai.ai_family), 
-                                static_cast<USHORT>(ai.ai_socktype), ai.ai_protocol, 
-                                WSK_FLAG_CONNECTION_SOCKET, socket_ctx, events::wsk_dispatch)) {
+        auto st = socket(sock, static_cast<ADDRESS_FAMILY>(ai.ai_family), 
+                         static_cast<USHORT>(ai.ai_socktype), ai.ai_protocol, 
+                         WSK_FLAG_CONNECTION_SOCKET, socket_ctx, events::wsk_dispatch);
+
+        if (NT_ERROR(st)) {
                 NT_ASSERT(!sock);
-                Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", err);
-                return err;
+                Trace(TRACE_LEVEL_ERROR, "socket %!STATUS!", st);
+                return st;
         }
 
-        if (auto err = set_options(sock)) {
-                return err;
+        st = set_options(sock);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         SOCKADDR_INET any { // see INADDR_ANY, IN6ADDR_ANY_INIT
                 .si_family = static_cast<ADDRESS_FAMILY>(ai.ai_family)
         };
 
-        if (auto err = bind(sock, reinterpret_cast<SOCKADDR*>(&any))) {
-                Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", err);
-                return err;
+        st = bind(sock, reinterpret_cast<SOCKADDR*>(&any));
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "bind %!STATUS!", st);
+                return st;
         }
 
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_
@@ -374,8 +399,9 @@ PAGED auto connect(
                 TraceDbg("%!BIN!", WppBinary(&v6.sin6_addr, sizeof(v6.sin6_addr)));
         }
 
-        if (auto err = create_socket(ext.sock, ai, &ext)) {
-                return err;
+        auto st = create_socket(ext.sock, ai, &ext);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         set_args(ctx.args, request, __func__, &ai);
@@ -383,7 +409,7 @@ PAGED auto connect(
         auto irp = WdfRequestWdmGetIrp(request);
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
 
-        auto st = connect(ext.sock, ai.ai_addr, irp); // completion handler will be called anyway
+        st = connect(ext.sock, ai.ai_addr, irp); // completion handler will be called anyway
         TraceDbg("%!STATUS!", st);
 
         return STATUS_PENDING;
@@ -551,9 +577,10 @@ PAGED auto plugin_hardware(
         auto vhci = get_vhci(request);
 
         WDFWORKITEM wi{};
-        if (auto err = create_workitem(wi, vhci)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", err);
-                return err;
+        auto st = create_workitem(wi, vhci);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", st);
+                return st;
         }
         auto &ctx = *get_workitem_ctx(wi);
 
@@ -561,9 +588,10 @@ PAGED auto plugin_hardware(
         ctx.request = request;
         ctx.one_attempt = once;
 
-        if (auto err = create_device_ctx_ext(ctx.ctx_ext, vhci, r)) {
+        st = create_device_ctx_ext(ctx.ctx_ext, vhci, r);
+        if (NT_ERROR(st)) {
                 WdfObjectDelete(wi);
-                return err;
+                return st;
         }
 
         auto &ext = ctx.ext();
@@ -578,11 +606,13 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
 {
         PAGED_CODE();
-        vhci::ioctl::stop_attach_attempts *r{};
 
-        if (size_t length; 
-            auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
-                return err;
+        vhci::ioctl::stop_attach_attempts *r{};
+        size_t length;
+        auto st = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length);
+
+        if (NT_ERROR(st)) {
+                return st;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
         } else if (r->size != sizeof(*r)) {
@@ -595,7 +625,6 @@ PAGED NTSTATUS stop_attach_attempts(_In_ WDFREQUEST request)
         TraceDbg("host '%s', service '%s', busid '%s'", r->host, r->service, r->busid);
 
         ULONG location_hash{};
-        NTSTATUS st;
 
         if (auto cnt = bool(*r->host) + bool(*r->service) + bool(*r->busid); !cnt) {
                 st = STATUS_SUCCESS; // stop all
@@ -625,18 +654,19 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
         WdfRequestSetInformation(request, 0);
 
         vhci::ioctl::plugin_hardware *r{};
+        size_t length;
+        auto st = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length);
 
-        if (size_t length;
-            auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
-                return err;
+        if (NT_ERROR(st)) {
+                return st;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
         } else if (r->size != length) {
                 Trace(TRACE_LEVEL_ERROR, "struct.size %lu != sizeof(struct) %Iu", r->size, length);
                 return USBIP_ERROR_ABI;
-        } else if (err = validate_serial_number(r->serial); err) {
+        } else if (st = validate_serial_number(r->serial); NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "bad serial '%s'", r->serial);
-                return err;
+                return st;
         }
 
         r->port = 0;
@@ -652,11 +682,13 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
 {
         PAGED_CODE();
-        vhci::ioctl::plugout_hardware *r{};
 
-        if (size_t length; 
-            auto err = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length)) {
-                return err;
+        vhci::ioctl::plugout_hardware *r{};
+        size_t length;
+        auto st = WdfRequestRetrieveInputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &length);
+
+        if (NT_ERROR(st)) {
+                return st;
         } else if (length != sizeof(*r)) {
                 return STATUS_INVALID_BUFFER_SIZE;
         } else if (r->size != length) {
@@ -665,7 +697,7 @@ PAGED NTSTATUS plugout_hardware(_In_ WDFREQUEST request, _In_ bool reattach)
         }
 
         TraceDbg("port %d, reattach %!bool!", r->port, reattach);
-        auto st = STATUS_SUCCESS;
+        st = STATUS_SUCCESS;
 
         if (auto vhci = get_vhci(request); r->port <= 0) {
                 auto plugout_and_delete = r->port != vhci::ioctl::PORT_ALL_CLOSEONLY;
@@ -690,9 +722,10 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
 
         size_t outlen;
         vhci::ioctl::get_imported_devices *r;
+        auto st = WdfRequestRetrieveOutputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &outlen);
 
-        if (auto err = WdfRequestRetrieveOutputBuffer(request, sizeof(*r), reinterpret_cast<PVOID*>(&r), &outlen)) {
-                return err;
+        if (NT_ERROR(st)) {
+                return st;
         } else if (r->size != sizeof(*r)) {
                 Trace(TRACE_LEVEL_ERROR, "get_imported_devices.size %lu != sizeof(get_imported_devices) %Iu", 
                                           r->size, sizeof(*r));
@@ -715,8 +748,12 @@ PAGED NTSTATUS get_imported_devices(_In_ WDFREQUEST request)
                         //
                 } else if (cnt == max_cnt) {
                         return STATUS_BUFFER_TOO_SMALL;
-                } else if (auto dc = get_device_ctx(dev.get()); auto err = fill(r->devices[cnt++], *dc)) {
-                        return err;
+                } else {
+                        auto dc = get_device_ctx(dev.get());
+                        st = fill(r->devices[cnt++], *dc);
+                        if (NT_ERROR(st)) {
+                                return st;
+                        }
                 }
         }
 
@@ -740,20 +777,22 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
 
         void *buf{};
         size_t length{};
-        if (auto err = WdfRequestRetrieveInputBuffer(request, 0, &buf, &length)) {
-                return err;
+        auto st = WdfRequestRetrieveInputBuffer(request, 0, &buf, &length);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         Registry key;
-        if (auto err = open(key, DriverRegKeyPersistentState, KEY_SET_VALUE)) {
-                return err;
+        st = open(key, DriverRegKeyPersistentState, KEY_SET_VALUE);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         UNICODE_STRING val_name;
         RtlUnicodeStringInit(&val_name, persistent_devices_value_name);
 
-        auto st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(length), buf);
-        if (st) {
+        st = WdfRegistryAssignValue(key.get(), &val_name, REG_MULTI_SZ, ULONG(length), buf);
+        if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryAssignValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
         }
         return st;
@@ -771,13 +810,15 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
 
         void *buf{};
         size_t length{};
-        if (auto err = WdfRequestRetrieveOutputBuffer(request, 0, &buf, &length)) {
-                return err;
+        auto st = WdfRequestRetrieveOutputBuffer(request, 0, &buf, &length);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         Registry key;
-        if (auto err = open(key, DriverRegKeyPersistentState)) {
-                return err;
+        st = open(key, DriverRegKeyPersistentState);
+        if (NT_ERROR(st)) {
+                return st;
         }
 
         UNICODE_STRING val_name;
@@ -785,9 +826,9 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
 
         ULONG actual{};
         auto type = REG_NONE;
-        auto st = WdfRegistryQueryValue(key.get(), &val_name, ULONG(length), buf, &actual, &type);
+        st = WdfRegistryQueryValue(key.get(), &val_name, ULONG(length), buf, &actual, &type);
 
-        if (st) {
+        if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!) %!STATUS!, length %Iu", &val_name, st, length);
         } else if (type != REG_MULTI_SZ) {
                 Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryValue(%!USTR!): type(%ul) != REG_MULTI_SZ(%ul)", &val_name, type, REG_MULTI_SZ);
@@ -963,12 +1004,16 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
         if (auto evt = (WDFMEMORY)WdfCollectionGetFirstItem(fobj.events)) {
                 vhci::complete_read(request, evt);
                 WdfCollectionRemove(fobj.events, evt); // decrements reference count
-        } else if (auto err = WdfRequestForwardToIoQueue(request, vhci.reads)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", err);
-                if (err == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
-                        err = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero
+                return;
+        }
+
+        auto st = WdfRequestForwardToIoQueue(request, vhci.reads);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfRequestForwardToIoQueue %!STATUS!", st);
+                if (st == STATUS_WDF_BUSY) { // the queue is not accepting new requests, purged
+                        st = STATUS_END_OF_FILE; // ReadFile will return TRUE and set lpNumberOfBytesRead to zero
                 }
-                WdfRequestCompleteWithInformation(request, err, 0);
+                WdfRequestCompleteWithInformation(request, st, 0);
         }
 }
 
@@ -993,22 +1038,26 @@ PAGED NTSTATUS usbip::vhci::create_queues(_In_ WDFDEVICE vhci)
         cfg.EvtIoDeviceControl = device_control;
         cfg.EvtIoRead = device_read;
 
-        if (auto err = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
+        auto st = WdfIoQueueCreate(vhci, &cfg, &attr, nullptr);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", st);
+                return st;
         }
 
         WDF_IO_QUEUE_CONFIG_INIT(&cfg, WdfIoQueueDispatchParallel);
         cfg.PowerManaged = PowerManaged;
         cfg.EvtIoDeviceControl = device_control_parallel;
 
-        if (WDFQUEUE queue{}; auto err = WdfIoQueueCreate(vhci, &cfg, &attr, &queue)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", err);
-                return err;
-        } else if (err = WdfDeviceConfigureRequestDispatching(vhci, queue, WdfRequestTypeDeviceControl); err) {
-                Trace(TRACE_LEVEL_ERROR, "WdfDeviceConfigureRequestDispatching %!STATUS!", err);
-                return err;
+        WDFQUEUE queue{};
+        st = WdfIoQueueCreate(vhci, &cfg, &attr, &queue);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfIoQueueCreate %!STATUS!", st);
+                return st;
         }
 
-        return STATUS_SUCCESS;
+        st = WdfDeviceConfigureRequestDispatching(vhci, queue, WdfRequestTypeDeviceControl);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfDeviceConfigureRequestDispatching %!STATUS!", st);
+        }
+        return st;
 }

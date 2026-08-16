@@ -325,9 +325,13 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ bool wsk_events, _In_ const head
 
         if (is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
                 buffer = nullptr;
-        } else if (ULONG length; auto err = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length)) {
-                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", err);
-                return err;
+        } else {
+                ULONG length;
+                auto st = UdecxUrbRetrieveBuffer(ctx.request, &buffer, &length);
+                if (NT_ERROR(st)) {
+                        Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", st);
+                        return st;
+                }
         }
 
         if (wsk_events) {
@@ -415,16 +419,17 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret,
         UCHAR *TransferBuffer{};
         ULONG TransferBufferLength{};
 
-        if (auto err = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength)) {
-                return err == STATUS_INVALID_PARAMETER ? STATUS_SUCCESS : err; // OK if URB has no transfer buffer
+        auto st = UdecxUrbRetrieveBuffer(ctx.request, &TransferBuffer, &TransferBufferLength);
+        if (NT_ERROR(st)) {
+                return st == STATUS_INVALID_PARAMETER ? STATUS_SUCCESS : st; // OK if URB has no transfer buffer
         }
 
         TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
 
         if (TransferBufferLength != static_cast<ULONG>(ret.actual_length)) { // prepare_wsk_mdl can set it
-		auto st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+		st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
 		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
-                if (st) {
+                if (NT_ERROR(st)) {
                         return st;
                 }
 	}
