@@ -1,3 +1,8 @@
 <Project>
  <Import Project="$(MSBuildThisFileDirectory)vcpkg\scripts\buildsystems\msbuild\vcpkg.props" />
+ <ItemDefinitionGroup>
+  <ClCompile>
+   <AdditionalOptions>/utf-8 /FS %(AdditionalOptions)</AdditionalOptions>
+  </ClCompile>
+ </ItemDefinitionGroup>
 </Project>
