@@ -4,6 +4,7 @@
 
 #include "..\vhci.h"
 
+#include "offsetof_ex.h"
 #include "device_speed.h"
 #include "output.h"
 
@@ -258,7 +259,7 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
 
         auto idx = static_cast<int>(state);
-        return idx >= 0 && idx < std::size(v) ? v[idx] : "";
+        return idx >= 0 && idx < std::ssize(v) ? v[idx] : "";
 }
 
 auto usbip::vhci::open(_In_ bool overlapped) -> Handle
@@ -286,8 +287,7 @@ auto usbip::vhci::open(_In_ bool overlapped) -> Handle
 std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_devices(_In_ HANDLE dev)
 {
         std::optional<std::vector<usbip::imported_device>> devices;
-
-        constexpr auto devices_offset = offsetof(ioctl::get_imported_devices, devices);
+        constexpr auto devices_offset = offsetof_ex(ioctl::get_imported_devices, devices);
 
         ioctl::get_imported_devices *r{};
         std::vector<char> buf;
@@ -316,7 +316,7 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
         }
 
         if (auto devices_size = buf.size() - devices_offset;
-            auto reminder = devices_size % sizeof(*r->devices)) { // must be zero
+            devices_size % sizeof(*r->devices)) { // reminder must be zero
                 libusbip::output("{}: N*sizeof(imported_device) != {}", __func__, devices_size);
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
         } else {
@@ -329,7 +329,8 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
 
 int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 {
-        ioctl::plugin_hardware r {{ .size = sizeof(r) }};
+        ioctl::plugin_hardware r{};
+        r.size = sizeof(r);
 
         if (auto err = assign(r, args)) {
                 SetLastError(err);
@@ -337,7 +338,7 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
         }
 
         auto ctl = args.once ? ioctl::PLUGIN_HARDWARE_ONCE : ioctl::PLUGIN_HARDWARE;
-        constexpr auto outlen = offsetof(ioctl::plugin_hardware, port) + sizeof(r.port);
+        constexpr auto outlen = offsetof_ex(ioctl::plugin_hardware, port) + sizeof(r.port);
 
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
             DeviceIoControl(dev, ctl, &r, sizeof(r), &r, outlen, &BytesReturned, nullptr)) {
@@ -360,7 +361,8 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 
 int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *location)
 {
-        ioctl::stop_attach_attempts r {{ .size = sizeof(r) }};
+        ioctl::stop_attach_attempts r{};
+        r.size = sizeof(r);
 
         if (location && !assign(r, *location)) {
                 SetLastError(ERROR_INVALID_PARAMETER);

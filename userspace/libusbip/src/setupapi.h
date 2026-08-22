@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -12,8 +12,23 @@
 namespace usbip
 {
 
-struct hdevinfo_tag {};
-using hdevinfo = generic_handle<HDEVINFO, hdevinfo_tag, INVALID_HANDLE_VALUE>;
+struct hdevinfo_traits 
+{
+        static HDEVINFO invalid() noexcept { return INVALID_HANDLE_VALUE; }
+};
+
+struct hinf_traits 
+{
+        static HINF invalid() noexcept { return INVALID_HANDLE_VALUE; }
+};
+
+struct hspfileq_traits 
+{
+        static HSPFILEQ invalid() noexcept { return INVALID_HANDLE_VALUE; }
+};
+
+
+using hdevinfo = generic_handle<hdevinfo_traits>;
 
 template<>
 inline void close_handle(_In_ hdevinfo::type h, _In_ hdevinfo::tag_type) noexcept
@@ -23,8 +38,7 @@ inline void close_handle(_In_ hdevinfo::type h, _In_ hdevinfo::tag_type) noexcep
 }
 
 
-struct HInfTag {};
-using HInf = generic_handle<HINF, HInfTag, HINF(INVALID_HANDLE_VALUE)>;
+using HInf = generic_handle<hinf_traits>;
 
 template<>
 inline void close_handle(_In_ HInf::type h, _In_ HInf::tag_type) noexcept
@@ -33,8 +47,7 @@ inline void close_handle(_In_ HInf::type h, _In_ HInf::tag_type) noexcept
 }
 
 
-struct HspFileQTag {};
-using HspFileQ = generic_handle<HSPFILEQ, HspFileQTag, HSPFILEQ(INVALID_HANDLE_VALUE)>;
+using HspFileQ = generic_handle<hspfileq_traits>;
 
 template<>
 inline void close_handle(_In_ HspFileQ::type h, _In_ HspFileQ::tag_type) noexcept

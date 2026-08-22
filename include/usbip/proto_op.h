@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -14,7 +14,7 @@
 namespace usbip
 {
 
-#include <PSHPACK1.H>
+#pragma pack(push, 1)
 
 struct usbip_usb_interface 
 {
@@ -84,7 +84,7 @@ struct op_devlist_reply_extra
         // followed by usbip_usb_interface uinf[]
 };
 
-#include <POPPACK.H>
+#pragma pack(pop)
 
 
 enum : UINT16 // op_common.code

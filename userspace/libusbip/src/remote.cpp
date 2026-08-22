@@ -60,11 +60,6 @@ inline auto set_nodelay(_Inout_ set_last_error &last, _In_ SOCKET s)
 	return do_setsockopt(last, s, IPPROTO_TCP, TCP_NODELAY, true);
 }
 
-inline auto set_keepalive(_Inout_ set_last_error &last, _In_ SOCKET s)
-{
-	return do_setsockopt(last, s, SOL_SOCKET, SO_KEEPALIVE, true);
-}
-
 inline auto set_ipv6only(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ bool ipv6only)
 {
 	return do_setsockopt(last, s, IPPROTO_IPV6, IPV6_V6ONLY, ipv6only);
@@ -147,7 +142,7 @@ auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = 
 		}
 		[[fallthrough]];
 	default:
-		return ret == len;
+                return static_cast<size_t>(ret) == len;
 	}
 }
 
@@ -331,7 +326,7 @@ auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const
         auto svc = utf8_to_wchar(service);
 
         if (!(host && svc)) {
-                last.error = host.error_or(svc.error());
+                last.error = !host ? host.error() : svc.error();
                 libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, last.error);
                 return ptr; 
         }
@@ -343,10 +338,14 @@ auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const
 		return ptr;
 	}
 
-	OVERLAPPED ovlp { .hEvent = evt.get() };
+        OVERLAPPED ovlp{};
+        ovlp.hEvent = evt.get();
 
-	const ADDRINFOEX hints{ .ai_family = AF_UNSPEC, .ai_socktype = SOCK_STREAM };
-	ADDRINFOEX *result{};
+        ADDRINFOEX hints{};
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+
+        ADDRINFOEX *result{};
 	HANDLE cancel{};
 
 	libusbip::output("resolving {}:{}", hostname, service);
@@ -398,7 +397,7 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Sock
 	auto svc = utf8_to_wchar(service);
 
         if (!(host && svc)) {
-                last.error = host.error_or(svc.error());
+                last.error = !host ? host.error() : svc.error();
                 libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, last.error);
                 return sock;
         }

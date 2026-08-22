@@ -7,9 +7,9 @@
 namespace usbip
 {
 
-constexpr auto &tcp_port = "3240";
-constexpr auto &driver_filename = L"usbip2_ude"; // used by filter driver
-constexpr auto &persistent_devices_value_name = L"PersistentDevices";
+constexpr auto tcp_port = "3240";
+constexpr auto driver_filename = L"usbip2_ude"; // used by filter driver
+constexpr auto persistent_devices_value_name = L"PersistentDevices";
 
 enum op_status_t // op_common.status
 {

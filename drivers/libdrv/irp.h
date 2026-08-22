@@ -10,12 +10,15 @@
 namespace usbip
 {
 
-struct irp_ptr_tag {};
+struct irp_ptr_traits
+{
+        static IRP* invalid() noexcept { return nullptr; }
+};
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 template<>
-inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_tag)
+inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_traits)
 {
         IoFreeIrp(irp);
 }
@@ -27,11 +30,13 @@ namespace libdrv
 {
 
 using usbip::swap;
+using usbip::generic_handle;
+using usbip::irp_ptr_traits;
 
-class irp_ptr : public usbip::generic_handle<IRP*, usbip::irp_ptr_tag, nullptr>
+class irp_ptr : public generic_handle<irp_ptr_traits>
 {
 public:
-        using usbip::generic_handle<IRP*, usbip::irp_ptr_tag, nullptr>::generic_handle;
+        using generic_handle<irp_ptr_traits>::generic_handle;
 
         irp_ptr(_In_ CCHAR StackSize, _In_ bool ChargeQuota) :
                 irp_ptr(IoAllocateIrp(StackSize, ChargeQuota)) {}

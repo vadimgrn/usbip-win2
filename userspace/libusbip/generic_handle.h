@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -13,13 +13,14 @@ namespace std
 using usbip::generic_handle;
 using usbip::swap;
 
-template<typename Handle, typename Tag, auto NoneValue>
-struct std::hash<generic_handle<Handle, Tag, NoneValue>>
+template<typename HandleTraits>
+struct hash<generic_handle<HandleTraits>>
 {
-        auto operator() (const generic_handle<Handle, Tag, NoneValue> &h) const noexcept
+        auto operator() (const generic_handle<HandleTraits> &h) const noexcept
         {
-                std::hash<h.type> f;
-                return f(h.get());
+                auto val = h.get();
+                hash<decltype(val)> f; // typename generic_handle<HandleTraits>::type
+                return f(val);
         }
 };
 

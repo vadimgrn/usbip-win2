@@ -167,9 +167,15 @@ struct get_imported_devices : base
         imported_device devices[ANYSIZE_ARRAY];
 };
 
-constexpr auto get_imported_devices_size(_In_ ULONG n)
+/*
+ * clang emits an error for offsetof() due to the inheritance.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto get_imported_devices_size(_In_ ULONG n)
 {
-        return offsetof(get_imported_devices, devices) + n*sizeof(*get_imported_devices::devices);
+        const auto offset = reinterpret_cast<size_t>(&static_cast<get_imported_devices*>(nullptr)->devices);
+        return offset + n*sizeof(*get_imported_devices::devices);
 }
 
 } // namespace usbip::vhci::ioctl

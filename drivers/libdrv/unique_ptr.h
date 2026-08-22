@@ -11,15 +11,17 @@ namespace usbip
 {
 
 template<ULONG PoolTag>
-struct pool_ptr_tag
+struct pool_ptr_traits
 {
-        enum { value = PoolTag };
+        static constexpr ULONG pooltag = PoolTag; // enum causes codeql error cpp/drivers/pool-tag-integral
+        static void* invalid() noexcept { return nullptr; }
 };
 
+
 template<ULONG PoolTag>
-inline void close_handle(_In_ void *ptr, _In_ pool_ptr_tag<PoolTag> tag)
+inline void close_handle(_In_ void *ptr, _In_ pool_ptr_traits<PoolTag> tag)
 {
-        ExFreePoolWithTag(ptr, tag.value);
+        ExFreePoolWithTag(ptr, tag.pooltag);
 }
 
 } // namespace usbip
@@ -29,14 +31,15 @@ namespace libdrv
 {
 
 using usbip::swap;
+using usbip::generic_handle;
 
 struct uninitialized_t { explicit uninitialized_t() = default; };
 inline constexpr uninitialized_t uninitialized;
 
 template<ULONG PoolTag>
-class unique_ptr : public usbip::generic_handle<void*, usbip::pool_ptr_tag<PoolTag>, nullptr>
+class unique_ptr : public generic_handle<usbip::pool_ptr_traits<PoolTag>>
 {
-        using base = usbip::generic_handle<void*, usbip::pool_ptr_tag<PoolTag>, nullptr>;
+        using base = generic_handle<usbip::pool_ptr_traits<PoolTag>>;
         using base::base;
 public:
         static constexpr ULONG pooltag = PoolTag; // enum causes codeql error cpp/drivers/pool-tag-integral

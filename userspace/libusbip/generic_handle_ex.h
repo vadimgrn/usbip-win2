@@ -20,14 +20,14 @@ template<typename Handle, typename Tag>
 void close_handle(Handle, Tag) NOEXCEPT;
 
 
-template<typename Handle, typename Tag, auto NoneValue>
+template<typename HandleTraits>
 class generic_handle
 {
 public:
-        using type = Handle;
-        using tag_type = Tag;
+        static auto None() NOEXCEPT { return HandleTraits::invalid(); }
 
-        static constexpr auto None = NoneValue;
+        using type = decltype(None());
+        using tag_type = HandleTraits;
 
         constexpr generic_handle() NOEXCEPT = default;
         constexpr explicit generic_handle(type h) NOEXCEPT : m_handle(h) {}
@@ -50,8 +50,8 @@ public:
                 return *this;
         }
 
-        constexpr explicit operator bool() const NOEXCEPT { return m_handle != None; }
-        constexpr auto operator !() const NOEXCEPT { return m_handle == None; }
+        constexpr explicit operator bool() const NOEXCEPT { return m_handle != None(); }
+        constexpr auto operator !() const NOEXCEPT { return m_handle == None(); }
 
         constexpr auto get() const NOEXCEPT { return m_handle; }
 
@@ -63,7 +63,7 @@ public:
         template<typename T>
         constexpr auto release() NOEXCEPT { return static_cast<T>(do_release()); }
 
-        void reset(type h = None) NOEXCEPT
+        void reset(type h = None()) NOEXCEPT
         {
                 if (m_handle != h) {
                         generic_handle(h).swap(*this);
@@ -81,20 +81,19 @@ public:
         }
 
 private:
-        type m_handle = None;
+        type m_handle = None();
 
         constexpr type do_release() NOEXCEPT
         {
                 auto h = m_handle;
-                m_handle = None;
+                m_handle = None();
                 return h;
         }
 };
 
 
-template<typename Handle, typename Tag, auto NoneValue>
-constexpr void swap(generic_handle<Handle, Tag, NoneValue> &a, 
-                    generic_handle<Handle, Tag, NoneValue> &b) NOEXCEPT
+template<typename HandleTraits>
+constexpr void swap(generic_handle<HandleTraits> &a, generic_handle<HandleTraits> &b) NOEXCEPT
 {
         a.swap(b);
 }

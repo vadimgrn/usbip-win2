@@ -102,7 +102,8 @@ using device_visitor_f = std::function<bool(HDEVINFO di, SP_DEVINFO_DATA &dd)>;
 
 DWORD enum_device_info(_In_ HDEVINFO di, _In_ const device_visitor_f &func)
 {
-        SP_DEVINFO_DATA	dd{ .cbSize = sizeof(dd) };
+        SP_DEVINFO_DATA	dd{};
+        dd.cbSize = sizeof(dd);
 
         for (DWORD i = 0; ; ++i) {
                 if (SetupDiEnumDeviceInfo(di, i, &dd)) {
@@ -172,7 +173,9 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
                 return false;
         }
 
-        SP_DEVINFO_DATA dev_data{ .cbSize = sizeof(dev_data) };
+        SP_DEVINFO_DATA dev_data{};
+        dev_data.cbSize = sizeof(dev_data);
+
         if (!SetupDiCreateDeviceInfo(dev_list.get(), class_name.c_str(), &class_guid, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
                 errmsg("SetupDiCreateDeviceInfo");
                 return false;
@@ -192,7 +195,9 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
                 return false;
         }
 
-        SP_DEVINSTALL_PARAMS params{ .cbSize = sizeof(params) };
+        SP_DEVINSTALL_PARAMS params{};
+        params.cbSize = sizeof(params);
+
         if (!SetupDiGetDeviceInstallParams(dev_list.get(), &dev_data, &params)) {
                 errmsg("SetupDiGetDeviceInstallParams");
                 return false;

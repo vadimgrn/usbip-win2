@@ -7,15 +7,6 @@
 #include <libusbip\src\usb_ids.h>
 #include <format>
 
-namespace
-{
-
-auto &fmt_name_val = "{:20} = {}"; // name is left aligned
-auto &fmt_name_hex = "{:20} = {:#x}";
-
-} // namespace
-
-
 const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
 {
          const char *names[] { 
@@ -30,7 +21,8 @@ const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
          static_assert(UsbHighSpeed == 2);
          static_assert(UsbSuperSpeed == 3);
 
-         return speed >= 0 && speed < std::size(names) ? names[speed] : "Unknown Speed";
+         auto idx = static_cast<int>(speed);
+         return idx >= 0 && idx < std::ssize(names) ? names[idx] : "Unknown Speed";
 }
 
 std::string usbip::get_product(const UsbIds &ids, uint16_t vendor, uint16_t product)

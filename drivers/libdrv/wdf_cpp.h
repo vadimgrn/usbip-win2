@@ -186,13 +186,18 @@ inline void release_lock(_In_ WDFOBJECT handle)
 }
 
 
-using usbip::generic_handle;
+struct wdfobject_traits
+{
+        static WDFOBJECT invalid() noexcept { return WDF_NO_HANDLE; }
+};
 
-struct ObjectDeleteTag {};
-using ObjectDelete = generic_handle<WDFOBJECT, ObjectDeleteTag, WDFOBJECT(WDF_NO_HANDLE)>;
+struct wdfkey_traits
+{
+        static WDFKEY invalid() noexcept { return WDF_NO_HANDLE; }
+};
 
-struct RegistryTag {};
-using Registry = generic_handle<WDFKEY, RegistryTag, WDFKEY(WDF_NO_HANDLE)>;
+using ObjectDelete = usbip::generic_handle<wdfobject_traits>;
+using Registry = usbip::generic_handle<wdfkey_traits>;
 
 using usbip::swap;
 

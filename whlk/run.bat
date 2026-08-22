@@ -1,6 +1,7 @@
 @echo off
 rem run from Visual Studio Developer Prompt
 
+set PACK_VERSION=1.8.2
 set CODEQL_HOME=D:\codeql-home
 set USBIP_HOME=D:\usbip-win2
 set UDE_HOME=%USBIP_HOME%\drivers\ude
@@ -10,9 +11,9 @@ set CURDIR=%CD%
 del /Q /F "%UDE_HOME%\%PROJ_NAME%.sarif" "%UDE_HOME%\%PROJ_NAME%.DVL.XML"
 rmdir /S /Q "%CODEQL_HOME%\databases"
 
-"%CODEQL_HOME%\codeql\codeql" pack download microsoft/windows-drivers@1.8.2
+"%CODEQL_HOME%\codeql\codeql" pack download microsoft/windows-drivers@%PACK_VERSION%
 "%CODEQL_HOME%\codeql\codeql" database create "%CODEQL_HOME%\databases" --language=cpp --source-root="%UDE_HOME%" --command="msbuild -target:usbip2_ude:rebuild -p:Configuration=Release -p:Platform=x64 -p:EnablePREfast=true -p:RunCodeAnalysis=false \"%USBIP_HOME%\usbip_win2.slnx\""
-"%CODEQL_HOME%\codeql\codeql" database analyze "%CODEQL_HOME%\databases" microsoft/windows-drivers@1.8.2:windows-driver-suites/mustrun.qls --download --format=sarif-latest --output="%UDE_HOME%\%PROJ_NAME%.sarif"
+"%CODEQL_HOME%\codeql\codeql" database analyze "%CODEQL_HOME%\databases" microsoft/windows-drivers@%PACK_VERSION%:windows-driver-suites/mustrun.qls --download --format=sarif-latest --output="%UDE_HOME%\%PROJ_NAME%.sarif"
 
 cd /d "%UDE_HOME%"
 msbuild /t:dvl /p:Configuration="Release" /p:Platform="x64" /p:SarifTelemetryPath="%PROJ_NAME%.sarif" usbip2_ude.vcxproj

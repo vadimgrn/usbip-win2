@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -18,8 +18,18 @@
 namespace usbip
 {
 
-struct SocketTag {};
-using Socket = generic_handle<SOCKET, SocketTag, INVALID_SOCKET>;
+struct socket_traits 
+{
+        static auto invalid() noexcept { return INVALID_SOCKET; }
+};
+
+struct wsaevent_traits 
+{
+        static auto invalid() noexcept { return WSA_INVALID_EVENT; }
+};
+
+
+using Socket = generic_handle<socket_traits>;
 
 template<>
 inline void close_handle(_In_ Socket::type s, _In_ Socket::tag_type) noexcept
@@ -29,8 +39,7 @@ inline void close_handle(_In_ Socket::type s, _In_ Socket::tag_type) noexcept
 }
 
 
-struct WSAEventTag {};
-using WSAEvent = generic_handle<WSAEVENT, WSAEventTag, WSA_INVALID_EVENT>;
+using WSAEvent = generic_handle<wsaevent_traits>;
 
 template<>
 inline void close_handle(_In_ WSAEvent::type evt, _In_ WSAEvent::tag_type) noexcept

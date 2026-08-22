@@ -32,7 +32,7 @@ constexpr auto is_valid_number_of_packets(int number_of_packets)
 	return number_of_packets >= 0 && number_of_packets <= max_iso_packets;
 }
 
-#include <PSHPACK1.H>
+#pragma pack(push, 1)
 
 struct header_basic 
 {
@@ -105,6 +105,6 @@ struct iso_packet_descriptor
 	UINT32 status;
 };
 
-#include <POPPACK.H>
+#pragma pack(pop)
 
 } // namespace usbip

@@ -228,12 +228,12 @@ bool usbip::UsbIds::Impl::parse_vid_pid(
                 if (bool(pid = remove_prefix_hex(line, 4))) {
                         line.remove_prefix(2); // device_name
                         auto &prod = m_vendor[vid].second;
-                        auto [it, inserted] = prod.emplace(pid, line);
+                        [[maybe_unused]] auto [it, inserted] = prod.emplace(pid, line);
                         assert(inserted);
                 }
         } else if (bool(vid = remove_prefix_hex(line, 4))) { // vendor  vendor_name
                 line.remove_prefix(2); // vendor_name
-                auto [it, inserted] = m_vendor.emplace(vid, std::make_pair(line, products_t()));
+                [[maybe_unused]] auto [it, inserted] = m_vendor.emplace(vid, std::make_pair(line, products_t()));
                 assert(inserted);
         }
 
@@ -253,7 +253,7 @@ bool usbip::UsbIds::Impl::parse_class_sub_proto(
                         line.remove_prefix(2);
                         auto &sub = m_class[cls].second;
                         auto &proto = sub[subcls].second;
-                        auto [it, inserted] = proto.emplace(prot, line);
+                        [[maybe_unused]] auto [it, inserted] = proto.emplace(prot, line);
                         assert(inserted);
                 }
         } else if (line.starts_with('\t')) {
@@ -261,7 +261,7 @@ bool usbip::UsbIds::Impl::parse_class_sub_proto(
                 if (bool(subcls = (uint8_t)remove_prefix_hex(line, 2))) {
                         line.remove_prefix(2);
                         auto &sub = m_class[cls].second;
-                        auto [it, inserted] = sub.emplace(subcls, std::make_pair(line, proto_t()));
+                        [[maybe_unused]] auto [it, inserted] = sub.emplace(subcls, std::make_pair(line, proto_t()));
                         assert(inserted);
                 }
         } else if (line.starts_with("C ")) {
@@ -270,7 +270,7 @@ bool usbip::UsbIds::Impl::parse_class_sub_proto(
                 cls = (uint8_t)remove_prefix_hex(line, 2); // "C 00  (Defined at Interface level)"
                 line.remove_prefix(2);
 
-                auto [it, inserted] = m_class.emplace(cls, std::make_pair(line, subclass_t()));
+                [[maybe_unused]] auto [it, inserted] = m_class.emplace(cls, std::make_pair(line, subclass_t()));
                 assert(inserted);
         }
 
