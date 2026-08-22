@@ -125,7 +125,6 @@ Source: {#BuildDir + "*.dll"}; DestDir: "{app}"; Components: main
 Source: {#SolutionDir + "userspace\libusbip\*.h"}; DestDir: "{app}\include\usbip"; Excludes: "resource.h"; Components: sdk
 Source: {#SolutionDir + "userspace\resources\messages.h"}; DestDir: "{app}\include\usbip"; Components: sdk
 Source: {#BuildDir + "libusbip.lib"}; DestDir: "{app}\lib"; Components: sdk
-Source: {#BuildDir + "libusbip.exp"}; DestDir: "{app}\lib"; Components: sdk
 
 Source: {#BuildDir + "*.pdb"}; DestDir: "{app}"; Excludes: "libusbip*.pdb, wusbip.pdb"; Components: pdb
 Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
