@@ -445,12 +445,12 @@ wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 MainFrame::MainFrame(_In_ Handle read, _In_ int appearance) : 
         Frame(nullptr),
-        m_read(std::move(read)),
         m_log(new LogWindow(this, 
                 m_menu_log->FindItem(ID_TOGGLE_LOG_WINDOW),
                 m_menu_view->FindItem(wxID_ZOOM_IN),
                 m_menu_view->FindItem(wxID_ZOOM_OUT),
-                m_menu_view->FindItem(wxID_ZOOM_100)))
+                m_menu_view->FindItem(wxID_ZOOM_100))),
+        m_read(std::move(read))
 {
         wxASSERT(m_read);
         check_view_appearance(appearance);
@@ -1278,7 +1278,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 update_device(item, dc, flags);
         };
 
-        auto intf = [this] (auto /*dev_idx*/, auto& /*dev*/, auto /*idx*/, auto& /*intf*/) {};
+        auto intf = [] <typename... Args> (Args&&...) {};
 
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();

@@ -106,12 +106,13 @@ bool usbip::init(_Inout_ wxString &err)
 
 const wchar_t* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
 {
-        return speed >= 0 && speed < std::size(g_usb_speed_str) ? g_usb_speed_str[speed] : L"?";
+        auto idx = static_cast<int>(speed);
+        return idx >= 0 && idx < std::ssize(g_usb_speed_str) ? g_usb_speed_str[idx] : L"?";
 }
 
 bool usbip::get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept
 {
-        for (int i = 0; i < std::size(g_usb_speed_str); ++i) {
+        for (int i = 0; i < std::ssize(g_usb_speed_str); ++i) {
                 if (speed.IsSameAs(g_usb_speed_str[i], false)) {
                         val = static_cast<USB_DEVICE_SPEED>(i);
                         return true;
@@ -135,7 +136,8 @@ auto usbip::make_imported_device(
                 .speed = dev.speed,
 
                 .vendor = dev.idVendor,
-                .product = dev.idProduct
+                .product = dev.idProduct,
+                .serial = {},
         };
 }
 
