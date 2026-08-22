@@ -8,9 +8,9 @@
 /.vs
 x64
 ARM64
-/packages
+packages
+vcpkg_installed
 /bin/usbip-*.*
 /userspace/resources/messages.h
 /userspace/resources/messages.rc
 /userspace/resources/MSG*.bin
-/userspace/wusbip/vcpkg_installed

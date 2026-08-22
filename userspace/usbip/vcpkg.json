@@ -1,12 +1,18 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
-    "wxwidgets"
+    {
+      "name": "spdlog",
+      "default-features": false,
+      "features": [
+        "tz-offset"
+      ]
+    }
   ],
   "overrides": [
     {
-      "name": "wxwidgets",
-      "version": "3.3.3#1"
+      "name": "spdlog",
+      "version": "1.17.0#1"
     }
   ],
   "builtin-baseline": "127402f1c75bb3d5ff6bce04b285faa4930a5aca"
