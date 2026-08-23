@@ -164,7 +164,7 @@ PAGED NTSTATUS usbip::do_add_device(
 	DEVICE_OBJECT *fido{}; // Filter Device Object
 
 	if (auto err = IoCreateDevice(drvobj, sizeof(*fltr), nullptr,
-				      FILE_DEVICE_UNKNOWN, FILE_DEVICE_SECURE_OPEN, false, &fido)) {
+				      FILE_DEVICE_UNKNOWN, 0, false, &fido)) {
 		Trace(TRACE_LEVEL_ERROR, "IoCreateDevice %!STATUS!", err);
 		return err;
 	}
