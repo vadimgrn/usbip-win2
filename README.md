@@ -29,7 +29,7 @@
 - Two implementations of receiving data from the network
   - Zero Copy
     - this is the default method
-    - a dedicated thread is created for each virtual device to execute a loop with two blocking WskReceive calls
+    - a dedicated thread is created for each virtual device to execute a loop with two blocking calls
       - receive USBIP header
       - receive USBIP payload (if any)
     - data is written directly to URB.TransferBuffer without any additional copying

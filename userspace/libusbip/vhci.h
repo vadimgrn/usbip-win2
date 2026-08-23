@@ -13,7 +13,7 @@
 #include <optional>
 
 /*
- * Strings encoding is UTF8. 
+ * Strings encoding is UTF8.
  */
 
 namespace usbip
@@ -29,7 +29,8 @@ namespace usbip
  * - low_latency - use WSK Event Callback Functions
  *   - Receive thread is not used, but the data is first written
  *     to an intermediate ring buffer, then copied to URB.TransferBuffer
- *   - Should be used for devices like HID keyboard, mouse, etc.
+ *   - Should be used for devices that generate small amounts of data
+ *     but at a high frequency, such as HID keyboard/mouse, etc.
  */
 enum class receive_mode { zero_copy, low_latency };
 
@@ -124,7 +125,7 @@ using attach_args = persistent_device;
 /**
  * @param dev handle of the driver device
  * @param args arguments
- * @return hub port number, >= 1. Call GetLastError() if zero is returned. 
+ * @return hub port number, >= 1. Call GetLastError() if zero is returned.
  */
 USBIP_API int attach(_In_ HANDLE dev, _In_ const attach_args &args);
 
