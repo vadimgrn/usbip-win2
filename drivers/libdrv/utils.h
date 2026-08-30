@@ -11,7 +11,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 template<class T>
 constexpr void swap(_Inout_ T &a, _Inout_ T &b)
 {
-        T tmp(a); // std::move is not available
-        a = b;
-        b = tmp;
+        T tmp(static_cast<T&&>(a));
+        a = static_cast<T&&>(b);
+        b = static_cast<T&&>(tmp);
 }

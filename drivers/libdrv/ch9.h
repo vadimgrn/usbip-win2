@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -109,6 +109,11 @@ inline auto operator !=(_In_ const USB_DEVICE_DESCRIPTOR &a, _In_ const USB_DEVI
 	return !(a == b);
 }
 
+/*
+ * Compares the entire configuration hierarchy (configuration descriptor and all
+ * subordinate interface, endpoint, and class descriptors). Both a and b must point
+ * to contiguous buffers of at least wTotalLength bytes.
+ */
 inline auto operator ==(_In_ const USB_CONFIGURATION_DESCRIPTOR &a, _In_ const USB_CONFIGURATION_DESCRIPTOR &b)
 {
 	return a.wTotalLength == b.wTotalLength && RtlEqualMemory(&a, &b, b.wTotalLength);

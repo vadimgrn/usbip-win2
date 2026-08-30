@@ -12,7 +12,7 @@ namespace usbip
 
 struct irp_ptr_traits
 {
-        static IRP* invalid() noexcept { return nullptr; }
+        static IRP* invalid() { return nullptr; }
 };
 
 template<>

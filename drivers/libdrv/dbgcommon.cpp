@@ -5,8 +5,8 @@
 #include "dbgcommon.h"
 #include "usbd_helper.h"
 
-#include <usbip\proto.h>
-#include <usbip\vhci.h>
+#include <usbip/proto.h>
+#include <usbip/vhci.h>
 
 #include <usb.h>
 #include <usbioctl.h>

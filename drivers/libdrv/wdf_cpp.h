@@ -191,12 +191,14 @@ inline void release_lock(
  * WDFOBJECT -> HANDLE -> void*
  */
 template<>
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void acquire_lock(_In_ WDFOBJECT handle)
 {
         WdfObjectAcquireLock(handle);
 }
 
 template<>
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void release_lock(_In_ WDFOBJECT handle)
 {
         WdfObjectReleaseLock(handle);
@@ -205,12 +207,12 @@ inline void release_lock(_In_ WDFOBJECT handle)
 
 struct wdfobject_traits
 {
-        static WDFOBJECT invalid() noexcept { return WDF_NO_HANDLE; }
+        static WDFOBJECT invalid() { return WDF_NO_HANDLE; }
 };
 
 struct wdfkey_traits
 {
-        static WDFKEY invalid() noexcept { return WDF_NO_HANDLE; }
+        static WDFKEY invalid() { return WDF_NO_HANDLE; }
 };
 
 using ObjectDelete = usbip::generic_handle<wdfobject_traits>;
@@ -227,7 +229,7 @@ namespace usbip
 using wdf::ObjectDelete;
 
 template<>
-inline void close_handle(_In_ ObjectDelete::type obj, _In_ ObjectDelete::tag_type) noexcept
+inline void close_handle(_In_ ObjectDelete::type obj, _In_ ObjectDelete::tag_type)
 {
         WdfObjectDelete(obj);
 }
@@ -235,7 +237,7 @@ inline void close_handle(_In_ ObjectDelete::type obj, _In_ ObjectDelete::tag_typ
 using wdf::Registry;
 
 template<>
-inline void close_handle(_In_ Registry::type key, _In_ Registry::tag_type) noexcept
+inline void close_handle(_In_ Registry::type key, _In_ Registry::tag_type)
 {
         WdfRegistryClose(key);
 }

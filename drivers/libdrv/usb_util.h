@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include <usbspec.h>
-#include <usbip\proto.h>
+#include <usbip/proto.h>
 
 inline auto& get_setup(usbip::header_cmd_submit &hdr)
 {

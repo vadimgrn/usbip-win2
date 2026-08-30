@@ -14,7 +14,7 @@ template<ULONG PoolTag>
 struct pool_ptr_traits
 {
         static constexpr ULONG pooltag = PoolTag; // enum causes codeql error cpp/drivers/pool-tag-integral
-        static void* invalid() noexcept { return nullptr; }
+        static void* invalid() { return nullptr; }
 };
 
 

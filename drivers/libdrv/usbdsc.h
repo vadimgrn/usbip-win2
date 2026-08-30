@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <cstddef>
+#include <stddef.h>
 #include <ntddk.h>
 #include <usb.h>
 

@@ -6,7 +6,7 @@
 #include "codeseg.h"
 #include "dbgcommon.h"
 
-#include <cstddef>
+#include <stddef.h>
 #include <ntintsafe.h>
 #include <ntstrsafe.h>
 

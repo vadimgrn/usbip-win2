@@ -1,23 +1,38 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
-#include <usbip\proto.h>
+#include <usbip/proto.h>
 
 #include <ntddk.h>
 #include <usb.h>
 
 enum { EndpointStalled = USBD_STATUS_STALL_PID }; // FIXME: for what USBD_STATUS_ENDPOINT_HALTED?
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 int to_linux_status(USBD_STATUS usbd_status);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch);
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto to_windows_status(int usbip_status) { return to_windows_status_ex(usbip_status, false); }
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto to_windows_status_isoch(int usbip_status) { return to_windows_status_ex(usbip_status, true); }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in);
 
 constexpr auto IsTransferDirectionIn(ULONG TransferFlags)
