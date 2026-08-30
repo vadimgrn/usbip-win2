@@ -1,4 +1,4 @@
-; Copyright (C) 2022 - 2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
 #if Ver < EncodeVer(7,1,0,0)
         #error This script requires Inno Setup 7.1.0 or later
@@ -124,7 +124,6 @@ Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Tasks: 
 [Files]
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
@@ -300,60 +299,87 @@ begin
   result := true;
 end;
 
-// UninsIS.dll
-// https://github.com/Bill-Stewart/UninsIS
-// The code is copied from [Code] section of UninsIS-Sample.iss, following modifications are made:
-// 1) CompareISPackageVersion is removed because it MUST always be uninstalled
-// 2) PrepareToInstall does not call it
-
-// Import IsISPackageInstalled() function from UninsIS.dll at setup time
-function DLLIsISPackageInstalled(AppId: string; Is64BitInstallMode,
-  IsAdminInstallMode: DWORD): DWORD;
-  external 'IsISPackageInstalled@files:UninsIS.dll stdcall setuponly';
-
-// Import UninstallISPackage() function from UninsIS.dll at setup time
-function DLLUninstallISPackage(AppId: string; Is64BitInstallMode,
-  IsAdminInstallMode: DWORD): DWORD;
-  external 'UninstallISPackage@files:UninsIS.dll stdcall setuponly';
-
-// Wrapper for UninsIS.dll IsISPackageInstalled() function
-// Returns true if package is detected as installed, or false otherwise
-function IsISPackageInstalled(): Boolean;
+// Check if an existing version of USBip is installed and locate its uninstaller
+function GetInstalledUninstallString(var UninstPath, UninstParams: String): Boolean;
+var
+  SubKey, UninstStr: String;
+  P: Integer;
 begin
-  result := DLLIsISPackageInstalled('{#AppGUID}',  // AppId
-    DWORD(Is64BitInstallMode()),                   // Is64BitInstallMode
-    DWORD(IsAdminInstallMode())) = 1;              // IsAdminInstallMode
-  if result then
-    Log('UninsIS.dll - Package detected as installed')
+  Result := False;
+  SubKey := 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#AppGUID}_is1';
+
+  // Check 64-bit HKLM, then 32-bit HKLM, then HKCU
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE_64, SubKey, 'UninstallString', UninstStr) then
+    if not RegQueryStringValue(HKEY_LOCAL_MACHINE_32, SubKey, 'UninstallString', UninstStr) then
+      if not RegQueryStringValue(HKEY_CURRENT_USER, SubKey, 'UninstallString', UninstStr) then
+        Exit;
+
+  UninstStr := Trim(UninstStr);
+  if UninstStr = '' then
+    Exit;
+
+  // Extract executable path from potentially quoted UninstallString
+  if (Length(UninstStr) > 0) and (UninstStr[1] = '"') then
+  begin
+    Delete(UninstStr, 1, 1);
+    P := Pos('"', UninstStr);
+    if P > 0 then
+      UninstPath := Copy(UninstStr, 1, P - 1)
+    else
+      UninstPath := UninstStr;
+  end
   else
-    Log('UninsIS.dll - Package not detected as installed');
+  begin
+    P := Pos(' ', UninstStr);
+    if P > 0 then
+      UninstPath := Copy(UninstStr, 1, P - 1)
+    else
+      UninstPath := UninstStr;
+  end;
+
+  UninstParams := '/SILENT /NORESTART /SUPPRESSMSGBOXES';
+  Result := FileExists(UninstPath);
 end;
 
-// Wrapper for UninsIS.dll UninstallISPackage() function
-// Returns 0 for success, non-zero for failure
-function UninstallISPackage(): DWORD;
+function IsPackageInstalled(): Boolean;
+var
+  DummyPath, DummyParams: String;
 begin
-  result := DLLUninstallISPackage('{#AppGUID}',  // AppId
-    DWORD(Is64BitInstallMode()),                 // Is64BitInstallMode
-    DWORD(IsAdminInstallMode()));                // IsAdminInstallMode
-  if result = 0 then
-    Log('UninsIS.dll - Installed package uninstall completed successfully')
+  Result := GetInstalledUninstallString(DummyPath, DummyParams);
+  if Result then
+    Log('Previous package detected as installed')
   else
-    Log('UninsIS.dll - installed package uninstall did not complete successfully');
+    Log('Previous package not detected as installed');
 end;
 
+function UninstallPreviousPackage(): Integer;
+var
+  UninstPath, UninstParams: String;
+begin
+  Result := 1;
+  if GetInstalledUninstallString(UninstPath, UninstParams) then
+  begin
+    Log('Uninstalling previous package: ' + UninstPath + ' ' + UninstParams);
+    if Exec(UninstPath, UninstParams, '', SW_HIDE, ewWaitUntilTerminated, Result) then
+    begin
+      if Result = 0 then
+        Log('Installed package uninstall completed successfully')
+      else
+        Log('Installed package uninstall did not complete successfully, exit code: ' + IntToStr(Result));
+    end
+    else
+    begin
+      Log('Failed to execute uninstaller: ' + SysErrorMessage(Result));
+    end;
+  end;
+end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): string;
 begin
   result := '';
-  // If package installed, uninstall it automatically if the version we are
-  // installing does not match the installed version; If you want to
-  // automatically uninstall only...
-  // ...when downgrading: change <> to <
-  // ...when upgrading:   change <> to >
-  if IsISPackageInstalled() then // and (CompareISPackageVersion() <> 0)
+  if IsPackageInstalled() then
   begin
-    if UninstallISPackage() <> 0 then
+    if UninstallPreviousPackage() <> 0 then
       result := 'Failed to automatically uninstall the previous version of USBip. ' +
                 'Please uninstall it manually before continuing.';
   end;
