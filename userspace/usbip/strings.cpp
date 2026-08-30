@@ -42,7 +42,7 @@ std::string usbip::get_product(const UsbIds &ids, uint16_t vendor, uint16_t prod
 
 std::string usbip::get_class(const UsbIds &ids, uint8_t class_, uint8_t subclass, uint8_t protocol)
 {
-	if (!(class_ && subclass && protocol)) {
+	if (!(class_ || subclass || protocol)) {
 		return "(Defined at Interface level) (00/00/00)";
 	}
 
