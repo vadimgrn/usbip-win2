@@ -242,8 +242,11 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
 
                 if (NT_ERROR(st)) {
                         Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
+                } else if (val > MAXINT) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) value %lu exceeds MAXINT(%d)",
+                                                  &value_name, val, MAXINT);
                 } else {
-                        value = val;
+                        value = static_cast<int>(val);
                 }
         }
 }
@@ -257,7 +260,10 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 {
         PAGED_CODE();
 
-        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
+        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr
+        {
+                return idle + static_cast<UINT64>(cnt)*intvl;
+        };
 
         int idle{};
         int cnt{};
@@ -269,7 +275,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
                 return st;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
+        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %Iu sec",
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
 
         query_keepalive_parameters(idle, cnt, intvl);
@@ -280,7 +286,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
                 return st;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
+        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %Iu sec",
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
         
         return STATUS_SUCCESS;
@@ -671,7 +677,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
 
         r->port = 0;
 
-        constexpr auto written = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
+        const auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
         return plugin_hardware(request, *r, once);
