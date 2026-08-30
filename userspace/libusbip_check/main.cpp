@@ -49,10 +49,12 @@ int main()
         [[maybe_unused]] auto port = get_tcp_port();
         auto s1 = connect("", "1234");
         auto s2 = connect("", "1234", CANCEL_BY_APC);
-        enum_exportable_devices(INVALID_SOCKET,
-                [] (int, const usb_device&) {},
-                [] (int, const usb_device&, int, const usb_interface&) {},
-                [] (int) {});
+        if (s1) {
+                enum_exportable_devices(s1.get(),
+                        [] (int, const usb_device&) {},
+                        [] (int, const usb_device&, int, const usb_interface&) {},
+                        [] (int) {});
+        }
 
         // vhci.h
         [[maybe_unused]] auto max_serial = get_device_serial_maxlen();
