@@ -76,7 +76,7 @@ Severity=Error
 Facility=Driver
 SymbolicName=USBIP_ERROR_ABI
 Language=English
-ABI mismatch, unexpected size of the input structure
+ABI mismatch, unexpected size of the input structure.
 .
 
 MessageId=
