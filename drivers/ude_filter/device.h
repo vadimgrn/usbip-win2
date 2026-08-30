@@ -45,6 +45,10 @@ inline auto get_filter_ext(_In_ DEVICE_OBJECT *devobj)
 	return static_cast<filter_ext*>(devobj->DeviceExtension); 
 }
 
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED void destroy_relations(_Inout_ DEVICE_RELATIONS* &relations);
+
 _Function_class_(DRIVER_ADD_DEVICE)
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_

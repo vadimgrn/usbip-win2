@@ -45,7 +45,7 @@ PAGED void do_destroy(_Inout_ filter_ext &f)
 	PAGED_CODE();
 
 	if (f.is_hub) {
-                unique_ptr{f.hub.previous};
+                destroy_relations(f.hub.previous);
 	} else {
 		auto &dev = f.device;
 		NT_ASSERT(!dev.usbd_handle); // @see IRP_MN_REMOVE_DEVICE
@@ -114,6 +114,25 @@ PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
 
 } // namespace
 
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
+PAGED void usbip::destroy_relations(_Inout_ DEVICE_RELATIONS* &relations)
+{
+	PAGED_CODE();
+
+	if (!relations) {
+		return;
+	}
+
+	for (ULONG i = 0; i < relations->Count; ++i) {
+		NT_ASSERT(relations->Objects[i]);
+		ObDereferenceObject(relations->Objects[i]);
+	}
+
+        unique_ptr{relations};
+        relations = nullptr;
+}
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
