@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "query_interface.h"
@@ -23,8 +23,8 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
 	_Out_opt_ ULONG *CurrentUsbFrame)
 {
 	if (CurrentUsbFrame) {
-		static ULONG dummy;
-		*CurrentUsbFrame = ++dummy; // zero is OK too
+		static LONG dummy;
+		*CurrentUsbFrame = static_cast<ULONG>(InterlockedIncrement(&dummy)); // zero is OK too
 		// TraceDbg("%lu", *CurrentUsbFrame); // too often
 	}
 
@@ -48,7 +48,7 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
 	auto st = QueryBusTime(BusContext, HighSpeedFrameCounter);
 	if (NT_SUCCESS(st) && HighSpeedFrameCounter) {
 		*HighSpeedFrameCounter <<= 3;
-		// TraceDbg("%lu", **HighSpeedFrameCounter); // too often
+		// TraceDbg("%lu", *HighSpeedFrameCounter); // too often
 	}
 	return st;
 }
@@ -61,16 +61,26 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::query_interface(_Inout_ filter_ext &, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
+PAGED NTSTATUS usbip::query_interface(_Inout_ filter_ext &, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
 {
 	PAGED_CODE();
 
+	const auto end = offsetof(_USB_BUS_INTERFACE_USBDI_V3, QueryBusTime) + sizeof(r.QueryBusTime);
+	const auto ex_end = offsetof(_USB_BUS_INTERFACE_USBDI_V3, QueryBusTimeEx) + sizeof(r.QueryBusTimeEx);
+
+	if (!(r.Size >= end && r.QueryBusTime)) {
+		return STATUS_INVALID_PARAMETER;
+	}
+
 	switch (ULONG dummy; r.Version) {
 	case USB_BUSIF_USBDI_VERSION_3:
-		if (auto st = r.QueryBusTimeEx(r.BusContext, &dummy); NT_ERROR(st)) {
-			TraceDbg("QueryBusTimeEx -> %!STATUS!, substituted", st);
-			r.QueryBusTimeEx = QueryBusTimeEx;
-		}
+                if (!(r.Size >= ex_end && r.QueryBusTimeEx)) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+                if (auto st = r.QueryBusTimeEx(r.BusContext, &dummy); NT_ERROR(st)) {
+	                TraceDbg("QueryBusTimeEx -> %!STATUS!, substituted", st);
+	                r.QueryBusTimeEx = QueryBusTimeEx;
+                }
 		[[fallthrough]];
 	case USB_BUSIF_USBDI_VERSION_2:
 	case USB_BUSIF_USBDI_VERSION_1:
@@ -82,5 +92,8 @@ PAGED void usbip::query_interface(_Inout_ filter_ext &, _Inout_ _USB_BUS_INTERFA
 		break;
 	default:
 		Trace(TRACE_LEVEL_ERROR, "Unexpected USB_BUSIF_USBDI_VERSION_%lu", r.Version);
+		return STATUS_NOT_SUPPORTED;
 	}
+
+	return STATUS_SUCCESS;
 }

@@ -220,7 +220,7 @@ PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const Q
 		TraceDbg("dev %04x, USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d", 
 			  ptr04x(fltr.self), qi.Size, qi.Version);
 
-		query_interface(fltr, v3);
+		st = query_interface(fltr, v3);
 
 	} else if (auto &i = *qi.Interface; name) {
 		TraceDbg("dev %04x, %s, Size %d, Version %d -> Size %d, Version %d", 
