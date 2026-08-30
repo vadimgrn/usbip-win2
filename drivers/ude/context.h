@@ -4,18 +4,18 @@
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-#include <libdrv\ch9.h>
-#include <libdrv\wdm_cpp.h>
-#include <libdrv\wdf_cpp.h>
+#include <libdrv/codeseg.h>
+#include <libdrv/ch9.h>
+#include <libdrv/wdm_cpp.h>
+#include <libdrv/wdf_cpp.h>
 
-#include <usbip\proto.h>
+#include <usbip/proto.h>
 
 #include <wdfusb.h>
 #include <UdeCx.h>
 
 #include <initguid.h>
-#include <usbip\vhci.h>
+#include <usbip/vhci.h>
 
 /*
  * Macro WDF_TYPE_NAME_TO_TYPE_INFO (see WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE)

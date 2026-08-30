@@ -121,11 +121,16 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
 {
         PAGED_CODE();
 
-        auto st = alloc_device_ctx_ext(ctx_ext, parent); 
+        WDFMEMORY mem{};
+        ctx_ext = mem;
+
+        auto st = alloc_device_ctx_ext(mem, parent); 
         if (NT_ERROR(st)) {
                 return st;
         }
-        auto &ext = get_device_ctx_ext(ctx_ext);
+
+        wdf::ObjectDelete del(mem);
+        auto &ext = get_device_ctx_ext(mem);
 
         st = init_device_attributes(ext.attr, r);
         if (NT_ERROR(st)) {
@@ -141,6 +146,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
                 return st;
         }
 
+        ctx_ext = del.release<WDFMEMORY>();
         return STATUS_SUCCESS;
 }
 
@@ -169,8 +175,17 @@ PAGED NTSTATUS usbip::init_device_attributes(
         _Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc)
 {
         PAGED_CODE();
-        auto st = save_device_location(attr, loc); 
-        return NT_ERROR(st) ? st : hash_location(attr.location_hash, attr);
+
+        auto st = save_device_location(attr, loc);
+        if (NT_SUCCESS(st)) {
+                st = hash_location(attr.location_hash, attr);
+        }
+
+        if (NT_ERROR(st)) {
+                free(attr);
+        }
+
+        return st;
 }
 
 /**
