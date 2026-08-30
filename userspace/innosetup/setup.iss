@@ -194,7 +194,7 @@ begin
     exit;
    
   subkey := make_bcd_subkey_path(value, '16000049'); // AllowPrereleaseSignatures
-  result := RegQueryBinaryValue(HKEY_LOCAL_MACHINE, subkey, name, binval) and (binval = #1)
+  result := RegQueryBinaryValue(HKEY_LOCAL_MACHINE, subkey, name, binval) and (Length(binval) >= 1) and (binval[1] = #1)
 end;
 
 function check_test_sign_mode(): Boolean;
