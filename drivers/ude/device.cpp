@@ -26,26 +26,31 @@ namespace
 using namespace usbip;
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto to_udex_speed(_In_ usb_device_speed speed)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto to_udex_speed(_Out_ UDECX_USB_DEVICE_SPEED &result, _In_ usb_device_speed speed)
 {
-        PAGED_CODE();
-
         switch (speed) {
         case USB_SPEED_SUPER_PLUS:
         case USB_SPEED_SUPER:
-                return UdecxUsbSuperSpeed;
+                result = UdecxUsbSuperSpeed;
+                break;
         case USB_SPEED_WIRELESS:
         case USB_SPEED_HIGH:
-                return UdecxUsbHighSpeed;
+                result = UdecxUsbHighSpeed;
+                break;
         case USB_SPEED_FULL:
-                return UdecxUsbFullSpeed;
+                result = UdecxUsbFullSpeed;
+                break;
         case USB_SPEED_LOW:
-                return UdecxUsbLowSpeed;
+                result = UdecxUsbLowSpeed;
+                break;
         case USB_SPEED_UNKNOWN:
+                [[fallthrough]];
         default:
-                return UdecxUsbHighSpeed; // FIXME
+                return STATUS_INVALID_PARAMETER;
         }
+
+        return STATUS_SUCCESS;
 }
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
@@ -61,9 +66,8 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
                 ptr04x(device), dev.cancelable_requests, dev.sent_requests);
 
-        NT_VERIFY(!device::detach(device, false)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
-
         if (auto &h = dev.ctx_ext) { // the parent is vhci controller
+                NT_VERIFY(!device::detach(device, false)); // receive thread never calls EVT_WDF_DEVICE_CONTEXT_CLEANUP
                 WdfObjectDelete(h);
                 h = WDF_NO_HANDLE;
         }
@@ -475,6 +479,15 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ usb_device_speed s
         PAGED_CODE();
         NT_ASSERT(init);
 
+        UDECX_USB_DEVICE_SPEED udex_speed; 
+        auto st = to_udex_speed(udex_speed, speed);
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "invalid usb_device_speed %d", speed);
+                return st;
+        }
+
+        TraceDbg("%!usb_device_speed! -> %!UDECX_USB_DEVICE_SPEED!", speed, udex_speed);
+
         UDECX_USB_DEVICE_STATE_CHANGE_CALLBACKS cb;
         UDECX_USB_DEVICE_CALLBACKS_INIT(&cb);
 
@@ -492,9 +505,6 @@ PAGED auto prepare_init(_In_ _UDECXUSBDEVICE_INIT *init, _In_ usb_device_speed s
         cb.EvtUsbDeviceEndpointsConfigure = endpoints_configure;
 
         UdecxUsbDeviceInitSetStateChangeCallbacks(init, &cb);
-
-        auto udex_speed = to_udex_speed(speed);
-        TraceDbg("%!usb_device_speed! -> %!UDECX_USB_DEVICE_SPEED!", speed, udex_speed);
 
         UdecxUsbDeviceInitSetSpeed(init, udex_speed);
         UdecxUsbDeviceInitSetEndpointsType(init, UdecxEndpointTypeDynamic);
@@ -525,6 +535,10 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
 {
         PAGED_CODE();
 
+        InitializeListHead(&dev.requests);
+        InitializeListHead(&dev.request_completions);
+        InitializeSListHead(&dev.pending_sends);
+
         WDFSPINLOCK *v[] = {
                 &dev.endpoint_list_lock,
                 &dev.requests_lock,
@@ -536,10 +550,6 @@ PAGED auto init_device(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev)
                         return st;
                 }
         }
-
-        InitializeListHead(&dev.requests);
-        InitializeListHead(&dev.request_completions);
-        InitializeSListHead(&dev.pending_sends);
 
         return device::create_request_completion_dpc(device, dev);
 }
@@ -686,6 +696,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", st);
                 return st;
         }
+        wdf::ObjectDelete del(device);
 
         NT_ASSERT(!init); // zeroed by UdecxUsbDeviceCreate
         auto &ctx = *get_device_ctx(device);
@@ -695,12 +706,17 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
         ext.ctx = &ctx;
 
         st = init_device(device, ctx);
-        if (NT_ERROR(st)) {
-                return st;
+
+        if (NT_SUCCESS(st)) {
+                Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
+                del.release();
+        } else {
+                device = WDF_NO_HANDLE;
+                ctx.ctx_ext = WDF_NO_HANDLE; // the work item still owns it
+                set_flag(ctx.unplugged);
         }
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x", ptr04x(device));
-        return STATUS_SUCCESS;
+        return st;
 }
 
 _IRQL_requires_same_

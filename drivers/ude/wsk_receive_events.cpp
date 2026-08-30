@@ -229,10 +229,12 @@ PAGED wdm::object_reference usbip::events::stop_receive_data(_In_ UDECXUSBDEVICE
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
-        for (auto evt: wsk_events) {
-                auto st = wsk::event_callback_control(dev.sock(), WSK_EVENT_DISABLE | evt, true);
-                if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, st);
+        if (auto sock = dev.sock()) {
+                for (auto evt: wsk_events) {
+                        auto st = wsk::event_callback_control(sock, WSK_EVENT_DISABLE | evt, true);
+                        if (NT_ERROR(st)) {
+                                Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, st);
+                        }
                 }
         }
 

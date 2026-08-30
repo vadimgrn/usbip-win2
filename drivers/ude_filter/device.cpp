@@ -9,7 +9,7 @@
 #include "device.tmh"
 
 #include "driver.h"
-#include <usbip\consts.h>
+#include <usbip/consts.h>
 
 #include <ntstrsafe.h>
 
@@ -96,7 +96,7 @@ PAGED bool driver_name_equal(
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto is_abobe_vhci(_In_ DEVICE_OBJECT *pdo)
+PAGED auto is_above_vhci(_In_ DEVICE_OBJECT *pdo)
 {
 	PAGED_CODE();
 
@@ -242,7 +242,7 @@ PAGED NTSTATUS usbip::add_device(_In_ DRIVER_OBJECT *drvobj, _In_ DEVICE_OBJECT 
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "drv %04x, pdo %04x", ptr04x(drvobj), ptr04x(hub_or_hci_pdo));
 
-	if (!is_abobe_vhci(hub_or_hci_pdo)) {
+	if (!is_above_vhci(hub_or_hci_pdo)) {
 		TraceDbg("Skip this device");
 		return STATUS_SUCCESS;
 	}
