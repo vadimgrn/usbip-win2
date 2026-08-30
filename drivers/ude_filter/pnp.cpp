@@ -125,7 +125,7 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
  * After we forward the request, the bus driver have created or deleted
  * a child device object. When bus driver created one (or more), this is the PDO
  * of our target device, we create and attach a filter object to it.
- * Note that we only attach the last detected USB device on it's hub.
+ * Note that we only attach the last detected USB device on its hub.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -199,6 +199,10 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const QueryInterface &qi)
 {
 	PAGED_CODE();
+
+	if (auto ok = qi.InterfaceType && qi.Interface && qi.Size >= sizeof(*qi.Interface); !ok) {
+		return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
+	}
 
 	auto st = ForwardIrpSynchronously(fltr, irp);
 
