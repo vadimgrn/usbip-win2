@@ -34,6 +34,20 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
 
         for (auto has_hdr = rb.peek_hdr(hdr); len || has_hdr; has_hdr = rb.peek_hdr(hdr)) {
 
+                if (!has_hdr && len > rb.available()) {
+                        if (len > static_cast<size_t>(-1) - rb.size()) [[unlikely]] {
+                                Trace(TRACE_LEVEL_ERROR, "receive indication size overflow");
+                                return false;
+                        }
+
+                        auto st = realloc(dev.recv_buf, rb.size() + len);
+                        if (NT_ERROR(st)) {
+                                return false;
+                        }
+                        rb = ring_buffer(dev.recv_buf);
+                        TraceDbg("dev %04x, ring buffer capacity %Iu", ptr04x(device), rb.capacity());
+                }
+
                 if (auto n = rb.write(data, len)) {
                         data += n;
                         len -= n;
