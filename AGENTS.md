@@ -1,4 +1,4 @@
-# Copilot Instructions for usbip-win2
+# Agents instructions for usbip-win2
 
 ## Architecture Overview
 
@@ -57,6 +57,7 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 
 ### RAII Patterns
 - Kernel: `ObjectRef`, `unique_ptr`, `auto_ref_ptr` for handle management
+- Spinlocks / WaitLocks: Always use named instances (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Unnamed temporaries (`wdf::Lock(spin_lock);`) destruct immediately at the statement semicolon, leaving code unprotected.
 - Userspace: Similar patterns with `generic_handle<>`, `HKey`, `HModule` for resource ownership
 - No manual `AddRef`/`Release` in wrapper classes - handled by destructors
 
@@ -66,8 +67,9 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 - SAL annotations: `_In_`, `_Out_`, `_Inout_` for pointer parameters
 
 ### Modern C++ Features
-- `constexpr`, `explicit`, `noexcept` used liberally for optimization
-- Range-based for loops, move semantics, lambda functions where applicable
+- `constexpr` and `explicit` used liberally for optimization and type safety
+- `noexcept` is used in **userspace only**; **do NOT use `noexcept` in driver code (`drivers/`)**
+- Range-based for loops, move semantics (use `static_cast<T&&>()` in drivers; `std::move` is userspace only), lambda functions where applicable
 - C++23 scoped enums with underlying types: `enum class name : int { ... }`
 
 ## Key Dependencies
@@ -123,3 +125,18 @@ Enables running build and validation commands:
 - **ARM64 Support**: Project supports both x64 and ARM64; always test on both architectures when possible
 - **Test-signed Drivers**: End users must enable test signing mode (`bcdedit /set testsigning on`) after installation
 - **Zero-copy Optimization**: Driver uses Memory Descriptor Lists (MDLs) and vectored I/O extensively—maintain these patterns when modifying I/O paths
+
+### Driver Development Rules (`drivers/`)
+
+- **No C++ Standard Library (`std::`)**: Drivers compile with `/kernel`. STL headers (`<utility>`, `<memory>`, `<algorithm>`, `<vector>`, `<string>`, `<functional>`, etc.) are not available or permitted.
+  - Do NOT use `std::move` — use `static_cast<T&&>(val)`.
+  - Do NOT use `std::swap` — use `::swap` from `drivers/libdrv/utils.h` or class-specific `swap()`.
+  - Do NOT use `std::unique_ptr` — use `libdrv::unique_ptr` (from `drivers/libdrv/unique_ptr.h`) with appropriate pool tags.
+- **No `noexcept` in Driver Code**: Do not annotate functions, constructors, destructors, or operators with `noexcept` in `drivers/`. Drivers compile in `/kernel` mode with C++ exceptions disabled.
+- **No C++ Exceptions or RTTI**: `throw`, `try`, `catch`, `dynamic_cast`, and `typeid` are prohibited and disabled (`/kernel`, `/GR-`).
+- **WDK C Headers Linkage (`extern "C"`)**: Legacy WDK C headers lacking internal `extern "C"` blocks (such as `<usbdlib.h>`) must be enclosed in `extern "C" { #include <header.h> }` to prevent C++ name mangling of kernel APIs.
+- **Driver IRQL Contracts & SAL**: Always annotate driver functions with SAL IRQL contracts (`_IRQL_requires_same_`, `_IRQL_requires_max_(DISPATCH_LEVEL)` or `PASSIVE_LEVEL`). Observe IRQL limits (no paging or blocking at `DISPATCH_LEVEL`).
+- **Memory Management & Synchronization**:
+  - No global `operator new`/`delete` or heap allocations (`malloc`/`free`). Use `ExAllocatePoolZero`, `ExAllocatePoolUninitialized`, or lookaside lists.
+  - Always use named RAII lock instances (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Never use unnamed temporaries.
+
