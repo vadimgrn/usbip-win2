@@ -50,7 +50,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto reattach_req_count(_Inout_ vhci_ctx &vhci)
 {
-        wdf::Lock(vhci.reattach_req_lock);
+        wdf::Lock lck(vhci.reattach_req_lock);
         return WdfCollectionGetCount(vhci.reattach_req);
 }
 
@@ -166,6 +166,34 @@ PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
         return col;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
+{
+        PAGED_CODE();
+
+        if (empty(str)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        for (USHORT i = 0; i < str.Length/sizeof(*str.Buffer); ++i) {
+                if (!libdrv::isdigit(str.Buffer[i])) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+        }
+
+        ULONG val{};
+        auto st = RtlUnicodeStringToInteger(&str, 10, &val);
+        if (NT_ERROR(st)) {
+                return st;
+        }
+
+        bool once; // ignore, does not make sence for persistent
+        unpack_attach_flags(once, wsk_events, val);
+
+        return STATUS_SUCCESS;
+}
+
 /*
  * @param r must be zeroed
  * @param device_str host,port,busid,serial,flags
@@ -207,15 +235,11 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
                 return st;
         }
 
-        ULONG val;
-        st = RtlUnicodeStringToInteger(&tail, 0, &val);
-
-        if (NT_ERROR(st)) {
-                NT_ASSERT(st == STATUS_INVALID_PARAMETER); // string is empty
-                NT_ASSERT(empty(tail));
-        } else {
-                bool once; // ignore, does not make sence for persistent
-                unpack_attach_flags(once, r.properties.wsk_events, val);
+        if (!empty(tail)) {
+                st = parse_flags(r.properties.wsk_events, tail);
+                if (NT_ERROR(st)) {
+                        return st;
+                }
         }
 
         return hash_location(r.location_hash, r);
@@ -246,7 +270,7 @@ PAGED bool create_outbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        constexpr auto len = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+        const auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
 
         auto st = WdfMemoryCreatePreallocated(&attr, req, len, &result);
         if (NT_ERROR(st)) {
@@ -679,7 +703,7 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         unique_ptr buf(libdrv::uninitialized, PagedPool, cb);
         if (!buf) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
-                return USBD_STATUS_INSUFFICIENT_RESOURCES;
+                return STATUS_INSUFFICIENT_RESOURCES;
         }
 
         UNICODE_STRING str { 

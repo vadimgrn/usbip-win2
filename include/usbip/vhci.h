@@ -48,6 +48,9 @@ constexpr auto pack_attach_flags(_In_ bool once, _In_ bool wsk_events)
                 static_cast<ULONG>(wsk_events);
 }
 
+/*
+ * Unknown flags are ignored.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, _In_ ULONG flags)

@@ -64,7 +64,9 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persiste
 
 auto parse_persistent_device(_In_ const std::string &str)
 {
-        persistent_device dev;
+        std::optional<persistent_device> result(std::in_place);
+
+        auto &dev = *result;
         auto &loc = dev.location;
 
         auto v = str | std::views::split(',');
@@ -88,15 +90,21 @@ auto parse_persistent_device(_In_ const std::string &str)
 
         if (it != v.end()) {
                 std::string_view s((*it).begin(), str.end()); // remaining suffix
-                ULONG flags{};
-                std::from_chars(s.data(), s.data() + s.size(), flags);
 
-                bool wsk_events;
-                unpack_attach_flags(dev.once, wsk_events, flags);
-                dev.recv_mode = wsk_events ? receive_mode::low_latency : receive_mode::zero_copy;
+                ULONG flags{};
+                auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), flags);
+
+                if (ec == std::errc{} && end == s.data() + s.size()) {
+                        bool wsk_events;
+                        unpack_attach_flags(dev.once, wsk_events, flags);
+
+                        dev.recv_mode = wsk_events ? receive_mode::low_latency : receive_mode::zero_copy;
+                } else {
+                        result.reset();
+                }
         }
 
-        return dev;
+        return result;
 }
 
 auto get_persistent_devices(_In_ HANDLE dev)
@@ -165,10 +173,10 @@ auto usbip::vhci::get_persistent(_In_ HANDLE dev) -> std::optional<std::vector<p
         for (auto &ws: strings) {
                 if (auto s = wchar_to_utf8(ws); !s) {
                         libusbip::output("wchar_to_utf8 error {}", s.error());
-                } else if (auto d = parse_persistent_device(*s); is_malformed(d)) {
-                        libusbip::output("malformed '{}'", *s);
+                } else if (auto d = parse_persistent_device(*s); d && !is_malformed(*d)) {
+                        devs->push_back(std::move(*d));
                 } else {
-                        devs->push_back(std::move(d));
+                        libusbip::output("invalid '{}'", *s);
                 }
         }
 

@@ -16,20 +16,6 @@
 
 #include <libusbip/src/op_common.h>
 
-namespace
-{
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto make_priority( _In_ LOCK_OPERATION operation)
-{
-        return NormalPagePriority | MdlMappingNoExecute | 
-                (operation == IoReadAccess ? MdlMappingNoWrite : 0UL);
-}
-
-} // namespace
-
-
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
@@ -118,7 +104,6 @@ PAGED USBIP_STATUS usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected
  * @param mdl_size pass URB_BUF_LEN to use TransferBufferLength, real value must not be greater than TransferBufferLength
  */
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::make_transfer_buffer_mdl(
         _Inout_ Mdl &mdl, _In_ ULONG mdl_size, _In_ LOCK_OPERATION operation, _In_ const URB &urb)
