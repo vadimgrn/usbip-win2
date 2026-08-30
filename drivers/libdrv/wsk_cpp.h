@@ -92,10 +92,10 @@ void free(_Inout_ SOCKET* &sock);
 //
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS get_keepalive(_In_ SOCKET *sock, _In_ bool &optval);
+PAGED NTSTATUS get_keepalive(_In_ SOCKET *sock, _Out_ bool &optval);
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, _In_ int *idle, _In_ int *cnt, _In_ int *intvl);
+PAGED NTSTATUS get_keepalive_opts(_In_ SOCKET *sock, _Out_opt_ int *idle, _Out_opt_ int *cnt, _Out_opt_ int *intvl);
 
 _IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS set_keepalive(_In_ SOCKET *sock, _In_ int idle = 0, _In_ int cnt = 0, _In_ int intvl = 0);
