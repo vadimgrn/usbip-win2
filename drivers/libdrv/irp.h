@@ -38,11 +38,26 @@ class irp_ptr : public generic_handle<irp_ptr_traits>
 public:
         using generic_handle<irp_ptr_traits>::generic_handle;
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
         irp_ptr(_In_ CCHAR StackSize, _In_ bool ChargeQuota) :
                 irp_ptr(IoAllocateIrp(StackSize, ChargeQuota)) {}
 
-	auto operator ->() const { return get(); }
-	auto& operator *() const { return *get(); }
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	auto operator ->() const
+	{
+		NT_ASSERT(get());
+		return get();
+	}
+
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	auto& operator *() const
+	{
+		NT_ASSERT(get());
+		return *get();
+	}
 };
 
 

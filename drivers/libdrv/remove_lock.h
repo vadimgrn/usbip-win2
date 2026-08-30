@@ -15,14 +15,20 @@ inline constexpr adopt_lock_t adopt_lock;
 class RemoveLockGuard
 {
 public:
-        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock, _In_opt_ void *tag = nullptr) : 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        RemoveLockGuard(_Inout_ IO_REMOVE_LOCK &lock, _In_opt_ void *tag = nullptr) : 
                 m_acquired(IoAcquireRemoveLock(&lock, tag)),
                 m_lock(NT_SUCCESS(m_acquired) ? &lock : nullptr),
                 m_tag(tag) {}
 
-        RemoveLockGuard(_In_ IO_REMOVE_LOCK &lock, _In_ adopt_lock_t, _In_opt_ void *tag = nullptr) : 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        RemoveLockGuard(_Inout_ IO_REMOVE_LOCK &lock, _In_ adopt_lock_t, _In_opt_ void *tag = nullptr) : 
                 m_lock(&lock), m_tag(tag) {}
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         ~RemoveLockGuard() 
         {
                 if (m_lock) {
@@ -47,11 +53,16 @@ public:
                 return tag;
         }
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(PASSIVE_LEVEL)
         void release_and_wait()
         {
-                NT_ASSERT(m_lock);
-                IoReleaseRemoveLockAndWait(m_lock, m_tag);
-                clear();
+                if (m_lock) [[likely]] {
+                        IoReleaseRemoveLockAndWait(m_lock, m_tag);
+                        clear();
+                } else {
+                        NT_ASSERT(!"release_and_wait() called without a held lock");
+                }
         }
 
 private:

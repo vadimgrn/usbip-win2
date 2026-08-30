@@ -7,7 +7,7 @@
 
 #include <wdm.h>
 
-wdm::object_reference::object_reference(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref) : 
+wdm::object_reference::object_reference(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref) : 
 	m_obj(obj),
 	m_defer_delete(defer_delete)
 {
@@ -53,7 +53,7 @@ auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> obje
 	return *this;
 }
 
-void wdm::object_reference::reset(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
+void wdm::object_reference::reset(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
 {
 	object_reference(obj, defer_delete, add_ref).swap(*this);
 }

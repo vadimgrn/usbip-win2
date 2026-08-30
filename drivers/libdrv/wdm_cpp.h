@@ -5,6 +5,7 @@
 #pragma once
 
 #include <sal.h>
+#include <kernelspecs.h>
 
 namespace wdm
 {
@@ -14,9 +15,13 @@ class object_reference
 public:
 	constexpr object_reference() = default;
 
-	object_reference(_In_ void *obj, _In_ bool add_ref = true) :
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	object_reference(_In_opt_ void *obj, _In_ bool add_ref = true) :
 		object_reference(obj, false, add_ref) {}
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	~object_reference();
 
 	object_reference(_In_ const object_reference &other) :
@@ -47,19 +52,30 @@ public:
 	constexpr void set_defer_delete() { m_defer_delete = true; }
 	constexpr auto get_defer_delete() const { return m_defer_delete; }
 
-	void reset(_In_ void *obj = nullptr, _In_ bool add_ref = true) { reset(obj, false, add_ref); }
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	void reset(_In_opt_ void *obj = nullptr, _In_ bool add_ref = true) { reset(obj, false, add_ref); }
 	void *release();
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	void swap(_Inout_ object_reference &other);
 
 private:
 	void *m_obj{};
 	bool m_defer_delete{};
 
-	object_reference(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref);
-	void reset(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref);
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	object_reference(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref);
+
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	void reset(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref);
 };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void swap(_Inout_ object_reference &a, _Inout_ object_reference &b)
 {
 	a.swap(b);

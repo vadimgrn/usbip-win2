@@ -28,6 +28,7 @@
     <ClCompile Include="irp.cpp" />
     <ClCompile Include="lists.cpp" />
     <ClCompile Include="mdl_cpp.cpp" />
+    <ClCompile Include="urb_ptr.cpp" />
     <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="select.cpp" />
     <ClCompile Include="usbdsc.cpp" />

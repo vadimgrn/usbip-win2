@@ -25,8 +25,12 @@ class ObjectRef
 {
 public:
         constexpr ObjectRef() = default;
-        explicit ObjectRef(WDFOBJECT handle, bool add_ref = true);
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        explicit ObjectRef(_In_opt_ WDFOBJECT handle, _In_ bool add_ref = true);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         ~ObjectRef();
 
         ObjectRef(const ObjectRef &obj) : ObjectRef(obj.m_handle) {}
@@ -50,14 +54,21 @@ public:
         auto get() const { return static_cast<T>(m_handle); }
 
         WDFOBJECT release();
-        void reset(WDFOBJECT handle = WDF_NO_HANDLE, bool add_ref = true);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void reset(_In_opt_ WDFOBJECT handle = WDF_NO_HANDLE, _In_ bool add_ref = true);
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void swap(_Inout_ ObjectRef &r);
 
 private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 {
         a.swap(b);

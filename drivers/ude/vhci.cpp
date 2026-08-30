@@ -15,8 +15,11 @@
 #include <libdrv/utils.h>
 
 #include <ntstrsafe.h>
-#include <usbdlib.h>
 #include <usbiodef.h>
+
+extern "C" {
+#include <usbdlib.h>
+}
 
 namespace
 {

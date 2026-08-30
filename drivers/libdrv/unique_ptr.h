@@ -19,6 +19,8 @@ struct pool_ptr_traits
 
 
 template<ULONG PoolTag>
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void close_handle(_In_ void *ptr, _In_ pool_ptr_traits<PoolTag> tag)
 {
         ExFreePoolWithTag(ptr, tag.pooltag);
@@ -44,9 +46,13 @@ class unique_ptr : public generic_handle<usbip::pool_ptr_traits<PoolTag>>
 public:
         static constexpr ULONG pooltag = PoolTag; // enum causes codeql error cpp/drivers/pool-tag-integral
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         unique_ptr(_In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
                 unique_ptr(ExAllocatePoolZero(PoolType, NumberOfBytes, pooltag)) {}
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         unique_ptr(_In_ const uninitialized_t&, _In_ POOL_TYPE PoolType, _In_ SIZE_T NumberOfBytes) :
                 unique_ptr(ExAllocatePoolUninitialized(PoolType, NumberOfBytes, pooltag)) {}
 

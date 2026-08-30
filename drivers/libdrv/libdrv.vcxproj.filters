@@ -13,6 +13,7 @@
     <ClCompile Include="select.cpp" />
     <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="lists.cpp" />
+    <ClCompile Include="urb_ptr.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />

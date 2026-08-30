@@ -13,7 +13,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto isdigit(_In_ wchar_t ch)
 {
-        return ch <= '9' && ch >= L'0';
+        return ch <= L'9' && ch >= L'0';
 }
 
 _IRQL_requires_same_

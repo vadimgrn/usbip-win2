@@ -18,9 +18,16 @@ class Mdl
 {
 public:
         constexpr Mdl() = default;
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length);
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         ~Mdl() { reset(); }
 
         Mdl(const Mdl&) = delete;
@@ -40,15 +47,28 @@ public:
         auto vaddr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : nullptr; }
         auto size() const { return m_mdl ? MmGetMdlByteCount(m_mdl) : 0; }
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void *sysaddr(_In_ ULONG Priority = NormalPagePriority | MdlMappingNoExecute);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         NTSTATUS prepare_nonpaged();
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(APC_LEVEL)
         NTSTATUS prepare_paged(_In_ LOCK_OPERATION Operation);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void reset() { reset(nullptr, false); }
 
         auto next() const { return m_mdl ? m_mdl->Next : nullptr; }
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void next(_In_opt_ MDL *m);
+
         auto& next(_Inout_ Mdl &m) { next(m.get()); return m; }
 
 private:
