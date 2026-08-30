@@ -215,7 +215,7 @@ auto fill_usb_device_serial(
         _In_ WDFREQUEST request, _Inout_ _URB_CONTROL_TRANSFER_EX &r,
         _In_ const vhci::imported_device_properties &props)
 {
-        constexpr UCHAR hdr_sz = libdrv::usb_string_descr_size(0);
+        const UCHAR hdr_sz = libdrv::usb_string_descr_size(0);
 
         if (r.TransferBufferLength < hdr_sz) {
                 Trace(TRACE_LEVEL_ERROR,"TransferBufferLength(%lu) < %d", r.TransferBufferLength, hdr_sz);
@@ -232,15 +232,19 @@ auto fill_usb_device_serial(
         USB_STRING_DESCRIPTOR *sd{};
         ULONG length; // can differ from r.TransferBufferLength, see prepare_wsk_mdl
         st = UdecxUrbRetrieveBuffer(request, reinterpret_cast<UCHAR**>(&sd), &length);
+
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", st);
                 return st;
+        } else if (length < hdr_sz) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer length(%lu) < %d", length, hdr_sz);
+                return STATUS_BUFFER_TOO_SMALL;
         }
 
         sd->bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
         sd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
 
-        auto buf_cch = (r.TransferBufferLength - hdr_sz)/sizeof(sd->bString);
+        auto buf_cch = (min(r.TransferBufferLength, length) - hdr_sz)/sizeof(sd->bString);
         auto cch = min(buf_cch, serial_cch);
 
         for (size_t i{}; i < cch; ++i) {
