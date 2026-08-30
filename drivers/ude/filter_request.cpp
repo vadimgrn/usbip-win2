@@ -38,6 +38,7 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
                 }
                 auto endp = get_endpoint_ctx(endp_ref.get<UDECXUSBENDPOINT>());
 
+                wdf::Lock lck(dev.endpoint_list_lock);
                 NT_ASSERT(usb_endpoint_type(endp->descriptor) == pipe.PipeType);
 
                 TraceDbg("interface %d.%d, %#x/%#x/%#x, Pipes[%lu], EndpointAddress %#x{%s %s[%d]} -> PipeHandle %04x (was %04x)",
