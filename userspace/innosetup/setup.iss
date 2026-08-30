@@ -1,7 +1,7 @@
 ; Copyright (C) 2022 - 2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
-#if Ver < EncodeVer(6,4,2,0)
-        #error This script requires Inno Setup 6.4.2 or later
+#if Ver < EncodeVer(7,1,0,0)
+        #error This script requires Inno Setup 7.1.0 or later
 #endif
 
 #ifndef SolutionDir
@@ -65,6 +65,14 @@
 
 #define INSTALL_TEST_CERTIFICATE Defined(TEST_SIGNED_DRIVERS)
 
+#if Platform == "arm64"
+  #define ArchMode "arm64"
+  #define VCRedistArch "ARM64"
+#else
+  #define ArchMode "x64os"
+  #define VCRedistArch "x64"
+#endif
+
 [Setup]
 AppName={#ProductName}
 AppVersion={#AppVersion}
@@ -74,8 +82,8 @@ AppPublisherURL=https://github.com/vadimgrn/usbip-win2
 WizardStyle=modern
 DefaultDirName={autopf}\{#ProductName}
 DefaultGroupName={#ProductName}
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#ArchMode}
+ArchitecturesInstallIn64BitMode={#ArchMode}
 VersionInfoVersion={#AppVersion}
 ShowLanguageDialog=no
 AllowNoIcons=yes
@@ -142,7 +150,7 @@ Source: {#SolutionDir + "userspace\innosetup\task_detach_all.xml"}; DestDir: "{t
 #endif
 
 [Tasks]
-Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
+Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable ({#VCRedistArch})"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Components: gui
 
 [Run]
@@ -153,20 +161,15 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
   Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden
 #endif
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; Flags: runhidden; Components: client
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden; Components: client
 
-Filename: {sys}\WindowsPowerShell\v1.0\powershell.exe; Parameters: "-ExecutionPolicy Bypass -Command ""(Get-Content '{tmp}\task_detach_all.xml') -replace 'USBIP_DIR', '{app}' | Set-Content '{tmp}\task_detach_all.xml'"""; Flags: runhidden; Components: client
-Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /xml {tmp}\task_detach_all.xml"; Flags: runhidden; Components: client
+Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /xml ""{tmp}\task_detach_all.xml"""; Flags: runhidden; Components: client
 
 [UninstallRun]
 
 Filename: {sys}\schtasks.exe; Parameters: "/delete /tn ""{#TaskDetachAll}"" /f"; Flags: runhidden; Components: client
 Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client
-
-; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#UdeDriver}    {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#FilterDriver} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
   Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
@@ -208,9 +211,88 @@ begin
 #endif
 end;
 
+function InitializeSetup(): Boolean;
+begin
+  result := check_test_sign_mode();
+end;
+
 procedure InitializeWizard();
 begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
+end;
+
+procedure UpdateDetachTaskXml();
+var
+  TaskFile: String;
+  Lines: TArrayOfString;
+  I: Integer;
+begin
+  TaskFile := ExpandConstant('{tmp}\task_detach_all.xml');
+  if FileExists(TaskFile) and LoadStringsFromFile(TaskFile, Lines) then
+  begin
+    for I := 0 to GetArrayLength(Lines) - 1 do
+      StringChange(Lines[I], 'USBIP_DIR', ExpandConstant('{app}'));
+    SaveStringsToUTF8FileWithoutBOM(TaskFile, Lines, False);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+  begin
+    UpdateDetachTaskXml();
+  end;
+end;
+
+procedure DeleteOemDriver(const DriverName: String);
+var
+  FindRec: TFindRec;
+  InfDir: String;
+  Lines: TArrayOfString;
+  I, ResultCode: Integer;
+  Matched: Boolean;
+begin
+  InfDir := ExpandConstant('{win}\INF\');
+  if FindFirst(InfDir + 'oem*.inf', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
+        begin
+          Matched := False;
+          if LoadStringsFromFile(InfDir + FindRec.Name, Lines) then
+          begin
+            for I := 0 to GetArrayLength(Lines) - 1 do
+            begin
+              if Pos(DriverName, Lines[I]) > 0 then
+              begin
+                Matched := True;
+                Break;
+              end;
+            end;
+          end;
+          if Matched then
+          begin
+            Log('Deleting OEM driver ' + FindRec.Name + ' (' + DriverName + ')');
+            Exec(ExpandConstant('{sys}\pnputil.exe'),
+                 '/delete-driver ' + FindRec.Name + ' /uninstall /force',
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    DeleteOemDriver('{#UdeDriver}');
+    DeleteOemDriver('{#FilterDriver}');
+  end;
 end;
 
 function UninstallNeedRestart(): Boolean;
@@ -270,5 +352,9 @@ begin
   // ...when downgrading: change <> to <
   // ...when upgrading:   change <> to >
   if IsISPackageInstalled() then // and (CompareISPackageVersion() <> 0)
-    UninstallISPackage();
+  begin
+    if UninstallISPackage() <> 0 then
+      result := 'Failed to automatically uninstall the previous version of USBip. ' +
+                'Please uninstall it manually before continuing.';
+  end;
 end;
