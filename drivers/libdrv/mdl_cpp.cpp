@@ -20,8 +20,15 @@ usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_m
                 return;
         }
 
-        NT_ASSERT(!SourceMdl->Next);
-        NT_ASSERT(static_cast<ULONG64>(Offset) + Length <= MmGetMdlByteCount(SourceMdl));
+        if (SourceMdl->Next) {
+                NT_ASSERT(!"SourceMdl is a chain, IoBuildPartialMdl requires a single MDL");
+                return;
+        }
+
+        if (static_cast<ULONG64>(Offset) + Length > MmGetMdlByteCount(SourceMdl)) {
+                NT_ASSERT(!"Offset/Length exceed SourceMdl size");
+                return;
+        }
 
         auto addr = reinterpret_cast<char*>(MmGetMdlVirtualAddress(SourceMdl)) + Offset;
         m_mdl = IoAllocateMdl(addr, Length, false, false, nullptr);
@@ -42,7 +49,7 @@ usbip::Mdl::Mdl(Mdl&& m) :
 
 auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 {
-        if (&m != this && m_mdl != m.m_mdl) {
+        if (&m != this) {
                 reset(m.release(), m.m_mapped);
                 m.m_mapped = false;
         }
@@ -72,10 +79,7 @@ void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
 NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
 {
         NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
-
-        if (!m_mdl) {
-                return STATUS_INVALID_PARAMETER;
-        }
+        NT_ASSERT(m_mdl);
 
         if (locked()) { 
                 return STATUS_ALREADY_COMPLETE;
@@ -126,6 +130,14 @@ NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
 
 /*
  * nonpaged() and partial() can be set both.
+ * 
+ * When a partial MDL is constructed using IoBuildPartialMdl, the partial MDL inherits MDL_PAGES_LOCKED from SourceMdl.
+ * Per Microsoft WDK documentation on IoBuildPartialMdl:
+ * "A driver must not call MmUnlockPages on a partial MDL created by IoBuildPartialMdl.
+ * The pages are unlocked when the source MDL is unlocked."
+ * Calling MmUnlockPages on a partial MDL decrements the underlying physical page lock counts prematurely.
+ * When the owner of the source MDL subsequently calls MmUnlockPages, it results in lock count underflow
+ * and Driver Verifier bugchecks (0xC4/PFN_SHARE_COUNT).
  */
 void usbip::Mdl::unprepare()
 {
@@ -140,7 +152,7 @@ void usbip::Mdl::unprepare()
                 NT_ASSERT(!mapped());
         }
 
-        if (locked()) {
+        if (locked() && !partial()) { // see comments
                 NT_ASSERT(!nonpaged());
                 MmUnlockPages(m_mdl);
                 NT_ASSERT(!locked());

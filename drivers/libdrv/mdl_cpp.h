@@ -32,10 +32,13 @@ public:
         constexpr explicit operator bool() const { return m_mdl; }
         constexpr auto operator !() const { return !m_mdl; }
 
+        constexpr bool operator ==(decltype(nullptr)) const { return m_mdl == nullptr; }
+        constexpr bool operator !=(decltype(nullptr)) const { return m_mdl != nullptr; }
+
         constexpr auto get() const { return m_mdl; }
 
-        auto vaddr() const { return m_mdl ? MmGetMdlVirtualAddress(const_cast<MDL*>(m_mdl)) : nullptr; }
-        auto size() const { return m_mdl ? MmGetMdlByteCount(const_cast<MDL*>(m_mdl)) : 0; }
+        auto vaddr() const { return m_mdl ? MmGetMdlVirtualAddress(m_mdl) : nullptr; }
+        auto size() const { return m_mdl ? MmGetMdlByteCount(m_mdl) : 0; }
 
         void *sysaddr(_In_ ULONG Priority = NormalPagePriority | MdlMappingNoExecute);
 
