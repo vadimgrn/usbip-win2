@@ -46,7 +46,7 @@
 #define Company GetFileCompanyString(ExePath)
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
-#define TaskDetachAll "USBip Detach All On Reboot Or Shutdown"
+#define DetachTaskName "USBip Detach All On Reboot Or Shutdown"
 
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
@@ -142,7 +142,6 @@ Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
-Source: {#SolutionDir + "userspace\innosetup\task_detach_all.xml"}; DestDir: "{tmp}"; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
   Source: {#CertFilePath}; DestDir: "{tmp}"; Components: main
@@ -163,11 +162,8 @@ Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcr
 Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden; Components: client
 Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden; Components: client
 
-Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /xml ""{tmp}\task_detach_all.xml"""; Flags: runhidden; Components: client
-
 [UninstallRun]
 
-Filename: {sys}\schtasks.exe; Parameters: "/delete /tn ""{#TaskDetachAll}"" /f"; Flags: runhidden; Components: client
 Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
@@ -220,26 +216,68 @@ begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
 end;
 
-procedure UpdateDetachTaskXml();
+procedure RegisterDetachTask();
 var
-  TaskFile: String;
-  Lines: TArrayOfString;
-  I: Integer;
+  Scheduler, RootFolder, TaskDef, Trigger, Principal, Settings, Action: Variant;
 begin
-  TaskFile := ExpandConstant('{tmp}\task_detach_all.xml');
-  if FileExists(TaskFile) and LoadStringsFromFile(TaskFile, Lines) then
-  begin
-    for I := 0 to GetArrayLength(Lines) - 1 do
-      StringChange(Lines[I], 'USBIP_DIR', ExpandConstant('{app}'));
-    SaveStringsToUTF8FileWithoutBOM(TaskFile, Lines, False);
+  Log('Registering detach task: {#DetachTaskName}');
+  try
+    Scheduler := CreateOleObject('Schedule.Service');
+    Scheduler.Connect();
+    RootFolder := Scheduler.GetFolder('\');
+
+    TaskDef := Scheduler.NewTask(0);
+    TaskDef.RegistrationInfo.Author := 'USBip Installer';
+    TaskDef.RegistrationInfo.Description := 'USBip: detach all imported devices on system reboot or shutdown';
+
+    Trigger := TaskDef.Triggers.Create(0); // TASK_TRIGGER_EVENT
+    Trigger.Subscription := '<QueryList><Query Id="0" Path="System"><Select Path="System">*[System[Provider[@Name=''Microsoft-Windows-Kernel-Power''] and (EventID=109)]] or *[System[Provider[@Name=''User32''] and (EventID=1074)]]</Select></Query></QueryList>';
+
+    Principal := TaskDef.Principal;
+    Principal.UserId := 'S-1-5-19';
+    Principal.RunLevel := 0; // TASK_RUNLEVEL_LUA
+
+    Settings := TaskDef.Settings;
+    Settings.DisallowStartIfOnBatteries := False;
+    Settings.StopIfGoingOnBatteries := False;
+    Settings.AllowHardTerminate := True;
+    Settings.StartWhenAvailable := False;
+    Settings.RunOnlyIfNetworkAvailable := False;
+    Settings.ExecutionTimeLimit := 'PT30S';
+    Settings.Priority := 7;
+
+    Action := TaskDef.Actions.Create(0); // TASK_ACTION_EXEC
+    Action.Path := ExpandConstant('{app}\usbip.exe');
+    Action.Arguments := 'detach --all=closeonly';
+
+    RootFolder.RegisterTaskDefinition('{#DetachTaskName}', TaskDef, 6, '', '', 5);
+    Log('Detach task registered successfully');
+  except
+    Log('Failed to register detach task: ' + GetExceptionMessage());
+  end;
+end;
+
+procedure UnregisterDetachTask();
+var
+  Scheduler, RootFolder: Variant;
+begin
+  Log('Unregistering detach task: {#DetachTaskName}');
+  try
+    Scheduler := CreateOleObject('Schedule.Service');
+    Scheduler.Connect();
+    RootFolder := Scheduler.GetFolder('\');
+    RootFolder.DeleteTask('{#DetachTaskName}', 0);
+    Log('Detach task unregistered successfully');
+  except
+    Log('Failed to unregister detach task: ' + GetExceptionMessage());
   end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if CurStep = ssPostInstall then
+  if (CurStep = ssPostInstall) and WizardIsComponentSelected('client') then
   begin
-    UpdateDetachTaskXml();
+    RegisterDetachTask();
   end;
 end;
 
@@ -287,7 +325,11 @@ end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
-  if CurUninstallStep = usPostUninstall then
+  if CurUninstallStep = usUninstall then
+  begin
+    UnregisterDetachTask();
+  end
+  else if CurUninstallStep = usPostUninstall then
   begin
     DeleteOemDriver('{#UdeDriver}');
     DeleteOemDriver('{#FilterDriver}');
