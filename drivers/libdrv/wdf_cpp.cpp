@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wdf_cpp.h"
@@ -40,9 +40,7 @@ WDFOBJECT wdf::ObjectRef::release()
 
 void wdf::ObjectRef::reset(WDFOBJECT handle, bool add_ref)
 {
-        if (m_handle != handle) {
-                ObjectRef(handle, add_ref).swap(*this);
-        }
+        ObjectRef(handle, add_ref).swap(*this);
 }
 
 void wdf::ObjectRef::swap(_Inout_ ObjectRef &r)
@@ -59,7 +57,8 @@ _When_(timeout != NULL, _Must_inspect_result_)
 NTSTATUS wdf::WaitLock::acquire(_In_ WDFWAITLOCK lock, _In_opt_ LONGLONG *timeout)
 {
         auto ret = m_lock ? STATUS_ALREADY_INITIALIZED : WdfWaitLockAcquire(lock, timeout); 
-        if (NT_SUCCESS(ret)) {
+        if (ret == STATUS_SUCCESS) {
+                static_assert(NT_SUCCESS(STATUS_TIMEOUT)); // why NT_SUCCESS(ret) is not used
                 m_lock = lock;
         }
         return ret;

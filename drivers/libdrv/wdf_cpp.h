@@ -35,8 +35,14 @@ public:
         ObjectRef(ObjectRef &&obj) : m_handle(obj.release()) {}
         ObjectRef& operator =(ObjectRef &&obj);
 
-        explicit operator bool() const { return m_handle; }
-        auto operator !() const { return !m_handle; }
+        constexpr explicit operator bool() const { return m_handle; }
+        constexpr auto operator !() const { return !m_handle; }
+
+        constexpr bool operator ==(decltype(nullptr)) const { return m_handle == WDF_NO_HANDLE; }
+        constexpr bool operator !=(decltype(nullptr)) const { return m_handle != WDF_NO_HANDLE; }
+
+        friend constexpr bool operator ==(const ObjectRef &a, const ObjectRef &b) { return a.m_handle == b.m_handle; }
+        friend constexpr bool operator !=(const ObjectRef &a, const ObjectRef &b) { return a.m_handle != b.m_handle; }
 
         auto get() const { return m_handle; }
 
