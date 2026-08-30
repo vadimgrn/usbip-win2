@@ -502,7 +502,10 @@ bool usbip::validate(_Inout_ header &hdr)
 	switch (cmd) {
 	case RET_SUBMIT: {
 		auto &ret = hdr.ret_submit;
-		if (ret.number_of_packets == number_of_packets_non_isoch) {
+		if (ret.actual_length < 0) {
+			Trace(TRACE_LEVEL_ERROR, "actual_length(%d) is out of range", ret.actual_length);
+			return false;
+		} else if (ret.number_of_packets == number_of_packets_non_isoch) {
 			ret.number_of_packets = 0;
 		} else if (!is_valid_number_of_packets(ret.number_of_packets)) {
 			Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) is out of range", ret.number_of_packets);
