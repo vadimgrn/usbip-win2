@@ -17,21 +17,30 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Inout_ UTF8_STRING &dst, _In_ const UNIC
         ULONG actual{};
         auto st = RtlUnicodeToUTF8N(dst.Buffer, dst.MaximumLength, &actual, src.Buffer, src.Length);
 
+        if (actual > UNICODE_STRING_MAX_BYTES) [[unlikely]] {
+                dst.Length = 0;
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
         dst.Length = static_cast<USHORT>(actual);
         return st;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_opt_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src)
+PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_writes_bytes_opt_(maxlen) char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src)
 {
         PAGED_CODE();
 
-        UTF8_STRING s { .MaximumLength = maxlen, .Buffer = utf8 };
+        UTF8_STRING s {
+                .MaximumLength = static_cast<USHORT>(maxlen ? maxlen - 1 : 0),
+                .Buffer = utf8
+        };
+
         auto st = unicode_to_utf8(s, src);
 
-        if (s.Length < s.MaximumLength) {
-                s.Buffer[s.Length] = '\0'; // null-terminated
+        if (s.Buffer && maxlen) {
+                s.Buffer[s.Length] = '\0';
         }
 
         return st;
@@ -44,7 +53,7 @@ PAGED NTSTATUS libdrv::unicode_to_utf8(_Out_opt_ char *utf8, _In_ USHORT maxlen,
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS libdrv::utf8_to_unicode(
-        _Inout_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag)
+        _Out_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag)
 {
         PAGED_CODE();
 
@@ -57,16 +66,24 @@ PAGED NTSTATUS libdrv::utf8_to_unicode(
                 return st;
         }
 
+        if (actual > UNICODE_STRING_MAX_BYTES) {
+                return STATUS_BUFFER_TOO_SMALL;
+        }
+
         dst.Buffer = (WCHAR*)ExAllocatePoolUninitialized(pooltype, actual, pooltag);
         if (!dst.Buffer) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
         dst.MaximumLength = static_cast<USHORT>(actual);
-
         auto st = RtlUTF8ToUnicodeN(dst.Buffer, dst.MaximumLength, &actual, src.Buffer, src.Length);
-        dst.Length = static_cast<USHORT>(actual);
 
+        if (bool err = NT_ERROR(st); err || actual > UNICODE_STRING_MAX_BYTES) {
+                FreeUnicodeString(dst, pooltag);
+                return err ? st : STATUS_BUFFER_TOO_SMALL;
+        }
+
+        dst.Length = static_cast<USHORT>(actual);
         return st;
 }
 
