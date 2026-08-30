@@ -47,15 +47,13 @@ void print_ret_submit(char *buf, size_t len, const header_ret_submit *cmd)
 const char* usbip::request_type_str(UCHAR type)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
-	NT_ASSERT(type < ARRAYSIZE(v));
-	return v[type];
+	return type < ARRAYSIZE(v) ? v[type] : "?";
 }
 
 const char* usbip::request_recipient_str(UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
-	NT_ASSERT(recipient < ARRAYSIZE(v));
-	return v[recipient];
+	return recipient < ARRAYSIZE(v) ? v[recipient] : "?";
 }
 
 const char* usbip::brequest_str(UCHAR bRequest)
@@ -339,8 +337,8 @@ const char* usbip::internal_device_control_name(ULONG ioctl_code)
 const char* usbip::usbd_pipe_type_str(USBD_PIPE_TYPE t)
 {
 	static const char* v[] = { "Ctrl", "Isoch", "Bulk", "Intr" };
-	NT_ASSERT(t < ARRAYSIZE(v));
-	return v[t];
+        auto idx = static_cast<int>(t);
+	return idx >= 0 && static_cast<size_t>(idx) < ARRAYSIZE(v) ? v[idx] : "?";
 }
 
 /*
@@ -510,4 +508,3 @@ const char* usbip::usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlag
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "usbd_transfer_flags invalid parameter";
 }
-

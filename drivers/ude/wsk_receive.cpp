@@ -467,9 +467,14 @@ WDFREQUEST usbip::ret_command(_In_ const header &hdr, _Inout_ device_ctx &dev)
 	auto request = hdr.command == RET_SUBMIT ? // request must be completed
 		       device::find_sent_request(dev, hdr.seqnum) : WDF_NO_HANDLE;
 
-	char buf[DBG_USBIP_HDR_BUFSZ];
-	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
-		    get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
+        if (WPP_LEVEL_FLAGS_ENABLED(TRACE_LEVEL_VERBOSE, FLAG_USBIP)) {
+                size_t len;
+                get_total_size(len, hdr);
+
+                char buf[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
+                                                 len, dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
+        }
 
 	return request;
 }

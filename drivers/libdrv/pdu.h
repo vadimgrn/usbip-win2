@@ -1,8 +1,10 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
+
+#include <kernelspecs.h>
 
 namespace usbip
 {
@@ -12,18 +14,24 @@ struct iso_packet_descriptor;
 
 enum class swap_dir { host2net, net2host };
 
-void byteswap_header(header &hdr, swap_dir dir);
-void byteswap_payload(header &hdr);
-void byteswap(iso_packet_descriptor *d, size_t cnt);
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir);
 
-/*
- * For a server's response, set hdr.base.direction to the value from the corresponding request, 
- * otherwise the result will be incorrect.
- */
-size_t get_isoc_descr(iso_packet_descriptor* &isoc, header &hdr);
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void byteswap_payload(_Inout_ header &hdr);
 
-size_t get_payload_size(const header &hdr);
-size_t get_total_size(const header &hdr);
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t cnt);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool get_payload_size(_Out_ size_t &result, _In_ const header &hdr);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool get_total_size(_Out_ size_t &result, _In_ const header &hdr);
 
 } // namespace usbip
-

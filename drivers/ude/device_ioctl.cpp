@@ -117,7 +117,11 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
 
         buf.Mdl = ctx.mdl_hdr.get();
         buf.Offset = 0;
-        buf.Length = get_total_size(ctx.hdr);
+
+        if (!get_total_size(buf.Length, ctx.hdr)) {
+                Trace(TRACE_LEVEL_ERROR, "invalid PDU");
+                return STATUS_INVALID_PARAMETER;
+        }
 
         NT_ASSERT(verify(buf, ctx.is_isoc));
         return STATUS_SUCCESS;

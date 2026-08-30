@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "pdu.h"
@@ -13,7 +13,9 @@ namespace
 
 using namespace usbip;
 
-void bswap(header_basic &r) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void bswap(_Inout_ header_basic &r) 
 {
         UINT32* v[]{ &r.command, &r.seqnum, &r.devid, &r.direction, &r.ep };
         static_assert(sizeof(*v[0]) == sizeof(unsigned long));
@@ -23,7 +25,9 @@ void bswap(header_basic &r)
 	}
 }
 
-void bswap(header_cmd_submit &r) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void bswap(_Inout_ header_cmd_submit &r) 
 {
 	static_assert(sizeof(r.transfer_flags) == sizeof(unsigned long));
 	r.transfer_flags = RtlUlongByteSwap(r.transfer_flags);
@@ -36,7 +40,9 @@ void bswap(header_cmd_submit &r)
 	}
 }
 
-void bswap(header_ret_submit &r) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void bswap(_Inout_ header_ret_submit &r) 
 {
         INT32 *v[] {&r.status, &r.actual_length, &r.start_frame, &r.number_of_packets, &r.error_count};
         static_assert(sizeof(*v[0]) == sizeof(unsigned long));
@@ -46,22 +52,96 @@ void bswap(header_ret_submit &r)
 	}
 }
 
-inline void bswap(header_cmd_unlink &r) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void bswap(_Inout_ header_cmd_unlink &r) 
 {
 	static_assert(sizeof(r.seqnum) == sizeof(unsigned long));
 	r.seqnum = RtlUlongByteSwap(r.seqnum);
 }
 
-inline void bswap(header_ret_unlink &r) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void bswap(_Inout_ header_ret_unlink &r) 
 {
 	static_assert(sizeof(r.status) == sizeof(unsigned long));
 	r.status = RtlUlongByteSwap(r.status);
 }
 
+struct packet_layout
+{
+        size_t payload;
+        size_t number_of_packets;
+        bool valid;
+};
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+auto get_packet_layout(_In_ const header &hdr)
+{
+        packet_layout result{};
+
+        INT32 number_of_packets;
+        INT32 payload_length;
+
+        switch (hdr.command) {
+        case CMD_SUBMIT:
+                if (!(hdr.direction == direction::in || hdr.direction == direction::out)) [[unlikely]] {
+                        return result;
+                }
+                number_of_packets = hdr.cmd_submit.number_of_packets;
+                payload_length = hdr.cmd_submit.transfer_buffer_length;
+                if (payload_length < 0) [[unlikely]] {
+                        return result;
+                }
+                if (hdr.direction != direction::out) {
+                        payload_length = 0;
+                }
+                break;
+        case RET_SUBMIT:
+                if (!(hdr.direction == direction::in || hdr.direction == direction::out)) [[unlikely]] {
+                        return result;
+                }
+                number_of_packets = hdr.ret_submit.number_of_packets;
+                payload_length = hdr.ret_submit.actual_length;
+                if (payload_length < 0) [[unlikely]] {
+                        return result;
+                }
+                if (hdr.direction != direction::in) {
+                        payload_length = 0;
+                }
+                break;
+        case CMD_UNLINK:
+        case RET_UNLINK:
+                result.valid = true;
+                [[fallthrough]];
+        default:
+                return result;
+        }
+
+        if (number_of_packets == number_of_packets_non_isoch) {
+                result.payload = static_cast<size_t>(payload_length);
+                result.valid = true;
+                return result;
+        }
+
+        if (!is_valid_number_of_packets(number_of_packets)) [[unlikely]] {
+                return result;
+        }
+
+        result.payload = static_cast<size_t>(payload_length);
+        result.number_of_packets = static_cast<size_t>(number_of_packets);
+        result.valid = true;
+
+        return result;
+}
+
 } // namespace
 
 
-void usbip::byteswap_header(header &hdr, swap_dir dir) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir) 
 {
 	if (dir == swap_dir::net2host) {
 		bswap(hdr);
@@ -87,7 +167,9 @@ void usbip::byteswap_header(header &hdr, swap_dir dir)
 	}
 }
 
-void usbip::byteswap(iso_packet_descriptor *d, size_t cnt) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t cnt) 
 {
 	for (size_t i = 0; i < cnt; ++i, ++d) {
 
@@ -100,53 +182,43 @@ void usbip::byteswap(iso_packet_descriptor *d, size_t cnt)
 	}
 }
 
-void usbip::byteswap_payload(header &hdr) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::byteswap_payload(_Inout_ header &hdr) 
 {
-	if (iso_packet_descriptor *isoc{}; auto cnt = get_isoc_descr(isoc, hdr)) {
-		byteswap(isoc, cnt);
-	}
+        if (auto layout = get_packet_layout(hdr);
+            layout.valid && layout.number_of_packets) {
+                auto isoc = reinterpret_cast<iso_packet_descriptor*>(reinterpret_cast<char*>(&hdr + 1) + layout.payload);
+                byteswap(isoc, layout.number_of_packets);
+        }
 }
 
 /*
+ * For a server's response, set hdr.base.direction to the value from the corresponding request, 
+ * otherwise the result will be incorrect.
+ *
  * Server's responses always have zeroes in usbip_header_basic's devid, direction, ep.
  * See: <linux>/Documentation/usb/usbip_protocol.rst, usbip_header_basic.
  */
-size_t usbip::get_isoc_descr(iso_packet_descriptor* &isoc, header &hdr) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::get_total_size(_Out_ size_t &result, _In_ const header &hdr)
 {
-	auto dir_out = hdr.direction == direction::out;
-
-	auto buf_end = reinterpret_cast<char*>(&hdr + 1);
-	size_t cnt = 0;
-
-	switch (hdr.command) {
-	case CMD_SUBMIT:
-		buf_end += dir_out ? hdr.cmd_submit.transfer_buffer_length : 0;
-		cnt = hdr.cmd_submit.number_of_packets;
-		break;
-	case RET_SUBMIT:
-		buf_end += dir_out ? 0 : hdr.ret_submit.actual_length; // harmless if direction was not corrected
-		cnt = hdr.ret_submit.number_of_packets;
-		break;
-	case CMD_UNLINK:
-	case RET_UNLINK:
-		break;
-	default:
-		NT_ASSERT(!"Invalid command, wrong endianness?");
-	}
-
-	isoc = reinterpret_cast<iso_packet_descriptor*>(buf_end);
-	return cnt == number_of_packets_non_isoch ? 0 : cnt;
+        auto layout = get_packet_layout(hdr);
+        result = layout.valid ? sizeof(hdr) + layout.payload + layout.number_of_packets*sizeof(iso_packet_descriptor) : 0;
+        return layout.valid;
 }
 
-size_t usbip::get_total_size(const header &hdr) 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool usbip::get_payload_size(_Out_ size_t &result, _In_ const header &hdr)
 {
-	iso_packet_descriptor *isoc{};
-	auto cnt = get_isoc_descr(isoc, const_cast<header&>(hdr));
+	auto ok = get_total_size(result, hdr);
 
-	return reinterpret_cast<char*>(isoc + cnt) - reinterpret_cast<const char*>(&hdr);
-}
+        if (ok) [[likely]] {
+                NT_ASSERT(result >= sizeof(hdr));
+                result -= sizeof(hdr);
+        }
 
-size_t usbip::get_payload_size(const header &hdr)
-{
-	return get_total_size(hdr) - sizeof(hdr);
+        return ok;
 }

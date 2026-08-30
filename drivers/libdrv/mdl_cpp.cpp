@@ -21,7 +21,7 @@ usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_m
         }
 
         NT_ASSERT(!SourceMdl->Next);
-        NT_ASSERT(Offset + Length <= MmGetMdlByteCount(SourceMdl));
+        NT_ASSERT(static_cast<ULONG64>(Offset) + Length <= MmGetMdlByteCount(SourceMdl));
 
         auto addr = reinterpret_cast<char*>(MmGetMdlVirtualAddress(SourceMdl)) + Offset;
         m_mdl = IoAllocateMdl(addr, Length, false, false, nullptr);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -31,6 +31,8 @@ constexpr auto is_valid_number_of_packets(int number_of_packets)
 {
 	return number_of_packets >= 0 && number_of_packets <= max_iso_packets;
 }
+static_assert(!is_valid_number_of_packets(number_of_packets_non_isoch));
+
 
 #pragma pack(push, 1)
 

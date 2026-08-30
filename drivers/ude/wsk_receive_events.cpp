@@ -50,7 +50,11 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
                         return false;
                 }
 
-                auto expected = get_total_size(hdr);
+                size_t expected;
+                if (!get_total_size(expected, hdr)) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "invalid PDU");
+                        return false;
+                }
 
                 if (rb.capacity() >= expected) [[likely]] {
                         //

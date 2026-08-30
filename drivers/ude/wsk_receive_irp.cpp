@@ -259,14 +259,17 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 		NT_ASSERT(!ctx.request); // must be completed and zeroed on every loop
 		ctx.request = ret_command(ctx.hdr, dev);
 
-		if (auto sz = get_payload_size(ctx.hdr); !sz) {
-			//
-		} else if (get_flag(dev.unplugged)) {
-			status = STATUS_CANCELLED; // do not receive payload
-		} else {
-			auto f = ctx.request ? recv_payload : drain_payload;
-			status = f(ctx, sz);
-		}
+                if (size_t sz; !get_payload_size(sz, ctx.hdr)) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "invalid PDU");
+                        status = STATUS_INVALID_PARAMETER;
+                } else if (!sz) {
+                        // no payload
+                } else if (get_flag(dev.unplugged)) [[unlikely]] {
+                        status = STATUS_CANCELLED;
+                } else {
+                        auto f = ctx.request ? recv_payload : drain_payload;
+                        status = f(ctx, sz);
+                }
 
 		if (auto &req = ctx.request) {
 			auto st = NT_ERROR(status) ? status : ret_submit(ctx);
