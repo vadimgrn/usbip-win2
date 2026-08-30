@@ -115,12 +115,12 @@ PAGED void free(_In_opt_ ADDRINFOEXW *AddrInfo);
 
 //
 
-enum { RECEIVE_EVENT_FLAGS_BUFBZ = 64 };
+enum { RECEIVE_EVENT_FLAGS_BUFSZ = 64 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 const char *ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags);
 
-enum { DISCONNECT_EVENT_FLAGS_BUFBZ = 32 };
+enum { DISCONNECT_EVENT_FLAGS_BUFSZ = 32 };
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 const char *DisconnectEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags);

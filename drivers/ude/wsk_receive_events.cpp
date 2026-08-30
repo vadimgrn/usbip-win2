@@ -121,7 +121,7 @@ auto wsk_receive(
         auto device = get_handle(&dev);
 
         if (WPP_LEVEL_FLAGS_ENABLED(TRACE_LEVEL_VERBOSE, FLAG_WSK)) {
-                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
+                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFSZ];
                 TraceWSK("dev %04x, BytesIndicated %Iu, Flags[%s]", ptr04x(device),
                           BytesIndicated, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
         }
@@ -172,7 +172,7 @@ auto wsk_disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
         auto &dev = *ext->ctx;
         auto device = get_handle(&dev);
 
-        if (char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFBZ]; true) {
+        if (char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFSZ]; true) {
                 TraceDbg("dev %04x, Flags[%s]", ptr04x(device), wsk::DisconnectEventFlags(buf, sizeof(buf), Flags));
         }
 

@@ -18,12 +18,28 @@ namespace
 
 using namespace usbip;
 
-constexpr auto bmrequest_dir(BM_REQUEST_TYPE r)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto bmrequest_dir(_In_ BM_REQUEST_TYPE r)
 {
-	return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
+        return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
 }
 
-void print_cmd_submit(char *buf, size_t len, const header_cmd_submit *cmd, bool setup)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto direction_str(_In_ const header &hdr)
+{
+        switch (hdr.direction) {
+        case direction::out: return "out";
+        case direction::in: return "in";
+        default: return "?";
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void print_cmd_submit(
+	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const header_cmd_submit *cmd, _In_ bool setup)
 {
 	auto st = RtlStringCbPrintfExA(buf, len,  &buf, &len, 0, 
 					"cmd_submit: flags %#x, length %d, start_frame %d, isoc[%d], interval %d%s",
@@ -35,7 +51,9 @@ void print_cmd_submit(char *buf, size_t len, const header_cmd_submit *cmd, bool 
 	}
 }
 
-void print_ret_submit(char *buf, size_t len, const header_ret_submit *cmd)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void print_ret_submit(_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const header_ret_submit *cmd)
 {
 	RtlStringCbPrintfA(buf, len, "ret_submit: status %d, actual_length %d, start_frame %d, isoc[%d], error_count %d", 
 			   cmd->status, cmd->actual_length, cmd->start_frame, cmd->number_of_packets, cmd->error_count);
@@ -44,19 +62,25 @@ void print_ret_submit(char *buf, size_t len, const header_ret_submit *cmd)
 } // namespace
 
 
-const char* usbip::request_type_str(UCHAR type)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::request_type_str(_In_ UCHAR type)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
 	return type < ARRAYSIZE(v) ? v[type] : "?";
 }
 
-const char* usbip::request_recipient_str(UCHAR recipient)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::request_recipient_str(_In_ UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
 	return recipient < ARRAYSIZE(v) ? v[recipient] : "?";
 }
 
-const char* usbip::brequest_str(UCHAR bRequest)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::brequest_str(_In_ UCHAR bRequest)
 {
 	switch (bRequest) {
 	case USB_REQUEST_GET_STATUS: return "GET_STATUS";
@@ -79,7 +103,9 @@ const char* usbip::brequest_str(UCHAR bRequest)
 	return "?";
 }
 
-const char* usbip::get_usbd_status(USBD_STATUS status)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::get_usbd_status(_In_ USBD_STATUS status)
 {
 	switch (status) {
 	case USBD_STATUS_SUCCESS: 
@@ -210,6 +236,8 @@ const char* usbip::get_usbd_status(USBD_STATUS status)
 /*
  * For IRP_MJ_DEVICE_CONTROL, IOCTL_USB_USER_REQUEST.
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 const char* usbip::usbuser_request_name(_In_ ULONG UsbUserRequest)
 {
 	switch (UsbUserRequest) {
@@ -245,9 +273,10 @@ const char* usbip::usbuser_request_name(_In_ ULONG UsbUserRequest)
 /*
  * For IRP_MJ_DEVICE_CONTROL.
  */
-const char* usbip::device_control_name(ULONG ioctl_code)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::device_control_name(_In_ ULONG ioctl_code)
 {
-	using namespace usbip;
 	static_assert(sizeof(ioctl_code) == sizeof(vhci::ioctl::PLUGIN_HARDWARE));
 
 	switch (ioctl_code) {
@@ -298,7 +327,9 @@ const char* usbip::device_control_name(ULONG ioctl_code)
 /*
  * For IRP_MJ_INTERNAL_DEVICE_CONTROL.
  */
-const char* usbip::internal_device_control_name(ULONG ioctl_code)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::internal_device_control_name(_In_ ULONG ioctl_code)
 {
 	static_assert(sizeof(ioctl_code) == sizeof(IOCTL_INTERNAL_USB_CYCLE_PORT));
 
@@ -334,7 +365,9 @@ const char* usbip::internal_device_control_name(ULONG ioctl_code)
 	return "?";
 }
 
-const char* usbip::usbd_pipe_type_str(USBD_PIPE_TYPE t)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::usbd_pipe_type_str(_In_ USBD_PIPE_TYPE t)
 {
 	static const char* v[] = { "Ctrl", "Isoch", "Bulk", "Intr" };
         auto idx = static_cast<int>(t);
@@ -344,7 +377,9 @@ const char* usbip::usbd_pipe_type_str(USBD_PIPE_TYPE t)
 /*
  * Can't use CUSTOM_TYPE(urb_function, ItemListShort(...)), it's too big for WPP.
  */
-const char* usbip::urb_function_str(int function)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::urb_function_str(_In_ int function)
 {
 	static const char* v[] = 
 	{
@@ -422,7 +457,7 @@ const char* usbip::urb_function_str(int function)
 		"CONTROL_TRANSFER_EX",
 
 		"RESERVE_0X0033",
-		"RESERVE_0X0034 ",                 
+		"RESERVE_0X0034",                 
 
 		"OPEN_STATIC_STREAMS",
 		"CLOSE_STATIC_STREAMS",
@@ -437,24 +472,23 @@ const char* usbip::urb_function_str(int function)
 		"GET_ISOCH_PIPE_TRANSFER_PATH_DELAYS"
 	};
 
-	return function >= 0 && function < ARRAYSIZE(v) ? v[function] : "URB_FUNCTION_?";
+	return function >= 0 && static_cast<size_t>(function) < ARRAYSIZE(v) ? v[function] : "URB_FUNCTION_?";
 }
 
-const char* usbip::dbg_usbip_hdr(char *buf, size_t len, const header *hdr, bool setup_packet)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::dbg_usbip_hdr(
+	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const header *hdr, _In_ bool setup_packet)
 {
-	if (!hdr) {
-		return "usbip_header{null}";
-	}
+        if (!(buf && len && hdr)) {
+                return "dbg_usbip_hdr invalid parameter";
+        }
 
-	auto result = buf;
+        const auto result = buf;
+        auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
+                                       hdr->seqnum, hdr->devid, direction_str(*hdr), hdr->ep);
 
-	auto st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0, "{seqnum %u, devid %#x, %s[%u]}, ",
-					hdr->seqnum, 
-					hdr->devid,			
-					hdr->direction == direction::out ? "out" : "in",
-					hdr->ep);
-
-	if (st != STATUS_SUCCESS) {
+	if (NT_ERROR(st)) {
 		return "dbg_usbip_hdr error";
 	}
 
@@ -478,8 +512,15 @@ const char* usbip::dbg_usbip_hdr(char *buf, size_t len, const header *hdr, bool 
 	return result;
 }
 
-const char* usbip::usb_setup_pkt_str(char *buf, size_t len, const void *packet)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::usb_setup_pkt_str(
+	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const void *packet)
 {
+	if (!(buf && len && packet)) {
+		return "usb_setup_pkt_str invalid parameter";
+	}
+
 	auto r  = static_cast<const USB_DEFAULT_PIPE_SETUP_PACKET*>(packet);
 
 	auto st = RtlStringCbPrintfA(buf, len, 
@@ -497,14 +538,20 @@ const char* usbip::usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 	return st != STATUS_INVALID_PARAMETER ? buf : "usb_setup_pkt_str invalid parameter";
 }
 
-const char* usbip::usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char* usbip::usbd_transfer_flags(
+	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG TransferFlags)
 {
-	auto dir = IsTransferDirectionOut(TransferFlags) ? "OUT" : "IN";
+	if (!(buf && len)) {
+		return "usbd_transfer_flags invalid parameter";
+	}
 
-	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
-					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
-					TransferFlags & USBD_START_ISO_TRANSFER_ASAP ? "|ISO_ASAP" : "",
-					TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");
+	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s",
+                        IsTransferDirectionOut(TransferFlags) ? "OUT" : "IN",
+                        TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",
+                        TransferFlags & USBD_START_ISO_TRANSFER_ASAP ? "|ISO_ASAP" : "",
+                        TransferFlags & USBD_DEFAULT_PIPE_TRANSFER ? "|DEFAULT_PIPE" : "");
 
 	return st != STATUS_INVALID_PARAMETER ? buf : "usbd_transfer_flags invalid parameter";
 }

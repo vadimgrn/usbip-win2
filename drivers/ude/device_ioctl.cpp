@@ -279,8 +279,8 @@ auto control_transfer(
         }
 
         {
-                char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
-                char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
+                char buf_flags[USBD_TRANSFER_FLAGS_BUFSZ];
+                char buf_setup[USB_SETUP_PKT_STR_BUFSZ];
 
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, Timeout %lu, %s",
                         ptr04x(request), ptr04x(r.PipeHandle),
@@ -343,7 +343,7 @@ auto bulk_or_interrupt_transfer(
 
         {
                 auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
-                char buf[USBD_TRANSFER_FLAGS_BUFBZ];
+                char buf[USBD_TRANSFER_FLAGS_BUFSZ];
 
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
@@ -411,7 +411,7 @@ auto isoch_transfer(
 
         {
                 const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
-                char buf[USBD_TRANSFER_FLAGS_BUFBZ];
+                char buf[USBD_TRANSFER_FLAGS_BUFSZ];
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle),
                         usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
