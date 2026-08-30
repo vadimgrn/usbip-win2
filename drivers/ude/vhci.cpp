@@ -1039,17 +1039,17 @@ PAGED void usbip::vhci::device_state_changed(
         PAGED_CODE();
 
         auto &ctx = *get_vhci_ctx(vhci);
-        auto subscribers = ctx.events_subscribers;
-
-        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d", 
-                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
-
-        if (!subscribers) {
+        int subscribers;
+        {
                 wdf::WaitLock lck(ctx.events_lock);
-                if (!ctx.events_subscribers) {
+                subscribers = ctx.events_subscribers;
+                if (!subscribers) {
                         return; // don't create device state unnecessarily
                 }
         }
+
+        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d",
+                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
 
         if (auto evt = make_device_state(vhci, attr, port, state)) {
                 process_event(ctx, evt);
