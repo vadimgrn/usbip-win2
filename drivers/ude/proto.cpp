@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "proto.h"
@@ -14,6 +14,7 @@
 namespace
 {
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
 {
@@ -45,6 +46,7 @@ auto fix_transfer_flags(_In_ ULONG TransferFlags, _In_ bool dir_out)
  * Default control pipe is bidirectional, direction in setup packet must be used instead of descriptor.
  * FIXME: are there exist non-default unidirectional control pipes?
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::set_cmd_submit_usbip_header(
 	_Out_ header &hdr, _Inout_ device_ctx &dev, _In_ const USB_ENDPOINT_DESCRIPTOR &epd,
@@ -85,6 +87,7 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 	return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void usbip::set_cmd_unlink_usbip_header(
 	_Out_ header &hdr, _Inout_ device_ctx &dev, _In_ seqnum_t seqnum_unlink)

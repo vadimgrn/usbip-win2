@@ -46,7 +46,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
                 WdfIoTargetClose(t);
         }
 
-        unique_ptr(ctx.devices); // destroy
+        unique_ptr{ctx.devices}; // destroy
         ctx.devices = nullptr;
 
         ctx.devices_cnt = 0;

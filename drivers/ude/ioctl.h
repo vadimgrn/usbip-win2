@@ -1,10 +1,10 @@
 /*
-* Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
-*/
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ */
 
 #pragma once
 
-#include <libdrv\ioctl.h>
+#include <libdrv/ioctl.h>
 
 namespace usbip
 {

@@ -278,8 +278,9 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 	}
 }
 
-_IRQL_requires_same_
 _Function_class_(KSTART_ROUTINE)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void recv_thread_function(_In_ void *context)
 {
 	PAGED_CODE();

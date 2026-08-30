@@ -16,6 +16,7 @@
 
 #include <libusbip/src/op_common.h>
 
+_IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
@@ -218,7 +219,7 @@ PAGED bool usbip::close_socket(_In_ SOCKET *sock)
  * @param size pass zero to bypasses AFD.sys copying completely
  */
 _IRQL_requires_same_
-_IRQL_requires_(APC_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS usbip::set_recvbuf_size(_In_ SOCKET *sock, _In_ ULONG size)
 {
         PAGED_CODE();

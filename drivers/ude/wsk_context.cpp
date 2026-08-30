@@ -228,9 +228,7 @@ NTSTATUS usbip::prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPacket
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
 
-                if (ctx.isoc) {
-                        unique_ptr(ctx.isoc);
-                }
+                unique_ptr{ctx.isoc};
 
                 ctx.isoc = isoc.release<iso_packet_descriptor>();
                 ctx.isoc_alloc_cnt = NumberOfPackets;

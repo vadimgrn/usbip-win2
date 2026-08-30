@@ -259,6 +259,7 @@ auto fill_usb_device_serial(
 
 using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, endpoint_ctx&, WDFREQUEST, URB&);
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 auto control_transfer(
@@ -330,6 +331,7 @@ auto control_transfer(
         return send(endpoint, ctx, dev, true, &urb);
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 auto bulk_or_interrupt_transfer(
@@ -370,6 +372,7 @@ auto bulk_or_interrupt_transfer(
 /*
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto repack(_In_ iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 {
@@ -400,6 +403,7 @@ auto repack(_In_ iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 /*
  * USBD_START_ISO_TRANSFER_ASAP is appended because URB_GET_CURRENT_FRAME_NUMBER is not implemented.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 auto isoch_transfer(
