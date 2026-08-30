@@ -167,10 +167,8 @@ inline auto as_wstring_view(_In_ std::vector<BYTE> &v) noexcept
  */
 auto install_devnode_and_driver(_In_ const devnode_install_args &r)
 {
-        auto infpath = std::filesystem::absolute(r.infpath).wstring();
-
         std::wstring class_name;
-        auto class_guid = get_class_guid(class_name, infpath.c_str());
+        auto class_guid = get_class_guid(class_name, r.infpath.c_str());
         if (class_guid == GUID_NULL) {
                 return false;
         }
@@ -215,7 +213,7 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
         // the same as "pnputil /add-driver usbip2_ude.inf /install"
 
         BOOL RebootRequired{};
-        bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
+        bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
         if (!ok) {
                 errmsg("UpdateDriverForPlugAndPlayDevices");
                 SetupDiCallClassInstaller(DIF_REMOVE, dev_list.get(), &dev_data);
@@ -325,7 +323,11 @@ void add_devnode_install_cmd(_In_ CLI::App &app)
 
         cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
 
-        auto f = [&r = r] { return install_devnode_and_driver(r); };
+        auto f = [&r = r] 
+        { 
+                r.infpath = std::filesystem::absolute(r.infpath).wstring();
+                return install_devnode_and_driver(r); 
+        };
         cmd->callback(pack(std::move(f)));
 }
 
