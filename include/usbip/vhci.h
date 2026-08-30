@@ -38,7 +38,7 @@ constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, _In_ SSIZE_T maxlen);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto is_ascii(_In_ unsigned char ch) { return ch < 0x7F; }
+constexpr auto is_ascii(_In_ unsigned char ch) { return ch < 0x80; }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -62,7 +62,7 @@ constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events,
 namespace usbip::vhci
 {
 
-DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
+DEFINE_GUID(GUID_DEVINTERFACE_USBIP_VHCI,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
 struct base

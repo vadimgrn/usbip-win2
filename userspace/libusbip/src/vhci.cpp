@@ -154,7 +154,7 @@ auto make_device_state(_In_ const vhci::device_state &r)
 
 auto get_path()
 {
-        auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
+        auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USBIP_VHCI);
         std::wstring path;
 
         for (std::wstring multi_sz; true; ) {

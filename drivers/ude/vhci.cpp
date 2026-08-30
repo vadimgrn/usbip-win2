@@ -387,7 +387,7 @@ PAGED auto create_interfaces(_In_ WDFDEVICE vhci)
 
         const GUID* v[] = {
                 &GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
-                &vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER
+                &vhci::GUID_DEVINTERFACE_USBIP_VHCI
         };
 
         for (auto guid: v) {
