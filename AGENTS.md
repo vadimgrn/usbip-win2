@@ -58,6 +58,11 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 ### RAII Patterns
 - Kernel: `ObjectRef`, `unique_ptr`, `auto_ref_ptr` for handle management
 - Spinlocks / WaitLocks: Always use named instances (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Unnamed temporaries (`wdf::Lock(spin_lock);`) destruct immediately at the statement semicolon, leaving code unprotected.
+- Lock / Adopt / Unlock Pattern (`RemoveLockGuard`):
+  - In asynchronous IRP forwarding, acquire the remove lock in dispatch (`RemoveLockGuard lck(lock, irp);`), disarm via `lck.clear()` before passing down the stack, and adopt in the completion routine.
+  - An unnamed temporary (`libdrv::RemoveLockGuard{lock, libdrv::adopt_lock, tag};`) is the intentional, idiomatic pattern to adopt an outstanding lock and release it immediately at statement completion when no further processing is needed.
+  - A named instance (`RemoveLockGuard lck(lock, adopt_lock, tag);`) is used when the completion routine performs post-processing and may forward ownership (`tag = lck.clear();`) or release on scope exit.
+- Temporary RAII for Immediate Deallocation: Constructing an unnamed temporary wrapper around a raw pointer (e.g., `unique_ptr{raw_ptr};`) is the idiomatic pattern to take ownership of a raw heap allocation and immediately free it via its destructor at statement completion without calling manual `ExFreePool` APIs.
 - Userspace: Similar patterns with `generic_handle<>`, `HKey`, `HModule` for resource ownership
 - No manual `AddRef`/`Release` in wrapper classes - handled by destructors
 
@@ -138,5 +143,7 @@ Enables running build and validation commands:
 - **Driver IRQL Contracts & SAL**: Always annotate driver functions with SAL IRQL contracts (`_IRQL_requires_same_`, `_IRQL_requires_max_(DISPATCH_LEVEL)` or `PASSIVE_LEVEL`). Observe IRQL limits (no paging or blocking at `DISPATCH_LEVEL`).
 - **Memory Management & Synchronization**:
   - No global `operator new`/`delete` or heap allocations (`malloc`/`free`). Use `ExAllocatePoolZero`, `ExAllocatePoolUninitialized`, or lookaside lists.
-  - Always use named RAII lock instances (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Never use unnamed temporaries.
+  - Always use named RAII lock instances for mutual exclusion (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Never use unnamed temporaries for scoped locks.
+  - **Lock / Adopt / Unlock Pattern**: For asynchronous completion, acquire via `RemoveLockGuard lck(lock, tag);`, transfer via `lck.clear()`, and adopt in the completion routine via unnamed `RemoveLockGuard{lock, adopt_lock, tag};` (immediate release) or named `RemoveLockGuard lck(lock, adopt_lock, tag);` (scoped/forwarded).
+  - **Immediate Deallocation Pattern**: Use unnamed temporary wrappers (`unique_ptr{ptr};`) for idiomatic, tag-safe pool freeing.
 

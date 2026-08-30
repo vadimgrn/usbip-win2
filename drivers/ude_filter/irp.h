@@ -5,7 +5,7 @@
 #pragma once
 
 #include "device.h"
-#include <libdrv\irp.h>
+#include <libdrv/irp.h>
 
 namespace usbip
 {

@@ -142,7 +142,7 @@ void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ 
 	}
 
         ULONG len{};
-        if (unique_ptr buf(libdrv::clone(len, r, NonPagedPoolNx, buf.pooltag)); buf) {
+        if (unique_ptr buf(libdrv::clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)); buf) {
 		send_request(fltr, lck, buf, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
