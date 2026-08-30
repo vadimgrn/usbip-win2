@@ -501,8 +501,13 @@ bool usbip::enum_exportable_devices(
 		return false;
 	}
 
-	libusbip::output("{} exportable device(s)", reply.ndev);
-	assert(reply.ndev <= INT_MAX);
+	if (reply.ndev > INT_MAX) {
+		libusbip::output("the number of exportable devices {} is too large", reply.ndev);
+		SetLastError(ERROR_INVALID_DATA);
+		return false;
+	}
+
+        libusbip::output("{} exportable device(s)", reply.ndev);
 
 	if (on_dev_cnt) {
 		on_dev_cnt(reply.ndev);
