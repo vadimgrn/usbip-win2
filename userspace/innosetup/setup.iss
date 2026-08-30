@@ -42,8 +42,8 @@
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
 #define AppVersion GetVersionNumbersString(ExePath)
-#define Copyright GetFileCopyright(ExePath)
-#define Company GetFileCompany(ExePath)
+#define Copyright GetFileCopyrightString(ExePath)
+#define Company GetFileCompanyString(ExePath)
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
 #define TaskDetachAll "USBip Detach All On Reboot Or Shutdown"
@@ -185,7 +185,7 @@ var
   binval : AnsiString;
 begin
   subkey := make_bcd_subkey_path('{9DEA862C-5CDD-4E70-ACC1-F32B344D4795}', '23000003'); // default loader
-  name := 'Element'
+  name := 'Element';
   
   result := RegQueryStringValue(HKEY_LOCAL_MACHINE, subkey, name, value);
   if not result then
