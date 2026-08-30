@@ -84,7 +84,7 @@ bool usbip::init(_Inout_ wxString &err)
 
         if (!get_resource_module()) {
                 auto ec = GetLastError();
-                err = wxString::Format(_("Cannot load '%s.dll'\nError %lu\n%s"), msgtable_dll, err, wformat_message(ec));
+                err = wxString::Format(_("Cannot load '%s.dll'\nError %lu\n%s"), msgtable_dll, ec, wformat_message(ec));
                 return false;
         }
 

@@ -1255,7 +1255,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
         auto dev = [this, host = std::move(u8_host), port = std::move(u8_port), &persistent, &saved] (auto, auto &device)
         {
                 device_state state {
-                        .device = make_imported_device(std::move(host), std::move(port), device),
+                        .device = make_imported_device(host, port, device),
                 };
                 auto [dc, flags] = make_device_columns(state);
 
@@ -1285,8 +1285,8 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
                 wxLogError(_("enum_exportable_devices error %lu\n%s"), err, GetLastErrorMsg(err));
         } else if (cb.FindString(host) != wxNOT_FOUND) {
                 // already exists
-        } else if (auto pos = cb.Append(host); cb.GetCount() > 32) {
-                cb.Delete(pos > 0 ? --pos : ++pos);
+        } else if (cb.Append(host); cb.GetCount() > 32) {
+                cb.Delete(0);
         }
 }
 

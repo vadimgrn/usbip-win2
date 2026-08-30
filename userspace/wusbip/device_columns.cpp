@@ -43,7 +43,7 @@ void set_vendor_product(_Inout_ device_columns &dc, _In_ UINT16 vendor_id, _In_ 
                                     std::make_tuple(COL_PRODUCT, product_id, product) }) {
 
                 if (id) {
-                        dc[col] = str.empty() ? wxString::Format(L"%08x", id) : wxString::FromAscii(str.data(), str.size());
+                        dc[col] = str.empty() ? wxString::Format(L"%04x", id) : wxString::FromAscii(str.data(), str.size());
                 }
         }
 }
