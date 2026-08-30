@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2024-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2024-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "tree_comparator.h"
@@ -49,12 +49,12 @@ int TreeListItemComparator::Compare(
         if (column == COL_BUSID && tree->GetItemParent(first) != tree->GetRootItem()) {
                 if (auto a = parse_busid(left), b = parse_busid(right); !(a.empty() || b.empty())) {
                         auto ret = a <=> b;
-                        return ret._Value;
+                        return ret < 0 ? -1 : (ret > 0 ? 1 : 0);
                 }
         } else if (column == COL_SPEED) {
                 if (USB_DEVICE_SPEED a, b; get_speed_val(a, left) && get_speed_val(b, right)) {
                         auto ret = a <=> b;
-                        return ret._Value;
+                        return ret < 0 ? -1 : (ret > 0 ? 1 : 0);
                 }
         }
 

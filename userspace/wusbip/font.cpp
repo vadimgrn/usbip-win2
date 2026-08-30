@@ -40,10 +40,10 @@ void usbip::change_font_size(_Inout_ wxFont &font, _In_ int dir)
         font.SetPointSize(pt);
 }
 
-bool usbip::change_font_size(_In_ wxWindow *wnd, _In_ int dir, _In_ bool resursive)
+bool usbip::change_font_size(_In_ wxWindow *wnd, _In_ int dir, _In_ bool recursive)
 {
         auto ok = do_change_font_size(wnd, dir);
-        if (ok && resursive) {
+        if (ok && recursive) {
                 for (auto child: wnd->GetChildren()) {
                         change_font_size(child, dir, true); // recursion
                 }
