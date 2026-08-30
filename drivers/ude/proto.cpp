@@ -8,8 +8,8 @@
 
 #include "context.h"
 
-#include <libdrv\ch9.h>
-#include <libdrv\usbd_helper.h>
+#include <libdrv/ch9.h>
+#include <libdrv/usbd_helper.h>
 
 namespace
 {
@@ -50,13 +50,18 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 	_Out_ header &hdr, _Inout_ device_ctx &dev, _In_ const USB_ENDPOINT_DESCRIPTOR &epd,
 	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength, _In_ setup_dir setup_out)
 {
-	if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !usb_default_control_pipe(epd)) {
+        if (TransferBufferLength > MAXINT32) { // transfer_buffer_length is INT32
+                Trace(TRACE_LEVEL_ERROR, "TransferBufferLength %lu exceeds protocol maximum", TransferBufferLength);
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        if ((TransferFlags & USBD_DEFAULT_PIPE_TRANSFER) && !usb_default_control_pipe(epd)) {
 		Trace(TRACE_LEVEL_ERROR, "Inconsistency between TransferFlags(USBD_DEFAULT_PIPE_TRANSFER) and "
 			                 "bEndpointAddress(%#x)", epd.bEndpointAddress);
 
 		return STATUS_INVALID_PARAMETER;
 	}
-	
+
 	NT_ASSERT(bool(setup_out) == (usb_endpoint_type(epd) == UsbdPipeTypeControl));
 	auto dir_out = setup_out ? *setup_out : usb_endpoint_dir_out(epd);
 

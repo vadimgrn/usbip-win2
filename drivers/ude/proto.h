@@ -5,7 +5,7 @@
 #pragma once
 
 #include <wdm.h>
-#include <usbip\proto.h>
+#include <usbip/proto.h>
 
 struct _USB_ENDPOINT_DESCRIPTOR;
 
