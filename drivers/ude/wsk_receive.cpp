@@ -114,12 +114,12 @@ void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
         for (USB_COMMON_DESCRIPTOR *cur{};
              (cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
 
-                if (cur->bLength < sizeof(USB_ENDPOINT_DESCRIPTOR)) [[unlikely]] {
-                        Trace(TRACE_LEVEL_ERROR, "Truncated endpoint descriptor discovered, bLength %d", cur->bLength);
+                auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
+
+                if (!libdrv::is_valid(e)) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "Truncated endpoint descriptor discovered, bLength %d", e.bLength);
                         break;
                 }
-
-                auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
                 auto old_pkt = e.wMaxPacketSize; // max payload size for this endpoint
                 auto old_intvl = e.bInterval; // polling interval, frames

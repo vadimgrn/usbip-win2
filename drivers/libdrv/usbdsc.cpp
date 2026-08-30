@@ -20,7 +20,23 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
         auto cfg_bytes = reinterpret_cast<char*>(cfg);
         auto end_bytes = cfg_bytes + cfg->wTotalLength;
 
-        cur = cur ? next(cur) : reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
+        if (cur) {
+                auto cur_addr = reinterpret_cast<uintptr_t>(cur);
+                auto begin_addr = reinterpret_cast<uintptr_t>(cfg_bytes);
+                auto end_addr = reinterpret_cast<uintptr_t>(end_bytes);
+
+                if (auto ok = cur_addr >= begin_addr &&
+                        cur_addr <= end_addr &&
+                        end_addr - cur_addr >= sizeof(*cur) &&
+                        is_valid(*cur) &&
+                        cur->bLength <= end_addr - cur_addr; !ok) {
+                        return nullptr;
+                }
+
+                cur = next(cur);
+        } else {
+                cur = reinterpret_cast<USB_COMMON_DESCRIPTOR*>(cfg);
+        }
 
         NT_ASSERT(reinterpret_cast<char*>(cur) >= cfg_bytes);
         NT_ASSERT(reinterpret_cast<char*>(cur) <= end_bytes);
@@ -51,4 +67,3 @@ bool libdrv::is_valid(_In_ const USB_OS_STRING_DESCRIPTOR &d)
 		d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && 
 		RtlEqualMemory(d.Signature, L"MSFT100", sizeof(d.Signature));
 }
-

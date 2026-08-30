@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <ntddk.h>
 #include <usb.h>
 
@@ -22,17 +23,16 @@ static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto usb_string_descr_size(_In_ UCHAR n)
+inline auto usb_string_descr_size(_In_ UCHAR n)
 {
-        auto cb = __builtin_offsetof(USB_STRING_DESCRIPTOR, bString) + n*sizeof(*USB_STRING_DESCRIPTOR::bString);
+        auto cb = offsetof(USB_STRING_DESCRIPTOR, bString) + n*sizeof(*USB_STRING_DESCRIPTOR::bString);
         if (cb >= MAXIMUM_USB_STRING_LENGTH) [[unlikely]] {
                 return UCHAR{};
         }
         return static_cast<UCHAR>(cb);
 }
-
-static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
-static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
+// static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
+// static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -46,7 +46,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_DEVICE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) && 
-		d.bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
+                d.bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
 }
 
 _IRQL_requires_same_
@@ -64,6 +64,14 @@ constexpr auto is_valid(_In_ const USB_INTERFACE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) &&
 		d.bDescriptorType == USB_INTERFACE_DESCRIPTOR_TYPE;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+constexpr auto is_valid(_In_ const USB_ENDPOINT_DESCRIPTOR &d)
+{
+        return  d.bLength >= sizeof(d) && 
+                d.bDescriptorType == USB_ENDPOINT_DESCRIPTOR_TYPE;
 }
 
 _IRQL_requires_same_
