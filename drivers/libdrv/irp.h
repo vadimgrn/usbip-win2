@@ -15,9 +15,9 @@ struct irp_ptr_traits
         static IRP* invalid() noexcept { return nullptr; }
 };
 
+template<>
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-template<>
 inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_traits)
 {
         IoFreeIrp(irp);
@@ -41,7 +41,6 @@ public:
         irp_ptr(_In_ CCHAR StackSize, _In_ bool ChargeQuota) :
                 irp_ptr(IoAllocateIrp(StackSize, ChargeQuota)) {}
 
-	auto operator &() const { return get(); }
 	auto operator ->() const { return get(); }
 	auto& operator *() const { return *get(); }
 };
@@ -54,19 +53,28 @@ constexpr auto list_entry(_In_ IRP *irp)
 	return &irp->Tail.Overlay.ListEntry;
 }
 
+/*
+ * @param entry must be Tail.Overlay.ListEntry.
+ */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto get_irp(_In_ LIST_ENTRY *entry)
 {
-	return CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
+        NT_ASSERT(entry);
+        auto irp = CONTAINING_RECORD(entry, IRP, Tail.Overlay.ListEntry);
+
+        NT_ASSERT(irp->Type == IO_TYPE_IRP);
+        NT_ASSERT(irp->Size >= sizeof(IRP));
+
+        return irp;
 }
 
 /*
  * IRP.Tail.Overlay.DriverContext[] must not be used.
  */
+template<typename T>
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-template<typename T>
 inline auto& get_params_others(_In_ IO_STACK_LOCATION *loc)
 {
         NT_ASSERT(loc);

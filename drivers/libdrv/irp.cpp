@@ -15,6 +15,11 @@ NTSTATUS libdrv::ForwardIrp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 /*
  * A caller must complete the IRP after this call.
+ *
+ * IoForwardIrpSynchronously only returns FALSE if no next stack location is available in the IRP.
+ * This means your driver is at the bottom of the device stack, or the IRP was poorly constructed
+ * by the sender. Because the function failed, the IRP was never passed down, and you are
+ * responsible for handling its failure lifecycle.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(APC_LEVEL)
@@ -26,8 +31,9 @@ PAGED NTSTATUS libdrv::ForwardIrpSynchronously(_In_ DEVICE_OBJECT *devobj, _In_ 
 	auto &status = irp->IoStatus.Status;
 
 	if (!IoForwardIrpSynchronously(devobj, irp)) {
-		status = STATUS_NO_MORE_ENTRIES;
-	}
+                status = STATUS_INVALID_DEVICE_REQUEST;
+                irp->IoStatus.Information = 0;
+        }
 
 	return status;
 }
