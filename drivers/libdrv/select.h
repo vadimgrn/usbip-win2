@@ -8,6 +8,7 @@
 
 struct _URB_SELECT_CONFIGURATION;
 struct _URB_SELECT_INTERFACE;
+struct _USBD_INTERFACE_INFORMATION;
 
 namespace libdrv
 {
@@ -16,6 +17,10 @@ enum {
 	SELECT_CONFIGURATION_STR_BUFSZ = 1024, 
 	SELECT_INTERFACE_STR_BUFSZ = SELECT_CONFIGURATION_STR_BUFSZ 
 };
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool is_valid(_In_ const _USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

@@ -35,7 +35,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto has_urb(_In_ IRP *irp)
 {
 	auto stack = IoGetCurrentIrpStackLocation(irp);
-	return has_urb(stack);
+	return has_urb(stack) && URB_FROM_IRP(irp);
 }
 
 _IRQL_requires_same_

@@ -12,7 +12,7 @@
 #include "pnp.h"
 #include "int_dev_ctrl.h"
 
-#include <libdrv\remove_lock.h>
+#include <libdrv/remove_lock.h>
 
 namespace
 {

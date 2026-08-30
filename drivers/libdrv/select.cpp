@@ -14,54 +14,13 @@ namespace
 {
 
 using namespace usbip;
-
-/*
- * Why `iface->Length < != min_len` would cause issues
- * - Interfaces with `NumberOfPipes == 0` would be rejected
- * - Windows USB core driver validation (`usbport.sys`) only checks `>=`
- * - The OS requires that `Length` is *at least* the minimum needed to hold
- *   the declared pipes (`Length >= Length`), not strictly equal.
- * - For `URB_FUNCTION_SELECT_INTERFACE`, `cfg_end` is `nullptr` and there is
- *   only a single interface. Requiring exact equality would break valid client
- *   driver requests that allocated standard buffer sizes where `Length > min_len`.
- */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-auto valid_interface(_In_ const USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)
-{
-        if (!iface) {
-                return false;
-        }
-
-        const auto pipes_offset = offsetof(USBD_INTERFACE_INFORMATION, Pipes);
-
-        const auto begin = reinterpret_cast<uintptr_t>(iface);
-        const auto end = reinterpret_cast<uintptr_t>(cfg_end);
-
-        if (end && !(end >= begin && (end - begin) >= pipes_offset)) {
-                return false; // not enough room to safely read the fixed header
-        }
-
-        ULONG pipes_len{};
-        if (NT_ERROR(RtlULongMult(iface->NumberOfPipes, sizeof(*iface->Pipes), &pipes_len))) {
-                return false;
-        }
-
-        ULONG min_len;
-        if (NT_ERROR(RtlULongAdd(pipes_offset, pipes_len, &min_len))) {
-                return false;
-        } else if (iface->Length < min_len) { // != is wrong here, see comments
-                return false;
-        }
-
-        return !end || (end - begin) >= iface->Length;
-}
+using libdrv::is_valid;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 USBD_INTERFACE_INFORMATION *next_interface(_In_ const USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)
 {
-        if (!valid_interface(iface, cfg_end)) {
+        if (!is_valid(iface, cfg_end)) {
                 return nullptr;
         }
 
@@ -74,6 +33,8 @@ USBD_INTERFACE_INFORMATION *next_interface(_In_ const USBD_INTERFACE_INFORMATION
         return static_cast<USBD_INTERFACE_INFORMATION*>(next);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline const void *get_configuration_end(_In_ const _URB_SELECT_CONFIGURATION *cfg)
 {
 	return (char*)cfg + cfg->Hdr.Length;
@@ -87,7 +48,7 @@ void interfaces_str(
 {
 	auto st = STATUS_SUCCESS;
 
-	for (int i = 0; i < cnt && !st && valid_interface(r, cfg_end);
+	for (int i = 0; i < cnt && !st && is_valid(r, cfg_end);
 	     ++i, r = next_interface(r, cfg_end)) {
 
 		st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
@@ -243,4 +204,46 @@ _URB_SELECT_CONFIGURATION* libdrv::clone(
 
         size = static_cast<ULONG>(local_size);
         return dst;
+}
+
+/*
+ * Why `iface->Length < != min_len` would cause issues
+ * - Interfaces with `NumberOfPipes == 0` would be rejected
+ * - Windows USB core driver validation (`usbport.sys`) only checks `>=`
+ * - The OS requires that `Length` is *at least* the minimum needed to hold
+ *   the declared pipes (`Length >= Length`), not strictly equal.
+ * - For `URB_FUNCTION_SELECT_INTERFACE`, `cfg_end` is `nullptr` and there is
+ *   only a single interface. Requiring exact equality would break valid client
+ *   driver requests that allocated standard buffer sizes where `Length > min_len`.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+bool libdrv::is_valid(_In_ const _USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)
+{
+        if (!iface) {
+                return false;
+        }
+
+        const auto pipes_offset = offsetof(USBD_INTERFACE_INFORMATION, Pipes);
+
+        const auto begin = reinterpret_cast<uintptr_t>(iface);
+        const auto end = reinterpret_cast<uintptr_t>(cfg_end);
+
+        if (end && !(end >= begin && (end - begin) >= pipes_offset)) {
+                return false; // not enough room to safely read the fixed header
+        }
+
+        ULONG pipes_len{};
+        if (NT_ERROR(RtlULongMult(iface->NumberOfPipes, sizeof(*iface->Pipes), &pipes_len))) {
+                return false;
+        }
+
+        ULONG min_len;
+        if (NT_ERROR(RtlULongAdd(pipes_offset, pipes_len, &min_len))) {
+                return false;
+        } else if (iface->Length < min_len) { // != is wrong here, see comments
+                return false;
+        }
+
+        return !end || (end - begin) >= iface->Length;
 }

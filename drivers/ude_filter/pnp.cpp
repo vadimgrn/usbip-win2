@@ -38,6 +38,9 @@ static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
 static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
 static_assert(SizeOf_DEVICE_RELATIONS(2)  > sizeof(DEVICE_RELATIONS));
 
+/*
+ * @see destroy_relations
+ */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
@@ -49,6 +52,11 @@ PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 
 	if (ptr) {
 		RtlCopyMemory(ptr.get(), &src, sz);
+
+		for (ULONG i = 0; i < src.Count; ++i) {
+			NT_ASSERT(src.Objects[i]);
+			ObReferenceObject(src.Objects[i]);
+		}
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
 	}
@@ -81,23 +89,36 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
 	NT_ASSERT(fltr.is_hub);
 	auto &previous = fltr.hub.previous;
 
-	for (ULONG i = 0; i < r.Count; ++i) {
-		auto pdo = r.Objects[i];
-		if (auto ok = previous && contains(*previous, pdo); !ok) {
-			TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
-			do_add_device(fltr.self->DriverObject, pdo, &fltr);
-		}
+	auto next = r.Count ? clone(r) : nullptr;
+	if (r.Count && !next) {
+		return;
 	}
 
-        unique_ptr prev(previous);
+	ULONG count{};
 
-        if (!r.Count) {
-                previous = nullptr;
-        } else if (auto ptr = clone(r)) {
-                previous = ptr;
-        } else { // leave as is
-                prev.release();
-        }
+	for (ULONG i = 0; i < r.Count; ++i) {
+
+                if (auto pdo = r.Objects[i]; !(previous && contains(*previous, pdo))) {
+
+                        TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
+
+                        auto st = do_add_device(fltr.self->DriverObject, pdo, &fltr);
+                        if (NT_ERROR(st)) {
+				Trace(TRACE_LEVEL_ERROR, "Failed to add a FiDO for PDO %04x, %!STATUS!", ptr04x(pdo), st);
+				ObDereferenceObject(next->Objects[i]);
+				continue;
+			}
+		}
+
+		next->Objects[count++] = next->Objects[i];
+	}
+
+        destroy_relations(previous);
+
+	previous = next;
+	if (previous) {
+		previous->Count = count;
+	}
 }
 
 /*
