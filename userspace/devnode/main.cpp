@@ -16,6 +16,7 @@
 #include <libusbip\src\file_ver.h>
 
 #include <CLI11\CLI11.hpp>
+#include <filesystem>
 
 #include <initguid.h>
 #include <devpkey.h>
@@ -95,7 +96,7 @@ auto get_class_guid(_Inout_ std::wstring &class_name, _In_ PCWSTR infname)
 
 void remind_reboot() noexcept
 {
-        wprintf(L"Reboot is requied to finish setup.\n");
+        wprintf(L"Reboot is required to finish setup.\n");
 }
 
 using device_visitor_f = std::function<bool(HDEVINFO di, SP_DEVINFO_DATA &dd)>;
@@ -161,8 +162,10 @@ inline auto as_wstring_view(_In_ std::vector<BYTE> &v) noexcept
  */
 auto install_devnode_and_driver(_In_ const devnode_install_args &r)
 {
+        auto infpath = std::filesystem::absolute(r.infpath).wstring();
+
         std::wstring class_name;
-        auto class_guid = get_class_guid(class_name, r.infpath.c_str());
+        auto class_guid = get_class_guid(class_name, infpath.c_str());
         if (class_guid == GUID_NULL) {
                 return false;
         }
@@ -207,7 +210,7 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
         // the same as "pnputil /add-driver usbip2_ude.inf /install"
 
         BOOL RebootRequired{};
-        bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
+        bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
         if (!ok) {
                 errmsg("UpdateDriverForPlugAndPlayDevices");
         }
