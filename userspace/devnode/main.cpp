@@ -3,19 +3,19 @@
  */
 
 #include <windows.h>
+#include <shlwapi.h>
 #include <cfgmgr32.h>
 #include <newdev.h>
 #include <regstr.h>
-#include <ks.h>
 
-#include <libusbip\format_message.h>
+#include <libusbip/format_message.h>
 
-#include <libusbip\src\hkey.h>
-#include <libusbip\src\setupapi.h>
-#include <libusbip\src\strconv.h>
-#include <libusbip\src\file_ver.h>
+#include <libusbip/src/hkey.h>
+#include <libusbip/src/setupapi.h>
+#include <libusbip/src/strconv.h>
+#include <libusbip/src/file_ver.h>
 
-#include <CLI11\CLI11.hpp>
+#include <CLI11/CLI11.hpp>
 #include <filesystem>
 
 #include <initguid.h>
@@ -42,6 +42,8 @@ struct devnode_remove_args
         std::wstring hwid;
         std::wstring enumerator;
         bool dry_run{};
+        int matched_count{};
+        int removed_count{};
 };
 
 using command_f = std::function<bool()>;
@@ -51,7 +53,7 @@ auto pack(command_f cmd)
         return [cmd = std::move(cmd)] 
         {
                 if (!cmd()) {
-                        exit(EXIT_FAILURE); // throw CLI::RuntimeError(EXIT_FAILURE);
+                        throw CLI::RuntimeError(EXIT_FAILURE);
                 }
         };
 }
@@ -61,13 +63,20 @@ void errmsg(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastErr
         auto msg_id = HRESULT_FROM_SETUPAPI(err);
         auto msg = wformat_message(msg_id);
         fwprintf(stderr, L"%S(%s) error %#lx %s\n", api, str, err, msg.c_str());
+        if (err == ERROR_ACCESS_DENIED) {
+                fwprintf(stderr, L"Administrator privileges are required.\n");
+        }
 }
 
-auto get_version(_In_ const wchar_t *program)
+auto get_version()
 {
-        win::FileVersion fv(program);
-        auto ver = fv.GetFileVersion();
-        return wchar_to_utf8_or(ver);
+        wchar_t program[MAX_PATH];
+        if (GetModuleFileName(nullptr, program, static_cast<DWORD>(std::size(program)))) {
+                win::FileVersion fv(program);
+                auto ver = fv.GetFileVersion();
+                return wchar_to_utf8_or(ver);
+        }
+        return std::string{};
 }
 
 /*
@@ -143,7 +152,7 @@ template<typename... Args>
 inline auto get_device_property_ex(const wchar_t *prop_name, Args&&... args)
 {
         auto err = get_device_property(std::forward<Args>(args)...);
-        if (err) {
+        if (err && err != ERROR_NOT_FOUND) {
                 errmsg("SetupDiGetDeviceProperty", prop_name, err);
         }
         return !err;
@@ -213,17 +222,19 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
         bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
         if (!ok) {
                 errmsg("UpdateDriverForPlugAndPlayDevices");
+                SetupDiCallClassInstaller(DIF_REMOVE, dev_list.get(), &dev_data);
+                return false;
         }
 
         if (reboot || RebootRequired) {
                 remind_reboot();
         }
 
-        return ok;
+        return true;
 }
 
 auto uninstall_device(
-        _In_ HDEVINFO di, _In_  SP_DEVINFO_DATA &dd, _In_ const devnode_remove_args &r, _Inout_ bool &reboot)
+        _In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd, _Inout_ devnode_remove_args &r, _Inout_ bool &reboot)
 {
         DEVPROPTYPE type = DEVPROP_TYPE_EMPTY;
         std::vector<BYTE> prop(REGSTR_VAL_MAX_HCID_LEN);
@@ -232,27 +243,36 @@ auto uninstall_device(
                 return false;
         }
 
-        assert(type == DEVPROP_TYPE_STRING_LIST);
+        if (type != DEVPROP_TYPE_STRING_LIST) {
+                return false;
+        }
         
         auto ids = split_multi_sz(as_wstring_view(prop));
-        auto iequal = [] (std::wstring_view a, std::wstring_view b) noexcept {
-                return std::ranges::equal(a, b, {}, ::towlower, ::towlower);
-        };
-        auto found = std::ranges::any_of(ids, [&r, &iequal] (const auto &id) { return iequal(id, r.hwid); });
+
+        auto found = std::ranges::any_of(ids, [&r] (const auto &id) {
+                return PathMatchSpec(id.c_str(), r.hwid.c_str());
+        });
 
         if (!found) {
-                //
-        } else if (r.dry_run) {
-                prop.resize(MAX_DEVICE_ID_LEN);
+                return false;
+        }
+
+        ++r.matched_count;
+
+        if (r.dry_run) {
+                prop.resize(MAX_DEVICE_ID_LEN * sizeof(wchar_t));
                 if (get_device_property_ex(L"InstanceId", di, dd, DEVPKEY_Device_InstanceId, type, prop) && !prop.empty()) {
                         assert(type == DEVPROP_TYPE_STRING);
-                        auto id = as_wstring_view(prop);
-                        wprintf(L"%s\n", id.data());
+                        auto id = reinterpret_cast<const wchar_t*>(prop.data());
+                        wprintf(L"%ls\n", id);
                 }
         } else if (BOOL NeedReboot{}; !DiUninstallDevice(nullptr, di, &dd, 0, &NeedReboot)) {
                 errmsg("DiUninstallDevice");
-        } else if (NeedReboot) {
-                reboot = true;
+        } else {
+                ++r.removed_count;
+                if (NeedReboot) {
+                        reboot = true;
+                }
         }
 
         return false;
@@ -268,7 +288,7 @@ auto uninstall_device(
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-auto remove_devnode(_In_ devnode_remove_args &r)
+auto remove_devnode(_Inout_ devnode_remove_args &r)
 {
         auto enumerator = r.enumerator.empty() ? nullptr : r.enumerator.c_str();
 
@@ -289,7 +309,13 @@ auto remove_devnode(_In_ devnode_remove_args &r)
                 remind_reboot();
         }
 
-        return true;
+        if (r.dry_run) {
+                wprintf(L"%d matching device(s) found.\n", r.matched_count);
+        } else {
+                wprintf(L"%d device(s) were removed.\n", r.removed_count);
+        }
+
+        return r.matched_count > 0;
 }
 
 void add_devnode_install_cmd(_In_ CLI::App &app)
@@ -330,7 +356,7 @@ int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
         CLI::App app("usbip2 drivers installation utility");
         
         app.option_defaults()->always_capture_default();
-        app.set_version_flag("-V,--version", get_version(*argv));
+        app.set_version_flag("-V,--version", get_version());
 
         add_devnode_install_cmd(app);
         add_devnode_remove_cmd(app);
