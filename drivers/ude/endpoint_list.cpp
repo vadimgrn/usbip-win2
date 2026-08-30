@@ -30,8 +30,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto get_endpoint_list_head(_In_ device_ctx &dev)
 {
-        auto ep0 = get_endpoint_ctx(dev.ep0);
-        return &ep0->entry;
+        return dev.ep0 ? &get_endpoint_ctx(dev.ep0)->entry : nullptr;
 }
 
 } // namespace
@@ -65,18 +64,25 @@ void usbip::remove_endpoint_list(_In_ endpoint_ctx &endp)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto usbip::find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_search &crit) -> endpoint_ctx*
+wdf::ObjectRef usbip::find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_search &crit)
 {
+        wdf::ObjectRef ref;
+
         auto head = get_endpoint_list_head(dev);
+        if (!head) {
+                return ref;
+        }
 
         wdf::Lock lck(dev.endpoint_list_lock);
 
         for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto endp = CONTAINING_RECORD(entry, endpoint_ctx, entry);
                 if (matches(*endp, crit)) {
-                        return endp;
+                        auto endpoint = static_cast<UDECXUSBENDPOINT>(WdfObjectContextGetObject(endp));
+                        ref.reset(endpoint);
+                        break;
                 }
         }
 
-        return nullptr;
+        return ref;
 }

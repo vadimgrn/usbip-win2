@@ -17,7 +17,7 @@ struct endpoint_search
                 handle(reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<uintptr_t>(addr))), // for operator bool correctness
                 what(ADDRESS) { NT_ASSERT(address == addr); }
 
-        explicit operator bool() const { return handle; }; // largest in union
+        explicit operator bool() const { return handle; } // largest in union
         auto operator !() const { return !handle; }
 
         union {
@@ -39,6 +39,6 @@ void remove_endpoint_list(_In_ endpoint_ctx &endp);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-endpoint_ctx *find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_search &crit);
+wdf::ObjectRef find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_search &crit);
 
 } // namespace usbip

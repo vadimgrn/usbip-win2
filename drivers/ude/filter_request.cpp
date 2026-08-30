@@ -27,8 +27,8 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
                 auto &pipe = intf.Pipes[i];
 
-                auto endp = find_endpoint(dev, pipe.EndpointAddress);
-                if (!endp) {
+                auto endp_ref = find_endpoint(dev, pipe.EndpointAddress);
+                if (!endp_ref) {
                         Trace(TRACE_LEVEL_ERROR, 
                                 "interface %d.%d, Pipes[%lu], EndpointAddress %#x{%s} -> not found",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, pipe.EndpointAddress, 
@@ -36,6 +36,7 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
 
                         continue;
                 }
+                auto endp = get_endpoint_ctx(endp_ref.get<UDECXUSBENDPOINT>());
 
                 NT_ASSERT(usb_endpoint_type(endp->descriptor) == pipe.PipeType);
 
@@ -56,7 +57,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto clear_endpoint_stall(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _Inout_ _URB_PIPE_REQUEST &r)
 {
-        if (auto endp = find_endpoint(dev, r.PipeHandle)) {
+        if (auto endp_ref = find_endpoint(dev, r.PipeHandle)) {
+                auto endp = get_endpoint_ctx(endp_ref.get<UDECXUSBENDPOINT>());
                 auto addr = endp->descriptor.bEndpointAddress;
                 pkt = device::make_clear_endpoint_stall(addr);
                 TraceDbg("PipeHandle %04x, bEndpointAddress %#x", ptr04x(r.PipeHandle), addr);
