@@ -58,11 +58,10 @@ auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-        lck.clear();
-
         IoCopyCurrentIrpStackLocationToNext(irp);
         IoSetCompletionRoutine(irp, irp_complete, &fltr, true, true, true);
 
+        lck.clear();
         return IoCallDriver(fltr.target, irp);
 }
 
