@@ -30,7 +30,7 @@
 
 ### Building
 1. Run `bootstrap.bat` to initialize vcpkg and git submodules
-2. Open `usbip_win2.sln` in Visual Studio
+2. Open `usbip_win2.slnx` in Visual Studio (or build via `msbuild usbip_win2.slnx /p:Configuration=Release /p:Platform=x64`)
 3. For driver signing: Right-click "package" project > Properties > Driver Signing > Test Certificate (password: `usbip`)
 4. Build solution (Ctrl+Shift+B or Build > Build Solution)
 
@@ -45,9 +45,10 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 
 ### Namespaces & Organization
 - Driver code uses `wdf::`, `wdm::`, `wsk::` namespaces for Windows API abstractions
-- Userspace code primarily uses `usbip::` namespace
+- Userspace code primarily uses `usbip::` namespace; never introduce `using namespace ...` into `namespace std` (e.g., when specializing `std::hash`)
 - Header files in top-level directory; implementation in `src/` subdirectories
 - `#pragma once` for header guards (not `#ifndef` guards)
+- Use forward slashes `/` in `#include` directives (e.g., `#include <libdrv/remove_lock.h>`), never backslashes `\`
 
 ### Naming
 - **Structs/Classes**: `CamelCase` (e.g., `ObjectRef`, `usb_device`, `usb_interface`)
@@ -83,6 +84,7 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 - **WSK**: Winsock Kernel for kernel-mode networking
 - **wxWidgets**: GUI framework (via vcpkg)
 - **CLI11**: Command-line parsing library (in `userspace/CLI11/`)
+- **Inno Setup**: Version 7.1+ (via NuGet package `Tools.InnoSetup`) for packaging x64 and ARM64 installers with native Pascal script uninstaller
 - **vcpkg**: x64 and ARM64 triplets: `x64-windows-static-md` and `arm64-windows-static-md`
 
 ## Common Tasks
@@ -146,4 +148,6 @@ Enables running build and validation commands:
   - Always use named RAII lock instances for mutual exclusion (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Never use unnamed temporaries for scoped locks.
   - **Lock / Adopt / Unlock Pattern**: For asynchronous completion, acquire via `RemoveLockGuard lck(lock, tag);`, transfer via `lck.clear()`, and adopt in the completion routine via unnamed `RemoveLockGuard{lock, adopt_lock, tag};` (immediate release) or named `RemoveLockGuard lck(lock, adopt_lock, tag);` (scoped/forwarded).
   - **Immediate Deallocation Pattern**: Use unnamed temporary wrappers (`unique_ptr{ptr};`) for idiomatic, tag-safe pool freeing.
+  - **Partial MDLs & Locking**: Never call `MmUnlockPages` on a partial MDL created by `IoBuildPartialMdl`. Partial MDLs inherit `MDL_PAGES_LOCKED` from their source MDL; unlocking a partial MDL prematurely decrements physical page lock counts and triggers Driver Verifier bugchecks (`0xC4` / `PFN_SHARE_COUNT`).
+  - **WaitLock Status Handling**: When checking the result of `WdfWaitLockAcquire`, verify `status == STATUS_SUCCESS`. Do NOT use `NT_SUCCESS(status)` because `NT_SUCCESS(STATUS_TIMEOUT)` evaluates to `TRUE` (`0x00000102`), which would falsely indicate the lock was acquired.
 
