@@ -30,8 +30,8 @@ using namespace usbip;
 
 const auto MAX_HUB_PORTS = 255; // @see drivers/usbip_ude/vhci.cpp, set_usb_ports_cnt
 
-auto& str_zero_copy = "zero-copy";
-auto& str_low_latency = "low-latency";
+constexpr auto &str_zero_copy = "zero-copy";
+constexpr auto &str_low_latency = "low-latency";
 
 auto get_ids_data()
 {
@@ -51,7 +51,7 @@ auto pack(command_t cmd, void *p)
 {
 	return [cmd, p] { 
 		if (!cmd(p)) {
-			exit(EXIT_FAILURE); // throw CLI::RuntimeError(EXIT_FAILURE);
+			throw CLI::RuntimeError(EXIT_FAILURE);
 		}
 	};
 }

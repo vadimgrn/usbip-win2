@@ -91,11 +91,16 @@ bool usbip::cmd_port(void *p)
         }
 
         auto ok = found || ports.empty();
+
         if (!ok) {
-                // requested port(s) not found
-        } else if (persistent && !vhci::set_persistent(dev.get(), *persistent)) {
+                spdlog::debug("requested port(s) not found");
+        } else if (!persistent) {
+                //
+        } else if (!vhci::set_persistent(dev.get(), *persistent)) {
                 spdlog::error(GetLastErrorMsg());
                 ok = false;
+        } else {
+                spdlog::debug("{} persistent device(s) stashed", persistent->size());
         }
 
         return ok;

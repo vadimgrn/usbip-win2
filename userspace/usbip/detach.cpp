@@ -25,7 +25,7 @@ bool usbip::cmd_detach(void *p)
 	} else if (args.port <= 0) {
 		std::println("all ports are detached");
 	} else {
-                std::println("port {} is succesfully detached", args.port);
+                std::println("port {} is successfully detached", args.port);
 	}
 
 	return ok;

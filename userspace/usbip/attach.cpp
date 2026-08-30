@@ -23,7 +23,7 @@ auto attach_persistent_devices(HANDLE dev)
         } else for (auto &args: *v) {
                 auto &loc = args.location;
 
-                std::println("{}:{}/{}, serial '{}', mode:{}, once:{}", 
+                std::println("{}:{}/{}, serial:{}, mode:{}, once:{}", 
                               loc.hostname, loc.service, loc.busid, args.serial,
                               to_string(args.recv_mode), args.once);
 
@@ -91,7 +91,7 @@ bool usbip::cmd_attach(void *p)
         if (args.terse) {
                 std::println("{}", port);
         } else {
-                std::println("succesfully attached to port {}", port);
+                std::println("successfully attached to port {}", port);
         }
 
         return true;

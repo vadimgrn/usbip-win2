@@ -4,7 +4,7 @@
 
 #include "strings.h"
 
-#include <libusbip\src\usb_ids.h>
+#include <libusbip/src/usb_ids.h>
 #include <format>
 
 const char* usbip::get_speed_str(USB_DEVICE_SPEED speed) noexcept
