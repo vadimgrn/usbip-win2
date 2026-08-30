@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usb_ids.h"
@@ -12,24 +12,25 @@
 namespace
 {
 
-uint16_t remove_prefix_hex(std::string_view &s, int cnt)
+template<typename T>
+auto remove_prefix_hex(std::string_view &s, int cnt, T &res)
 {
+        if (s.size() < static_cast<size_t>(cnt)) {
+                return false;
+        }
+
         int val{};
         auto end = s.data() + cnt;
 
         auto [ptr, ec] = std::from_chars(s.data(), end, val, 16);
 
-        if (ec != std::errc{}) {
-		return 0;
-	}
+        if (ec != std::errc{} || ptr != end) {
+                return false;
+        }
 
-        assert(ptr == end);
         s.remove_prefix(cnt);
-
-        auto res = static_cast<uint16_t>(val);
-        assert(res == val);
-
-        return res;
+        res = static_cast<T>(val);
+        return true;
 }
 
 using line_f = std::function<bool(std::string_view&, std::string_view&)>;
@@ -225,13 +226,13 @@ bool usbip::UsbIds::Impl::parse_vid_pid(
                 assert(!"\\t\\t detected");
         } else if (line.starts_with('\t')) { // \t device  device_name
                 line.remove_prefix(1);
-                if (bool(pid = remove_prefix_hex(line, 4))) {
+                if (remove_prefix_hex(line, 4, pid) && line.size() >= 2) {
                         line.remove_prefix(2); // device_name
                         auto &prod = m_vendor[vid].second;
                         [[maybe_unused]] auto [it, inserted] = prod.emplace(pid, line);
                         assert(inserted);
                 }
-        } else if (bool(vid = remove_prefix_hex(line, 4))) { // vendor  vendor_name
+        } else if (remove_prefix_hex(line, 4, vid) && line.size() >= 2) { // vendor  vendor_name
                 line.remove_prefix(2); // vendor_name
                 [[maybe_unused]] auto [it, inserted] = m_vendor.emplace(vid, std::make_pair(line, products_t()));
                 assert(inserted);
@@ -249,7 +250,7 @@ bool usbip::UsbIds::Impl::parse_class_sub_proto(
                 // continue;
         } else if (line.starts_with("\t\t")) {
                 line.remove_prefix(2);
-                if (auto prot = (uint8_t)remove_prefix_hex(line, 2)) {
+                if (uint8_t prot{}; remove_prefix_hex(line, 2, prot) && line.size() >= 2) {
                         line.remove_prefix(2);
                         auto &sub = m_class[cls].second;
                         auto &proto = sub[subcls].second;
@@ -258,7 +259,7 @@ bool usbip::UsbIds::Impl::parse_class_sub_proto(
                 }
         } else if (line.starts_with('\t')) {
                 line.remove_prefix(1);
-                if (bool(subcls = (uint8_t)remove_prefix_hex(line, 2))) {
+                if (remove_prefix_hex(line, 2, subcls) && line.size() >= 2) {
                         line.remove_prefix(2);
                         auto &sub = m_class[cls].second;
                         [[maybe_unused]] auto [it, inserted] = sub.emplace(subcls, std::make_pair(line, proto_t()));
@@ -266,12 +267,11 @@ bool usbip::UsbIds::Impl::parse_class_sub_proto(
                 }
         } else if (line.starts_with("C ")) {
                 line.remove_prefix(2);
-
-                cls = (uint8_t)remove_prefix_hex(line, 2); // "C 00  (Defined at Interface level)"
-                line.remove_prefix(2);
-
-                [[maybe_unused]] auto [it, inserted] = m_class.emplace(cls, std::make_pair(line, subclass_t()));
-                assert(inserted);
+                if (remove_prefix_hex(line, 2, cls) && line.size() >= 2) {
+                        line.remove_prefix(2);
+                        [[maybe_unused]] auto [it, inserted] = m_class.emplace(cls, std::make_pair(line, subclass_t()));
+                        assert(inserted);
+                }
         }
 
         return false;

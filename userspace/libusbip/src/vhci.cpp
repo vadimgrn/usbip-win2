@@ -364,9 +364,11 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
         ioctl::stop_attach_attempts r{};
         r.size = sizeof(r);
 
-        if (location && !assign(r, *location)) {
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return -1;
+        if (location) {
+                if (auto err = assign(r, *location)) {
+                        SetLastError(err);
+                        return -1;
+                }
         }
         
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL

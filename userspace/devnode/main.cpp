@@ -231,7 +231,13 @@ auto uninstall_device(
 
         assert(type == DEVPROP_TYPE_STRING_LIST);
         
-        if (as_wstring_view(prop) != r.hwid) {
+        auto ids = split_multi_sz(as_wstring_view(prop));
+        auto iequal = [] (std::wstring_view a, std::wstring_view b) noexcept {
+                return std::ranges::equal(a, b, {}, ::towlower, ::towlower);
+        };
+        auto found = std::ranges::any_of(ids, [&r, &iequal] (const auto &id) { return iequal(id, r.hwid); });
+
+        if (!found) {
                 //
         } else if (r.dry_run) {
                 prop.resize(MAX_DEVICE_ID_LEN);
@@ -268,8 +274,6 @@ auto remove_devnode(_In_ devnode_remove_args &r)
                 errmsg("SetupDiGetClassDevs");
                 return false;
         }
-
-        r.hwid = make_hwid(std::move(r.hwid)); // DEVPKEY_Device_HardwareIds is DEVPROP_TYPE_STRING_LIST
 
         bool reboot{};
         auto f = [&r, &reboot] (auto di, auto &dd) { return uninstall_device(di, dd, r, reboot); };
