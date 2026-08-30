@@ -42,6 +42,10 @@ auto wdm::object_reference::operator =(_In_ const object_reference &other) -> ob
 
 auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> object_reference&
 {
+	if (this == &other) {
+		return *this;
+	}
+
 	auto defer_delete = other.m_defer_delete;
 	auto obj = other.release();
 
@@ -51,9 +55,7 @@ auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> obje
 
 void wdm::object_reference::reset(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
 {
-	if (m_obj != obj) {
-		object_reference(obj, defer_delete, add_ref).swap(*this);
-	}
+	object_reference(obj, defer_delete, add_ref).swap(*this);
 }
 
 void* wdm::object_reference::release()
