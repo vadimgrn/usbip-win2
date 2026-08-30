@@ -223,7 +223,7 @@ bool usbip::UsbIds::Impl::parse_vid_pid(
         } else if (line.starts_with('#')) {
                 // continue;
         } else if (line.starts_with("\t\t")) { // \t \t interface  interface_name
-                assert(!"\\t\\t detected");
+                // ignore device interface sub-entry
         } else if (line.starts_with('\t')) { // \t device  device_name
                 line.remove_prefix(1);
                 if (remove_prefix_hex(line, 4, pid) && line.size() >= 2) {

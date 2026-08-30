@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -8,8 +8,8 @@
   * This header is used in the driver and libusbip.
   */
 
-#include <usbip\consts.h>
-#include <resources\messages.h>
+#include <usbip/consts.h>
+#include <resources/messages.h>
 
 #include <basetsd.h>
 

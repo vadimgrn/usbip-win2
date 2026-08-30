@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2001-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "file_ver.h"
@@ -87,14 +87,15 @@ DWORD win::FileVersion::Impl::SetFile(std::wstring_view path)
                 return ERROR_INVALID_PARAMETER;
         }
 
-        auto sz = GetFileVersionInfoSize(path.data(), nullptr);
+        std::wstring null_term_path(path);
+        auto sz = GetFileVersionInfoSize(null_term_path.c_str(), nullptr);
         if (!sz) {
                 return GetLastError();
         }
 
         m_info.resize(sz);
 
-        if (!GetFileVersionInfo(path.data(), 0, sz, m_info.data())) {
+        if (!GetFileVersionInfo(null_term_path.c_str(), 0, sz, m_info.data())) {
                 return GetLastError();
         } 
 
@@ -213,7 +214,7 @@ std::wstring win::FileVersion::Impl::GetTranslation(bool original) const
         auto ptr = reinterpret_cast<const DWORD*>(VerQueryValue(L"\\VarFileInfo\\Translation", buf_sz)); // first always must be present
 
         if (ptr && buf_sz) {
-                assert(buf_sz == sizeof(*ptr));
+                assert(buf_sz >= sizeof(*ptr));
                 s = MakeTransl(*ptr);
         }
 

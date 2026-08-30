@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "..\output.h"
+#include "../output.h"
 #include "strconv.h"
 
 #include <format>

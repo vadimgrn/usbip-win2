@@ -2,11 +2,11 @@
  * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\persistent.h"
-#include "..\vhci.h"
+#include "../persistent.h"
+#include "../vhci.h"
 #include "output.h"
 
-#include <usbip\vhci.h>
+#include <usbip/vhci.h>
 
 #include <charconv>
 #include <ranges>

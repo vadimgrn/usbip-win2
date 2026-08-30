@@ -2,8 +2,8 @@
  * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\remote.h"
-#include "..\win_handle.h"
+#include "../remote.h"
+#include "../win_handle.h"
 
 #include "device_speed.h"
 #include "op_common.h"
@@ -11,7 +11,7 @@
 #include "strconv.h"
 #include "output.h"
 
-#include <usbip\proto_op.h>
+#include <usbip/proto_op.h>
 
 #include <chrono>
 

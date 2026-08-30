@@ -2,17 +2,17 @@
  * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\vhci.h"
+#include "../vhci.h"
 
 #include "offsetof_ex.h"
 #include "device_speed.h"
 #include "output.h"
 
-#include <resources\messages.h>
+#include <resources/messages.h>
 #include <cfgmgr32.h>
 
 #include <initguid.h>
-#include <usbip\vhci.h>
+#include <usbip/vhci.h>
 
 #include <span>
 #include <random>
@@ -372,7 +372,7 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
         }
         
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-            !DeviceIoControl(dev,ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
+            !DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
                 return -1;
         } else if (BytesReturned != sizeof(r)) [[unlikely]] {
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
