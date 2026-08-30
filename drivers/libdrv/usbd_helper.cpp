@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbd_helper.h"
@@ -39,7 +39,8 @@ enum {
  */
 USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
 {
-	switch (usbip_status >= 0 ? usbip_status : -usbip_status) {
+	switch (auto status = static_cast<LONG64>(usbip_status);
+                status >= 0 ? status : -status) {
 	case 0:
 		return USBD_STATUS_SUCCESS;
 	case EPIPE_LNX: // Endpoint stalled. For non-control endpoints, reset this status with usb_clear_halt()
@@ -79,6 +80,8 @@ USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
 		return USBD_STATUS_INTERNAL_HC_ERROR;
 	case EBUSY_LNX:
 		return USBD_STATUS_ERROR_BUSY;
+	case EINVAL_LNX:
+		return USBD_STATUS_INVALID_PARAMETER;
 	}
 
 	return USBD_STATUS_INVALID_PARAMETER;
@@ -125,10 +128,16 @@ int to_linux_status(USBD_STATUS status)
 	case USBD_STATUS_INSUFFICIENT_RESOURCES:
 		err = ENOMEM_LNX;
 		break;
+	case USBD_STATUS_DEV_NOT_RESPONDING:
+		err = ETIME_LNX;
+		break;
+	case USBD_STATUS_ISO_TD_ERROR:
+	case USBD_STATUS_ISOCH_REQUEST_FAILED:
+		err = EXDEV_LNX;
+		break;
 	case USBD_STATUS_BTSTUFF:
 	case USBD_STATUS_INTERNAL_HC_ERROR:
 	case USBD_STATUS_HUB_INTERNAL_ERROR:
-	case USBD_STATUS_DEV_NOT_RESPONDING:
 		err = EPROTO_LNX;
 		break;
 	case USBD_STATUS_ERROR_BUSY:
@@ -195,7 +204,9 @@ UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
 
 	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
 		flags |= URB_ISO_ASAP;
-	} else if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
+	}
+
+	if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
 		flags |= URB_SHORT_NOT_OK;
 	}
 

@@ -9,8 +9,6 @@
 #include <ntddk.h>
 #include <usb.h>
 
-struct usbip_iso_packet_descriptor;
-
 enum { EndpointStalled = USBD_STATUS_STALL_PID }; // FIXME: for what USBD_STATUS_ENDPOINT_HALTED?
 
 int to_linux_status(USBD_STATUS usbd_status);
