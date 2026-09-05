@@ -106,6 +106,9 @@
   <PropertyGroup Label="Vcpkg">
     <VcpkgAutoLink>false</VcpkgAutoLink>
   </PropertyGroup>
+  <PropertyGroup>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
