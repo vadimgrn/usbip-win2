@@ -44,7 +44,7 @@ auto init_mainframe(_In_ wxApp::Appearance app)
         }
 
         if (err.empty()) {
-                err = GetLastErrorMsg();
+                err = get_last_error_msg();
         }
 
         wxSafeShowMessage(_("Fatal error"), err);

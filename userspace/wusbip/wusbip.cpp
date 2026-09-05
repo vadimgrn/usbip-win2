@@ -99,6 +99,13 @@ constexpr auto is_port_residual(_In_ state st)
         }
 }
 
+template <typename F>
+struct scope_guard
+{
+        F fn;
+        ~scope_guard() { fn(); }
+};
+
 template<typename T>
 requires std::three_way_comparable<T>
 auto as_set(_In_ std::vector<T> v)
@@ -345,7 +352,7 @@ auto get_persistent(_In_ const Handle &vhci = get_vhci())
                 result = as_set(*v);
         } else {
                 auto err = GetLastError();
-                wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogVerbose(_("Could not get persistent info\nError %lu\n%s"), err, get_last_error_msg(err));
         }
 
         return result;
@@ -458,6 +465,8 @@ MainFrame::MainFrame(_In_ Handle read, _In_ int appearance) :
         init();
         restore_state();
         post_refresh();
+
+        m_read_thread = std::thread(&MainFrame::read_loop, this);
 }
 
 MainFrame::~MainFrame()
@@ -609,13 +618,10 @@ void MainFrame::iconize_to_tray()
 
 void MainFrame::read_loop()
 {
-        auto on_exit = [] (auto frame)
-        {
-                std::lock_guard<std::mutex> lock(frame->m_read_close_mtx);
-                frame->m_read.close();
-        };
-
-        std::unique_ptr<MainFrame, decltype(on_exit)> ptr(this, on_exit);
+        scope_guard guard([this] {
+                std::lock_guard<std::mutex> lock(m_read_close_mtx);
+                m_read.close();
+        });
 
         while (auto state = vhci::read_device_state(m_read.get())) {
                 auto evt = new DeviceStateEvent(std::move(*state));
@@ -623,7 +629,7 @@ void MainFrame::read_loop()
         }
 
         if (auto err = GetLastError(); err != ERROR_OPERATION_ABORTED) { // see CancelSynchronousIo
-                wxLogError(_("vhci::read_device_state error %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("vhci::read_device_state error %lu\n%s"), err, get_last_error_msg(err));
         }
 }
 
@@ -829,7 +835,7 @@ void MainFrame::on_edit_serial(wxCommandEvent&)
         {
                 wxString err;
                 if (auto s = serial.utf8_string(); !validate_device_serial(s)) {
-                        err = GetLastErrorMsg();
+                        err = get_last_error_msg();
                 }
                 return err;
         };
@@ -1006,7 +1012,7 @@ void MainFrame::attach(_In_ bool once)
                 if (auto err = attach(url, busid, serial, recv_mode, once)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not attach %s/%s\nError %lu\n%s"), 
-                                              url, busid, err, GetLastErrorMsg(err));
+                                              url, busid, err, get_last_error_msg(err));
                         }
                         break;
                 }
@@ -1034,7 +1040,7 @@ void MainFrame::on_attach_stop(wxCommandEvent&)
                 auto &busid = tree.GetItemText(dev);
 
                 wxLogError(_("Could not stop attach attempts %s/%s\nError %lu\n%s"),
-                              url, busid, err, GetLastErrorMsg(err));
+                              url, busid, err, get_last_error_msg(err));
 
                 break;
         }
@@ -1048,7 +1054,7 @@ void MainFrame::on_attach_stop_all(wxCommandEvent&)
 
         if (auto cnt = vhci::stop_attach_attempts(vhci.get(), nullptr); cnt < 0) {
                 auto err = GetLastError();
-                wxLogError(_("Could not stop attach attempts\nError %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Could not stop attach attempts\nError %lu\n%s"), err, get_last_error_msg(err));
         } else {
                 set_status_text(wxString::Format(_("%d request(s) stopped"), cnt));
         }
@@ -1081,7 +1087,7 @@ void MainFrame::on_detach(wxCommandEvent&)
                 } else if (auto err = detach(port)) {
                         if (err != ERROR_OPERATION_ABORTED) {
                                 wxLogError(_("Could not detach port %d\nError %lu\n%s"),
-                                              port, err, GetLastErrorMsg(err));
+                                              port, err, get_last_error_msg(err));
                         }
                         break;
                 }
@@ -1092,7 +1098,7 @@ void MainFrame::on_detach_all(wxCommandEvent&)
 {
         if (auto err = detach(vhci::port_all); err && err != ERROR_OPERATION_ABORTED) {
                 wxLogError(_("Could not detach all devices\nError %lu\n%s"),
-                              err, GetLastErrorMsg(err));
+                              err, get_last_error_msg(err));
         }
 }
 
@@ -1222,7 +1228,7 @@ auto MainFrame::connect(
         case ERROR_CANCELLED:
                 break;
         default:
-                wxLogError(_("Could not connect to %s:%s\nError %lu\n%s"), hostname, service, err, GetLastErrorMsg(err));
+                wxLogError(_("Could not connect to %s:%s\nError %lu\n%s"), hostname, service, err, get_last_error_msg(err));
         }
 
         return sock;
@@ -1282,7 +1288,7 @@ void MainFrame::add_exported_devices(wxCommandEvent&)
 
         if (!enum_exportable_devices(sock.get(), dev, intf)) {
                 auto err = GetLastError();
-                wxLogError(_("enum_exportable_devices error %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("enum_exportable_devices error %lu\n%s"), err, get_last_error_msg(err));
         } else if (cb.FindString(host) != wxNOT_FOUND) {
                 // already exists
         } else if (cb.Append(host); cb.GetCount() > 32) {
@@ -1447,7 +1453,7 @@ void MainFrame::save(_In_ const wxTreeListItems &devices)
 
         if (auto &vhci = get_vhci(); !vhci::set_persistent(vhci.get(), persistent)) {
                 auto err = GetLastError();
-                wxLogError(_("Could not save persistent info\nError %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Could not save persistent info\nError %lu\n%s"), err, get_last_error_msg(err));
         }
 }
 
@@ -1513,7 +1519,7 @@ void MainFrame::on_reload(wxCommandEvent &event)
         auto devices = vhci::get_imported_devices(vhci.get());
         if (!devices) {
                 auto err = GetLastError();
-                wxLogError(_("Could not get imported devices\nError %lu\n%s"), err, GetLastErrorMsg(err));
+                wxLogError(_("Could not get imported devices\nError %lu\n%s"), err, get_last_error_msg(err));
                 return;
         }
 

@@ -15,22 +15,38 @@ using namespace usbip;
 /*
  * @param busid hub-port[.port]... 
  */
-auto parse_busid(_In_ wxString busid)
+auto parse_busid(_In_ const wxString &busid)
 {
         std::vector<int> v;
 
-        if (auto i = busid.Find(L'-'); i != wxNOT_FOUND) {
-                busid[i] = L'.';
-        } else {
+        if (busid.length() < 3) { // "1-1"
                 return v;
         }
 
-        int val;
-        for (wxString rest; busid.BeforeFirst(L'.', &rest).ToInt(&val); busid = std::move(rest)) {
-                v.push_back(val);
+        v.reserve(4);
+
+        int val{};
+        bool has_val{};
+        auto sep = L'-';
+
+        for (auto ch : busid) {
+                if (usbip::isdigit(ch)) {
+                        val = 10*val + (ch - L'0');
+                        has_val = true;
+                } else if (ch == sep && has_val) {
+                        v.push_back(val);
+                        val = 0;
+                        has_val = false;
+                        sep = L'.';
+                } else {
+                        v.clear();
+                        return v;
+                }
         }
 
-        if (v.size() < 2) { // hub-port at least
+        if (has_val && sep == L'.') {
+                v.push_back(val);
+        } else {
                 v.clear();
         }
 
@@ -43,8 +59,8 @@ auto parse_busid(_In_ wxString busid)
 int TreeListItemComparator::Compare(
         wxTreeListCtrl *tree, unsigned int column, wxTreeListItem first, wxTreeListItem second)
 {
-        auto left = tree->GetItemText(first, column);
-        auto right = tree->GetItemText(second, column);
+        auto &left = tree->GetItemText(first, column);
+        auto &right = tree->GetItemText(second, column);
 
         if (column == COL_BUSID && tree->GetItemParent(first) != tree->GetRootItem()) {
                 if (auto a = parse_busid(left), b = parse_busid(right); !(a.empty() || b.empty())) {
@@ -52,8 +68,8 @@ int TreeListItemComparator::Compare(
                         return ret < 0 ? -1 : (ret > 0 ? 1 : 0);
                 }
         } else if (column == COL_SPEED) {
-                if (USB_DEVICE_SPEED a, b; get_speed_val(a, left) && get_speed_val(b, right)) {
-                        auto ret = a <=> b;
+                if (auto a = get_speed_val(left), b = get_speed_val(right); a && b) {
+                        auto ret = *a <=> *b;
                         return ret < 0 ? -1 : (ret > 0 ? 1 : 0);
                 }
         }

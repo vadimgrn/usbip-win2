@@ -77,6 +77,7 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 - `noexcept` is used in **userspace only**; **do NOT use `noexcept` in driver code (`drivers/`)**
 - Range-based for loops, move semantics (use `static_cast<T&&>()` in drivers; `std::move` is userspace only), lambda functions where applicable
 - C++23 scoped enums with underlying types: `enum class name : int { ... }`
+- Do not inherit from concrete types like `std::array`, `std::string`, etc.
 
 ## Key Dependencies
 

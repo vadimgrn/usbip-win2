@@ -29,10 +29,10 @@ LogWindow::LogWindow(
         set_accelerators(log_toggle, font_incr, font_decr, font_dflt);
         auto wnd = GetFrame();
 
-        wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(LogWindow::on_font_increase), this, font_incr->GetId());
-        wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(LogWindow::on_font_decrease), this, font_decr->GetId());
-        wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(LogWindow::on_font_default), this, font_dflt->GetId());
-        m_ctrl->Bind(wxEVT_MOUSEWHEEL, wxMouseEventHandler(LogWindow::on_mouse_wheel), this);
+        wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, &LogWindow::on_font_increase, this, font_incr->GetId());
+        wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, &LogWindow::on_font_decrease, this, font_decr->GetId());
+        wnd->Bind(wxEVT_COMMAND_MENU_SELECTED, &LogWindow::on_font_default, this, font_dflt->GetId());
+        m_ctrl->Bind(wxEVT_MOUSEWHEEL, &LogWindow::on_mouse_wheel, this);
 
         wxPersistentRegisterAndRestore(wnd, wxString::FromAscii(__func__));
 
