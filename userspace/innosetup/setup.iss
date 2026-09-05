@@ -99,6 +99,9 @@ WizardImageAlphaFormat=defined
 WizardImageStretch=no
 UninstallDisplayIcon="{app}\{#AppExeName}"
 AlwaysRestart=yes
+CloseApplications=yes
+CloseApplicationsFilter=*.exe,*.dll
+PrivilegesRequired=admin
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no
@@ -153,21 +156,21 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Run]
 
-Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist
+Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist; StatusMsg: "Installing Microsoft Visual C++ Redistributable ({#VCRedistArch})..."
 
 #if INSTALL_TEST_CERTIFICATE
-  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden
+  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden; StatusMsg: "Installing test certificate..."
 #endif
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden; Components: client
-Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden; Components: client
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden; Components: client; StatusMsg: "Installing upper filter driver..."
+Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden; Components: client; StatusMsg: "Installing UDE driver and virtual host controller..."
 
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client; StatusMsg: "Removing virtual host controller device..."
 
 #if INSTALL_TEST_CERTIFICATE
-  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
+  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden; StatusMsg: "Removing test certificate..."
 #endif
 
 [Code]
@@ -280,6 +283,12 @@ begin
     Scheduler := CreateOleObject('Schedule.Service');
     Scheduler.Connect();
     RootFolder := Scheduler.GetFolder('\');
+    try
+      RootFolder.GetTask('{#DetachTaskName}');
+    except
+      Log('Detach task does not exist, skipping deletion');
+      Exit;
+    end;
     RootFolder.DeleteTask('{#DetachTaskName}', 0);
     Log('Detach task unregistered successfully');
   except
@@ -425,6 +434,10 @@ begin
     else
       UninstPath := UninstStr;
   end
+  else if FileExists(UninstStr) then
+  begin
+    UninstPath := UninstStr;
+  end
   else
   begin
     P := Pos(' ', UninstStr);
@@ -438,46 +451,27 @@ begin
   Result := FileExists(UninstPath);
 end;
 
-function IsPackageInstalled(): Boolean;
-var
-  DummyPath, DummyParams: String;
-begin
-  Result := GetInstalledUninstallString(DummyPath, DummyParams);
-  if Result then
-    Log('Previous package detected as installed')
-  else
-    Log('Previous package not detected as installed');
-end;
-
-function UninstallPreviousPackage(): Integer;
+function PrepareToInstall(var NeedsRestart: Boolean): string;
 var
   UninstPath, UninstParams: String;
+  ExitCode: Integer;
 begin
-  Result := 1;
+  Result := '';
   if GetInstalledUninstallString(UninstPath, UninstParams) then
   begin
     Log('Uninstalling previous package: ' + UninstPath + ' ' + UninstParams);
-    if Exec(UninstPath, UninstParams, '', SW_HIDE, ewWaitUntilTerminated, Result) then
+    if Exec(UninstPath, UninstParams, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
     begin
-      if Result = 0 then
+      if ExitCode = 0 then
         Log('Installed package uninstall completed successfully')
       else
-        Log('Installed package uninstall did not complete successfully, exit code: ' + IntToStr(Result));
+        Result := 'Failed to automatically uninstall the previous version of USBip (exit code ' + IntToStr(ExitCode) + '). ' +
+                  'Please uninstall it manually before continuing.';
     end
     else
     begin
-      Log('Failed to execute uninstaller: ' + SysErrorMessage(Result));
-    end;
-  end;
-end;
-
-function PrepareToInstall(var NeedsRestart: Boolean): string;
-begin
-  result := '';
-  if IsPackageInstalled() then
-  begin
-    if UninstallPreviousPackage() <> 0 then
-      result := 'Failed to automatically uninstall the previous version of USBip. ' +
+      Result := 'Failed to execute uninstaller for the previous version of USBip: ' + SysErrorMessage(ExitCode) + '. ' +
                 'Please uninstall it manually before continuing.';
+    end;
   end;
 end;
