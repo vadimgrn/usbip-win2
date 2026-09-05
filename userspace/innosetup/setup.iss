@@ -295,13 +295,50 @@ begin
   end;
 end;
 
-procedure DeleteOemDriver(const DriverName: String);
+function DeleteOemDriverFromRegistry(const DriverName: String): Boolean;
+var
+  Names: TArrayOfString;
+  I, ResultCode: Integer;
+  OemName, Prefix: String;
+begin
+  Result := False;
+  Prefix := Lowercase(DriverName + '.inf');
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE_64, 'SYSTEM\DriverDatabase\DriverPackages', Names) then
+  begin
+    for I := 0 to GetArrayLength(Names) - 1 do
+    begin
+      if Pos(Prefix, Lowercase(Names[I])) = 1 then
+      begin
+        if RegQueryStringValue(HKEY_LOCAL_MACHINE_64, 'SYSTEM\DriverDatabase\DriverPackages\' + Names[I], '', OemName) then
+        begin
+          OemName := Trim(OemName);
+          if OemName <> '' then
+          begin
+            Log('Deleting OEM driver ' + OemName + ' (' + Names[I] + ')');
+            if ExecWithNativeSysDir(
+                 ExpandConstant('{sys}\pnputil.exe'),
+                 '/delete-driver ' + OemName + ' /uninstall /force',
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+            begin
+              Log(Format('pnputil /delete-driver %s returned exit code %d', [OemName, ResultCode]));
+              Result := True;
+            end
+            else
+            begin
+              Log(Format('Failed to execute pnputil for %s, error code %d', [OemName, ResultCode]));
+            end;
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure DeleteOemDriverFromFileSearch(const DriverName: String);
 var
   FindRec: TFindRec;
-  InfDir: String;
-  Lines: TArrayOfString;
-  I, ResultCode: Integer;
-  Matched: Boolean;
+  InfDir, CatVal: String;
+  ResultCode: Integer;
 begin
   InfDir := ExpandConstant('{win}\INF\');
   if FindFirst(InfDir + 'oem*.inf', FindRec) then
@@ -310,24 +347,22 @@ begin
       repeat
         if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
         begin
-          Matched := False;
-          if LoadStringsFromFile(InfDir + FindRec.Name, Lines) then
-          begin
-            for I := 0 to GetArrayLength(Lines) - 1 do
-            begin
-              if Pos(DriverName, Lines[I]) > 0 then
-              begin
-                Matched := True;
-                Break;
-              end;
-            end;
-          end;
-          if Matched then
+          CatVal := Lowercase(GetIniString('Version', 'CatalogFile', '', InfDir + FindRec.Name));
+          if (Pos(Lowercase(DriverName), CatVal) > 0) or
+             (GetIniString('SourceDisksFiles', DriverName + '.sys', '', InfDir + FindRec.Name) <> '') then
           begin
             Log('Deleting OEM driver ' + FindRec.Name + ' (' + DriverName + ')');
-            Exec(ExpandConstant('{sys}\pnputil.exe'),
+            if ExecWithNativeSysDir(
+                 ExpandConstant('{sys}\pnputil.exe'),
                  '/delete-driver ' + FindRec.Name + ' /uninstall /force',
-                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+            begin
+              Log(Format('pnputil /delete-driver %s returned exit code %d', [FindRec.Name, ResultCode]));
+            end
+            else
+            begin
+              Log(Format('Failed to execute pnputil for %s, error code %d', [FindRec.Name, ResultCode]));
+            end;
           end;
         end;
       until not FindNext(FindRec);
@@ -335,6 +370,12 @@ begin
       FindClose(FindRec);
     end;
   end;
+end;
+
+procedure DeleteOemDriver(const DriverName: String);
+begin
+  DeleteOemDriverFromRegistry(DriverName);
+  DeleteOemDriverFromFileSearch(DriverName);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
