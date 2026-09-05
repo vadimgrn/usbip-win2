@@ -8,6 +8,7 @@
 
 #include <string_view>
 #include <tuple>
+#include <optional>
 
 #include <wx/string.h>
 
@@ -25,7 +26,7 @@ namespace usbip
 
 bool init(_Inout_ wxString &err);
 
-wxString GetLastErrorMsg(_In_ DWORD msg_id = GetLastError());
+wxString get_last_error_msg(_In_ DWORD msg_id = GetLastError());
 Handle& get_vhci();
 
 class UsbIds;
@@ -34,7 +35,7 @@ const UsbIds& get_ids();
 NullableHandle& get_event();
 
 const wchar_t* get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept;
-bool get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept;
+std::optional<USB_DEVICE_SPEED> get_speed_val(_In_ const wxString &speed) noexcept;
 
 wxString to_string(_In_ state state);
 

@@ -54,7 +54,7 @@ private:
 	usbip::Handle m_read;
 	std::mutex m_read_close_mtx;
 
-	std::thread m_read_thread{ &MainFrame::read_loop, this };
+	std::thread m_read_thread;
 
         int m_status_text_pushes{};
         wxTimer m_status_bar_timer{this};

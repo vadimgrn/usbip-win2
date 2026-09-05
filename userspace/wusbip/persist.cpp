@@ -15,7 +15,8 @@ namespace
 
 using namespace usbip;
 
-auto try_catch(_In_ const char *function, _In_ const std::function<void()> &func)
+template <typename F>
+auto try_catch(_In_ const char *function, F &&func)
 {
         try {
                 func();

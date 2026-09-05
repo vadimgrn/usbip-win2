@@ -53,7 +53,7 @@ auto win::get_file_version() -> const FileVersion&
  * Use for libusbip.dll errors only. 
  * @see wxSysErrorMsg
  */
-wxString usbip::GetLastErrorMsg(_In_ DWORD msg_id)
+wxString usbip::get_last_error_msg(_In_ DWORD msg_id)
 {
         auto &mod = get_resource_module();
         return wformat_message(mod.get(), msg_id);
@@ -110,16 +110,15 @@ const wchar_t* usbip::get_speed_str(_In_ USB_DEVICE_SPEED speed) noexcept
         return idx >= 0 && idx < std::ssize(g_usb_speed_str) ? g_usb_speed_str[idx] : L"?";
 }
 
-bool usbip::get_speed_val(_Out_ USB_DEVICE_SPEED &val, _In_ const wxString &speed) noexcept
+std::optional<USB_DEVICE_SPEED> usbip::get_speed_val(_In_ const wxString &speed) noexcept
 {
         for (int i = 0; i < std::ssize(g_usb_speed_str); ++i) {
                 if (speed.IsSameAs(g_usb_speed_str[i], false)) {
-                        val = static_cast<USB_DEVICE_SPEED>(i);
-                        return true;
+                        return static_cast<USB_DEVICE_SPEED>(i);
                 }
         }
 
-        return false;
+        return std::nullopt;
 }
 
 auto usbip::make_imported_device(
