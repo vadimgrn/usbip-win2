@@ -172,25 +172,39 @@ Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: ru
 
 [Code]
 
-function make_bcd_subkey_path(const object, element: String): String;
-begin
-  result := 'BCD00000000\Objects\' + object +  '\Elements\' + element;
-end;
+type
+  SYSTEM_CODEINTEGRITY_INFORMATION = record
+    Length: Cardinal;
+    CodeIntegrityOptions: Cardinal;
+  end;
+
+function NtQuerySystemInformation(
+  SystemInformationClass: Integer;
+  var SystemInformation: SYSTEM_CODEINTEGRITY_INFORMATION;
+  SystemInformationLength: Cardinal;
+  var ReturnLength: Cardinal
+): Integer; external 'NtQuerySystemInformation@ntdll.dll stdcall';
+
+const
+  SystemCodeIntegrityInformation = 103;
+  CODEINTEGRITY_OPTION_TESTSIGN = 2;
 
 function IsTestSigningModeEnabled(): Boolean;
 var
-  subkey, name, value : String;
-  binval : AnsiString;
+  Info: SYSTEM_CODEINTEGRITY_INFORMATION;
+  RetLen: Cardinal;
+  Status: Integer;
 begin
-  subkey := make_bcd_subkey_path('{9DEA862C-5CDD-4E70-ACC1-F32B344D4795}', '23000003'); // default loader
-  name := 'Element';
-  
-  result := RegQueryStringValue(HKEY_LOCAL_MACHINE, subkey, name, value);
-  if not result then
-    exit;
-   
-  subkey := make_bcd_subkey_path(value, '16000049'); // AllowPrereleaseSignatures
-  result := RegQueryBinaryValue(HKEY_LOCAL_MACHINE, subkey, name, binval) and (Length(binval) >= 1) and (binval[1] = #1)
+  Result := False;
+  Info.Length := 8;
+  Info.CodeIntegrityOptions := 0;
+  RetLen := 0;
+
+  Status := NtQuerySystemInformation(SystemCodeIntegrityInformation, Info, 8, RetLen);
+  if Status = 0 then
+  begin
+    Result := (Info.CodeIntegrityOptions and CODEINTEGRITY_OPTION_TESTSIGN) <> 0;
+  end;
 end;
 
 function check_test_sign_mode(): Boolean;
