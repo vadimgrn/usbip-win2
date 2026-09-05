@@ -224,11 +224,6 @@ auto run(int argc, wchar_t *argv[])
 } // namespace
 
 
-const char* usbip::to_string(_In_ receive_mode mode) noexcept
-{
-        return mode == receive_mode::low_latency ? str_low_latency : str_zero_copy;
-}
-
 std::string usbip::get_last_error_msg(DWORD msg_id)
 {
 	auto &mod = get_resource_module();

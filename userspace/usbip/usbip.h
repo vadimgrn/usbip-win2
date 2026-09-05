@@ -16,9 +16,6 @@ namespace usbip
 class UsbIds;
 const UsbIds& get_ids();
 
-enum class receive_mode;
-const char *to_string(_In_ receive_mode mode) noexcept;
-
 std::string get_last_error_msg(DWORD msg_id = GetLastError());
 
 struct global_args

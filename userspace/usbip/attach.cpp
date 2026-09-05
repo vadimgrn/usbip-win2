@@ -3,6 +3,7 @@
  */
 
 #include "usbip.h"
+#include "strings.h"
 
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
@@ -25,11 +26,7 @@ auto attach_persistent_devices(HANDLE dev)
 
         auto ok = true;
         for (const auto &args: *v) {
-                auto &loc = args.location;
-
-                std::println("{}:{}/{}, serial:{}, mode:{}, once:{}", 
-                              loc.hostname, loc.service, loc.busid, args.serial,
-                              to_string(args.recv_mode), args.once);
+                std::println("{}", args);
 
                 if (!vhci::attach(dev, args)) {
                         spdlog::error(get_last_error_msg());
