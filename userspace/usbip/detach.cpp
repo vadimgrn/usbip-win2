@@ -3,23 +3,23 @@
  */
 
 #include "usbip.h"
+#include "log.h"
 #include <libusbip/vhci.h>
 
-#include <spdlog/spdlog.h>
 #include <print>
 
 bool usbip::cmd_detach(const detach_args &args)
 {
 	auto dev = vhci::open();
 	if (!dev) {
-		spdlog::error(get_last_error_msg());
+		log::error(get_last_error_msg());
 		return false;
 	}
 
 	auto ok = vhci::detach(dev.get(), args.port);
 
 	if (!ok) {
-		spdlog::error(get_last_error_msg());		
+		log::error(get_last_error_msg());		
 	} else if (args.port <= 0) {
 		std::println("all ports are detached");
 	} else {

@@ -4,11 +4,11 @@
 
 #include "usbip.h"
 #include "strings.h"
+#include "log.h"
 
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
 
-#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -20,8 +20,8 @@ void print(const imported_device &d)
 {
         auto product = get_product(get_ids(), d.vendor, d.product);
 
-        USHORT bus = d.devid >> 16;
-        USHORT dev = d.devid & 0xFFFF;
+        auto bus = static_cast<uint16_t>(d.devid >> 16);
+        auto dev = static_cast<uint16_t>(d.devid & 0xFFFF);
 
         constexpr auto &fmt = R"(Port {:02}: device in use at {}
          {}
@@ -47,17 +47,17 @@ bool usbip::cmd_port(const port_args &args)
 {
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error(get_last_error_msg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
         auto devices = vhci::get_imported_devices(dev.get());
         if (!devices) {
-                spdlog::error(get_last_error_msg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
-        spdlog::debug("{} imported usb device(s)", devices->size());
+        log::debug("{} imported usb device(s)", devices->size());
 
         std::optional<std::vector<persistent_device>> persistent;
         if (args.persistent) {
@@ -89,16 +89,16 @@ bool usbip::cmd_port(const port_args &args)
         }
 
         if (!found && !ports.empty()) {
-                spdlog::error("requested port(s) not found");
+                log::error("requested port(s) not found");
                 return false;
         }
 
         if (persistent) {
                 if (!vhci::set_persistent(dev.get(), *persistent)) {
-                        spdlog::error(get_last_error_msg());
+                        log::error(get_last_error_msg());
                         return false;
                 }
-                spdlog::debug("{} persistent device(s) stashed", persistent->size());
+                log::debug("{} persistent device(s) stashed", persistent->size());
         }
 
         return true;

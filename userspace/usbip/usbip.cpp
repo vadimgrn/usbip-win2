@@ -17,8 +17,8 @@
 
 #include <resources/messages.h>
 
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
+#include "log.h"
+#include "strings.h"
 
 #include <CLI11/CLI11.hpp>
 #include <print>
@@ -164,23 +164,13 @@ auto& get_resource_module() noexcept
 	return mod;
 }
 
-void init_spdlog()
-{
-	set_default_logger(spdlog::stderr_color_st("stderr"));
-	spdlog::set_pattern("%^%l%$: %v");
-
-	using fn = void(const std::string&);
-	fn &f = spdlog::debug; // pick this overload
-	libusbip::set_debug_output(f);
-}
-
 void init(CLI::App &app)
 {
 	app.option_defaults()->always_capture_default();
 	app.set_version_flag("-V,--version", get_version());
 
 	app.add_flag("-d,--debug", 
-		[] (auto) { spdlog::set_level(spdlog::level::debug); }, "Debug output");
+		[] (auto) { log::set_debug(true); }, "Debug output");
 
 	app.add_option("-t,--tcp-port", global_args.tcp_port, "TCP/IP port number of USB/IP server")
 		->check(CLI::Range(1024, USHRT_MAX));
@@ -195,17 +185,18 @@ void init(CLI::App &app)
 
 auto run(int argc, wchar_t *argv[])
 {
-	init_spdlog();
+	log::init();
+	libusbip::set_debug_output(log::debug_msg);
 
 	if (!get_resource_module()) {
 		auto err = GetLastError();
-		spdlog::critical(L"can't load '{}.dll', error {:#x} {}", msgtable_dll, err, wformat_message(err));
+		log::critical("can't load '{}.dll', error {:#x} {}", "resources", err, format_message(err));
 		return EXIT_FAILURE;
 	}
 
 	InitWinSock2 ws2;
 	if (!ws2) {
-		spdlog::critical("can't initialize Windows Sockets 2, {}", get_last_error_msg());
+		log::critical("can't initialize Windows Sockets 2, {}", get_last_error_msg());
 		return EXIT_FAILURE;
 	}
 

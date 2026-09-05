@@ -4,11 +4,11 @@
 
 #include "usbip.h"
 #include "strings.h"
+#include "log.h"
 
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
 
-#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -62,13 +62,13 @@ auto list_persistent_devices()
 {
 	auto dev = vhci::open();
 	if (!dev) {
-		spdlog::error(get_last_error_msg());
+		log::error(get_last_error_msg());
 		return false;
 	}
 
 	auto v = vhci::get_persistent(dev.get());
 	if (!v) {
-		spdlog::error(get_last_error_msg());
+		log::error(get_last_error_msg());
 		return false;
 	}
 
@@ -90,14 +90,14 @@ bool usbip::cmd_list(const list_args &args)
 
 	auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
-		spdlog::error(get_last_error_msg());
+		log::error(get_last_error_msg());
 		return false;
 	}
 
-	spdlog::debug("connected to {}:{}", args.remote, global_args.tcp_port);
+	log::debug("connected to {}:{}", args.remote, global_args.tcp_port);
 
 	if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
-		spdlog::error(get_last_error_msg());
+		log::error(get_last_error_msg());
 		return false;
 	}
 

@@ -4,11 +4,11 @@
 
 #include "usbip.h"
 #include "strings.h"
+#include "log.h"
 
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
 
-#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -20,7 +20,7 @@ auto attach_persistent_devices(HANDLE dev)
 {
         auto v = vhci::get_persistent(dev);
         if (!v) {
-                spdlog::error(get_last_error_msg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
@@ -29,7 +29,7 @@ auto attach_persistent_devices(HANDLE dev)
                 std::println("{}", args);
 
                 if (!vhci::attach(dev, args)) {
-                        spdlog::error(get_last_error_msg());
+                        log::error(get_last_error_msg());
                         ok = false;
                 }
         }
@@ -43,9 +43,9 @@ auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
         auto ok = cnt >= 0;
 
         if (ok) {
-                spdlog::debug("{} request(s) stopped", cnt);
+                log::debug("{} request(s) stopped", cnt);
         } else {
-                spdlog::error(get_last_error_msg());
+                log::error(get_last_error_msg());
         }
 
         return ok;
@@ -58,7 +58,7 @@ bool usbip::cmd_attach(const attach_args &args)
 {
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error(get_last_error_msg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
@@ -89,7 +89,7 @@ bool usbip::cmd_attach(const attach_args &args)
 
         auto port = vhci::attach(dev.get(), cmd_args);
         if (!port) {
-                spdlog::error(get_last_error_msg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
