@@ -60,42 +60,47 @@ void on_interface(int, const usb_device &d, int idx, const usb_interface &r)
 
 auto list_persistent_devices()
 {
-	if (auto dev = vhci::open(); !dev) {
-		spdlog::error(GetLastErrorMsg());
-                return false;
-        } else if (auto v = vhci::get_persistent(dev.get()); !v) {
-		spdlog::error(GetLastErrorMsg());
-                return false;
-        } else for (auto &i: *v) {
-                auto &loc = i.location;
-                std::println("{}:{}/{}, serial:{}, mode:{}, once:{}",
-                        loc.hostname, loc.service, loc.busid, i.serial,
-                        to_string(i.recv_mode), i.once);
-        }
+	auto dev = vhci::open();
+	if (!dev) {
+		spdlog::error(get_last_error_msg());
+		return false;
+	}
 
-        return true;
+	auto v = vhci::get_persistent(dev.get());
+	if (!v) {
+		spdlog::error(get_last_error_msg());
+		return false;
+	}
+
+	for (const auto &i: *v) {
+		auto &loc = i.location;
+		std::println("{}:{}/{}, serial:{}, mode:{}, once:{}",
+			loc.hostname, loc.service, loc.busid, i.serial,
+			to_string(i.recv_mode), i.once);
+	}
+
+	return true;
 }
 
 } // namespace
 
 
-bool usbip::cmd_list(void *p)
+bool usbip::cmd_list(const list_args &args)
 {
-	auto &args = *reinterpret_cast<list_args*>(p);
 	if (args.persistent) {
 		return list_persistent_devices();
 	}
 
 	auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str());
 	if (!sock) {
-		spdlog::error(GetLastErrorMsg());
+		spdlog::error(get_last_error_msg());
 		return false;
 	}
 
 	spdlog::debug("connected to {}:{}", args.remote, global_args.tcp_port);
 
 	if (!enum_exportable_devices(sock.get(), on_device, on_interface, on_device_count)) {
-		spdlog::error(GetLastErrorMsg());
+		spdlog::error(get_last_error_msg());
 		return false;
 	}
 

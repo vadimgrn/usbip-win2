@@ -43,19 +43,17 @@ void print(const imported_device &d)
 } // namespace
 
 
-bool usbip::cmd_port(void *p)
+bool usbip::cmd_port(const port_args &args)
 {
-        auto &args = *reinterpret_cast<port_args*>(p); 
-
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error(GetLastErrorMsg());
+                spdlog::error(get_last_error_msg());
                 return false;
         }
 
         auto devices = vhci::get_imported_devices(dev.get());
         if (!devices) {
-                spdlog::error(GetLastErrorMsg());
+                spdlog::error(get_last_error_msg());
                 return false;
         }
 
@@ -67,10 +65,10 @@ bool usbip::cmd_port(void *p)
                 persistent->reserve(devices->size());
         }
 
-        auto &ports = args.ports; 
+        const auto &ports = args.ports; 
         auto found = false;
 
-        for (auto &d: *devices) {
+        for (const auto &d: *devices) {
                 assert(d.port);
                 if (ports.empty() || ports.contains(d.port)) {
                         if (!found) {
@@ -81,8 +79,8 @@ bool usbip::cmd_port(void *p)
                         print(d);
                         if (persistent) {
                                 persistent_device pd {
-                                        .location = std::move(d.location),
-                                        .serial = std::move(d.serial),
+                                        .location = d.location,
+                                        .serial = d.serial,
                                         .recv_mode = d.recv_mode
                                 };
                                 persistent->push_back(std::move(pd));
@@ -90,18 +88,18 @@ bool usbip::cmd_port(void *p)
                 }
         }
 
-        auto ok = found || ports.empty();
+        if (!found && !ports.empty()) {
+                spdlog::error("requested port(s) not found");
+                return false;
+        }
 
-        if (!ok) {
-                spdlog::debug("requested port(s) not found");
-        } else if (!persistent) {
-                //
-        } else if (!vhci::set_persistent(dev.get(), *persistent)) {
-                spdlog::error(GetLastErrorMsg());
-                ok = false;
-        } else {
+        if (persistent) {
+                if (!vhci::set_persistent(dev.get(), *persistent)) {
+                        spdlog::error(get_last_error_msg());
+                        return false;
+                }
                 spdlog::debug("{} persistent device(s) stashed", persistent->size());
         }
 
-        return ok;
+        return true;
 }

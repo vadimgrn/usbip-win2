@@ -47,10 +47,11 @@ auto get_version()
         return wchar_to_utf8_or(ver);
 }
 
-auto pack(command_t cmd, void *p) 
+template <typename Cmd, typename Args>
+auto pack(Cmd &&cmd, const Args &args) 
 {
-	return [cmd, p] { 
-		if (!cmd(p)) {
+	return [&cmd, &args] { 
+		if (!cmd(args)) {
 			throw CLI::RuntimeError(EXIT_FAILURE);
 		}
 	};
@@ -60,7 +61,7 @@ auto serial_validator(const std::string &serial)
 {
         std::string s;
         if (!validate_device_serial(serial)) {
-                s = GetLastErrorMsg();
+                s = get_last_error_msg();
         }
         return s;
 }
@@ -70,7 +71,7 @@ void add_cmd_attach(CLI::App &app)
 	static attach_args r;
 
 	auto cmd = app.add_subcommand("attach", "Attach remote/persistent USB device(s)")
-		->callback(pack(cmd_attach, &r))
+		->callback(pack(cmd_attach, r))
 		->require_option(1);
 
 	auto rem = cmd->add_option_group("Remote", "Attach remote USB device");
@@ -97,8 +98,10 @@ void add_cmd_attach(CLI::App &app)
                 ->default_str(str_zero_copy)
                 ->excludes(stop);
 
-	cmd->add_option_group("Stop")
+	auto stop_all = cmd->add_option_group("Stop")
 		->add_flag("-X,--stop-all", r.stop_all, "Stop all active attach attempts");
+
+	stop->excludes(stop_all);
 
         cmd->add_option_group("Persistent", "Attach persistent USB device(s)")
                 ->add_flag("-s,--stashed,--persistent", r.persistent, "Attach persistent device(s) stashed by 'port --stash'");
@@ -106,12 +109,10 @@ void add_cmd_attach(CLI::App &app)
 
 void add_cmd_detach(CLI::App &app)
 {
-	static detach_args r {
-                .port = vhci::port_all
-        };
+	static detach_args r;
 
 	auto cmd = app.add_subcommand("detach", "Detach a remote USB device")
-		->callback(pack(cmd_detach, &r))
+		->callback(pack(cmd_detach, r))
 		->require_option(1);
 
 	auto opt_port = cmd->add_option("-p,--port", r.port, "Hub port number the device is plugged in")
@@ -129,7 +130,7 @@ void add_cmd_list(CLI::App &app)
 	static list_args r;
 
 	auto cmd = app.add_subcommand("list", "List exportable/persistent USB devices")
-		->callback(pack(cmd_list, &r))
+		->callback(pack(cmd_list, r))
 		->require_option(1);
 
 	cmd->add_option_group("Remote", "List exportable USB devices")
@@ -145,7 +146,7 @@ void add_cmd_port(CLI::App &app)
 	static port_args r;
 
 	auto cmd = app.add_subcommand("port", "Show/stash imported USB devices")
-		->callback(pack(cmd_port, &r));
+		->callback(pack(cmd_port, r));
 
 	cmd->add_flag("-s,--stash,--persistent", r.persistent,
 		      "Devices listed by the command will be attached every time the driver is loaded (aka persistent devices)");
@@ -204,7 +205,7 @@ auto run(int argc, wchar_t *argv[])
 
 	InitWinSock2 ws2;
 	if (!ws2) {
-		spdlog::critical("can't initialize Windows Sockets 2, {}", GetLastErrorMsg());
+		spdlog::critical("can't initialize Windows Sockets 2, {}", get_last_error_msg());
 		return EXIT_FAILURE;
 	}
 
@@ -228,15 +229,8 @@ const char* usbip::to_string(_In_ receive_mode mode) noexcept
         return mode == receive_mode::low_latency ? str_low_latency : str_zero_copy;
 }
 
-std::string usbip::GetLastErrorMsg(unsigned long msg_id)
+std::string usbip::get_last_error_msg(DWORD msg_id)
 {
-	static_assert(sizeof(msg_id) == sizeof(UINT32));
-	static_assert(std::is_same_v<decltype(msg_id), DWORD>);
-
-	if (msg_id == ~0UL) {
-		msg_id = GetLastError();
-	}
-
 	auto &mod = get_resource_module();
 	return format_message(mod.get(), msg_id);
 }
@@ -250,13 +244,10 @@ const UsbIds& usbip::get_ids()
 
 int wmain(int argc, wchar_t *argv[])
 {
-	auto ret = EXIT_FAILURE;
-
 	try {
-		ret = run(argc, argv);
-	} catch (std::exception &e) {
-                std::println("exception: {}", e.what());
+		return run(argc, argv);
+	} catch (const std::exception &e) {
+                std::println(stderr, "exception: {}", e.what());
+                return EXIT_FAILURE;
 	}
-
-	return ret;
 }

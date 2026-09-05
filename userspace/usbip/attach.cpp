@@ -17,10 +17,14 @@ using namespace usbip;
 
 auto attach_persistent_devices(HANDLE dev)
 {
-        if (auto v = vhci::get_persistent(dev); !v) {
-                spdlog::error(GetLastErrorMsg());
+        auto v = vhci::get_persistent(dev);
+        if (!v) {
+                spdlog::error(get_last_error_msg());
                 return false;
-        } else for (auto &args: *v) {
+        }
+
+        auto ok = true;
+        for (const auto &args: *v) {
                 auto &loc = args.location;
 
                 std::println("{}:{}/{}, serial:{}, mode:{}, once:{}", 
@@ -28,11 +32,12 @@ auto attach_persistent_devices(HANDLE dev)
                               to_string(args.recv_mode), args.once);
 
                 if (!vhci::attach(dev, args)) {
-                        spdlog::error(GetLastErrorMsg());
+                        spdlog::error(get_last_error_msg());
+                        ok = false;
                 }
         }
 
-        return true;
+        return ok;
 }
 
 auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
@@ -43,7 +48,7 @@ auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
         if (ok) {
                 spdlog::debug("{} request(s) stopped", cnt);
         } else {
-                spdlog::error(GetLastErrorMsg());
+                spdlog::error(get_last_error_msg());
         }
 
         return ok;
@@ -52,13 +57,11 @@ auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
 } // namespace
 
 
-bool usbip::cmd_attach(void *p)
+bool usbip::cmd_attach(const attach_args &args)
 {
-        auto &args = *reinterpret_cast<attach_args*>(p);
-
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error(GetLastErrorMsg());
+                spdlog::error(get_last_error_msg());
                 return false;
         }
 
@@ -66,25 +69,30 @@ bool usbip::cmd_attach(void *p)
                 return attach_persistent_devices(dev.get());
         }
 
+        if (args.stop_all) {
+                return stop_attach_attempts(dev.get(), nullptr);
+        }
+
+        device_location loc {
+                .hostname = args.remote,
+                .service = global_args.tcp_port,
+                .busid = args.busid,
+        };
+
+        if (args.stop) {
+                return stop_attach_attempts(dev.get(), &loc);
+        }
+
         vhci::attach_args cmd_args {
-                .location {
-                        .hostname = std::move(args.remote), 
-                        .service = global_args.tcp_port, 
-                        .busid = std::move(args.busid),
-                },
-                .serial = std::move(args.serial),
+                .location = std::move(loc),
+                .serial = args.serial,
                 .recv_mode = args.recv_mode,
                 .once = args.once,
         };
 
-        if (args.stop || args.stop_all) {
-                assert(args.stop != args.stop_all);
-                return stop_attach_attempts(dev.get(), args.stop ? &cmd_args.location : nullptr);
-        }
-
         auto port = vhci::attach(dev.get(), cmd_args);
         if (!port) {
-                spdlog::error(GetLastErrorMsg());
+                spdlog::error(get_last_error_msg());
                 return false;
         }
 
