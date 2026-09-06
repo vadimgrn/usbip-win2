@@ -55,7 +55,8 @@ std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persiste
                 }
         }
 
-        for (int i = 0; i < devices.empty() + 1; ++i) { // double null terminator if empty
+        multi_sz += L'\0';
+        if (devices.empty()) { // double null terminator if empty
                 multi_sz += L'\0';
         }
 

@@ -7,8 +7,6 @@
 #include <cassert>
 #include <system_error>
 #include <vector>
-#include <sstream>
-#include <iomanip>
 #include <format>
 
  /*
@@ -31,6 +29,21 @@ std::wstring win::get_module_filename()
 
         return path;
 }
+
+namespace
+{
+
+DWORD parse_transl(const std::wstring &s)
+{
+        wchar_t *end{};
+        auto dw = wcstoul(s.c_str(), &end, 16);
+        if (s.empty() || end != s.c_str() + s.size()) {
+                throw std::runtime_error("FileVersion: invalid translation string");
+        }
+        return dw;
+}
+
+} // namespace
 
 class win::FileVersion::Impl
 {
@@ -145,14 +158,9 @@ std::wstring_view win::FileVersion::Impl::VerQueryValue(const wchar_t *value) co
 
 std::wstring win::FileVersion::Impl::VerLanguageName() const
 {
-        WORD wLang{};
+        auto wLang = HIWORD(parse_transl(m_def_transl));
 
-        std::wistringstream is(std::wstring(m_def_transl, m_def_transl.size() >> 1));
-        if (!(is >> std::hex >> wLang)) {
-                throw std::runtime_error("FileVersion::VerLanguageName: stream in error state");
-        }
-
-	auto cnt = ::VerLanguageName(wLang, 0, 0);
+        auto cnt = ::VerLanguageName(wLang, nullptr, 0);
         std::vector<wchar_t> v(cnt);
 
         cnt = ::VerLanguageName(wLang, v.data(), cnt);
@@ -161,13 +169,7 @@ std::wstring win::FileVersion::Impl::VerLanguageName() const
 
 std::wstring win::FileVersion::Impl::MakeTransl(DWORD transl)
 {
-	std::wostringstream os;
-
-	os << std::hex << std::noshowbase << std::setfill(L'0')
-	   << std::setw(sizeof(WORD) << 1) << LOWORD(transl)  // lang_id
-           << std::setw(sizeof(WORD) << 1) << HIWORD(transl); // code page
-
-        return os.str();
+        return std::format(L"{:04x}{:04x}", LOWORD(transl), HIWORD(transl));
 }
 
 DWORD win::FileVersion::Impl::PackTransl(WORD lang_id, UINT code_page)
@@ -223,13 +225,7 @@ std::wstring win::FileVersion::Impl::GetTranslation(bool original) const
 
 void win::FileVersion::Impl::GetTranslation(WORD &lang_id, UINT &code_page) const
 {
-        DWORD dw = 0;
-        std::wistringstream is(m_def_transl);
-
-        if (!(is >> std::hex >> dw)) {
-                throw std::runtime_error("FileVersion::GetTranslation: istream in error state");
-        }
-        
+        auto dw = parse_transl(m_def_transl);
         lang_id   = HIWORD(dw);
         code_page = LOWORD(dw);
 }

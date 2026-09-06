@@ -6,12 +6,12 @@
 
 ### Driver Layer (`drivers/`)
 - **libdrv/**: Common kernel-mode library providing RAII wrappers around Windows Driver APIs (WDF, WSK, MDL, IRPs)
-- **ude/**: USB Device Emulation (UDE) driver - the main USB/IP client driver using Winsock Kernel NPI
-- **ude_filter/**: Companion upper filter driver for device-specific handling
+- **ude/**: USB Device Emulation (UDE) driver - the main USB/IP client driver using Winsock Kernel NPI (KMDF driver)
+- **ude_filter/**: Companion upper filter driver for device-specific handling (WDM driver)
 - **package/**: Driver packaging and signing project
 
 ### Userspace Layer (`userspace/`)
-- **libusbip/**: Public SDK/DLL for USB/IP client functionality; includes networking, USB device management, and helper utilities
+- **libusbip/**: Public SDK/DLL for USB/IP client functionality (public API uses C++17, implementation uses C++23); includes networking, USB device management, and helper utilities
 - **usbip/**: Command-line utility for attaching/detaching remote USB devices
 - **wusbip/**: wxWidgets-based GUI application for device management
 - **devnode/**: Device node utility for driver management
@@ -75,6 +75,8 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 ### Modern C++ Features
 - `constexpr` and `explicit` used liberally for optimization and type safety
 - `noexcept` is used in **userspace only**; **do NOT use `noexcept` in driver code (`drivers/`)**
+- Do not use trailing return type syntax without necessity, use standard syntax 'result func()'
+- `libusbip` public API uses C++17, the implementation uses C++23
 - Range-based for loops, move semantics (use `static_cast<T&&>()` in drivers; `std::move` is userspace only), lambda functions where applicable
 - C++23 scoped enums with underlying types: `enum class name : int { ... }`
 - Do not inherit from concrete types like `std::array`, `std::string`, etc.
@@ -129,6 +131,9 @@ Enables running build and validation commands:
 
 ## Important Notes
 
+- **Driver Frameworks**: `drivers/ude` is a **KMDF driver**; `drivers/ude_filter` is a **WDM driver**
+- **C++ Standards**: `libusbip` public API uses C++17, while the implementation uses C++23 (compile-time verified by `libusbip_check`)
+- **Syntax**: Do not use trailing return type syntax without necessity, use standard syntax `result func()`
 - **Kernel vs. Userspace**: Code in `drivers/` uses kernel APIs and must follow driver safety rules (no heap allocation without lookaside lists, proper IRQL handling, etc.)
 - **ARM64 Support**: Project supports both x64 and ARM64; always test on both architectures when possible
 - **Test-signed Drivers**: End users must enable test signing mode (`bcdedit /set testsigning on`) after installation
@@ -136,6 +141,9 @@ Enables running build and validation commands:
 
 ### Driver Development Rules (`drivers/`)
 
+- **Driver Frameworks**:
+  - `drivers/ude` is a **KMDF driver**
+  - `drivers/ude_filter` is a **WDM driver**
 - **No C++ Standard Library (`std::`)**: Drivers compile with `/kernel`. STL headers (`<utility>`, `<memory>`, `<algorithm>`, `<vector>`, `<string>`, `<functional>`, etc.) are not available or permitted.
   - Do NOT use `std::move` — use `static_cast<T&&>(val)`.
   - Do NOT use `std::swap` — use `::swap` from `drivers/libdrv/utils.h` or class-specific `swap()`.

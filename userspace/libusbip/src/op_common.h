@@ -16,18 +16,18 @@
 namespace usbip
 {
 
-inline auto op_status_str(op_status_t st)
+constexpr auto op_status_str(_In_ op_status_t st)
 {
-        static const char* v[] = {
+        constexpr const char* v[] = {
                 "ST_OK", "ST_NA", "ST_DEV_BUSY", "ST_DEV_ERR", "ST_NODEV", "ST_ERROR"
         };
 
-        return st >= 0 && st < sizeof(v)/sizeof(*v) ? v[st] : "op_status_str: out of range";
+        return st >= 0 && static_cast<size_t>(st) < ARRAYSIZE(v) ? v[st] : "op_status_str: out of range";
 }
 
-inline auto op_status_error(_In_ op_status_t st)
+constexpr auto op_status_error(_In_ op_status_t st)
 {
-        const USBIP_STATUS v[] = 
+        constexpr USBIP_STATUS v[] = 
         {
                 USBIP_ERROR_SUCCESS, // ST_OK
                 USBIP_ERROR_ST_NA,
@@ -37,7 +37,7 @@ inline auto op_status_error(_In_ op_status_t st)
                 USBIP_ERROR_ST_ERROR,
         };
 
-        return st >= 0 && st < sizeof(v)/sizeof(*v) ? v[st] : USBIP_ERROR_ST_ERROR;
+        return st >= 0 && static_cast<size_t>(st) < ARRAYSIZE(v) ? v[st] : USBIP_ERROR_ST_ERROR;
 }
 
 } // namespace usbip

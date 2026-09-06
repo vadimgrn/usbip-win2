@@ -96,23 +96,16 @@ DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_ar
 
 auto make_device_location(_In_ const vhci::imported_device_location &src)
 {
-        device_location dst;
-
-        struct {
-                std::string &dst;
-                const char *src;
-                size_t maxlen;
-        } const v[] = {
-                { dst.hostname, src.host, std::size(src.host) },
-                { dst.service, src.service, std::size(src.service) },
-                { dst.busid, src.busid, std::size(src.busid) },
+        auto str = [] (const char *str, size_t maxlen)
+        {
+                return std::string(str, strnlen(str, maxlen));
         };
 
-        for (auto &i: v) {
-                i.dst.assign(i.src, strnlen(i.src, i.maxlen));
-        }
-
-        return dst;
+        return device_location {
+                .hostname = str(src.host, std::size(src.host)),
+                .service = str(src.service, std::size(src.service)),
+                .busid = str(src.busid, std::size(src.busid)),
+        };
 }
 
 auto make_imported_device(_In_ const vhci::imported_device &d)
@@ -256,7 +249,9 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         static_assert(int(state::disconnected) == 4);
         static_assert(int(state::unplugging) == 5);
 
-        const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
+        static constexpr const char* const v[] = {
+                "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging"
+        };
 
         auto idx = static_cast<int>(state);
         return idx >= 0 && idx < std::ssize(v) ? v[idx] : "";
