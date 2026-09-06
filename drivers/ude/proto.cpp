@@ -11,6 +11,8 @@
 #include <libdrv/ch9.h>
 #include <libdrv/usbd_helper.h>
 
+using namespace libdrv;
+
 namespace
 {
 

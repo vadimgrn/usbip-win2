@@ -5,6 +5,7 @@
 #pragma once
 
 #include <libdrv/codeseg.h>
+#include <libdrv/dbgcommon.h>
 
 #include <usb.h>
 

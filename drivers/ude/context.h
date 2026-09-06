@@ -5,6 +5,7 @@
 #pragma once
 
 #include <libdrv/codeseg.h>
+#include <libdrv/dbgcommon.h>
 #include <libdrv/ch9.h>
 #include <libdrv/wdm_cpp.h>
 #include <libdrv/wdf_cpp.h>
@@ -187,7 +188,7 @@ struct endpoint_ctx
         WDFQUEUE queue; // child
 
         union { // some descriptors have extra bytes beyond sizeof(USB_ENDPOINT_DESCRIPTOR)
-                USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
+                libdrv::USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
                 UCHAR descriptor_raw[MAXUCHAR];
                 static_assert(sizeof(USB_COMMON_DESCRIPTOR::bLength) == sizeof(UCHAR));
         };

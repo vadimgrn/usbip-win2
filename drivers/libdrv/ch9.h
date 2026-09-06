@@ -8,6 +8,9 @@
 #include <wdm.h>
 #include <usb.h>
 
+namespace libdrv
+{
+
 enum { // <uapi/linux/usb/ch9.h>
 
 /*
@@ -113,3 +116,5 @@ inline auto operator ==(_In_ const USB_ENDPOINT_DESCRIPTOR &a, _In_ const USB_EN
 {
 	return reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(a) == reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(b);
 }
+
+} // namespace libdrv

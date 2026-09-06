@@ -10,6 +10,8 @@
 namespace usbip::filter
 {
 
+using namespace libdrv;
+
 namespace impl
 {
 

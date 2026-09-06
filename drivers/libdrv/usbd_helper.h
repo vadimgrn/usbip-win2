@@ -9,6 +9,9 @@
 #include <ntddk.h>
 #include <usb.h>
 
+namespace libdrv
+{
+
 enum { EndpointStalled = USBD_STATUS_STALL_PID }; // FIXME: for what USBD_STATUS_ENDPOINT_HALTED?
 
 _IRQL_requires_same_
@@ -103,3 +106,5 @@ constexpr auto is_isoch(_In_ const URB &urb)
 	return  f == URB_FUNCTION_ISOCH_TRANSFER || 
 		f == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL;
 }
+
+} // namespace libdrv

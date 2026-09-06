@@ -35,6 +35,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.

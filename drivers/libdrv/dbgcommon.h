@@ -7,8 +7,24 @@
 #include <ntddk.h>
 #include <usb.h>
 
+namespace libdrv
+{
+
+_IRQL_requires_same_
+_IRQL_requires_max_(HIGH_LEVEL)
+inline auto ptr04x(_In_opt_ const void *ptr) // use format "%04x"
+{
+        auto n = reinterpret_cast<uintptr_t>(ptr);
+        return static_cast<UINT32>(n);
+}
+
+} // namespace libdrv
+
+
 namespace usbip
 {
+
+using libdrv::ptr04x;
 
 struct header;
 

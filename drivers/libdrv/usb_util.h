@@ -7,6 +7,9 @@
 #include <usbspec.h>
 #include <usbip/proto.h>
 
+namespace libdrv
+{
+
 inline auto& get_setup(usbip::header_cmd_submit &hdr)
 {
 	static_assert(sizeof(USB_DEFAULT_PIPE_SETUP_PACKET) == sizeof(hdr.setup));
@@ -17,3 +20,5 @@ inline auto& get_submit_setup(usbip::header &hdr)
 {
 	return get_setup(hdr.cmd_submit);
 }
+
+} // namespace libdrv

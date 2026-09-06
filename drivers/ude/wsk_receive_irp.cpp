@@ -120,7 +120,7 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
         }
         TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
 
-        auto dir_out = is_transfer_dir_out(ctx.hdr);
+        auto dir_out = libdrv::is_transfer_dir_out(ctx.hdr);
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload

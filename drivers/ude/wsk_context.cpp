@@ -7,6 +7,7 @@
 #include "wsk_context.tmh"
 
 #include "driver.h"
+#include <libdrv/dbgcommon.h>
 
 namespace
 {

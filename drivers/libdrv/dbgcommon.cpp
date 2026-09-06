@@ -13,6 +13,8 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
+using namespace libdrv;
+
 namespace
 {
 

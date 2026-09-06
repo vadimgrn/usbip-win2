@@ -230,6 +230,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto get_request_type(_In_ const URB &urb)
 {
+        using namespace libdrv;
         UCHAR bmRequestType;
 
         switch (urb.UrbHeader.Function) {
