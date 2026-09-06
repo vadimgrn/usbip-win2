@@ -37,7 +37,7 @@ enum {
  * Meaning of some errors differs for usb_submit_urb and urb->status, we would prefer urb->status.
  * See: https://www.kernel.org/doc/Documentation/usb/error-codes.txt
  */
-USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
+USBD_STATUS to_windows_status_ex(_In_ int usbip_status, _In_ bool isoch)
 {
 	switch (auto status = static_cast<LONG64>(usbip_status);
                 status >= 0 ? status : -status) {
@@ -87,7 +87,7 @@ USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
 	return USBD_STATUS_INVALID_PARAMETER;
 }
 
-int to_linux_status(USBD_STATUS status)
+int to_linux_status(_In_ USBD_STATUS status)
 {
 	int err = 0;
 
@@ -183,7 +183,7 @@ enum {
  1.Direction in endpoint address or transfer flags should be ignored
  2.Direction is determined by bits of bmRequestType in the Setup packet (D7 Data Phase Transfer Direction) 
  */
-ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in)
+ULONG to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in)
 {
 	ULONG TransferFlags = dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT;
 
@@ -198,7 +198,7 @@ ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in)
 	return TransferFlags;
 }
 
-UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
+UINT32 to_linux_flags(_In_ ULONG TransferFlags, _In_ bool dir_in)
 {
 	UINT32 flags = 0;
 

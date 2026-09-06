@@ -802,7 +802,7 @@ PAGED void wsk::shutdown()
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags)
+const char* wsk::ReceiveEventFlags(_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG Flags)
 {
         auto st = RtlStringCbPrintfA(buf, len, "%s%s%s",
                                         Flags & WSK_FLAG_RELEASE_ASAP ? ":RELEASE_ASAP" : "",
@@ -813,7 +813,7 @@ const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG 
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* wsk::DisconnectEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags)
+const char* wsk::DisconnectEventFlags(_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG Flags)
 {
         auto st = RtlStringCbPrintfA(buf, len, "%s%s",
                 Flags & WSK_FLAG_ABORTIVE ? ":ABORTIVE" : "",

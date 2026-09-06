@@ -94,19 +94,9 @@ inline auto operator ==(_In_ const USB_COMMON_DESCRIPTOR &a, _In_ const USB_COMM
 	return a.bLength == b.bLength && RtlEqualMemory(&a, &b, b.bLength);
 }
 
-inline auto operator !=(_In_ const USB_COMMON_DESCRIPTOR &a, _In_ const USB_COMMON_DESCRIPTOR &b)
-{
-	return !(a == b);
-}
-
 inline auto operator ==(_In_ const USB_DEVICE_DESCRIPTOR &a, _In_ const USB_DEVICE_DESCRIPTOR &b)
 {
 	return reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(a) == reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(b);
-}
-
-inline auto operator !=(_In_ const USB_DEVICE_DESCRIPTOR &a, _In_ const USB_DEVICE_DESCRIPTOR &b)
-{
-	return !(a == b);
 }
 
 /*
@@ -119,17 +109,7 @@ inline auto operator ==(_In_ const USB_CONFIGURATION_DESCRIPTOR &a, _In_ const U
 	return a.wTotalLength == b.wTotalLength && RtlEqualMemory(&a, &b, b.wTotalLength);
 }
 
-inline auto operator !=(_In_ const USB_CONFIGURATION_DESCRIPTOR &a, _In_ const USB_CONFIGURATION_DESCRIPTOR &b)
-{
-	return !(a == b);
-}
-
 inline auto operator ==(_In_ const USB_ENDPOINT_DESCRIPTOR &a, _In_ const USB_ENDPOINT_DESCRIPTOR &b)
 {
 	return reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(a) == reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(b);
-}
-
-inline auto operator !=(_In_ const USB_ENDPOINT_DESCRIPTOR &a, _In_ const USB_ENDPOINT_DESCRIPTOR &b)
-{
-	return !(a == b);
 }

@@ -75,7 +75,6 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 ### Modern C++ Features
 - `constexpr` and `explicit` used liberally for optimization and type safety
 - `noexcept` is used in **userspace only**; **do NOT use `noexcept` in driver code (`drivers/`)**
-- Do not use trailing return type syntax without necessity, use standard syntax 'result func()'
 - `libusbip` public API uses C++17, the implementation uses C++23
 - Range-based for loops, move semantics (use `static_cast<T&&>()` in drivers; `std::move` is userspace only), lambda functions where applicable
 - C++23 scoped enums with underlying types: `enum class name : int { ... }`
@@ -133,7 +132,6 @@ Enables running build and validation commands:
 
 - **Driver Frameworks**: `drivers/ude` is a **KMDF driver**; `drivers/ude_filter` is a **WDM driver**
 - **C++ Standards**: `libusbip` public API uses C++17, while the implementation uses C++23 (compile-time verified by `libusbip_check`)
-- **Syntax**: Do not use trailing return type syntax without necessity, use standard syntax `result func()`
 - **Kernel vs. Userspace**: Code in `drivers/` uses kernel APIs and must follow driver safety rules (no heap allocation without lookaside lists, proper IRQL handling, etc.)
 - **ARM64 Support**: Project supports both x64 and ARM64; always test on both architectures when possible
 - **Test-signed Drivers**: End users must enable test signing mode (`bcdedit /set testsigning on`) after installation

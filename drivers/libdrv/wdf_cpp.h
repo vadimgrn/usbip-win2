@@ -43,10 +43,8 @@ public:
         constexpr auto operator !() const { return !m_handle; }
 
         constexpr bool operator ==(decltype(nullptr)) const { return m_handle == WDF_NO_HANDLE; }
-        constexpr bool operator !=(decltype(nullptr)) const { return m_handle != WDF_NO_HANDLE; }
 
         friend constexpr bool operator ==(const ObjectRef &a, const ObjectRef &b) { return a.m_handle == b.m_handle; }
-        friend constexpr bool operator !=(const ObjectRef &a, const ObjectRef &b) { return a.m_handle != b.m_handle; }
 
         auto get() const { return m_handle; }
 
@@ -92,6 +90,9 @@ public:
 
         WaitLock(_In_ const WaitLock&) = delete;
         WaitLock& operator =(_In_ const WaitLock&) = delete;
+
+        constexpr bool is_acquired() const { return m_lock != WDF_NO_HANDLE; }
+        constexpr explicit operator bool() const { return is_acquired(); }
 
         _When_(timeout == NULL, _IRQL_requires_max_(PASSIVE_LEVEL))
         _When_(timeout != NULL && *timeout == 0, _IRQL_requires_max_(DISPATCH_LEVEL))

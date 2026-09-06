@@ -36,14 +36,9 @@ public:
 	constexpr bool operator !() const { return !m_obj; }
 
 	constexpr bool operator ==(decltype(nullptr)) const { return m_obj == nullptr; }
-	constexpr bool operator !=(decltype(nullptr)) const { return m_obj != nullptr; }
 
 	friend constexpr bool operator ==(const object_reference &a, const object_reference &b) {
 		return a.m_obj == b.m_obj;
-	}
-
-	friend constexpr bool operator !=(const object_reference &a, const object_reference &b) {
-		return a.m_obj != b.m_obj;
 	}
 
 	template<typename T = void>
