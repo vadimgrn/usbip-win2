@@ -151,7 +151,9 @@ public:
         _IRQL_restores_global_(m_lock, this)
         void release()
         {
-                if (auto handle = (type)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_lock), WDF_NO_HANDLE)) {
+                if (m_lock != WDF_NO_HANDLE) {
+                        auto handle = m_lock;
+                        m_lock = WDF_NO_HANDLE;
                         release_lock(handle);
                 }
         }

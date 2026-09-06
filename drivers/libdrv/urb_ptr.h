@@ -75,7 +75,6 @@ public:
 	constexpr bool operator !() const { return !m_urb; }
 
 	constexpr bool operator ==(decltype(nullptr)) const { return m_urb == nullptr; }
-	constexpr bool operator !=(decltype(nullptr)) const { return m_urb != nullptr; }
 
 	constexpr auto handle() const { return m_handle; }
 	constexpr auto get() const { return m_urb; }

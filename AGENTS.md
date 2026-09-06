@@ -79,6 +79,7 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 - Range-based for loops, move semantics (use `static_cast<T&&>()` in drivers; `std::move` is userspace only), lambda functions where applicable
 - C++23 scoped enums with underlying types: `enum class name : int { ... }`
 - Do not inherit from concrete types like `std::array`, `std::string`, etc.
+- Use C++23 "deducing this" (explicit object parameter) for member accessors and operators to collapse redundant `const` and non-`const` overloads into a single implementation (e.g., `constexpr auto& get(this auto&& self) { return self.m_val; }`)
 
 ## Key Dependencies
 

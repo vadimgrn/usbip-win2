@@ -3,6 +3,7 @@
  */
 
 #include "mdl_cpp.h"
+#include "utils.h"
 
 /*
  * @see reactos\ntoskrnl\io\iomgr\iomdl.c
@@ -49,12 +50,14 @@ usbip::Mdl::Mdl(Mdl&& m) :
 
 auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
 {
-        if (&m != this) {
-                reset(m.release(), m.m_mapped);
-                m.m_mapped = false;
-        }
-
+        Mdl(static_cast<Mdl&&>(m)).swap(*this);
         return *this;
+}
+
+void usbip::Mdl::swap(_Inout_ Mdl &other)
+{
+        ::swap(m_mdl, other.m_mdl);
+        ::swap(m_mapped, other.m_mapped);
 }
 
 MDL* usbip::Mdl::release()

@@ -17,12 +17,12 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void bswap(_Inout_ header_basic &r) 
 {
-        UINT32* v[]{ &r.command, &r.seqnum, &r.devid, &r.direction, &r.ep };
-        static_assert(sizeof(*v[0]) == sizeof(unsigned long));
-
-        for (auto val: v) {
-		*val = RtlUlongByteSwap(*val); // _byteswap_ulong
-	}
+        static_assert(sizeof(r.command) == sizeof(unsigned long));
+        r.command = RtlUlongByteSwap(r.command);
+        r.seqnum = RtlUlongByteSwap(r.seqnum);
+        r.devid = RtlUlongByteSwap(r.devid);
+        r.direction = RtlUlongByteSwap(r.direction);
+        r.ep = RtlUlongByteSwap(r.ep);
 }
 
 _IRQL_requires_same_
@@ -31,25 +31,22 @@ void bswap(_Inout_ header_cmd_submit &r)
 {
 	static_assert(sizeof(r.transfer_flags) == sizeof(unsigned long));
 	r.transfer_flags = RtlUlongByteSwap(r.transfer_flags);
-
-        INT32 *v[] {&r.transfer_buffer_length, &r.start_frame, &r.number_of_packets, &r.interval};
-        static_assert(sizeof(*v[0]) == sizeof(unsigned long));
-
-	for (auto val: v) {
-		*val = RtlUlongByteSwap(*val);
-	}
+        r.transfer_buffer_length = RtlUlongByteSwap(r.transfer_buffer_length);
+        r.start_frame = RtlUlongByteSwap(r.start_frame);
+        r.number_of_packets = RtlUlongByteSwap(r.number_of_packets);
+        r.interval = RtlUlongByteSwap(r.interval);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void bswap(_Inout_ header_ret_submit &r) 
 {
-        INT32 *v[] {&r.status, &r.actual_length, &r.start_frame, &r.number_of_packets, &r.error_count};
-        static_assert(sizeof(*v[0]) == sizeof(unsigned long));
-
-	for (auto val: v) {
-		*val = RtlUlongByteSwap(*val);
-	}
+        static_assert(sizeof(r.status) == sizeof(unsigned long));
+        r.status = RtlUlongByteSwap(r.status);
+        r.actual_length = RtlUlongByteSwap(r.actual_length);
+        r.start_frame = RtlUlongByteSwap(r.start_frame);
+        r.number_of_packets = RtlUlongByteSwap(r.number_of_packets);
+        r.error_count = RtlUlongByteSwap(r.error_count);
 }
 
 _IRQL_requires_same_

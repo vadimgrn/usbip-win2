@@ -71,6 +71,10 @@ public:
 
         auto& next(_Inout_ Mdl &m) { next(m.get()); return m; }
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void swap(_Inout_ Mdl &other);
+
 private:
         MDL *m_mdl{};
         bool m_mapped{};
@@ -86,6 +90,13 @@ private:
         MDL *release();
         void reset(_In_opt_ MDL *mdl, _In_ bool mapped);
 };
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void swap(_Inout_ Mdl &a, _Inout_ Mdl &b)
+{
+        a.swap(b);
+}
 
 inline auto tail(_In_ const Mdl &mdl) { return tail(mdl.get()); }
 inline auto size(_In_ const Mdl &mdl) { return size(mdl.get()); }

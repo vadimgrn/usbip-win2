@@ -42,14 +42,7 @@ auto wdm::object_reference::operator =(_In_ const object_reference &other) -> ob
 
 auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> object_reference&
 {
-	if (this == &other) {
-		return *this;
-	}
-
-	auto defer_delete = other.m_defer_delete;
-	auto obj = other.release();
-
-	reset(obj, defer_delete, false);
+	object_reference(static_cast<object_reference&&>(other)).swap(*this);
 	return *this;
 }
 
