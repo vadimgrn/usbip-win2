@@ -226,27 +226,23 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
         }
 
         struct {
-                const wchar_t *name;
+                UNICODE_STRING name;
                 int &value;
         } const params[] = {
-                { L"TCP_KEEPIDLE", idle },
-                { L"TCP_KEEPCNT", cnt },
-                { L"TCP_KEEPINTVL", intvl },
+                { RTL_CONSTANT_STRING(L"TCP_KEEPIDLE"), idle },
+                { RTL_CONSTANT_STRING(L"TCP_KEEPCNT"), cnt },
+                { RTL_CONSTANT_STRING(L"TCP_KEEPINTVL"), intvl },
         };
 
         for (auto& [name, value]: params) {
-
-                UNICODE_STRING value_name;
-                NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
-
                 ULONG val{};
-                st = WdfRegistryQueryULong(key.get(), &value_name, &val);
+                st = WdfRegistryQueryULong(key.get(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
                 } else if (val > MAXINT) {
                         Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) value %lu exceeds MAXINT(%d)",
-                                                  &value_name, val, MAXINT);
+                                                  &name, val, MAXINT);
                 } else {
                         value = static_cast<int>(val);
                 }

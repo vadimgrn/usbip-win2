@@ -103,23 +103,19 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
         }
 
         struct {
-                const wchar_t *name;
+                UNICODE_STRING name;
                 int &value;
         } const params[] = {
-                { L"NumberOfUsb20Ports", v.cnt[v.usb2] },
-                { L"NumberOfUsb30Ports", v.cnt[v.usb3] },
+                { RTL_CONSTANT_STRING(L"NumberOfUsb20Ports"), v.cnt[v.usb2] },
+                { RTL_CONSTANT_STRING(L"NumberOfUsb30Ports"), v.cnt[v.usb3] },
         };
 
         for (auto& [name, value]: params) {
-
-                UNICODE_STRING value_name;
-                NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
-
                 ULONG val{};
-                st = WdfRegistryQueryULong(key.get(), &value_name, &val);
+                st = WdfRegistryQueryULong(key.get(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
                 } else {
                         value = val;
                 }
@@ -284,24 +280,20 @@ PAGED void init_constants(
         }
 
         struct {
-                const wchar_t *name;
+                UNICODE_STRING name;
                 unsigned int &val;
         } const v[] {
-                { L"ReattachMaxAttempts", max_attempts },
-                { L"ReattachFirstDelay", first_delay },
-                { L"ReattachMaxDelay", max_delay },
+                { RTL_CONSTANT_STRING(L"ReattachMaxAttempts"), max_attempts },
+                { RTL_CONSTANT_STRING(L"ReattachFirstDelay"), first_delay },
+                { RTL_CONSTANT_STRING(L"ReattachMaxDelay"), max_delay },
         };
 
         for (auto& [name, value]: v) {
-
-                UNICODE_STRING value_name;
-                RtlUnicodeStringInit(&value_name, name);
-
                 ULONG val{};
-                auto st = WdfRegistryQueryULong(key.get<WDFKEY>(), &value_name, &val);
+                auto st = WdfRegistryQueryULong(key.get<WDFKEY>(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &value_name, st);
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &name, st);
                 } else {
                         value = static_cast<unsigned int>(val);
                 }
@@ -320,7 +312,7 @@ PAGED void init_constants(
                 max_attempts = n;
         }
 
-        TraceDbg("%S=%u, %S=%u, %S=%u", v[0].name, max_attempts, v[1].name, first_delay, v[2].name, max_delay);
+        TraceDbg("%!USTR!=%u, %!USTR!=%u, %!USTR!=%u", &v[0].name, max_attempts, &v[1].name, first_delay, &v[2].name, max_delay);
 
         NT_ASSERT(first_delay >= MIN_DELAY);
         NT_ASSERT(first_delay <= max_delay);
