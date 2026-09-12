@@ -253,6 +253,7 @@ NTSTATUS usbip::prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPacket
 auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ctx) -> wsk_context_ptr&
 {
         auto reuse = ctx.m_reuse;
+        ctx.m_reuse = false;
         reset(ctx.release(), reuse);
         return *this;
 }
