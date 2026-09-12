@@ -8,6 +8,8 @@
 #include <ntddk.h>
 #include <usb.h>
 
+#include <usbspec.h>
+
 namespace libdrv
 {
 
@@ -97,6 +99,15 @@ inline auto next(_In_ USB_COMMON_DESCRIPTOR *d)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+inline auto next(_In_ const USB_COMMON_DESCRIPTOR *d)
+{
+	NT_ASSERT(d);
+	const void *next = reinterpret_cast<const char*>(d) + d->bLength;
+	return static_cast<const USB_COMMON_DESCRIPTOR*>(next);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline auto next(_In_ const USBD_INTERFACE_INFORMATION *d)
 {
 	NT_ASSERT(d);
@@ -113,5 +124,47 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 USB_COMMON_DESCRIPTOR *find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline const USB_COMMON_DESCRIPTOR *find_next(
+	_In_ const USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ const USB_COMMON_DESCRIPTOR *cur)
+{
+	return find_next(const_cast<USB_CONFIGURATION_DESCRIPTOR*>(cfg), type, const_cast<USB_COMMON_DESCRIPTOR*>(cur));
+}
+
+template<typename Desc>
+struct descriptor_traits;
+
+template<> struct descriptor_traits<USB_INTERFACE_DESCRIPTOR> {
+	static constexpr LONG type = USB_INTERFACE_DESCRIPTOR_TYPE;
+};
+template<> struct descriptor_traits<USB_ENDPOINT_DESCRIPTOR> {
+	static constexpr LONG type = USB_ENDPOINT_DESCRIPTOR_TYPE;
+};
+template<> struct descriptor_traits<USB_STRING_DESCRIPTOR> {
+	static constexpr LONG type = USB_STRING_DESCRIPTOR_TYPE;
+};
+template<> struct descriptor_traits<USB_INTERFACE_ASSOCIATION_DESCRIPTOR> {
+	static constexpr LONG type = USB_INTERFACE_ASSOCIATION_DESCRIPTOR_TYPE;
+};
+
+template<typename Desc>
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline Desc* find_next(
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ USB_COMMON_DESCRIPTOR *cur = nullptr)
+{
+	return reinterpret_cast<Desc*>(find_next(cfg, descriptor_traits<Desc>::type, cur));
+}
+
+template<typename Desc>
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline const Desc* find_next(
+	_In_ const USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ const USB_COMMON_DESCRIPTOR *cur = nullptr)
+{
+	return reinterpret_cast<const Desc*>(find_next(cfg, descriptor_traits<Desc>::type, cur));
+}
 
 } // namespace libdrv
