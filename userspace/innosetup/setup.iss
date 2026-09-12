@@ -455,7 +455,7 @@ begin
       UninstPath := UninstStr;
   end;
 
-  UninstParams := '/SILENT /NORESTART /SUPPRESSMSGBOXES';
+  UninstParams := '/SILENT /NORESTART /SUPPRESSMSGBOXES /_?="' + ExtractFilePath(UninstPath) + '"';
   Result := FileExists(UninstPath);
 end;
 
