@@ -22,7 +22,6 @@ inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_traits)
         IoFreeIrp(irp);
 }
 
-using usbip::swap;
 using usbip::generic_handle;
 
 class irp_ptr : public generic_handle<irp_ptr_traits>

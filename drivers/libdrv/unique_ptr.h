@@ -26,7 +26,6 @@ inline void close_handle(_In_ void *ptr, _In_ pool_ptr_traits<PoolTag> tag)
         ExFreePoolWithTag(ptr, tag.pooltag);
 }
 
-using usbip::swap;
 using usbip::generic_handle;
 
 struct uninitialized_t { explicit uninitialized_t() = default; };
