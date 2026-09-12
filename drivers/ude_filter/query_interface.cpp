@@ -60,7 +60,7 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::query_interface(_Inout_ filter_ext &, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
+PAGED NTSTATUS usbip::query_interface(_Inout_ [[maybe_unused]] filter_ext &fltr, _Inout_ _USB_BUS_INTERFACE_USBDI_V3 &r)
 {
 	PAGED_CODE();
 

@@ -32,7 +32,7 @@ struct irp_args
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-auto is_valid_urb_length(_In_ const URB &urb)
+bool is_valid_urb_length(_In_ const URB &urb)
 {
         auto &hdr = urb.UrbHeader;
 
