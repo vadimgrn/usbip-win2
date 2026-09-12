@@ -139,10 +139,10 @@ PAGED const char* get_guid_name(_In_ const GUID &guid)
 {
 	PAGED_CODE();
 
-	struct {
+	static const struct {
 		const GUID &guid;
 		const char *name;
-	} const v[] = {
+	} v[] = {
 		{GUID_D3COLD_SUPPORT_INTERFACE, "D3COLD_SUPPORT"},
 		{GUID_PNP_EXTENDED_ADDRESS_INTERFACE, "PNP_EXTENDED_ADDRESS"},
 		{GUID_PNP_LOCATION_INTERFACE, "PNP_LOCATION"},
