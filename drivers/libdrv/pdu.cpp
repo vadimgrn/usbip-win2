@@ -169,13 +169,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void libdrv::byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t cnt) 
 {
 	for (size_t i = 0; i < cnt; ++i, ++d) {
-
-		UINT32 *v[] {&d->offset, &d->length, &d->actual_length, &d->status};
-		static_assert(sizeof(*v[0]) == sizeof(unsigned long));
-
-		for (auto val: v) {
-			*val = RtlUlongByteSwap(*val);
-		}
+		static_assert(sizeof(d->offset) == sizeof(unsigned long));
+		d->offset = RtlUlongByteSwap(d->offset);
+		d->length = RtlUlongByteSwap(d->length);
+		d->actual_length = RtlUlongByteSwap(d->actual_length);
+		d->status = RtlUlongByteSwap(d->status);
 	}
 }
 
