@@ -112,7 +112,7 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
         auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
 
         ULONG TransferBufferLength{};
-        UCHAR *buf;
+        UCHAR *buf{};
         st = UdecxUrbRetrieveBuffer(ctx.request, &buf, &TransferBufferLength); // URB must have transfer buffer
 
         if (NT_ERROR(st)) {

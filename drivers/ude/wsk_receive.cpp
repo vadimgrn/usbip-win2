@@ -322,7 +322,7 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ bool wsk_events, _In_ const head
                 return STATUS_INVALID_PARAMETER;
         }
 
-        UCHAR *buffer;
+        UCHAR *buffer{};
 
         if (is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
                 buffer = nullptr;
