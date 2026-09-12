@@ -16,7 +16,6 @@
 #include "urbtransfer.h"
 #include "request_list.h"
 
-#include <libdrv/wait_timeout.h>
 #include <libdrv/usbd_helper.h>
 #include <libdrv/dbgcommon.h>
 #include <libdrv/pdu.h>
@@ -362,10 +361,9 @@ PAGED wdm::object_reference usbip::stop_receive_data_irp(_In_ UDECXUSBDEVICE dev
         NT_ASSERT(get_flag(dev.unplugged)); // thread checks it
         TraceDbg("dev %04x", ptr04x(device));
 
-        auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
-        auto st = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout);
-
-        if (NT_ERROR(st)) {
+        auto st = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, nullptr);
+        if (st != STATUS_SUCCESS) {
+                static_assert(NT_SUCCESS(STATUS_TIMEOUT));
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), st);
         } else {
                 TraceDbg("dev %04x, joined", ptr04x(device));

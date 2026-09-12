@@ -44,7 +44,6 @@
     </ClInclude>
     <ClInclude Include="urb_ptr.h" />
     <ClInclude Include="..\..\userspace\libusbip\generic_handle_ex.h" />
-    <ClInclude Include="wait_timeout.h" />
     <ClInclude Include="wdm_cpp.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="lists.h" />

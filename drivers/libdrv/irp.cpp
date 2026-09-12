@@ -102,10 +102,13 @@ PAGED NTSTATUS libdrv::sync_irp::wait_for_completion(_Inout_ NTSTATUS &status)
         }
 
         if (status == STATUS_PENDING) {
-                NT_VERIFY(!KeWaitForSingleObject(&m_event, Executive, KernelMode, false, nullptr));
+                auto st = KeWaitForSingleObject(&m_event, Executive, KernelMode, false, nullptr);
+                if (st != STATUS_SUCCESS) {
+                        NT_ASSERT(!"sync_irp: KeWaitForSingleObject");
+                        return status = st;
+                }
                 status = m_irp->IoStatus.Status;
         }
 
         return status;
 }
-
