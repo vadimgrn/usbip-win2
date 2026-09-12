@@ -185,7 +185,8 @@ auto wsk_disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
         auto &dev = *ext->ctx;
         auto device = get_handle(&dev);
 
-        if (char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFSZ]; true) {
+        {
+                char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFSZ];
                 TraceDbg("dev %04x, Flags[%s]", ptr04x(device), wsk::DisconnectEventFlags(buf, sizeof(buf), Flags));
         }
 

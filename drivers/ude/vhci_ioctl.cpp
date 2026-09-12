@@ -331,9 +331,8 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), r->port);
 
-        if (auto dc = get_device_ctx(dev); true) {
-                device_state_changed(*dc, vhci::state::plugged);
-        }
+        auto dc = get_device_ctx(dev);
+        device_state_changed(*dc, vhci::state::plugged);
 
         return STATUS_SUCCESS;
 }

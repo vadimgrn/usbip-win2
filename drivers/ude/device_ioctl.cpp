@@ -516,7 +516,8 @@ auto send_ep0_out(
                 return st;
         }
 
-        if constexpr (auto &r = get_submit_setup(ctx->hdr); true) {
+        {
+                auto &r = get_submit_setup(ctx->hdr);
                 r = setup;
                 NT_ASSERT(!r.wLength);
                 NT_ASSERT(is_transfer_dir_out(r));

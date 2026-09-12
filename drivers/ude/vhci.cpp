@@ -507,10 +507,9 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(vhci));
         
-        if (auto &ctx = *get_vhci_ctx(vhci); true) {
-                set_flag(ctx.removing);
-                stop_attach_attempts(ctx, 0);
-        }
+        auto &ctx = *get_vhci_ctx(vhci);
+        set_flag(ctx.removing);
+        stop_attach_attempts(ctx, 0);
 
         async_detach_and_delete_all(vhci);
         purge_read_queue(vhci); // detach notifications may not be received
