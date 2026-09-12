@@ -23,9 +23,8 @@ _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTime(
 	_Out_opt_ ULONG *CurrentUsbFrame)
 {
 	if (CurrentUsbFrame) {
-		static LONG dummy;
-		*CurrentUsbFrame = static_cast<ULONG>(InterlockedIncrement(&dummy)); // zero is OK too
-		// TraceDbg("%lu", *CurrentUsbFrame); // too often
+		// 1 frame = 1ms = 10,000 * 100ns units
+		*CurrentUsbFrame = static_cast<ULONG>(KeQueryInterruptTime() / 10'000);
 	}
 
 	return STATUS_SUCCESS;
@@ -42,15 +41,15 @@ _Function_class_(PUSB_BUSIFFN_QUERY_BUS_TIME_EX)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Must_inspect_result_ NTSTATUS USB_BUSIFFN QueryBusTimeEx(
-	_In_opt_ PVOID BusContext,
-	_Out_opt_ PULONG HighSpeedFrameCounter)
+	_In_opt_ void *,
+	_Out_opt_ ULONG *HighSpeedFrameCounter)
 {
-	auto st = QueryBusTime(BusContext, HighSpeedFrameCounter);
-	if (NT_SUCCESS(st) && HighSpeedFrameCounter) {
-		*HighSpeedFrameCounter <<= 3;
-		// TraceDbg("%lu", *HighSpeedFrameCounter); // too often
+	if (HighSpeedFrameCounter) {
+		// 1 micro-frame = 125us = 1,250 * 100ns units (8 micro-frames per 1ms frame)
+		*HighSpeedFrameCounter = static_cast<ULONG>(KeQueryInterruptTime() / 1'250);
 	}
-	return st;
+
+	return STATUS_SUCCESS;
 }
 
 } // namespace
