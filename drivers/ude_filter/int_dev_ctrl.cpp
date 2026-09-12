@@ -343,9 +343,9 @@ NTSTATUS irp_complete(
         auto &fltr = *get_filter_ext(devobj);
         RemoveLockGuard lck(fltr.remove_lock, adopt_lock, irp);
 
-        if (auto val = reinterpret_cast<uintptr_t>(context); fltr.is_hub) {
-                NT_ASSERT(!val);
-        } else if (val) { // legacy control transfer
+        if (fltr.is_hub) {
+                NT_ASSERT(!context);
+        } else if (auto val = reinterpret_cast<uintptr_t>(context)) { // legacy control transfer
                 auto urb = urb_from_irp(irp);
                 control_to_vendor_class(*urb, val);
                 TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self),
