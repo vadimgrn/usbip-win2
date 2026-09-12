@@ -106,9 +106,9 @@ struct device_ctx_ext
 
         device_attributes attr;
 
-        auto node_name() { return &attr.node_name; }
-        auto service_name() { return &attr.service_name; }
-        auto busid() { return &attr.busid; }
+        auto* node_name(this auto&& self) { return &self.attr.node_name; }
+        auto* service_name(this auto&& self) { return &self.attr.service_name; }
+        auto* busid(this auto&& self) { return &self.attr.busid; }
 
         auto location_hash() const { return attr.location_hash; }
         auto&& properties(this auto&& self) { return self.attr.properties; }
