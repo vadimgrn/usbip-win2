@@ -11,11 +11,13 @@ namespace usbip
 
 struct endpoint_search
 {
-        endpoint_search(USBD_PIPE_HANDLE h) : handle(h), what(HANDLE) { NT_ASSERT(handle); }
+        enum class what_t : UINT8 { handle, address };
+
+        endpoint_search(USBD_PIPE_HANDLE h) : handle(h), what(what_t::handle) { NT_ASSERT(handle); }
         
         endpoint_search(UINT8 addr) : 
                 handle(reinterpret_cast<USBD_PIPE_HANDLE>(static_cast<uintptr_t>(addr))), // for operator bool correctness
-                what(ADDRESS) { NT_ASSERT(address == addr); }
+                what(what_t::address) { NT_ASSERT(address == addr); }
 
         explicit operator bool() const { return handle; } // largest in union
 
@@ -24,7 +26,6 @@ struct endpoint_search
                 UINT8 address;
         };
 
-        enum what_t { HANDLE, ADDRESS };
         what_t what; // union's member selector
 };
 

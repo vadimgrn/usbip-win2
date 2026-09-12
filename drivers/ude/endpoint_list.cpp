@@ -16,13 +16,13 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto matches(_In_ const endpoint_ctx &endp, _In_ const endpoint_search &crit)
 {
         switch (crit.what) {
-        case crit.HANDLE:
+        case endpoint_search::what_t::handle:
                 return crit.handle == endp.PipeHandle;
-        case crit.ADDRESS:
+        case endpoint_search::what_t::address:
                 return crit.address == endp.descriptor.bEndpointAddress;
         }
 
-        Trace(TRACE_LEVEL_ERROR, "Invalid union's member selector %d", crit.what);
+        Trace(TRACE_LEVEL_ERROR, "Invalid union's member selector %d", static_cast<int>(crit.what));
         return false;
 }
 
