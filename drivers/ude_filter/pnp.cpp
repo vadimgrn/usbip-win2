@@ -221,10 +221,10 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	}
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
-	case IRP_MN_START_DEVICE: // must be started after lower device objects
-		if (auto st = ForwardIrpSynchronously(fltr, irp); true) {
-		        return CompleteRequest(irp, st);
-	        }
+	case IRP_MN_START_DEVICE: { // must be started after lower device objects
+		auto st = ForwardIrpSynchronously(fltr, irp);
+		return CompleteRequest(irp, st);
+	}
 	case IRP_MN_REMOVE_DEVICE:
 		return remove_device(fltr, irp, lck);
 	case IRP_MN_QUERY_DEVICE_RELATIONS:
