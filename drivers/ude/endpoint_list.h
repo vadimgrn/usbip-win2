@@ -18,7 +18,6 @@ struct endpoint_search
                 what(ADDRESS) { NT_ASSERT(address == addr); }
 
         explicit operator bool() const { return handle; } // largest in union
-        auto operator !() const { return !handle; }
 
         union {
                 USBD_PIPE_HANDLE handle;

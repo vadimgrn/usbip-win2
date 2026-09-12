@@ -95,8 +95,6 @@ public:
         wsk_context_ptr& operator =(wsk_context_ptr&& ctx);
 
         explicit operator bool() const { return m_ctx; }
-        auto operator !() const { return !m_ctx; }
-
         auto operator ->() const { return m_ctx; }
         auto& operator *() const { return *m_ctx; }
 

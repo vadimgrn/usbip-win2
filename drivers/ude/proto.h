@@ -21,10 +21,7 @@ public:
 	constexpr setup_dir(bool dir_out) : val((1 << int(dir_out)) | 1) {}
 
 	constexpr explicit operator bool() const { return val & 1; }
-	constexpr auto operator !() const { return !static_cast<bool>(*this); }
-
 	constexpr auto operator ==(setup_dir d) const { return val == d.val; }
-	constexpr auto operator !=(setup_dir d) const { return val != d.val; }
 
 	constexpr bool operator *() const { return val >> 1; }
 

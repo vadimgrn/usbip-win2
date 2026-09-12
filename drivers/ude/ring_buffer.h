@@ -41,7 +41,6 @@ public:
         constexpr ring_buffer(_In_opt_ ring_buffer_data *data) : m_data(data) {}
 
         constexpr explicit operator bool() const { return m_data; }
-        constexpr auto operator !() const { return !m_data; }
 
         auto capacity() const { return m_data ? m_data->capacity : 0; }
         auto size() const { return m_data ? m_data->size : 0; }
