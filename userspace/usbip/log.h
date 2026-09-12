@@ -66,7 +66,8 @@ inline void error(std::string_view msg)
 template <typename... Args>
 void error(std::format_string<Args...> fmt, Args&&... args)
 {
-        error(std::string_view(std::format(fmt, std::forward<Args>(args)...)));
+        auto msg = std::format(fmt, std::forward<Args>(args)...);
+        error(std::string_view{msg});
 }
 
 inline void critical(std::string_view msg)
@@ -81,7 +82,8 @@ inline void critical(std::string_view msg)
 template <typename... Args>
 void critical(std::format_string<Args...> fmt, Args&&... args)
 {
-        critical(std::string_view(std::format(fmt, std::forward<Args>(args)...)));
+        auto msg = std::format(fmt, std::forward<Args>(args)...);
+        critical(std::string_view{msg});
 }
 
 inline void debug(std::string_view msg)
@@ -99,7 +101,8 @@ template <typename... Args>
 void debug(std::format_string<Args...> fmt, Args&&... args)
 {
         if (g_debug) {
-                debug(std::string_view(std::format(fmt, std::forward<Args>(args)...)));
+                auto msg = std::format(fmt, std::forward<Args>(args)...);
+                debug(std::string_view{msg});
         }
 }
 
