@@ -896,13 +896,11 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
                         
                         port = i + 1;
                         NT_ASSERT(is_valid_port(vhci, port));
-
                         dev.port = port;
                         break;
                 }
         }
 
-        lck.release();
         return port;
 }
 
