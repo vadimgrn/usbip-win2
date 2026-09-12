@@ -25,7 +25,7 @@ wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 class MainFrame : public Frame
 {
 public:
-	MainFrame(_In_ usbip::Handle read, _In_ int appearance);
+	[[nodiscard]] static MainFrame* create(_In_ usbip::Handle read, _In_ int appearance);
 	~MainFrame();
 
 	auto start_in_tray() const noexcept { return m_start_in_tray; }
@@ -40,6 +40,8 @@ public:
 private:
         friend class TaskBarIcon;
         friend class wxPersistentMainFrame;
+
+	MainFrame(_In_ usbip::Handle read, _In_ int appearance);
 
         enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
 
@@ -135,6 +137,7 @@ private:
 	void init_tree_list();
 	void restore_state();
 
+	void start_read_thread();
 	void read_loop();
 	void break_read_loop();
 

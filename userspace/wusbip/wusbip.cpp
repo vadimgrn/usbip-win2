@@ -450,6 +450,13 @@ private:
 wxDEFINE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 
 
+MainFrame* MainFrame::create(_In_ Handle read, _In_ int appearance)
+{
+        auto frame = new MainFrame(std::move(read), appearance);
+        frame->start_read_thread();
+        return frame;
+}
+
 MainFrame::MainFrame(_In_ Handle read, _In_ int appearance) : 
         Frame(nullptr),
         m_log(new LogWindow(this, 
@@ -465,13 +472,16 @@ MainFrame::MainFrame(_In_ Handle read, _In_ int appearance) :
         init();
         restore_state();
         post_refresh();
-
-        m_read_thread = std::thread(&MainFrame::read_loop, this);
 }
 
 MainFrame::~MainFrame()
 {
         m_treeListCtrl->SetItemComparator(nullptr);
+
+        if (m_read_thread.joinable()) {
+                break_read_loop();
+                m_read_thread.join();
+        }
 }
 
 void MainFrame::check_view_appearance(_In_ int appearance)
@@ -585,8 +595,10 @@ void MainFrame::on_close(wxCloseEvent &event)
                 return;
         }
 
-        break_read_loop();
-        m_read_thread.join();
+        if (m_read_thread.joinable()) {
+                break_read_loop();
+                m_read_thread.join();
+        }
 
         event.Skip();
 }
@@ -616,6 +628,12 @@ void MainFrame::iconize_to_tray()
         }
 }
 
+void MainFrame::start_read_thread()
+{
+        wxASSERT(!m_read_thread.joinable());
+        m_read_thread = std::thread(&MainFrame::read_loop, this);
+}
+
 void MainFrame::read_loop()
 {
         scope_guard guard([this] {
@@ -635,6 +653,10 @@ void MainFrame::read_loop()
 
 void MainFrame::break_read_loop()
 {
+        if (!m_read_thread.joinable()) {
+                return;
+        }
+
         auto cancel_read = [this] // CancelSynchronousIo hangs if thread was terminated
         {
                 std::lock_guard<std::mutex> lock(m_read_close_mtx);

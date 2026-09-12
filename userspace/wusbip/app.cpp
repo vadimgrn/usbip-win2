@@ -35,7 +35,7 @@ auto init_mainframe(_In_ wxApp::Appearance app)
         wxString err;
 
         if (auto read = usbip::init(err) ? vhci::open() : Handle()) {
-                if (auto &frame = *new MainFrame(std::move(read), static_cast<int>(app)); frame.start_in_tray()) {
+                if (auto &frame = *MainFrame::create(std::move(read), static_cast<int>(app)); frame.start_in_tray()) {
                         frame.iconize_to_tray();
                 } else {
                         frame.Show();
