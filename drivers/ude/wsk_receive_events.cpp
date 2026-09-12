@@ -193,18 +193,8 @@ auto wsk_disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
         return async_reattach(device, dev, STATUS_SUCCESS);
 }
 
-const ULONG wsk_events[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto make_event_mask()
-{
-        ULONG mask = 0;
-        for (auto evt: wsk_events) {
-                mask |= evt;
-        }
-        return mask;
-}
+constexpr ULONG wsk_events[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
+constexpr ULONG wsk_event_mask = WSK_EVENT_RECEIVE | WSK_EVENT_DISCONNECT;
 
 const WSK_CLIENT_CONNECTION_DISPATCH g_dispatch
 {
@@ -229,7 +219,7 @@ PAGED NTSTATUS usbip::events::start_receive_data(_In_ UDECXUSBDEVICE device)
                 return st;
         }
 
-        st = wsk::event_callback_control(dev.sock(), make_event_mask(), false);
+        st = wsk::event_callback_control(dev.sock(), wsk_event_mask, false);
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", st);
         }
