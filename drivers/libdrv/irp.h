@@ -37,18 +37,18 @@ public:
 
 	_IRQL_requires_same_
 	_IRQL_requires_max_(DISPATCH_LEVEL)
-	auto operator ->() const
+	constexpr auto operator ->(this auto&& self)
 	{
-		NT_ASSERT(get());
-		return get();
+		NT_ASSERT(self.get());
+		return self.get();
 	}
 
 	_IRQL_requires_same_
 	_IRQL_requires_max_(DISPATCH_LEVEL)
-	auto& operator *() const
+	constexpr auto& operator *(this auto&& self)
 	{
-		NT_ASSERT(get());
-		return *get();
+		NT_ASSERT(self.get());
+		return *self.get();
 	}
 };
 

@@ -76,23 +76,23 @@ public:
 
 	constexpr bool operator ==(decltype(nullptr)) const { return m_urb == nullptr; }
 
-	constexpr auto handle() const { return m_handle; }
-	constexpr auto get() const { return m_urb; }
+	constexpr auto handle(this auto&& self) { return self.m_handle; }
+	constexpr auto get(this auto&& self) { return self.m_urb; }
 
 	_IRQL_requires_same_
 	_IRQL_requires_max_(DISPATCH_LEVEL)
-	constexpr auto operator ->() const
+	constexpr auto operator ->(this auto&& self)
 	{
-		NT_ASSERT(m_urb);
-		return m_urb;
+		NT_ASSERT(self.m_urb);
+		return self.m_urb;
 	}
 
 	_IRQL_requires_same_
 	_IRQL_requires_max_(DISPATCH_LEVEL)
-	constexpr auto& operator *() const
+	constexpr auto& operator *(this auto&& self)
 	{
-		NT_ASSERT(m_urb);
-		return *m_urb;
+		NT_ASSERT(self.m_urb);
+		return *self.m_urb;
 	}
 
 	_IRQL_requires_same_

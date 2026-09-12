@@ -46,10 +46,10 @@ public:
 
         friend constexpr bool operator ==(const ObjectRef &a, const ObjectRef &b) { return a.m_handle == b.m_handle; }
 
-        auto get() const { return m_handle; }
+        auto get(this auto&& self) { return self.m_handle; }
 
         template<typename T>
-        auto get() const { return static_cast<T>(m_handle); }
+        auto get(this auto&& self) { return static_cast<T>(self.m_handle); }
 
         WDFOBJECT release();
 
