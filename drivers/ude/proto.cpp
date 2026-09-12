@@ -77,14 +77,13 @@ NTSTATUS usbip::set_cmd_submit_usbip_header(
 	hdr.direction = dir_out ? direction::out : direction::in;
 	hdr.ep = usb_endpoint_num(epd);
 
-	if (auto r = &hdr.cmd_submit) {
-		r->transfer_flags = to_linux_flags(TransferFlags, !dir_out);
-		r->transfer_buffer_length = TransferBufferLength;
-		r->start_frame = 0;
-		r->number_of_packets = number_of_packets_non_isoch;
-		r->interval = epd.bInterval;
-		RtlZeroMemory(r->setup, sizeof(r->setup));
-	}
+	auto &r = hdr.cmd_submit;
+	r.transfer_flags = to_linux_flags(TransferFlags, !dir_out);
+	r.transfer_buffer_length = TransferBufferLength;
+	r.start_frame = 0;
+	r.number_of_packets = number_of_packets_non_isoch;
+	r.interval = epd.bInterval;
+	RtlZeroMemory(r.setup, sizeof(r.setup));
 
 	return STATUS_SUCCESS;
 }
