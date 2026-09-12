@@ -251,13 +251,13 @@ PAGED NTSTATUS usbip::do_add_device(
 	fido->Characteristics = target->Characteristics; 
 	fido->Flags |= target->Flags & (DO_BUFFERED_IO | DO_DIRECT_IO | DO_POWER_PAGABLE | DO_POWER_INRUSH);
 
-	if (fltr->is_hub) {
-		//
-	} else if (auto &dev = fltr->device;
-		   auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, unique_ptr::pooltag, &dev.usbd_handle)) {
-		Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
-		destroy(*fltr);
-		return err;
+	if (!fltr->is_hub) {
+		auto &dev = fltr->device;
+		if (auto err = USBD_CreateHandle(fido, target, USBD_CLIENT_CONTRACT_VERSION_602, unique_ptr::pooltag, &dev.usbd_handle)) {
+			Trace(TRACE_LEVEL_ERROR, "USBD_CreateHandle %!STATUS!", err);
+			destroy(*fltr);
+			return err;
+		}
 	}
 
 	Trace(TRACE_LEVEL_INFORMATION, "FiDO %04x, pdo %04x (DeviceType %#lx), target %04x (DeviceType %#lx)", 

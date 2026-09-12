@@ -121,11 +121,11 @@ PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ RemoveLoc
 
 	lock.release_and_wait(); // all allocated URBs are freed after this, USBD_HANDLE can be closed
 
-	if (fltr.is_hub) {
-		//
-	} else if (auto &h = fltr.device.usbd_handle) {
-		USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
-		h = nullptr;
+	if (!fltr.is_hub) {
+		if (auto &h = fltr.device.usbd_handle) {
+			USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
+			h = nullptr;
+		}
 	}
 
 	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
