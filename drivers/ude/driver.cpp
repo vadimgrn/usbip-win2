@@ -20,7 +20,7 @@ using namespace libdrv;
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 {
 	PAGED_CODE();

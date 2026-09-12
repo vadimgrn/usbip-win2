@@ -68,7 +68,7 @@ PAGED void set_args(
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void log(_In_ const usbip_usb_device &d)
 {
         PAGED_CODE();
