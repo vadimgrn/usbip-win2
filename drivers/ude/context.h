@@ -279,7 +279,7 @@ constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 
 constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
-        return (busnum << 16) | devnum;
+        return (static_cast<UINT32>(busnum) << 16) | devnum;
 }
 
 _IRQL_requires_same_
