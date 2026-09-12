@@ -18,12 +18,12 @@ wdm::object_reference::object_reference(_In_opt_ void *obj, _In_ bool defer_dele
 
 wdm::object_reference::~object_reference()
 {
-	if (!m_obj) {
-		//
-	} else if (m_defer_delete) {
-		ObDereferenceObjectDeferDelete(m_obj);
-	} else {
-		ObDereferenceObject(m_obj);
+	if (m_obj) {
+		if (m_defer_delete) {
+			ObDereferenceObjectDeferDelete(m_obj);
+		} else {
+			ObDereferenceObject(m_obj);
+		}
 	}
 }
 
