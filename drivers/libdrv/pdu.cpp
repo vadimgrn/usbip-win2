@@ -179,17 +179,6 @@ void libdrv::byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t
 	}
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void libdrv::byteswap_payload(_Inout_ header &hdr) 
-{
-        if (auto layout = get_packet_layout(hdr);
-            layout.valid && layout.number_of_packets) {
-                auto isoc = reinterpret_cast<iso_packet_descriptor*>(reinterpret_cast<char*>(&hdr + 1) + layout.payload);
-                byteswap(isoc, layout.number_of_packets);
-        }
-}
-
 /*
  * For a server's response, set hdr.base.direction to the value from the corresponding request, 
  * otherwise the result will be incorrect.

@@ -19,9 +19,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void byteswap_payload(_Inout_ header &hdr);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
