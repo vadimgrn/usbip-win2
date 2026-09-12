@@ -753,23 +753,14 @@ auto get_port_range(_In_ const vhci_ctx &vhci, _In_ usb_device_speed speed)
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto make_source_id(_In_ const void *ptr)
+auto make_source_id(_In_ const void *ptr)
 {
-        PAGED_CODE();
-        wchar_t buf[17];
-
-        UNICODE_STRING s {
-                .MaximumLength = sizeof(buf), // bytes
-                .Buffer = buf
-        };
-
-        NT_VERIFY(NT_SUCCESS(RtlIntPtrToUnicodeString(reinterpret_cast<ULONG_PTR>(ptr), 16, &s)));
-
-        ULONG hash{};
-        NT_VERIFY(NT_SUCCESS(RtlHashUnicodeString(&s, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)));
-
-        return hash;
+        auto val = reinterpret_cast<ULONG_PTR>(ptr);
+        if constexpr (sizeof(ULONG_PTR) > 4) {
+                return static_cast<ULONG>(val ^ (val >> 32));
+        } else {
+                return static_cast<ULONG>(val);
+        }
 }
 
 _IRQL_requires_same_
