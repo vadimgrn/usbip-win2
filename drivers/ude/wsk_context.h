@@ -97,7 +97,6 @@ public:
         explicit operator bool() const { return m_ctx; }
         auto operator !() const { return !m_ctx; }
 
-        auto& operator &() const { return m_ctx; }
         auto operator ->() const { return m_ctx; }
         auto& operator *() const { return *m_ctx; }
 
