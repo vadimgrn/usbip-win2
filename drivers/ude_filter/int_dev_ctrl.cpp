@@ -137,14 +137,12 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
-	{
-		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
-	}
+	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
 
         ULONG len{};
-        if (unique_ptr buf(clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)); buf) {
-		send_request(fltr, lck, buf, r.Hdr.Function);
+        if (unique_ptr ptr(clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)); ptr) {
+		send_request(fltr, lck, ptr, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
 	}
@@ -180,9 +178,6 @@ void post_process_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ 
 	}
 	case URB_FUNCTION_SELECT_CONFIGURATION: {
 		static_assert(is_request_function(URB_FUNCTION_SELECT_CONFIGURATION));
-		auto &r = urb.UrbSelectConfiguration;
-		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
 		send_urb(fltr, lck, urb.UrbSelectConfiguration);
 		break;
 	}
