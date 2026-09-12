@@ -48,6 +48,10 @@ inline auto get_filter_ext(_In_ DEVICE_OBJECT *devobj)
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+PAGED DEVICE_RELATIONS* clone_relations(_In_ const DEVICE_RELATIONS &src);
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGED void destroy_relations(_Inout_ DEVICE_RELATIONS* &relations);
 
 _Function_class_(DRIVER_ADD_DEVICE)

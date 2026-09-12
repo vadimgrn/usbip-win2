@@ -116,6 +116,43 @@ PAGED auto is_above_vhci(_In_ DEVICE_OBJECT *pdo)
 } // namespace
 
 
+constexpr size_t SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
+{
+	return sizeof(DEVICE_RELATIONS) + (cnt > 1 ? (cnt - 1) * sizeof(PDEVICE_OBJECT) : 0);
+}
+static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
+static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
+static_assert(SizeOf_DEVICE_RELATIONS(2) == sizeof(DEVICE_RELATIONS) + sizeof(PDEVICE_OBJECT));
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED DEVICE_RELATIONS* usbip::clone_relations(_In_ const DEVICE_RELATIONS &src)
+{
+	PAGED_CODE();
+
+	constexpr auto max_extra = (MAXULONG - sizeof(DEVICE_RELATIONS)) / sizeof(PDEVICE_OBJECT);
+	if (src.Count > 1 && (src.Count - 1) > max_extra) {
+		Trace(TRACE_LEVEL_ERROR, "Relations count overflow: %lu", src.Count);
+		return nullptr;
+	}
+
+	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
+	unique_ptr ptr(uninitialized, PagedPool, sz);
+
+	if (ptr) {
+		RtlCopyMemory(ptr.get(), &src, sz);
+
+		for (ULONG i = 0; i < src.Count; ++i) {
+			NT_ASSERT(src.Objects[i]);
+			ObReferenceObject(src.Objects[i]);
+		}
+	} else {
+		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
+	}
+
+	return ptr.release<DEVICE_RELATIONS>();
+}
+
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
 PAGED void usbip::destroy_relations(_Inout_ DEVICE_RELATIONS* &relations)

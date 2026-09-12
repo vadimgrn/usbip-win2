@@ -32,40 +32,6 @@ namespace
 
 using QueryInterface = decltype(_IO_STACK_LOCATION::Parameters.QueryInterface);
 
-constexpr auto SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
-{
-	return sizeof(DEVICE_RELATIONS) + (cnt ? --cnt*sizeof(*DEVICE_RELATIONS::Objects) : 0);
-}
-static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
-static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
-static_assert(SizeOf_DEVICE_RELATIONS(2)  > sizeof(DEVICE_RELATIONS));
-
-/*
- * @see destroy_relations
- */
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
-{
-	PAGED_CODE();
-
-	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
-        unique_ptr ptr(uninitialized, PagedPool, sz);
-
-	if (ptr) {
-		RtlCopyMemory(ptr.get(), &src, sz);
-
-		for (ULONG i = 0; i < src.Count; ++i) {
-			NT_ASSERT(src.Objects[i]);
-			ObReferenceObject(src.Objects[i]);
-		}
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
-	}
-
-	return ptr.release<DEVICE_RELATIONS>();
-}
-
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto contains(_In_ const DEVICE_RELATIONS &r, _In_ const DEVICE_OBJECT *obj)
@@ -91,7 +57,7 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
 	NT_ASSERT(fltr.is_hub);
 	auto &previous = fltr.hub.previous;
 
-	auto next = r.Count ? clone(r) : nullptr;
+	auto next = r.Count ? clone_relations(r) : nullptr;
 	if (r.Count && !next) {
 		return;
 	}
