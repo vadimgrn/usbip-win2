@@ -39,7 +39,7 @@ static_assert(sizeof(const_part) == 2*sizeof(USHORT));
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto is_request_function(_In_ int function)
+constexpr bool is_request_function(_In_ USHORT function)
 {
         switch (function) {
         case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
@@ -76,7 +76,6 @@ inline auto get_function(_Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool clear = 
 
         NT_ASSERT(is_request_function(function));
         return function;
-
 }
 
 _IRQL_requires_same_
