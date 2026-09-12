@@ -160,32 +160,32 @@ void post_process_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ 
 	using filter::is_request_function;
 	case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
 	case URB_FUNCTION_SYNC_RESET_PIPE:
-	case URB_FUNCTION_SYNC_CLEAR_STALL:
+	case URB_FUNCTION_SYNC_CLEAR_STALL: {
 		static_assert(is_request_function(URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL));
 		static_assert(is_request_function(URB_FUNCTION_SYNC_RESET_PIPE));
 		static_assert(is_request_function(URB_FUNCTION_SYNC_CLEAR_STALL));
-		if constexpr (auto &r = urb.UrbPipeRequest; true) {
-			TraceDbg("dev %04x, %s, PipeHandle %04x", ptr04x(fltr.self), 
-				  urb_function_str(hdr.Function), ptr04x(r.PipeHandle));
-		}
+		auto &r = urb.UrbPipeRequest;
+		TraceDbg("dev %04x, %s, PipeHandle %04x", ptr04x(fltr.self), 
+			  urb_function_str(hdr.Function), ptr04x(r.PipeHandle));
 		send = true;
 		break;
-	case URB_FUNCTION_SELECT_INTERFACE:
+	}
+	case URB_FUNCTION_SELECT_INTERFACE: {
 		static_assert(is_request_function(URB_FUNCTION_SELECT_INTERFACE));
-		if constexpr (auto &r = urb.UrbSelectInterface; true) {
-			char buf[SELECT_INTERFACE_STR_BUFSZ];
-			TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), r));
-		}
+		auto &r = urb.UrbSelectInterface;
+		char buf[SELECT_INTERFACE_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), r));
 		send = true;
 		break;
-	case URB_FUNCTION_SELECT_CONFIGURATION:
+	}
+	case URB_FUNCTION_SELECT_CONFIGURATION: {
 		static_assert(is_request_function(URB_FUNCTION_SELECT_CONFIGURATION));
-                if constexpr (auto &r = urb.UrbSelectConfiguration; true) {
-                        char buf[SELECT_CONFIGURATION_STR_BUFSZ];
-                        TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
-                }
-                send_urb(fltr, lck, urb.UrbSelectConfiguration);
+		auto &r = urb.UrbSelectConfiguration;
+		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
+		send_urb(fltr, lck, urb.UrbSelectConfiguration);
 		break;
+	}
 	default:
 		TraceDbg("dev %04x, %s", ptr04x(fltr.self), urb_function_str(hdr.Function));
 	}
