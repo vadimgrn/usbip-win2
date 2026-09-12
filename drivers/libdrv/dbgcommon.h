@@ -7,7 +7,10 @@
 #include <ntddk.h>
 #include <usb.h>
 
-#include <usbip/proto.h>
+namespace usbip
+{
+        struct header;
+}
 
 namespace libdrv
 {

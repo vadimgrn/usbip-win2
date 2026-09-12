@@ -54,7 +54,7 @@ public:
 #endif // if DBG
 
 
-using irp_cls = libdrv::SyncIrp;
+using irp_cls = libdrv::sync_irp;
 
 _Function_class_(RTL_RUN_ONCE_INIT_FN)
 _When_(Parameter, _IRQL_requires_(PASSIVE_LEVEL))

@@ -41,14 +41,14 @@ libdrv::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_
         }
 }
 
-libdrv::Mdl::Mdl(Mdl&& m) :
+libdrv::Mdl::Mdl(_Inout_ Mdl&& m) :
         m_mdl(m.release()),
         m_mapped(m.m_mapped)
 {
         m.m_mapped = false;
 }
 
-auto libdrv::Mdl::operator =(Mdl&& m) -> Mdl&
+auto libdrv::Mdl::operator =(_Inout_ Mdl&& m) -> Mdl&
 {
         Mdl(static_cast<Mdl&&>(m)).swap(*this);
         return *this;

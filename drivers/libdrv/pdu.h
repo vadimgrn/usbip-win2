@@ -5,7 +5,12 @@
 #pragma once
 
 #include <kernelspecs.h>
-#include <usbip/proto.h>
+
+namespace usbip
+{
+        struct header;
+        struct iso_packet_descriptor;
+}
 
 namespace libdrv
 {
@@ -18,7 +23,6 @@ enum class swap_dir { host2net, net2host };
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir);
-
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

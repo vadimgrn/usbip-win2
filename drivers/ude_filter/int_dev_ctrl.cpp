@@ -67,7 +67,7 @@ NTSTATUS request_complete(
         auto &fltr = *static_cast<filter_ext*>(context);
         auto &args = get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp));
 
-        RemoveLockGuard lck(fltr.remove_lock, adopt_lock, args.tag);
+        remove_lock_guard lck(fltr.remove_lock, adopt_lock, args.tag);
         NT_ASSERT(lck.tag() != irp);
 
         irp_ptr rip(irp);
@@ -83,7 +83,7 @@ NTSTATUS request_complete(
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 auto send_request(
-	_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, 
+	_In_ filter_ext &fltr, _Inout_ remove_lock_guard &lck, 
 	_Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
 {
 	irp_ptr irp(fltr.target->StackSize + 1, false); // plus one for this driver's parameters
@@ -118,7 +118,7 @@ auto send_request(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const URB &urb)
+void send_urb(_In_ filter_ext &fltr, _Inout_ remove_lock_guard &lck, _In_ const URB &urb)
 {
 	if (auto &hdr = urb.UrbHeader; !is_valid_urb_length(urb)) {
 		Trace(TRACE_LEVEL_ERROR, "Invalid URB length %lu", hdr.Length);
@@ -135,7 +135,7 @@ void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const UR
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const _URB_SELECT_CONFIGURATION &r)
+void send_urb(_In_ filter_ext &fltr, _Inout_ remove_lock_guard &lck, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
 	char buf[SELECT_CONFIGURATION_STR_BUFSZ];
 	TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
@@ -150,7 +150,7 @@ void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const _U
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const URB &urb)
+void post_process_urb(_In_ filter_ext &fltr, _Inout_ remove_lock_guard &lck, _In_ const URB &urb)
 {
 	bool send{};
 	
@@ -326,7 +326,7 @@ void control_to_vendor_class(_Inout_ URB &urb, _In_ void *context)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_irp(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ IRP *irp)
+void post_process_irp(_In_ filter_ext &fltr, _Inout_ remove_lock_guard &lck, _In_ IRP *irp)
 {
         auto status = irp->IoStatus.Status;
 
@@ -352,7 +352,7 @@ NTSTATUS irp_complete(
         _In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         auto &fltr = *get_filter_ext(devobj);
-        RemoveLockGuard lck(fltr.remove_lock, adopt_lock, irp);
+        remove_lock_guard lck(fltr.remove_lock, adopt_lock, irp);
 
         if (fltr.is_hub) {
                 NT_ASSERT(!context);
@@ -398,9 +398,9 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
 
-	RemoveLockGuard lck(fltr.remove_lock, irp);
+	remove_lock_guard lck(fltr.remove_lock, irp);
 	if (!lck) {
-		auto err = lck.acquired();
+		auto err = lck.status();
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}

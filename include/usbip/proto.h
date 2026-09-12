@@ -5,6 +5,7 @@
 #pragma once
 
 #include <basetsd.h>
+#include <kernelspecs.h>
 
 /*
  * Declarations from <drivers/usb/usbip/usbip_common.h>
@@ -108,5 +109,12 @@ struct iso_packet_descriptor
 };
 
 #pragma pack(pop)
+
+
+constexpr auto is_valid_direction(_In_ UINT32 dir)
+{
+        static_assert(sizeof(header_basic::direction) ==  sizeof(dir));
+        return dir == direction::out || dir == direction::in;
+}
 
 } // namespace usbip

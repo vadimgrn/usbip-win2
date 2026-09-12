@@ -48,7 +48,7 @@ NTSTATUS libdrv::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS libdrv::SyncIrp::ctor(_In_ CCHAR StackSize, _In_ bool ChargeQuota)
+NTSTATUS libdrv::sync_irp::ctor(_In_ CCHAR StackSize, _In_ bool ChargeQuota)
 {
         if (*this) {
                 return STATUS_ALREADY_INITIALIZED;
@@ -66,7 +66,7 @@ NTSTATUS libdrv::SyncIrp::ctor(_In_ CCHAR StackSize, _In_ bool ChargeQuota)
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void libdrv::SyncIrp::dtor()
+void libdrv::sync_irp::dtor()
 {
         if (auto ptr = static_cast<IRP*>(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr))) {
                 IoFreeIrp(ptr);
@@ -74,7 +74,7 @@ void libdrv::SyncIrp::dtor()
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void libdrv::SyncIrp::reset()
+void libdrv::sync_irp::reset()
 {
         if (*this) {
                 IoReuseIrp(m_irp, STATUS_SUCCESS);
@@ -85,15 +85,15 @@ void libdrv::SyncIrp::reset()
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS libdrv::SyncIrp::completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context)
+NTSTATUS libdrv::sync_irp::completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context)
 {
-        auto &self = *static_cast<SyncIrp*>(context);
+        auto &self = *static_cast<sync_irp*>(context);
         KeSetEvent(&self.m_event, IO_NO_INCREMENT, false);
         return StopCompletion;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS libdrv::SyncIrp::wait_for_completion(_Inout_ NTSTATUS &status)
+PAGED NTSTATUS libdrv::sync_irp::wait_for_completion(_Inout_ NTSTATUS &status)
 {
         PAGED_CODE();
 

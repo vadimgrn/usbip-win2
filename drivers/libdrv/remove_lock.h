@@ -12,37 +12,37 @@ namespace libdrv
 struct adopt_lock_t {};
 inline constexpr adopt_lock_t adopt_lock;
 
-class RemoveLockGuard
+class remove_lock_guard
 {
 public:
         _IRQL_requires_same_
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        RemoveLockGuard(_Inout_ IO_REMOVE_LOCK &lock, _In_opt_ void *tag = nullptr) : 
-                m_acquired(IoAcquireRemoveLock(&lock, tag)),
-                m_lock(NT_SUCCESS(m_acquired) ? &lock : nullptr),
+        remove_lock_guard(_Inout_ IO_REMOVE_LOCK &lock, _In_opt_ void *tag = nullptr) : 
+                m_status(IoAcquireRemoveLock(&lock, tag)),
+                m_lock(NT_SUCCESS(m_status) ? &lock : nullptr),
                 m_tag(tag) {}
 
         _IRQL_requires_same_
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        RemoveLockGuard(_Inout_ IO_REMOVE_LOCK &lock, _In_ adopt_lock_t, _In_opt_ void *tag = nullptr) : 
+        remove_lock_guard(_Inout_ IO_REMOVE_LOCK &lock, _In_ adopt_lock_t, _In_opt_ void *tag = nullptr) : 
                 m_lock(&lock), m_tag(tag) {}
 
         _IRQL_requires_same_
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        ~RemoveLockGuard() 
+        ~remove_lock_guard() 
         {
                 if (m_lock) {
                         IoReleaseRemoveLock(m_lock, m_tag);
                 }
         }
 
-        RemoveLockGuard(const RemoveLockGuard&) = delete;
-        RemoveLockGuard& operator =(const RemoveLockGuard&) = delete;
+        remove_lock_guard(const remove_lock_guard&) = delete;
+        remove_lock_guard& operator =(const remove_lock_guard&) = delete;
 
-        constexpr bool is_acquired() const { return m_lock != nullptr; }
+        constexpr bool is_acquired() const { return m_lock; }
         constexpr explicit operator bool() const { return is_acquired(); }
 
-        auto acquired() const { return m_acquired; }
+        auto status() const { return m_status; }
         auto tag() const { return m_tag; }
 
         auto clear() 
@@ -68,7 +68,7 @@ public:
         }
 
 private:
-        NTSTATUS m_acquired = STATUS_SUCCESS;
+        NTSTATUS m_status = STATUS_SUCCESS;
         IO_REMOVE_LOCK *m_lock{};
         void *m_tag{};
 };

@@ -4,9 +4,10 @@
 
 #pragma once
 
-#include <wdm.h>
-#include <libusbip/generic_handle_ex.h>
 #include "codeseg.h"
+#include <libusbip/generic_handle_ex.h>
+
+#include <wdm.h>
 
 namespace libdrv
 {
@@ -53,14 +54,14 @@ public:
 };
 
 
-class SyncIrp
+class sync_irp
 {
 public:
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        SyncIrp() { ctor(); } // works for allocations on stack
+        sync_irp() { ctor(); } // works for allocations on stack
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        ~SyncIrp() { dtor(); }
+        ~sync_irp() { dtor(); }
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         NTSTATUS ctor(_In_ CCHAR StackSize = 1, _In_ bool ChargeQuota = false);
@@ -68,10 +69,10 @@ public:
         _IRQL_requires_max_(DISPATCH_LEVEL)
         void dtor();
 
-        SyncIrp(_In_ const SyncIrp&) = delete;
-        SyncIrp& operator=(_In_ const SyncIrp&) = delete;
+        sync_irp(_In_ const sync_irp&) = delete;
+        sync_irp& operator=(_In_ const sync_irp&) = delete;
 
-        constexpr explicit operator bool(this auto&& self) { return self.m_irp != nullptr; }
+        constexpr explicit operator bool(this auto&& self) { return self.m_irp; }
         constexpr auto operator !(this auto&& self) { return !self.m_irp; }
 
         constexpr auto get(this auto&& self) { return self.m_irp; }

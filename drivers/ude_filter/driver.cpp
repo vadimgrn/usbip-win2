@@ -37,7 +37,7 @@ NTSTATUS irp_complete(
         _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         auto fltr = static_cast<filter_ext*>(context);
-        RemoveLockGuard{fltr->remove_lock, adopt_lock, irp};
+        remove_lock_guard{fltr->remove_lock, adopt_lock, irp};
 
         if (irp->PendingReturned) {
                 IoMarkIrpPending(irp);
@@ -53,9 +53,9 @@ auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
 
-	RemoveLockGuard lck(fltr.remove_lock, irp);
+	remove_lock_guard lck(fltr.remove_lock, irp);
 	if (!lck) {
-		auto err = lck.acquired();
+		auto err = lck.status();
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}

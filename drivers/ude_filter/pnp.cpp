@@ -114,7 +114,7 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ RemoveLockGuard &lock)
+PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ remove_lock_guard &lock)
 {
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
@@ -213,9 +213,9 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	PAGED_CODE();
 	auto &fltr = *get_filter_ext(devobj);
 
-	RemoveLockGuard lck(fltr.remove_lock, irp);
+	remove_lock_guard lck(fltr.remove_lock, irp);
 	if (!lck) {
-		auto err = lck.acquired();
+		auto err = lck.status();
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
