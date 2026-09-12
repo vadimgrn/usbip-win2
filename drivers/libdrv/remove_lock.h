@@ -47,7 +47,6 @@ public:
 
         auto clear() 
         { 
-                m_acquired = STATUS_UNSUCCESSFUL;
                 m_lock = nullptr; 
 
                 auto tag = m_tag;
