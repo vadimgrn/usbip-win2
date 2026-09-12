@@ -36,7 +36,7 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
 
                 if (!has_hdr && len > rb.available()) {
                         if (len > static_cast<size_t>(-1) - rb.size()) [[unlikely]] {
-                                Trace(TRACE_LEVEL_ERROR, "receive indication size overflow");
+                                Trace(TRACE_LEVEL_ERROR, "dev %04x, receive indication size overflow", ptr04x(device));
                                 return false;
                         }
 
@@ -66,13 +66,11 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
 
                 size_t expected;
                 if (!get_total_size(expected, hdr)) [[unlikely]] {
-                        Trace(TRACE_LEVEL_ERROR, "invalid PDU");
+                        Trace(TRACE_LEVEL_ERROR, "dev %04x, invalid PDU", ptr04x(device));
                         return false;
                 }
 
-                if (rb.capacity() >= expected) [[likely]] {
-                        //
-                } else {
+                if (rb.capacity() < expected) [[unlikely]] {
                         auto st = realloc(dev.recv_buf, expected);
                         if (NT_ERROR(st)) {
                                 return false;
