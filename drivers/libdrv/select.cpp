@@ -3,6 +3,7 @@
  */
 
 #include "select.h"
+#include "usbdsc.h"
 #include "codeseg.h"
 #include "dbgcommon.h"
 
@@ -17,26 +18,34 @@ using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-USBD_INTERFACE_INFORMATION *next_interface(_In_ const USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)
+const USBD_INTERFACE_INFORMATION *next_interface(
+	_In_ const USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end)
 {
         if (!is_valid(iface, cfg_end)) {
                 return nullptr;
         }
 
-        void *next = (char*)iface + iface->Length;
+        const void *next = reinterpret_cast<const char*>(iface) + iface->Length;
 
         if (cfg_end && next >= cfg_end) {
                 return nullptr;
         }
 
-        return static_cast<USBD_INTERFACE_INFORMATION*>(next);
+        return static_cast<const USBD_INTERFACE_INFORMATION*>(next);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline const void *get_configuration_end(_In_ const _URB_SELECT_CONFIGURATION *cfg)
 {
-	return (char*)cfg + cfg->Hdr.Length;
+	return reinterpret_cast<const char*>(cfg) + cfg->Hdr.Length;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline const void *get_interface_end(_In_ const _URB_SELECT_INTERFACE &iface)
+{
+	return reinterpret_cast<const char*>(&iface) + iface.Hdr.Length;
 }
 
 _IRQL_requires_same_
@@ -47,8 +56,7 @@ void interfaces_str(
 {
 	auto st = STATUS_SUCCESS;
 
-	for (int i = 0; i < cnt && !st && is_valid(r, cfg_end);
-	     ++i, r = next_interface(r, cfg_end)) {
+	for (int i = 0; i < cnt && !st && is_valid(r, cfg_end); ++i) {
 
 		st = RtlStringCbPrintfExA(buf, len, &buf, &len, 0,
 			"\nInterface(Length %d, InterfaceNumber %d, AlternateSetting %d, "
@@ -79,6 +87,10 @@ void interfaces_str(
 				ptr04x(p.PipeHandle),
 				p.MaximumTransferSize,
 				p.PipeFlags);
+		}
+
+		if (i + 1 < cnt) {
+			r = next_interface(r, cfg_end);
 		}
 	}
 }
@@ -127,7 +139,7 @@ const char* libdrv::select_configuration_str(
 		interfaces_str(buf, len, &cfg->Interface, cd->bNumInterfaces, cfg_end);
 	}
 
-	return result && *result ? result : "select_configuration_str error";
+	return st != STATUS_INVALID_PARAMETER ? result : "select_configuration_str error";
 }
 
 _IRQL_requires_same_
@@ -135,7 +147,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 const char* libdrv::select_interface_str(
 	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const _URB_SELECT_INTERFACE &iface)
 {
-	if (!(buf && len)) {
+	if (!(buf && len &&
+	      iface.Hdr.Length >= offsetof(_URB_SELECT_INTERFACE, Interface))) {
 		return "select_interface_str invalid parameter";
 	}
 
@@ -144,10 +157,10 @@ const char* libdrv::select_interface_str(
 				       "ConfigurationHandle %04x", ptr04x(iface.ConfigurationHandle));
 
 	if (!st) {
-		interfaces_str(buf, len, &iface.Interface, 1, nullptr);
+		interfaces_str(buf, len, &iface.Interface, 1, get_interface_end(iface));
 	}
 
-	return result && *result ? result : "select_interface_str error";
+	return st != STATUS_INVALID_PARAMETER ? result : "select_interface_str error";
 }
 
 /*
@@ -165,7 +178,7 @@ _URB_SELECT_CONFIGURATION* libdrv::clone(
                 return nullptr;
         }
 
-        if (KeGetCurrentIrql() == DISPATCH_LEVEL &&
+        if (KeGetCurrentIrql() >= DISPATCH_LEVEL &&
             (pool_type == PagedPool || pool_type == PagedPoolCacheAligned)) [[unlikely]] {
                 NT_ASSERT(!"cannot allocate from paged pool at high IRQL"); 
                 return nullptr;
@@ -174,7 +187,7 @@ _URB_SELECT_CONFIGURATION* libdrv::clone(
         auto cd = src.ConfigurationDescriptor;
         ULONG cd_len = cd ? cd->wTotalLength : 0;
 
-        if (cd && cd_len < sizeof(*cd)) {
+        if (cd && (!is_valid(*cd) || cd_len < sizeof(*cd))) {
                 return nullptr;
         }
 
@@ -209,14 +222,13 @@ _URB_SELECT_CONFIGURATION* libdrv::clone(
 }
 
 /*
- * Why `iface->Length < != min_len` would cause issues
+ * Why `iface->Length != min_len` would cause issues
  * - Interfaces with `NumberOfPipes == 0` would be rejected
  * - Windows USB core driver validation (`usbport.sys`) only checks `>=`
  * - The OS requires that `Length` is *at least* the minimum needed to hold
- *   the declared pipes (`Length >= Length`), not strictly equal.
- * - For `URB_FUNCTION_SELECT_INTERFACE`, `cfg_end` is `nullptr` and there is
- *   only a single interface. Requiring exact equality would break valid client
- *   driver requests that allocated standard buffer sizes where `Length > min_len`.
+ *   the declared pipes (`Length >= min_len`), not strictly equal.
+ * - Requiring exact equality would break valid client driver requests
+ *   that allocated standard buffer sizes where `Length > min_len`.
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
