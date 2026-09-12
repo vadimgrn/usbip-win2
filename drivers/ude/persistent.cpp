@@ -701,15 +701,22 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
         USHORT cb = r.node_name.Length + r.service_name.Length + r.busid.Length + sizeof(L",,"); // see format string
 
-        unique_ptr buf(uninitialized, PagedPool, cb);
-        if (!buf) {
-                Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
-                return STATUS_INSUFFICIENT_RESOURCES;
+        wchar_t stack_buf[96];
+        unique_ptr buf;
+        wchar_t *pbuf = stack_buf;
+
+        if (cb > sizeof(stack_buf)) {
+                buf = unique_ptr(uninitialized, PagedPool, cb);
+                if (!buf) {
+                        Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
+                        return STATUS_INSUFFICIENT_RESOURCES;
+                }
+                pbuf = buf.get<wchar_t>();
         }
 
         UNICODE_STRING str { 
                 .MaximumLength = cb, 
-                .Buffer = buf.get<wchar_t>()
+                .Buffer = pbuf
         };
 
         auto st = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid);
