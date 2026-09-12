@@ -264,7 +264,7 @@ auto fill_isoc_data(
         for (ULONG i = 0; i < r.NumberOfPackets; ++i) { // set dd.Status and dd.Length
 
                 iso_packet_descriptor sd;
-                iso.read(&sd, sizeof(sd));
+                iso.read(sd);
                 byteswap(&sd, 1);
 
                 auto &dd = r.IsoPacket[i];

@@ -143,10 +143,11 @@ Enables running build and validation commands:
 - **Driver Frameworks**:
   - `drivers/ude` is a **KMDF driver**
   - `drivers/ude_filter` is a **WDM driver**
-- **No C++ Standard Library (`std::`)**: Drivers compile with `/kernel`. STL headers (`<utility>`, `<memory>`, `<algorithm>`, `<vector>`, `<string>`, `<functional>`, etc.) are not available or permitted.
+- **No C++ Standard Library (`std::`)**: Drivers compile with `/kernel`. STL headers (`<utility>`, `<memory>`, `<algorithm>`, `<vector>`, `<string>`, `<functional>`, `<type_traits>`, `<ranges>`, `<span>`, etc.) are not available or permitted.
   - Do NOT use `std::move` — use `static_cast<T&&>(val)`.
   - Do NOT use `std::swap` — use `::swap` from `drivers/libdrv/utils.h` or class-specific `swap()`.
   - Do NOT use `std::unique_ptr` — use `libdrv::unique_ptr_t` (from `drivers/libdrv/unique_ptr.h`) with appropriate pool tags.
+  - Do NOT use STL `<type_traits>` (`std::conditional_t`, `std::is_const_v`, `std::remove_reference_t`, etc.) — driver code must use pure template techniques and intrinsics without STL metaprogramming headers.
 - **No `noexcept` in Driver Code**: Do not annotate functions, constructors, destructors, or operators with `noexcept` in `drivers/`. Drivers compile in `/kernel` mode with C++ exceptions disabled.
 - **No C++ Exceptions or RTTI**: `throw`, `try`, `catch`, `dynamic_cast`, and `typeid` are prohibited and disabled (`/kernel`, `/GR-`).
 - **WDK C Headers Linkage (`extern "C"`)**: Legacy WDK C headers lacking internal `extern "C"` blocks (such as `<usbdlib.h>`) must be enclosed in `extern "C" { #include <header.h> }` to prevent C++ name mangling of kernel APIs.

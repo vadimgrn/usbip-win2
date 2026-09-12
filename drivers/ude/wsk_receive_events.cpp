@@ -33,7 +33,7 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
 
         ring_buffer rb(dev.recv_buf);
 
-        for (auto has_hdr = rb.peek_hdr(hdr); len || has_hdr; has_hdr = rb.peek_hdr(hdr)) {
+        for (auto has_hdr = rb.peek(hdr); len || has_hdr; has_hdr = rb.peek(hdr)) {
 
                 if (!has_hdr && len > rb.available()) {
                         if (len > static_cast<size_t>(-1) - rb.size()) [[unlikely]] {
@@ -53,7 +53,7 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
                         data += n;
                         len -= n;
                         if (!has_hdr) {
-                                has_hdr = rb.peek_hdr(hdr);
+                                has_hdr = rb.peek(hdr);
                         }
                 }
 
