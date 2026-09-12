@@ -138,7 +138,7 @@ auto get_packet_layout(_In_ const header &hdr)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir) 
+void libdrv::byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir) 
 {
 	if (dir == swap_dir::net2host) {
 		bswap(hdr);
@@ -166,7 +166,7 @@ void usbip::byteswap_header(_Inout_ header &hdr, _In_ swap_dir dir)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t cnt) 
+void libdrv::byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t cnt) 
 {
 	for (size_t i = 0; i < cnt; ++i, ++d) {
 
@@ -181,7 +181,7 @@ void usbip::byteswap(_Inout_updates_(cnt) iso_packet_descriptor *d, _In_ size_t 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void usbip::byteswap_payload(_Inout_ header &hdr) 
+void libdrv::byteswap_payload(_Inout_ header &hdr) 
 {
         if (auto layout = get_packet_layout(hdr);
             layout.valid && layout.number_of_packets) {
@@ -199,7 +199,7 @@ void usbip::byteswap_payload(_Inout_ header &hdr)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-bool usbip::get_total_size(_Out_ size_t &result, _In_ const header &hdr)
+bool libdrv::get_total_size(_Out_ size_t &result, _In_ const header &hdr)
 {
         auto layout = get_packet_layout(hdr);
         result = layout.valid ? sizeof(hdr) + layout.payload + layout.number_of_packets*sizeof(iso_packet_descriptor) : 0;
@@ -208,7 +208,7 @@ bool usbip::get_total_size(_Out_ size_t &result, _In_ const header &hdr)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-bool usbip::get_payload_size(_Out_ size_t &result, _In_ const header &hdr)
+bool libdrv::get_payload_size(_Out_ size_t &result, _In_ const header &hdr)
 {
 	auto ok = get_total_size(result, hdr);
 

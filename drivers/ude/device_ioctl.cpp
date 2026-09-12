@@ -137,7 +137,7 @@ void send_pending(_Inout_ device_ctx &dev)
         }
 
         do {
-                for (auto entry = libdrv::reverse(InterlockedFlushSList(&dev.pending_sends)); entry; ) {
+                for (auto entry = reverse(InterlockedFlushSList(&dev.pending_sends)); entry; ) {
 
                         auto &ctx = *CONTAINING_RECORD(entry, wsk_context, entry);
                         {
@@ -159,7 +159,7 @@ void send_pending(_Inout_ device_ctx &dev)
 
                 InterlockedExchange(&dev.sending, false);
 
-        } while (!(libdrv::empty(&dev.pending_sends) || InterlockedExchange(&dev.sending, true)));
+        } while (!(empty(&dev.pending_sends) || InterlockedExchange(&dev.sending, true)));
 }
 
 _IRQL_requires_same_
@@ -216,7 +216,7 @@ auto fill_usb_device_serial(
         _In_ WDFREQUEST request, _Inout_ _URB_CONTROL_TRANSFER_EX &r,
         _In_ const vhci::imported_device_properties &props)
 {
-        const UCHAR hdr_sz = libdrv::usb_string_descr_size(0);
+        const UCHAR hdr_sz = usb_string_descr_size(0);
 
         if (r.TransferBufferLength < hdr_sz) {
                 Trace(TRACE_LEVEL_ERROR,"TransferBufferLength(%lu) < %d", r.TransferBufferLength, hdr_sz);
@@ -242,7 +242,7 @@ auto fill_usb_device_serial(
                 return STATUS_BUFFER_TOO_SMALL;
         }
 
-        sd->bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
+        sd->bLength = usb_string_descr_size(static_cast<UCHAR>(serial_cch));
         sd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
 
         auto buf_cch = (min(r.TransferBufferLength, length) - hdr_sz)/sizeof(sd->bString);
@@ -254,7 +254,7 @@ auto fill_usb_device_serial(
                 sd->bString[i] = ch;
         }
 
-        r.TransferBufferLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
+        r.TransferBufferLength = usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
         return STATUS_SUCCESS;
 }
 

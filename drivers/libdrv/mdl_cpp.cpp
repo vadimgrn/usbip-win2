@@ -8,13 +8,13 @@
 /*
  * @see reactos\ntoskrnl\io\iomgr\iomdl.c
  */
-usbip::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
+libdrv::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
         m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr)) {}
 
 /*
  * Impossible to build partial MDL for a chain, only for THIS SourceMdl.
  */
-usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_mdl(nullptr)
+libdrv::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_mdl(nullptr)
 {
         if (!SourceMdl) {
                 NT_ASSERT(!"SourceMdl is NULL");
@@ -41,33 +41,33 @@ usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_m
         }
 }
 
-usbip::Mdl::Mdl(Mdl&& m) :
+libdrv::Mdl::Mdl(Mdl&& m) :
         m_mdl(m.release()),
         m_mapped(m.m_mapped)
 {
         m.m_mapped = false;
 }
 
-auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
+auto libdrv::Mdl::operator =(Mdl&& m) -> Mdl&
 {
         Mdl(static_cast<Mdl&&>(m)).swap(*this);
         return *this;
 }
 
-void usbip::Mdl::swap(_Inout_ Mdl &other)
+void libdrv::Mdl::swap(_Inout_ Mdl &other)
 {
         ::swap(m_mdl, other.m_mdl);
         ::swap(m_mapped, other.m_mapped);
 }
 
-MDL* usbip::Mdl::release()
+MDL* libdrv::Mdl::release()
 {
         auto m = m_mdl;
         m_mdl = nullptr;
         return m;
 }
 
-void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
+void libdrv::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
 {
         if (m_mdl) {
                 NT_ASSERT(m_mdl != mdl);
@@ -79,7 +79,7 @@ void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
         m_mapped = mapped;
 }
 
-NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
+NTSTATUS libdrv::Mdl::lock(_In_ LOCK_OPERATION Operation)
 {
         NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
         NT_ASSERT(m_mdl);
@@ -98,7 +98,7 @@ NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
         return STATUS_SUCCESS;
 }
 
-void usbip::Mdl::next(_In_opt_ MDL *m)
+void libdrv::Mdl::next(_In_opt_ MDL *m)
 { 
         if (m_mdl) {
                 NT_ASSERT(m_mdl != m);
@@ -106,7 +106,7 @@ void usbip::Mdl::next(_In_opt_ MDL *m)
         }
 }
 
-NTSTATUS usbip::Mdl::prepare_nonpaged()
+NTSTATUS libdrv::Mdl::prepare_nonpaged()
 {
         if (!m_mdl) {
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -126,7 +126,7 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
         return STATUS_SUCCESS;
 }
 
-NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
+NTSTATUS libdrv::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
 {
         return m_mdl ? lock(Operation) : STATUS_INSUFFICIENT_RESOURCES;
 }
@@ -142,7 +142,7 @@ NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
  * When the owner of the source MDL subsequently calls MmUnlockPages, it results in lock count underflow
  * and Driver Verifier bugchecks (0xC4/PFN_SHARE_COUNT).
  */
-void usbip::Mdl::unprepare()
+void libdrv::Mdl::unprepare()
 {
         if (!m_mdl) {
                 return;
@@ -166,7 +166,7 @@ void usbip::Mdl::unprepare()
  * Take ownership of unmapping if the system flag
  * flipped from false to true strictly during this call.
  */
-void* usbip::Mdl::sysaddr(_In_ ULONG Priority)
+void* libdrv::Mdl::sysaddr(_In_ ULONG Priority)
 { 
         if (!m_mdl) {
                 return nullptr;
@@ -186,7 +186,7 @@ void* usbip::Mdl::sysaddr(_In_ ULONG Priority)
         return addr;
 }
 
-size_t usbip::size(_In_opt_ const MDL *mdl)
+size_t libdrv::size(_In_opt_ const MDL *mdl)
 {
         size_t total = 0;
 
@@ -197,7 +197,7 @@ size_t usbip::size(_In_opt_ const MDL *mdl)
         return total;
 }
 
-MDL *usbip::tail(_In_opt_ MDL *mdl)
+MDL *libdrv::tail(_In_opt_ MDL *mdl)
 {
         for ( ; mdl && mdl->Next; mdl = mdl->Next);
         return mdl;

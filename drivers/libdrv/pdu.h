@@ -5,12 +5,13 @@
 #pragma once
 
 #include <kernelspecs.h>
+#include <usbip/proto.h>
 
-namespace usbip
+namespace libdrv
 {
 
-struct header;
-struct iso_packet_descriptor;
+using usbip::header;
+using usbip::iso_packet_descriptor;
 
 enum class swap_dir { host2net, net2host };
 
@@ -34,4 +35,4 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool get_total_size(_Out_ size_t &result, _In_ const header &hdr);
 
-} // namespace usbip
+} // namespace libdrv

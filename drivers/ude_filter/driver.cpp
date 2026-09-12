@@ -14,10 +14,11 @@
 
 #include <libdrv/remove_lock.h>
 
+using namespace usbip;
+using namespace libdrv;
+
 namespace
 {
-
-using namespace usbip;
 
 _Function_class_(DRIVER_UNLOAD)
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -36,7 +37,7 @@ NTSTATUS irp_complete(
         _In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         auto fltr = static_cast<filter_ext*>(context);
-        libdrv::RemoveLockGuard{fltr->remove_lock, libdrv::adopt_lock, irp};
+        RemoveLockGuard{fltr->remove_lock, adopt_lock, irp};
 
         if (irp->PendingReturned) {
                 IoMarkIrpPending(irp);
@@ -52,7 +53,7 @@ auto dispatch_lower(_In_ DEVICE_OBJECT *devobj, _Inout_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
+	RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);

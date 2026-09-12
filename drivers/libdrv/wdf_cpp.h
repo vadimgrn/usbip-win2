@@ -218,31 +218,23 @@ struct wdfkey_traits
         static WDFKEY invalid() { return WDF_NO_HANDLE; }
 };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void close_handle(_In_ WDFOBJECT obj, _In_ wdfobject_traits)
+{
+        WdfObjectDelete(obj);
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+inline void close_handle(_In_ WDFKEY key, _In_ wdfkey_traits)
+{
+        WdfRegistryClose(key);
+}
+
 using ObjectDelete = usbip::generic_handle<wdfobject_traits>;
 using Registry = usbip::generic_handle<wdfkey_traits>;
 
 using usbip::swap;
 
 } // namespace wdf
-
-
-namespace usbip
-{
-
-using wdf::ObjectDelete;
-
-template<>
-inline void close_handle(_In_ ObjectDelete::type obj, _In_ ObjectDelete::tag_type)
-{
-        WdfObjectDelete(obj);
-}
-
-using wdf::Registry;
-
-template<>
-inline void close_handle(_In_ Registry::type key, _In_ Registry::tag_type)
-{
-        WdfRegistryClose(key);
-}
-
-} // namespace usbip

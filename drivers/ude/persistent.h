@@ -12,6 +12,9 @@
 namespace usbip
 {
 
+using wdf::Registry;
+using wdf::ObjectDelete;
+
 struct vhci_ctx;
 struct device_attributes;
 

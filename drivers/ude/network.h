@@ -18,6 +18,8 @@ namespace usbip
 {
 
 using wsk::SOCKET;
+using libdrv::Mdl;
+using libdrv::memory;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -54,7 +56,7 @@ inline auto verify(_In_ const WSK_BUF &buf, _In_ bool exact)
 		return false;
 	}
 
-	auto sz = size(buf.Mdl);
+	auto sz = libdrv::size(buf.Mdl);
 	return exact ? buf.Length == sz : buf.Length <= sz;
 }
 

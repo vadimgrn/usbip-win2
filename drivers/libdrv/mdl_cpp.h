@@ -6,7 +6,7 @@
 
 #include <wdm.h>
 
-namespace usbip
+namespace libdrv
 {
 
 enum class memory { nonpaged, paged, stack = paged };
@@ -101,4 +101,4 @@ inline void swap(_Inout_ Mdl &a, _Inout_ Mdl &b)
 inline auto tail(_In_ const Mdl &mdl) { return tail(mdl.get()); }
 inline auto size(_In_ const Mdl &mdl) { return size(mdl.get()); }
 
-} // namespace usbip
+} // namespace libdrv

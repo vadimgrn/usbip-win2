@@ -25,6 +25,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -66,7 +67,7 @@ PAGED auto make_mdl(_Inout_ Mdl &mdl, _Inout_ unique_ptr &buf, _In_ ULONG length
         NT_ASSERT(!buf);
         NT_ASSERT(length);
 
-        if (buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, length); !buf) {
+        if (buf = unique_ptr(uninitialized, NonPagedPoolNx, length); !buf) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", length);
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -120,7 +121,7 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
         }
         TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
 
-        auto dir_out = libdrv::is_transfer_dir_out(ctx.hdr);
+        auto dir_out = is_transfer_dir_out(ctx.hdr);
 	bool fail{};
 
 	if (ctx.is_isoc) { // always has payload

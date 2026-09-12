@@ -13,6 +13,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 bool g_initialized;
 LOOKASIDE_LIST_EX g_lookaside;
@@ -62,7 +63,7 @@ void *allocate_function_ex(
                 return nullptr;
         }
 
-        if (ctx->wsk_irp = libdrv::irp_ptr(1, false); !ctx->wsk_irp) {
+        if (ctx->wsk_irp = irp_ptr(1, false); !ctx->wsk_irp) {
                 Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp -> NULL");
                 free_function_ex(ctx, list);
                 return nullptr;
@@ -108,7 +109,7 @@ auto alloc_buf_tail(_Inout_ void* &buf, _In_ ULONG length)
                 st = STATUS_BUFFER_TOO_SMALL;
         } else if (buf) {
                 // allocate once
-        } else if (unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
+        } else if (unique_ptr ptr(uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate %d bytes", MAXLEN);
                 st = STATUS_INSUFFICIENT_RESOURCES;
         } else {

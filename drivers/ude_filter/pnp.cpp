@@ -24,10 +24,12 @@
 #include <initguid.h>
 #include <usbcamdi.h>
 
+using namespace usbip;
+using namespace libdrv;
+
 namespace
 {
 
-using namespace usbip;
 using QueryInterface = decltype(_IO_STACK_LOCATION::Parameters.QueryInterface);
 
 constexpr auto SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
@@ -48,7 +50,7 @@ PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
 	PAGED_CODE();
 
 	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
-        unique_ptr ptr(libdrv::uninitialized, PagedPool, sz);
+        unique_ptr ptr(uninitialized, PagedPool, sz);
 
 	if (ptr) {
 		RtlCopyMemory(ptr.get(), &src, sz);
@@ -146,7 +148,7 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::RemoveLockGuard &lock)
+PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ RemoveLockGuard &lock)
 {
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
@@ -245,7 +247,7 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	PAGED_CODE();
 	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
+	RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);

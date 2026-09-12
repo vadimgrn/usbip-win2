@@ -14,10 +14,11 @@
 
 #include <ntstrsafe.h>
 
+using namespace usbip;
+using namespace libdrv;
+
 namespace
 {
-
-using namespace usbip;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -40,7 +41,7 @@ PAGED auto save_device_location(_Inout_ device_attributes &attr, _In_ const vhci
                         continue; // RtlInitUnicodeString(&dst, nullptr); // the same as zeroed memory
                 }
 
-                auto st = libdrv::utf8_to_unicode(*dst, src, maxlen, PagedPool, unique_ptr::pooltag);
+                auto st = utf8_to_unicode(*dst, src, maxlen, PagedPool, unique_ptr::pooltag);
                 if (NT_ERROR(st)) {
                         Trace(TRACE_LEVEL_ERROR, "utf8_to_unicode('%s') %!STATUS!", src, st);
                         return st;
@@ -197,7 +198,7 @@ PAGED void usbip::free(_Inout_ device_attributes &r)
 {
         PAGED_CODE();
 
-        libdrv::FreeUnicodeString(r.node_name, unique_ptr::pooltag); // @see RtlFreeUnicodeString
-        libdrv::FreeUnicodeString(r.service_name, unique_ptr::pooltag);
-        libdrv::FreeUnicodeString(r.busid, unique_ptr::pooltag);
+        FreeUnicodeString(r.node_name, unique_ptr::pooltag); // @see RtlFreeUnicodeString
+        FreeUnicodeString(r.service_name, unique_ptr::pooltag);
+        FreeUnicodeString(r.busid, unique_ptr::pooltag);
 }

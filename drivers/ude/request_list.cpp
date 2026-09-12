@@ -19,19 +19,20 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto in_sent_list(_In_ const request_ctx &req)
 {
-        return !libdrv::is_zeroed(req.entry);
+        return !is_zeroed(req.entry);
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto in_completion_queue(_In_ const request_ctx &req)
 {
-        return !libdrv::is_zeroed(req.completion_entry);
+        return !is_zeroed(req.completion_entry);
 }
 
 _IRQL_requires_same_
@@ -98,7 +99,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 
 	auto &req = *get_request_ctx(request);
 
-	if (!libdrv::has_urb(irp)) {
+	if (!has_urb(irp)) {
 		if (NT_ERROR(status)) {
 			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
@@ -106,7 +107,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		return;
 	}
 
-	auto &urb = *libdrv::urb_from_irp(irp);
+	auto &urb = *urb_from_irp(irp);
 	auto &urb_st = urb.UrbHeader.Status;
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {

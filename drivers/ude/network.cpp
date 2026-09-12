@@ -124,7 +124,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
 
         if (auto head = r.TransferBufferMDL) { // preferable case because it is locked-down, can be a chain
 
-                auto len = static_cast<ULONG>(size(head));
+                auto len = static_cast<ULONG>(libdrv::size(head));
 
                 if (len < mdl_size && (head->Next || operation == IoReadAccess)) {
                         Trace(TRACE_LEVEL_ERROR, "MDL size %lu < mdl_size(%lu)", len, mdl_size);

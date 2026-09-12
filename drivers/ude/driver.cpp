@@ -16,6 +16,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_

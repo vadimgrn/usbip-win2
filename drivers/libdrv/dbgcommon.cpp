@@ -13,12 +13,11 @@
 #include <usbuser.h>
 #include <ntstrsafe.h>
 
-using namespace libdrv;
-
 namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -49,7 +48,7 @@ void print_cmd_submit(
 					cmd->number_of_packets, cmd->interval, setup ? ", " : "");
 
 	if (!st && setup) {
-		usb_setup_pkt_str(buf, len, cmd->setup);
+                usb_setup_pkt_str(buf, len, cmd->setup);
 	}
 }
 
@@ -66,7 +65,7 @@ void print_ret_submit(_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ c
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::request_type_str(_In_ UCHAR type)
+const char* libdrv::request_type_str(_In_ UCHAR type)
 {
 	static const char* v[] = { "STANDARD", "CLASS", "VENDOR", "BMREQUEST_3" };
 	return type < ARRAYSIZE(v) ? v[type] : "?";
@@ -74,7 +73,7 @@ const char* usbip::request_type_str(_In_ UCHAR type)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::request_recipient_str(_In_ UCHAR recipient)
+const char* libdrv::request_recipient_str(_In_ UCHAR recipient)
 {
 	static const char* v[] = { "DEVICE", "INTERFACE", "ENDPOINT", "OTHER" };
 	return recipient < ARRAYSIZE(v) ? v[recipient] : "?";
@@ -82,7 +81,7 @@ const char* usbip::request_recipient_str(_In_ UCHAR recipient)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::brequest_str(_In_ UCHAR bRequest)
+const char* libdrv::brequest_str(_In_ UCHAR bRequest)
 {
 	switch (bRequest) {
 	case USB_REQUEST_GET_STATUS: return "GET_STATUS";
@@ -107,7 +106,7 @@ const char* usbip::brequest_str(_In_ UCHAR bRequest)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::get_usbd_status(_In_ USBD_STATUS status)
+const char* libdrv::get_usbd_status(_In_ USBD_STATUS status)
 {
 	switch (status) {
 	case USBD_STATUS_SUCCESS: 
@@ -240,7 +239,7 @@ const char* usbip::get_usbd_status(_In_ USBD_STATUS status)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::usbuser_request_name(_In_ ULONG UsbUserRequest)
+const char* libdrv::usbuser_request_name(_In_ ULONG UsbUserRequest)
 {
 	switch (UsbUserRequest) {
 	case USBUSER_GET_CONTROLLER_INFO_0: return "GET_CONTROLLER_INFO_0";
@@ -277,7 +276,7 @@ const char* usbip::usbuser_request_name(_In_ ULONG UsbUserRequest)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::device_control_name(_In_ ULONG ioctl_code)
+const char* libdrv::device_control_name(_In_ ULONG ioctl_code)
 {
 	static_assert(sizeof(ioctl_code) == sizeof(vhci::ioctl::PLUGIN_HARDWARE));
 
@@ -331,7 +330,7 @@ const char* usbip::device_control_name(_In_ ULONG ioctl_code)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::internal_device_control_name(_In_ ULONG ioctl_code)
+const char* libdrv::internal_device_control_name(_In_ ULONG ioctl_code)
 {
 	static_assert(sizeof(ioctl_code) == sizeof(IOCTL_INTERNAL_USB_CYCLE_PORT));
 
@@ -369,7 +368,7 @@ const char* usbip::internal_device_control_name(_In_ ULONG ioctl_code)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::usbd_pipe_type_str(_In_ USBD_PIPE_TYPE t)
+const char* libdrv::usbd_pipe_type_str(_In_ USBD_PIPE_TYPE t)
 {
 	static const char* v[] = { "Ctrl", "Isoch", "Bulk", "Intr" };
         auto idx = static_cast<int>(t);
@@ -381,7 +380,7 @@ const char* usbip::usbd_pipe_type_str(_In_ USBD_PIPE_TYPE t)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::urb_function_str(_In_ int function)
+const char* libdrv::urb_function_str(_In_ int function)
 {
 	static const char* v[] = 
 	{
@@ -479,7 +478,7 @@ const char* usbip::urb_function_str(_In_ int function)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::dbg_usbip_hdr(
+const char* libdrv::dbg_usbip_hdr(
 	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const header *hdr, _In_ bool setup_packet)
 {
         if (!(buf && len && hdr)) {
@@ -516,7 +515,7 @@ const char* usbip::dbg_usbip_hdr(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::usb_setup_pkt_str(
+const char* libdrv::usb_setup_pkt_str(
 	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const void *packet)
 {
 	if (!(buf && len && packet)) {
@@ -542,7 +541,7 @@ const char* usbip::usb_setup_pkt_str(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* usbip::usbd_transfer_flags(
+const char* libdrv::usbd_transfer_flags(
 	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG TransferFlags)
 {
 	if (!(buf && len)) {

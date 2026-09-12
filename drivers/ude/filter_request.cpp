@@ -19,6 +19,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -78,8 +79,8 @@ auto select_configuration(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
         {
-                char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-                TraceDbg("%s", libdrv::select_configuration_str(buf, sizeof(buf), &r));
+                char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+                TraceDbg("%s", select_configuration_str(buf, sizeof(buf), &r));
         }
 
         UCHAR cfg{}; // FIXME: can't pass -1 if unconfigured
@@ -88,7 +89,7 @@ auto select_configuration(
                 cfg = cd->bConfigurationValue;
 
                 auto intf = &r.Interface;
-                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = libdrv::next(intf)) {
+                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = next(intf)) {
                         update_pipe_properties(dev, *intf);
                 }
         }
@@ -103,8 +104,8 @@ auto select_interface(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const _URB_SELECT_INTERFACE &r)
 {
         {
-                char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
-                TraceDbg("%s", libdrv::select_interface_str(buf, sizeof(buf), r));
+                char buf[SELECT_INTERFACE_STR_BUFSZ];
+                TraceDbg("%s", select_interface_str(buf, sizeof(buf), r));
         }
 
         auto &i = r.Interface;

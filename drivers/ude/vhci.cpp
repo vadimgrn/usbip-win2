@@ -25,6 +25,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 /*
  * WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE.

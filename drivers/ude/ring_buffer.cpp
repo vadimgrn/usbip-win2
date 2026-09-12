@@ -9,6 +9,8 @@
 #include "driver.h"
 #include <usbip/proto.h>
 
+using namespace libdrv;
+
 /*
 * While the TransferBufferLength field itself is a 32-bit integer (ULONG),
 * you cannot pass an arbitrary 4 GB buffer.
@@ -49,7 +51,7 @@ NTSTATUS usbip::realloc(_Inout_ ring_buffer_data* &data, _In_ size_t bytes)
                 return STATUS_BUFFER_TOO_SMALL;
         }
 
-        unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, bytes);
+        unique_ptr ptr(uninitialized, NonPagedPoolNx, bytes);
         if (!ptr) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", bytes);
                 return STATUS_INSUFFICIENT_RESOURCES;

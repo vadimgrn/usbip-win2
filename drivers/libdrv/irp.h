@@ -7,7 +7,7 @@
 #include <libusbip/generic_handle_ex.h>
 #include "codeseg.h"
 
-namespace usbip
+namespace libdrv
 {
 
 struct irp_ptr_traits
@@ -15,7 +15,6 @@ struct irp_ptr_traits
         static IRP* invalid() { return nullptr; }
 };
 
-template<>
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_traits)
@@ -23,15 +22,8 @@ inline void close_handle(_In_ IRP *irp, _In_ irp_ptr_traits)
         IoFreeIrp(irp);
 }
 
-} // namespace usbip
-
-
-namespace libdrv
-{
-
 using usbip::swap;
 using usbip::generic_handle;
-using usbip::irp_ptr_traits;
 
 class irp_ptr : public generic_handle<irp_ptr_traits>
 {

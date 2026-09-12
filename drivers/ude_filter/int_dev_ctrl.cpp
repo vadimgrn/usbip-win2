@@ -18,10 +18,11 @@
 #include <libdrv/select.h>
 #include <libdrv/urb_ptr.h>
 
+using namespace usbip;
+using namespace libdrv;
+
 namespace
 {
-
-using namespace usbip;
 
 struct irp_args
 {
@@ -49,7 +50,7 @@ auto is_valid_urb_length(_In_ const URB &urb)
                 auto &intf = urb.UrbSelectInterface.Interface;
                 auto end = reinterpret_cast<const char*>(&urb) + hdr.Length;
 
-                return libdrv::is_valid(&intf, end);
+                return is_valid(&intf, end);
         }
         }
 
@@ -64,13 +65,13 @@ NTSTATUS request_complete(
         _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         auto &fltr = *static_cast<filter_ext*>(context);
-        auto &args = libdrv::get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp));
+        auto &args = get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp));
 
-        libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, args.tag);
+        RemoveLockGuard lck(fltr.remove_lock, adopt_lock, args.tag);
         NT_ASSERT(lck.tag() != irp);
 
-        libdrv::irp_ptr rip(irp);
-        libdrv::urb_ptr urb(fltr.device.usbd_handle, args.urb);
+        irp_ptr rip(irp);
+        urb_ptr urb(fltr.device.usbd_handle, args.urb);
 
         TraceDbg("dev %04x, irp %04x -> target %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self), 
                   ptr04x(irp), ptr04x(fltr.target), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb.get())));
@@ -82,10 +83,10 @@ NTSTATUS request_complete(
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _IRQL_requires_same_
 auto send_request(
-	_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, 
+	_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, 
 	_Inout_ unique_ptr &TransferBuffer, _In_ USHORT function)
 {
-	libdrv::irp_ptr irp(fltr.target->StackSize + 1, false); // plus one for this driver's parameters
+	irp_ptr irp(fltr.target->StackSize + 1, false); // plus one for this driver's parameters
 	if (!irp) {
 		Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp error");
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -95,9 +96,9 @@ auto send_request(
         auto next = IoGetNextIrpStackLocation(irp.get());
 
         next->MajorFunction = IRP_MJ_INTERNAL_DEVICE_CONTROL;
-        libdrv::DeviceIoControlCode(next) = IOCTL_INTERNAL_USB_SUBMIT_URB;
+        DeviceIoControlCode(next) = IOCTL_INTERNAL_USB_SUBMIT_URB;
 
-	libdrv::urb_ptr urb(fltr.device.usbd_handle);
+	urb_ptr urb(fltr.device.usbd_handle);
 	if (auto err = urb.alloc(next)) {
 		Trace(TRACE_LEVEL_ERROR, "USBD_UrbAllocate %!STATUS!", err);
 		return err;
@@ -107,7 +108,7 @@ auto send_request(
 
         filter::pack_request(urb->UrbControlTransferEx, TransferBuffer.release(), function);
 
-        auto &args = libdrv::get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp.get()));
+        auto &args = get_params_others<irp_args>(IoGetCurrentIrpStackLocation(irp.get()));
         args.urb = urb.release();
         args.tag = lck.clear();
 
@@ -117,11 +118,11 @@ auto send_request(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const URB &urb)
+void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const URB &urb)
 {
 	if (auto &hdr = urb.UrbHeader; !is_valid_urb_length(urb)) {
 		Trace(TRACE_LEVEL_ERROR, "Invalid URB length %lu", hdr.Length);
-	} else if (auto buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, hdr.Length)) {
+	} else if (auto buf = unique_ptr(uninitialized, NonPagedPoolNx, hdr.Length)) {
 		RtlCopyMemory(buf.get(), &urb, hdr.Length);
 		send_request(fltr, lck, buf, hdr.Function);
 	} else {
@@ -134,15 +135,15 @@ void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ 
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const _URB_SELECT_CONFIGURATION &r)
+void send_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
 	{
-		char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-		TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
+		char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+		TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
 	}
 
         ULONG len{};
-        if (unique_ptr buf(libdrv::clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)); buf) {
+        if (unique_ptr buf(clone(len, r, NonPagedPoolNx, unique_ptr::pooltag)); buf) {
 		send_request(fltr, lck, buf, r.Hdr.Function);
 	} else {
 		Trace(TRACE_LEVEL_ERROR, "Can't allocate %lu bytes", len);
@@ -151,7 +152,7 @@ void send_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ const URB &urb)
+void post_process_urb(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ const URB &urb)
 {
 	bool send{};
 	
@@ -172,16 +173,16 @@ void post_process_urb(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lc
 	case URB_FUNCTION_SELECT_INTERFACE:
 		static_assert(is_request_function(URB_FUNCTION_SELECT_INTERFACE));
 		if constexpr (auto &r = urb.UrbSelectInterface; true) {
-			char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
-			TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_interface_str(buf, sizeof(buf), r));
+			char buf[SELECT_INTERFACE_STR_BUFSZ];
+			TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_interface_str(buf, sizeof(buf), r));
 		}
 		send = true;
 		break;
 	case URB_FUNCTION_SELECT_CONFIGURATION:
 		static_assert(is_request_function(URB_FUNCTION_SELECT_CONFIGURATION));
                 if constexpr (auto &r = urb.UrbSelectConfiguration; true) {
-                        char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-                        TraceDbg("dev %04x, %s", ptr04x(fltr.self), libdrv::select_configuration_str(buf, sizeof(buf), &r));
+                        char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+                        TraceDbg("dev %04x, %s", ptr04x(fltr.self), select_configuration_str(buf, sizeof(buf), &r));
                 }
                 send_urb(fltr, lck, urb.UrbSelectConfiguration);
 		break;
@@ -230,7 +231,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto get_request_type(_In_ const URB &urb)
 {
-        using namespace libdrv;
         UCHAR bmRequestType;
 
         switch (urb.UrbHeader.Function) {
@@ -315,14 +315,14 @@ void control_to_vendor_class(_Inout_ URB &urb, _In_ uintptr_t val)
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void post_process_irp(_In_ filter_ext &fltr, _Inout_ libdrv::RemoveLockGuard &lck, _In_ IRP *irp)
+void post_process_irp(_In_ filter_ext &fltr, _Inout_ RemoveLockGuard &lck, _In_ IRP *irp)
 {
         auto status = irp->IoStatus.Status;
 
-        if (auto ctl = libdrv::DeviceIoControlCode(irp); ctl != IOCTL_INTERNAL_USB_SUBMIT_URB) {
+        if (auto ctl = DeviceIoControlCode(irp); ctl != IOCTL_INTERNAL_USB_SUBMIT_URB) {
                 TraceDbg("dev %04x, %s, %!STATUS!", ptr04x(fltr.self), internal_device_control_name(ctl), status);
 
-        } else if (auto urb = libdrv::urb_from_irp(irp); !urb) {
+        } else if (auto urb = urb_from_irp(irp); !urb) {
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, submit URB has no URB pointer", ptr04x(fltr.self));
 
         } else if (NT_ERROR(status) || USBD_ERROR(URB_STATUS(urb))) {
@@ -341,12 +341,12 @@ NTSTATUS irp_complete(
         _In_ DEVICE_OBJECT *devobj, _In_ IRP *irp, _In_reads_opt_(_Inexpressible_("varies")) void *context)
 {
         auto &fltr = *get_filter_ext(devobj);
-        libdrv::RemoveLockGuard lck(fltr.remove_lock, libdrv::adopt_lock, irp);
+        RemoveLockGuard lck(fltr.remove_lock, adopt_lock, irp);
 
         if (auto val = reinterpret_cast<uintptr_t>(context); fltr.is_hub) {
                 NT_ASSERT(!val);
         } else if (val) { // legacy control transfer
-                auto urb = libdrv::urb_from_irp(irp);
+                auto urb = urb_from_irp(irp);
                 control_to_vendor_class(*urb, val);
                 TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self),
                           ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
@@ -387,7 +387,7 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 {
 	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
+	RemoveLockGuard lck(fltr.remove_lock, irp);
 	if (auto err = lck.acquired()) {
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
@@ -395,8 +395,8 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 
 	uintptr_t ctx{};
 
-	if (libdrv::DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
-		auto urb = libdrv::urb_from_irp(irp);
+	if (DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
+		auto urb = urb_from_irp(irp);
 		if (!urb) {
 			Trace(TRACE_LEVEL_ERROR, "dev %04x, submit URB has no URB pointer", ptr04x(fltr.self));
 			return CompleteRequest(irp, STATUS_INVALID_PARAMETER);

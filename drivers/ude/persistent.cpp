@@ -19,6 +19,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 /*
  * Context space for WDFREQUEST which is used for attach attempts.
@@ -177,7 +178,7 @@ PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
         }
 
         for (USHORT i = 0; i < str.Length/sizeof(*str.Buffer); ++i) {
-                if (!libdrv::isdigit(str.Buffer[i])) {
+                if (!isdigit(str.Buffer[i])) {
                         return STATUS_INVALID_PARAMETER;
                 }
         }
@@ -214,7 +215,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
         UNICODE_STRING* v[] { &r.node_name, &r.service_name, &r.busid, &serial, &tail };
 
         for (int i = 0; i < ARRAYSIZE(v) - 1; ++i) {
-                libdrv::split(*v[i], tail, tail, L',');
+                split(*v[i], tail, tail, L',');
         }
 
         if (empty(r.node_name) || empty(r.service_name) || empty(r.busid)) {
@@ -223,7 +224,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
 
         auto &u8_serial = r.properties.serial;
 
-        auto st = libdrv::unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
+        auto st = unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, st);
                 return st;
@@ -612,7 +613,7 @@ PAGED NTSTATUS usbip::fill_location(
         };
 
         for (auto &[dst, dst_sz, src]: v) {
-                auto st = libdrv::unicode_to_utf8(dst, dst_sz, src);
+                auto st = unicode_to_utf8(dst, dst_sz, src);
                 if (NT_ERROR(st)) {
                         Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &src, st);
                         return st;
@@ -700,7 +701,7 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
         USHORT cb = r.node_name.Length + r.service_name.Length + r.busid.Length + sizeof(L",,"); // see format string
 
-        unique_ptr buf(libdrv::uninitialized, PagedPool, cb);
+        unique_ptr buf(uninitialized, PagedPool, cb);
         if (!buf) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
                 return STATUS_INSUFFICIENT_RESOURCES;

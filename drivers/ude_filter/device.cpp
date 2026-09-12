@@ -13,10 +13,11 @@
 
 #include <ntstrsafe.h>
 
+using namespace usbip;
+using namespace libdrv;
+
 namespace
 {
-
-using namespace usbip;
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
@@ -67,7 +68,7 @@ PAGED bool driver_name_equal(
 	PAGED_CODE();
 
 	const auto buf_sz = 1024UL;
-	unique_ptr buf(libdrv::uninitialized, PagedPool, buf_sz);
+	unique_ptr buf(uninitialized, PagedPool, buf_sz);
 	if (!buf) {
 		Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", buf_sz);
 		return false;

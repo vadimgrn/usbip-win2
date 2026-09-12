@@ -7,6 +7,8 @@
 #include <ntddk.h>
 #include <usb.h>
 
+#include <usbip/proto.h>
+
 namespace libdrv
 {
 
@@ -17,16 +19,6 @@ inline auto ptr04x(_In_opt_ const void *ptr) // use format "%04x"
         auto n = reinterpret_cast<uintptr_t>(ptr);
         return static_cast<UINT32>(n);
 }
-
-} // namespace libdrv
-
-
-namespace usbip
-{
-
-using libdrv::ptr04x;
-
-struct header;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -93,5 +85,5 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 const char *usbd_transfer_flags(
 	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG TransferFlags);
 
-} // namespace usbip
+} // namespace libdrv
 

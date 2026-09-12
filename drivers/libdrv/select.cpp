@@ -13,8 +13,7 @@
 namespace
 {
 
-using namespace usbip;
-using libdrv::is_valid;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

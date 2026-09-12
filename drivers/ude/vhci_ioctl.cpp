@@ -28,6 +28,8 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
+using namespace wdf;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
@@ -97,7 +99,7 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
         auto busid = ext.busid();
 
         auto &dst = req.body.busid;
-        auto st = libdrv::unicode_to_utf8(dst, sizeof(dst), *busid);
+        auto st = unicode_to_utf8(dst, sizeof(dst), *busid);
 
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", busid, st);
@@ -130,7 +132,7 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
         byteswap(reply);
 
         char busid[sizeof(reply.udev.busid)];
-        st = libdrv::unicode_to_utf8(busid, sizeof(busid), *ext.busid());
+        st = unicode_to_utf8(busid, sizeof(busid), *ext.busid());
 
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), st);
@@ -460,7 +462,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto &vhci = *get_vhci_ctx(ctx.vhci);
 
         auto &ext = get_device_ctx_ext(ctx.ctx_ext);
-        wdf::ObjectRef ext_ref(ctx.ctx_ext); // on_connect/connected can WdfObjectDelete it
+        ObjectRef ext_ref(ctx.ctx_ext); // on_connect/connected can WdfObjectDelete it
 
         auto request = ctx.request;
         WdfRequestSetInformation(request, ctx.args.info); // restore
@@ -1000,7 +1002,7 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
         auto device = WdfIoQueueGetDevice(queue);
         auto &vhci = *get_vhci_ctx(device);
         
-        wdf::WaitLock lck(vhci.events_lock);
+        WaitLock lck(vhci.events_lock);
 
         if (auto &val = fobj.process_events; !val) {
                 ++vhci.events_subscribers;

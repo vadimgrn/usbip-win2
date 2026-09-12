@@ -74,7 +74,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         }
 
         // all resources must be freed
-        NT_ASSERT(libdrv::empty(&dev.pending_sends));
+        NT_ASSERT(empty(&dev.pending_sends));
         NT_ASSERT(IsListEmpty(&dev.requests));
         NT_ASSERT(IsListEmpty(&dev.request_completions));
         NT_ASSERT(get_flag(dev.unplugged));

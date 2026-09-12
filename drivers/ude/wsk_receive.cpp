@@ -113,11 +113,11 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
         for (USB_COMMON_DESCRIPTOR *cur{};
-             (cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
+             (cur = find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
 
                 auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
 
-                if (!libdrv::is_valid(e)) [[unlikely]] {
+                if (!is_valid(e)) [[unlikely]] {
                         Trace(TRACE_LEVEL_ERROR, "Truncated endpoint descriptor discovered, bLength %d", e.bLength);
                         break;
                 }
@@ -369,7 +369,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
-                        NT_ASSERT(libdrv::is_valid(d));
+                        NT_ASSERT(is_valid(d));
                         log(d);
                         if (dev.speed() < USB_SPEED_HIGH) {
                                 patch_config(&d);
@@ -379,7 +379,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
 		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
-                        NT_ASSERT(libdrv::is_valid(d));
+                        NT_ASSERT(is_valid(d));
                         log(d);
                         if (auto &props = dev.ext().properties(); *props.serial) {
                                 if (!d.iSerialNumber) {
