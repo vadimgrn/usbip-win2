@@ -5,8 +5,8 @@
 #include "usbdsc.h"
 
 /*
- * USBD_ParseDescriptors requires PASSIVE_LEVEL.
- * @see reactos\drivers\usb\usbd\usbd.c
+ * Reimplementation usable up to DISPATCH_LEVEL (standard USBD_ParseDescriptors requires PASSIVE_LEVEL).
+ * @see reactos/drivers/usb/usbd/usbd.c
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

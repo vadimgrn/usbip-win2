@@ -72,6 +72,13 @@ constexpr auto is_valid(_In_ const USB_STRING_DESCRIPTOR &d)
                 d.bDescriptorType == USB_STRING_DESCRIPTOR_TYPE && 
                 !(d.bLength % 2); // crucial check for UTF-16 character sizing
 }
+
+constexpr auto is_valid(_In_ const USB_INTERFACE_ASSOCIATION_DESCRIPTOR &d)
+{
+	return  d.bLength == sizeof(d) &&
+		d.bDescriptorType == USB_INTERFACE_ASSOCIATION_DESCRIPTOR_TYPE;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool is_valid(_In_ const USB_OS_STRING_DESCRIPTOR &d);
@@ -133,9 +140,15 @@ template<typename Desc>
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 inline Desc* find_next(
-	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ USB_COMMON_DESCRIPTOR *cur = nullptr)
+	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ void *cur = nullptr)
 {
-	return reinterpret_cast<Desc*>(find_next(cfg, descriptor_traits<Desc>::type, cur));
+	auto c = static_cast<USB_COMMON_DESCRIPTOR*>(cur);
+	while ((c = find_next(cfg, descriptor_traits<Desc>::type, c)) != nullptr) {
+		if (auto d = reinterpret_cast<Desc*>(c); is_valid(*d)) {
+			return d;
+		}
+	}
+	return nullptr;
 }
 
 } // namespace libdrv
