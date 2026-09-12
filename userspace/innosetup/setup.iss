@@ -346,7 +346,7 @@ end;
 procedure DeleteOemDriverFromFileSearch(const DriverName: String);
 var
   FindRec: TFindRec;
-  InfDir, CatVal: String;
+  InfDir, CatVal, CatBase: String;
   ResultCode: Integer;
 begin
   InfDir := ExpandConstant('{win}\INF\');
@@ -357,7 +357,14 @@ begin
         if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
         begin
           CatVal := Lowercase(GetIniString('Version', 'CatalogFile', '', InfDir + FindRec.Name));
-          if (Pos(Lowercase(DriverName), CatVal) > 0) or
+          // Strip optional .cat extension to get the bare catalog base name,
+          // then compare for equality — avoids substring false-positives
+          // (e.g. 'usbip2_ude' must not match 'extra_usbip2_ude_old.cat').
+          if Length(CatVal) > 4 then
+            CatBase := Copy(CatVal, 1, Length(CatVal) - 4)  // remove '.cat'
+          else
+            CatBase := CatVal;
+          if (CatBase = Lowercase(DriverName)) or (CatVal = Lowercase(DriverName)) or
              (GetIniString('SourceDisksFiles', DriverName + '.sys', '', InfDir + FindRec.Name) <> '') then
           begin
             Log('Deleting OEM driver ' + FindRec.Name + ' (' + DriverName + ')');
@@ -380,6 +387,7 @@ begin
     end;
   end;
 end;
+
 
 procedure DeleteOemDriver(const DriverName: String);
 begin
