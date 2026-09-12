@@ -48,6 +48,12 @@ auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> obje
 
 void wdm::object_reference::reset(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
 {
+	if (obj == m_obj && !add_ref) {
+		// Self-reset without add_ref: swapping would ObDereferenceObject the pointer
+		// still held by *this.  Just update defer_delete in-place.
+		m_defer_delete = defer_delete;
+		return;
+	}
 	object_reference(obj, defer_delete, add_ref).swap(*this);
 }
 
