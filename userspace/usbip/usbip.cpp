@@ -50,7 +50,7 @@ auto get_version()
 template <typename Cmd, typename Args>
 auto pack(Cmd &&cmd, const Args &args) 
 {
-	return [&cmd, &args] { 
+	return [cmd = std::forward<Cmd>(cmd), &args] { 
 		if (!cmd(args)) {
 			throw CLI::RuntimeError(EXIT_FAILURE);
 		}
