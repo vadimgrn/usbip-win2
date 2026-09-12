@@ -3,6 +3,7 @@
  */
 
 #include "wdf_cpp.h"
+#include "utils.h"
 
 wdf::ObjectRef::ObjectRef(WDFOBJECT handle, bool add_ref) :
         m_handle(handle)
@@ -27,7 +28,7 @@ auto wdf::ObjectRef::operator =(const ObjectRef &obj) -> ObjectRef&
 
 auto wdf::ObjectRef::operator =(ObjectRef &&obj) -> ObjectRef&
 {
-        reset(obj.release(), false);
+        ObjectRef(static_cast<ObjectRef&&>(obj)).swap(*this);
         return *this;
 }
 
@@ -45,9 +46,7 @@ void wdf::ObjectRef::reset(WDFOBJECT handle, bool add_ref)
 
 void wdf::ObjectRef::swap(_Inout_ ObjectRef &r)
 {
-        auto tmp = r.m_handle;
-        r.m_handle = m_handle;
-        m_handle = tmp;
+        ::swap(m_handle, r.m_handle);
 }
 
 _When_(timeout == NULL, _IRQL_requires_max_(PASSIVE_LEVEL))
