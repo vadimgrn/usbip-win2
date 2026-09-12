@@ -39,12 +39,15 @@ public:
         RemoveLockGuard(const RemoveLockGuard&) = delete;
         RemoveLockGuard& operator =(const RemoveLockGuard&) = delete;
 
+        constexpr bool is_acquired() const { return m_lock != nullptr; }
+        constexpr explicit operator bool() const { return is_acquired(); }
+
         auto acquired() const { return m_acquired; }
         auto tag() const { return m_tag; }
 
         auto clear() 
         { 
-                m_acquired = STATUS_INVALID_ADDRESS;
+                m_acquired = STATUS_UNSUCCESSFUL;
                 m_lock = nullptr; 
 
                 auto tag = m_tag;
