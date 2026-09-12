@@ -4,6 +4,7 @@
 
 #include <ntddk.h>
 #include "wsk_cpp.h"
+#include "irp.h"
 
 #include <ntstrsafe.h>
 
@@ -53,105 +54,7 @@ public:
 #endif // if DBG
 
 
-class irp_cls
-{
-public:
-        irp_cls() { ctor(); } // works for allocations on stack only
-        ~irp_cls() { dtor(); }
-
-        _IRQL_requires_max_(DISPATCH_LEVEL) // use if an object is allocated on heap, f.e. by ExAllocatePool2
-        NTSTATUS ctor();
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        void dtor();
-
-        irp_cls(_In_ const irp_cls &) = delete;
-        irp_cls& operator=(_In_ const irp_cls&) = delete;
-
-        explicit operator bool() const { return m_irp; }
-        auto operator !() const { return !m_irp; }
-
-        auto get() const { return m_irp; }
-        auto operator ->() const { return m_irp; }
-
-        _IRQL_requires_max_(APC_LEVEL)
-        PAGED NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        void reset();
-
-private:
-        IRP *m_irp{};
-        KEVENT m_event{};
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context);
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        void set_completetion_routine()
-        {
-                IoSetCompletionRoutine(m_irp, completion, this, true, true, true);
-        }
-};
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_cls::ctor()
-{
-        NT_ASSERT(!*this);
-
-        m_irp = IoAllocateIrp(1, false); // will be allocated from lookaside list
-        if (!m_irp) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        KeInitializeEvent(&m_event, SynchronizationEvent, false);
-        set_completetion_routine();
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void irp_cls::dtor()
-{
-        if (auto ptr = (IRP*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr)) {
-                IoFreeIrp(ptr);
-        }
-}
-
-/*
- * SynchronizationEvent is also called an autoreset or autoclearing event.
- * The kernel automatically resets the event to the not-signaled state each time a wait is satisfied.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void irp_cls::reset()
-{
-        NT_ASSERT(*this);
-        IoReuseIrp(m_irp, STATUS_SUCCESS);
-        KeClearEvent(&m_event);
-        set_completetion_routine();
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_cls::completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context)
-{
-        auto &self = *static_cast<irp_cls*>(context);
-        KeSetEvent(&self.m_event, IO_NO_INCREMENT, false);
-        return StopCompletion;
-}
-
-_IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS irp_cls::wait_for_completion(_Inout_ NTSTATUS &status)
-{
-        PAGED_CODE();
-        NT_ASSERT(*this);
-
-        if (status == STATUS_PENDING) {
-                NT_VERIFY(!KeWaitForSingleObject(&m_event, Executive, KernelMode, false, nullptr));
-                status = m_irp->IoStatus.Status;
-        }
-
-        return status;
-}
+using irp_cls = libdrv::SyncIrp;
 
 _Function_class_(RTL_RUN_ONCE_INIT_FN)
 _When_(Parameter, _IRQL_requires_(PASSIVE_LEVEL))

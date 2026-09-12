@@ -46,3 +46,66 @@ NTSTATUS libdrv::CompleteRequest(_In_ IRP *irp, _In_ NTSTATUS status)
 	CompleteRequest(irp);
 	return status;
 }
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS libdrv::SyncIrp::ctor(_In_ CCHAR StackSize, _In_ bool ChargeQuota)
+{
+        if (*this) {
+                return STATUS_ALREADY_INITIALIZED;
+        }
+
+        m_irp = IoAllocateIrp(StackSize, ChargeQuota);
+        if (!m_irp) {
+                return STATUS_INSUFFICIENT_RESOURCES;
+        }
+
+        KeInitializeEvent(&m_event, SynchronizationEvent, false);
+        set_completion_routine();
+
+        return STATUS_SUCCESS;
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void libdrv::SyncIrp::dtor()
+{
+        if (auto ptr = static_cast<IRP*>(InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr))) {
+                IoFreeIrp(ptr);
+        }
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void libdrv::SyncIrp::reset()
+{
+        if (*this) {
+                IoReuseIrp(m_irp, STATUS_SUCCESS);
+                KeClearEvent(&m_event);
+                set_completion_routine();
+        }
+}
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+NTSTATUS libdrv::SyncIrp::completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context)
+{
+        auto &self = *static_cast<SyncIrp*>(context);
+        KeSetEvent(&self.m_event, IO_NO_INCREMENT, false);
+        return StopCompletion;
+}
+
+_IRQL_requires_max_(APC_LEVEL)
+PAGED NTSTATUS libdrv::SyncIrp::wait_for_completion(_Inout_ NTSTATUS &status)
+{
+        PAGED_CODE();
+
+        if (!*this) {
+                return status = STATUS_INVALID_DEVICE_STATE;
+        }
+
+        if (status == STATUS_PENDING) {
+                NT_VERIFY(!KeWaitForSingleObject(&m_event, Executive, KernelMode, false, nullptr));
+                status = m_irp->IoStatus.Status;
+        }
+
+        return status;
+}
+

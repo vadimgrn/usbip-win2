@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <wdm.h>
 #include <libusbip/generic_handle_ex.h>
 #include "codeseg.h"
 
@@ -49,6 +50,59 @@ public:
 		NT_ASSERT(self.get());
 		return *self.get();
 	}
+};
+
+
+class SyncIrp
+{
+public:
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        SyncIrp() { ctor(); } // works for allocations on stack
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        ~SyncIrp() { dtor(); }
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        NTSTATUS ctor(_In_ CCHAR StackSize = 1, _In_ bool ChargeQuota = false);
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void dtor();
+
+        SyncIrp(_In_ const SyncIrp&) = delete;
+        SyncIrp& operator=(_In_ const SyncIrp&) = delete;
+
+        constexpr explicit operator bool(this auto&& self) { return self.m_irp != nullptr; }
+        constexpr auto operator !(this auto&& self) { return !self.m_irp; }
+
+        constexpr auto get(this auto&& self) { return self.m_irp; }
+        constexpr auto operator ->(this auto&& self)
+        {
+                NT_ASSERT(self.m_irp);
+                return self.m_irp;
+        }
+        constexpr auto& operator *(this auto&& self) { NT_ASSERT(self.m_irp); return *self.m_irp; }
+
+        _IRQL_requires_max_(APC_LEVEL)
+        PAGED NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
+
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void reset();
+
+private:
+        IRP *m_irp{};
+        KEVENT m_event{};
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context);
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void set_completion_routine()
+        {
+                NT_ASSERT(m_irp);
+                IoSetCompletionRoutine(m_irp, completion, this, true, true, true);
+        }
 };
 
 
