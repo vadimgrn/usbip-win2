@@ -96,7 +96,7 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
                 int cnt[2];
         } v {def_cnt, def_cnt};
 
-        Registry key;
+        registry key;
         auto st = open(key, DriverRegKeyParameters);
         if (NT_ERROR(st)) {
                 return v;
@@ -269,7 +269,7 @@ PAGED void init_constants(
         };
         static_assert(DEF_MAX_ATTEMPTS == 20); // see.inf
 
-        Registry key; 
+        registry key; 
         if (NT_ERROR(open(key, DriverRegKeyParameters))) {
                 max_attempts = DEF_MAX_ATTEMPTS;
                 first_delay = DEF_FIRST_DELAY;

@@ -246,7 +246,7 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
 {
         PAGED_CODE();
 
-        Registry key;
+        registry key;
         auto st = open(key, DriverRegKeyParameters);
         if (NT_ERROR(st)) {
                 return;
@@ -513,7 +513,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 {
         PAGED_CODE();
-        ObjectDelete del(wi);
+        object_delete del(wi);
 
         auto &ctx = *get_workitem_ctx(wi);
         auto &vhci = *get_vhci_ctx(ctx.vhci);
@@ -845,7 +845,7 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
                 return st;
         }
 
-        Registry key;
+        registry key;
         st = open(key, DriverRegKeyPersistentState, KEY_SET_VALUE);
         if (NT_ERROR(st)) {
                 return st;
@@ -878,7 +878,7 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
                 return st;
         }
 
-        Registry key;
+        registry key;
         st = open(key, DriverRegKeyPersistentState);
         if (NT_ERROR(st)) {
                 return st;

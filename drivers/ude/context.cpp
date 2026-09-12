@@ -130,7 +130,7 @@ PAGED NTSTATUS usbip::create_device_ctx_ext(
                 return st;
         }
 
-        wdf::ObjectDelete del(mem);
+        wdf::object_delete del(mem);
         auto &ext = get_device_ctx_ext(mem);
 
         st = init_device_attributes(ext.attr, r);

@@ -121,7 +121,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
-        ObjectDelete col;
+        object_delete col;
 
         WDFCOLLECTION h;
         auto st = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &h);
@@ -157,9 +157,9 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 {
         PAGED_CODE();
-        ObjectDelete col;
+        object_delete col;
 
-        if (Registry key; NT_SUCCESS(open(key, DriverRegKeyPersistentState))) {
+        if (registry key; NT_SUCCESS(open(key, DriverRegKeyPersistentState))) {
                 col = get_persistent_devices(key.get());
         }
 
@@ -286,7 +286,7 @@ _IRQL_requires_same_
 void on_plugin_hardware(
         _In_ WDFREQUEST request, _In_ WDFIOTARGET, _In_ WDF_REQUEST_COMPLETION_PARAMS*, _In_ WDFCONTEXT)
 {
-        ObjectDelete ptr(request);
+        object_delete ptr(request);
 
         auto &req = *get_attach_ctx(request);
         auto &vhci = *get_vhci_ctx(req.vhci);
@@ -333,7 +333,7 @@ void on_plugin_hardware(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_plugin_hardware(
-        _In_ WDFIOTARGET target, _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf, _Inout_ ObjectDelete &req)
+        _In_ WDFIOTARGET target, _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf, _Inout_ object_delete &req)
 {
         auto request = req.get<WDFREQUEST>();
         TraceDbg("req %04x", ptr04x(request));
@@ -366,7 +366,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void on_attach_timer(_In_ WDFTIMER timer)
 {
-        ObjectDelete req(WdfTimerGetParentObject(timer));
+        object_delete req(WdfTimerGetParentObject(timer));
 
         auto &r = *get_attach_ctx(req.get());
         auto &vhci = *get_vhci_ctx(r.vhci);
@@ -629,7 +629,7 @@ PAGED NTSTATUS usbip::fill_location(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access)
+PAGED NTSTATUS usbip::open(_Inout_ registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access)
 {
         PAGED_CODE();
         WDFKEY h{};
@@ -647,9 +647,9 @@ PAGED NTSTATUS usbip::open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-ObjectDelete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr)
+object_delete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr)
 {
-        ObjectDelete ptr;
+        object_delete ptr;
 
         WDFREQUEST req;
         auto st = WdfRequestCreate(&attr, target, &req);

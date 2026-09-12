@@ -12,8 +12,8 @@
 namespace usbip
 {
 
-using wdf::Registry;
-using wdf::ObjectDelete;
+using wdf::registry;
+using wdf::object_delete;
 
 struct vhci_ctx;
 struct device_attributes;
@@ -25,7 +25,7 @@ namespace vhci
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access = KEY_QUERY_VALUE);
+PAGED NTSTATUS open(_Inout_ registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access = KEY_QUERY_VALUE);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -37,7 +37,7 @@ PAGED NTSTATUS hash_location(_Inout_ ULONG &hash, _In_ const device_attributes &
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-ObjectDelete create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr);
+object_delete create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)

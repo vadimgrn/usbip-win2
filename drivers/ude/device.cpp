@@ -694,7 +694,7 @@ PAGED NTSTATUS usbip::device::create(_Out_ UDECXUSBDEVICE &device, _In_ WDFDEVIC
                 Trace(TRACE_LEVEL_ERROR, "UdecxUsbDeviceCreate %!STATUS!", st);
                 return st;
         }
-        wdf::ObjectDelete del(device);
+        wdf::object_delete del(device);
 
         NT_ASSERT(!init); // zeroed by UdecxUsbDeviceCreate
         auto &ctx = *get_device_ctx(device);

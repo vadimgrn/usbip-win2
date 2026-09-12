@@ -232,7 +232,7 @@ inline void close_handle(_In_ WDFKEY key, _In_ wdfkey_traits)
         WdfRegistryClose(key);
 }
 
-using ObjectDelete = usbip::generic_handle<wdfobject_traits>;
-using Registry = usbip::generic_handle<wdfkey_traits>;
+using object_delete = usbip::generic_handle<wdfobject_traits>;
+using registry = usbip::generic_handle<wdfkey_traits>;
 
 } // namespace wdf
