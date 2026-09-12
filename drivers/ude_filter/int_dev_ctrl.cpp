@@ -267,6 +267,19 @@ constexpr auto get_request_type(_In_ const URB &urb)
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
+union legacy_ctrl_context
+{
+        void *as_context{};
+        struct {
+                USHORT function;
+                USHORT reserved1;
+                UCHAR request_type_reserved_bits;
+        } s;
+};
+static_assert(sizeof(legacy_ctrl_context) == sizeof(void*));
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
 {
         auto &d = urb.UrbControlTransfer;
@@ -275,8 +288,10 @@ auto vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
         static_assert(sizeof(d) == sizeof(s));
         NT_ASSERT(d.Hdr.Length == sizeof(d));
 
-        auto val = (uintptr_t(s.RequestTypeReservedBits) << 32) |
-                   (uintptr_t(s.Reserved1) << 16) | s.Hdr.Function;
+        legacy_ctrl_context ctx;
+        ctx.s.function = s.Hdr.Function;
+        ctx.s.reserved1 = s.Reserved1;
+        ctx.s.request_type_reserved_bits = s.RequestTypeReservedBits;
 
         d.Hdr.Function = URB_FUNCTION_CONTROL_TRANSFER;
         // NT_ASSERT(!d.PipeHandle); // s.Reserved, fails for some devices
@@ -287,20 +302,21 @@ auto vendor_class_to_control(_Inout_ URB &urb, _In_ UCHAR bmRequestType)
         s.RequestTypeReservedBits = bmRequestType;
         s.Reserved1 = static_cast<USHORT>(s.TransferBufferLength); // get_setup_packet(d).wLength
 
-        NT_ASSERT(val);
-        return val;
+        NT_ASSERT(ctx.as_context);
+        return ctx.as_context;
 }
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-void control_to_vendor_class(_Inout_ URB &urb, _In_ uintptr_t val)
+void control_to_vendor_class(_Inout_ URB &urb, _In_ void *context)
 {
+        legacy_ctrl_context ctx{ .as_context = context };
         auto &r = urb.UrbControlVendorClassRequest;
 
-        r.Hdr.Function = val & MAXUSHORT;
+        r.Hdr.Function = ctx.s.function;
         r.TransferFlags &= ~USBD_DEFAULT_PIPE_TRANSFER; // clear flag
-        r.RequestTypeReservedBits = (val >> 32) & MAXUCHAR;
-        r.Reserved1 = (val >> 16) & MAXUSHORT;
+        r.RequestTypeReservedBits = ctx.s.request_type_reserved_bits;
+        r.Reserved1 = ctx.s.reserved1;
 }
 
 /*
@@ -340,9 +356,9 @@ NTSTATUS irp_complete(
 
         if (fltr.is_hub) {
                 NT_ASSERT(!context);
-        } else if (auto val = reinterpret_cast<uintptr_t>(context)) { // legacy control transfer
+        } else if (context) { // legacy control transfer
                 auto urb = urb_from_irp(irp);
-                control_to_vendor_class(*urb, val);
+                control_to_vendor_class(*urb, context);
                 TraceDbg("dev %04x, irp %04x, %!STATUS!, USBD_STATUS_%s", ptr04x(fltr.self),
                           ptr04x(irp), irp->IoStatus.Status, get_usbd_status(URB_STATUS(urb)));
         } else {
@@ -358,11 +374,11 @@ NTSTATUS irp_complete(
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-uintptr_t try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
+void* try_legacy_ctrl(_In_ filter_ext &fltr, _In_ IRP *irp, _Inout_ URB &urb)
 {
         auto bmRequestType = get_request_type(urb);
         if (!bmRequestType) {
-                return 0;
+                return nullptr;
         }
 
         TraceDbg("dev %04x, irp %04x -> target %04x, %s", ptr04x(fltr.self), ptr04x(irp),
@@ -389,7 +405,7 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 		return CompleteRequest(irp, err);
 	}
 
-	uintptr_t ctx{};
+	void *ctx{};
 
 	if (DeviceIoControlCode(irp) == IOCTL_INTERNAL_USB_SUBMIT_URB) {
 		auto urb = urb_from_irp(irp);
@@ -403,7 +419,7 @@ NTSTATUS usbip::int_dev_ctrl(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	}
 
         IoCopyCurrentIrpStackLocationToNext(irp);
-        IoSetCompletionRoutine(irp, irp_complete, reinterpret_cast<void*>(ctx), true, true, true);
+        IoSetCompletionRoutine(irp, irp_complete, ctx, true, true, true);
 
         lck.clear();
         return IoCallDriver(fltr.target, irp);
