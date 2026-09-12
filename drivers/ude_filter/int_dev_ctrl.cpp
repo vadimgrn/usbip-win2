@@ -222,8 +222,6 @@ case URB_FUNCTION_GET_INTERFACE: // _URB_CONTROL_GET_INTERFACE_REQUEST
 
 case URB_FUNCTION_GET_MS_FEATURE_DESCRIPTOR: // _URB_OS_FEATURE_DESCRIPTOR_REQUEST
 */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto get_request_type(_In_ const URB &urb)
 {
         UCHAR bmRequestType;

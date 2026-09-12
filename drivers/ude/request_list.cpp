@@ -21,15 +21,11 @@ namespace
 using namespace usbip;
 using namespace libdrv;
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto in_sent_list(_In_ const request_ctx &req)
 {
         return !is_zeroed(req.entry);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto in_completion_queue(_In_ const request_ctx &req)
 {
         return !is_zeroed(req.completion_entry);

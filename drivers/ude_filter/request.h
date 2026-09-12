@@ -37,9 +37,7 @@ static_assert(sizeof(const_part) == 2*sizeof(USHORT));
 } // namespace impl
 
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr bool is_request_function(_In_ USHORT function)
+constexpr bool is_request_function(USHORT function)
 {
         switch (function) {
         case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:

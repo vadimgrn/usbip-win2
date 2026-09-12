@@ -234,10 +234,8 @@ for i in range(1000): # ReattachMaxAttempts
                 if delay > max_delay:
                         delay = max_delay
  */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto get_max_attach_attempts(
-        _In_ unsigned int first_delay, _In_ unsigned int max_delay, _In_ unsigned int max_total_delay)
+        unsigned int first_delay, unsigned int max_delay, unsigned int max_total_delay)
 {
         auto cnt = 0U;
 

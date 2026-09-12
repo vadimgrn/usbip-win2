@@ -26,9 +26,7 @@ namespace
 using namespace usbip;
 using namespace libdrv;
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto to_udex_speed(_Out_ UDECX_USB_DEVICE_SPEED &result, _In_ usb_device_speed speed)
+constexpr auto to_udex_speed(_Out_ UDECX_USB_DEVICE_SPEED &result, usb_device_speed speed)
 {
         switch (speed) {
         case USB_SPEED_SUPER_PLUS:

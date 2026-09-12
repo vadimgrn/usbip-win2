@@ -111,7 +111,7 @@ struct iso_packet_descriptor
 #pragma pack(pop)
 
 
-constexpr auto is_valid_direction(_In_ UINT32 dir)
+constexpr auto is_valid_direction(UINT32 dir)
 {
         static_assert(sizeof(header_basic::direction) ==  sizeof(dir));
         return dir == direction::out || dir == direction::in;

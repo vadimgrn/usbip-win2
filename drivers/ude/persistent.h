@@ -60,9 +60,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS validate_serial_number(_In_ const char (&serial)[SERIAL_BUFSZ]);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto get_next_delay(_In_ unsigned int delay, _In_ unsigned int max_delay)
+constexpr auto get_next_delay(unsigned int delay, unsigned int max_delay)
 {
         NT_ASSERT(delay && delay <= max_delay);
 

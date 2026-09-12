@@ -116,7 +116,7 @@ PAGED auto is_above_vhci(_In_ DEVICE_OBJECT *pdo)
 } // namespace
 
 
-constexpr size_t SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
+constexpr size_t SizeOf_DEVICE_RELATIONS(ULONG cnt)
 {
 	return sizeof(DEVICE_RELATIONS) + (cnt > 1 ? (cnt - 1) * sizeof(PDEVICE_OBJECT) : 0);
 }

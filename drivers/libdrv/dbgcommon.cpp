@@ -19,15 +19,11 @@ namespace
 using namespace usbip;
 using namespace libdrv;
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto bmrequest_dir(_In_ BM_REQUEST_TYPE r)
+constexpr auto bmrequest_dir(BM_REQUEST_TYPE r)
 {
         return r.s.Dir == BMREQUEST_HOST_TO_DEVICE ? "OUT" : "IN";
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto direction_str(_In_ const header &hdr)
 {
         switch (hdr.direction) {

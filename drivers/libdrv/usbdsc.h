@@ -36,23 +36,17 @@ inline auto usb_string_descr_size(_In_ UCHAR n)
 // static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
 // static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_COMMON_DESCRIPTOR &d)
 {
 	return d.bLength >= sizeof(d);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_DEVICE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) && 
                 d.bDescriptorType == USB_DEVICE_DESCRIPTOR_TYPE;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) &&
@@ -60,24 +54,18 @@ constexpr auto is_valid(_In_ const USB_CONFIGURATION_DESCRIPTOR &d)
 		d.wTotalLength > d.bLength;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_INTERFACE_DESCRIPTOR &d)
 {
 	return  d.bLength == sizeof(d) &&
 		d.bDescriptorType == USB_INTERFACE_DESCRIPTOR_TYPE;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_ENDPOINT_DESCRIPTOR &d)
 {
         return  d.bLength >= sizeof(d) && 
                 d.bDescriptorType == USB_ENDPOINT_DESCRIPTOR_TYPE;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_valid(_In_ const USB_STRING_DESCRIPTOR &d)
 {
         return  d.bLength >= sizeof(USB_COMMON_DESCRIPTOR) && 

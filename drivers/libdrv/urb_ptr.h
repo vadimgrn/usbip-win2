@@ -71,7 +71,7 @@ public:
 		}
 	}
 
-	constexpr explicit operator bool() const { return m_urb != nullptr; }
+	constexpr explicit operator bool() const { return m_urb; }
 	constexpr bool operator !() const { return !m_urb; }
 
 	constexpr bool operator ==(decltype(nullptr)) const { return m_urb == nullptr; }

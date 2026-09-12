@@ -23,8 +23,6 @@ struct UrbTransfer
 	decltype(type::TransferBufferMDL) TransferBufferMDL;
 };
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto has_transfer_buffer(_In_ const URB &urb)
 {
         switch (urb.UrbHeader.Function) {
