@@ -362,7 +362,7 @@ auto remove_devnode(_In_ const devnode_remove_args &r)
                 std::println("{} device(s) were removed.", stats.removed);
         }
 
-        return stats.matched > 0;
+        return r.dry_run ? (stats.matched > 0) : (stats.matched > 0 && stats.removed == stats.matched);
 }
 
 void add_devnode_install_cmd(_In_ CLI::App &app)
