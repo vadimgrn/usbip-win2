@@ -248,7 +248,8 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	auto &fltr = *get_filter_ext(devobj);
 
 	RemoveLockGuard lck(fltr.remove_lock, irp);
-	if (auto err = lck.acquired()) {
+	if (!lck) {
+		auto err = lck.acquired();
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
