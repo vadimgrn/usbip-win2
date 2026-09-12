@@ -52,8 +52,35 @@ struct workitem_ctx
         ADDRINFOEXW *addrinfo; // list head
         irp_args args;
         bool one_attempt;
+
+        workitem_ctx& operator=(const workitem_ctx&) = delete;
+        workitem_ctx& operator=(workitem_ctx &&src);
+
+        void take(_Inout_ workitem_ctx &src)
+        {
+                *this = static_cast<workitem_ctx&&>(src);
+        }
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
+
+workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
+{
+        if (this != &src) {
+                vhci = src.vhci;
+                args = src.args;
+                one_attempt = src.one_attempt;
+
+                request = src.request;
+                src.request = WDF_NO_HANDLE;
+
+                ctx_ext = src.ctx_ext;
+                src.ctx_ext = WDF_NO_HANDLE;
+
+                addrinfo = src.addrinfo;
+                src.addrinfo = nullptr;
+        }
+        return *this;
+}
 
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
@@ -387,9 +414,34 @@ PAGED auto create_socket(_Inout_ SOCKET* &sock, _In_ const ADDRINFOEXW &ai, _In_
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
+PAGED NTSTATUS create_workitem(_Out_ WDFWORKITEM &wi, _In_ WDFOBJECT parent);
+
+/*
+ * WSK can complete before this callback returns. A fresh work item
+ * keeps the callbacks' worker-thread state separate during deletion.
+ *
+ * If a single WDFWORKITEM (wi) is reused across multiple asynchronous operations:
+ *  - First for wsk::getaddrinfo
+ *  - Then re-enqueued for wsk::connect (and potential retries)
+ *
+ * When WSK completed a connection attempt very quickly (e.g. on loopback or local LAN),
+ * the completion routine enqueued the wi while its previous callback was still returning
+ * on another worker thread.
+ *
+ * In WDF’s internal FxWorkItem::WorkItemThunk:
+ * - Thread B entered the new invocation and set m_WorkItemThread = Thread B.
+ * - Thread A finished its invocation and cleared m_WorkItemThread = NULL.
+ * - Thread B finished and called WdfObjectDelete(wi).
+ * - FxWorkItem::FlushAndRundown checked m_WorkItemThread == KeGetCurrentThread().
+ *   Because Thread A had cleared the field to NULL, WDF believed another thread was executing
+ *   the callback and entered WaitForSignal, deadlocking the worker on itself and blocking
+ *   subsequent driver unloads/restarts.
+ */
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto connect(
         _In_ WDFREQUEST request,
-        _In_ WDFWORKITEM wi, _Inout_ workitem_ctx &ctx,
+        _Inout_ workitem_ctx &ctx,
         _Inout_ device_ctx_ext &ext, _In_ const ADDRINFOEXW &ai)
 {
         PAGED_CODE();
@@ -407,7 +459,17 @@ PAGED auto connect(
                 return st;
         }
 
-        set_args(ctx.args, request, __func__, &ai);
+        WDFWORKITEM wi{};
+        st = create_workitem(wi, ctx.vhci); // see comments
+        if (NT_ERROR(st)) {
+                Trace(TRACE_LEVEL_ERROR, "WdfWorkItemCreate %!STATUS!", st);
+                return st;
+        }
+
+        auto &next = *get_workitem_ctx(wi);
+        next.take(ctx);
+
+        set_args(next.args, request, __func__, &ai);
 
         auto irp = WdfRequestWdmGetIrp(request);
         IoSetCompletionRoutine(irp, irp_complete, wi, true, true, true);
@@ -422,7 +484,6 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto on_connect(
         _In_ WDFREQUEST request,
-        _In_ WDFWORKITEM wi, 
         _Inout_ workitem_ctx &ctx,
         _Inout_ device_ctx_ext &ext,
         _In_ const ADDRINFOEXW &ai)
@@ -439,7 +500,7 @@ PAGED auto on_connect(
                 free(ext.sock);
 
                 if (st != STATUS_CANCELLED && ai.ai_next) {
-                        st = connect(request, wi, ctx, ext, *ai.ai_next);
+                        st = connect(request, ctx, ext, *ai.ai_next);
                 }
         }
 
@@ -452,6 +513,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 {
         PAGED_CODE();
+        ObjectDelete del(wi);
 
         auto &ctx = *get_workitem_ctx(wi);
         auto &vhci = *get_vhci_ctx(ctx.vhci);
@@ -469,14 +531,14 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
                 st = STATUS_CANCELLED;
                 TraceDbg("req %04x, set %!STATUS!, vhci is being removing", ptr04x(request), st);
         } else if (auto ai = ctx.args.ai) {
-                st = on_connect(request, wi, ctx, ext, *ai);
+                st = on_connect(request, ctx, ext, *ai);
         } else if (NT_SUCCESS(st)) { // on_addrinfo
                 NT_ASSERT(ctx.addrinfo);
-                st = connect(request, wi, ctx, ext, *ctx.addrinfo);
+                st = connect(request, ctx, ext, *ctx.addrinfo);
         }
 
         if (st == STATUS_PENDING) {
-                return;
+                return; // the successor owns the request and allocation cleanup
         }
 
         TraceDbg("req %04x, %!STATUS!", ptr04x(request), st);
@@ -490,8 +552,6 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
                 stop_attach_attempts(vhci, hash);
                 start_attach_attempts(ctx.vhci, vhci, ext.attr, true);
         }
-
-        WdfObjectDelete(wi); // do not use ctx.request more, see workitem_cleanup
 }
 
 /*
@@ -526,7 +586,7 @@ PAGED void workitem_cleanup(_In_ WDFOBJECT object)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto create_workitem(_Out_ WDFWORKITEM &wi, _In_ WDFOBJECT parent)
+PAGED NTSTATUS create_workitem(_Out_ WDFWORKITEM &wi, _In_ WDFOBJECT parent)
 {
         PAGED_CODE();
 
