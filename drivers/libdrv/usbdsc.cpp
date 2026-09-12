@@ -21,15 +21,13 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
         auto end_bytes = cfg_bytes + cfg->wTotalLength;
 
         if (cur) {
-                auto cur_addr = reinterpret_cast<uintptr_t>(cur);
-                auto begin_addr = reinterpret_cast<uintptr_t>(cfg_bytes);
-                auto end_addr = reinterpret_cast<uintptr_t>(end_bytes);
+                auto cur_bytes = reinterpret_cast<char*>(cur);
+                if (cur_bytes < cfg_bytes || cur_bytes >= end_bytes) {
+                        return nullptr;
+                }
 
-                if (auto ok = cur_addr >= begin_addr &&
-                        cur_addr <= end_addr &&
-                        end_addr - cur_addr >= sizeof(*cur) &&
-                        is_valid(*cur) &&
-                        cur->bLength <= end_addr - cur_addr; !ok) {
+                auto remaining = static_cast<size_t>(end_bytes - cur_bytes);
+                if (remaining < sizeof(*cur) || !is_valid(*cur) || cur->bLength > remaining) {
                         return nullptr;
                 }
 
@@ -41,13 +39,11 @@ USB_COMMON_DESCRIPTOR* libdrv::find_next(
         NT_ASSERT(reinterpret_cast<char*>(cur) >= cfg_bytes);
         NT_ASSERT(reinterpret_cast<char*>(cur) <= end_bytes);
 
-        for ( ; reinterpret_cast<char*>(cur) + sizeof(*cur) <= end_bytes; cur = next(cur)) {
-                
-                if (!is_valid(*cur)) [[unlikely]] {
-                        break; 
-                }
+        for ( ; static_cast<size_t>(end_bytes - reinterpret_cast<char*>(cur)) >= sizeof(*cur); cur = next(cur)) {
 
-                if (reinterpret_cast<char*>(cur) + cur->bLength > end_bytes) [[unlikely]] {
+                auto remaining = static_cast<size_t>(end_bytes - reinterpret_cast<char*>(cur));
+
+                if (!is_valid(*cur) || cur->bLength > remaining) [[unlikely]] {
                         break;
                 }
 

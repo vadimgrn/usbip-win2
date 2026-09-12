@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <libusbip/src/offsetof_ex.h>
+
 #include <stddef.h>
 #include <ntddk.h>
 #include <usb.h>
@@ -23,18 +25,16 @@ struct USB_OS_STRING_DESCRIPTOR : USB_COMMON_DESCRIPTOR
 };
 static_assert(sizeof(USB_OS_STRING_DESCRIPTOR) == 18);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline auto usb_string_descr_size(_In_ UCHAR n)
+constexpr auto usb_string_descr_size(UCHAR n)
 {
-        auto cb = offsetof(USB_STRING_DESCRIPTOR, bString) + n*sizeof(*USB_STRING_DESCRIPTOR::bString);
+        auto cb = offsetof_ex(USB_STRING_DESCRIPTOR, bString) + n*sizeof(*USB_STRING_DESCRIPTOR::bString);
         if (cb >= MAXIMUM_USB_STRING_LENGTH) [[unlikely]] {
                 return UCHAR{};
         }
         return static_cast<UCHAR>(cb);
 }
-// static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
-// static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
+static_assert(usb_string_descr_size(0) == sizeof(USB_COMMON_DESCRIPTOR));
+static_assert(usb_string_descr_size(126) + 1 == MAXIMUM_USB_STRING_LENGTH);
 
 constexpr auto is_valid(_In_ const USB_COMMON_DESCRIPTOR &d)
 {
@@ -113,14 +113,6 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 USB_COMMON_DESCRIPTOR *find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ USB_COMMON_DESCRIPTOR *cur);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline const USB_COMMON_DESCRIPTOR *find_next(
-	_In_ const USB_CONFIGURATION_DESCRIPTOR *cfg, _In_ LONG type, _In_opt_ const USB_COMMON_DESCRIPTOR *cur)
-{
-	return find_next(const_cast<USB_CONFIGURATION_DESCRIPTOR*>(cfg), type, const_cast<USB_COMMON_DESCRIPTOR*>(cur));
-}
-
 template<typename Desc>
 struct descriptor_traits;
 
@@ -144,15 +136,6 @@ inline Desc* find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ USB_COMMON_DESCRIPTOR *cur = nullptr)
 {
 	return reinterpret_cast<Desc*>(find_next(cfg, descriptor_traits<Desc>::type, cur));
-}
-
-template<typename Desc>
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline const Desc* find_next(
-	_In_ const USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ const USB_COMMON_DESCRIPTOR *cur = nullptr)
-{
-	return reinterpret_cast<const Desc*>(find_next(cfg, descriptor_traits<Desc>::type, cur));
 }
 
 } // namespace libdrv
