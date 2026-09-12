@@ -468,7 +468,6 @@ struct device_init_ptr
         device_init_ptr& operator=(const device_init_ptr&) = delete;
 
         explicit operator bool() const { return ptr; }
-        auto operator !() const { return !ptr; }
 
         _UDECXUSBDEVICE_INIT *ptr{};
 };
