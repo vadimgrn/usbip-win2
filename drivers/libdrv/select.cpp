@@ -178,10 +178,13 @@ _URB_SELECT_CONFIGURATION* libdrv::clone(
                 return nullptr;
         }
 
-        auto aligned_hdr_len = ALIGN_UP_BY(src.Hdr.Length, alignof(_URB_SELECT_CONFIGURATION));
-        auto local_size = aligned_hdr_len + cd_len;
+        auto aligned_hdr_len = static_cast<ULONG>(ALIGN_UP_BY(src.Hdr.Length, alignof(_URB_SELECT_CONFIGURATION)));
+        ULONG local_size = 0;
+        if (NT_ERROR(RtlULongAdd(aligned_hdr_len, cd_len, &local_size))) {
+                return nullptr;
+        }
 
-        auto dst = (_URB_SELECT_CONFIGURATION*)ExAllocatePoolUninitialized(pool_type, local_size, pooltag);
+        auto dst = static_cast<_URB_SELECT_CONFIGURATION*>(ExAllocatePoolUninitialized(pool_type, local_size, pooltag));
         if (!dst) {
                 return nullptr;
         }

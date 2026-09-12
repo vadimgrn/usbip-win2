@@ -5,8 +5,10 @@
 #include "pdu.h"
 #include <usbip/proto.h>
 
-#include <intrin.h>
 #include <wdm.h>
+#include <ntstatus.h>
+#include <ntintsafe.h>
+#include <intrin.h>
 
 namespace
 {
@@ -188,9 +190,25 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 bool libdrv::get_total_size(_Out_ size_t &result, _In_ const header &hdr)
 {
+        result = 0;
         auto layout = get_packet_layout(hdr);
-        result = layout.valid ? sizeof(hdr) + layout.payload + layout.number_of_packets*sizeof(iso_packet_descriptor) : 0;
-        return layout.valid;
+        if (!layout.valid) {
+                return false;
+        }
+
+        size_t isoc_len = 0;
+        if (NT_ERROR(RtlSizeTMult(layout.number_of_packets, sizeof(iso_packet_descriptor), &isoc_len))) {
+                return false;
+        }
+
+        size_t total = 0;
+        if (NT_ERROR(RtlSizeTAdd(sizeof(hdr), layout.payload, &total)) ||
+            NT_ERROR(RtlSizeTAdd(total, isoc_len, &total))) {
+                return false;
+        }
+
+        result = total;
+        return true;
 }
 
 _IRQL_requires_same_
