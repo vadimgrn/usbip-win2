@@ -3,25 +3,33 @@
  */
 
 #include "mdl_cpp.h"
+#include "utils.h"
 
 /*
  * @see reactos\ntoskrnl\io\iomgr\iomdl.c
  */
-usbip::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
+libdrv::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
         m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr)) {}
 
 /*
  * Impossible to build partial MDL for a chain, only for THIS SourceMdl.
  */
-usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_mdl(nullptr)
+libdrv::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_mdl(nullptr)
 {
         if (!SourceMdl) {
                 NT_ASSERT(!"SourceMdl is NULL");
                 return;
         }
 
-        NT_ASSERT(!SourceMdl->Next);
-        NT_ASSERT(Offset + Length <= MmGetMdlByteCount(SourceMdl));
+        if (SourceMdl->Next) {
+                NT_ASSERT(!"SourceMdl is a chain, IoBuildPartialMdl requires a single MDL");
+                return;
+        }
+
+        if (static_cast<ULONG64>(Offset) + Length > MmGetMdlByteCount(SourceMdl)) {
+                NT_ASSERT(!"Offset/Length exceed SourceMdl size");
+                return;
+        }
 
         auto addr = reinterpret_cast<char*>(MmGetMdlVirtualAddress(SourceMdl)) + Offset;
         m_mdl = IoAllocateMdl(addr, Length, false, false, nullptr);
@@ -33,31 +41,33 @@ usbip::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_m
         }
 }
 
-usbip::Mdl::Mdl(Mdl&& m) :
+libdrv::Mdl::Mdl(_Inout_ Mdl&& m) :
         m_mdl(m.release()),
         m_mapped(m.m_mapped)
 {
         m.m_mapped = false;
 }
 
-auto usbip::Mdl::operator =(Mdl&& m) -> Mdl&
+auto libdrv::Mdl::operator =(_Inout_ Mdl&& m) -> Mdl&
 {
-        if (&m != this && m_mdl != m.m_mdl) {
-                reset(m.release(), m.m_mapped);
-                m.m_mapped = false;
-        }
-
+        Mdl(static_cast<Mdl&&>(m)).swap(*this);
         return *this;
 }
 
-MDL* usbip::Mdl::release()
+void libdrv::Mdl::swap(_Inout_ Mdl &other)
+{
+        ::swap(m_mdl, other.m_mdl);
+        ::swap(m_mapped, other.m_mapped);
+}
+
+MDL* libdrv::Mdl::release()
 {
         auto m = m_mdl;
         m_mdl = nullptr;
         return m;
 }
 
-void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
+void libdrv::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
 {
         if (m_mdl) {
                 NT_ASSERT(m_mdl != mdl);
@@ -69,13 +79,10 @@ void usbip::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
         m_mapped = mapped;
 }
 
-NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
+NTSTATUS libdrv::Mdl::lock(_In_ LOCK_OPERATION Operation)
 {
         NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
-
-        if (!m_mdl) {
-                return STATUS_INVALID_PARAMETER;
-        }
+        NT_ASSERT(m_mdl);
 
         if (locked()) { 
                 return STATUS_ALREADY_COMPLETE;
@@ -91,7 +98,7 @@ NTSTATUS usbip::Mdl::lock(_In_ LOCK_OPERATION Operation)
         return STATUS_SUCCESS;
 }
 
-void usbip::Mdl::next(_In_opt_ MDL *m)
+void libdrv::Mdl::next(_In_opt_ MDL *m)
 { 
         if (m_mdl) {
                 NT_ASSERT(m_mdl != m);
@@ -99,7 +106,7 @@ void usbip::Mdl::next(_In_opt_ MDL *m)
         }
 }
 
-NTSTATUS usbip::Mdl::prepare_nonpaged()
+NTSTATUS libdrv::Mdl::prepare_nonpaged()
 {
         if (!m_mdl) {
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -119,15 +126,23 @@ NTSTATUS usbip::Mdl::prepare_nonpaged()
         return STATUS_SUCCESS;
 }
 
-NTSTATUS usbip::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
+NTSTATUS libdrv::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
 {
         return m_mdl ? lock(Operation) : STATUS_INSUFFICIENT_RESOURCES;
 }
 
 /*
  * nonpaged() and partial() can be set both.
+ * 
+ * When a partial MDL is constructed using IoBuildPartialMdl, the partial MDL inherits MDL_PAGES_LOCKED from SourceMdl.
+ * Per Microsoft WDK documentation on IoBuildPartialMdl:
+ * "A driver must not call MmUnlockPages on a partial MDL created by IoBuildPartialMdl.
+ * The pages are unlocked when the source MDL is unlocked."
+ * Calling MmUnlockPages on a partial MDL decrements the underlying physical page lock counts prematurely.
+ * When the owner of the source MDL subsequently calls MmUnlockPages, it results in lock count underflow
+ * and Driver Verifier bugchecks (0xC4/PFN_SHARE_COUNT).
  */
-void usbip::Mdl::unprepare()
+void libdrv::Mdl::unprepare()
 {
         if (!m_mdl) {
                 return;
@@ -140,7 +155,7 @@ void usbip::Mdl::unprepare()
                 NT_ASSERT(!mapped());
         }
 
-        if (locked()) {
+        if (locked() && !partial()) { // see comments
                 NT_ASSERT(!nonpaged());
                 MmUnlockPages(m_mdl);
                 NT_ASSERT(!locked());
@@ -151,7 +166,7 @@ void usbip::Mdl::unprepare()
  * Take ownership of unmapping if the system flag
  * flipped from false to true strictly during this call.
  */
-void* usbip::Mdl::sysaddr(_In_ ULONG Priority)
+void* libdrv::Mdl::sysaddr(_In_ ULONG Priority)
 { 
         if (!m_mdl) {
                 return nullptr;
@@ -171,7 +186,7 @@ void* usbip::Mdl::sysaddr(_In_ ULONG Priority)
         return addr;
 }
 
-size_t usbip::size(_In_opt_ const MDL *mdl)
+size_t libdrv::size(_In_opt_ const MDL *mdl)
 {
         size_t total = 0;
 
@@ -182,7 +197,7 @@ size_t usbip::size(_In_opt_ const MDL *mdl)
         return total;
 }
 
-MDL *usbip::tail(_In_opt_ MDL *mdl)
+MDL *libdrv::tail(_In_opt_ MDL *mdl)
 {
         for ( ; mdl && mdl->Next; mdl = mdl->Next);
         return mdl;
