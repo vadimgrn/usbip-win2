@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "app.h"
@@ -35,7 +35,7 @@ auto init_mainframe(_In_ wxApp::Appearance app)
         wxString err;
 
         if (auto read = usbip::init(err) ? vhci::open() : Handle()) {
-                if (auto &frame = *new MainFrame(std::move(read), static_cast<int>(app)); frame.start_in_tray()) {
+                if (auto &frame = *MainFrame::create(std::move(read), static_cast<int>(app)); frame.start_in_tray()) {
                         frame.iconize_to_tray();
                 } else {
                         frame.Show();
@@ -44,7 +44,7 @@ auto init_mainframe(_In_ wxApp::Appearance app)
         }
 
         if (err.empty()) {
-                err = GetLastErrorMsg();
+                err = get_last_error_msg();
         }
 
         wxSafeShowMessage(_("Fatal error"), err);
