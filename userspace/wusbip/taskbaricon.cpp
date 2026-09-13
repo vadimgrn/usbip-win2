@@ -12,8 +12,8 @@
 
 TaskBarIcon::TaskBarIcon()
 {
-        Bind(wxEVT_TASKBAR_LEFT_DCLICK, wxTaskBarIconEventHandler(TaskBarIcon::on_left_dclick), this);
-        Bind(wxEVT_TASKBAR_BALLOON_TIMEOUT, wxTaskBarIconEventHandler(TaskBarIcon::on_balloon_timeout), this);
+        Bind(wxEVT_TASKBAR_LEFT_DCLICK, &TaskBarIcon::on_left_dclick, this);
+        Bind(wxEVT_TASKBAR_BALLOON_TIMEOUT, &TaskBarIcon::on_balloon_timeout, this);
 }
 
 wxMenu* TaskBarIcon::GetPopupMenu()
@@ -30,20 +30,20 @@ std::unique_ptr<wxMenu> TaskBarIcon::create_popup_menu()
         auto menu = std::make_unique<wxMenu>();
 
         if (auto item = menu->Append(wxID_ANY, _("Open window"), _("Open the main window"))) {
-                Bind(wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler(TaskBarIcon::on_open), this, item->GetId());
+                Bind(wxEVT_COMMAND_MENU_SELECTED, &TaskBarIcon::on_open, this, item->GetId());
                 item->SetBitmaps(wxArtProvider::GetBitmap(wxASCII_STR(wxART_FULL_SCREEN), wxASCII_STR(wxART_MENU)));
         }
 
         struct {
                 int id;
-                wxEventFunction f;
+                void (MainFrame::*f)(wxCommandEvent&);
                 wxMenu *menu;
         } const cmds[] {
                 {},
-                { MainFrame::ID_ATTACH_STOP_ALL, wxCommandEventHandler(MainFrame::on_attach_stop_all), fr.m_menu_devices },
-                { wxID_CLOSE_ALL, wxCommandEventHandler(MainFrame::on_detach_all), fr.m_menu_devices },
+                { MainFrame::ID_ATTACH_STOP_ALL, &MainFrame::on_attach_stop_all, fr.m_menu_devices },
+                { wxID_CLOSE_ALL, &MainFrame::on_detach_all, fr.m_menu_devices },
                 {},
-                { wxID_EXIT, wxCommandEventHandler(MainFrame::on_exit), fr.m_menu_file },
+                { wxID_EXIT, &MainFrame::on_exit, fr.m_menu_file },
         };
 
         for (auto [id, handler, src]: cmds) {
