@@ -20,8 +20,6 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 SLIST_ENTRY *reverse(_In_opt_ SLIST_ENTRY *head);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto is_zeroed(_In_ const LIST_ENTRY &e)
 {
         return !(e.Flink || e.Blink);

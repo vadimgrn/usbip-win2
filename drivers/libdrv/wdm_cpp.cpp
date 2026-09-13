@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2025-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wdm_cpp.h"
@@ -7,7 +7,7 @@
 
 #include <wdm.h>
 
-wdm::object_reference::object_reference(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref) : 
+wdm::object_reference::object_reference(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref) : 
 	m_obj(obj),
 	m_defer_delete(defer_delete)
 {
@@ -18,12 +18,12 @@ wdm::object_reference::object_reference(_In_ void *obj, _In_ bool defer_delete, 
 
 wdm::object_reference::~object_reference()
 {
-	if (!m_obj) {
-		//
-	} else if (m_defer_delete) {
-		ObDereferenceObjectDeferDelete(m_obj);
-	} else {
-		ObDereferenceObject(m_obj);
+	if (m_obj) {
+		if (m_defer_delete) {
+			ObDereferenceObjectDeferDelete(m_obj);
+		} else {
+			ObDereferenceObject(m_obj);
+		}
 	}
 }
 
@@ -42,18 +42,19 @@ auto wdm::object_reference::operator =(_In_ const object_reference &other) -> ob
 
 auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> object_reference&
 {
-	auto defer_delete = other.m_defer_delete;
-	auto obj = other.release();
-
-	reset(obj, defer_delete, false);
+	object_reference(static_cast<object_reference&&>(other)).swap(*this);
 	return *this;
 }
 
-void wdm::object_reference::reset(_In_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
+void wdm::object_reference::reset(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
 {
-	if (m_obj != obj) {
-		object_reference(obj, defer_delete, add_ref).swap(*this);
+	if (obj == m_obj && !add_ref) {
+		// Self-reset without add_ref: swapping would ObDereferenceObject the pointer
+		// still held by *this.  Just update defer_delete in-place.
+		m_defer_delete = defer_delete;
+		return;
 	}
+	object_reference(obj, defer_delete, add_ref).swap(*this);
 }
 
 void* wdm::object_reference::release()

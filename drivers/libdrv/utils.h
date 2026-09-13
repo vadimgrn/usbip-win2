@@ -6,11 +6,12 @@
 
 #include <kernelspecs.h>
 
+template<class T>
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr void swap(auto &a, auto &b)
+constexpr void swap(_Inout_ T &a, _Inout_ T &b)
 {
-        decltype(a) tmp(a); // std::move is not available
-        a = b;
-        b = tmp;
+        T tmp(static_cast<T&&>(a));
+        a = static_cast<T&&>(b);
+        b = static_cast<T&&>(tmp);
 }
