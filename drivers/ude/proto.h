@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include <wdm.h>
-#include <usbip\proto.h>
+#include <usbip/proto.h>
 
 struct _USB_ENDPOINT_DESCRIPTOR;
 
@@ -21,10 +21,7 @@ public:
 	constexpr setup_dir(bool dir_out) : val((1 << int(dir_out)) | 1) {}
 
 	constexpr explicit operator bool() const { return val & 1; }
-	constexpr auto operator !() const { return !static_cast<bool>(*this); }
-
 	constexpr auto operator ==(setup_dir d) const { return val == d.val; }
-	constexpr auto operator !=(setup_dir d) const { return val != d.val; }
 
 	constexpr bool operator *() const { return val >> 1; }
 
@@ -47,11 +44,13 @@ static_assert(!!setup_dir::out());
 static_assert(*setup_dir::out());
 
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS set_cmd_submit_usbip_header(
 	_Out_ usbip::header &hdr, _Inout_ device_ctx &dev, _In_ const _USB_ENDPOINT_DESCRIPTOR &epd,
 	_In_ ULONG TransferFlags, _In_ ULONG TransferBufferLength = 0, _In_ setup_dir setup_dir_out = setup_dir());
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void set_cmd_unlink_usbip_header(_Out_ usbip::header &hdr, _Inout_ device_ctx &dev, _In_ seqnum_t seqnum_unlink);
 
