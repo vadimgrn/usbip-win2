@@ -1,8 +1,8 @@
-﻿/*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+/*
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include <usbip\proto_op.h>
+#include <usbip/proto_op.h>
 #include <intrin.h>
 
 namespace
