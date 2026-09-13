@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
-#include <libdrv\codeseg.h>
+#include <libdrv/codeseg.h>
 
 namespace usbip
 {
