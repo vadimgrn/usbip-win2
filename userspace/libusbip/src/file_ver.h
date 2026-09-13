@@ -1,10 +1,10 @@
 /*
- * Copyright (c) 2001-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2001-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
-#include "..\dllspec.h"
+#include "../dllspec.h"
 
 #include <windows.h>
 #include <string>
