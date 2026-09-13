@@ -19,8 +19,8 @@ class LogWindow : public wxEvtHandler, public wxLogWindow
 public:
 	LogWindow(
 		_In_ wxWindow *parent, 
-		_In_ const wxMenuItem *log_toogle,
-		_In_ const wxMenuItem *font_inc,
+		_In_ const wxMenuItem *log_toggle,
+		_In_ const wxMenuItem *font_incr,
 		_In_ const wxMenuItem *font_decr,
 		_In_ const wxMenuItem *font_dflt);
 
@@ -42,7 +42,7 @@ private:
 	void on_mouse_wheel(_In_ wxMouseEvent &event);
 
 	void set_accelerators(
-		_In_ const wxMenuItem *log_toogle, 
+		_In_ const wxMenuItem *log_toggle, 
 		_In_ const wxMenuItem *font_incr, 
 		_In_ const wxMenuItem *font_decr, 
 		_In_ const wxMenuItem *font_dflt);
