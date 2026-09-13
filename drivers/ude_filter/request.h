@@ -4,11 +4,13 @@
 
 #pragma once
 
-#include <libdrv\ch9.h>
-#include <libdrv\usbd_helper.h>
+#include <libdrv/ch9.h>
+#include <libdrv/usbd_helper.h>
 
 namespace usbip::filter
 {
+
+using namespace libdrv;
 
 namespace impl
 {
@@ -21,9 +23,9 @@ namespace impl
  * wIndex: Zero
  * wLength: Zero
  */
-inline const USB_DEFAULT_PIPE_SETUP_PACKET setup_packet =
+inline constexpr USB_DEFAULT_PIPE_SETUP_PACKET setup_packet =
 {
-        .bmRequestType = USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
+        .bmRequestType{.B = static_cast<UCHAR>(USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE)},
         .bRequest = USB_REQUEST_GET_FIRMWARE_STATUS,
         .wValue{.W = USB_GET_FIRMWARE_ALLOWED_OR_DISALLOWED_STATE},
         .wIndex{.W = MAXUSHORT}, // real request should have zero
@@ -35,9 +37,7 @@ static_assert(sizeof(const_part) == 2*sizeof(USHORT));
 } // namespace impl
 
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto is_request_function(_In_ int function)
+constexpr bool is_request_function(USHORT function)
 {
         switch (function) {
         case URB_FUNCTION_SYNC_RESET_PIPE_AND_CLEAR_STALL:
@@ -74,7 +74,6 @@ inline auto get_function(_Inout_ _URB_CONTROL_TRANSFER_EX &r, _In_ bool clear = 
 
         NT_ASSERT(is_request_function(function));
         return function;
-
 }
 
 _IRQL_requires_same_
