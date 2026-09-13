@@ -5,6 +5,7 @@
 #pragma once
 
 /*
+ * kmdf/1.27/wdfdevice.h(504)
  * warning C4471: '_WDF_REQUEST_TYPE': a forward declaration of an unscoped enumeration 
  * must have an underlying type.
  * P.S. Set C++ "All Options"/AdditionalOptions: /Zc:__cplusplus
@@ -25,8 +26,12 @@ class ObjectRef
 {
 public:
         constexpr ObjectRef() = default;
-        explicit ObjectRef(WDFOBJECT handle, bool add_ref = true);
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        explicit ObjectRef(_In_opt_ WDFOBJECT handle, _In_ bool add_ref = true);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         ~ObjectRef();
 
         ObjectRef(const ObjectRef &obj) : ObjectRef(obj.m_handle) {}
@@ -35,23 +40,34 @@ public:
         ObjectRef(ObjectRef &&obj) : m_handle(obj.release()) {}
         ObjectRef& operator =(ObjectRef &&obj);
 
-        explicit operator bool() const { return m_handle; }
-        auto operator !() const { return !m_handle; }
+        constexpr explicit operator bool() const { return m_handle; }
+        constexpr auto operator !() const { return !m_handle; }
 
-        auto get() const { return m_handle; }
+        constexpr bool operator ==(decltype(nullptr)) const { return m_handle == WDF_NO_HANDLE; }
+
+        friend constexpr bool operator ==(const ObjectRef &a, const ObjectRef &b) { return a.m_handle == b.m_handle; }
+
+        auto get(this auto&& self) { return self.m_handle; }
 
         template<typename T>
-        auto get() const { return static_cast<T>(m_handle); }
+        auto get(this auto&& self) { return static_cast<T>(self.m_handle); }
 
         WDFOBJECT release();
-        void reset(WDFOBJECT handle = WDF_NO_HANDLE, bool add_ref = true);
 
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void reset(_In_opt_ WDFOBJECT handle = WDF_NO_HANDLE, _In_ bool add_ref = true);
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         void swap(_Inout_ ObjectRef &r);
 
 private:
         WDFOBJECT m_handle = WDF_NO_HANDLE;
 };
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 {
         a.swap(b);
@@ -75,6 +91,9 @@ public:
 
         WaitLock(_In_ const WaitLock&) = delete;
         WaitLock& operator =(_In_ const WaitLock&) = delete;
+
+        constexpr bool is_acquired() const { return m_lock != WDF_NO_HANDLE; }
+        constexpr explicit operator bool() const { return is_acquired(); }
 
         _When_(timeout == NULL, _IRQL_requires_max_(PASSIVE_LEVEL))
         _When_(timeout != NULL && *timeout == 0, _IRQL_requires_max_(DISPATCH_LEVEL))
@@ -133,7 +152,9 @@ public:
         _IRQL_restores_global_(m_lock, this)
         void release()
         {
-                if (auto handle = (type)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_lock), WDF_NO_HANDLE)) {
+                if (m_lock != WDF_NO_HANDLE) {
+                        auto handle = m_lock;
+                        m_lock = WDF_NO_HANDLE;
                         release_lock(handle);
                 }
         }
@@ -174,12 +195,14 @@ inline void release_lock(
  * WDFOBJECT -> HANDLE -> void*
  */
 template<>
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void acquire_lock(_In_ WDFOBJECT handle)
 {
         WdfObjectAcquireLock(handle);
 }
 
 template<>
+_IRQL_requires_max_(DISPATCH_LEVEL)
 inline void release_lock(_In_ WDFOBJECT handle)
 {
         WdfObjectReleaseLock(handle);
@@ -188,39 +211,29 @@ inline void release_lock(_In_ WDFOBJECT handle)
 
 struct wdfobject_traits
 {
-        static WDFOBJECT invalid() noexcept { return WDF_NO_HANDLE; }
+        static WDFOBJECT invalid() { return WDF_NO_HANDLE; }
 };
 
 struct wdfkey_traits
 {
-        static WDFKEY invalid() noexcept { return WDF_NO_HANDLE; }
+        static WDFKEY invalid() { return WDF_NO_HANDLE; }
 };
 
-using ObjectDelete = usbip::generic_handle<wdfobject_traits>;
-using Registry = usbip::generic_handle<wdfkey_traits>;
-
-using usbip::swap;
-
-} // namespace wdf
-
-
-namespace usbip
-{
-
-using wdf::ObjectDelete;
-
-template<>
-inline void close_handle(_In_ ObjectDelete::type obj, _In_ ObjectDelete::tag_type) noexcept
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+inline void close_handle(_In_ WDFOBJECT obj, _In_ wdfobject_traits)
 {
         WdfObjectDelete(obj);
 }
 
-using wdf::Registry;
-
-template<>
-inline void close_handle(_In_ Registry::type key, _In_ Registry::tag_type) noexcept
+_IRQL_requires_same_
+_IRQL_requires_max_(PASSIVE_LEVEL)
+inline void close_handle(_In_ WDFKEY key, _In_ wdfkey_traits)
 {
         WdfRegistryClose(key);
 }
 
-} // namespace usbip
+using object_delete = usbip::generic_handle<wdfobject_traits>;
+using registry = usbip::generic_handle<wdfkey_traits>;
+
+} // namespace wdf
