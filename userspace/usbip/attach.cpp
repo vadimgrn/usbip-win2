@@ -3,11 +3,12 @@
  */
 
 #include "usbip.h"
+#include "strings.h"
+#include "log.h"
 
 #include <libusbip/vhci.h>
 #include <libusbip/persistent.h>
 
-#include <spdlog/spdlog.h>
 #include <print>
 
 namespace
@@ -17,22 +18,23 @@ using namespace usbip;
 
 auto attach_persistent_devices(HANDLE dev)
 {
-        if (auto v = vhci::get_persistent(dev); !v) {
-                spdlog::error(GetLastErrorMsg());
+        auto v = vhci::get_persistent(dev);
+        if (!v) {
+                log::error(get_last_error_msg());
                 return false;
-        } else for (auto &args: *v) {
-                auto &loc = args.location;
+        }
 
-                std::println("{}:{}/{}, serial '{}', mode:{}, once:{}", 
-                              loc.hostname, loc.service, loc.busid, args.serial,
-                              to_string(args.recv_mode), args.once);
+        auto ok = true;
+        for (const auto &args: *v) {
+                std::println("{}", args);
 
                 if (!vhci::attach(dev, args)) {
-                        spdlog::error(GetLastErrorMsg());
+                        log::error(get_last_error_msg());
+                        ok = false;
                 }
         }
 
-        return true;
+        return ok;
 }
 
 auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
@@ -41,9 +43,9 @@ auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
         auto ok = cnt >= 0;
 
         if (ok) {
-                spdlog::debug("{} request(s) stopped", cnt);
+                log::debug("{} request(s) stopped", cnt);
         } else {
-                spdlog::error(GetLastErrorMsg());
+                log::error(get_last_error_msg());
         }
 
         return ok;
@@ -52,13 +54,11 @@ auto stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_location *loc)
 } // namespace
 
 
-bool usbip::cmd_attach(void *p)
+bool usbip::cmd_attach(const attach_args &args)
 {
-        auto &args = *reinterpret_cast<attach_args*>(p);
-
         auto dev = vhci::open();
         if (!dev) {
-                spdlog::error(GetLastErrorMsg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
@@ -66,32 +66,37 @@ bool usbip::cmd_attach(void *p)
                 return attach_persistent_devices(dev.get());
         }
 
+        if (args.stop_all) {
+                return stop_attach_attempts(dev.get(), nullptr);
+        }
+
+        device_location loc {
+                .hostname = args.remote,
+                .service = global_args.tcp_port,
+                .busid = args.busid,
+        };
+
+        if (args.stop) {
+                return stop_attach_attempts(dev.get(), &loc);
+        }
+
         vhci::attach_args cmd_args {
-                .location {
-                        .hostname = std::move(args.remote), 
-                        .service = global_args.tcp_port, 
-                        .busid = std::move(args.busid),
-                },
-                .serial = std::move(args.serial),
+                .location = std::move(loc),
+                .serial = args.serial,
                 .recv_mode = args.recv_mode,
                 .once = args.once,
         };
 
-        if (args.stop || args.stop_all) {
-                assert(args.stop != args.stop_all);
-                return stop_attach_attempts(dev.get(), args.stop ? &cmd_args.location : nullptr);
-        }
-
         auto port = vhci::attach(dev.get(), cmd_args);
         if (!port) {
-                spdlog::error(GetLastErrorMsg());
+                log::error(get_last_error_msg());
                 return false;
         }
 
         if (args.terse) {
                 std::println("{}", port);
         } else {
-                std::println("succesfully attached to port {}", port);
+                std::println("successfully attached to port {}", port);
         }
 
         return true;
