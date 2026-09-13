@@ -25,25 +25,19 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS ret_submit(_Inout_ wsk_context &ctx);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto& get_ret_submit(_In_ const header &hdr)
 {
         NT_ASSERT(hdr.command == RET_SUBMIT);
         return hdr.ret_submit;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto check(_In_ ULONG TransferBufferLength, _In_ int actual_length)
+constexpr auto check(ULONG TransferBufferLength, int actual_length)
 {
         return  actual_length >= 0 && static_cast<ULONG>(actual_length) <= TransferBufferLength ? 
                 STATUS_SUCCESS : STATUS_INVALID_BUFFER_SIZE;
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto assign(_Inout_ ULONG &TransferBufferLength, _In_ int actual_length)
+constexpr auto assign(_Inout_ ULONG &TransferBufferLength, int actual_length)
 {
         auto st = check(TransferBufferLength, actual_length);
         TransferBufferLength = NT_ERROR(st) ? 0 : actual_length;

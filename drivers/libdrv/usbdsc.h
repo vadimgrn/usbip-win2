@@ -142,13 +142,15 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline Desc* find_next(
 	_In_ USB_CONFIGURATION_DESCRIPTOR *cfg, _In_opt_ void *cur = nullptr)
 {
-	auto c = static_cast<USB_COMMON_DESCRIPTOR*>(cur);
-	while ((c = find_next(cfg, descriptor_traits<Desc>::type, c)) != nullptr) {
-		if (auto d = reinterpret_cast<Desc*>(c); is_valid(*d)) {
+	for (auto c = static_cast<USB_COMMON_DESCRIPTOR*>(cur);
+             (c = find_next(cfg, descriptor_traits<Desc>::type, c)); ) {
+
+                if (auto d = reinterpret_cast<Desc*>(c); is_valid(*d)) {
 			return d;
 		}
 	}
-	return nullptr;
+
+        return nullptr;
 }
 
 } // namespace libdrv

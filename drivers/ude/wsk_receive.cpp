@@ -22,6 +22,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -111,16 +112,10 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void patch_config(_In_opt_ USB_CONFIGURATION_DESCRIPTOR *cd)
 {
-        for (USB_COMMON_DESCRIPTOR *cur{};
-             (cur = libdrv::find_next(cd, USB_ENDPOINT_DESCRIPTOR_TYPE, cur)); ) {
+        for (USB_ENDPOINT_DESCRIPTOR *cur{};
+             (cur = find_next<USB_ENDPOINT_DESCRIPTOR>(cd, cur)); ) {
 
-                if (cur->bLength < sizeof(USB_ENDPOINT_DESCRIPTOR)) [[unlikely]] {
-                        Trace(TRACE_LEVEL_ERROR, "Truncated endpoint descriptor discovered, bLength %d", cur->bLength);
-                        break;
-                }
-
-                auto &e = *reinterpret_cast<USB_ENDPOINT_DESCRIPTOR*>(cur);
-
+                auto &e = *cur;
                 auto old_pkt = e.wMaxPacketSize; // max payload size for this endpoint
                 auto old_intvl = e.bInterval; // polling interval, frames
 
@@ -263,7 +258,7 @@ auto fill_isoc_data(
         for (ULONG i = 0; i < r.NumberOfPackets; ++i) { // set dd.Status and dd.Length
 
                 iso_packet_descriptor sd;
-                iso.read(&sd, sizeof(sd));
+                iso.read(sd);
                 byteswap(&sd, 1);
 
                 auto &dd = r.IsoPacket[i];
@@ -321,7 +316,7 @@ auto isoch_transfer(_In_ wsk_context &ctx, _In_ bool wsk_events, _In_ const head
                 return STATUS_INVALID_PARAMETER;
         }
 
-        UCHAR *buffer;
+        UCHAR *buffer{};
 
         if (is_transfer_dir_out(ctx.hdr)) { // TransferFlags can have wrong direction
                 buffer = nullptr;
@@ -368,7 +363,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 	case USB_CONFIGURATION_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_CONFIGURATION_DESCRIPTOR&>(*dsc);
 		    dsc_len > sizeof(d) && d.bLength == sizeof(d) && d.wTotalLength == dsc_len) {
-                        NT_ASSERT(libdrv::is_valid(d));
+                        NT_ASSERT(is_valid(d));
                         log(d);
                         if (dev.speed() < USB_SPEED_HIGH) {
                                 patch_config(&d);
@@ -378,7 +373,7 @@ void post_control_transfer(_In_ const device_ctx &dev, _In_ const _URB_CONTROL_T
 	case USB_DEVICE_DESCRIPTOR_TYPE:
 		if (auto &d = reinterpret_cast<USB_DEVICE_DESCRIPTOR&>(*dsc); 
 		    dsc_len == sizeof(d) && d.bLength == dsc_len) {
-                        NT_ASSERT(libdrv::is_valid(d));
+                        NT_ASSERT(is_valid(d));
                         log(d);
                         if (auto &props = dev.ext().properties(); *props.serial) {
                                 if (!d.iSerialNumber) {
@@ -467,9 +462,14 @@ WDFREQUEST usbip::ret_command(_In_ const header &hdr, _Inout_ device_ctx &dev)
 	auto request = hdr.command == RET_SUBMIT ? // request must be completed
 		       device::find_sent_request(dev, hdr.seqnum) : WDF_NO_HANDLE;
 
-	char buf[DBG_USBIP_HDR_BUFSZ];
-	TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
-		    get_total_size(hdr), dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
+        if (WPP_LEVEL_FLAGS_ENABLED(TRACE_LEVEL_VERBOSE, FLAG_USBIP)) {
+                size_t len;
+                get_total_size(len, hdr);
+
+                char buf[DBG_USBIP_HDR_BUFSZ];
+                TraceEvents(TRACE_LEVEL_VERBOSE, FLAG_USBIP, "req %04x <- %Iu%s", ptr04x(request), 
+                                                 len, dbg_usbip_hdr(buf, sizeof(buf), &hdr, false));
+        }
 
 	return request;
 }
@@ -497,7 +497,10 @@ bool usbip::validate(_Inout_ header &hdr)
 	switch (cmd) {
 	case RET_SUBMIT: {
 		auto &ret = hdr.ret_submit;
-		if (ret.number_of_packets == number_of_packets_non_isoch) {
+		if (ret.actual_length < 0) {
+			Trace(TRACE_LEVEL_ERROR, "actual_length(%d) is out of range", ret.actual_length);
+			return false;
+		} else if (ret.number_of_packets == number_of_packets_non_isoch) {
 			ret.number_of_packets = 0;
 		} else if (!is_valid_number_of_packets(ret.number_of_packets)) {
 			Trace(TRACE_LEVEL_ERROR, "number_of_packets(%d) is out of range", ret.number_of_packets);
