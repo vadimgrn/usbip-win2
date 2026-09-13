@@ -2,17 +2,17 @@
  * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\vhci.h"
+#include "../vhci.h"
 
 #include "offsetof_ex.h"
 #include "device_speed.h"
 #include "output.h"
 
-#include <resources\messages.h>
+#include <resources/messages.h>
 #include <cfgmgr32.h>
 
 #include <initguid.h>
-#include <usbip\vhci.h>
+#include <usbip/vhci.h>
 
 #include <span>
 #include <random>
@@ -96,23 +96,16 @@ DWORD assign(_Inout_ vhci::ioctl::plugin_hardware &r, _In_ const vhci::attach_ar
 
 auto make_device_location(_In_ const vhci::imported_device_location &src)
 {
-        device_location dst;
-
-        struct {
-                std::string &dst;
-                const char *src;
-                size_t maxlen;
-        } const v[] = {
-                { dst.hostname, src.host, std::size(src.host) },
-                { dst.service, src.service, std::size(src.service) },
-                { dst.busid, src.busid, std::size(src.busid) },
+        auto str = [] (const char *str, size_t maxlen)
+        {
+                return std::string(str, strnlen(str, maxlen));
         };
 
-        for (auto &i: v) {
-                i.dst.assign(i.src, strnlen(i.src, i.maxlen));
-        }
-
-        return dst;
+        return device_location {
+                .hostname = str(src.host, std::size(src.host)),
+                .service = str(src.service, std::size(src.service)),
+                .busid = str(src.busid, std::size(src.busid)),
+        };
 }
 
 auto make_imported_device(_In_ const vhci::imported_device &d)
@@ -154,7 +147,7 @@ auto make_device_state(_In_ const vhci::device_state &r)
 
 auto get_path()
 {
-        auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER);
+        auto guid = const_cast<GUID*>(&vhci::GUID_DEVINTERFACE_USBIP_VHCI);
         std::wstring path;
 
         for (std::wstring multi_sz; true; ) {
@@ -256,7 +249,9 @@ const char* usbip::vhci::get_state_str(_In_ usbip::state state) noexcept
         static_assert(int(state::disconnected) == 4);
         static_assert(int(state::unplugging) == 5);
 
-        const char* v[] = { "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging" };
+        static constexpr const char* const v[] = {
+                "unplugged", "connecting", "connected", "plugged", "disconnected", "unplugging"
+        };
 
         auto idx = static_cast<int>(state);
         return idx >= 0 && idx < std::ssize(v) ? v[idx] : "";
@@ -364,13 +359,15 @@ int usbip::vhci::stop_attach_attempts(_In_ HANDLE dev, _In_opt_ const device_loc
         ioctl::stop_attach_attempts r{};
         r.size = sizeof(r);
 
-        if (location && !assign(r, *location)) {
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return -1;
+        if (location) {
+                if (auto err = assign(r, *location)) {
+                        SetLastError(err);
+                        return -1;
+                }
         }
         
         if (DWORD BytesReturned{}; // must be set if the last arg is NULL
-            !DeviceIoControl(dev,ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
+            !DeviceIoControl(dev, ioctl::STOP_ATTACH_ATTEMPTS, &r, sizeof(r), &r, sizeof(r), &BytesReturned, nullptr)) {
                 return -1;
         } else if (BytesReturned != sizeof(r)) [[unlikely]] {
                 SetLastError(USBIP_ERROR_DRIVER_RESPONSE);

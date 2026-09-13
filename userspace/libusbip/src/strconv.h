@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include "..\dllspec.h"
+#include "../dllspec.h"
 
 #include <string>
 #include <vector>
