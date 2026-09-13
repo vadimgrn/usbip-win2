@@ -1,10 +1,11 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include <basetsd.h>
+#include <kernelspecs.h>
 
 /*
  * Declarations from <drivers/usb/usbip/usbip_common.h>
@@ -31,6 +32,8 @@ constexpr auto is_valid_number_of_packets(int number_of_packets)
 {
 	return number_of_packets >= 0 && number_of_packets <= max_iso_packets;
 }
+static_assert(!is_valid_number_of_packets(number_of_packets_non_isoch));
+
 
 #pragma pack(push, 1)
 
@@ -106,5 +109,12 @@ struct iso_packet_descriptor
 };
 
 #pragma pack(pop)
+
+
+constexpr auto is_valid_direction(UINT32 dir)
+{
+        static_assert(sizeof(header_basic::direction) ==  sizeof(dir));
+        return dir == direction::out || dir == direction::in;
+}
 
 } // namespace usbip
