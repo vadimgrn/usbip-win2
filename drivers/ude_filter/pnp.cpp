@@ -24,37 +24,13 @@
 #include <initguid.h>
 #include <usbcamdi.h>
 
+using namespace usbip;
+using namespace libdrv;
+
 namespace
 {
 
-using namespace usbip;
 using QueryInterface = decltype(_IO_STACK_LOCATION::Parameters.QueryInterface);
-
-constexpr auto SizeOf_DEVICE_RELATIONS(_In_ ULONG cnt)
-{
-	return sizeof(DEVICE_RELATIONS) + (cnt ? --cnt*sizeof(*DEVICE_RELATIONS::Objects) : 0);
-}
-static_assert(SizeOf_DEVICE_RELATIONS(0) == sizeof(DEVICE_RELATIONS));
-static_assert(SizeOf_DEVICE_RELATIONS(1) == sizeof(DEVICE_RELATIONS));
-static_assert(SizeOf_DEVICE_RELATIONS(2)  > sizeof(DEVICE_RELATIONS));
-
-_IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto clone(_In_ const DEVICE_RELATIONS &src)
-{
-	PAGED_CODE();
-
-	auto sz = SizeOf_DEVICE_RELATIONS(src.Count);
-        unique_ptr ptr(libdrv::uninitialized, PagedPool, sz);
-
-	if (ptr) {
-		RtlCopyMemory(ptr.get(), &src, sz);
-	} else {
-		Trace(TRACE_LEVEL_ERROR, "Can't allocate %Iu bytes", sz);
-	}
-
-	return ptr.release<DEVICE_RELATIONS>();
-}
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -81,30 +57,43 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
 	NT_ASSERT(fltr.is_hub);
 	auto &previous = fltr.hub.previous;
 
-	for (ULONG i = 0; i < r.Count; ++i) {
-		auto pdo = r.Objects[i];
-		if (auto ok = previous && contains(*previous, pdo); !ok) {
-			TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
-			do_add_device(fltr.self->DriverObject, pdo, &fltr);
-		}
+	auto next = r.Count ? clone_relations(r) : nullptr;
+	if (r.Count && !next) {
+		return;
 	}
 
-        unique_ptr prev(previous);
+	ULONG count{};
 
-        if (!r.Count) {
-                previous = nullptr;
-        } else if (auto ptr = clone(r)) {
-                previous = ptr;
-        } else { // leave as is
-                prev.release();
-        }
+	for (ULONG i = 0; i < r.Count; ++i) {
+
+                if (auto pdo = r.Objects[i]; !(previous && contains(*previous, pdo))) {
+
+                        TraceDbg("Creating a FiDO for PDO %04x", ptr04x(pdo));
+
+                        auto st = do_add_device(fltr.self->DriverObject, pdo, &fltr);
+                        if (NT_ERROR(st)) {
+				Trace(TRACE_LEVEL_ERROR, "Failed to add a FiDO for PDO %04x, %!STATUS!", ptr04x(pdo), st);
+				ObDereferenceObject(next->Objects[i]);
+				continue;
+			}
+		}
+
+		next->Objects[count++] = next->Objects[i];
+	}
+
+        destroy_relations(previous);
+
+	previous = next;
+	if (previous) {
+		previous->Count = count;
+	}
 }
 
 /*
  * After we forward the request, the bus driver have created or deleted
  * a child device object. When bus driver created one (or more), this is the PDO
  * of our target device, we create and attach a filter object to it.
- * Note that we only attach the last detected USB device on it's hub.
+ * Note that we only attach the last detected USB device on its hub.
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -125,18 +114,18 @@ PAGED auto query_bus_relations(_Inout_ filter_ext &fltr, _In_ IRP *irp)
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ libdrv::RemoveLockGuard &lock)
+PAGED auto remove_device(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ remove_lock_guard &lock)
 {
 	PAGED_CODE();
 	Trace(TRACE_LEVEL_INFORMATION, "%04x", ptr04x(fltr.self));
 
 	lock.release_and_wait(); // all allocated URBs are freed after this, USBD_HANDLE can be closed
 
-	if (fltr.is_hub) {
-		//
-	} else if (auto &h = fltr.device.usbd_handle) {
-		USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
-		h = nullptr;
+	if (!fltr.is_hub) {
+		if (auto &h = fltr.device.usbd_handle) {
+			USBD_CloseHandle(h); // must be called before sending the IRP down the USB driver stack
+			h = nullptr;
+		}
 	}
 
 	auto st = ForwardIrp(fltr, irp); // drivers must not fail this IRP
@@ -150,10 +139,10 @@ PAGED const char* get_guid_name(_In_ const GUID &guid)
 {
 	PAGED_CODE();
 
-	struct {
+	static const struct {
 		const GUID &guid;
 		const char *name;
-	} const v[] = {
+	} v[] = {
 		{GUID_D3COLD_SUPPORT_INTERFACE, "D3COLD_SUPPORT"},
 		{GUID_PNP_EXTENDED_ADDRESS_INTERFACE, "PNP_EXTENDED_ADDRESS"},
 		{GUID_PNP_LOCATION_INTERFACE, "PNP_LOCATION"},
@@ -179,6 +168,10 @@ PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const Q
 {
 	PAGED_CODE();
 
+	if (auto ok = qi.InterfaceType && qi.Interface && qi.Size >= sizeof(*qi.Interface); !ok) {
+		return CompleteRequest(irp, STATUS_INVALID_PARAMETER);
+	}
+
 	auto st = ForwardIrpSynchronously(fltr, irp);
 
 	if (auto name = get_guid_name(*qi.InterfaceType); NT_ERROR(st)) {
@@ -195,7 +188,7 @@ PAGED auto query_interface(_Inout_ filter_ext &fltr, _In_ IRP *irp, _In_ const Q
 		TraceDbg("dev %04x, USB_BUS_INTERFACE_USBDI_GUID, Size %d, Version %d", 
 			  ptr04x(fltr.self), qi.Size, qi.Version);
 
-		query_interface(fltr, v3);
+		st = query_interface(fltr, v3);
 
 	} else if (auto &i = *qi.Interface; name) {
 		TraceDbg("dev %04x, %s, Size %d, Version %d -> Size %d, Version %d", 
@@ -220,17 +213,18 @@ PAGED NTSTATUS usbip::pnp(_In_ DEVICE_OBJECT *devobj, _In_ IRP *irp)
 	PAGED_CODE();
 	auto &fltr = *get_filter_ext(devobj);
 
-	libdrv::RemoveLockGuard lck(fltr.remove_lock, irp);
-	if (auto err = lck.acquired()) {
+	remove_lock_guard lck(fltr.remove_lock, irp);
+	if (!lck) {
+		auto err = lck.status();
 		Trace(TRACE_LEVEL_ERROR, "Acquire remove lock %!STATUS!", err);
 		return CompleteRequest(irp, err);
 	}
 
 	switch (auto &stack = *IoGetCurrentIrpStackLocation(irp); stack.MinorFunction) {
-	case IRP_MN_START_DEVICE: // must be started after lower device objects
-		if (auto st = ForwardIrpSynchronously(fltr, irp); true) {
-		        return CompleteRequest(irp, st);
-	        }
+	case IRP_MN_START_DEVICE: { // must be started after lower device objects
+		auto st = ForwardIrpSynchronously(fltr, irp);
+		return CompleteRequest(irp, st);
+	}
 	case IRP_MN_REMOVE_DEVICE:
 		return remove_device(fltr, irp, lck);
 	case IRP_MN_QUERY_DEVICE_RELATIONS:
