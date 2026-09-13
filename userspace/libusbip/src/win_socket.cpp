@@ -1,8 +1,8 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\win_socket.h"
+#include "../win_socket.h"
 #include "output.h"
 #include "last_error.h"
 

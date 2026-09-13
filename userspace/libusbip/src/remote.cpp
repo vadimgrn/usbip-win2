@@ -2,8 +2,8 @@
  * Copyright (c) 2021-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
-#include "..\remote.h"
-#include "..\win_handle.h"
+#include "../remote.h"
+#include "../win_handle.h"
 
 #include "device_speed.h"
 #include "op_common.h"
@@ -11,7 +11,7 @@
 #include "strconv.h"
 #include "output.h"
 
-#include <usbip\proto_op.h>
+#include <usbip/proto_op.h>
 
 #include <chrono>
 
@@ -501,8 +501,13 @@ bool usbip::enum_exportable_devices(
 		return false;
 	}
 
-	libusbip::output("{} exportable device(s)", reply.ndev);
-	assert(reply.ndev <= INT_MAX);
+	if (reply.ndev > INT_MAX) {
+		libusbip::output("the number of exportable devices {} is too large", reply.ndev);
+		SetLastError(ERROR_INVALID_DATA);
+		return false;
+	}
+
+        libusbip::output("{} exportable device(s)", reply.ndev);
 
 	if (on_dev_cnt) {
 		on_dev_cnt(reply.ndev);
