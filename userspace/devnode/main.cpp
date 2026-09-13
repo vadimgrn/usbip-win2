@@ -3,19 +3,21 @@
  */
 
 #include <windows.h>
+#include <shlwapi.h>
 #include <cfgmgr32.h>
 #include <newdev.h>
-#include <regstr.h>
-#include <ks.h>
 
-#include <libusbip\format_message.h>
+#include <libusbip/format_message.h>
 
-#include <libusbip\src\hkey.h>
-#include <libusbip\src\setupapi.h>
-#include <libusbip\src\strconv.h>
-#include <libusbip\src\file_ver.h>
+#include <libusbip/src/setupapi.h>
+#include <libusbip/src/strconv.h>
+#include <libusbip/src/file_ver.h>
 
-#include <CLI11\CLI11.hpp>
+#include <CLI11/CLI11.hpp>
+#include <filesystem>
+#include <optional>
+#include <print>
+#include <utility>
 
 #include <initguid.h>
 #include <devpkey.h>
@@ -30,6 +32,22 @@ namespace
 
 using namespace usbip;
 
+template <typename F>
+class scope_exit
+{
+public:
+        explicit scope_exit(F &&f) : m_f(std::forward<F>(f)) {}
+        ~scope_exit() { if (m_active) m_f(); }
+        void release() noexcept { m_active = false; }
+
+        scope_exit(const scope_exit&) = delete;
+        scope_exit& operator=(const scope_exit&) = delete;
+
+private:
+        F m_f;
+        bool m_active{true};
+};
+
 struct devnode_install_args
 {
         std::wstring infpath;
@@ -43,28 +61,42 @@ struct devnode_remove_args
         bool dry_run{};
 };
 
-using command_f = std::function<bool()>;
-
-auto pack(command_f cmd) 
+struct remove_stats
 {
-        return [cmd = std::move(cmd)] 
-        {
+        int matched{};
+        int removed{};
+};
+
+template <typename F>
+auto pack(F &&cmd) 
+{
+        return [cmd = std::forward<F>(cmd)] {
                 if (!cmd()) {
-                        exit(EXIT_FAILURE); // throw CLI::RuntimeError(EXIT_FAILURE);
+                        throw CLI::RuntimeError(EXIT_FAILURE);
                 }
         };
 }
 
 void errmsg(_In_ LPCSTR api, _In_ LPCWSTR str = L"", _In_ DWORD err = GetLastError())
 {
-        auto msg_id = HRESULT_FROM_SETUPAPI(err);
-        auto msg = wformat_message(msg_id);
-        fwprintf(stderr, L"%S(%s) error %#lx %s\n", api, str, err, msg.c_str());
+        auto mod = GetModuleHandle(L"setupapi.dll");
+        auto msg = wformat_message(mod, err);
+        auto u8_msg = wchar_to_utf8_or(msg);
+
+        if (*str) {
+                std::println(stderr, "{}({}) error {:#x} {}", api, wchar_to_utf8_or(str), err, u8_msg);
+        } else {
+                std::println(stderr, "{} error {:#x} {}", api, err, u8_msg);
+        }
+
+        if (err == ERROR_ACCESS_DENIED) {
+                std::println(stderr, "Administrator privileges are required.");
+        }
 }
 
-auto get_version(_In_ const wchar_t *program)
+auto get_version()
 {
-        win::FileVersion fv(program);
+        win::FileVersion fv;
         auto ver = fv.GetFileVersion();
         return wchar_to_utf8_or(ver);
 }
@@ -72,37 +104,45 @@ auto get_version(_In_ const wchar_t *program)
 /*
  * @return REG_MULTI_SZ 
  */
-auto make_hwid(_In_ std::wstring hwid)
+auto make_hwid(_In_ std::wstring_view hwid)
 {
-        hwid += L'\0'; // first string
-        hwid += L'\0'; // end of the list
-        return hwid;
+        std::wstring s;
+        s.reserve(hwid.size() + 2);
+        s.append(hwid);
+        s.push_back(L'\0'); // first string
+        s.push_back(L'\0'); // end of the list
+        return s;
 }
 
-auto get_class_guid(_Inout_ std::wstring &class_name, _In_ PCWSTR infname)
+struct device_class
 {
-        auto guid = GUID_NULL;
+        GUID guid{GUID_NULL};
+        std::wstring name;
+};
 
-        if (WCHAR name[MAX_CLASS_NAME_LEN]; SetupDiGetINFClass(infname, &guid, name, std::size(name), nullptr)) {
-                class_name = name;
-        } else {
-                errmsg("SetupDiGetINFClass", infname);
-                assert(guid == GUID_NULL);
+std::optional<device_class> get_class_info(_In_ PCWSTR infname)
+{
+        device_class cls;
+        WCHAR name[MAX_CLASS_NAME_LEN];
+
+        if (SetupDiGetINFClass(infname, &cls.guid, name, static_cast<DWORD>(std::size(name)), nullptr)) {
+                cls.name = name;
+                return cls;
         }
 
-        return guid;
+        errmsg("SetupDiGetINFClass", infname);
+        return std::nullopt;
 }
 
 void remind_reboot() noexcept
 {
-        wprintf(L"Reboot is requied to finish setup.\n");
+        std::println("Reboot is required to finish setup.");
 }
 
-using device_visitor_f = std::function<bool(HDEVINFO di, SP_DEVINFO_DATA &dd)>;
-
-DWORD enum_device_info(_In_ HDEVINFO di, _In_ const device_visitor_f &func)
+template <typename Visitor>
+DWORD enum_device_info(_In_ HDEVINFO di, Visitor &&func)
 {
-        SP_DEVINFO_DATA	dd{};
+        SP_DEVINFO_DATA dd{};
         dd.cbSize = sizeof(dd);
 
         for (DWORD i = 0; ; ++i) {
@@ -126,7 +166,7 @@ DWORD get_device_property(
 {
         for (;;) {
                 if (DWORD actual{}; // bytes
-                    SetupDiGetDeviceProperty(di, &dd, &key, &type, prop.data(), DWORD(prop.size()), &actual, 0)) {
+                    SetupDiGetDeviceProperty(di, &dd, &key, &type, prop.data(), static_cast<DWORD>(prop.size()), &actual, 0)) {
                         prop.resize(actual);
                         return ERROR_SUCCESS;
                 } else if (auto err = GetLastError(); err == ERROR_INSUFFICIENT_BUFFER) {
@@ -138,20 +178,45 @@ DWORD get_device_property(
         }
 }
 
-template<typename... Args>
-inline auto get_device_property_ex(const wchar_t *prop_name, Args&&... args)
+std::vector<std::wstring> get_device_hardware_ids(_In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd)
 {
-        auto err = get_device_property(std::forward<Args>(args)...);
-        if (err) {
-                errmsg("SetupDiGetDeviceProperty", prop_name, err);
+        DEVPROPTYPE type = DEVPROP_TYPE_EMPTY;
+        std::vector<BYTE> buf;
+
+        if (auto err = get_device_property(di, dd, DEVPKEY_Device_HardwareIds, type, buf)) {
+                if (err != ERROR_NOT_FOUND) {
+                        errmsg("SetupDiGetDeviceProperty", L"HardwareIds", err);
+                }
+                return {};
         }
-        return !err;
+
+        if (type != DEVPROP_TYPE_STRING_LIST || buf.size() < sizeof(wchar_t)) {
+                return {};
+        }
+
+        auto ws_view = std::wstring_view(reinterpret_cast<const wchar_t*>(buf.data()), buf.size() / sizeof(wchar_t));
+        return split_multi_sz(ws_view);
 }
 
-inline auto as_wstring_view(_In_ std::vector<BYTE> &v) noexcept
+std::optional<std::wstring> get_device_instance_id(_In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd)
 {
-        assert(!(v.size() % sizeof(wchar_t)));
-        return std::wstring_view(reinterpret_cast<wchar_t*>(v.data()), v.size()/sizeof(wchar_t));
+        DEVPROPTYPE type = DEVPROP_TYPE_EMPTY;
+        std::vector<BYTE> buf;
+
+        if (auto err = get_device_property(di, dd, DEVPKEY_Device_InstanceId, type, buf)) {
+                if (err != ERROR_NOT_FOUND) {
+                        errmsg("SetupDiGetDeviceProperty", L"InstanceId", err);
+                }
+                return std::nullopt;
+        }
+
+        if (type != DEVPROP_TYPE_STRING || buf.size() < sizeof(wchar_t)) {
+                return std::nullopt;
+        }
+
+        auto c_str = reinterpret_cast<const wchar_t*>(buf.data());
+        auto len = wcsnlen_s(c_str, buf.size() / sizeof(wchar_t));
+        return std::wstring(c_str, len);
 }
 
 /*
@@ -161,28 +226,27 @@ inline auto as_wstring_view(_In_ std::vector<BYTE> &v) noexcept
  */
 auto install_devnode_and_driver(_In_ const devnode_install_args &r)
 {
-        std::wstring class_name;
-        auto class_guid = get_class_guid(class_name, r.infpath.c_str());
-        if (class_guid == GUID_NULL) {
+        auto cls = get_class_info(r.infpath.c_str());
+        if (!cls) {
                 return false;
         }
 
-        hdevinfo dev_list(SetupDiCreateDeviceInfoList(&class_guid, nullptr));
+        hdevinfo dev_list(SetupDiCreateDeviceInfoList(&cls->guid, nullptr));
         if (!dev_list) {
-                errmsg("SetupDiCreateDeviceInfoList", class_name.c_str());
+                errmsg("SetupDiCreateDeviceInfoList", cls->name.c_str());
                 return false;
         }
 
         SP_DEVINFO_DATA dev_data{};
         dev_data.cbSize = sizeof(dev_data);
 
-        if (!SetupDiCreateDeviceInfo(dev_list.get(), class_name.c_str(), &class_guid, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
+        if (!SetupDiCreateDeviceInfo(dev_list.get(), cls->name.c_str(), &cls->guid, nullptr, 0, DICD_GENERATE_ID, &dev_data)) {
                 errmsg("SetupDiCreateDeviceInfo");
                 return false;
         }
 
         auto id = make_hwid(r.hwid);
-        auto id_sz = DWORD(id.length()*sizeof(id[0]));
+        auto id_sz = static_cast<DWORD>(id.size() * sizeof(wchar_t));
 
         if (!SetupDiSetDeviceRegistryProperty(dev_list.get(), &dev_data, SPDRP_HARDWAREID, 
                                               reinterpret_cast<const BYTE*>(id.data()), id_sz)) {
@@ -194,6 +258,10 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
                 errmsg("SetupDiCallClassInstaller");
                 return false;
         }
+
+        scope_exit rollback([dev_list = dev_list.get(), &dev_data] {
+                SetupDiCallClassInstaller(DIF_REMOVE, dev_list, &dev_data);
+        });
 
         SP_DEVINSTALL_PARAMS params{};
         params.cbSize = sizeof(params);
@@ -210,40 +278,47 @@ auto install_devnode_and_driver(_In_ const devnode_install_args &r)
         bool ok = UpdateDriverForPlugAndPlayDevices(nullptr, r.hwid.c_str(), r.infpath.c_str(), INSTALLFLAG_FORCE, &RebootRequired);
         if (!ok) {
                 errmsg("UpdateDriverForPlugAndPlayDevices");
+                return false;
         }
+
+        rollback.release();
 
         if (reboot || RebootRequired) {
                 remind_reboot();
         }
 
-        return ok;
+        return true;
 }
 
 auto uninstall_device(
-        _In_ HDEVINFO di, _In_  SP_DEVINFO_DATA &dd, _In_ const devnode_remove_args &r, _Inout_ bool &reboot)
+        _In_ HDEVINFO di, _In_ SP_DEVINFO_DATA &dd, _In_ const devnode_remove_args &r, _Inout_ remove_stats &stats, _Inout_ bool &reboot)
 {
-        DEVPROPTYPE type = DEVPROP_TYPE_EMPTY;
-        std::vector<BYTE> prop(REGSTR_VAL_MAX_HCID_LEN);
-
-        if (!get_device_property_ex(L"HardwareIds", di, dd, DEVPKEY_Device_HardwareIds, type, prop) || prop.empty()) {
+        auto ids = get_device_hardware_ids(di, dd);
+        if (ids.empty()) {
                 return false;
         }
 
-        assert(type == DEVPROP_TYPE_STRING_LIST);
-        
-        if (as_wstring_view(prop) != r.hwid) {
-                //
-        } else if (r.dry_run) {
-                prop.resize(MAX_DEVICE_ID_LEN);
-                if (get_device_property_ex(L"InstanceId", di, dd, DEVPKEY_Device_InstanceId, type, prop) && !prop.empty()) {
-                        assert(type == DEVPROP_TYPE_STRING);
-                        auto id = as_wstring_view(prop);
-                        wprintf(L"%s\n", id.data());
+        auto found = std::ranges::any_of(ids, [&r] (const auto &id) {
+                return PathMatchSpec(id.c_str(), r.hwid.c_str());
+        });
+
+        if (!found) {
+                return false;
+        }
+
+        ++stats.matched;
+
+        if (r.dry_run) {
+                if (auto id = get_device_instance_id(di, dd)) {
+                        std::println("{}", wchar_to_utf8_or(*id));
                 }
         } else if (BOOL NeedReboot{}; !DiUninstallDevice(nullptr, di, &dd, 0, &NeedReboot)) {
                 errmsg("DiUninstallDevice");
-        } else if (NeedReboot) {
-                reboot = true;
+        } else {
+                ++stats.removed;
+                if (NeedReboot) {
+                        reboot = true;
+                }
         }
 
         return false;
@@ -259,7 +334,7 @@ auto uninstall_device(
  * @see devcon, cmd/cmd_remove
  * @see devcon hwids ROOT\USBIP_WIN2\*
  */
-auto remove_devnode(_In_ devnode_remove_args &r)
+auto remove_devnode(_In_ const devnode_remove_args &r)
 {
         auto enumerator = r.enumerator.empty() ? nullptr : r.enumerator.c_str();
 
@@ -269,10 +344,9 @@ auto remove_devnode(_In_ devnode_remove_args &r)
                 return false;
         }
 
-        r.hwid = make_hwid(std::move(r.hwid)); // DEVPKEY_Device_HardwareIds is DEVPROP_TYPE_STRING_LIST
-
+        remove_stats stats;
         bool reboot{};
-        auto f = [&r, &reboot] (auto di, auto &dd) { return uninstall_device(di, dd, r, reboot); };
+        auto f = [&r, &stats, &reboot] (auto di, auto &dd) { return uninstall_device(di, dd, r, stats, reboot); };
 
         if (auto err = enum_device_info(di.get(), f)) {
                 errmsg("SetupDiEnumDeviceInfo", L"", err);
@@ -282,7 +356,13 @@ auto remove_devnode(_In_ devnode_remove_args &r)
                 remind_reboot();
         }
 
-        return true;
+        if (r.dry_run) {
+                std::println("{} matching device(s) found.", stats.matched);
+        } else {
+                std::println("{} device(s) were removed.", stats.removed);
+        }
+
+        return r.dry_run ? (stats.matched > 0) : (stats.matched > 0 && stats.removed == stats.matched);
 }
 
 void add_devnode_install_cmd(_In_ CLI::App &app)
@@ -296,7 +376,11 @@ void add_devnode_install_cmd(_In_ CLI::App &app)
 
         cmd->add_option("hwid", r.hwid, "Hardware Id of the device")->required();
 
-        auto f = [&r = r] { return install_devnode_and_driver(r); };
+        auto f = [&r = r] 
+        { 
+                r.infpath = std::filesystem::absolute(r.infpath).wstring();
+                return install_devnode_and_driver(r); 
+        };
         cmd->callback(pack(std::move(f)));
 }
 
@@ -320,14 +404,19 @@ void add_devnode_remove_cmd(_In_ CLI::App &app)
 
 int wmain(_In_ int argc, _Inout_ wchar_t* argv[])
 {
-        CLI::App app("usbip2 drivers installation utility");
-        
-        app.option_defaults()->always_capture_default();
-        app.set_version_flag("-V,--version", get_version(*argv));
+        try {
+                CLI::App app("usbip2 drivers installation utility");
+                
+                app.option_defaults()->always_capture_default();
+                app.set_version_flag("-V,--version", get_version());
 
-        add_devnode_install_cmd(app);
-        add_devnode_remove_cmd(app);
+                add_devnode_install_cmd(app);
+                add_devnode_remove_cmd(app);
 
-        app.require_subcommand(1);
-        CLI11_PARSE(app, argc, argv);
+                app.require_subcommand(1);
+                CLI11_PARSE(app, argc, argv);
+        } catch (std::exception &e) {
+                std::println(stderr, "exception: {}", e.what());
+                return EXIT_FAILURE;
+        }
 }
