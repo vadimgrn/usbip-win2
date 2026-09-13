@@ -19,6 +19,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -27,8 +28,8 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
         for (ULONG i = 0; i < intf.NumberOfPipes; ++i) {
                 auto &pipe = intf.Pipes[i];
 
-                auto endp = find_endpoint(dev, pipe.EndpointAddress);
-                if (!endp) {
+                auto endp_ref = find_endpoint(dev, pipe.EndpointAddress);
+                if (!endp_ref) {
                         Trace(TRACE_LEVEL_ERROR, 
                                 "interface %d.%d, Pipes[%lu], EndpointAddress %#x{%s} -> not found",
                                 intf.InterfaceNumber, intf.AlternateSetting, i, pipe.EndpointAddress, 
@@ -36,7 +37,9 @@ void update_pipe_properties(_In_ device_ctx &dev, _In_ const USBD_INTERFACE_INFO
 
                         continue;
                 }
+                auto endp = get_endpoint_ctx(endp_ref.get<UDECXUSBENDPOINT>());
 
+                wdf::Lock lck(dev.endpoint_list_lock);
                 NT_ASSERT(usb_endpoint_type(endp->descriptor) == pipe.PipeType);
 
                 TraceDbg("interface %d.%d, %#x/%#x/%#x, Pipes[%lu], EndpointAddress %#x{%s %s[%d]} -> PipeHandle %04x (was %04x)",
@@ -56,7 +59,8 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 auto clear_endpoint_stall(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _Inout_ _URB_PIPE_REQUEST &r)
 {
-        if (auto endp = find_endpoint(dev, r.PipeHandle)) {
+        if (auto endp_ref = find_endpoint(dev, r.PipeHandle)) {
+                auto endp = get_endpoint_ctx(endp_ref.get<UDECXUSBENDPOINT>());
                 auto addr = endp->descriptor.bEndpointAddress;
                 pkt = device::make_clear_endpoint_stall(addr);
                 TraceDbg("PipeHandle %04x, bEndpointAddress %#x", ptr04x(r.PipeHandle), addr);
@@ -75,8 +79,8 @@ auto select_configuration(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const _URB_SELECT_CONFIGURATION &r)
 {
         {
-                char buf[libdrv::SELECT_CONFIGURATION_STR_BUFSZ];
-                TraceDbg("%s", libdrv::select_configuration_str(buf, sizeof(buf), &r));
+                char buf[SELECT_CONFIGURATION_STR_BUFSZ];
+                TraceDbg("%s", select_configuration_str(buf, sizeof(buf), &r));
         }
 
         UCHAR cfg{}; // FIXME: can't pass -1 if unconfigured
@@ -85,7 +89,7 @@ auto select_configuration(
                 cfg = cd->bConfigurationValue;
 
                 auto intf = &r.Interface;
-                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = libdrv::next(intf)) {
+                for (int i = 0; i < cd->bNumInterfaces; ++i, intf = next(intf)) {
                         update_pipe_properties(dev, *intf);
                 }
         }
@@ -100,8 +104,8 @@ auto select_interface(
         _In_ device_ctx &dev, _Inout_ USB_DEFAULT_PIPE_SETUP_PACKET &pkt, _In_ const _URB_SELECT_INTERFACE &r)
 {
         {
-                char buf[libdrv::SELECT_INTERFACE_STR_BUFSZ];
-                TraceDbg("%s", libdrv::select_interface_str(buf, sizeof(buf), r));
+                char buf[SELECT_INTERFACE_STR_BUFSZ];
+                TraceDbg("%s", select_interface_str(buf, sizeof(buf), r));
         }
 
         auto &i = r.Interface;
