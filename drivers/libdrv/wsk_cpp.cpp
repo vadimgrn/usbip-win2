@@ -4,7 +4,7 @@
 
 #include <ntddk.h>
 #include "wsk_cpp.h"
-#include "wait_timeout.h"
+#include "irp.h"
 
 #include <ntstrsafe.h>
 
@@ -18,6 +18,9 @@ WSK_REGISTRATION g_Registration;
 
 enum { F_REGISTER, F_CAPTURE };
 LONG g_init_flags;
+
+RTL_RUN_ONCE g_npi_once = RTL_RUN_ONCE_INIT;
+WSK_PROVIDER_NPI g_npi_prov;
 
 
 #if DBG
@@ -51,108 +54,7 @@ public:
 #endif // if DBG
 
 
-class irp_cls
-{
-public:
-        irp_cls() { ctor(); } // works for allocations on stack only
-        ~irp_cls() { dtor(); }
-
-        _IRQL_requires_max_(DISPATCH_LEVEL) // use if an object is allocated on heap, f.e. by ExAllocatePool2
-        NTSTATUS ctor();
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        void dtor();
-
-        irp_cls(_In_ const irp_cls &) = delete;
-        irp_cls& operator=(_In_ const irp_cls&) = delete;
-
-        explicit operator bool() const { return m_irp; }
-        auto operator !() const { return !m_irp; }
-
-        auto get() const { return m_irp; }
-        auto operator ->() const { return m_irp; }
-
-        _IRQL_requires_max_(APC_LEVEL)
-        PAGED NTSTATUS wait_for_completion(_Inout_ NTSTATUS &status);
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        void reset();
-
-private:
-        IRP *m_irp{};
-        KEVENT m_event{};
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        static NTSTATUS completion(_In_ DEVICE_OBJECT*, _In_ IRP*, _In_ void *context);
-
-        _IRQL_requires_max_(DISPATCH_LEVEL)
-        void set_completetion_routine()
-        {
-                IoSetCompletionRoutine(m_irp, completion, this, true, true, true);
-        }
-};
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_cls::ctor()
-{
-        NT_ASSERT(!*this);
-
-        m_irp = IoAllocateIrp(1, false); // will be allocated from lookaside list
-        if (!m_irp) {
-                return STATUS_INSUFFICIENT_RESOURCES;
-        }
-
-        KeInitializeEvent(&m_event, SynchronizationEvent, false);
-        set_completetion_routine();
-
-        return STATUS_SUCCESS;
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void irp_cls::dtor()
-{
-        if (auto ptr = (IRP*)InterlockedExchangePointer(reinterpret_cast<PVOID*>(&m_irp), nullptr)) {
-                IoFreeIrp(ptr);
-        }
-}
-
-/*
- * SynchronizationEvent is also called an autoreset or autoclearing event.
- * The kernel automatically resets the event to the not-signaled state each time a wait is satisfied.
- */
-_IRQL_requires_max_(DISPATCH_LEVEL)
-void irp_cls::reset()
-{
-        NT_ASSERT(*this);
-        IoReuseIrp(m_irp, STATUS_SUCCESS);
-        set_completetion_routine();
-}
-
-_IRQL_requires_max_(DISPATCH_LEVEL)
-NTSTATUS irp_cls::completion(_In_ DEVICE_OBJECT*, _In_ IRP *irp, _In_ void *context)
-{
-        auto &self = *static_cast<irp_cls*>(context);
-
-        if (irp->PendingReturned) {
-                KeSetEvent(&self.m_event, IO_NO_INCREMENT, false);
-        }
-
-        return StopCompletion;
-}
-
-_IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS irp_cls::wait_for_completion(_Inout_ NTSTATUS &status)
-{
-        PAGED_CODE();
-        NT_ASSERT(*this);
-
-        if (status == STATUS_PENDING) {
-                NT_VERIFY(!KeWaitForSingleObject(&m_event, Executive, KernelMode, false, nullptr));
-                status = m_irp->IoStatus.Status;
-        }
-
-        return status;
-}
+using irp_cls = libdrv::sync_irp;
 
 _Function_class_(RTL_RUN_ONCE_INIT_FN)
 _When_(Parameter, _IRQL_requires_(PASSIVE_LEVEL))
@@ -184,11 +86,8 @@ PAGED auto GetProviderNPI(bool testonly = false)
 {
         PAGED_CODE();
 
-        static RTL_RUN_ONCE once = RTL_RUN_ONCE_INIT;
-        static WSK_PROVIDER_NPI prov;
-
-        RtlRunOnceExecuteOnce(&once, ProviderNpiInit, testonly ? nullptr : &prov, nullptr);
-        return BitTest(&g_init_flags, F_CAPTURE) ? &prov : nullptr;
+        RtlRunOnceExecuteOnce(&g_npi_once, ProviderNpiInit, testonly ? nullptr : &g_npi_prov, nullptr);
+        return BitTest(&g_init_flags, F_CAPTURE) ? &g_npi_prov : nullptr;
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -198,6 +97,7 @@ PAGED void ReleaseProviderNPI()
 
         if (GetProviderNPI(true); InterlockedBitTestAndReset(&g_init_flags, F_CAPTURE)) {
                 WskReleaseProviderNPI(&g_Registration);
+                RtlRunOnceInitialize(&g_npi_once);
         }
 }
 
@@ -318,7 +218,7 @@ PAGED auto transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _
 
         irp_cls *irp;
         SOCKET::count_t *cnt;
-        PFN_WSK_SEND func;
+        PFN_WSK_SEND func; // the same as PFN_WSK_RECEIVE
 
         if (auto con = sock->Connection; send) {
                 irp = &sock->send_irp;
@@ -349,8 +249,11 @@ PAGED auto wait_invokers(_Inout_ SOCKET &s)
                 return STATUS_NOT_SUPPORTED; // must be called once
         } else if (n) { // count is not zero
                 NT_ASSERT((n & s.COUNT_MASK) == n);
-                auto timeout = make_timeout(30*wdm::second, wdm::period::relative);
-                NT_VERIFY(!KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, &timeout));
+                auto st = KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, nullptr);
+                if (st != STATUS_SUCCESS) { // NT_ERROR must not be used
+                        static_assert(NT_SUCCESS(STATUS_TIMEOUT));
+                        return st;
+                }
         } else {
                 InterlockedBitTestAndSet64(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
         }
@@ -707,7 +610,7 @@ PAGED NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddre
  * Error if optval is ULONG, one byte is written actually.
  */
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, _In_ bool &optval)
+PAGED NTSTATUS wsk::get_keepalive(_In_ SOCKET *sock, _Out_ bool &optval)
 {
         PAGED_CODE();
         return getsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
@@ -751,7 +654,7 @@ PAGED NTSTATUS wsk::set_keepalive(_In_ SOCKET *sock, _In_ int idle, _In_ int cnt
 }
 
 _IRQL_requires_max_(APC_LEVEL)
-PAGED NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, _In_ int *idle, _In_ int *cnt, _In_ int *intvl)
+PAGED NTSTATUS wsk::get_keepalive_opts(_In_ SOCKET *sock, _Out_opt_ int *idle, _Out_opt_ int *cnt, _Out_opt_ int *intvl)
 {
         PAGED_CODE();
 
@@ -802,7 +705,7 @@ PAGED void wsk::shutdown()
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags)
+const char* wsk::ReceiveEventFlags(_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG Flags)
 {
         auto st = RtlStringCbPrintfA(buf, len, "%s%s%s",
                                         Flags & WSK_FLAG_RELEASE_ASAP ? ":RELEASE_ASAP" : "",
@@ -813,7 +716,7 @@ const char* wsk::ReceiveEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG 
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char* wsk::DisconnectEventFlags(_Out_ char *buf, _In_ size_t len, _In_ ULONG Flags)
+const char* wsk::DisconnectEventFlags(_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ ULONG Flags)
 {
         auto st = RtlStringCbPrintfA(buf, len, "%s%s",
                 Flags & WSK_FLAG_ABORTIVE ? ":ABORTIVE" : "",
