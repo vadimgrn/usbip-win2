@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "driver.h"
@@ -10,16 +10,17 @@
 #include "context.h"
 #include "wsk_context.h"
 
-#include <libdrv\wsk_cpp.h>
+#include <libdrv/wsk_cpp.h>
 
 namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _Function_class_(EVT_WDF_OBJECT_CONTEXT_CLEANUP)
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void driver_cleanup(_In_ WDFOBJECT Object)
 {
 	PAGED_CODE();
@@ -66,6 +67,7 @@ CS_INIT auto init()
         st = wsk::initialize();
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_CRITICAL, "WskRegister %!STATUS!", st);
+                delete_wsk_context_list();
         }
 	return st;
 }
@@ -88,5 +90,11 @@ CS_INIT EXTERN_C NTSTATUS DriverEntry(_In_ DRIVER_OBJECT *DriverObject, _In_ UNI
 	WPP_INIT_TRACING(DriverObject, RegistryPath);
 	Trace(TRACE_LEVEL_INFORMATION, "RegistryPath '%!USTR!'", RegistryPath);
 
-	return init();
+        st = init();
+        if (NT_ERROR(st)) {
+                WPP_CLEANUP(DriverObject);
+                return st;
+        }
+
+	return STATUS_SUCCESS;
 }

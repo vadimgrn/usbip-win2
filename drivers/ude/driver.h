@@ -9,6 +9,6 @@
 namespace usbip
 {
 
-using unique_ptr = libdrv::unique_ptr<'ICHV'>;
+using unique_ptr = libdrv::unique_ptr_t<'ICHV'>;
 
 } // namespace usbip
