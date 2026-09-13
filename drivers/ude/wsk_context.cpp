@@ -7,11 +7,13 @@
 #include "wsk_context.tmh"
 
 #include "driver.h"
+#include <libdrv/dbgcommon.h>
 
 namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 bool g_initialized;
 LOOKASIDE_LIST_EX g_lookaside;
@@ -61,7 +63,7 @@ void *allocate_function_ex(
                 return nullptr;
         }
 
-        if (ctx->wsk_irp = libdrv::irp_ptr(1, false); !ctx->wsk_irp) {
+        if (ctx->wsk_irp = irp_ptr(1, false); !ctx->wsk_irp) {
                 Trace(TRACE_LEVEL_ERROR, "IoAllocateIrp -> NULL");
                 free_function_ex(ctx, list);
                 return nullptr;
@@ -107,7 +109,7 @@ auto alloc_buf_tail(_Inout_ void* &buf, _In_ ULONG length)
                 st = STATUS_BUFFER_TOO_SMALL;
         } else if (buf) {
                 // allocate once
-        } else if (unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
+        } else if (unique_ptr ptr(uninitialized, NonPagedPoolNx, MAXLEN); !ptr) {
                 Trace(TRACE_LEVEL_ERROR, "Can't allocate %d bytes", MAXLEN);
                 st = STATUS_INSUFFICIENT_RESOURCES;
         } else {
@@ -228,9 +230,7 @@ NTSTATUS usbip::prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPacket
                         return STATUS_INSUFFICIENT_RESOURCES;
                 }
 
-                if (ctx.isoc) {
-                        unique_ptr(ctx.isoc);
-                }
+                unique_ptr{ctx.isoc};
 
                 ctx.isoc = isoc.release<iso_packet_descriptor>();
                 ctx.isoc_alloc_cnt = NumberOfPackets;
@@ -253,6 +253,7 @@ NTSTATUS usbip::prepare_isoc(_Inout_ wsk_context &ctx, _In_ ULONG NumberOfPacket
 auto usbip::wsk_context_ptr::operator =(wsk_context_ptr&& ctx) -> wsk_context_ptr&
 {
         auto reuse = ctx.m_reuse;
+        ctx.m_reuse = false;
         reset(ctx.release(), reuse);
         return *this;
 }
