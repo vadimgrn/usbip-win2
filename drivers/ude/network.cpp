@@ -16,20 +16,7 @@
 
 #include <libusbip/src/op_common.h>
 
-namespace
-{
-
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto make_priority( _In_ LOCK_OPERATION operation)
-{
-        return NormalPagePriority | MdlMappingNoExecute | 
-                (operation == IoReadAccess ? MdlMappingNoWrite : 0UL);
-}
-
-} // namespace
-
-
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS usbip::send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len)
 {
@@ -119,7 +106,6 @@ PAGED USBIP_STATUS usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS usbip::make_transfer_buffer_mdl(
         _Inout_ Mdl &mdl, _In_ ULONG mdl_size, _In_ LOCK_OPERATION operation, _In_ const URB &urb)
 {
@@ -138,7 +124,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
 
         if (auto head = r.TransferBufferMDL) { // preferable case because it is locked-down, can be a chain
 
-                auto len = static_cast<ULONG>(size(head));
+                auto len = static_cast<ULONG>(libdrv::size(head));
 
                 if (len < mdl_size && (head->Next || operation == IoReadAccess)) {
                         Trace(TRACE_LEVEL_ERROR, "MDL size %lu < mdl_size(%lu)", len, mdl_size);
@@ -233,7 +219,7 @@ PAGED bool usbip::close_socket(_In_ SOCKET *sock)
  * @param size pass zero to bypasses AFD.sys copying completely
  */
 _IRQL_requires_same_
-_IRQL_requires_(APC_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS usbip::set_recvbuf_size(_In_ SOCKET *sock, _In_ ULONG size)
 {
         PAGED_CODE();

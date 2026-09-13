@@ -18,11 +18,14 @@ namespace usbip
 {
 
 using wsk::SOCKET;
+using libdrv::Mdl;
+using libdrv::memory;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED bool close_socket(_In_ SOCKET *sock);
 
+_IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS send(_In_ SOCKET *sock, _In_ memory pool, _In_ void *data, _In_ ULONG len);
 
@@ -31,7 +34,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS recv(_In_ SOCKET *sock, _In_ memory pool, _Inout_ void *data, _In_ ULONG len);
 
 _IRQL_requires_same_
-_IRQL_requires_(APC_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 PAGED NTSTATUS set_recvbuf_size(_In_ SOCKET *sock, _In_ ULONG size);
 
 _IRQL_requires_same_
@@ -53,7 +56,7 @@ inline auto verify(_In_ const WSK_BUF &buf, _In_ bool exact)
 		return false;
 	}
 
-	auto sz = size(buf.Mdl);
+	auto sz = libdrv::size(buf.Mdl);
 	return exact ? buf.Length == sz : buf.Length <= sz;
 }
 
