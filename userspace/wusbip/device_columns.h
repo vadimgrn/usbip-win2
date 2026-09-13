@@ -40,7 +40,19 @@ enum { // for device_columns only
         DEV_COL_CNT
 };
 
-using device_columns = std::array<wxString, DEV_COL_CNT>; // indexed by visible columns only and DEV_COL_URL
+struct device_columns
+{
+        std::array<wxString, DEV_COL_CNT> values{};
+
+        constexpr auto& operator[](this auto&& self, size_t idx) noexcept
+        {
+                return self.values[idx];
+        }
+
+        constexpr auto size() const noexcept { return values.size(); }
+        constexpr auto begin(this auto&& self) noexcept { return self.values.begin(); }
+        constexpr auto end(this auto&& self) noexcept { return self.values.end(); }
+};
 
 template<typename Array>
 constexpr auto& get_url(_In_ Array &v) { return v[DEV_COL_URL]; }
@@ -91,10 +103,3 @@ constexpr auto operator <=> (_In_ const device_columns &a, _In_ const device_col
 }
 
 } // namespace usbip
-
-
-namespace std
-{
-	using usbip::operator ==; // ADL does not help because std::tuple is defined in namespace std
-	using usbip::operator <=>;
-}
