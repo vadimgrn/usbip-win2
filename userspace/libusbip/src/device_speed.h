@@ -1,6 +1,8 @@
 /*
- * Copyright (c) 2023-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
+
+#pragma once
 
 #include <usbip/ch9.h>
 
