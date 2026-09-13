@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="dbgcommon.cpp" />
@@ -13,6 +13,7 @@
     <ClCompile Include="select.cpp" />
     <ClCompile Include="wdm_cpp.cpp" />
     <ClCompile Include="lists.cpp" />
+    <ClCompile Include="urb_ptr.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ch11.h" />
