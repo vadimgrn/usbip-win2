@@ -19,6 +19,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 /*
  * Context space for WDFREQUEST which is used for attach attempts.
@@ -50,7 +51,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto reattach_req_count(_Inout_ vhci_ctx &vhci)
 {
-        wdf::Lock(vhci.reattach_req_lock);
+        wdf::Lock lck(vhci.reattach_req_lock);
         return WdfCollectionGetCount(vhci.reattach_req);
 }
 
@@ -120,7 +121,7 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_In_ WDFKEY key)
 {
         PAGED_CODE();
-        ObjectDelete col;
+        object_delete col;
 
         WDFCOLLECTION h;
         auto st = WdfCollectionCreate(WDF_NO_OBJECT_ATTRIBUTES, &h);
@@ -156,14 +157,42 @@ _IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto get_persistent_devices(_Inout_ ULONG &cnt, _In_ ULONG max_cnt)
 {
         PAGED_CODE();
-        ObjectDelete col;
+        object_delete col;
 
-        if (Registry key; NT_SUCCESS(open(key, DriverRegKeyPersistentState))) {
+        if (registry key; NT_SUCCESS(open(key, DriverRegKeyPersistentState))) {
                 col = get_persistent_devices(key.get());
         }
 
         cnt = col ? min(WdfCollectionGetCount(col.get<WDFCOLLECTION>()), max_cnt) : 0;
         return col;
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
+{
+        PAGED_CODE();
+
+        if (empty(str)) {
+                return STATUS_INVALID_PARAMETER;
+        }
+
+        for (USHORT i = 0; i < str.Length/sizeof(*str.Buffer); ++i) {
+                if (!isdigit(str.Buffer[i])) {
+                        return STATUS_INVALID_PARAMETER;
+                }
+        }
+
+        ULONG val{};
+        auto st = RtlUnicodeStringToInteger(&str, 10, &val);
+        if (NT_ERROR(st)) {
+                return st;
+        }
+
+        bool once; // ignore, does not make sence for persistent
+        unpack_attach_flags(once, wsk_events, val);
+
+        return STATUS_SUCCESS;
 }
 
 /*
@@ -186,7 +215,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
         UNICODE_STRING* v[] { &r.node_name, &r.service_name, &r.busid, &serial, &tail };
 
         for (int i = 0; i < ARRAYSIZE(v) - 1; ++i) {
-                libdrv::split(*v[i], tail, tail, L',');
+                split(*v[i], tail, tail, L',');
         }
 
         if (empty(r.node_name) || empty(r.service_name) || empty(r.busid)) {
@@ -195,7 +224,7 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
 
         auto &u8_serial = r.properties.serial;
 
-        auto st = libdrv::unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
+        auto st = unicode_to_utf8(u8_serial, sizeof(u8_serial), serial);
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &serial, st);
                 return st;
@@ -207,15 +236,11 @@ PAGED auto parse_device_str(_Inout_ device_attributes &r, _In_ const UNICODE_STR
                 return st;
         }
 
-        ULONG val;
-        st = RtlUnicodeStringToInteger(&tail, 0, &val);
-
-        if (NT_ERROR(st)) {
-                NT_ASSERT(st == STATUS_INVALID_PARAMETER); // string is empty
-                NT_ASSERT(empty(tail));
-        } else {
-                bool once; // ignore, does not make sence for persistent
-                unpack_attach_flags(once, r.properties.wsk_events, val);
+        if (!empty(tail)) {
+                st = parse_flags(r.properties.wsk_events, tail);
+                if (NT_ERROR(st)) {
+                        return st;
+                }
         }
 
         return hash_location(r.location_hash, r);
@@ -246,7 +271,7 @@ PAGED bool create_outbuf(
         PAGED_CODE();
         NT_ASSERT(!result);
 
-        constexpr auto len = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
+        const auto len = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(req->port);
 
         auto st = WdfMemoryCreatePreallocated(&attr, req, len, &result);
         if (NT_ERROR(st)) {
@@ -261,7 +286,7 @@ _IRQL_requires_same_
 void on_plugin_hardware(
         _In_ WDFREQUEST request, _In_ WDFIOTARGET, _In_ WDF_REQUEST_COMPLETION_PARAMS*, _In_ WDFCONTEXT)
 {
-        ObjectDelete ptr(request);
+        object_delete ptr(request);
 
         auto &req = *get_attach_ctx(request);
         auto &vhci = *get_vhci_ctx(req.vhci);
@@ -308,7 +333,7 @@ void on_plugin_hardware(
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void send_plugin_hardware(
-        _In_ WDFIOTARGET target, _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf, _Inout_ ObjectDelete &req)
+        _In_ WDFIOTARGET target, _In_ WDFMEMORY inbuf, _In_ WDFMEMORY outbuf, _Inout_ object_delete &req)
 {
         auto request = req.get<WDFREQUEST>();
         TraceDbg("req %04x", ptr04x(request));
@@ -341,7 +366,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void on_attach_timer(_In_ WDFTIMER timer)
 {
-        ObjectDelete req(WdfTimerGetParentObject(timer));
+        object_delete req(WdfTimerGetParentObject(timer));
 
         auto &r = *get_attach_ctx(req.get());
         auto &vhci = *get_vhci_ctx(r.vhci);
@@ -588,7 +613,7 @@ PAGED NTSTATUS usbip::fill_location(
         };
 
         for (auto &[dst, dst_sz, src]: v) {
-                auto st = libdrv::unicode_to_utf8(dst, dst_sz, src);
+                auto st = unicode_to_utf8(dst, dst_sz, src);
                 if (NT_ERROR(st)) {
                         Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", &src, st);
                         return st;
@@ -604,7 +629,7 @@ PAGED NTSTATUS usbip::fill_location(
  */
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS usbip::open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access)
+PAGED NTSTATUS usbip::open(_Inout_ registry &key, _In_ DRIVER_REGKEY_TYPE type, _In_ ACCESS_MASK access)
 {
         PAGED_CODE();
         WDFKEY h{};
@@ -622,9 +647,9 @@ PAGED NTSTATUS usbip::open(_Inout_ Registry &key, _In_ DRIVER_REGKEY_TYPE type, 
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-ObjectDelete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr)
+object_delete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATTRIBUTES &attr)
 {
-        ObjectDelete ptr;
+        object_delete ptr;
 
         WDFREQUEST req;
         auto st = WdfRequestCreate(&attr, target, &req);
@@ -676,15 +701,22 @@ PAGED NTSTATUS usbip::hash_location(_Inout_ ULONG &hash, _In_ const device_attri
         static_assert(sizeof(L",,") == 3*sizeof(wchar_t)); // must have space for null terminator
         USHORT cb = r.node_name.Length + r.service_name.Length + r.busid.Length + sizeof(L",,"); // see format string
 
-        unique_ptr buf(libdrv::uninitialized, PagedPool, cb);
-        if (!buf) {
-                Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
-                return USBD_STATUS_INSUFFICIENT_RESOURCES;
+        wchar_t stack_buf[96];
+        unique_ptr buf;
+        wchar_t *pbuf = stack_buf;
+
+        if (cb > sizeof(stack_buf)) {
+                buf = unique_ptr(uninitialized, PagedPool, cb);
+                if (!buf) {
+                        Trace(TRACE_LEVEL_ERROR, "Cannot allocate %d bytes", cb);
+                        return STATUS_INSUFFICIENT_RESOURCES;
+                }
+                pbuf = buf.get<wchar_t>();
         }
 
         UNICODE_STRING str { 
                 .MaximumLength = cb, 
-                .Buffer = buf.get<wchar_t>()
+                .Buffer = pbuf
         };
 
         auto st = RtlUnicodeStringPrintf(&str, L"%wZ,%wZ,%wZ", &r.node_name, &r.service_name, &r.busid);

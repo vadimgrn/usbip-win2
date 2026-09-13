@@ -32,25 +32,20 @@ namespace usbip
  * @return < 0 if parameters/characters are invalid,
  *         otherwise the same as strnlen(s, maxlen)
  */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, _In_ SSIZE_T maxlen);
+constexpr SSIZE_T is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen);
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto is_ascii(_In_ unsigned char ch) { return ch < 0x7F; }
+constexpr auto is_ascii(unsigned char ch) { return ch < 0x80; }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto pack_attach_flags(_In_ bool once, _In_ bool wsk_events)
+constexpr auto pack_attach_flags(bool once, bool wsk_events)
 {
         return (static_cast<ULONG>(once) << 1) |
                 static_cast<ULONG>(wsk_events);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, _In_ ULONG flags)
+/*
+ * Unknown flags are ignored.
+ */
+constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events, ULONG flags)
 {
         once = flags & 2;
         wsk_events = flags & 1;
@@ -62,7 +57,7 @@ constexpr void unpack_attach_flags(_Inout_ bool &once, _Inout_ bool &wsk_events,
 namespace usbip::vhci
 {
 
-DEFINE_GUID(GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
+DEFINE_GUID(GUID_DEVINTERFACE_USBIP_VHCI,
         0xB4030C06, 0xDC5F, 0x4FCC, 0x87, 0xEB, 0xE5, 0x51, 0x5A, 0x09, 0x35, 0xC0);
 
 struct base
@@ -185,9 +180,7 @@ inline auto get_imported_devices_size(_In_ ULONG n)
  * UTF-8 is designed so that all ASCII characters (0–127)
  * are represented by a single byte with the high bit set to 0.
  */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, _In_ SSIZE_T maxlen)
+constexpr SSIZE_T usbip::is_ascii_alnum(_In_opt_ const char *s, SSIZE_T maxlen)
 {
         if (!(s && maxlen >= 0)) {
                 return -1;
