@@ -15,13 +15,17 @@
 #include <libdrv/utils.h>
 
 #include <ntstrsafe.h>
-#include <usbdlib.h>
 #include <usbiodef.h>
+
+extern "C" {
+#include <usbdlib.h>
+}
 
 namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 /*
  * WDF calls the callback at PASSIVE_LEVEL if object's handle type is WDFDEVICE.
@@ -43,7 +47,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
                 WdfIoTargetClose(t);
         }
 
-        unique_ptr(ctx.devices); // destroy
+        unique_ptr{ctx.devices}; // destroy
         ctx.devices = nullptr;
 
         ctx.devices_cnt = 0;
@@ -92,30 +96,26 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
                 int cnt[2];
         } v {def_cnt, def_cnt};
 
-        Registry key;
+        registry key;
         auto st = open(key, DriverRegKeyParameters);
         if (NT_ERROR(st)) {
                 return v;
         }
 
         struct {
-                const wchar_t *name;
+                UNICODE_STRING name;
                 int &value;
         } const params[] = {
-                { L"NumberOfUsb20Ports", v.cnt[v.usb2] },
-                { L"NumberOfUsb30Ports", v.cnt[v.usb3] },
+                { RTL_CONSTANT_STRING(L"NumberOfUsb20Ports"), v.cnt[v.usb2] },
+                { RTL_CONSTANT_STRING(L"NumberOfUsb30Ports"), v.cnt[v.usb3] },
         };
 
         for (auto& [name, value]: params) {
-
-                UNICODE_STRING value_name;
-                NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
-
                 ULONG val{};
-                st = WdfRegistryQueryULong(key.get(), &value_name, &val);
+                st = WdfRegistryQueryULong(key.get(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
                 } else {
                         value = val;
                 }
@@ -234,10 +234,8 @@ for i in range(1000): # ReattachMaxAttempts
                 if delay > max_delay:
                         delay = max_delay
  */
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto get_max_attach_attempts(
-        _In_ unsigned int first_delay, _In_ unsigned int max_delay, _In_ unsigned int max_total_delay)
+        unsigned int first_delay, unsigned int max_delay, unsigned int max_total_delay)
 {
         auto cnt = 0U;
 
@@ -271,7 +269,7 @@ PAGED void init_constants(
         };
         static_assert(DEF_MAX_ATTEMPTS == 20); // see.inf
 
-        Registry key; 
+        registry key; 
         if (NT_ERROR(open(key, DriverRegKeyParameters))) {
                 max_attempts = DEF_MAX_ATTEMPTS;
                 first_delay = DEF_FIRST_DELAY;
@@ -280,24 +278,20 @@ PAGED void init_constants(
         }
 
         struct {
-                const wchar_t *name;
+                UNICODE_STRING name;
                 unsigned int &val;
         } const v[] {
-                { L"ReattachMaxAttempts", max_attempts },
-                { L"ReattachFirstDelay", first_delay },
-                { L"ReattachMaxDelay", max_delay },
+                { RTL_CONSTANT_STRING(L"ReattachMaxAttempts"), max_attempts },
+                { RTL_CONSTANT_STRING(L"ReattachFirstDelay"), first_delay },
+                { RTL_CONSTANT_STRING(L"ReattachMaxDelay"), max_delay },
         };
 
         for (auto& [name, value]: v) {
-
-                UNICODE_STRING value_name;
-                RtlUnicodeStringInit(&value_name, name);
-
                 ULONG val{};
-                auto st = WdfRegistryQueryULong(key.get<WDFKEY>(), &value_name, &val);
+                auto st = WdfRegistryQueryULong(key.get<WDFKEY>(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &value_name, st);
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &name, st);
                 } else {
                         value = static_cast<unsigned int>(val);
                 }
@@ -316,7 +310,7 @@ PAGED void init_constants(
                 max_attempts = n;
         }
 
-        TraceDbg("%S=%u, %S=%u, %S=%u", v[0].name, max_attempts, v[1].name, first_delay, v[2].name, max_delay);
+        TraceDbg("%!USTR!=%u, %!USTR!=%u, %!USTR!=%u", &v[0].name, max_attempts, &v[1].name, first_delay, &v[2].name, max_delay);
 
         NT_ASSERT(first_delay >= MIN_DELAY);
         NT_ASSERT(first_delay <= max_delay);
@@ -387,7 +381,7 @@ PAGED auto create_interfaces(_In_ WDFDEVICE vhci)
 
         const GUID* v[] = {
                 &GUID_DEVINTERFACE_USB_HOST_CONTROLLER,
-                &vhci::GUID_DEVINTERFACE_USB_HOST_CONTROLLER
+                &vhci::GUID_DEVINTERFACE_USBIP_VHCI
         };
 
         for (auto guid: v) {
@@ -503,10 +497,9 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
         PAGED_CODE();
         TraceDbg("%04x", ptr04x(vhci));
         
-        if (auto &ctx = *get_vhci_ctx(vhci); true) {
-                set_flag(ctx.removing);
-                stop_attach_attempts(ctx, 0);
-        }
+        auto &ctx = *get_vhci_ctx(vhci);
+        set_flag(ctx.removing);
+        stop_attach_attempts(ctx, 0);
 
         async_detach_and_delete_all(vhci);
         purge_read_queue(vhci); // detach notifications may not be received
@@ -749,24 +742,16 @@ auto get_port_range(_In_ const vhci_ctx &vhci, _In_ usb_device_speed speed)
         return r;
 }
 
+/**
+ * Similar to RtlIntPtrToUnicodeString and RtlHashUnicodeString.
+ * @return hash value
+ */
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
-PAGED auto make_source_id(_In_ const void *ptr)
+auto make_source_id(_In_ const void *ptr)
 {
-        PAGED_CODE();
-        wchar_t buf[17];
-
-        UNICODE_STRING s {
-                .MaximumLength = sizeof(buf), // bytes
-                .Buffer = buf
-        };
-
-        NT_VERIFY(NT_SUCCESS(RtlIntPtrToUnicodeString(reinterpret_cast<ULONG_PTR>(ptr), 16, &s)));
-
-        ULONG hash{};
-        NT_VERIFY(NT_SUCCESS(RtlHashUnicodeString(&s, true, HASH_STRING_ALGORITHM_DEFAULT, &hash)));
-
-        return hash;
+        auto val = reinterpret_cast<uintptr_t>(ptr);
+        static_assert(sizeof(val) == sizeof(ULONG64));
+        return static_cast<ULONG>(val ^ (val >> 32));
 }
 
 _IRQL_requires_same_
@@ -892,13 +877,11 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
                         
                         port = i + 1;
                         NT_ASSERT(is_valid_port(vhci, port));
-
                         dev.port = port;
                         break;
                 }
         }
 
-        lck.release();
         return port;
 }
 
@@ -1039,17 +1022,17 @@ PAGED void usbip::vhci::device_state_changed(
         PAGED_CODE();
 
         auto &ctx = *get_vhci_ctx(vhci);
-        auto subscribers = ctx.events_subscribers;
-
-        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d", 
-                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
-
-        if (!subscribers) {
+        int subscribers;
+        {
                 wdf::WaitLock lck(ctx.events_lock);
-                if (!ctx.events_subscribers) {
+                subscribers = ctx.events_subscribers;
+                if (!subscribers) {
                         return; // don't create device state unnecessarily
                 }
         }
+
+        TraceDbg("%!USTR!:%!USTR!/%!USTR!, port %d, %!vhci_state!, subscribers %d",
+                  &attr.node_name, &attr.service_name, &attr.busid, port, int(state), subscribers);
 
         if (auto evt = make_device_state(vhci, attr, port, state)) {
                 process_event(ctx, evt);
