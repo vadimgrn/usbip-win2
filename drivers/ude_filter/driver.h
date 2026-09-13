@@ -9,6 +9,6 @@
 namespace usbip
 {
 
-using unique_ptr = libdrv::unique_ptr<'RTLF'>;
+using unique_ptr = libdrv::unique_ptr_t<'RTLF'>;
 
 } // namespace usbip
