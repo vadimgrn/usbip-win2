@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -13,9 +13,3 @@
   #define PAGED
   #define CS_INIT
 #endif
-
-inline auto ptr04x(const void *ptr) // use format "%04x"
-{
-        auto n = reinterpret_cast<uintptr_t>(ptr);
-        return static_cast<UINT32>(n);
-}
