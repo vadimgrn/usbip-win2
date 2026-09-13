@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
-#include "..\format_message.h"
+#include "../format_message.h"
 #include "strconv.h"
 
 #include <memory>
