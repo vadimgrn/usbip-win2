@@ -10,16 +10,13 @@
 namespace std
 {
 
-using usbip::generic_handle;
-using usbip::swap;
-
 template<typename HandleTraits>
-struct hash<generic_handle<HandleTraits>>
+struct hash<usbip::generic_handle<HandleTraits>>
 {
-        auto operator() (const generic_handle<HandleTraits> &h) const noexcept
+        auto operator() (const usbip::generic_handle<HandleTraits> &h) const noexcept
         {
                 auto val = h.get();
-                hash<decltype(val)> f; // typename generic_handle<HandleTraits>::type
+                hash<decltype(val)> f; // typename usbip::generic_handle<HandleTraits>::type
                 return f(val);
         }
 };
