@@ -19,19 +19,16 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto in_sent_list(_In_ const request_ctx &req)
 {
-        return !libdrv::is_zeroed(req.entry);
+        return !is_zeroed(req.entry);
 }
 
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
 constexpr auto in_completion_queue(_In_ const request_ctx &req)
 {
-        return !libdrv::is_zeroed(req.completion_entry);
+        return !is_zeroed(req.completion_entry);
 }
 
 _IRQL_requires_same_
@@ -39,9 +36,17 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 inline void check_request_locked(_In_ [[maybe_unused]] const request_ctx &req)
 {
         NT_ASSERT(req.endpoint);
+
+//      a request can only be marked cancelable after WskSend has completed and while still waiting in the sent list
         NT_ASSERT(!req.cancelable || (in_sent_list(req) && !req.send_completion_pending));
+
+//      once a response PDU claims the request, it is removed from the sent list and unmarked cancelable
         NT_ASSERT(!req.response_in_progress || (!in_sent_list(req) && !req.cancelable));
+
+//      terminal state is mutually exclusive with active list membership or in-flight I/O
         NT_ASSERT(!req.terminal || (!in_sent_list(req) && !req.cancelable && !req.response_in_progress));
+
+//      if a request is currently in the completion queue, it must be terminal and have no asynchronous I/O in flight
         NT_ASSERT(!in_completion_queue(req) ||
                   (req.terminal && !req.send_completion_pending && !req.response_in_progress));
 }
@@ -90,7 +95,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 
 	auto &req = *get_request_ctx(request);
 
-	if (!libdrv::has_urb(irp)) {
+	if (!has_urb(irp)) {
 		if (NT_ERROR(status)) {
 			TraceUrb("seqnum %u, %!STATUS!, Information %#Ix", req.seqnum, status, info);
 		}
@@ -98,7 +103,7 @@ void complete(_In_ WDFREQUEST request, _In_ NTSTATUS status)
 		return;
 	}
 
-	auto &urb = *libdrv::urb_from_irp(irp);
+	auto &urb = *urb_from_irp(irp);
 	auto &urb_st = urb.UrbHeader.Status;
 
 	if (status == STATUS_CANCELLED && urb_st == USBD_STATUS_PENDING) {
@@ -165,7 +170,10 @@ void cancel(_In_ WDFREQUEST request)
                 wdf::Lock lck(dev->requests_lock);
 
                 remove_from_sent_list_locked(req);
-                req.cancelable = false;
+                if (req.cancelable) {
+                        req.cancelable = false;
+                        --dev->cancelable_requests;
+                }
                 check_request_locked(req);
         }
 
@@ -349,6 +357,7 @@ WDFREQUEST usbip::device::find_sent_request(_Inout_ device_ctx &dev, _In_ seqnum
                 if (req.cancelable) {
                         auto status = WdfRequestUnmarkCancelable(request);
                         req.cancelable = false;
+                        --dev.cancelable_requests;
 
                         if (status == STATUS_CANCELLED) {
                                 request = WDF_NO_HANDLE;
