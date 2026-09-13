@@ -501,7 +501,7 @@ const char* usbip::usb_setup_pkt_str(char *buf, size_t len, const void *packet)
 
 const char* usbip::usbd_transfer_flags(char *buf, size_t len, ULONG TransferFlags)
 {
-	auto dir = IsTransferDirectionOut(TransferFlags) ? "OUT" : "IN";
+	auto dir = libdrv::IsTransferDirectionOut(TransferFlags) ? "OUT" : "IN";
 
 	auto st = RtlStringCbPrintfA(buf, len, "%s%s%s%s", dir,
 					TransferFlags & USBD_SHORT_TRANSFER_OK ? "|SHORT_OK" : "",

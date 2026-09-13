@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "usbd_helper.h"
@@ -37,9 +37,10 @@ enum {
  * Meaning of some errors differs for usb_submit_urb and urb->status, we would prefer urb->status.
  * See: https://www.kernel.org/doc/Documentation/usb/error-codes.txt
  */
-USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
+USBD_STATUS libdrv::to_windows_status_ex(_In_ int usbip_status, _In_ bool isoch)
 {
-	switch (usbip_status >= 0 ? usbip_status : -usbip_status) {
+	switch (auto status = static_cast<LONG64>(usbip_status);
+                status >= 0 ? status : -status) {
 	case 0:
 		return USBD_STATUS_SUCCESS;
 	case EPIPE_LNX: // Endpoint stalled. For non-control endpoints, reset this status with usb_clear_halt()
@@ -79,12 +80,14 @@ USBD_STATUS to_windows_status_ex(int usbip_status, bool isoch)
 		return USBD_STATUS_INTERNAL_HC_ERROR;
 	case EBUSY_LNX:
 		return USBD_STATUS_ERROR_BUSY;
+	case EINVAL_LNX:
+		return USBD_STATUS_INVALID_PARAMETER;
 	}
 
 	return USBD_STATUS_INVALID_PARAMETER;
 }
 
-int to_linux_status(USBD_STATUS status)
+int libdrv::to_linux_status(_In_ USBD_STATUS status)
 {
 	int err = 0;
 
@@ -125,10 +128,16 @@ int to_linux_status(USBD_STATUS status)
 	case USBD_STATUS_INSUFFICIENT_RESOURCES:
 		err = ENOMEM_LNX;
 		break;
+	case USBD_STATUS_DEV_NOT_RESPONDING:
+		err = ETIME_LNX;
+		break;
+	case USBD_STATUS_ISO_TD_ERROR:
+	case USBD_STATUS_ISOCH_REQUEST_FAILED:
+		err = EXDEV_LNX;
+		break;
 	case USBD_STATUS_BTSTUFF:
 	case USBD_STATUS_INTERNAL_HC_ERROR:
 	case USBD_STATUS_HUB_INTERNAL_ERROR:
-	case USBD_STATUS_DEV_NOT_RESPONDING:
 		err = EPROTO_LNX;
 		break;
 	case USBD_STATUS_ERROR_BUSY:
@@ -174,7 +183,7 @@ enum {
  1.Direction in endpoint address or transfer flags should be ignored
  2.Direction is determined by bits of bmRequestType in the Setup packet (D7 Data Phase Transfer Direction) 
  */
-ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in)
+ULONG libdrv::to_windows_flags(_In_ UINT32 transfer_flags, _In_ bool dir_in)
 {
 	ULONG TransferFlags = dir_in ? USBD_TRANSFER_DIRECTION_IN : USBD_TRANSFER_DIRECTION_OUT;
 
@@ -189,13 +198,15 @@ ULONG to_windows_flags(UINT32 transfer_flags, bool dir_in)
 	return TransferFlags;
 }
 
-UINT32 to_linux_flags(ULONG TransferFlags, bool dir_in)
+UINT32 libdrv::to_linux_flags(_In_ ULONG TransferFlags, _In_ bool dir_in)
 {
 	UINT32 flags = 0;
 
 	if (TransferFlags & USBD_START_ISO_TRANSFER_ASAP) {
 		flags |= URB_ISO_ASAP;
-	} else if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
+	}
+
+	if (dir_in && !(TransferFlags & USBD_SHORT_TRANSFER_OK)) {
 		flags |= URB_SHORT_NOT_OK;
 	}
 

@@ -1,10 +1,13 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
 
 #include "ch9.h"
+
+namespace libdrv
+{
 
 /*
  * Declarations from include/uapi/linux/usb/ch11.h
@@ -29,3 +32,5 @@ enum {
         USB_PORT_FEAT_OVER_CURRENT,
         USB_PORT_FEAT_RESET,
 };
+
+} // namespace libdrv

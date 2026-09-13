@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2022-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #pragma once
@@ -7,6 +7,9 @@
 #include <ntdef.h>
 #include <wdm.h>
 #include <usb.h>
+
+namespace libdrv
+{
 
 enum { // <uapi/linux/usb/ch9.h>
 
@@ -94,29 +97,19 @@ inline auto operator ==(_In_ const USB_COMMON_DESCRIPTOR &a, _In_ const USB_COMM
 	return a.bLength == b.bLength && RtlEqualMemory(&a, &b, b.bLength);
 }
 
-inline auto operator !=(_In_ const USB_COMMON_DESCRIPTOR &a, _In_ const USB_COMMON_DESCRIPTOR &b)
-{
-	return !(a == b);
-}
-
 inline auto operator ==(_In_ const USB_DEVICE_DESCRIPTOR &a, _In_ const USB_DEVICE_DESCRIPTOR &b)
 {
 	return reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(a) == reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(b);
 }
 
-inline auto operator !=(_In_ const USB_DEVICE_DESCRIPTOR &a, _In_ const USB_DEVICE_DESCRIPTOR &b)
-{
-	return !(a == b);
-}
-
+/*
+ * Compares the entire configuration hierarchy (configuration descriptor and all
+ * subordinate interface, endpoint, and class descriptors). Both a and b must point
+ * to contiguous buffers of at least wTotalLength bytes.
+ */
 inline auto operator ==(_In_ const USB_CONFIGURATION_DESCRIPTOR &a, _In_ const USB_CONFIGURATION_DESCRIPTOR &b)
 {
 	return a.wTotalLength == b.wTotalLength && RtlEqualMemory(&a, &b, b.wTotalLength);
-}
-
-inline auto operator !=(_In_ const USB_CONFIGURATION_DESCRIPTOR &a, _In_ const USB_CONFIGURATION_DESCRIPTOR &b)
-{
-	return !(a == b);
 }
 
 inline auto operator ==(_In_ const USB_ENDPOINT_DESCRIPTOR &a, _In_ const USB_ENDPOINT_DESCRIPTOR &b)
@@ -124,7 +117,4 @@ inline auto operator ==(_In_ const USB_ENDPOINT_DESCRIPTOR &a, _In_ const USB_EN
 	return reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(a) == reinterpret_cast<const USB_COMMON_DESCRIPTOR&>(b);
 }
 
-inline auto operator !=(_In_ const USB_ENDPOINT_DESCRIPTOR &a, _In_ const USB_ENDPOINT_DESCRIPTOR &b)
-{
-	return !(a == b);
-}
+} // namespace libdrv
