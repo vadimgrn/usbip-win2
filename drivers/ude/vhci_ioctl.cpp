@@ -28,6 +28,8 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
+using namespace wdf;
 
 static_assert(sizeof(vhci::imported_device_location::service) == NI_MAXSERV);
 static_assert(sizeof(vhci::imported_device_location::host) == NI_MAXHOST);
@@ -53,6 +55,27 @@ struct workitem_ctx
 };
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(workitem_ctx, get_workitem_ctx)
 
+workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
+{
+        if (this != &src) {
+                NT_ASSERT(!request && !ctx_ext && !addrinfo);
+
+                vhci = src.vhci;
+                args = src.args;
+                one_attempt = src.one_attempt;
+
+                request = src.request;
+                src.request = WDF_NO_HANDLE;
+
+                ctx_ext = src.ctx_ext;
+                src.ctx_ext = WDF_NO_HANDLE;
+
+                addrinfo = src.addrinfo;
+                src.addrinfo = nullptr;
+        }
+        return *this;
+}
+
 _IRQL_requires_same_
 _IRQL_requires_max_(PASSIVE_LEVEL)
 PAGED void set_args(
@@ -66,7 +89,7 @@ PAGED void set_args(
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void log(_In_ const usbip_usb_device &d)
 {
         PAGED_CODE();
@@ -97,7 +120,7 @@ PAGED auto send_req_import(_In_ device_ctx_ext &ext)
         auto busid = ext.busid();
 
         auto &dst = req.body.busid;
-        auto st = libdrv::unicode_to_utf8(dst, sizeof(dst), *busid);
+        auto st = unicode_to_utf8(dst, sizeof(dst), *busid);
 
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", busid, st);
@@ -130,7 +153,7 @@ PAGED NTSTATUS recv_rep_import(_In_ device_ctx_ext &ext, _In_ memory pool, _Out_
         byteswap(reply);
 
         char busid[sizeof(reply.udev.busid)];
-        st = libdrv::unicode_to_utf8(busid, sizeof(busid), *ext.busid());
+        st = unicode_to_utf8(busid, sizeof(busid), *ext.busid());
 
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "unicode_to_utf8('%!USTR!') %!STATUS!", ext.busid(), st);
@@ -217,33 +240,32 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
 {
         PAGED_CODE();
 
-        Registry key;
+        registry key;
         auto st = open(key, DriverRegKeyParameters);
         if (NT_ERROR(st)) {
                 return;
         }
 
         struct {
-                const wchar_t *name;
+                UNICODE_STRING name;
                 int &value;
         } const params[] = {
-                { L"TCP_KEEPIDLE", idle },
-                { L"TCP_KEEPCNT", cnt },
-                { L"TCP_KEEPINTVL", intvl },
+                { RTL_CONSTANT_STRING(L"TCP_KEEPIDLE"), idle },
+                { RTL_CONSTANT_STRING(L"TCP_KEEPCNT"), cnt },
+                { RTL_CONSTANT_STRING(L"TCP_KEEPINTVL"), intvl },
         };
 
         for (auto& [name, value]: params) {
-
-                UNICODE_STRING value_name;
-                NT_VERIFY(!RtlUnicodeStringInit(&value_name, name));
-
                 ULONG val{};
-                st = WdfRegistryQueryULong(key.get(), &value_name, &val);
+                st = WdfRegistryQueryULong(key.get(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &value_name, st);
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
+                } else if (val > MAXINT) {
+                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) value %lu exceeds MAXINT(%d)",
+                                                  &name, val, MAXINT);
                 } else {
-                        value = val;
+                        value = static_cast<int>(val);
                 }
         }
 }
@@ -257,7 +279,10 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
 {
         PAGED_CODE();
 
-        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr { return idle + cnt*intvl; };
+        auto keepalive = [] (auto idle, auto cnt, auto intvl) constexpr
+        {
+                return idle + static_cast<UINT64>(cnt)*intvl;
+        };
 
         int idle{};
         int cnt{};
@@ -269,7 +294,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
                 return st;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
+        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %Iu sec",
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
 
         query_keepalive_parameters(idle, cnt, intvl);
@@ -280,7 +305,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
                 return st;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %d sec", 
+        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %Iu sec",
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
         
         return STATUS_SUCCESS;
@@ -323,9 +348,8 @@ PAGED auto connected(_In_ WDFREQUEST request, _Inout_ workitem_ctx &ctx, _Inout_
 
         Trace(TRACE_LEVEL_INFORMATION, "dev %04x plugged in, port %d", ptr04x(dev), r->port);
 
-        if (auto dc = get_device_ctx(dev); true) {
-                device_state_changed(*dc, vhci::state::plugged);
-        }
+        auto dc = get_device_ctx(dev);
+        device_state_changed(*dc, vhci::state::plugged);
 
         return STATUS_SUCCESS;
 }
@@ -454,7 +478,7 @@ PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
         auto &vhci = *get_vhci_ctx(ctx.vhci);
 
         auto &ext = get_device_ctx_ext(ctx.ctx_ext);
-        wdf::ObjectRef ext_ref(ctx.ctx_ext); // on_connect/connected can WdfObjectDelete it
+        ObjectRef ext_ref(ctx.ctx_ext); // on_connect/connected can WdfObjectDelete it
 
         auto request = ctx.request;
         WdfRequestSetInformation(request, ctx.args.info); // restore
@@ -671,7 +695,7 @@ PAGED NTSTATUS plugin_hardware(_In_ WDFREQUEST request, _In_ bool once)
 
         r->port = 0;
 
-        constexpr auto written = __builtin_offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
+        const auto written = offsetof(vhci::ioctl::plugin_hardware, port) + sizeof(r->port);
         WdfRequestSetInformation(request, written);
 
         return plugin_hardware(request, *r, once);
@@ -782,7 +806,7 @@ PAGED auto set_persistent(_In_ WDFREQUEST request)
                 return st;
         }
 
-        Registry key;
+        registry key;
         st = open(key, DriverRegKeyPersistentState, KEY_SET_VALUE);
         if (NT_ERROR(st)) {
                 return st;
@@ -815,7 +839,7 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
                 return st;
         }
 
-        Registry key;
+        registry key;
         st = open(key, DriverRegKeyPersistentState);
         if (NT_ERROR(st)) {
                 return st;
@@ -994,7 +1018,7 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
         auto device = WdfIoQueueGetDevice(queue);
         auto &vhci = *get_vhci_ctx(device);
         
-        wdf::WaitLock lck(vhci.events_lock);
+        WaitLock lck(vhci.events_lock);
 
         if (auto &val = fobj.process_events; !val) {
                 ++vhci.events_subscribers;
