@@ -9,18 +9,23 @@
 namespace libdrv
 {
 
+constexpr auto isdigit(wchar_t ch)
+{
+        return ch <= L'9' && ch >= L'0';
+}
+
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS unicode_to_utf8(_Inout_ UTF8_STRING &dst, _In_ const UNICODE_STRING &src);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
-PAGED NTSTATUS unicode_to_utf8(_Out_opt_ char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src);
+PAGED NTSTATUS unicode_to_utf8(_Out_writes_bytes_opt_(maxlen) char *utf8, _In_ USHORT maxlen, _In_ const UNICODE_STRING &src);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS utf8_to_unicode(
-        _Inout_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag);
+        _Out_ UNICODE_STRING &dst, _In_ const UTF8_STRING &src, _In_ POOL_TYPE pooltype, _In_ ULONG pooltag);
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
