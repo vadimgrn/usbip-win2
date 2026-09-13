@@ -35,6 +35,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 /*
  * wsk_irp->Tail.Overlay.DriverContext[] are zeroed.
@@ -117,7 +118,11 @@ auto prepare_wsk_buf(_Inout_ WSK_BUF &buf, _Inout_ wsk_context &ctx, _Inout_opt_
 
         buf.Mdl = ctx.mdl_hdr.get();
         buf.Offset = 0;
-        buf.Length = get_total_size(ctx.hdr);
+
+        if (!get_total_size(buf.Length, ctx.hdr)) {
+                Trace(TRACE_LEVEL_ERROR, "invalid PDU");
+                return STATUS_INVALID_PARAMETER;
+        }
 
         NT_ASSERT(verify(buf, ctx.is_isoc));
         return STATUS_SUCCESS;
@@ -132,7 +137,7 @@ void send_pending(_Inout_ device_ctx &dev)
         }
 
         do {
-                for (auto entry = libdrv::reverse(InterlockedFlushSList(&dev.pending_sends)); entry; ) {
+                for (auto entry = reverse(InterlockedFlushSList(&dev.pending_sends)); entry; ) {
 
                         auto &ctx = *CONTAINING_RECORD(entry, wsk_context, entry);
                         {
@@ -154,7 +159,7 @@ void send_pending(_Inout_ device_ctx &dev)
 
                 InterlockedExchange(&dev.sending, false);
 
-        } while (!(libdrv::empty(&dev.pending_sends) || InterlockedExchange(&dev.sending, true)));
+        } while (!(empty(&dev.pending_sends) || InterlockedExchange(&dev.sending, true)));
 }
 
 _IRQL_requires_same_
@@ -211,7 +216,7 @@ auto fill_usb_device_serial(
         _In_ WDFREQUEST request, _Inout_ _URB_CONTROL_TRANSFER_EX &r,
         _In_ const vhci::imported_device_properties &props)
 {
-        constexpr UCHAR hdr_sz = libdrv::usb_string_descr_size(0);
+        const UCHAR hdr_sz = usb_string_descr_size(0);
 
         if (r.TransferBufferLength < hdr_sz) {
                 Trace(TRACE_LEVEL_ERROR,"TransferBufferLength(%lu) < %d", r.TransferBufferLength, hdr_sz);
@@ -228,15 +233,19 @@ auto fill_usb_device_serial(
         USB_STRING_DESCRIPTOR *sd{};
         ULONG length; // can differ from r.TransferBufferLength, see prepare_wsk_mdl
         st = UdecxUrbRetrieveBuffer(request, reinterpret_cast<UCHAR**>(&sd), &length);
+
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer %!STATUS!", st);
                 return st;
+        } else if (length < hdr_sz) {
+                Trace(TRACE_LEVEL_ERROR, "UdecxUrbRetrieveBuffer length(%lu) < %d", length, hdr_sz);
+                return STATUS_BUFFER_TOO_SMALL;
         }
 
-        sd->bLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(serial_cch));
+        sd->bLength = usb_string_descr_size(static_cast<UCHAR>(serial_cch));
         sd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
 
-        auto buf_cch = (r.TransferBufferLength - hdr_sz)/sizeof(sd->bString);
+        auto buf_cch = (min(r.TransferBufferLength, length) - hdr_sz)/sizeof(sd->bString);
         auto cch = min(buf_cch, serial_cch);
 
         for (size_t i{}; i < cch; ++i) {
@@ -245,12 +254,13 @@ auto fill_usb_device_serial(
                 sd->bString[i] = ch;
         }
 
-        r.TransferBufferLength = libdrv::usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
+        r.TransferBufferLength = usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
         return STATUS_SUCCESS;
 }
 
 using urb_function_t = NTSTATUS (device_ctx&, UDECXUSBENDPOINT, endpoint_ctx&, WDFREQUEST, URB&);
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 auto control_transfer(
@@ -275,8 +285,8 @@ auto control_transfer(
         }
 
         {
-                char buf_flags[USBD_TRANSFER_FLAGS_BUFBZ];
-                char buf_setup[USB_SETUP_PKT_STR_BUFBZ];
+                char buf_flags[USBD_TRANSFER_FLAGS_BUFSZ];
+                char buf_setup[USB_SETUP_PKT_STR_BUFSZ];
 
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, Timeout %lu, %s",
                         ptr04x(request), ptr04x(r.PipeHandle),
@@ -322,6 +332,7 @@ auto control_transfer(
         return send(endpoint, ctx, dev, true, &urb);
 }
 
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 auto bulk_or_interrupt_transfer(
@@ -339,7 +350,7 @@ auto bulk_or_interrupt_transfer(
 
         {
                 auto func = urb.UrbHeader.Function == URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
-                char buf[USBD_TRANSFER_FLAGS_BUFBZ];
+                char buf[USBD_TRANSFER_FLAGS_BUFSZ];
 
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle), usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
@@ -362,6 +373,7 @@ auto bulk_or_interrupt_transfer(
 /*
  * USBD_ISO_PACKET_DESCRIPTOR.Length is not used (zero) for USB_DIR_OUT transfer.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto repack(_In_ iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 {
@@ -392,6 +404,7 @@ auto repack(_In_ iso_packet_descriptor *d, _In_ const _URB_ISOCH_TRANSFER &r)
 /*
  * USBD_START_ISO_TRANSFER_ASAP is appended because URB_GET_CURRENT_FRAME_NUMBER is not implemented.
  */
+_IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 _Function_class_(urb_function_t)
 auto isoch_transfer(
@@ -407,7 +420,7 @@ auto isoch_transfer(
 
         {
                 const char *func = urb.UrbHeader.Function == URB_FUNCTION_ISOCH_TRANSFER_USING_CHAINED_MDL ? ", MDL" : " ";
-                char buf[USBD_TRANSFER_FLAGS_BUFBZ];
+                char buf[USBD_TRANSFER_FLAGS_BUFSZ];
                 TraceUrb("req %04x -> PipeHandle %04x, %s, TransferBufferLength %lu, StartFrame %lu, NumberOfPackets %lu, ErrorCount %lu%s",
                         ptr04x(request), ptr04x(r.PipeHandle),
                         usbd_transfer_flags(buf, sizeof(buf), r.TransferFlags),
@@ -503,7 +516,8 @@ auto send_ep0_out(
                 return st;
         }
 
-        if constexpr (auto &r = get_submit_setup(ctx->hdr); true) {
+        {
+                auto &r = get_submit_setup(ctx->hdr);
                 r = setup;
                 NT_ASSERT(!r.wLength);
                 NT_ASSERT(is_transfer_dir_out(r));
