@@ -8,6 +8,7 @@
 
 struct _URB_SELECT_CONFIGURATION;
 struct _URB_SELECT_INTERFACE;
+struct _USBD_INTERFACE_INFORMATION;
 
 namespace libdrv
 {
@@ -19,11 +20,17 @@ enum {
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char *select_configuration_str(char *buf, size_t len, const _URB_SELECT_CONFIGURATION *cfg);
+bool is_valid(_In_ const _USBD_INTERFACE_INFORMATION *iface, _In_opt_ const void *cfg_end);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-const char *select_interface_str(char *buf, size_t len, const _URB_SELECT_INTERFACE &iface);
+const char *select_configuration_str(
+	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const _URB_SELECT_CONFIGURATION *cfg);
+
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+const char *select_interface_str(
+	_Out_writes_bytes_(len) char *buf, _In_ size_t len, _In_ const _URB_SELECT_INTERFACE &iface);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
