@@ -1,7 +1,7 @@
-; Copyright (C) 2022 - 2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
+; Copyright (c) 2023-2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
 
-#if Ver < EncodeVer(6,4,2,0)
-        #error This script requires Inno Setup 6.4.2 or later
+#if Ver < EncodeVer(7,1,0,0)
+        #error This script requires Inno Setup 7.1.0 or later
 #endif
 
 #ifndef SolutionDir
@@ -42,11 +42,11 @@
 ; information from .exe GetVersionInfo
 #define ProductName GetStringFileInfo(ExePath, PRODUCT_NAME)
 #define AppVersion GetVersionNumbersString(ExePath)
-#define Copyright GetFileCopyright(ExePath)
-#define Company GetFileCompany(ExePath)
+#define Copyright GetFileCopyrightString(ExePath)
+#define Company GetFileCompanyString(ExePath)
 
 #define AppGUID "{199505b0-b93d-4521-a8c7-897818e0205a}"
-#define TaskDetachAll "USBip Detach All On Reboot Or Shutdown"
+#define DetachTaskName "USBip Detach All On Reboot Or Shutdown"
 
 #define FilterDriver "usbip2_filter"
 #define UdeDriver "usbip2_ude"
@@ -65,6 +65,14 @@
 
 #define INSTALL_TEST_CERTIFICATE Defined(TEST_SIGNED_DRIVERS)
 
+#if Platform == "arm64"
+  #define ArchMode "arm64"
+  #define VCRedistArch "ARM64"
+#else
+  #define ArchMode "x64os"
+  #define VCRedistArch "x64"
+#endif
+
 [Setup]
 AppName={#ProductName}
 AppVersion={#AppVersion}
@@ -74,8 +82,8 @@ AppPublisherURL=https://github.com/vadimgrn/usbip-win2
 WizardStyle=modern
 DefaultDirName={autopf}\{#ProductName}
 DefaultGroupName={#ProductName}
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#ArchMode}
+ArchitecturesInstallIn64BitMode={#ArchMode}
 VersionInfoVersion={#AppVersion}
 ShowLanguageDialog=no
 AllowNoIcons=yes
@@ -91,6 +99,9 @@ WizardImageAlphaFormat=defined
 WizardImageStretch=no
 UninstallDisplayIcon="{app}\{#AppExeName}"
 AlwaysRestart=yes
+CloseApplications=yes
+CloseApplicationsFilter=*.exe,*.dll
+PrivilegesRequired=admin
 
 ; this app can't be installed more than once
 MissingRunOnceIdsWarning=no
@@ -116,7 +127,6 @@ Name: "{commondesktop}\{#ProductName}"; Filename: "{app}\{#GuiExeName}"; Tasks: 
 [Files]
 
 Source: {#SolutionDir + "Readme.md"}; DestDir: "{app}"; Flags: isreadme; Components: main
-Source: {#SolutionDir + "userspace\innosetup\UninsIS.dll"}; Flags: dontcopy; Components: main
 
 Source: {#BuildDir + "usbip.exe"}; DestDir: "{app}"; Components: main
 Source: {#BuildDir + "devnode.exe"}; DestDir: "{app}"; Components: main
@@ -135,64 +145,69 @@ Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
 Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
-Source: {#SolutionDir + "userspace\innosetup\task_detach_all.xml"}; DestDir: "{tmp}"; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
   Source: {#CertFilePath}; DestDir: "{tmp}"; Components: main
 #endif
 
 [Tasks]
-Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable(x64)"
+Name: vcredist; Description: "Install Microsoft Visual C++ &Redistributable ({#VCRedistArch})"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Components: gui
 
 [Run]
 
-Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist
+Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist; StatusMsg: "Installing Microsoft Visual C++ Redistributable ({#VCRedistArch})..."
 
 #if INSTALL_TEST_CERTIFICATE
-  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden
+  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden; StatusMsg: "Installing test certificate..."
 #endif
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver {tmp}\{#FilterDriver}.inf /install"; Flags: runhidden; Components: client
-Filename: {app}\devnode.exe; Parameters: "install {tmp}\{#UdeDriver}.inf {#CLIENT_HWID}"; Flags: runhidden; Components: client
-
-Filename: {sys}\WindowsPowerShell\v1.0\powershell.exe; Parameters: "-ExecutionPolicy Bypass -Command ""(Get-Content '{tmp}\task_detach_all.xml') -replace 'USBIP_DIR', '{app}' | Set-Content '{tmp}\task_detach_all.xml'"""; Flags: runhidden; Components: client
-Filename: {sys}\schtasks.exe; Parameters: "/create /tn ""{#TaskDetachAll}"" /f /xml {tmp}\task_detach_all.xml"; Flags: runhidden; Components: client
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden; Components: client; StatusMsg: "Installing upper filter driver..."
+Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden; Components: client; StatusMsg: "Installing UDE driver and virtual host controller..."
 
 [UninstallRun]
 
-Filename: {sys}\schtasks.exe; Parameters: "/delete /tn ""{#TaskDetachAll}"" /f"; Flags: runhidden; Components: client
-Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client
-
-; FIXME: findstr cannot search Unicode files, /Q:u switch is used to supress warnings
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#UdeDriver}    {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client
-Filename: {cmd}; Parameters: "/c FOR /f %P IN ('findstr /M /L /Q:u {#FilterDriver} {win}\INF\oem*.inf') DO {sys}\pnputil.exe /delete-driver %~nxP /uninstall"; Flags: runhidden; Components: client
+Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client; StatusMsg: "Removing virtual host controller device..."
 
 #if INSTALL_TEST_CERTIFICATE
-  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden
+  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden; StatusMsg: "Removing test certificate..."
 #endif
 
 [Code]
 
-function make_bcd_subkey_path(const object, element: String): String;
-begin
-  result := 'BCD00000000\Objects\' + object +  '\Elements\' + element;
-end;
+type
+  SYSTEM_CODEINTEGRITY_INFORMATION = record
+    Length: Cardinal;
+    CodeIntegrityOptions: Cardinal;
+  end;
+
+function NtQuerySystemInformation(
+  SystemInformationClass: Integer;
+  var SystemInformation: SYSTEM_CODEINTEGRITY_INFORMATION;
+  SystemInformationLength: Cardinal;
+  var ReturnLength: Cardinal
+): Integer; external 'NtQuerySystemInformation@ntdll.dll stdcall';
+
+const
+  SystemCodeIntegrityInformation = 103;
+  CODEINTEGRITY_OPTION_TESTSIGN = 2;
 
 function IsTestSigningModeEnabled(): Boolean;
 var
-  subkey, name, value : String;
-  binval : AnsiString;
+  Info: SYSTEM_CODEINTEGRITY_INFORMATION;
+  RetLen: Cardinal;
+  Status: Integer;
 begin
-  subkey := make_bcd_subkey_path('{9DEA862C-5CDD-4E70-ACC1-F32B344D4795}', '23000003'); // default loader
-  name := 'Element'
-  
-  result := RegQueryStringValue(HKEY_LOCAL_MACHINE, subkey, name, value);
-  if not result then
-    exit;
-   
-  subkey := make_bcd_subkey_path(value, '16000049'); // AllowPrereleaseSignatures
-  result := RegQueryBinaryValue(HKEY_LOCAL_MACHINE, subkey, name, binval) and (binval = #1)
+  Result := False;
+  Info.Length := 8;
+  Info.CodeIntegrityOptions := 0;
+  RetLen := 0;
+
+  Status := NtQuerySystemInformation(SystemCodeIntegrityInformation, Info, 8, RetLen);
+  if Status = 0 then
+  begin
+    Result := (Info.CodeIntegrityOptions and CODEINTEGRITY_OPTION_TESTSIGN) <> 0;
+  end;
 end;
 
 function check_test_sign_mode(): Boolean;
@@ -208,9 +223,189 @@ begin
 #endif
 end;
 
+function InitializeSetup(): Boolean;
+begin
+  result := check_test_sign_mode();
+end;
+
 procedure InitializeWizard();
 begin
   WizardForm.LicenseAcceptedRadio.Checked := True;
+end;
+
+procedure RegisterDetachTask();
+var
+  Scheduler, RootFolder, TaskDef, Trigger, Principal, Settings, Action: Variant;
+begin
+  Log('Registering detach task: {#DetachTaskName}');
+  try
+    Scheduler := CreateOleObject('Schedule.Service');
+    Scheduler.Connect();
+    RootFolder := Scheduler.GetFolder('\');
+
+    TaskDef := Scheduler.NewTask(0);
+    TaskDef.RegistrationInfo.Author := 'USBip Installer';
+    TaskDef.RegistrationInfo.Description := 'USBip: detach all imported devices on system reboot or shutdown';
+
+    Trigger := TaskDef.Triggers.Create(0); // TASK_TRIGGER_EVENT
+    Trigger.Subscription := '<QueryList><Query Id="0" Path="System"><Select Path="System">*[System[Provider[@Name=''Microsoft-Windows-Kernel-Power''] and (EventID=109)]] or *[System[Provider[@Name=''User32''] and (EventID=1074)]]</Select></Query></QueryList>';
+
+    Principal := TaskDef.Principal;
+    Principal.UserId := 'S-1-5-19';
+    Principal.RunLevel := 0; // TASK_RUNLEVEL_LUA
+
+    Settings := TaskDef.Settings;
+    Settings.DisallowStartIfOnBatteries := False;
+    Settings.StopIfGoingOnBatteries := False;
+    Settings.AllowHardTerminate := True;
+    Settings.StartWhenAvailable := False;
+    Settings.RunOnlyIfNetworkAvailable := False;
+    Settings.ExecutionTimeLimit := 'PT30S';
+    Settings.Priority := 7;
+
+    Action := TaskDef.Actions.Create(0); // TASK_ACTION_EXEC
+    Action.Path := ExpandConstant('{app}\usbip.exe');
+    Action.Arguments := 'detach --all=closeonly';
+
+    RootFolder.RegisterTaskDefinition('{#DetachTaskName}', TaskDef, 6, '', '', 5);
+    Log('Detach task registered successfully');
+  except
+    Log('Failed to register detach task: ' + GetExceptionMessage());
+  end;
+end;
+
+procedure UnregisterDetachTask();
+var
+  Scheduler, RootFolder: Variant;
+begin
+  Log('Unregistering detach task: {#DetachTaskName}');
+  try
+    Scheduler := CreateOleObject('Schedule.Service');
+    Scheduler.Connect();
+    RootFolder := Scheduler.GetFolder('\');
+    try
+      RootFolder.GetTask('{#DetachTaskName}');
+    except
+      Log('Detach task does not exist, skipping deletion');
+      Exit;
+    end;
+    RootFolder.DeleteTask('{#DetachTaskName}', 0);
+    Log('Detach task unregistered successfully');
+  except
+    Log('Failed to unregister detach task: ' + GetExceptionMessage());
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssPostInstall) and WizardIsComponentSelected('client') then
+  begin
+    RegisterDetachTask();
+  end;
+end;
+
+function DeleteOemDriverFromRegistry(const DriverName: String): Boolean;
+var
+  Names: TArrayOfString;
+  I, ResultCode: Integer;
+  OemName, Prefix: String;
+begin
+  Result := False;
+  Prefix := Lowercase(DriverName + '.inf');
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE_64, 'SYSTEM\DriverDatabase\DriverPackages', Names) then
+  begin
+    for I := 0 to GetArrayLength(Names) - 1 do
+    begin
+      if Pos(Prefix, Lowercase(Names[I])) = 1 then
+      begin
+        if RegQueryStringValue(HKEY_LOCAL_MACHINE_64, 'SYSTEM\DriverDatabase\DriverPackages\' + Names[I], '', OemName) then
+        begin
+          OemName := Trim(OemName);
+          if OemName <> '' then
+          begin
+            Log('Deleting OEM driver ' + OemName + ' (' + Names[I] + ')');
+            if ExecWithNativeSysDir(
+                 ExpandConstant('{sys}\pnputil.exe'),
+                 '/delete-driver ' + OemName + ' /uninstall /force',
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+            begin
+              Log(Format('pnputil /delete-driver %s returned exit code %d', [OemName, ResultCode]));
+              Result := True;
+            end
+            else
+            begin
+              Log(Format('Failed to execute pnputil for %s, error code %d', [OemName, ResultCode]));
+            end;
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+procedure DeleteOemDriverFromFileSearch(const DriverName: String);
+var
+  FindRec: TFindRec;
+  InfDir, CatVal, CatBase: String;
+  ResultCode: Integer;
+begin
+  InfDir := ExpandConstant('{win}\INF\');
+  if FindFirst(InfDir + 'oem*.inf', FindRec) then
+  begin
+    try
+      repeat
+        if (FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
+        begin
+          CatVal := Lowercase(Trim(GetIniString('Version', 'CatalogFile', '', InfDir + FindRec.Name)));
+          // Strip optional .cat extension to get the bare catalog base name,
+          // then compare for equality — avoids substring false-positives
+          // (e.g. 'usbip2_ude' must not match 'extra_usbip2_ude_old.cat').
+          if (Length(CatVal) > 4) and (Copy(CatVal, Length(CatVal) - 3, 4) = '.cat') then
+            CatBase := Copy(CatVal, 1, Length(CatVal) - 4)  // remove '.cat'
+          else
+            CatBase := CatVal;
+          if (CatBase = Lowercase(DriverName)) or (CatVal = Lowercase(DriverName)) or
+             (GetIniString('SourceDisksFiles', DriverName + '.sys', '', InfDir + FindRec.Name) <> '') then
+          begin
+            Log('Deleting OEM driver ' + FindRec.Name + ' (' + DriverName + ')');
+            if ExecWithNativeSysDir(
+                 ExpandConstant('{sys}\pnputil.exe'),
+                 '/delete-driver ' + FindRec.Name + ' /uninstall /force',
+                 '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+            begin
+              Log(Format('pnputil /delete-driver %s returned exit code %d', [FindRec.Name, ResultCode]));
+            end
+            else
+            begin
+              Log(Format('Failed to execute pnputil for %s, error code %d', [FindRec.Name, ResultCode]));
+            end;
+          end;
+        end;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+end;
+
+
+procedure DeleteOemDriver(const DriverName: String);
+begin
+  DeleteOemDriverFromRegistry(DriverName);
+  DeleteOemDriverFromFileSearch(DriverName);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    UnregisterDetachTask();
+  end
+  else if CurUninstallStep = usPostUninstall then
+  begin
+    DeleteOemDriver('{#UdeDriver}');
+    DeleteOemDriver('{#FilterDriver}');
+  end;
 end;
 
 function UninstallNeedRestart(): Boolean;
@@ -218,57 +413,73 @@ begin
   result := true;
 end;
 
-// UninsIS.dll
-// https://github.com/Bill-Stewart/UninsIS
-// The code is copied from [Code] section of UninsIS-Sample.iss, following modifications are made:
-// 1) CompareISPackageVersion is removed because it MUST always be uninstalled
-// 2) PrepareToInstall does not call it
-
-// Import IsISPackageInstalled() function from UninsIS.dll at setup time
-function DLLIsISPackageInstalled(AppId: string; Is64BitInstallMode,
-  IsAdminInstallMode: DWORD): DWORD;
-  external 'IsISPackageInstalled@files:UninsIS.dll stdcall setuponly';
-
-// Import UninstallISPackage() function from UninsIS.dll at setup time
-function DLLUninstallISPackage(AppId: string; Is64BitInstallMode,
-  IsAdminInstallMode: DWORD): DWORD;
-  external 'UninstallISPackage@files:UninsIS.dll stdcall setuponly';
-
-// Wrapper for UninsIS.dll IsISPackageInstalled() function
-// Returns true if package is detected as installed, or false otherwise
-function IsISPackageInstalled(): Boolean;
+// Check if an existing version of USBip is installed and locate its uninstaller
+function GetInstalledUninstallString(var UninstPath, UninstParams: String): Boolean;
+var
+  SubKey, UninstStr: String;
+  P: Integer;
 begin
-  result := DLLIsISPackageInstalled('{#AppGUID}',  // AppId
-    DWORD(Is64BitInstallMode()),                   // Is64BitInstallMode
-    DWORD(IsAdminInstallMode())) = 1;              // IsAdminInstallMode
-  if result then
-    Log('UninsIS.dll - Package detected as installed')
-  else
-    Log('UninsIS.dll - Package not detected as installed');
-end;
+  Result := False;
+  SubKey := 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{#AppGUID}_is1';
 
-// Wrapper for UninsIS.dll UninstallISPackage() function
-// Returns 0 for success, non-zero for failure
-function UninstallISPackage(): DWORD;
-begin
-  result := DLLUninstallISPackage('{#AppGUID}',  // AppId
-    DWORD(Is64BitInstallMode()),                 // Is64BitInstallMode
-    DWORD(IsAdminInstallMode()));                // IsAdminInstallMode
-  if result = 0 then
-    Log('UninsIS.dll - Installed package uninstall completed successfully')
-  else
-    Log('UninsIS.dll - installed package uninstall did not complete successfully');
-end;
+  // Check 64-bit HKLM, then 32-bit HKLM, then HKCU
+  if not RegQueryStringValue(HKEY_LOCAL_MACHINE_64, SubKey, 'UninstallString', UninstStr) then
+    if not RegQueryStringValue(HKEY_LOCAL_MACHINE_32, SubKey, 'UninstallString', UninstStr) then
+      if not RegQueryStringValue(HKEY_CURRENT_USER, SubKey, 'UninstallString', UninstStr) then
+        Exit;
 
+  UninstStr := Trim(UninstStr);
+  if UninstStr = '' then
+    Exit;
+
+  // Extract executable path from potentially quoted UninstallString
+  if (Length(UninstStr) > 0) and (UninstStr[1] = '"') then
+  begin
+    Delete(UninstStr, 1, 1);
+    P := Pos('"', UninstStr);
+    if P > 0 then
+      UninstPath := Copy(UninstStr, 1, P - 1)
+    else
+      UninstPath := UninstStr;
+  end
+  else if FileExists(UninstStr) then
+  begin
+    UninstPath := UninstStr;
+  end
+  else
+  begin
+    P := Pos(' ', UninstStr);
+    if P > 0 then
+      UninstPath := Copy(UninstStr, 1, P - 1)
+    else
+      UninstPath := UninstStr;
+  end;
+
+  UninstParams := '/SILENT /NORESTART /SUPPRESSMSGBOXES /_?="' + ExtractFilePath(UninstPath) + '"';
+  Result := FileExists(UninstPath);
+end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): string;
+var
+  UninstPath, UninstParams: String;
+  ExitCode: Integer;
 begin
-  result := '';
-  // If package installed, uninstall it automatically if the version we are
-  // installing does not match the installed version; If you want to
-  // automatically uninstall only...
-  // ...when downgrading: change <> to <
-  // ...when upgrading:   change <> to >
-  if IsISPackageInstalled() then // and (CompareISPackageVersion() <> 0)
-    UninstallISPackage();
+  Result := '';
+  if GetInstalledUninstallString(UninstPath, UninstParams) then
+  begin
+    Log('Uninstalling previous package: ' + UninstPath + ' ' + UninstParams);
+    if Exec(UninstPath, UninstParams, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+    begin
+      if ExitCode = 0 then
+        Log('Installed package uninstall completed successfully')
+      else
+        Result := 'Failed to automatically uninstall the previous version of USBip (exit code ' + IntToStr(ExitCode) + '). ' +
+                  'Please uninstall it manually before continuing.';
+    end
+    else
+    begin
+      Result := 'Failed to execute uninstaller for the previous version of USBip: ' + SysErrorMessage(ExitCode) + '. ' +
+                'Please uninstall it manually before continuing.';
+    end;
+  end;
 end;
