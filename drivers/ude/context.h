@@ -4,18 +4,19 @@
 
 #pragma once
 
-#include <libdrv\codeseg.h>
-#include <libdrv\ch9.h>
-#include <libdrv\wdm_cpp.h>
-#include <libdrv\wdf_cpp.h>
+#include <libdrv/codeseg.h>
+#include <libdrv/dbgcommon.h>
+#include <libdrv/ch9.h>
+#include <libdrv/wdm_cpp.h>
+#include <libdrv/wdf_cpp.h>
 
-#include <usbip\proto.h>
+#include <usbip/proto.h>
 
 #include <wdfusb.h>
 #include <UdeCx.h>
 
 #include <initguid.h>
-#include <usbip\vhci.h>
+#include <usbip/vhci.h>
 
 /*
  * Macro WDF_TYPE_NAME_TO_TYPE_INFO (see WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE)
@@ -105,9 +106,9 @@ struct device_ctx_ext
 
         device_attributes attr;
 
-        auto node_name() { return &attr.node_name; }
-        auto service_name() { return &attr.service_name; }
-        auto busid() { return &attr.busid; }
+        auto* node_name(this auto&& self) { return &self.attr.node_name; }
+        auto* service_name(this auto&& self) { return &self.attr.service_name; }
+        auto* busid(this auto&& self) { return &self.attr.busid; }
 
         auto location_hash() const { return attr.location_hash; }
         auto&& properties(this auto&& self) { return self.attr.properties; }
@@ -187,7 +188,7 @@ struct endpoint_ctx
         WDFQUEUE queue; // child
 
         union { // some descriptors have extra bytes beyond sizeof(USB_ENDPOINT_DESCRIPTOR)
-                USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
+                libdrv::USB_ENDPOINT_DESCRIPTOR_AUDIO descriptor;
                 UCHAR descriptor_raw[MAXUCHAR];
                 static_assert(sizeof(USB_COMMON_DESCRIPTOR::bLength) == sizeof(UCHAR));
         };
@@ -273,12 +274,12 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 seqnum_t next_seqnum(_Inout_ device_ctx &dev, _In_ bool dir_in);
 
 constexpr auto extract_num(seqnum_t seqnum) { return seqnum >> 1; }
-constexpr auto extract_dir(seqnum_t seqnum) { return usbip::direction(seqnum & 1); }
+constexpr auto extract_dir(seqnum_t seqnum) { return direction(seqnum & 1); }
 constexpr bool is_valid_seqnum(seqnum_t seqnum) { return extract_num(seqnum); }
 
 constexpr UINT32 make_devid(UINT16 busnum, UINT16 devnum)
 {
-        return (busnum << 16) | devnum;
+        return (static_cast<UINT32>(busnum) << 16) | devnum;
 }
 
 _IRQL_requires_same_
