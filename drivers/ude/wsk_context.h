@@ -15,6 +15,7 @@
 namespace usbip
 {
 
+using libdrv::Mdl;
 struct device_ctx;
 
 struct wsk_context
@@ -37,7 +38,7 @@ struct wsk_context
         Mdl mdl_buf_tail; // mdl_buf may describe a buffer shorter than required
 
         Mdl mdl_hdr;
-        usbip::header hdr;
+        header hdr;
 
         Mdl mdl_isoc;
         iso_packet_descriptor *isoc;
@@ -90,13 +91,10 @@ public:
         wsk_context_ptr(const wsk_context_ptr&) = delete;
         wsk_context_ptr& operator =(const wsk_context_ptr&) = delete;
 
-        wsk_context_ptr(wsk_context_ptr&& ctx) : m_reuse(ctx.m_reuse), m_ctx(ctx.release()) {}
+        wsk_context_ptr(wsk_context_ptr&& ctx) : m_reuse(ctx.m_reuse), m_ctx(ctx.release()) { ctx.m_reuse = false; }
         wsk_context_ptr& operator =(wsk_context_ptr&& ctx);
 
         explicit operator bool() const { return m_ctx; }
-        auto operator !() const { return !m_ctx; }
-
-        auto& operator &() const { return m_ctx; }
         auto operator ->() const { return m_ctx; }
         auto& operator *() const { return *m_ctx; }
 
