@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "wsk_receive_events.h"
@@ -20,6 +20,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -32,13 +33,27 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
 
         ring_buffer rb(dev.recv_buf);
 
-        for (auto has_hdr = rb.peek_hdr(hdr); len || has_hdr; has_hdr = rb.peek_hdr(hdr)) {
+        for (auto has_hdr = rb.peek(hdr); len || has_hdr; has_hdr = rb.peek(hdr)) {
+
+                if (!has_hdr && len > rb.available()) {
+                        if (len > static_cast<size_t>(-1) - rb.size()) [[unlikely]] {
+                                Trace(TRACE_LEVEL_ERROR, "dev %04x, receive indication size overflow", ptr04x(device));
+                                return false;
+                        }
+
+                        auto st = realloc(dev.recv_buf, rb.size() + len);
+                        if (NT_ERROR(st)) {
+                                return false;
+                        }
+                        rb = ring_buffer(dev.recv_buf);
+                        TraceDbg("dev %04x, ring buffer capacity %Iu", ptr04x(device), rb.capacity());
+                }
 
                 if (auto n = rb.write(data, len)) {
                         data += n;
                         len -= n;
                         if (!has_hdr) {
-                                has_hdr = rb.peek_hdr(hdr);
+                                has_hdr = rb.peek(hdr);
                         }
                 }
 
@@ -50,11 +65,13 @@ auto received(_In_ UDECXUSBDEVICE device, _Inout_ device_ctx &dev, _In_ const ch
                         return false;
                 }
 
-                auto expected = get_total_size(hdr);
+                size_t expected;
+                if (!get_total_size(expected, hdr)) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "dev %04x, invalid PDU", ptr04x(device));
+                        return false;
+                }
 
-                if (rb.capacity() >= expected) [[likely]] {
-                        //
-                } else {
+                if (rb.capacity() < expected) [[unlikely]] {
                         auto st = realloc(dev.recv_buf, expected);
                         if (NT_ERROR(st)) {
                                 return false;
@@ -117,7 +134,7 @@ auto wsk_receive(
         auto device = get_handle(&dev);
 
         if (WPP_LEVEL_FLAGS_ENABLED(TRACE_LEVEL_VERBOSE, FLAG_WSK)) {
-                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFBZ];
+                char buf[wsk::RECEIVE_EVENT_FLAGS_BUFSZ];
                 TraceWSK("dev %04x, BytesIndicated %Iu, Flags[%s]", ptr04x(device),
                           BytesIndicated, wsk::ReceiveEventFlags(buf, sizeof(buf), Flags));
         }
@@ -168,25 +185,16 @@ auto wsk_disconnect(_In_opt_ void *SocketContext, _In_ ULONG Flags)
         auto &dev = *ext->ctx;
         auto device = get_handle(&dev);
 
-        if (char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFBZ]; true) {
+        {
+                char buf[wsk::DISCONNECT_EVENT_FLAGS_BUFSZ];
                 TraceDbg("dev %04x, Flags[%s]", ptr04x(device), wsk::DisconnectEventFlags(buf, sizeof(buf), Flags));
         }
 
         return async_reattach(device, dev, STATUS_SUCCESS);
 }
 
-const ULONG wsk_events[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
-
-_IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
-constexpr auto make_event_mask()
-{
-        ULONG mask = 0;
-        for (auto evt: wsk_events) {
-                mask |= evt;
-        }
-        return mask;
-}
+constexpr ULONG wsk_events[] {WSK_EVENT_RECEIVE, WSK_EVENT_DISCONNECT};
+constexpr ULONG wsk_event_mask = WSK_EVENT_RECEIVE | WSK_EVENT_DISCONNECT;
 
 const WSK_CLIENT_CONNECTION_DISPATCH g_dispatch
 {
@@ -211,7 +219,7 @@ PAGED NTSTATUS usbip::events::start_receive_data(_In_ UDECXUSBDEVICE device)
                 return st;
         }
 
-        st = wsk::event_callback_control(dev.sock(), make_event_mask(), false);
+        st = wsk::event_callback_control(dev.sock(), wsk_event_mask, false);
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "event_callback_control %!STATUS!", st);
         }
@@ -225,10 +233,12 @@ PAGED wdm::object_reference usbip::events::stop_receive_data(_In_ UDECXUSBDEVICE
         PAGED_CODE();
         auto &dev = *get_device_ctx(device);
 
-        for (auto evt: wsk_events) {
-                auto st = wsk::event_callback_control(dev.sock(), WSK_EVENT_DISABLE | evt, true);
-                if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, st);
+        if (auto sock = dev.sock()) {
+                for (auto evt: wsk_events) {
+                        auto st = wsk::event_callback_control(sock, WSK_EVENT_DISABLE | evt, true);
+                        if (NT_ERROR(st)) {
+                                Trace(TRACE_LEVEL_ERROR, "event_callback_control(%#x) %!STATUS!", evt, st);
+                        }
                 }
         }
 
