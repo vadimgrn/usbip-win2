@@ -16,7 +16,6 @@
 #include "urbtransfer.h"
 #include "request_list.h"
 
-#include <libdrv/wait_timeout.h>
 #include <libdrv/usbd_helper.h>
 #include <libdrv/dbgcommon.h>
 #include <libdrv/pdu.h>
@@ -25,6 +24,7 @@ namespace
 {
 
 using namespace usbip;
+using namespace libdrv;
 
 _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
@@ -66,7 +66,7 @@ PAGED auto make_mdl(_Inout_ Mdl &mdl, _Inout_ unique_ptr &buf, _In_ ULONG length
         NT_ASSERT(!buf);
         NT_ASSERT(length);
 
-        if (buf = unique_ptr(libdrv::uninitialized, NonPagedPoolNx, length); !buf) {
+        if (buf = unique_ptr(uninitialized, NonPagedPoolNx, length); !buf) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %lu bytes", length);
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -111,7 +111,7 @@ PAGED auto prepare_wsk_mdl(_Inout_ MDL* &mdl, _Inout_ wsk_context &ctx)
         auto &urb = get_urb(ctx.request); // only IOCTL_INTERNAL_USB_SUBMIT_URB has payload
 
         ULONG TransferBufferLength{};
-        UCHAR *buf;
+        UCHAR *buf{};
         st = UdecxUrbRetrieveBuffer(ctx.request, &buf, &TransferBufferLength); // URB must have transfer buffer
 
         if (NT_ERROR(st)) {
@@ -259,14 +259,17 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 		NT_ASSERT(!ctx.request); // must be completed and zeroed on every loop
 		ctx.request = ret_command(ctx.hdr, dev);
 
-		if (auto sz = get_payload_size(ctx.hdr); !sz) {
-			//
-		} else if (get_flag(dev.unplugged)) {
-			status = STATUS_CANCELLED; // do not receive payload
-		} else {
-			auto f = ctx.request ? recv_payload : drain_payload;
-			status = f(ctx, sz);
-		}
+                if (size_t sz; !get_payload_size(sz, ctx.hdr)) [[unlikely]] {
+                        Trace(TRACE_LEVEL_ERROR, "invalid PDU");
+                        status = STATUS_INVALID_PARAMETER;
+                } else if (!sz) {
+                        // no payload
+                } else if (get_flag(dev.unplugged)) [[unlikely]] {
+                        status = STATUS_CANCELLED;
+                } else {
+                        auto f = ctx.request ? recv_payload : drain_payload;
+                        status = f(ctx, sz);
+                }
 
 		if (auto &req = ctx.request) {
 			auto st = NT_ERROR(status) ? status : ret_submit(ctx);
@@ -275,8 +278,9 @@ PAGED void recv_loop(_Inout_ device_ctx &dev, _Inout_ wsk_context &ctx)
 	}
 }
 
-_IRQL_requires_same_
 _Function_class_(KSTART_ROUTINE)
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void recv_thread_function(_In_ void *context)
 {
 	PAGED_CODE();
@@ -357,10 +361,9 @@ PAGED wdm::object_reference usbip::stop_receive_data_irp(_In_ UDECXUSBDEVICE dev
         NT_ASSERT(get_flag(dev.unplugged)); // thread checks it
         TraceDbg("dev %04x", ptr04x(device));
 
-        auto timeout = make_timeout(1*wdm::minute, wdm::period::relative);
-        auto st = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, &timeout);
-
-        if (NT_ERROR(st)) {
+        auto st = KeWaitForSingleObject(thread.get(), Executive, KernelMode, false, nullptr);
+        if (st != STATUS_SUCCESS) {
+                static_assert(NT_SUCCESS(STATUS_TIMEOUT));
                 Trace(TRACE_LEVEL_ERROR, "dev %04x, KeWaitForSingleObject %!STATUS!", ptr04x(device), st);
         } else {
                 TraceDbg("dev %04x, joined", ptr04x(device));
