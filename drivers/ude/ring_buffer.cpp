@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, Vadym Hrynchyshyn <vadimgrn@gmail.com>
+ * Copyright (c) 2026 Vadym Hrynchyshyn <vadimgrn@gmail.com>
  */
 
 #include "ring_buffer.h"
@@ -8,6 +8,8 @@
 
 #include "driver.h"
 #include <usbip/proto.h>
+
+using namespace libdrv;
 
 /*
 * While the TransferBufferLength field itself is a 32-bit integer (ULONG),
@@ -49,7 +51,7 @@ NTSTATUS usbip::realloc(_Inout_ ring_buffer_data* &data, _In_ size_t bytes)
                 return STATUS_BUFFER_TOO_SMALL;
         }
 
-        unique_ptr ptr(libdrv::uninitialized, NonPagedPoolNx, bytes);
+        unique_ptr ptr(uninitialized, NonPagedPoolNx, bytes);
         if (!ptr) {
                 Trace(TRACE_LEVEL_ERROR, "Cannot allocate %Iu bytes", bytes);
                 return STATUS_INSUFFICIENT_RESOURCES;
@@ -79,7 +81,15 @@ void usbip::free(_Inout_ ring_buffer_data* &p)
         p = nullptr;
 }
 
-size_t usbip::ring_buffer::write(_In_ const void *src, _In_ size_t len)
+/*
+ * Replace 64-bit modulo (% capacity) with conditional subtraction:
+ * 64-bit division/modulo takes 20-40 CPU cycles on x64/ARM64.
+ * Because to_write <= available() <= capacity, head + to_write is strictly < 2 * capacity.
+ * Conditional subtraction executes in 1-2 cycles, avoiding division at DISPATCH_LEVEL.
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+size_t usbip::ring_buffer::write(_In_reads_bytes_(len) const void *src, _In_ size_t len)
 {
         if (!(len && src)) {
                 return 0;
@@ -91,20 +101,27 @@ size_t usbip::ring_buffer::write(_In_ const void *src, _In_ size_t len)
         }
 
         auto first_chunk = min(to_write, m_data->capacity - m_data->head);
-        RtlCopyMemory(m_data->buf + m_data->head, src, first_chunk);
+        if (first_chunk) {
+                RtlCopyMemory(m_data->buf + m_data->head, src, first_chunk);
+        }
 
         if (auto second_chunk = to_write - first_chunk) {
                 RtlCopyMemory(m_data->buf, static_cast<const char*>(src) + first_chunk, second_chunk);
         }
 
-        m_data->head = (m_data->head + to_write) % m_data->capacity;
+        if (m_data->head += to_write; m_data->head >= m_data->capacity) {
+                m_data->head -= m_data->capacity;
+        }
+
         m_data->size += to_write;
 
         NT_ASSERT(size() <= capacity());
         return to_write;
 }
 
-size_t usbip::ring_buffer::peek(_In_ void *dest, _In_ size_t len) const
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+size_t usbip::ring_buffer::peek(_Out_writes_bytes_to_(len, return) void *dest, _In_ size_t len) const
 {
         if (!(len && dest)) {
                 return 0;
@@ -116,7 +133,9 @@ size_t usbip::ring_buffer::peek(_In_ void *dest, _In_ size_t len) const
         }
 
         auto first_chunk = min(to_read, m_data->capacity - m_data->tail);
-        RtlCopyMemory(dest, m_data->buf + m_data->tail, first_chunk);
+        if (first_chunk) {
+                RtlCopyMemory(dest, m_data->buf + m_data->tail, first_chunk);
+        }
 
         if (auto second_chunk = to_read - first_chunk) {
                 RtlCopyMemory(static_cast<char*>(dest) + first_chunk, m_data->buf, second_chunk);
@@ -125,10 +144,18 @@ size_t usbip::ring_buffer::peek(_In_ void *dest, _In_ size_t len) const
         return to_read;
 }
 
+/*
+ * Replace 64-bit modulo (% capacity) with conditional subtraction.
+ * @see write
+ */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 size_t usbip::ring_buffer::skip(_In_ size_t len)
 {
         if (len = min(len, size()); len) {
-                m_data->tail = (m_data->tail + len) % m_data->capacity;
+                if (m_data->tail += len; m_data->tail >= m_data->capacity) {
+                        m_data->tail -= m_data->capacity;
+                }
                 m_data->size -= len;
         }
 
@@ -136,7 +163,9 @@ size_t usbip::ring_buffer::skip(_In_ size_t len)
         return len;
 }
 
-size_t usbip::ring_buffer::read(_In_ void *dest, _In_ size_t len)
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
+size_t usbip::ring_buffer::read(_Out_writes_bytes_to_(len, return) void *dest, _In_ size_t len)
 {
         auto n = peek(dest, len);
         return skip(n);
@@ -146,7 +175,9 @@ size_t usbip::ring_buffer::read(_In_ void *dest, _In_ size_t len)
  * The pointer inside the buffer is never returned,
  * it may be misaligned and will cause BSOD on ARM64.
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 bool usbip::ring_buffer::peek_hdr(_Inout_ header &hdr) const
 {
-        return size() >= sizeof(hdr) ? peek(&hdr, sizeof(hdr)) : false;
+        return peek(hdr);
 }
