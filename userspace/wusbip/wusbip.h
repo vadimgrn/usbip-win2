@@ -10,6 +10,7 @@
 
 #include <libusbip/win_handle.h>
 
+#include <stop_token>
 #include <thread>
 #include <mutex>
 #include <chrono>
@@ -25,7 +26,7 @@ wxDECLARE_EVENT(EVT_DEVICE_STATE, DeviceStateEvent);
 class MainFrame : public Frame
 {
 public:
-	MainFrame(_In_ usbip::Handle read, _In_ int appearance);
+	[[nodiscard]] static MainFrame* create(_In_ usbip::Handle read, _In_ int appearance);
 	~MainFrame();
 
 	auto start_in_tray() const noexcept { return m_start_in_tray; }
@@ -41,6 +42,8 @@ private:
         friend class TaskBarIcon;
         friend class wxPersistentMainFrame;
 
+	MainFrame(_In_ usbip::Handle read, _In_ int appearance);
+
         enum { IMG_SERVER, IMG_DEVICE, IMG_CNT };
 
 	bool m_start_in_tray{};
@@ -54,7 +57,7 @@ private:
 	usbip::Handle m_read;
 	std::mutex m_read_close_mtx;
 
-	std::thread m_read_thread{ &MainFrame::read_loop, this };
+	std::jthread m_read_thread;
 
         int m_status_text_pushes{};
         wxTimer m_status_bar_timer{this};
@@ -135,8 +138,9 @@ private:
 	void init_tree_list();
 	void restore_state();
 
-	void read_loop();
-	void break_read_loop();
+	void start_read_thread();
+	void read_loop(std::stop_token stoken);
+	void break_and_join_read_loop();
 
 	wxTreeListItem find_or_add_server(_In_ const wxString &url);
 
