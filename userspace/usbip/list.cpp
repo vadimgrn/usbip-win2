@@ -3,6 +3,7 @@
  */
 
 #include "usbip.h"
+#include "ctrl_c_guard.h"
 #include "strings.h"
 #include "log.h"
 
@@ -88,7 +89,8 @@ bool usbip::cmd_list(const list_args &args)
 		return list_persistent_devices();
 	}
 
-	auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str());
+	ctrl_c_guard guard;
+	auto sock = connect(args.remote.c_str(), global_args.tcp_port.c_str(), guard.token());
 	if (!sock) {
 		log::error(get_last_error_msg());
 		return false;

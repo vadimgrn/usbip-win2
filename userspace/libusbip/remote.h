@@ -5,10 +5,16 @@
 #pragma once
 
 #include "dllspec.h"
+#include "win_handle.h"
 #include "win_socket.h"
 
 #include <usbspec.h>
 #include <string>
+
+#if __cplusplus >= 202002L
+  #include <optional>
+  #include <stop_token>
+#endif
 
 namespace usbip
 {
@@ -50,32 +56,55 @@ struct usb_interface
 USBIP_API const char *get_tcp_port() noexcept;
 
 /**
- * This call is blocking and cannot be cancelled.
+ * The call is blocking.
  * @param hostname name or IP address of a host to connect to
- * @param service TCP/IP port number of symbolic name
+ * @param service TCP/IP port number or symbolic name
+ * @param cancel_event optional event handle to cancel the connection attempt
  * @return call GetLastError() if returned handle is invalid
  */
-USBIP_API Socket connect(_In_ const char *hostname, _In_ const char *service);
+USBIP_API Socket connect(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_opt_ HANDLE cancel_event = HANDLE{});
 
-enum connect_flags_t : unsigned long {
-        CANCEL_BY_APC = 1
-};
 
+#if __cplusplus >= 202002L
 /**
  * The call is blocking.
  * @param hostname name or IP address of a host to connect to
- * @param service TCP/IP port number of symbolic name
- * @param options
- *      CANCEL_BY_APC 
- *      The call will be canceled by any asynchronous procedure call (APC).
- *      It does not matter what APC is doing. If APC is queued to a thread, it will be executed, 
- *      after which the call will be canceled. This is possible due to using alertable wait functions. 
- *      In such case, GetLastError() will return WSA_E_CANCELLED if GetAddrInfoEx is canceled
- *      or ERROR_CANCELLED if connect is canceled.
+ * @param service TCP/IP port number or symbolic name
+ * @param stoken stop token to cancel the connection attempt
  * @return call GetLastError() if returned handle is invalid
- * @see Asynchronous Procedure Calls, QueueUserAPC
  */
-USBIP_API Socket connect(_In_ const char *hostname, _In_ const char *service, _In_ unsigned long options);
+inline Socket connect(
+        _In_ const char *hostname,
+        _In_ const char *service,
+        _In_ std::stop_token stoken)
+{
+        Socket sock;
+        if (stoken.stop_requested()) {
+                SetLastError(ERROR_CANCELLED);
+                return sock;
+        }
+
+        NullableHandle cancel_evt;
+        auto on_stop = [&cancel_evt] { SetEvent(cancel_evt.get()); };
+
+        using stop_cb_t = std::stop_callback<decltype(on_stop)>;
+        std::optional<stop_cb_t> stop_cb;
+
+        if (stoken.stop_possible()) {
+                cancel_evt.reset(CreateEvent(nullptr, true, false, nullptr));
+                if (!cancel_evt) {
+                        return sock;
+                }
+                stop_cb.emplace(stoken, on_stop);
+        }
+
+        sock = connect(hostname, service, cancel_evt.get());
+        return sock;
+}
+#endif // __cplusplus
 
 /**
  * @param idx zero-based index of usb device

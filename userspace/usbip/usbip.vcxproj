@@ -178,6 +178,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ctrl_c_guard.cpp" />
     <ClCompile Include="strings.cpp" />
     <ClCompile Include="usbip.cpp" />
     <ClCompile Include="attach.cpp" />
@@ -186,6 +187,7 @@
     <ClCompile Include="port.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ctrl_c_guard.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="strings.h" />
     <ClInclude Include="resource.h" />
