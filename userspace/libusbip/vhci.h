@@ -149,6 +149,15 @@ enum { port_all_closeonly = -2, port_all };
 USBIP_API bool detach(_In_ HANDLE dev, _In_ int port);
 
 /**
+ * Cancel pending synchronous or asynchronous I/O operations on the VHCI driver device.
+ * @param dev handle of the driver device
+ * @param overlapped optional pointer to the OVERLAPPED structure of a specific request to cancel,
+ *                   or nullptr to cancel all pending requests on the handle
+ * @return call GetLastError() if false is returned
+ */
+USBIP_API bool cancel_io(_In_ HANDLE dev, _In_opt_ OVERLAPPED *overlapped = nullptr) noexcept;
+
+/**
  * @return textual representation of the given constant
  */
 USBIP_API const char* get_state_str(_In_ state state) noexcept;

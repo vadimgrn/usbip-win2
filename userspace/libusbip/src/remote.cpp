@@ -12,7 +12,6 @@
 #include "output.h"
 
 #include <usbip/proto_op.h>
-
 #include <chrono>
 
 #include <ws2tcpip.h>
@@ -249,7 +248,7 @@ auto prepare_event(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ WSAEVENT ev
 	return true;
 }
 
-auto try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_ const sockaddr &addr, _In_ DWORD len)
+int try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_opt_ HANDLE cancel_evt, _In_ const sockaddr &addr, _In_ DWORD len)
 {
 	libusbip::output(L"connecting to {}", address_to_string(addr, len));
 
@@ -260,65 +259,74 @@ auto try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_ const sockaddr &addr, _I
 		return err;
 	}
 
-	int err;
+	WSAEVENT events[] { evt, cancel_evt };
+	DWORD cnt = cancel_evt ? 2 : 1;
+	
+	for (int err;;) {
+		switch (auto ret = WSAWaitForMultipleEvents(cnt, events, false, WSA_INFINITE, true)) {
+		case WSA_WAIT_EVENT_0:
+			if (WSANETWORKEVENTS net_events; WSAEnumNetworkEvents(s, evt, &net_events)) { // resets event if success
+				err = WSAGetLastError();
+				libusbip::output("WSAEnumNetworkEvents error {}", err);
+			} else {
+				assert(net_events.lNetworkEvents & FD_CONNECT);
+				err = net_events.iErrorCode[FD_CONNECT_BIT];
+			}
+			return err;
+		case WSA_WAIT_EVENT_0 + 1:
+			libusbip::output("connect cancelled");
+			return ERROR_CANCELLED;
+		case WSA_WAIT_IO_COMPLETION: // see QueueUserAPC
+			continue;
+		default:
+			assert(ret == WSA_WAIT_FAILED);
 
-	switch (auto ret = WSAWaitForMultipleEvents(1, &evt, false, WSA_INFINITE, true)) {
-	case WSA_WAIT_EVENT_0:
-		if (WSANETWORKEVENTS events; WSAEnumNetworkEvents(s, evt, &events)) { // resets event if success
 			err = WSAGetLastError();
-			libusbip::output("WSAEnumNetworkEvents error {}", err);
-		} else {
-			assert(events.lNetworkEvents & FD_CONNECT);
-			err = events.iErrorCode[FD_CONNECT_BIT];
+			assert(err != ERROR_CANCELLED);
+
+			libusbip::output("WSAWaitForMultipleEvents -> {}, error {}", ret, err);
+			return err;
 		}
-		break;
-	case WSA_WAIT_IO_COMPLETION: // see QueueUserAPC
-		libusbip::output("connect cancelled");
-		err = ERROR_CANCELLED;
-		break;
-	default:
-		assert(ret == WSA_WAIT_FAILED);
-
-		err = WSAGetLastError();
-		assert(err != ERROR_CANCELLED);
-
-		libusbip::output("WSAWaitForMultipleEvents -> {}, error {}", ret, err);
 	}
-
-	return err;
 }
 
-INT wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_opt_ HANDLE cancel, _In_ bool alertable)
+int wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_opt_ HANDLE cancel, _In_opt_ HANDLE cancel_evt)
 {
-	INT err;
-
-	switch (auto ret = WaitForSingleObjectEx(ovlp.hEvent, INFINITE, alertable)) {
-	case WAIT_OBJECT_0:
-		if (err = GetAddrInfoExOverlappedResult(&ovlp); err) {
-			libusbip::output("GetAddrInfoExOverlappedResult error {}", err);
+	HANDLE events[] { ovlp.hEvent, cancel_evt };
+	DWORD cnt = cancel_evt ? 2 : 1;
+	
+	for (INT err;;) {
+		switch (auto ret = WaitForMultipleObjectsEx(cnt, events, false, INFINITE, true)) {
+		case WAIT_OBJECT_0:
+			if (err = GetAddrInfoExOverlappedResult(&ovlp); err) {
+				libusbip::output("GetAddrInfoExOverlappedResult error {}", err);
+			}
+			return err;
+		case WAIT_OBJECT_0 + 1:
+			libusbip::output("GetAddrInfoEx cancelled");
+			if (err = GetAddrInfoExCancel(&cancel); err) {
+				libusbip::output("GetAddrInfoExCancel error {}", err);
+			} else {
+				WaitForSingleObject(ovlp.hEvent, INFINITE);
+				[[maybe_unused]] auto res = GetAddrInfoExOverlappedResult(&ovlp); // see WSA_E_CANCELLED
+				assert(res == WSA_E_CANCELLED);
+			}
+			return ERROR_CANCELLED;
+		case WAIT_IO_COMPLETION: // see QueueUserAPC
+			continue;
+		default:
+			assert(ret == WAIT_FAILED);
+			err = GetLastError();
+			libusbip::output("WaitForMultipleObjectsEx -> {}, error {}", ret, err);
+			return err;
 		}
-		break;
-	case WAIT_IO_COMPLETION: // see QueueUserAPC
-		libusbip::output("GetAddrInfoEx cancelled by APC");
-		if (err = GetAddrInfoExCancel(&cancel); err) {
-			libusbip::output("GetAddrInfoExOverlappedResult error {}", err);
-		} else {
-			err = wait_for_resolve(ovlp, HANDLE(), false); // see WSA_E_CANCELLED
-		}
-		break;
-	default:
-		assert(ret == WAIT_FAILED);
-		err = GetLastError();
-		libusbip::output("WaitForSingleObjectEx(alertable={}) -> {}, error {}", alertable, ret, err);
 	}
-
-	return err;
 }
 
 /*
  * Numeric IP addresses like "XXX.XXX.XXX.XXX" are resolved instantly. 
  */
-auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const char *service)
+auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_evt)
 {
 	std::unique_ptr<ADDRINFOEX, decltype(FreeAddrInfoEx)&> ptr(nullptr, FreeAddrInfoEx);
 
@@ -355,26 +363,21 @@ auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const
 
 	switch (last.error) {
 	case WSA_IO_PENDING:
-		if (last.error = wait_for_resolve(ovlp, cancel, true); last.error) {
-			break;
-		}
-		[[fallthrough]];
+		last.error = wait_for_resolve(ovlp, cancel, cancel_evt);
+		break;
 	case NO_ERROR:
-		ptr.reset(result);
 		break;
 	default:
 		libusbip::output("GetAddrInfoEx error {}", last.error);
 	}
 
-	return ptr;
-}
+	ptr.reset(result);
 
-inline auto connect_by_name(_In_ SOCKET s, _In_ LPCWSTR hostname, _In_ _In_ LPCWSTR service) noexcept
-{
-	return WSAConnectByName(s, const_cast<wchar_t*>(hostname), const_cast<wchar_t*>(service), 
-				nullptr, nullptr, // LocalAddress
-				nullptr, nullptr, // RemoteAddress
-				nullptr, nullptr);
+	if (last.error) {
+		ptr.reset();
+	}
+
+	return ptr;
 }
 
 } // namespace
@@ -385,61 +388,18 @@ const char* usbip::get_tcp_port() noexcept
 	return tcp_port;
 }
 
-/*
- * QueueUserAPC() does not terminate connect/WSAConnectByName.
- */
-auto usbip::connect(_In_ const char *hostname, _In_ const char *service) -> Socket
-{
-        set_last_error last(NO_ERROR); // restore after sock.close()
-        Socket sock;
-
-        auto host = utf8_to_wchar(hostname);
-	auto svc = utf8_to_wchar(service);
-
-        if (!(host && svc)) {
-                last.error = !host ? host.error() : svc.error();
-                libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, last.error);
-                return sock;
-        }
-
-	for (auto family: {AF_INET, AF_INET6}) {
-
-		sock.reset(socket(family, SOCK_STREAM, 0));
-
-		if (!sock) {
-			last.error = WSAGetLastError();
-			libusbip::output("socket(family={}) error {}", family, last.error);
-		} else if (family == AF_INET6 && !set_ipv6only(last, sock.get(), false)) {
-			//
-		} else if (!set_options(last, sock.get())) {
-			//
-		} else if (!connect_by_name(sock.get(), host->c_str(), svc->c_str())) {
-			last.error = WSAGetLastError();
-			libusbip::output("WSAConnectByName(family={}) error {}", family, last.error);
-			break; // it makes no sense to try next family
-		} else if (setsockopt(sock.get(), SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nullptr, 0)) {
-			last.error = WSAGetLastError();
-			libusbip::output("setsockopt(SO_UPDATE_CONNECT_CONTEXT) error {}", last.error);
-			break;
-		} else {
-			return sock;
-		}
-	}
-
-	sock.close();
-	return sock;
-}
-
-auto usbip::connect(_In_ const char *hostname, _In_ const char *service, _In_ unsigned long options) -> Socket
+auto usbip::connect(
+        _In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_event) -> Socket
 {
 	set_last_error last(ERROR_INVALID_PARAMETER); // restore after sock.close()
 	Socket sock;
 
-	if (options != CANCEL_BY_APC) {
+	if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+		last.error = ERROR_CANCELLED;
 		return sock;
 	}
 
-	auto ai = resolve(last, hostname, service);
+	auto ai = resolve(last, hostname, service, cancel_event);
 	if (!ai) {
 		return sock;
 	}
@@ -460,7 +420,7 @@ auto usbip::connect(_In_ const char *hostname, _In_ const char *service, _In_ un
 			libusbip::output("socket(family={}) error {}", r->ai_family, last.error);
 		} else if (auto ok = set_options(last, sock.get()) && prepare_event(last, sock.get(), evt.get()); !ok) {
 			//
-		} else if (auto err = try_connect(sock.get(), evt.get(), *r->ai_addr, static_cast<DWORD>(r->ai_addrlen))) {
+		} else if (auto err = try_connect(sock.get(), evt.get(), cancel_event, *r->ai_addr, static_cast<DWORD>(r->ai_addrlen))) {
 			if (last.error = err; err == ERROR_CANCELLED) {
 				break;
 			}

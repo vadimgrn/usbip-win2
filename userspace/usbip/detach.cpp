@@ -3,6 +3,7 @@
  */
 
 #include "usbip.h"
+#include "ctrl_c_guard.h"
 #include "log.h"
 #include <libusbip/vhci.h>
 
@@ -16,6 +17,7 @@ bool usbip::cmd_detach(const detach_args &args)
 		return false;
 	}
 
+	ctrl_c_guard guard(dev.get());
 	auto ok = vhci::detach(dev.get(), args.port);
 
 	if (!ok) {

@@ -387,6 +387,18 @@ bool usbip::vhci::detach(_In_ HANDLE dev, _In_ int port)
         return DeviceIoControl(dev, ioctl::PLUGOUT_HARDWARE, &r, sizeof(r), nullptr, 0, &BytesReturned, nullptr);
 }
 
+bool usbip::vhci::cancel_io(_In_ HANDLE dev, _In_opt_ OVERLAPPED *overlapped) noexcept
+{
+        if (CancelIoEx(dev, overlapped)) {
+                return true;
+        }
+        if (GetLastError() == ERROR_NOT_FOUND) {
+                SetLastError(ERROR_SUCCESS);
+                return true;
+        }
+        return false;
+}
+
 DWORD usbip::vhci::get_device_state_size() noexcept
 {
         return sizeof(vhci::device_state);

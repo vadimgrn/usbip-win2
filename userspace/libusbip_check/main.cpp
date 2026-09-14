@@ -48,7 +48,11 @@ int main()
         // remote.h
         [[maybe_unused]] auto port = get_tcp_port();
         auto s1 = connect("", "1234");
-        auto s2 = connect("", "1234", CANCEL_BY_APC);
+        auto s2 = connect("", "1234", HANDLE());
+#if __cplusplus >= 202002L
+        std::stop_source ssrc;
+        auto s3 = connect("", "1234", ssrc.get_token());
+#endif
         if (s1) {
                 enum_exportable_devices(s1.get(),
                         [] (int, const usb_device&) {},
@@ -78,6 +82,8 @@ int main()
         [[maybe_unused]] auto stopped_cnt = vhci::stop_attach_attempts(dev.get(), &args.location);
         [[maybe_unused]] auto stopped_all = vhci::stop_attach_attempts(dev.get(), nullptr);
         [[maybe_unused]] auto detached = vhci::detach(dev.get(), 1);
+        [[maybe_unused]] auto cancelled = vhci::cancel_io(dev.get());
+        [[maybe_unused]] auto cancelled_ovl = vhci::cancel_io(dev.get(), nullptr);
 
         [[maybe_unused]] auto state_str = vhci::get_state_str(state::plugged);
         [[maybe_unused]] auto state_size = vhci::get_device_state_size();

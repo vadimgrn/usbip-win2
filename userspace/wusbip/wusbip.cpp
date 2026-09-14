@@ -630,7 +630,7 @@ void MainFrame::iconize_to_tray()
 void MainFrame::start_read_thread()
 {
         wxASSERT(!m_read_thread.joinable());
-        m_read_thread = std::jthread([this](std::stop_token stoken) { read_loop(stoken); });
+        m_read_thread = std::jthread([this] (std::stop_token stoken) { read_loop(stoken); });
 }
 
 void MainFrame::read_loop(std::stop_token stoken)
@@ -992,14 +992,14 @@ DWORD MainFrame::attach(
         };
 
         DWORD err{};
-        auto f = [&err, args = std::move(args), vhci = get_vhci().get()]
+        auto f = [&err, args = std::move(args), vhci = get_vhci().get()] (std::stop_token)
         { 
                 auto port = vhci::attach(vhci, args); 
                 err = port > 0 ? ERROR_SUCCESS : GetLastError();
         };
 
         auto msg = wxString::Format(L"%s/%s", url, busid);
-        run_cancellable(this, msg, _("Attaching"), std::move(f));
+        run_cancellable(this, msg, _("Attaching"), std::move(f), cancel_vhci_io);
 
         return err;
 }
@@ -1077,7 +1077,7 @@ DWORD MainFrame::detach(_In_ int port)
         wxLogVerbose(_("Detach port %d"), port);
         auto err = ERROR_SUCCESS;
 
-        auto f = [&err, port]
+        auto f = [&err, port] (std::stop_token)
         {
                 if (auto &vhci = get_vhci(); !vhci::detach(vhci.get(), port)) {
                         err = GetLastError();
@@ -1085,7 +1085,7 @@ DWORD MainFrame::detach(_In_ int port)
         };
 
         auto msg = wxString::Format(_("Port %d"), port);
-        run_cancellable(this, msg, _("Detaching"), std::move(f));
+        run_cancellable(this, msg, _("Detaching"), std::move(f), cancel_vhci_io);
 
         return err;
 }
@@ -1225,14 +1225,14 @@ auto MainFrame::connect(
         Socket sock;
         DWORD err{};
 
-        auto f = [&sock, &err, host = hostname_u8.c_str(), svc = service_u8.c_str()]
+        auto f = [&sock, &err, host = hostname_u8.c_str(), svc = service_u8.c_str()] (std::stop_token st)
         {
-                sock = usbip::connect(host, svc, CANCEL_BY_APC);
+                sock = usbip::connect(host, svc, st);
                 err = sock ? ERROR_SUCCESS : GetLastError();
         };
 
         auto msg = wxString::Format(L"%s:%s", hostname, service);
-        run_cancellable(this, msg, _("Connecting"), std::move(f), cancel_connect);
+        run_cancellable(this, msg, _("Connecting"), std::move(f));
 
         switch (err) {
         case ERROR_SUCCESS:

@@ -3,6 +3,7 @@
  */
 
 #include "usbip.h"
+#include "ctrl_c_guard.h"
 #include "strings.h"
 #include "log.h"
 
@@ -25,6 +26,7 @@ auto attach_persistent_devices(HANDLE dev)
         }
 
         auto ok = true;
+
         for (const auto &args: *v) {
                 std::println("{}", args);
 
@@ -61,6 +63,8 @@ bool usbip::cmd_attach(const attach_args &args)
                 log::error(get_last_error_msg());
                 return false;
         }
+
+        ctrl_c_guard guard(dev.get());
 
         if (args.persistent) {
                 return attach_persistent_devices(dev.get());

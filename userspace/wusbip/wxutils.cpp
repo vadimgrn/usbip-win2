@@ -55,9 +55,9 @@ wxMenuItem* clone_menu_item(_In_ wxMenu &dest, _In_ int item_id, _In_ const wxMe
         return clone;
 }
 
-BOOL usbip::cancel_connect(_In_ HANDLE thread)
+bool usbip::cancel_vhci_io()
 {
-        return QueueUserAPC( [] (auto) { wxLogVerbose(L"APC"); }, thread, 0);
+        return vhci::cancel_io(get_vhci().get());
 }
 
 /*
@@ -76,7 +76,7 @@ void usbip::run_cancellable(
         _In_ wxWindow *parent,
         _In_ const wxString &msg,
         _In_ const wxString &caption,
-        _In_ std::function<void()> func,
+        _In_ std::function<void(std::stop_token)> func,
         _In_ const std::function<cancel_function> &cancel)
 {
         constexpr auto style = wxOK | wxICON_WARNING | wxCENTER | wxSTAY_ON_TOP | wxBORDER_NONE | wxPOPUP_WINDOW;
@@ -90,10 +90,10 @@ void usbip::run_cancellable(
         [[maybe_unused]] auto ok = ResetEvent(evt.get());
         wxASSERT(ok);
 
-        auto f = [&dlg, evt = evt.get(), func = std::move(func)]
+        auto f = [&dlg, evt = evt.get(), func = std::move(func)] (std::stop_token st)
         {
                 try {
-                        func();
+                        func(st);
                 } catch (std::exception &e) {
                         wxLogVerbose(_("exception: %s"), what(e));
                 }
@@ -113,9 +113,12 @@ void usbip::run_cancellable(
                 }
         }
 
-        if (auto done = !dlg.ShowModal() || wait(evt.get(), 0); // wxID_OK if cancelled by user
-            !(done || cancel(thread.native_handle()))) { // cancelled by user
-                auto err = GetLastError();
-                wxLogVerbose(_("Could not cancel '%s', error %lu\n%s"), caption, err, wxSysErrorMsg(err));
+        if (auto done = !dlg.ShowModal() || wait(evt.get(), 0); !done) { // cancelled by user
+                thread.request_stop();
+
+                if (cancel && !cancel()) {
+                        auto err = GetLastError();
+                        wxLogVerbose(_("Could not cancel '%s', error %lu\n%s"), caption, err, wxSysErrorMsg(err));
+                }
         }
 }

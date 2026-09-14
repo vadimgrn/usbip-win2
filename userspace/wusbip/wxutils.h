@@ -7,6 +7,9 @@
 #include <windows.h>
 #include <wx/string.h>
 
+#include <functional>
+#include <stop_token>
+
 class wxMenu;
 class wxMenuItem;
 class wxWindow;
@@ -21,15 +24,15 @@ inline auto what(_In_ const std::exception &e)
         return wxString(e.what(), wxConvLibc);
 }
 
-using cancel_function = decltype(CancelSynchronousIo);
-BOOL cancel_connect(_In_ HANDLE thread);
+using cancel_function = bool();
+bool cancel_vhci_io();
 
 void run_cancellable(
         _In_ wxWindow *parent,
         _In_ const wxString &msg,
         _In_ const wxString &caption,
-        _In_ std::function<void()> func,
-        _In_ const std::function<cancel_function> &cancel = CancelSynchronousIo);
+        _In_ std::function<void(std::stop_token)> func,
+        _In_ const std::function<cancel_function> &cancel = {});
 
 } // namespace usbip
 
