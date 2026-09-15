@@ -5,14 +5,15 @@
 #include "../remote.h"
 #include "../win_handle.h"
 
+#include "last_error.h"
 #include "device_speed.h"
 #include "op_common.h"
-#include "last_error.h"
 #include "strconv.h"
 #include "output.h"
 
 #include <usbip/proto_op.h>
 #include <chrono>
+#include <expected>
 
 #include <ws2tcpip.h>
 #include <mstcpip.h>
@@ -43,37 +44,37 @@ auto address_to_string(_In_ const SOCKADDR &addr, _In_ DWORD len, _In_opt_ WSAPR
 	return s;
 }
 
-auto do_setsockopt(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ int level, _In_ int optname, _In_ int optval)
+int do_setsockopt(_In_ SOCKET s, _In_ int level, _In_ int optname, _In_ int optval)
 {
-	auto err = setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval));
-	if (err) {
-		last.error = WSAGetLastError();
+	if (setsockopt(s, level, optname, reinterpret_cast<const char*>(&optval), sizeof(optval))) {
+		auto err = WSAGetLastError();
 		libusbip::output("setsockopt(level={}, optname={}, optval={}) error {}", 
-			          level, optname, optval, last.error);	
+			          level, optname, optval, err);
+		return err;
 	}
-	return !err;
+	return 0;
 }
 
-inline auto set_nodelay(_Inout_ set_last_error &last, _In_ SOCKET s)
+inline int set_nodelay(_In_ SOCKET s)
 {
-	return do_setsockopt(last, s, IPPROTO_TCP, TCP_NODELAY, true);
+	return do_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, true);
 }
 
-inline auto set_ipv6only(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ bool ipv6only)
+inline int set_ipv6only(_In_ SOCKET s, _In_ bool ipv6only)
 {
-	return do_setsockopt(last, s, IPPROTO_IPV6, IPV6_V6ONLY, ipv6only);
+	return do_setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, ipv6only);
 }
 
-auto set_nonblock(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ bool nonblock)
+int set_nonblock(_In_ SOCKET s, _In_ bool nonblock)
 {
 	u_long mode = nonblock;
 
-	auto err = ioctlsocket(s, FIONBIO, &mode);
-	if (err) {
-		last.error = WSAGetLastError();
-		libusbip::output("ioctlsocket(FIONBIO={}) error {}", nonblock, last.error);
+	if (ioctlsocket(s, FIONBIO, &mode)) {
+		auto err = WSAGetLastError();
+		libusbip::output("ioctlsocket(FIONBIO={}) error {}", nonblock, err);
+		return err;
 	}
-	return !err;
+	return 0;
 }
 
 /*
@@ -88,7 +89,7 @@ auto set_nonblock(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ bool nonbloc
  * On Windows Vista and later, the number of keep-alive probes (data retransmissions) 
  * is set to 10 and cannot be changed. 
  */
-auto set_keepalive(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ ULONG timeout, _In_ ULONG interval)
+int set_keepalive(_In_ SOCKET s, _In_ ULONG timeout, _In_ ULONG interval)
 {
 	tcp_keepalive r {
 		.onoff = true,
@@ -98,15 +99,15 @@ auto set_keepalive(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ ULONG timeo
 
 	DWORD outlen{};
 
-	auto err = WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr);
-	if (err) {
-		last.error = WSAGetLastError();
-		libusbip::output("WSAIoctl(SIO_KEEPALIVE_VALS) error {}", last.error);
+	if (WSAIoctl(s, SIO_KEEPALIVE_VALS, &r, sizeof(r), nullptr, 0, &outlen, nullptr, nullptr)) {
+		auto err = WSAGetLastError();
+		libusbip::output("WSAIoctl(SIO_KEEPALIVE_VALS) error {}", err);
+		return err;
 	}
-	return !err;
+	return 0;
 }
 
-auto set_options(_Inout_ set_last_error &last, _In_ SOCKET s)
+int set_options(_In_ SOCKET s)
 {
 	using namespace std::chrono_literals;
 	enum { 
@@ -114,8 +115,10 @@ auto set_options(_Inout_ set_last_error &last, _In_ SOCKET s)
 		interval = std::chrono::milliseconds(1s).count(),
 	};
 
-	return  set_keepalive(last, s, timeout, interval) &&
-		set_nodelay(last, s);
+	if (auto err = set_keepalive(s, timeout, interval)) {
+		return err;
+	}
+	return set_nodelay(s);
 }
 
 auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = nullptr)
@@ -134,10 +137,12 @@ auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = 
 		return false;
 	case 0: // connection has been gracefully closed
 		if (len) {
+			set_last_error last(static_cast<DWORD>(WSAECONNRESET));
 			libusbip::output("recv EOF");
 			if (eof) {
 				*eof = true;
 			}
+			return false;
 		}
 		[[fallthrough]];
 	default:
@@ -231,21 +236,21 @@ auto as_usb_device(_In_ const usbip_usb_device &d)
  * WSAEnumNetworkEvents is not used because SOCKET is new,
  * WSAEventSelect here is the first call for it.
  */
-auto prepare_event(_Inout_ set_last_error &last, _In_ SOCKET s, _In_ WSAEVENT evt)
+int prepare_event(_In_ SOCKET s, _In_ WSAEVENT evt)
 {
 	if (!WSAResetEvent(evt)) { // is reused in the loop
-		last.error = WSAGetLastError();
-		libusbip::output("WSAResetEvent error {}", last.error);
-		return false;
+		auto err = WSAGetLastError();
+		libusbip::output("WSAResetEvent error {}", err);
+		return err;
 	}
 
 	if (WSAEventSelect(s, evt, FD_CONNECT)) { // sets socket to nonblocking mode
-		last.error = WSAGetLastError();
-		libusbip::output("WSAEventSelect(FD_CONNECT) error {}", last.error);
-		return false;
+		auto err = WSAGetLastError();
+		libusbip::output("WSAEventSelect(FD_CONNECT) error {}", err);
+		return err;
 	}
 
-	return true;
+	return 0;
 }
 
 int try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_opt_ HANDLE cancel_evt, _In_ const sockaddr &addr, _In_ DWORD len)
@@ -323,61 +328,134 @@ int wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_opt_ HANDLE cancel, _In_opt_ 
 	}
 }
 
+using addrinfo_ptr = std::unique_ptr<ADDRINFOEX, decltype(FreeAddrInfoEx)&>;
+
 /*
  * Numeric IP addresses like "XXX.XXX.XXX.XXX" are resolved instantly. 
  */
-auto resolve(_Inout_ set_last_error &last, _In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_evt)
+auto resolve(_In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_evt)
+	-> std::expected<addrinfo_ptr, DWORD>
 {
-	std::unique_ptr<ADDRINFOEX, decltype(FreeAddrInfoEx)&> ptr(nullptr, FreeAddrInfoEx);
+	addrinfo_ptr ptr(nullptr, FreeAddrInfoEx);
 
-        auto host = utf8_to_wchar(hostname);
-        auto svc = utf8_to_wchar(service);
+	auto host = utf8_to_wchar(hostname);
+	auto svc = utf8_to_wchar(service);
 
-        if (!(host && svc)) {
-                last.error = !host ? host.error() : svc.error();
-                libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, last.error);
-                return ptr; 
-        }
-
-        NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
-	if (!evt) {
-		last.error = WSAGetLastError();
-		libusbip::output("CreateEvent error {}", last.error);
-		return ptr;
+	if (!(host && svc)) {
+		DWORD err = !host ? host.error() : svc.error();
+		libusbip::output("utf8_to_wchar('{}','{}') error {}", hostname, service, err);
+		return std::unexpected(err); 
 	}
 
-        OVERLAPPED ovlp{};
-        ovlp.hEvent = evt.get();
+	NullableHandle evt(CreateEvent(nullptr, true, false, nullptr));
+	if (!evt) {
+		DWORD err = GetLastError();
+		libusbip::output("CreateEvent error {}", err);
+		return std::unexpected(err);
+	}
 
-        ADDRINFOEX hints{};
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
+	OVERLAPPED ovlp{};
+	ovlp.hEvent = evt.get();
 
-        ADDRINFOEX *result{};
+	ADDRINFOEX hints{};
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	ADDRINFOEX *result{};
 	HANDLE cancel{};
 
 	libusbip::output("resolving {}:{}", hostname, service);
 
-	last.error = GetAddrInfoEx(host->c_str(), svc->c_str(), NS_ALL, nullptr, 
-				   &hints, &result, nullptr, &ovlp, nullptr, &cancel);
+	DWORD err = GetAddrInfoEx(host->c_str(), svc->c_str(), NS_ALL, nullptr, 
+				  &hints, &result, nullptr, &ovlp, nullptr, &cancel);
 
-	switch (last.error) {
+	switch (err) {
 	case WSA_IO_PENDING:
-		last.error = wait_for_resolve(ovlp, cancel, cancel_evt);
+		err = wait_for_resolve(ovlp, cancel, cancel_evt);
 		break;
 	case NO_ERROR:
 		break;
 	default:
-		libusbip::output("GetAddrInfoEx error {}", last.error);
+		libusbip::output("GetAddrInfoEx error {}", err);
 	}
 
 	ptr.reset(result);
 
-	if (last.error) {
+	if (err) {
 		ptr.reset();
+		return std::unexpected(err);
 	}
 
 	return ptr;
+}
+
+auto do_connect(
+        _In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_event)
+        -> std::expected<Socket, DWORD>
+{
+	if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
+		return std::unexpected(static_cast<DWORD>(ERROR_CANCELLED));
+	}
+
+	auto ai = resolve(hostname, service, cancel_event);
+	if (!ai) {
+		return std::unexpected(ai.error());
+	}
+
+	WSAEvent evt(WSACreateEvent());
+	if (!evt) {
+		auto err = WSAGetLastError();
+		libusbip::output("WSACreateEvent error {}", err);
+		return std::unexpected(err);
+	}
+
+	DWORD last_err = ERROR_INVALID_PARAMETER;
+	Socket sock;
+
+	for (auto r = ai->get(); r; r = r->ai_next) {
+
+		sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
+
+		if (!sock) {
+			last_err = WSAGetLastError();
+			libusbip::output("socket(family={}) error {}", r->ai_family, last_err);
+			continue;
+		}
+
+		if (auto err = set_options(sock.get())) {
+			last_err = err;
+			continue;
+		}
+
+		if (auto err = prepare_event(sock.get(), evt.get())) {
+			last_err = err;
+			continue;
+		}
+
+		if (auto err = try_connect(sock.get(), evt.get(), cancel_event, *r->ai_addr, static_cast<DWORD>(r->ai_addrlen))) {
+			last_err = err;
+			if (err == ERROR_CANCELLED) {
+				break;
+			}
+			continue;
+		}
+
+		if (WSAEventSelect(sock.get(), WSA_INVALID_EVENT, 0)) { // cancel the association and selection of network events
+			last_err = WSAGetLastError();
+			libusbip::output("WSAEventSelect(0) error {}", last_err);
+			continue;
+		}
+
+		if (auto err = set_nonblock(sock.get(), false)) {
+			last_err = err;
+			continue;
+		}
+
+		return sock;
+	}
+
+	sock.close();
+	return std::unexpected(last_err);
 }
 
 } // namespace
@@ -391,50 +469,12 @@ const char* usbip::get_tcp_port() noexcept
 auto usbip::connect(
         _In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_event) -> Socket
 {
-	set_last_error last(ERROR_INVALID_PARAMETER); // restore after sock.close()
-	Socket sock;
-
-	if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
-		last.error = ERROR_CANCELLED;
-		return sock;
+	auto res = do_connect(hostname, service, cancel_event);
+	if (!res) {
+		SetLastError(res.error());
+		return Socket{};
 	}
-
-	auto ai = resolve(last, hostname, service, cancel_event);
-	if (!ai) {
-		return sock;
-	}
-
-	WSAEvent evt(WSACreateEvent());
-	if (!evt) {
-		last.error = WSAGetLastError();
-		libusbip::output("WSACreateEvent error {}", last.error);
-		return sock;
-	}
-
-	for (auto r = ai.get(); r; r = r->ai_next) {
-
-		sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
-
-		if (!sock) {
-			last.error = WSAGetLastError();
-			libusbip::output("socket(family={}) error {}", r->ai_family, last.error);
-		} else if (auto ok = set_options(last, sock.get()) && prepare_event(last, sock.get(), evt.get()); !ok) {
-			//
-		} else if (auto err = try_connect(sock.get(), evt.get(), cancel_event, *r->ai_addr, static_cast<DWORD>(r->ai_addrlen))) {
-			if (last.error = err; err == ERROR_CANCELLED) {
-				break;
-			}
-		} else if (WSAEventSelect(sock.get(), WSA_INVALID_EVENT, 0)) { // cancel the association and selection of network events
-			last.error = WSAGetLastError();
-			libusbip::output("WSAEventSelect(0) error {}", last.error);
-		} else if (set_nonblock(last, sock.get(), false)) {
-			last.dismiss();
-			return sock;
-		}
-	}
-
-	sock.close();
-	return sock;
+	return std::move(*res);
 }
 
 bool usbip::enum_exportable_devices(

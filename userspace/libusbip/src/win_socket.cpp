@@ -4,7 +4,6 @@
 
 #include "../win_socket.h"
 #include "output.h"
-#include "last_error.h"
 
 namespace
 {
@@ -16,7 +15,7 @@ auto init_wsa() noexcept
 
         WSADATA	wsaData;
         if (auto err = WSAStartup(MAKEWORD(MINOR, MAJOR), &wsaData)) {
-                usbip::set_last_error wsa(err);
+                SetLastError(err);
                 libusbip::output("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);
                 return false;
         }
