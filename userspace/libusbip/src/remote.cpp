@@ -129,12 +129,9 @@ auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = 
 	}
 
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
-	case SOCKET_ERROR: {
-		auto err = WSAGetLastError();
-		libusbip::output("recv error {}", err);
-		SetLastError(err);
+	case SOCKET_ERROR:
+		libusbip::output("recv error {}", WSAGetLastError());
 		return false;
-	}
 	case 0: // connection has been gracefully closed
 		if (len) {
 			libusbip::output("recv EOF");
@@ -157,9 +154,7 @@ auto send(_In_ SOCKET s, _In_ const void *buf, _In_ size_t len)
 		auto ret = ::send(s, addr, static_cast<int>(len), 0);
 
 		if (ret == SOCKET_ERROR) {
-			auto err = WSAGetLastError();
-			libusbip::output("send error {}", err);
-			SetLastError(err);
+			libusbip::output("send error {}", WSAGetLastError());
 			return false;
 		}
 
@@ -308,13 +303,13 @@ int wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_opt_ HANDLE cancel, _In_opt_ 
 			return err;
 		case WAIT_OBJECT_0 + 1:
 			libusbip::output("GetAddrInfoEx cancelled");
-			if (err = GetAddrInfoExCancel(&cancel); err) {
-				libusbip::output("GetAddrInfoExCancel error {}", err);
-			} else {
-				WaitForSingleObject(ovlp.hEvent, INFINITE);
-				[[maybe_unused]] auto res = GetAddrInfoExOverlappedResult(&ovlp); // see WSA_E_CANCELLED
-				assert(res == WSA_E_CANCELLED);
+			if (cancel) {
+				if (auto cancel_err = GetAddrInfoExCancel(&cancel)) {
+					libusbip::output("GetAddrInfoExCancel error {}", cancel_err);
+				}
 			}
+			WaitForSingleObject(ovlp.hEvent, INFINITE);
+			GetAddrInfoExOverlappedResult(&ovlp);
 			return ERROR_CANCELLED;
 		case WAIT_IO_COMPLETION: // see QueueUserAPC
 			continue;
