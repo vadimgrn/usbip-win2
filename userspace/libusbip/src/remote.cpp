@@ -128,7 +128,7 @@ auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = 
 
 	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
 	case SOCKET_ERROR:
-		if (wsa_set_last_error wsa; wsa) {
+		if (auto wsa = make_wsa_last_error(); wsa) {
 			libusbip::output("recv error {}", wsa.error);
 		}
 		return false;
@@ -154,7 +154,7 @@ auto send(_In_ SOCKET s, _In_ const void *buf, _In_ size_t len)
 		auto ret = ::send(s, addr, static_cast<int>(len), 0);
 
 		if (ret == SOCKET_ERROR) {
-			wsa_set_last_error wsa;
+			auto wsa = make_wsa_last_error();
 			libusbip::output("send error {}", wsa.error);
 			return false;
 		}
@@ -428,6 +428,7 @@ auto usbip::connect(
 			last.error = WSAGetLastError();
 			libusbip::output("WSAEventSelect(0) error {}", last.error);
 		} else if (set_nonblock(last, sock.get(), false)) {
+			last.dismiss();
 			return sock;
 		}
 	}

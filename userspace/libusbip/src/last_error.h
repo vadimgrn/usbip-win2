@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <errhandlingapi.h>
 #include <WinSock2.h>
+#include <errhandlingapi.h>
 
 namespace usbip
 {
@@ -13,23 +13,54 @@ namespace usbip
 /*
  * libusbip uses SetLastError() regardless of error origin.  
  */
-struct set_last_error
+struct [[nodiscard]] set_last_error
 {
+        DWORD error = GetLastError();
+
         set_last_error() noexcept = default;
-        explicit set_last_error(int err) noexcept : error(err) {} // WSA, etc.
+        explicit set_last_error(DWORD err) noexcept : error(err) {}
 
-        ~set_last_error() { SetLastError(error); }
+        set_last_error(const set_last_error&) = delete;
+        set_last_error& operator=(const set_last_error&) = delete;
 
-        explicit operator bool() const noexcept { return !error; }
-        auto operator !() const noexcept { return bool(error); }
+        set_last_error(set_last_error&& other) noexcept 
+                : error(other.error), m_active(other.m_active) 
+        { 
+                other.m_active = false; 
+        }
+
+        set_last_error& operator=(set_last_error&& other) noexcept {
+                if (this != &other) {
+                        error = other.error;
+                        m_active = other.m_active;
+                        other.m_active = false;
+                }
+                return *this;
+        }
+
+        ~set_last_error() {
+                if (m_active) {
+                        SetLastError(error);
+                }
+        }
+
+        void dismiss() noexcept { m_active = false; }
+
+        explicit operator bool() const noexcept { return error != 0; }
+        bool operator !() const noexcept { return error == 0; }
 
         auto get() const noexcept { return error; }
-        int error = GetLastError();
+
+private:
+        bool m_active{true};
 };
 
-struct wsa_set_last_error : set_last_error
+/**
+ * @return scope guard capturing the last Windows Sockets error.
+ */
+[[nodiscard]] inline set_last_error make_wsa_last_error() noexcept
 {
-        wsa_set_last_error() : set_last_error(WSAGetLastError()) {}
-};
+        return set_last_error(static_cast<DWORD>(WSAGetLastError()));
+}
 
 } // namespace usbip
