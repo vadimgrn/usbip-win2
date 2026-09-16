@@ -309,13 +309,13 @@ int wait_for_resolve(_Inout_ OVERLAPPED &ovlp, _In_opt_ HANDLE cancel, _In_opt_ 
 			return err;
 		case WAIT_OBJECT_0 + 1:
 			libusbip::output("GetAddrInfoEx cancelled");
-			if (err = GetAddrInfoExCancel(&cancel); err) {
-				libusbip::output("GetAddrInfoExCancel error {}", err);
-			} else {
-				WaitForSingleObject(ovlp.hEvent, INFINITE);
-				[[maybe_unused]] auto res = GetAddrInfoExOverlappedResult(&ovlp); // see WSA_E_CANCELLED
-				assert(res == WSA_E_CANCELLED);
+			if (cancel) {
+				if (auto cancel_err = GetAddrInfoExCancel(&cancel)) {
+					libusbip::output("GetAddrInfoExCancel error {}", cancel_err);
+				}
 			}
+			WaitForSingleObject(ovlp.hEvent, INFINITE);
+			GetAddrInfoExOverlappedResult(&ovlp);
 			return ERROR_CANCELLED;
 		case WAIT_IO_COMPLETION: // see QueueUserAPC
 			continue;
