@@ -58,7 +58,7 @@ The project uses `libusbip_check` as a **compile-time validation** tool (not a r
 
 ### RAII Patterns
 - Kernel: `ObjectRef`, `unique_ptr`, `auto_ref_ptr` for handle management
-- Spinlocks / WaitLocks: Always use named instances (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Unnamed temporaries (`wdf::Lock(spin_lock);`) destruct immediately at the statement semicolon, leaving code unprotected.
+- Spinlocks / WaitLocks: Always use named instances (e.g., `wdf::spinlock lck(spin_lock);` or `wdf::waitlock lck(wait_lock);`). Unnamed temporaries (`wdf::spinlock(spin_lock);` or `wdf::waitlock(wait_lock);`) destruct immediately at the statement semicolon, leaving code unprotected.
 - Lock / Adopt / Unlock Pattern (`remove_lock_guard`):
   - In asynchronous IRP forwarding, acquire the remove lock in dispatch (`remove_lock_guard lck(lock, irp);`), disarm via `lck.clear()` before passing down the stack, and adopt in the completion routine.
   - An unnamed temporary (`libdrv::remove_lock_guard{lock, libdrv::adopt_lock, tag};`) is the intentional, idiomatic pattern to adopt an outstanding lock and release it immediately at statement completion when no further processing is needed.
@@ -154,7 +154,7 @@ Enables running build and validation commands:
 - **Driver IRQL Contracts & SAL**: Always annotate driver functions with SAL IRQL contracts (`_IRQL_requires_same_`, `_IRQL_requires_max_(DISPATCH_LEVEL)` or `PASSIVE_LEVEL`). Observe IRQL limits (no paging or blocking at `DISPATCH_LEVEL`).
 - **Memory Management & Synchronization**:
   - No global `operator new`/`delete` or heap allocations (`malloc`/`free`). Use `ExAllocatePoolZero`, `ExAllocatePoolUninitialized`, or lookaside lists.
-  - Always use named RAII lock instances for mutual exclusion (e.g., `wdf::Lock lck(spin_lock);` or `wdf::WaitLock lck(wait_lock);`). Never use unnamed temporaries for scoped locks.
+  - Always use named RAII lock instances for mutual exclusion (e.g., `wdf::spinlock lck(spin_lock);` or `wdf::waitlock lck(wait_lock);`). Never use unnamed temporaries for scoped locks.
   - **Lock / Adopt / Unlock Pattern**: For asynchronous completion, acquire via `remove_lock_guard lck(lock, tag);`, transfer via `lck.clear()`, and adopt in the completion routine via unnamed `remove_lock_guard{lock, adopt_lock, tag};` (immediate release) or named `remove_lock_guard lck(lock, adopt_lock, tag);` (scoped/forwarded).
   - **Immediate Deallocation Pattern**: Use unnamed temporary wrappers (`unique_ptr{ptr};`) for idiomatic, tag-safe pool freeing.
   - **Partial MDLs & Locking**: Never call `MmUnlockPages` on a partial MDL created by `IoBuildPartialMdl`. Partial MDLs inherit `MDL_PAGES_LOCKED` from their source MDL; unlocking a partial MDL prematurely decrements physical page lock counts and triggers Driver Verifier bugchecks (`0xC4` / `PFN_SHARE_COUNT`).

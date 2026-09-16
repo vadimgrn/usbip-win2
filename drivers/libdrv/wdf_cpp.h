@@ -47,10 +47,10 @@ public:
 
         friend constexpr bool operator ==(const ObjectRef &a, const ObjectRef &b) { return a.m_handle == b.m_handle; }
 
-        auto get(this auto&& self) { return self.m_handle; }
-
+        constexpr auto get(this auto&& self) { return self.m_handle; }
+ 
         template<typename T>
-        auto get(this auto&& self) { return static_cast<T>(self.m_handle); }
+        constexpr auto get(this auto&& self) { return static_cast<T>(self.m_handle); }
 
         WDFOBJECT release();
 
@@ -74,23 +74,23 @@ inline void swap(_Inout_ ObjectRef &a, _Inout_ ObjectRef &b)
 }
 
 
-class WaitLock
+class waitlock
 {
 public:
-        constexpr WaitLock() = default;
+        constexpr waitlock() = default;
                 
         _IRQL_requires_max_(PASSIVE_LEVEL)
-        PAGED explicit WaitLock(_In_ WDFWAITLOCK lock) : m_lock(lock) 
+        PAGED explicit waitlock(_In_ WDFWAITLOCK lock) : m_lock(lock) 
         { 
                 PAGED_CODE();
                 WdfWaitLockAcquire(m_lock, nullptr); 
         }
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
-        ~WaitLock() { release(); }
+        ~waitlock() { release(); }
 
-        WaitLock(_In_ const WaitLock&) = delete;
-        WaitLock& operator =(_In_ const WaitLock&) = delete;
+        waitlock(_In_ const waitlock&) = delete;
+        waitlock& operator =(_In_ const waitlock&) = delete;
 
         constexpr bool is_acquired() const { return m_lock != WDF_NO_HANDLE; }
         constexpr explicit operator bool() const { return is_acquired(); }
@@ -115,37 +115,29 @@ private:
 };
 
 
-/*
- * Full specialization of these functions must be defined for each used type.
- */
-template<typename T>
-void acquire_lock(_In_ T);
-
-template<typename T>
-void release_lock(_In_ T);
-
-
-template<typename T>
-class Lock
+class spinlock
 {
 public:
-        using type = T;
-
         _IRQL_requires_max_(DISPATCH_LEVEL)
         _IRQL_raises_(DISPATCH_LEVEL)
         _IRQL_saves_global_(m_lock, this)
-        explicit Lock(_In_ type obj) : m_lock(obj)
+        explicit spinlock(
+                _In_
+                _Requires_lock_not_held_(_Curr_)
+                _Acquires_lock_(_Curr_)
+                _IRQL_saves_
+                WDFSPINLOCK lock) : m_lock(lock)
         { 
-                acquire_lock(m_lock);
+                WdfSpinLockAcquire(m_lock);
         }
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         _IRQL_requires_min_(DISPATCH_LEVEL)
         _IRQL_restores_global_(m_lock, this)
-        ~Lock() { release(); }
+        ~spinlock() { release(); }
 
-        Lock(_In_ const Lock&) = delete;
-        Lock& operator =(_In_ const Lock&) = delete;
+        spinlock(_In_ const spinlock&) = delete;
+        spinlock& operator =(_In_ const spinlock&) = delete;
 
         _IRQL_requires_max_(DISPATCH_LEVEL)
         _IRQL_requires_min_(DISPATCH_LEVEL)
@@ -153,60 +145,14 @@ public:
         void release()
         {
                 if (m_lock != WDF_NO_HANDLE) {
-                        auto handle = m_lock;
+                        WdfSpinLockRelease(m_lock);
                         m_lock = WDF_NO_HANDLE;
-                        release_lock(handle);
                 }
         }
 
 private:
-        type m_lock = WDF_NO_HANDLE;
+        WDFSPINLOCK m_lock = WDF_NO_HANDLE;
 };
-
-
-template<>
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_raises_(DISPATCH_LEVEL)
-inline void acquire_lock(
-        _In_ 
-        _Requires_lock_not_held_(_Curr_)
-        _Acquires_lock_(_Curr_)
-        _IRQL_saves_
-        WDFSPINLOCK handle)
-{
-        WdfSpinLockAcquire(handle);
-}
-
-template<>
-_IRQL_requires_max_(DISPATCH_LEVEL)
-_IRQL_requires_min_(DISPATCH_LEVEL)
-inline void release_lock(
-        _In_ 
-        _Requires_lock_held_(_Curr_)
-        _Releases_lock_(_Curr_)
-        _IRQL_restores_
-        WDFSPINLOCK handle)
-{
-        WdfSpinLockRelease(handle);
-}
-
-/*
- * Must be declared last, WDFOBJECT is typeless.
- * WDFOBJECT -> HANDLE -> void*
- */
-template<>
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void acquire_lock(_In_ WDFOBJECT handle)
-{
-        WdfObjectAcquireLock(handle);
-}
-
-template<>
-_IRQL_requires_max_(DISPATCH_LEVEL)
-inline void release_lock(_In_ WDFOBJECT handle)
-{
-        WdfObjectReleaseLock(handle);
-}
 
 
 struct wdfobject_traits

@@ -28,12 +28,21 @@ public:
 	_IRQL_requires_max_(DISPATCH_LEVEL)
 	~object_reference();
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	object_reference(_In_ const object_reference &other) :
 		object_reference(other.m_obj, other.m_defer_delete, true) {}
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	object_reference& operator =(_In_ const object_reference &other);
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	object_reference(_Inout_ object_reference&& other);
+
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	object_reference& operator =(_Inout_ object_reference&& other);
 
 	constexpr explicit operator bool() const { return m_obj; }
@@ -41,7 +50,7 @@ public:
 
 	constexpr bool operator ==(decltype(nullptr)) const { return m_obj == nullptr; }
 
-	friend constexpr bool operator ==(const object_reference &a, const object_reference &b) {
+	friend constexpr bool operator ==(_In_ const object_reference &a, _In_ const object_reference &b) {
 		return a.m_obj == b.m_obj;
 	}
 
@@ -59,6 +68,8 @@ public:
 	_IRQL_requires_max_(DISPATCH_LEVEL)
 	void reset(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref);
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	void *release();
 
 	_IRQL_requires_same_
@@ -83,16 +94,22 @@ class object_ref : public object_reference
 public:
 	using object_reference::object_reference;
 
-	constexpr explicit object_ref(T *obj, bool add_ref = true) :
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	explicit object_ref(_In_opt_ T *obj, _In_ bool add_ref = true) :
 		object_reference(obj, add_ref) {}
 
-	constexpr explicit object_ref(T *obj, bool defer_delete, bool add_ref) :
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
+	explicit object_ref(_In_opt_ T *obj, _In_ bool defer_delete, _In_ bool add_ref) :
 		object_reference(obj, defer_delete, add_ref) {}
 
 	constexpr T* get(this auto&& self) { return self.object_reference::template get<T>(); }
 	constexpr T* operator ->(this auto&& self) { auto p = self.get(); NT_ASSERT(p); return p; }
 	constexpr T& operator *(this auto&& self) { auto p = self.get(); NT_ASSERT(p); return *p; }
 
+	_IRQL_requires_same_
+	_IRQL_requires_max_(DISPATCH_LEVEL)
 	T* release() { return static_cast<T*>(object_reference::release()); }
 };
 

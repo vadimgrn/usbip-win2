@@ -198,7 +198,7 @@ void* libdrv::Mdl::sysaddr(_In_ ULONG Priority)
                 return nullptr;
         }
 
-        if (m_mapped) { // skip flag checks, we arleady did it
+        if (m_mapped) { // skip flag checks, we already did it
                 return MmGetSystemAddressForMdlSafe(m_mdl, Priority);
         }
 

@@ -43,7 +43,7 @@ void usbip::insert_endpoint_list(_In_ endpoint_ctx &endp)
         NT_ASSERT(IsListEmpty(&endp.entry));
 
         if (auto &dev = *get_device_ctx(endp.device); auto head = get_endpoint_list_head(dev)) {
-                wdf::Lock lck(dev.endpoint_list_lock);
+                wdf::spinlock lck(dev.endpoint_list_lock);
                 InsertHeadList(head, &endp.entry); // outdated, but still not removed endpoints will be at end
         }
 }
@@ -55,7 +55,7 @@ void usbip::remove_endpoint_list(_In_ endpoint_ctx &endp)
         auto e = &endp.entry;
 
         if (auto dev = get_device_ctx(endp.device)) {
-                wdf::Lock lck(dev->endpoint_list_lock);
+                wdf::spinlock lck(dev->endpoint_list_lock);
                 RemoveEntryList(e); // works if entry was just InitializeListHead-ed
         }
 
@@ -73,7 +73,7 @@ wdf::ObjectRef usbip::find_endpoint(_In_ device_ctx &dev, _In_ const endpoint_se
                 return ref;
         }
 
-        wdf::Lock lck(dev.endpoint_list_lock);
+        wdf::spinlock lck(dev.endpoint_list_lock);
 
         for (auto entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto endp = CONTAINING_RECORD(entry, endpoint_ctx, entry);

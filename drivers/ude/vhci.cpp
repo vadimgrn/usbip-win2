@@ -471,7 +471,7 @@ PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
         auto &ctx = *get_vhci_ctx(vhci);
         TraceDbg("%04x", ptr04x(ctx.reads));
 
-        wdf::WaitLock lck(ctx.events_lock);
+        wdf::waitlock lck(ctx.events_lock);
         WdfIoQueuePurgeSynchronously(ctx.reads);
 }
 
@@ -536,7 +536,7 @@ PAGED void device_file_create(_In_ WDFDEVICE vhci, _In_ WDFREQUEST request, _In_
         if (NT_ERROR(st)) {
                 Trace(TRACE_LEVEL_ERROR, "WdfCollectionCreate %!STATUS!", st);
         } else if (auto v = get_vhci_ctx(vhci)) {
-                wdf::WaitLock lck(v->events_lock);
+                wdf::waitlock lck(v->events_lock);
                 InsertTailList(&v->fileobjects, &fobj.entry);
         }
 
@@ -555,7 +555,7 @@ PAGED void file_cleanup(_In_ WDFFILEOBJECT fileobj)
         auto vhci = WdfFileObjectGetDevice(fileobj);
         auto &ctx = *get_vhci_ctx(vhci);
 
-        wdf::WaitLock lck(ctx.events_lock);
+        wdf::waitlock lck(ctx.events_lock);
 
         RemoveEntryList(&fobj.entry);
         InitializeListHead(&fobj.entry);
@@ -836,7 +836,7 @@ PAGED void process_event(_In_ vhci_ctx &vhci, _In_ WDFMEMORY evt)
         PAGED_CODE();
 
         int cnt = 0;
-        wdf::WaitLock lck(vhci.events_lock);
+        wdf::waitlock lck(vhci.events_lock);
 
         for (auto head = &vhci.fileobjects, entry = head->Flink; entry != head; entry = entry->Flink) {
                 auto &fobj = *CONTAINING_RECORD(entry, fileobject_ctx, entry);
@@ -867,8 +867,8 @@ int usbip::vhci::claim_roothub_port(_In_ UDECXUSBDEVICE device)
 
         auto [begin, end] = get_port_range(vhci, dev.speed());
 
-        wdf::Lock lck(vhci.devices_lock); // function must be resident, do not use PAGED
-
+        wdf::spinlock lck(vhci.devices_lock); // function must be resident, do not use PAGED
+ 
         for (auto i = begin; i < end; ++i) {
                 NT_ASSERT(i < vhci.devices_cnt);
 
@@ -894,7 +894,7 @@ int usbip::vhci::reclaim_roothub_port(_In_ UDECXUSBDEVICE device)
 
         int portnum = 0;
 
-        wdf::Lock lck(vhci.devices_lock); 
+        wdf::spinlock lck(vhci.devices_lock); 
         if (auto &port = dev.port) {
                 NT_ASSERT(is_valid_port(vhci, port));
                 portnum = port;
@@ -920,7 +920,7 @@ bool usbip::vhci::has_device(_In_ WDFDEVICE vhci, _In_ ULONG location_hash)
         NT_ASSERT(location_hash);
 
         auto &ctx = *get_vhci_ctx(vhci);
-        wdf::Lock lck(ctx.devices_lock); 
+        wdf::spinlock lck(ctx.devices_lock); 
 
         for (int i = 0; i < ctx.devices_cnt; ++i) {
 
@@ -946,7 +946,7 @@ wdf::ObjectRef usbip::vhci::get_device(_In_ WDFDEVICE vhci, _In_ int port)
                 return ptr;
         }
 
-        wdf::Lock lck(ctx.devices_lock); 
+        wdf::spinlock lck(ctx.devices_lock); 
         if (auto handle = ctx.devices[port - 1]) {
                 NT_ASSERT(get_device_ctx(handle)->port == port);
                 ptr.reset(handle); // adds reference
@@ -1024,7 +1024,7 @@ PAGED void usbip::vhci::device_state_changed(
         auto &ctx = *get_vhci_ctx(vhci);
         int subscribers;
         {
-                wdf::WaitLock lck(ctx.events_lock);
+                wdf::waitlock lck(ctx.events_lock);
                 subscribers = ctx.events_subscribers;
                 if (!subscribers) {
                         return; // don't create device state unnecessarily

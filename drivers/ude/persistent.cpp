@@ -51,7 +51,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto reattach_req_count(_Inout_ vhci_ctx &vhci)
 {
-        wdf::Lock lck(vhci.reattach_req_lock);
+        wdf::spinlock lck(vhci.reattach_req_lock);
         return WdfCollectionGetCount(vhci.reattach_req);
 }
 
@@ -59,7 +59,7 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 auto reattach_req_add(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 {
-        wdf::Lock lck(vhci.reattach_req_lock);
+        wdf::spinlock lck(vhci.reattach_req_lock);
 
         auto st = WdfCollectionAdd(vhci.reattach_req, request);
         if (NT_ERROR(st)) {
@@ -79,7 +79,7 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 void reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ WDFOBJECT request)
 {
         auto col = vhci.reattach_req;
-        wdf::Lock lck(vhci.reattach_req_lock);
+        wdf::spinlock lck(vhci.reattach_req_lock);
 
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 
@@ -100,7 +100,7 @@ auto reattach_req_remove(_Inout_ vhci_ctx &vhci, _In_ ULONG location_hash)
         wdf::ObjectRef ref;
         auto col = vhci.reattach_req;
 
-        wdf::Lock lck(vhci.reattach_req_lock);
+        wdf::spinlock lck(vhci.reattach_req_lock);
 
         for (auto n = WdfCollectionGetCount(col), i = 0UL; i < n; ++i) {
 

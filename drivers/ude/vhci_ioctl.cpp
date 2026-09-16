@@ -1061,7 +1061,7 @@ PAGED void device_read(_In_ WDFQUEUE queue, _In_ WDFREQUEST request, _In_ size_t
         auto device = WdfIoQueueGetDevice(queue);
         auto &vhci = *get_vhci_ctx(device);
         
-        WaitLock lck(vhci.events_lock);
+        waitlock lck(vhci.events_lock);
 
         if (auto &val = fobj.process_events; !val) {
                 ++vhci.events_subscribers;

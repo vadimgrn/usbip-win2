@@ -27,6 +27,8 @@ wdm::object_reference::~object_reference()
 	}
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 wdm::object_reference::object_reference(_Inout_ object_reference&& other) :
 	m_obj(other.m_obj),
 	m_defer_delete(other.m_defer_delete)
@@ -34,18 +36,24 @@ wdm::object_reference::object_reference(_Inout_ object_reference&& other) :
 	other.release();
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto wdm::object_reference::operator =(_In_ const object_reference &other) -> object_reference&
 {
 	reset(other.m_obj, other.m_defer_delete, true);
 	return *this;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto wdm::object_reference::operator =(_Inout_ object_reference&& other) -> object_reference&
 {
 	object_reference(static_cast<object_reference&&>(other)).swap(*this);
 	return *this;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void wdm::object_reference::reset(_In_opt_ void *obj, _In_ bool defer_delete, _In_ bool add_ref)
 {
 	if (obj == m_obj && !add_ref) {
@@ -57,6 +65,8 @@ void wdm::object_reference::reset(_In_opt_ void *obj, _In_ bool defer_delete, _I
 	object_reference(obj, defer_delete, add_ref).swap(*this);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void* wdm::object_reference::release()
 {
 	auto obj = m_obj;
@@ -67,6 +77,8 @@ void* wdm::object_reference::release()
 	return obj;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void wdm::object_reference::swap(_Inout_ object_reference &other)
 {
         ::swap(m_obj, other.m_obj);

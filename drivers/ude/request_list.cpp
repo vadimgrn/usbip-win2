@@ -136,7 +136,7 @@ void request_completion_dpc(_In_ WDFDPC dpc)
                 NTSTATUS status;
 
                 {
-                        wdf::Lock lck(dev.requests_lock);
+                        wdf::spinlock lck(dev.requests_lock);
 
                         if (IsListEmpty(head)) {
                                 break;
@@ -167,7 +167,7 @@ void cancel(_In_ WDFREQUEST request)
         auto dev = get_device_ctx(device);
 
         {
-                wdf::Lock lck(dev->requests_lock);
+                wdf::spinlock lck(dev->requests_lock);
 
                 remove_from_sent_list_locked(req);
                 if (req.cancelable) {
@@ -261,7 +261,7 @@ void usbip::device::add_request_to_sent_list(_Inout_ device_ctx &dev, _In_ WDFRE
         check_request_locked(req);
 
         {
-                wdf::Lock lck(dev.requests_lock);
+                wdf::spinlock lck(dev.requests_lock);
                 InsertTailList(&dev.requests, &req.entry);
         }
 }
@@ -287,7 +287,7 @@ NTSTATUS usbip::device::on_send_complete(
         bool enqueue{};
 
         {
-                wdf::Lock lck(dev.requests_lock);
+                wdf::spinlock lck(dev.requests_lock);
 
                 NT_ASSERT(req.seqnum == seqnum);
                 NT_ASSERT(req.send_completion_pending);
@@ -339,7 +339,7 @@ WDFREQUEST usbip::device::find_sent_request(_Inout_ device_ctx &dev, _In_ seqnum
         NT_ASSERT(is_valid_seqnum(seqnum));
         WDFREQUEST request{};
 
-        wdf::Lock lck(dev.requests_lock);
+        wdf::spinlock lck(dev.requests_lock);
 
         for (auto head = &dev.requests, entry = head->Flink; entry != head; entry = entry->Flink) {
 
@@ -394,7 +394,7 @@ void usbip::device::enqueue_for_completion(_In_ WDFREQUEST request, _In_ NTSTATU
         bool enqueue{};
 
         {
-                wdf::Lock lck(dev.requests_lock);
+                wdf::spinlock lck(dev.requests_lock);
 
                 if (req.response_in_progress) {
                         req.response_in_progress = false;
