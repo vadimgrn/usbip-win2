@@ -11,6 +11,10 @@
 
 std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
 {
+        if (s.empty()) {
+                return std::wstring{};
+        }
+
         auto f = [] (const auto &s, auto buf, auto cch) { 
                 return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, 
                                            s.data(), static_cast<int>(s.size()), buf, cch); 
@@ -34,6 +38,10 @@ std::expected<std::wstring, DWORD> usbip::utf8_to_wchar(_In_ std::string_view s)
  
 std::expected<std::string, DWORD> usbip::wchar_to_utf8(_In_ std::wstring_view ws)
 {
+        if (ws.empty()) {
+                return std::string{};
+        }
+
         auto f = [] (const auto &ws, auto buf, auto cb) {
                 return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, ws.data(), static_cast<int>(ws.size()), 
                                            buf, cb, nullptr, nullptr);
@@ -106,6 +114,10 @@ std::wstring usbip::make_multi_sz(_In_ const std::vector<std::wstring> &v)
                         str.append(data, len);
                         str += L'\0';
                 }
+        }
+
+        if (str.empty()) {
+                str += L'\0';
         }
 
         str += L'\0';

@@ -29,7 +29,7 @@ USBIP_API std::string  wchar_to_utf8_or(_In_ std::wstring_view ws, _In_ std::opt
  * @return multi-sz string
  * Examples: 
  * {"aaa\0\zzz", "\0", "bbb", ""} -> "aaa\0\bbb\0\0"
- * {} -> "\0"
+ * {} -> "\0\0"
  */
 USBIP_API std::wstring make_multi_sz(_In_ const std::vector<std::wstring> &v);
 

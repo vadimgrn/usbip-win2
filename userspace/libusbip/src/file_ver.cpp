@@ -83,7 +83,7 @@ private:
 
         std::wstring GetTranslation(bool original = false) const;
 
-        const void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const;
+        const void *VerQueryValue(const std::wstring &val, UINT &buf_sz) const noexcept;
         std::wstring_view VerQueryValue(const wchar_t *value) const;
 };
 
@@ -122,17 +122,13 @@ void win::FileVersion::Impl::SetTranslation(WORD lang_id, UINT code_page)
         m_def_transl = MakeTransl(transl);
 }
 
-const void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_sz) const
+const void *win::FileVersion::Impl::VerQueryValue(const std::wstring &val, UINT &buf_sz) const noexcept
 {
-        if (m_info.empty()) {
-                throw std::logic_error("FileVersion::VerQueryValue: not initialized");
-        }
-
         void *buf{};
         buf_sz = 0;
 
-        if (!::VerQueryValue(m_info.data(), val.c_str(), &buf, &buf_sz)) {
-                throw std::invalid_argument("FileVersion::VerQueryValue");
+        if (!m_info.empty()) {
+                ::VerQueryValue(m_info.data(), val.c_str(), &buf, &buf_sz);
         }
         
         return buf;

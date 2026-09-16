@@ -27,7 +27,7 @@ auto is_malformed(_In_ const persistent_device &d) noexcept
         return is_malformed(d.location) || !validate_device_serial(d.serial);
 }
 
-std::expected<std::wstring, DWORD> make_multi_sz(_In_ const std::vector<persistent_device> &devices)
+std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<persistent_device> &devices)
 {
         std::wstring multi_sz;
 
@@ -138,7 +138,7 @@ auto get_persistent_devices(_In_ HANDLE dev)
 
 bool usbip::vhci::set_persistent(_In_ HANDLE dev, _In_ const std::vector<persistent_device> &devices)
 {
-        auto val = ::make_multi_sz(devices);
+        auto val = devices_to_multi_sz(devices);
         if (!val) {
                 SetLastError(val.error());
                 return false;

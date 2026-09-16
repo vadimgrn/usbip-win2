@@ -56,7 +56,10 @@ namespace usbip
 class USBIP_API UsbIds
 {
 public:
-	UsbIds(std::string_view content);
+	/**
+	 * @param content Buffer containing usb.ids data. Must outlive this UsbIds instance.
+	 */
+	explicit UsbIds(std::string_view content);
 	~UsbIds();
 
 	UsbIds(const UsbIds&) = delete;
@@ -68,6 +71,9 @@ public:
 	explicit operator bool() const noexcept;
 	bool operator !() const noexcept;
 
+	/**
+	 * @param content Buffer containing usb.ids data. Must outlive this UsbIds instance.
+	 */
 	void load(std::string_view content);
 
 	std::pair<std::string_view, std::string_view> find_product(uint16_t vid, uint16_t pid) const noexcept;

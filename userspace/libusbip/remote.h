@@ -10,6 +10,7 @@
 
 #include <usbspec.h>
 #include <string>
+#include <functional>
 
 #if __cplusplus >= 202002L
   #include <optional>

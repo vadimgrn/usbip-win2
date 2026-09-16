@@ -287,7 +287,10 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
         ioctl::get_imported_devices *r{};
         std::vector<char> buf;
 
-        for (auto cnt = 4; true; cnt <<= 1) {
+        constexpr auto max_devices = 1024;
+        bool ok = false;
+
+        for (auto cnt = 4; cnt <= max_devices; cnt <<= 1) {
                 buf.resize(ioctl::get_imported_devices_size(cnt));
 
                 r = reinterpret_cast<ioctl::get_imported_devices*>(buf.data());
@@ -303,11 +306,16 @@ std::optional<std::vector<usbip::imported_device>> usbip::vhci::get_imported_dev
                         }
                                 
                         buf.resize(BytesReturned);
+                        ok = true;
                         break;
 
                 } else if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
                         return devices;
                 }
+        }
+
+        if (!ok) {
+                return devices;
         }
 
         if (auto devices_size = buf.size() - devices_offset;
@@ -340,10 +348,11 @@ int usbip::vhci::attach(_In_ HANDLE dev, _In_ const attach_args &args)
 
                 if (BytesReturned != outlen) [[unlikely]] {
                         SetLastError(USBIP_ERROR_DRIVER_RESPONSE);
-                } else {
-                        assert(r.port > 0);
-                        return r.port;
+                        return 0;
                 }
+
+                assert(r.port > 0);
+                return r.port;
         }
 
         auto err = GetLastError();
