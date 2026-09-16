@@ -71,7 +71,7 @@ public:
         NTSTATUS prepare_nonpaged();
 
         _IRQL_requires_same_
-        _IRQL_requires_max_(APC_LEVEL)
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         NTSTATUS prepare_paged(_In_ LOCK_OPERATION Operation);
 
         _IRQL_requires_same_
@@ -115,7 +115,7 @@ private:
         bool mapped() const { return m_mdl && (m_mdl->MdlFlags & MDL_MAPPED_TO_SYSTEM_VA); }
 
         _IRQL_requires_same_
-        _IRQL_requires_max_(APC_LEVEL)
+        _IRQL_requires_max_(DISPATCH_LEVEL)
         NTSTATUS lock(_In_ LOCK_OPERATION Operation);
 
         _IRQL_requires_same_

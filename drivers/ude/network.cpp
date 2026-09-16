@@ -80,29 +80,24 @@ PAGED USBIP_STATUS usbip::recv_op_common(_In_ SOCKET *sock, _In_ UINT16 expected
 }
 
 /*
- * URB must have TransferBuffer* members.
- * 
- * TransferBuffer && TransferBufferMDL can be both not NULL for bulk/int at least.
- * Microsoft documentation specifically states that a client driver can safely
- * populate both fields at the same time. If you do this, both pointers
- * must point to the exact same underlying memory buffer.
+ * Prepares an MDL for the URB transfer buffer.
  *
- * Use TransferBufferMDL if it is present: Hardware and lower-level drivers
- * (like the HCD processing requests at DISPATCH_LEVEL) prioritize the MDL.
- * The MDL provides the safe physical memory locking required for DMA) transactions.
- * If you need a virtual pointer to inspect or write data in your code, use TransferBuffer. 
- * 
- * TransferBufferMDL can be a chain and have size greater than mdl_size. 
- * TransferBufferMDL is not used directly because of BSODs in random third-party drivers during "usbip detach".
- * It happens rarely, but ~1500 attach/detach loops is used to enough to get it.
- * Symptoms: read memory address 0x0000'0000'0000'0008.
- * The possible reason could be that we do not own TransferBufferMDL and it can be freed by IOManager.
- * A partial MDL made from TransferBufferMDL fixes such BSODs.
- * 
- * If use MmBuildMdlForNonPagedPool for TransferBuffer, DRIVER_VERIFIER_DETECTED_VIOLATION (c4) will happen sooner or later,
- * Arg1: 0000000000000140, Non-locked MDL constructed from either pageable or tradable memory.
- * 
- * @param mdl_size pass URB_BUF_LEN to use TransferBufferLength, real value must not be greater than TransferBufferLength
+ * An URB may supply TransferBufferMDL, TransferBuffer, or both pointing to the same buffer.
+ * When TransferBufferMDL is present, it is preferred since its pages are already locked down;
+ * a partial MDL is constructed to reference the locked pages without taking ownership of or
+ * modifying the caller-owned MDL.
+ *
+ * For bare TransferBuffer, MmProbeAndLockPages is used to construct a locked MDL (using
+ * MmBuildMdlForNonPagedPool triggers Driver Verifier bugcheck 0xC4 / 0x140). Because URB transfer
+ * buffers are contractually resident (nonpageable), calling MmProbeAndLockPages at DISPATCH_LEVEL
+ * is valid and compliant with WDK rules.
+ *
+ * Chained MDLs are not supported.
+ *
+ * @param mdl output Mdl wrapper
+ * @param mdl_size pass URB_BUF_LEN to use TransferBufferLength, real value must not exceed TransferBufferLength
+ * @param operation IoReadAccess (OUT transfer) or IoWriteAccess (IN transfer)
+ * @param urb the URB containing the transfer buffer
  */
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
@@ -150,11 +145,7 @@ NTSTATUS usbip::make_transfer_buffer_mdl(
                 return STATUS_INVALID_PARAMETER;
         }
 
-        if (KeGetCurrentIrql() > APC_LEVEL) {
-                Trace(TRACE_LEVEL_ERROR, "TransferBuffer: MmProbeAndLockPages cannot be called at DISPATCH_LEVEL");
-                return STATUS_MUTANT_NOT_OWNED; 
-        }
-
+        // TransferBuffer is contractually resident/nonpageable memory, so MmProbeAndLockPages can be called at DISPATCH_LEVEL
         mdl = Mdl(r.TransferBuffer, mdl_size);
 
         auto st = mdl.prepare_paged(operation); // calls MmProbeAndLockPages

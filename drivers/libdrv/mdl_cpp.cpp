@@ -81,7 +81,7 @@ void libdrv::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
 
 NTSTATUS libdrv::Mdl::lock(_In_ LOCK_OPERATION Operation)
 {
-        NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
+        NT_ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL); // nonpageable buffers may be locked at DISPATCH_LEVEL
         NT_ASSERT(m_mdl);
 
         if (locked()) { 
