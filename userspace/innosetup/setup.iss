@@ -21,13 +21,21 @@
 #endif
 
 #ifdef ExePath
-        #define BuildDir AddBackslash(ExtractFilePath(ExePath))
+	#define BuildDir AddBackslash(ExtractFilePath(ExePath))
 #else
-        #error Use option /DExePath=path-to-exe
+	#error Use option /DExePath=path-to-exe
+#endif
+
+#if !FileExists(ExePath)
+	#error File not found: ExePath
 #endif
 
 #ifndef GuiExePath
-        #error Use option /DGuiExePath=path-to-exe
+	#error Use option /DGuiExePath=path-to-exe
+#endif
+
+#if !FileExists(GuiExePath)
+	#error File not found: GuiExePath
 #endif
 
 #ifndef VCToolsRedistInstallDir
@@ -68,9 +76,11 @@
 #if Platform == "arm64"
   #define ArchMode "arm64"
   #define VCRedistArch "ARM64"
-#else
+#elif Platform == "x64"
   #define ArchMode "x64os"
   #define VCRedistArch "x64"
+#else
+  #error Unsupported Platform (expected "x64" or "arm64")
 #endif
 
 [Setup]
@@ -94,10 +104,11 @@ OutputDir={#BuildDir}
 SolidCompression=yes
 DisableWelcomePage=no
 WizardSmallImageFile=48.bmp,64.bmp,128.bmp
-WizardImageFile=164.bmp,192.bmp
+WizardImageFile=164.bmp,192.bmp,256.bmp,384.bmp,512.bmp
 WizardImageAlphaFormat=defined
 WizardImageStretch=no
 UninstallDisplayIcon="{app}\{#AppExeName}"
+UninstallLogging=yes
 AlwaysRestart=yes
 CloseApplications=yes
 CloseApplicationsFilter=*.exe,*.dll
@@ -144,7 +155,7 @@ Source: {#BuildDir + "libusbip.pdb"}; DestDir: "{app}"; Components: pdb or sdk
 Source: {#BuildDir + "wusbip.exe"}; DestDir: "{app}"; Components: gui
 
 Source: {#VCToolsRedistInstallDir}{#VCToolsRedistExe}; DestDir: "{tmp}"; Flags: nocompression; Components: main
-Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: main
+Source: {#BuildDir + "package\*"}; DestDir: "{tmp}"; Components: client
 
 #if INSTALL_TEST_CERTIFICATE
   Source: {#CertFilePath}; DestDir: "{tmp}"; Components: main
@@ -159,18 +170,18 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Filename: {tmp}\{#VCToolsRedistExe}; Parameters: "/quiet /norestart"; Tasks: vcredist; StatusMsg: "Installing Microsoft Visual C++ Redistributable ({#VCRedistArch})..."
 
 #if INSTALL_TEST_CERTIFICATE
-  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden; StatusMsg: "Installing test certificate..."
+  Filename: {sys}\certutil.exe; Parameters: "-f -p ""{#CertPwd}"" -importPFX root ""{tmp}\{#CertFileName}"" FriendlyName=""{#CertName}"""; Flags: runhidden logoutput; StatusMsg: "Installing test certificate..."
 #endif
 
-Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden; Components: client; StatusMsg: "Installing upper filter driver..."
-Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden; Components: client; StatusMsg: "Installing UDE driver and virtual host controller..."
+Filename: {sys}\pnputil.exe; Parameters: "/add-driver ""{tmp}\{#FilterDriver}.inf"" /install"; Flags: runhidden logoutput; Components: client; StatusMsg: "Installing upper filter driver..."
+Filename: {app}\devnode.exe; Parameters: "install ""{tmp}\{#UdeDriver}.inf"" {#CLIENT_HWID}"; Flags: runhidden logoutput; Components: client; StatusMsg: "Installing UDE driver and virtual host controller..."
 
 [UninstallRun]
 
-Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden; Components: client; StatusMsg: "Removing virtual host controller device..."
+Filename: {app}\devnode.exe; Parameters: "remove {#CLIENT_HWID} root"; Flags: runhidden logoutput; Components: client; StatusMsg: "Removing virtual host controller device..."
 
 #if INSTALL_TEST_CERTIFICATE
-  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden; StatusMsg: "Removing test certificate..."
+  Filename: {sys}\certutil.exe; Parameters: "-f -delstore root ""{#CertName}"""; Flags: runhidden logoutput; StatusMsg: "Removing test certificate..."
 #endif
 
 [Code]
@@ -199,11 +210,11 @@ var
   Status: Integer;
 begin
   Result := False;
-  Info.Length := 8;
+  Info.Length := SizeOf(Info);
   Info.CodeIntegrityOptions := 0;
   RetLen := 0;
 
-  Status := NtQuerySystemInformation(SystemCodeIntegrityInformation, Info, 8, RetLen);
+  Status := NtQuerySystemInformation(SystemCodeIntegrityInformation, Info, SizeOf(Info), RetLen);
   if Status = 0 then
   begin
     Result := (Info.CodeIntegrityOptions and CODEINTEGRITY_OPTION_TESTSIGN) <> 0;
@@ -215,9 +226,9 @@ begin
 #ifdef TEST_SIGNED_DRIVERS
   result := IsTestSigningModeEnabled();
   if not result then
-    MsgBox('To use USBip, enable test-signed drivers to load.' #13#13
+    SuppressibleMsgBox('To use USBip, enable test-signed drivers to load.' #13#13
            'Run "Bcdedit.exe -set TESTSIGNING ON" as Administrator and reboot the PC.',
-            mbCriticalError, MB_OK);
+            mbCriticalError, MB_OK, IDOK);
 #else
   result := true;
 #endif
@@ -255,6 +266,7 @@ begin
     Principal.RunLevel := 0; // TASK_RUNLEVEL_LUA
 
     Settings := TaskDef.Settings;
+    Settings.MultipleInstancesPolicy := 1; // TASK_INSTANCES_IGNORE_NEW
     Settings.DisallowStartIfOnBatteries := False;
     Settings.StopIfGoingOnBatteries := False;
     Settings.AllowHardTerminate := True;
@@ -455,14 +467,14 @@ begin
       UninstPath := UninstStr;
   end;
 
-  UninstParams := '/SILENT /NORESTART /SUPPRESSMSGBOXES /_?="' + ExtractFilePath(UninstPath) + '"';
+  UninstParams := '/VERYSILENT /NORESTART /SUPPRESSMSGBOXES';
   Result := FileExists(UninstPath);
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): string;
 var
   UninstPath, UninstParams: String;
-  ExitCode: Integer;
+  ExitCode, I: Integer;
 begin
   Result := '';
   if GetInstalledUninstallString(UninstPath, UninstParams) then
@@ -471,7 +483,15 @@ begin
     if Exec(UninstPath, UninstParams, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
     begin
       if ExitCode = 0 then
-        Log('Installed package uninstall completed successfully')
+      begin
+        Log('Installed package uninstall completed successfully');
+        I := 0;
+        while FileExists(UninstPath) and (I < 20) do
+        begin
+          Sleep(100);
+          I := I + 1;
+        end;
+      end
       else
         Result := 'Failed to automatically uninstall the previous version of USBip (exit code ' + IntToStr(ExitCode) + '). ' +
                   'Please uninstall it manually before continuing.';
