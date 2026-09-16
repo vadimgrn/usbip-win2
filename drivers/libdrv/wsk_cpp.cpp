@@ -11,6 +11,7 @@
 namespace
 {
 
+using libdrv::sync_irp;
 const ULONG WSK_POOL_TAG = 'KSWV';
 
 const WSK_CLIENT_DISPATCH g_Dispatch{ MAKE_WSK_VERSION(1, 0) };
@@ -21,11 +22,6 @@ LONG g_init_flags;
 
 RTL_RUN_ONCE g_npi_once = RTL_RUN_ONCE_INIT;
 WSK_PROVIDER_NPI g_npi_prov;
-
-
-
-
-using irp_cls = libdrv::sync_irp;
 
 _Function_class_(RTL_RUN_ONCE_INIT_FN)
 _When_(Parameter, _IRQL_requires_(PASSIVE_LEVEL))
@@ -72,6 +68,34 @@ PAGED void ReleaseProviderNPI()
         }
 }
 
+class rundown_guard
+{
+public:
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        explicit rundown_guard(_Inout_ EX_RUNDOWN_REF &ref) :
+                m_ref(&ref),
+                m_acquired(ExAcquireRundownProtection(m_ref)) {}
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        ~rundown_guard()
+        {
+                if (m_acquired) {
+                        ExReleaseRundownProtection(m_ref);
+                }
+        }
+
+        rundown_guard(const rundown_guard&) = delete;
+        rundown_guard& operator=(const rundown_guard&) = delete;
+
+        constexpr explicit operator bool() const { return m_acquired; }
+
+private:
+        EX_RUNDOWN_REF *m_ref{};
+        bool m_acquired{};
+};
+
 } // namespace
 
 
@@ -79,9 +103,9 @@ struct wsk::SOCKET
 {
         WSK_SOCKET *Self;
 
-        irp_cls recv_irp; // recv/send can be called concurrently
-        irp_cls send_irp;
-        irp_cls misc_irp;
+        sync_irp recv_irp; // recv/send can be called concurrently
+        sync_irp send_irp;
+        sync_irp misc_irp;
 
         union { // shortcuts to Self->Dispatch
                 const WSK_PROVIDER_BASIC_DISPATCH *Basic;
@@ -91,38 +115,19 @@ struct wsk::SOCKET
                 const WSK_PROVIDER_STREAM_DISPATCH *Stream;
         };
 
-        using count_t = LONG64;
-
-        enum : count_t { // three highest bits are flags, lower bits comprise a counter
-                SIGN = count_t(1) << 63,
-                EVENT_SET_OFFSET = 62, EVENT_SET = count_t(1) << EVENT_SET_OFFSET,
-                CLOSING = count_t(1) << 61,
-                COUNT_MASK = ~(SIGN | EVENT_SET | CLOSING)
-        };
-
-        count_t invoke_cnt;
-        KEVENT can_close;
+        EX_RUNDOWN_REF rundown;
+        LONG is_closed;
 
         template<typename F, typename... Args>
-        auto invoke(F &&f, Args&&... args) 
+        NTSTATUS invoke(F &&f, Args&&... args) 
         {
-                NTSTATUS ret;
+                rundown_guard guard(rundown);
 
-                if (auto n = InterlockedIncrement64(&invoke_cnt); n & CLOSING) {
-                        ret = STATUS_NOT_SUPPORTED; // WSK callbacks do not complete IRP if this status is returned
-                } else {
-                        ret = f(args...);
-
-                        using R = decltype(f(args...)); // @see std::invoke_result
-                        static_assert(sizeof(R) == sizeof(ret)); // R must be NTSTATUS
+                if (!guard) [[unlikely]] {
+                        return STATUS_NOT_SUPPORTED;
                 }
 
-                if (InterlockedDecrement64(&invoke_cnt) == CLOSING && // count is zero, event is not set
-                    !InterlockedBitTestAndSet64(&invoke_cnt, EVENT_SET_OFFSET)) {
-                        NT_VERIFY(!KeSetEvent(&can_close, IO_NO_INCREMENT, false)); // once
-                }
-
-                return ret;
+                return f(static_cast<Args&&>(args)...);
         }
 };
 
@@ -140,7 +145,9 @@ auto alloc_socket(_Out_ SOCKET* &sock)
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
 
-        irp_cls* v[] = {
+        ExInitializeRundownProtection(&sock->rundown);
+
+        sync_irp* v[] = {
                 &sock->recv_irp,
                 &sock->send_irp,
                 &sock->misc_irp,
@@ -153,7 +160,6 @@ auto alloc_socket(_Out_ SOCKET* &sock)
                 }
         }
 
-        KeInitializeEvent(&sock->can_close, NotificationEvent, false);
         return STATUS_SUCCESS;
 }
 
@@ -182,7 +188,7 @@ PAGED auto transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _
         PAGED_CODE();
         NT_ASSERT(sock);
 
-        irp_cls *irp;
+        sync_irp *irp;
         PFN_WSK_SEND func; // the same as PFN_WSK_RECEIVE
 
         if (auto con = sock->Connection; send) {
@@ -200,29 +206,6 @@ PAGED auto transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _
 
         actual = NT_SUCCESS(st) ? (*irp)->IoStatus.Information : 0;
         return st;
-}
-
-_IRQL_requires_same_
-_IRQL_requires_max_(APC_LEVEL)
-PAGED auto wait_invokers(_Inout_ SOCKET &s)
-{
-        PAGED_CODE();
-
-        if (auto n = InterlockedOr64(&s.invoke_cnt, s.CLOSING); n & s.CLOSING) {
-                return STATUS_NOT_SUPPORTED; // must be called once
-        } else if (n) { // count is not zero
-                NT_ASSERT((n & s.COUNT_MASK) == n);
-                auto st = KeWaitForSingleObject(&s.can_close, Executive, KernelMode, false, nullptr);
-                if (st != STATUS_SUCCESS) { // NT_ERROR must not be used
-                        static_assert(NT_SUCCESS(STATUS_TIMEOUT));
-                        return st;
-                }
-        } else {
-                InterlockedBitTestAndSet64(&s.invoke_cnt, s.EVENT_SET_OFFSET); // do not set event, it's all over
-        }
-
-        NT_ASSERT(!(s.invoke_cnt & s.COUNT_MASK));
-        return STATUS_SUCCESS;
 }
 
 } // namespace
@@ -386,7 +369,7 @@ PAGED NTSTATUS wsk::control_client(
                                         OutputSize, OutputBuffer, OutputSizeReturned, nullptr);
         }
 
-        irp_cls irp;
+        sync_irp irp;
         if (!irp) {
                 return STATUS_INSUFFICIENT_RESOURCES;
         }
@@ -466,6 +449,15 @@ PAGED NTSTATUS wsk::event_callback_control(_In_ SOCKET *sock, _In_ ULONG EventMa
  * Before calling the WskCloseSocket function, a WSK application must ensure that there are no other 
  * function calls in progress to any of the socket's functions, including any extension functions, 
  * in any of the application's other threads.
+ *
+ * After ExWaitForRundownProtectionRelease returns, the shared object is in a run-down state. 
+ * If the driver is to delete the object, the driver typically calls the ExFreePool routine
+ * to free the memory that was allocated for the object. ExRundownCompleted is strictly required
+ * only if you plan to reinitialize and reuse EX_RUNDOWN_REF via ExReInitializeRundownProtection.
+ *
+ * Cache-aware run-down protection is not used. At peak load, at most two threads (1 sender + 1 receiver)
+ * ever touch sock->rundown concurrently for a given device. Two threads do not cause cache line bouncing
+ * or CPU stall cycles.
  * 
  * After this call, further calls must return STATUS_NOT_SUPPORTED.
  * @see SOCKET::invoke
@@ -480,9 +472,11 @@ PAGED NTSTATUS wsk::close(_In_ SOCKET *sock)
                 return STATUS_INVALID_PARAMETER;
         }
 
-        if (auto err = wait_invokers(*sock)) {
-                return err;
+        if (InterlockedExchange(&sock->is_closed, true)) {
+                return STATUS_NOT_SUPPORTED;
         }
+
+        ExWaitForRundownProtectionRelease(&sock->rundown); // ExRundownCompleted is not required
 
         auto &irp = sock->misc_irp;
         irp.reset();
