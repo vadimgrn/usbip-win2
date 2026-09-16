@@ -8,12 +8,16 @@
 /*
  * @see reactos\ntoskrnl\io\iomgr\iomdl.c
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 libdrv::Mdl::Mdl(_In_opt_ __drv_aliasesMem void *VirtualAddress, _In_ ULONG Length) :
         m_mdl(IoAllocateMdl(VirtualAddress, Length, false, false, nullptr)) {}
 
 /*
  * Impossible to build partial MDL for a chain, only for THIS SourceMdl.
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 libdrv::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_mdl(nullptr)
 {
         if (!SourceMdl) {
@@ -41,6 +45,8 @@ libdrv::Mdl::Mdl(_In_ MDL *SourceMdl, _In_ ULONG Offset, _In_ ULONG Length) : m_
         }
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 libdrv::Mdl::Mdl(_Inout_ Mdl&& m) :
         m_mdl(m.release()),
         m_mapped(m.m_mapped)
@@ -48,18 +54,24 @@ libdrv::Mdl::Mdl(_Inout_ Mdl&& m) :
         m.m_mapped = false;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 auto libdrv::Mdl::operator =(_Inout_ Mdl&& m) -> Mdl&
 {
         Mdl(static_cast<Mdl&&>(m)).swap(*this);
         return *this;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void libdrv::Mdl::swap(_Inout_ Mdl &other)
 {
         ::swap(m_mdl, other.m_mdl);
         ::swap(m_mapped, other.m_mapped);
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 MDL* libdrv::Mdl::release()
 {
         auto m = m_mdl;
@@ -67,6 +79,8 @@ MDL* libdrv::Mdl::release()
         return m;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void libdrv::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
 {
         if (m_mdl) {
@@ -79,6 +93,8 @@ void libdrv::Mdl::reset(_In_opt_ MDL *mdl, _In_ bool mapped)
         m_mapped = mapped;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS libdrv::Mdl::lock(_In_ LOCK_OPERATION Operation)
 {
         NT_ASSERT(KeGetCurrentIrql() <= DISPATCH_LEVEL); // nonpageable buffers may be locked at DISPATCH_LEVEL
@@ -98,6 +114,8 @@ NTSTATUS libdrv::Mdl::lock(_In_ LOCK_OPERATION Operation)
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void libdrv::Mdl::next(_In_opt_ MDL *m)
 { 
         if (m_mdl) {
@@ -106,6 +124,8 @@ void libdrv::Mdl::next(_In_opt_ MDL *m)
         }
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS libdrv::Mdl::prepare_nonpaged()
 {
         if (!m_mdl) {
@@ -126,6 +146,8 @@ NTSTATUS libdrv::Mdl::prepare_nonpaged()
         return STATUS_SUCCESS;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS libdrv::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
 {
         return m_mdl ? lock(Operation) : STATUS_INSUFFICIENT_RESOURCES;
@@ -142,6 +164,8 @@ NTSTATUS libdrv::Mdl::prepare_paged(_In_ LOCK_OPERATION Operation)
  * When the owner of the source MDL subsequently calls MmUnlockPages, it results in lock count underflow
  * and Driver Verifier bugchecks (0xC4/PFN_SHARE_COUNT).
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void libdrv::Mdl::unprepare()
 {
         if (!m_mdl) {
@@ -166,6 +190,8 @@ void libdrv::Mdl::unprepare()
  * Take ownership of unmapping if the system flag
  * flipped from false to true strictly during this call.
  */
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 void* libdrv::Mdl::sysaddr(_In_ ULONG Priority)
 { 
         if (!m_mdl) {
@@ -186,6 +212,8 @@ void* libdrv::Mdl::sysaddr(_In_ ULONG Priority)
         return addr;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 size_t libdrv::size(_In_opt_ const MDL *mdl)
 {
         size_t total = 0;
@@ -197,6 +225,8 @@ size_t libdrv::size(_In_opt_ const MDL *mdl)
         return total;
 }
 
+_IRQL_requires_same_
+_IRQL_requires_max_(DISPATCH_LEVEL)
 MDL *libdrv::tail(_In_opt_ MDL *mdl)
 {
         for ( ; mdl && mdl->Next; mdl = mdl->Next);
