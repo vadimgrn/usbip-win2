@@ -23,35 +23,6 @@ RTL_RUN_ONCE g_npi_once = RTL_RUN_ONCE_INIT;
 WSK_PROVIDER_NPI g_npi_prov;
 
 
-#if DBG
-
-class ConcurrencyCheck
-{
-public:
-        ConcurrencyCheck(_In_opt_ LONG64 *cnt) : m_cnt(cnt) {}
-
-        ~ConcurrencyCheck()
-        {
-                NT_ASSERT(!m_cnt || InterlockedIncrement64(m_cnt) == m_val + 1); // there were no concurrent calls
-        }
-
-        ConcurrencyCheck(const ConcurrencyCheck&) = delete;
-        ConcurrencyCheck& operator =(const ConcurrencyCheck&) = delete;
-
-private:
-        LONG64 *m_cnt{};
-        LONG64 m_val = m_cnt ? InterlockedIncrement64(m_cnt) : 0;
-};
-
-#else
-
-class ConcurrencyCheck
-{
-public:
-        ConcurrencyCheck(_In_opt_ LONG64*) {}
-};
-
-#endif // if DBG
 
 
 using irp_cls = libdrv::sync_irp;
@@ -122,10 +93,6 @@ struct wsk::SOCKET
 
         using count_t = LONG64;
 
-        count_t recv_cnt;
-        count_t sent_cnt;
-        count_t misc_cnt;
-
         enum : count_t { // three highest bits are flags, lower bits comprise a counter
                 SIGN = count_t(1) << 63,
                 EVENT_SET_OFFSET = 62, EVENT_SET = count_t(1) << EVENT_SET_OFFSET,
@@ -137,14 +104,13 @@ struct wsk::SOCKET
         KEVENT can_close;
 
         template<typename F, typename... Args>
-        auto invoke(count_t *cnt, F &&f, Args&&... args) 
+        auto invoke(F &&f, Args&&... args) 
         {
                 NTSTATUS ret;
 
                 if (auto n = InterlockedIncrement64(&invoke_cnt); n & CLOSING) {
                         ret = STATUS_NOT_SUPPORTED; // WSK callbacks do not complete IRP if this status is returned
                 } else {
-                        ConcurrencyCheck chk(cnt);
                         ret = f(args...);
 
                         using R = decltype(f(args...)); // @see std::invoke_result
@@ -217,22 +183,19 @@ PAGED auto transfer(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _
         NT_ASSERT(sock);
 
         irp_cls *irp;
-        SOCKET::count_t *cnt;
         PFN_WSK_SEND func; // the same as PFN_WSK_RECEIVE
 
         if (auto con = sock->Connection; send) {
                 irp = &sock->send_irp;
-                cnt = &sock->sent_cnt;
                 func = con->WskSend;
         } else {
                 irp = &sock->recv_irp;
-                cnt = &sock->recv_cnt;
                 func = con->WskReceive;
         }
 
         irp->reset();
 
-        auto st = sock->invoke(cnt, func, sock->Self, buffer, flags, irp->get());
+        auto st = sock->invoke(func, sock->Self, buffer, flags, irp->get());
         irp->wait_for_completion(st);
 
         actual = NT_SUCCESS(st) ? (*irp)->IoStatus.Information : 0;
@@ -269,19 +232,14 @@ _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::send(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
         NT_ASSERT(sock);
-        return sock->invoke(&sock->sent_cnt, sock->Connection->WskSend, sock->Self, buffer, flags, irp);
+        return sock->invoke(sock->Connection->WskSend, sock->Self, buffer, flags, irp);
 }
 
-/*
- * FIXME: 
- * recv_cnt is commented out because WSK thread has high priority and completion handler is called
- * before WSK function returns control.
- */
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::receive(_In_ SOCKET *sock, _In_ WSK_BUF *buffer, _In_ ULONG flags, _In_ IRP *irp)
 {
         NT_ASSERT(sock);
-        return sock->invoke(nullptr /*&sock->recv_cnt*/, sock->Connection->WskReceive, sock->Self, buffer, flags, irp);
+        return sock->invoke(sock->Connection->WskReceive, sock->Self, buffer, flags, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -470,8 +428,7 @@ PAGED NTSTATUS wsk::control(
                 irp.reset();
         }
 
-        auto st = sock->invoke(&sock->misc_cnt,
-                                sock->Basic->WskControlSocket, 
+        auto st = sock->invoke(sock->Basic->WskControlSocket, 
                                 sock->Self, RequestType, ControlCode, Level,
                                 InputSize, InputBuffer,
                                 OutputSize, OutputBuffer, OutputSizeReturned,
@@ -560,14 +517,14 @@ PAGED NTSTATUS wsk::bind(_In_ SOCKET *sock, _In_ SOCKADDR *LocalAddress)
         auto &irp = sock->misc_irp;
         irp.reset();
 
-        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskBind, sock->Self, LocalAddress, 0, irp.get());
+        auto st = sock->invoke(sock->Connection->WskBind, sock->Self, LocalAddress, 0, irp.get());
         return irp.wait_for_completion(st);
 }
 
 _IRQL_requires_max_(DISPATCH_LEVEL)
 NTSTATUS wsk::connect(_In_ SOCKET *sock, _In_ SOCKADDR *RemoteAddress, _In_ IRP *irp)
 {
-        return sock->invoke(nullptr, sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, irp);
+        return sock->invoke(sock->Connection->WskConnect, sock->Self, RemoteAddress, 0, irp);
 }
 
 _IRQL_requires_max_(APC_LEVEL)
@@ -578,7 +535,7 @@ PAGED NTSTATUS wsk::disconnect(_In_ SOCKET *sock, _In_opt_ WSK_BUF *buffer, _In_
         auto &irp = sock->misc_irp;
         irp.reset();
 
-        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskDisconnect, sock->Self, buffer, flags, irp.get());
+        auto st = sock->invoke(sock->Connection->WskDisconnect, sock->Self, buffer, flags, irp.get());
         return irp.wait_for_completion(st);
 }
 
@@ -590,7 +547,7 @@ PAGED NTSTATUS wsk::getlocaladdr(_In_ SOCKET *sock, _Out_ SOCKADDR *LocalAddress
         auto &irp = sock->misc_irp;
         irp.reset();
 
-        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskGetLocalAddress, sock->Self, LocalAddress, irp.get());
+        auto st = sock->invoke(sock->Connection->WskGetLocalAddress, sock->Self, LocalAddress, irp.get());
         return irp.wait_for_completion(st);
 }
 
@@ -602,7 +559,7 @@ PAGED NTSTATUS wsk::getremoteaddr(_In_ SOCKET *sock, _Out_ SOCKADDR *RemoteAddre
         auto &irp = sock->misc_irp;
         irp.reset();
 
-        auto st = sock->invoke(&sock->misc_cnt, sock->Connection->WskGetRemoteAddress, sock->Self, RemoteAddress, irp.get());
+        auto st = sock->invoke(sock->Connection->WskGetRemoteAddress, sock->Self, RemoteAddress, irp.get());
         return irp.wait_for_completion(st);
 }
 
