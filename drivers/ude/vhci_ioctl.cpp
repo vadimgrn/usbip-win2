@@ -87,7 +87,7 @@ workitem_ctx& workitem_ctx::operator=(workitem_ctx &&src)
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void set_args(
         _Inout_ irp_args &r, _In_ WDFREQUEST request,
         _In_ const char *function, _In_opt_ const ADDRINFOEXW *ai = nullptr)
@@ -270,7 +270,7 @@ PAGED void query_keepalive_parameters(_Inout_ int &idle, _Inout_ int &cnt, _Inou
                 st = WdfRegistryQueryULong(key.get(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
+                        Trace(TRACE_LEVEL_VERBOSE, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
                 } else if (val > MAXINT) {
                         Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) value %lu exceeds MAXINT(%d)",
                                                   &name, val, MAXINT);
@@ -304,7 +304,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
                 return st;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %Iu sec",
+        Trace(TRACE_LEVEL_VERBOSE, "get keepalive: idle(%d) + cnt(%d)*intvl(%d) => %I64u sec",
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
 
         query_keepalive_parameters(idle, cnt, intvl);
@@ -315,7 +315,7 @@ PAGED auto set_options(_In_ wsk::SOCKET *sock)
                 return st;
         }
 
-        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %Iu sec",
+        Trace(TRACE_LEVEL_VERBOSE, "set keepalive: idle(%d) + cnt(%d)*intvl(%d) => %I64u sec",
                 idle, cnt, intvl, keepalive(idle, cnt, intvl));
         
         return STATUS_SUCCESS;
@@ -513,7 +513,7 @@ PAGED auto on_connect(
 
 _Function_class_(EVT_WDF_WORKITEM)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void NTAPI complete(_In_ WDFWORKITEM wi)
 {
         PAGED_CODE();
@@ -911,10 +911,10 @@ PAGED auto get_persistent(_In_ WDFREQUEST request)
  * IRP_MJ_DEVICE_CONTROL
  * 
  * This is a public driver API. How to maintain its compatibility for libusbip users.
- * 1.IOCTLs are like syscals on Linux. Once IOCTL code is released, its input/output data remain 
+ * 1.IOCTLs are like syscalls on Linux. Once IOCTL code is released, its input/output data remain 
  *   the same for lifetime.
  * 2.If this is not possible, new IOCTL code must be added.
- * 3.IOCTL could be removed (unlike syscals) for various reasons. This will break backward compatibility.
+ * 3.IOCTL could be removed (unlike syscalls) for various reasons. This will break backward compatibility.
  *   It can be declared as deprecated in some release and removed afterwards. 
  *   The removed IOCTL code must never be reused.
  */

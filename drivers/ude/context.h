@@ -152,7 +152,7 @@ struct device_ctx
         WDFDPC request_completion_dpc;
 
         // statistics
-        UINT64 sent_requests; // were sent successfully
+        LONG64 sent_requests; // were sent successfully
         UINT64 cancelable_requests; // marked as
 
         union {
@@ -290,9 +290,13 @@ _IRQL_requires_same_
 _IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS init_device_attributes(_Inout_ device_attributes &attr, _In_ const vhci::imported_device_location &loc);
 
+/*
+ * Not PAGED: called by destroy_device_ctx_ext at DISPATCH_LEVEL.
+ * @see init_device_attributes
+ */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void free(_Inout_ device_attributes &r);
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void free(_Inout_ device_attributes &r);
 
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)

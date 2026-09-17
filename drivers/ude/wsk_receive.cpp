@@ -421,13 +421,11 @@ auto ret_submit_urb(_Inout_ wsk_context &ctx, _In_ const header_ret_submit &ret,
 
         TransferBufferLength = AsUrbTransfer(urb).TransferBufferLength; // ignore Length from UdecxUrbRetrieveBuffer
 
-        if (TransferBufferLength != static_cast<ULONG>(ret.actual_length)) { // prepare_wsk_mdl can set it
-		st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
-		UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
-                if (NT_ERROR(st)) {
-                        return st;
-                }
-	}
+        st = assign(TransferBufferLength, ret.actual_length); // DIR_OUT or !actual_length
+        if (NT_ERROR(st)) {
+                return st;
+        }
+        UdecxUrbSetBytesCompleted(ctx.request, TransferBufferLength);
 
         if (TransferBufferLength && is_transfer_dir_in(ctx.hdr)) { // TransferFlags can have wrong direction
                 if (wsk_events) {

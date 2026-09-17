@@ -117,11 +117,9 @@ _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
 void libdrv::FreeUnicodeString(_Inout_ UNICODE_STRING &s, _In_ ULONG pooltag)
 {
-        if (auto &b = s.Buffer) {
-                ExFreePoolWithTag(b, pooltag);
-                b = nullptr;
-                s.Length = 0;
-                s.MaximumLength = 0;
+        if (s.Buffer) {
+                ExFreePoolWithTag(s.Buffer, pooltag);
+                s = UNICODE_STRING{};
         }
 }
 

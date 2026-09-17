@@ -41,7 +41,7 @@ PAGED void vhci_cleanup(_In_ WDFOBJECT object)
         auto vhci = static_cast<WDFDEVICE>(object);
         auto &ctx = *get_vhci_ctx(vhci);
 
-        set_flag(ctx.removing); // used to set earlear
+        set_flag(ctx.removing); // used to set earlier
 
         if (auto t = ctx.target_self) {
                 WdfIoTargetClose(t);
@@ -115,7 +115,7 @@ PAGED auto query_usb_ports_cnt(_In_ int def_cnt)
                 st = WdfRegistryQueryULong(key.get(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
+                        Trace(TRACE_LEVEL_VERBOSE, "WdfRegistryQueryULong(%!USTR!) %!STATUS!", &name, st);
                 } else {
                         value = val;
                 }
@@ -291,7 +291,7 @@ PAGED void init_constants(
                 auto st = WdfRegistryQueryULong(key.get<WDFKEY>(), &name, &val);
 
                 if (NT_ERROR(st)) {
-                        Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &name, st);
+                        Trace(TRACE_LEVEL_VERBOSE, "WdfRegistryQueryULong('%!USTR!') %!STATUS!", &name, st);
                 } else {
                         value = static_cast<unsigned int>(val);
                 }
@@ -436,7 +436,7 @@ NTSTATUS query_usb_capability(
  */
 _Function_class_(EVT_WDF_DEVICE_D0_EXIT)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE TargetState)
 {
         PAGED_CODE();
@@ -449,7 +449,7 @@ PAGED NTSTATUS NTAPI vhci_d0_exit(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE Ta
  */
 _Function_class_(EVT_WDF_DEVICE_D0_ENTRY)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 /*PAGED*/ NTSTATUS NTAPI vhci_d0_entry(_In_ WDFDEVICE, _In_ WDF_POWER_DEVICE_STATE PreviousState)
 {
         PAGED_CODE();
@@ -463,7 +463,7 @@ _IRQL_requires_max_(PASSIVE_LEVEL)
  * EvtIoDefault, EvtIoDeviceControl, EvtIoInternalDeviceControl, EvtIoRead, EvtIoWrite.
  */
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
@@ -491,7 +491,7 @@ PAGED void purge_read_queue(_In_ WDFDEVICE vhci)
  */
 _Function_class_(EVT_WDF_DEVICE_QUERY_REMOVE)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
 {
         PAGED_CODE();
@@ -508,7 +508,7 @@ PAGED NTSTATUS vhci_query_remove(_In_ WDFDEVICE vhci)
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto create_collection(_Out_ WDFCOLLECTION &result, _In_ WDFOBJECT parent)
 {
         PAGED_CODE();
@@ -522,7 +522,7 @@ PAGED auto create_collection(_Out_ WDFCOLLECTION &result, _In_ WDFOBJECT parent)
 
 _Function_class_(EVT_WDF_DEVICE_FILE_CREATE)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void device_file_create(_In_ WDFDEVICE vhci, _In_ WDFREQUEST request, _In_ WDFFILEOBJECT fileobj)
 {
         PAGED_CODE();
@@ -545,7 +545,7 @@ PAGED void device_file_create(_In_ WDFDEVICE vhci, _In_ WDFREQUEST request, _In_
 
 _Function_class_(EVT_WDF_FILE_CLEANUP)
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void file_cleanup(_In_ WDFFILEOBJECT fileobj)
 {
         PAGED_CODE();
@@ -755,7 +755,7 @@ auto make_source_id(_In_ const void *ptr)
 }
 
 _IRQL_requires_same_
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED auto make_device_state(
         _In_ WDFOBJECT parent, _In_ const device_attributes &dev, _In_ int port, _In_ vhci::state state)
 {

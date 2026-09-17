@@ -80,7 +80,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
         if (!request) {
                 // nothing to do
         } else if (NT_SUCCESS(wsk_status)) {
-                ++dev.sent_requests;
+                InterlockedIncrement64(&dev.sent_requests);
                 auto st = device::on_send_complete(dev, request, seqnum, wsk_status);
                 if (NT_ERROR(st)) {
                         auto device = get_handle(&dev);
@@ -254,7 +254,8 @@ auto fill_usb_device_serial(
                 sd->bString[i] = ch;
         }
 
-        r.TransferBufferLength = usb_string_descr_size(static_cast<UCHAR>(cch)); // UdecxUrbSetBytesCompleted
+        r.TransferBufferLength = usb_string_descr_size(static_cast<UCHAR>(cch));
+        UdecxUrbSetBytesCompleted(request, r.TransferBufferLength);
         return STATUS_SUCCESS;
 }
 

@@ -54,7 +54,7 @@ constexpr auto to_udex_speed(_Out_ UDECX_USB_DEVICE_SPEED &result, usb_device_sp
 
 _Function_class_(EVT_WDF_DEVICE_CONTEXT_CLEANUP)
 _IRQL_requires_same_
-_IRQL_requires_max_(DISPATCH_LEVEL)
+_IRQL_requires_(PASSIVE_LEVEL)
 PAGED void device_cleanup(_In_ WDFOBJECT Object)
 {
         PAGED_CODE();
@@ -62,7 +62,7 @@ PAGED void device_cleanup(_In_ WDFOBJECT Object)
         auto device = static_cast<UDECXUSBDEVICE>(Object);
         auto &dev = *get_device_ctx(device);
 
-        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%!UINT64!) / sent(%!UINT64!) requests",
+        Trace(TRACE_LEVEL_INFORMATION, "dev %04x, cancelable(%I64u) / sent(%I64d) requests",
                 ptr04x(device), dev.cancelable_requests, dev.sent_requests);
 
         if (auto &h = dev.ctx_ext) { // the parent is vhci controller

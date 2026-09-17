@@ -379,7 +379,7 @@ WDFREQUEST usbip::device::find_sent_request(_Inout_ device_ctx &dev, _In_ seqnum
 }
 
 /*
- * Publish a terminal request/reqponse state. The device completion DPC performs
+ * Publish a terminal request/response state. The device completion DPC performs
  * the actual UDE completion after both response processing and WskSend are done.
  * @see Write a UDE client driver
  */

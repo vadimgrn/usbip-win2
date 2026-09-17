@@ -51,13 +51,15 @@ PAGED auto save_device_location(_Inout_ device_attributes &attr, _In_ const vhci
         return STATUS_SUCCESS;
 }
 
-_Function_class_(EVT_WDF_DEVICE_CONTEXT_DESTROY)
+/*
+ * Not PAGED: EvtDestroyCallback on a WDFMEMORY object can be invoked at
+ * DISPATCH_LEVEL if the object's reference count drops to zero at DISPATCH_LEVEL.
+ */
+_Function_class_(EVT_WDF_OBJECT_CONTEXT_DESTROY)
 _IRQL_requires_same_
 _IRQL_requires_max_(DISPATCH_LEVEL)
-PAGED void destroy_device_ctx_ext(_In_ WDFOBJECT object)
+void destroy_device_ctx_ext(_In_ WDFOBJECT object)
 {
-        PAGED_CODE();
-
         auto mem = static_cast<WDFMEMORY>(object);
         auto &ext = get_device_ctx_ext(mem);
 
@@ -189,15 +191,17 @@ PAGED NTSTATUS usbip::init_device_attributes(
         return st;
 }
 
-/**
- * @see init_device_attributes
+/*
+ * Not PAGED: called by destroy_device_ctx_ext, which can be invoked at
+ * DISPATCH_LEVEL if the WDFMEMORY object's reference count drops to zero at DISPATCH_LEVEL.
+ * Freeing pool memory via FreeUnicodeString is safe up to DISPATCH_LEVEL.
+ *
+ * @see init_device_attributes, destroy_device_ctx_ext
  */
 _IRQL_requires_same_
-_IRQL_requires_(PASSIVE_LEVEL)
-PAGED void usbip::free(_Inout_ device_attributes &r)
+_IRQL_requires_max_(DISPATCH_LEVEL)
+void usbip::free(_Inout_ device_attributes &r)
 {
-        PAGED_CODE();
-
         FreeUnicodeString(r.node_name, unique_ptr::pooltag); // @see RtlFreeUnicodeString
         FreeUnicodeString(r.service_name, unique_ptr::pooltag);
         FreeUnicodeString(r.busid, unique_ptr::pooltag);

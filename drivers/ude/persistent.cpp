@@ -142,7 +142,7 @@ PAGED auto get_persistent_devices(_In_ WDFKEY key)
 
         st = WdfRegistryQueryMultiString(key, &value_name, &str_attr, col.get<WDFCOLLECTION>());
         if (NT_ERROR(st)) {
-                Trace(TRACE_LEVEL_ERROR, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, st);
+                Trace(TRACE_LEVEL_VERBOSE, "WdfRegistryQueryMultiString('%!USTR!') %!STATUS!", &value_name, st);
                 col.reset();
         }
 
@@ -189,7 +189,7 @@ PAGED auto parse_flags(_Inout_ bool &wsk_events, _In_ const UNICODE_STRING &str)
                 return st;
         }
 
-        bool once; // ignore, does not make sence for persistent
+        bool once; // ignore, does not make sense for persistent
         unpack_attach_flags(once, wsk_events, val);
 
         return STATUS_SUCCESS;
@@ -543,7 +543,7 @@ PAGED void usbip::start_attach_attempts(
  * The request can be in undefined state (completing/completed), a BSOD can occur.
  *
  * The timer callback will be fired. If it calls WdfRequestSend, STATUS_CANCELLED
- * will be immetiately returned due to previosly called WdfRequestCancelSentRequest.
+ * will be immediately returned due to previously called WdfRequestCancelSentRequest.
  * WdfRequestReuse does not clear cancellation flag.
  *
  * If timer in system queue, its callback will delete cancelled request sooner or later.
@@ -667,7 +667,7 @@ object_delete usbip::create_request(_In_ WDFIOTARGET target, _In_ WDF_OBJECT_ATT
  * WskGetAddressInfo() can return STATUS_INTERNAL_ERROR(0xC00000E5), but after some delay it will succeed.
  * This can happen after reboot if dnscache(?) service is not ready yet.
  *
- * USBIP_ERROR_ST_DEV_BUSY is here because you call attach, it can fail and start attach attemtps.
+ * USBIP_ERROR_ST_DEV_BUSY is here because you call attach, it can fail and start attach attempts.
  * You call attach again, it can succeed, but background attach attempts will not be stopped.
  */
 _IRQL_requires_same_
