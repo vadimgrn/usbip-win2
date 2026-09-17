@@ -222,7 +222,9 @@ PAGED auto recv_payload(_Inout_ wsk_context &ctx, _In_ size_t length)
                 return st;
         }
 
-        return receive(ctx, buf);
+        st = receive(ctx, buf);
+        ctx.clear_mdl_next();
+        return st;
 }
 
 _IRQL_requires_same_
@@ -232,7 +234,7 @@ PAGED auto recv_usbip_header(_Inout_ wsk_context &ctx)
 	PAGED_CODE();
 
 	ctx.mdl_buf.reset();
-	ctx.mdl_hdr.next(nullptr);
+	ctx.clear_mdl_next();
 
 	WSK_BUF buf{ .Mdl = ctx.mdl_hdr.get(), .Length = sizeof(ctx.hdr) };
 

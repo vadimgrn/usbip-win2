@@ -44,6 +44,16 @@ struct wsk_context
         iso_packet_descriptor *isoc;
         ULONG isoc_alloc_cnt;
         bool is_isoc;
+
+        _IRQL_requires_same_
+        _IRQL_requires_max_(DISPATCH_LEVEL)
+        void clear_mdl_next()
+        {
+                mdl_hdr.next(nullptr);
+                mdl_buf.next(nullptr);
+                mdl_buf_tail.next(nullptr);
+                mdl_isoc.next(nullptr);
+        }
 };
 
 _IRQL_requires_same_

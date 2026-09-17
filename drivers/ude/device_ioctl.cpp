@@ -64,7 +64,7 @@ NTSTATUS send_complete(_In_ DEVICE_OBJECT*, _In_ IRP *wsk_irp, _In_reads_opt_(_I
          * WskSend is finished. Drop the partial MDL before publishing send completion:
          * it describes pages owned by the upper URB and does not lock them itself.
          */
-        ctx->mdl_hdr.next(nullptr);
+        ctx->clear_mdl_next();
         ctx->mdl_buf.reset();
 
         if (wsk_status == STATUS_FILE_FORCED_CLOSED && !get_flag(dev.unplugged)) {

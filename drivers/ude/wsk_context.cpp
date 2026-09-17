@@ -180,6 +180,7 @@ void usbip::free(_In_opt_ wsk_context *ctx, _In_ bool reuse_irp)
         }
 
         ctx->mdl_buf.reset();
+        ctx->clear_mdl_next();
 
         if (reuse_irp) {
                 IoReuseIrp(ctx->wsk_irp.get(), STATUS_SUCCESS);
