@@ -52,6 +52,11 @@ PAGED DEVICE_RELATIONS* clone_relations(_In_ const DEVICE_RELATIONS &src);
 
 _IRQL_requires_(PASSIVE_LEVEL)
 _IRQL_requires_same_
+PAGED DEVICE_RELATIONS* clone_relations_retry(
+        _In_ const DEVICE_RELATIONS &src, _In_ ULONG max_attempts = 3, _In_ LONGLONG delay_ms = 50);
+
+_IRQL_requires_(PASSIVE_LEVEL)
+_IRQL_requires_same_
 PAGED void destroy_relations(_Inout_ DEVICE_RELATIONS* &relations);
 
 _Function_class_(DRIVER_ADD_DEVICE)

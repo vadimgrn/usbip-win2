@@ -57,8 +57,11 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
 	NT_ASSERT(fltr.is_hub);
 	auto &previous = fltr.hub.previous;
 
-	auto next = r.Count ? clone_relations(r) : nullptr;
+	auto next = r.Count ? clone_relations_retry(r) : nullptr;
 	if (r.Count && !next) {
+		Trace(TRACE_LEVEL_ERROR, 
+		      "hub %04x: failed to allocate relations buffer for %lu PDOs; skipping FiDO attachment", 
+		      ptr04x(fltr.self), r.Count);
 		return;
 	}
 
@@ -72,7 +75,9 @@ PAGED void query_bus_relations(_Inout_ filter_ext &fltr, _In_ const DEVICE_RELAT
 
                         auto st = do_add_device(fltr.self->DriverObject, pdo, &fltr);
                         if (NT_ERROR(st)) {
-				Trace(TRACE_LEVEL_ERROR, "Failed to add a FiDO for PDO %04x, %!STATUS!", ptr04x(pdo), st);
+				Trace(TRACE_LEVEL_ERROR, 
+				      "Failed to add a FiDO for PDO %04x (%lu of %lu), %!STATUS! - device will lack URB fixup", 
+				      ptr04x(pdo), i + 1, r.Count, st);
 				ObDereferenceObject(next->Objects[i]);
 				continue;
 			}

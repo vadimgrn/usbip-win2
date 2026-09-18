@@ -12,6 +12,7 @@
 #include <usbip/consts.h>
 
 #include <ntstrsafe.h>
+#include <libdrv/timeout.h>
 
 using namespace usbip;
 using namespace libdrv;
@@ -154,6 +155,32 @@ PAGED DEVICE_RELATIONS* usbip::clone_relations(_In_ const DEVICE_RELATIONS &src)
 	}
 
 	return ptr.release<DEVICE_RELATIONS>();
+}
+
+_IRQL_requires_same_
+_IRQL_requires_(PASSIVE_LEVEL)
+PAGED DEVICE_RELATIONS* usbip::clone_relations_retry(
+	_In_ const DEVICE_RELATIONS &src, _In_ ULONG max_attempts, _In_ LONGLONG delay_ms)
+{
+        PAGED_CODE();
+
+        if (!max_attempts) {
+                return nullptr;
+        }
+
+        for (ULONG i = 1; ; ++i) {
+                if (auto ptr = clone_relations(src)) {
+                        return ptr;
+                }
+
+                if (i >= max_attempts) {
+                        Trace(TRACE_LEVEL_ERROR, "clone_relations failed after %lu attempts (%lu relations)", i, src.Count);
+                        return nullptr;
+                }
+
+                auto interval = wdm::make_timeout(delay_ms*wdm::msec, wdm::period::relative);
+                KeDelayExecutionThread(KernelMode, false, &interval);
+        }
 }
 
 _IRQL_requires_(PASSIVE_LEVEL)

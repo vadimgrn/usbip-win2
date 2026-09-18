@@ -267,6 +267,7 @@
     <ClInclude Include="usbdsc.h" />
     <ClInclude Include="pdu.h" />
     <ClInclude Include="strconv.h" />
+    <ClInclude Include="timeout.h" />
     <ClInclude Include="usbd_helper.h" />
     <ClInclude Include="usb_util.h" />
     <ClInclude Include="wdf_cpp.h" />
