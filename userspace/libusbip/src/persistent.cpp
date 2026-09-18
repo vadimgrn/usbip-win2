@@ -38,7 +38,7 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<pe
                 if (is_malformed(d)) {
                         libusbip::output("malformed persistent_device( hostname='{}', service='{}', "
                                          "busid='{}', serial='{}', wsk_events={}, once={} )",
-                                          dl.hostname, dl.service, dl.busid, d.serial, wsk_events, d.once);
+                                         dl.hostname, dl.service, dl.busid, d.serial, wsk_events, d.once);
 
                         return std::unexpected(ERROR_INVALID_PARAMETER);
                 }
@@ -63,6 +63,14 @@ std::expected<std::wstring, DWORD> devices_to_multi_sz(_In_ const std::vector<pe
         return multi_sz;
 }
 
+/*
+ * Format: hostname,service,busid,serial[,flags[,...]]
+ * Designed for forward and backward compatibility:
+ * - Backward compatibility: older entries with fewer fields (e.g. omitting flags)
+ *   retain default values; is_malformed() validates that required fields are present.
+ * - Forward compatibility: future entries with extra trailing comma-separated fields
+ *   are accepted; only known fields are parsed and remaining tokens are ignored.
+ */
 auto parse_persistent_device(_In_ const std::string &str)
 {
         std::optional<persistent_device> result(std::in_place);
@@ -90,7 +98,7 @@ auto parse_persistent_device(_In_ const std::string &str)
         }
 
         if (it != v.end()) {
-                std::string_view s((*it).begin(), str.end()); // remaining suffix
+                std::string_view s(*it++);
 
                 ULONG flags{};
                 auto [end, ec] = std::from_chars(s.data(), s.data() + s.size(), flags);
@@ -111,25 +119,31 @@ auto parse_persistent_device(_In_ const std::string &str)
 auto get_persistent_devices(_In_ HANDLE dev)
 {
         std::optional<std::wstring> val(std::in_place, 512, L'\0');
+        constexpr int max_attempts = 3;
 
-        for (DWORD BytesReturned{}; ; ) { // must be set if the last arg is NULL
+        for (int attempt = 0; attempt < max_attempts; ++attempt) {
 
                 auto bytes = std::span(*val).size_bytes();
 
+                DWORD BytesReturned{}; // must be set if the last arg is NULL
                 auto ok = DeviceIoControl(dev, vhci::ioctl::GET_PERSISTENT, nullptr, 0, 
                                           val->data(), static_cast<DWORD>(bytes), &BytesReturned, nullptr);
 
-                if (ok || GetLastError() == ERROR_MORE_DATA) { // WdfRegistryQueryValue -> STATUS_BUFFER_OVERFLOW
-                        val->resize(BytesReturned/sizeof(val->front()));
-                        if (ok) {
-                                break;
-                        }
+                auto cnt = BytesReturned/sizeof(val->front());
+
+                if (ok) {
+                        val->resize(cnt);
+                        return val;
+                }
+
+                if (GetLastError() == ERROR_MORE_DATA && BytesReturned > bytes) { // WdfRegistryQueryValue -> STATUS_BUFFER_OVERFLOW
+                        val->resize(cnt);
                 } else {
-                        val.reset();
                         break;
                 }
         }
 
+        val.reset();
         return val;
 }
 

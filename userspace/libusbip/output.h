@@ -17,8 +17,11 @@ namespace libusbip
  */
 using output_func_type = std::function<void(std::string)>;
 
-/*
+/**
  * Set a function if you want to get debug messages from the library.
+ * Must be called during single-threaded initialization prior to invoking other
+ * library functions. The callback itself must be thread-safe as debug messages
+ * may be emitted concurrently from multiple worker threads.
  */
 USBIP_API void set_debug_output(const output_func_type &f);
 

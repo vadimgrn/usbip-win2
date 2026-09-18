@@ -7,6 +7,11 @@
 #include <memory>
 #include <format>
 
+
+/*
+ * FormatMessageW appends trailing "\r\n" to system error messages,
+ * strip them to avoid unintended line breaks in structured log outputs.
+ */
 std::wstring usbip::wformat_message(
         _In_ DWORD flags, _In_opt_ HMODULE module, _In_ DWORD msg_id, _In_ DWORD lang_id)
 {
@@ -15,11 +20,12 @@ std::wstring usbip::wformat_message(
         flags |= FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | 
                  FORMAT_MESSAGE_MAX_WIDTH_MASK; // do not append '\n'
 
-        if (LPWSTR buf{}; auto cch = FormatMessageW(flags, module, msg_id, lang_id, (LPWSTR)&buf, 0, nullptr)) {
+        if (LPWSTR buf{}; auto cch = FormatMessage(flags, module, msg_id, lang_id, (LPWSTR)&buf, 0, nullptr)) {
                 std::unique_ptr<void, decltype(LocalFree)&> buf_ptr(buf, LocalFree);
                 msg.assign(buf, cch);
+                trim_right(msg);
         } else {
-                msg = std::format(L"FormatMessageW error {:#x}", GetLastError());
+                msg = std::format(L"FormatMessage error {:#x}", GetLastError());
         }
 
         return msg;

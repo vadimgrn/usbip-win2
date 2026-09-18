@@ -7,12 +7,23 @@
 #include "../dllspec.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 #include <expected>
 #include <optional>
 
 namespace usbip
 {
+
+/**
+ * Trims trailing characters (by default whitespace: space, tab, CR, LF).
+ */
+USBIP_API std::wstring_view trim_right(_In_ std::wstring_view s, _In_ std::wstring_view chars = L" \t\r\n") noexcept;
+USBIP_API std::string_view  trim_right(_In_ std::string_view s,  _In_ std::string_view chars = " \t\r\n") noexcept;
+
+USBIP_API std::wstring& trim_right(_Inout_ std::wstring &s, _In_ std::wstring_view chars = L" \t\r\n");
+USBIP_API std::string&  trim_right(_Inout_ std::string &s,  _In_ std::string_view chars = " \t\r\n");
+
 
 /**
  * @return value or result of GetLastError()

@@ -14,13 +14,13 @@ auto init_wsa() noexcept
         const BYTE MINOR = 2;
 
         WSADATA	wsaData;
-        if (auto err = WSAStartup(MAKEWORD(MINOR, MAJOR), &wsaData)) {
+        if (auto err = WSAStartup(MAKEWORD(MAJOR, MINOR), &wsaData)) {
                 SetLastError(err);
                 libusbip::output("WSAStartup version {}.{} error {:#x}", MAJOR, MINOR, err);
                 return false;
         }
 
-        if (!(LOBYTE(wsaData.wVersion) == MINOR && HIBYTE(wsaData.wVersion) == MAJOR)) {
+        if (!(LOBYTE(wsaData.wVersion) == MAJOR && HIBYTE(wsaData.wVersion) == MINOR)) {
                 libusbip::output("WinSock2 version {}.{} is not available", MAJOR, MINOR);
                 WSACleanup();
                 SetLastError(WSAEINVAL);
