@@ -239,8 +239,8 @@ auto win::FileVersion::operator =(FileVersion&& obj) noexcept -> FileVersion&
         return *this;
 }
 
-win::FileVersion::operator bool () const { return static_cast<bool>(*m_impl); }
-bool win::FileVersion::operator !() const { return !*m_impl; }
+win::FileVersion::operator bool () const { return m_impl && static_cast<bool>(*m_impl); }
+bool win::FileVersion::operator !() const { return !bool(*this); }
 
 DWORD win::FileVersion::SetFile(std::wstring_view path) { return m_impl->SetFile(path); }
 std::wstring win::FileVersion::VerLanguageName() const { return m_impl->VerLanguageName(); }

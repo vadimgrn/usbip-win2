@@ -52,17 +52,13 @@ int do_setsockopt(_In_ SOCKET s, _In_ int level, _In_ int optname, _In_ int optv
 			          level, optname, optval, err);
 		return err;
 	}
-	return 0;
+
+        return 0;
 }
 
 inline int set_nodelay(_In_ SOCKET s)
 {
 	return do_setsockopt(s, IPPROTO_TCP, TCP_NODELAY, true);
-}
-
-inline int set_ipv6only(_In_ SOCKET s, _In_ bool ipv6only)
-{
-	return do_setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, ipv6only);
 }
 
 int set_nonblock(_In_ SOCKET s, _In_ bool nonblock)
@@ -74,7 +70,8 @@ int set_nonblock(_In_ SOCKET s, _In_ bool nonblock)
 		libusbip::output("ioctlsocket(FIONBIO={}) error {}", nonblock, err);
 		return err;
 	}
-	return 0;
+
+        return 0;
 }
 
 /*
@@ -121,33 +118,33 @@ int set_options(_In_ SOCKET s)
 	return set_nodelay(s);
 }
 
-auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len, _Out_opt_ bool *eof = nullptr)
+auto recv(_In_ SOCKET s, _In_ void *buf, _In_ size_t len)
 {
 	assert(s != INVALID_SOCKET);
+	assert(len <= INT_MAX);
 
-	if (eof) {
-		*eof = false;
-	}
+	auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL);
 
-	switch (auto ret = ::recv(s, static_cast<char*>(buf), static_cast<int>(len), MSG_WAITALL)) {
-	case SOCKET_ERROR:
+        if (ret == SOCKET_ERROR) {
 		if (auto wsa = make_wsa_last_error(); wsa) {
 			libusbip::output("recv error {}", wsa.error);
 		}
 		return false;
-	case 0: // connection has been gracefully closed
-		if (len) {
-			set_last_error last(static_cast<DWORD>(WSAECONNRESET));
-			libusbip::output("recv EOF");
-			if (eof) {
-				*eof = true;
-			}
-			return false;
-		}
-		[[fallthrough]];
-	default:
-                return static_cast<size_t>(ret) == len;
 	}
+
+	if (static_cast<size_t>(ret) == len) {
+                return true;
+        }
+
+        set_last_error last(static_cast<DWORD>(WSAECONNRESET));
+
+        if (ret) {
+		libusbip::output("recv EOF: received {} of {} bytes", ret, len);
+	} else {
+		libusbip::output("recv EOF");
+	}
+
+        return false;
 }
 
 auto send(_In_ SOCKET s, _In_ const void *buf, _In_ size_t len)
@@ -207,7 +204,7 @@ auto recv_op_common(_In_ SOCKET s, _In_ uint16_t expected_code)
 	return op_status_error(static_cast<op_status_t>(r.status));
 }
 
-auto as_usb_device(_In_ const usbip_usb_device &d)
+constexpr auto as_usb_device(_In_ const usbip_usb_device &d)
 {
 	return usb_device {
 		.path = d.path,
@@ -232,6 +229,17 @@ auto as_usb_device(_In_ const usbip_usb_device &d)
 	};
 }
 
+constexpr auto as_usb_interface(_In_ const usbip_usb_interface &r)
+{
+        static_assert(sizeof(r) == sizeof(usb_interface));
+        return usb_interface {
+                .bInterfaceClass = r.bInterfaceClass,
+                .bInterfaceSubClass = r.bInterfaceSubClass,
+                .bInterfaceProtocol = r.bInterfaceProtocol,
+                .padding = r.padding,
+        };
+}
+
 /*
  * WSAEnumNetworkEvents is not used because SOCKET is new,
  * WSAEventSelect here is the first call for it.
@@ -253,12 +261,26 @@ int prepare_event(_In_ SOCKET s, _In_ WSAEVENT evt)
 	return 0;
 }
 
+auto check_cancelled(_In_opt_ HANDLE cancel_evt)
+{
+	if (cancel_evt && WaitForSingleObject(cancel_evt, 0) == WAIT_OBJECT_0) {
+		libusbip::output("connect cancelled");
+		return ERROR_CANCELLED;
+	}
+
+	return ERROR_SUCCESS;
+}
+
 int try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_opt_ HANDLE cancel_evt, _In_ const sockaddr &addr, _In_ DWORD len)
 {
+	if (auto err = check_cancelled(cancel_evt)) {
+		return err;
+	}
+
 	libusbip::output(L"connecting to {}", address_to_string(addr, len));
 
 	if (auto err = connect(s, &addr, len) ? WSAGetLastError() : 0; !err) {
-		return 0;
+		return check_cancelled(cancel_evt);
 	} else if (err != WSAEWOULDBLOCK) {
 		libusbip::output("connect error {}", err);
 		return err;
@@ -273,9 +295,10 @@ int try_connect(_In_ SOCKET s, _In_ WSAEVENT evt, _In_opt_ HANDLE cancel_evt, _I
 			if (WSANETWORKEVENTS net_events; WSAEnumNetworkEvents(s, evt, &net_events)) { // resets event if success
 				err = WSAGetLastError();
 				libusbip::output("WSAEnumNetworkEvents error {}", err);
-			} else {
-				assert(net_events.lNetworkEvents & FD_CONNECT);
+			} else if (net_events.lNetworkEvents & FD_CONNECT) {
 				err = net_events.iErrorCode[FD_CONNECT_BIT];
+			} else {
+				err = WSAECONNABORTED;
 			}
 			return err;
 		case WSA_WAIT_EVENT_0 + 1:
@@ -393,8 +416,8 @@ auto do_connect(
         _In_ const char *hostname, _In_ const char *service, _In_opt_ HANDLE cancel_event)
         -> std::expected<Socket, DWORD>
 {
-	if (cancel_event && WaitForSingleObject(cancel_event, 0) == WAIT_OBJECT_0) {
-		return std::unexpected(static_cast<DWORD>(ERROR_CANCELLED));
+	if (auto err = check_cancelled(cancel_event)) {
+		return std::unexpected(static_cast<DWORD>(err));
 	}
 
 	auto ai = resolve(hostname, service, cancel_event);
@@ -413,6 +436,11 @@ auto do_connect(
 	Socket sock;
 
 	for (auto r = ai->get(); r; r = r->ai_next) {
+
+		if (auto err = check_cancelled(cancel_event)) {
+			last_err = err;
+			break;
+		}
 
 		sock.reset(socket(r->ai_family, r->ai_socktype, r->ai_protocol));
 
@@ -530,12 +558,10 @@ bool usbip::enum_exportable_devices(
 
 		for (int j = 0; j < lib_dev.bNumInterfaces; ++j) {
 
-			usbip_usb_interface intf{};
-
-			if (recv(s, &intf, sizeof(intf))) {
+			if (usbip_usb_interface intf{}; recv(s, &intf, sizeof(intf))) {
 				byteswap(intf);
-				static_assert(sizeof(intf) == sizeof(usb_interface));
-				on_intf(i, lib_dev, j, reinterpret_cast<usb_interface&>(intf));
+				auto uintf = as_usb_interface(intf);
+				on_intf(i, lib_dev, j, uintf);
 			} else {
 				return false;
 			}

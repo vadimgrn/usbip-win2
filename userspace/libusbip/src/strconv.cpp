@@ -123,3 +123,27 @@ std::wstring usbip::make_multi_sz(_In_ const std::vector<std::wstring> &v)
         str += L'\0';
         return str;
 }
+
+std::wstring_view usbip::trim_right(_In_ std::wstring_view s, _In_ std::wstring_view chars) noexcept
+{
+        auto pos = s.find_last_not_of(chars);
+        return pos == std::wstring_view::npos ? std::wstring_view{} : s.substr(0, pos + 1);
+}
+
+std::string_view usbip::trim_right(_In_ std::string_view s, _In_ std::string_view chars) noexcept
+{
+        auto pos = s.find_last_not_of(chars);
+        return pos == std::string_view::npos ? std::string_view{} : s.substr(0, pos + 1);
+}
+
+std::wstring& usbip::trim_right(_Inout_ std::wstring &s, _In_ std::wstring_view chars)
+{
+        s.resize(trim_right(std::wstring_view(s), chars).size());
+        return s;
+}
+
+std::string& usbip::trim_right(_Inout_ std::string &s, _In_ std::string_view chars)
+{
+        s.resize(trim_right(std::string_view(s), chars).size());
+        return s;
+}
